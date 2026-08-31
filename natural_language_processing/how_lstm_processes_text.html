@@ -531,41 +531,38 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Discover how Long Short-Term Memory networks use a dual-state architecture to overcome the limitations of standard RNNs.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The Vanishing Gradient Problem</h3>
-                    <p>Standard Recurrent Neural Networks (RNNs) pass a single "hidden state" forward through time. While great in theory, standard RNNs suffer from the <strong>vanishing gradient problem</strong>. During training, as the network looks back across many time steps (long sentences), the signals necessary to update the weights become microscopically small.</p><p>The result? A standard RNN essentially develops "amnesia." By the time it reads the 20th word in a sentence, it has mostly forgotten the 1st word. This makes it terrible at understanding long-range dependencies in text.</p>
-                </div>
-                <div>
-                    <h3>The Dual State Solution: Cell and Hidden States</h3>
+                    <h3 id="vz-s-the-dual-state-solution-cell-and-hidden-states">The Dual State Solution: Cell and Hidden States</h3>
                     <p>LSTMs solve this amnesia by introducing a more complex internal structure that passes <strong>two</strong> distinct states forward at every time step (as seen in the visualization):</p><ol><li><strong style="color: var(--cell-state)">The Cell State ($C_t$):</strong> Often compared to a conveyor belt. It runs straight down the entire chain, with only minor linear interactions. It's very easy for information to flow along it unchanged. This is the LSTM's <em>long-term memory</em>.</li><li><strong style="color: var(--accent-primary)">The Hidden State ($H_t$):</strong> This is the LSTM's <em>short-term memory</em> or its "focus" for the current time step. It is derived from the Cell State and is what gets passed up as the output ($Y_t$) for that specific step.</li></ol>
                 </div>
                 <div>
-                    <h3>The Four Gates (Why so many parameters?)</h3>
+                    <h3 id="vz-s-the-four-gates-why-so-many-parameters">The Four Gates (Why so many parameters?)</h3>
                     <p>To control what gets added to or removed from the Cell State conveyor belt, the LSTM uses neural network layers called <strong>gates</strong>. Inside every single LSTM cell block shown in the visual, there are actually four separate fully-connected layers operating simultaneously:</p><ul><li><strong>Forget Gate ($f_t$):</strong> Decides what information to throw away from the past cell state.</li><li><strong>Input Gate ($i_t$):</strong> Decides which new values to update in the cell state.</li><li><strong>Cell Candidate ($\tilde{C}_t$):</strong> Creates a vector of new candidate values that could be added to the state.</li><li><strong>Output Gate ($o_t$):</strong> Decides what parts of the cell state to output as the new Hidden State ($H_t$).</li></ul><p>Because there are 4 independent layers doing calculations on the inputs ($X_t$) and previous hidden state ($H_{t-1}$), <strong>an LSTM has roughly 4 times as many parameters as a standard RNN</strong> of the same size. Click the <span class="font-bold border px-2 py-1 rounded text-xs" style="border-color: var(--accent-primary); color: var(--accent-primary)">Parameters</span> button to see the math.</p>
                 </div>
                 <div>
-                    <h3>Following a sentence through the cell</h3>
+                    <h3 id="vz-s-following-a-sentence-through-the-cell">Following a sentence through the cell</h3>
                     <p>Take "the film was not very good" and watch what an LSTM does with it, one token at a time.</p><p>At each step the cell receives the current word's embedding and its own two states from the previous step, computes four things from them, and produces new states.</p><div class="vz-table-wrap"><table><thead><tr><th>Step</th><th>Word</th><th>What the gates plausibly do</th></tr></thead><tbody><tr><td>1</td><td>the</td><td>Little to store; state stays near its initial value</td></tr><tr><td>2</td><td>film</td><td>Input gate opens on subject dimensions; "film" is the topic</td></tr><tr><td>3</td><td>was</td><td>Tense recorded; subject retained (forget gate near 1)</td></tr><tr><td>4</td><td>not</td><td>A negation dimension is set; this is the important step</td></tr><tr><td>5</td><td>very</td><td>Intensifier stored; negation retained</td></tr><tr><td>6</td><td>good</td><td>Candidate is strongly positive &mdash; and the negation dimension is still set</td></tr></tbody></table></div><p>The interesting step is 4. "Not" carries no sentiment on its own; its job is to invert what follows. A trained cell stores that in some dimension and keeps it (forget gate near 1) so that at step 6 the positive candidate for "good" is combined with an active negation signal.</p><p>That is what a bag-of-words model cannot do: to it, this sentence contains "good" and is therefore positive.</p>
                 </div>
                 <div>
-                    <h3>Four computations per step</h3>
+                    <h3 id="vz-s-four-computations-per-step">Four computations per step</h3>
                     <p class="mono-font">f&#7511; = &sigma;(W&#7584;[h&#7511;&#8331;&#8321;, x&#7511;])&nbsp;&nbsp;&nbsp;i&#7511; = &sigma;(W&#7522;[h&#7511;&#8331;&#8321;, x&#7511;])</p>
 <p class="mono-font">g&#7511; = tanh(W&#7509;[h&#7511;&#8331;&#8321;, x&#7511;])&nbsp;&nbsp;o&#7511; = &sigma;(W&#8338;[h&#7511;&#8331;&#8321;, x&#7511;])</p>
 <p class="mono-font">c&#7511; = f&#7511; &#8857; c&#7511;&#8331;&#8321; + i&#7511; &#8857; g&#7511;&nbsp;&nbsp;&nbsp;&nbsp;h&#7511; = o&#7511; &#8857; tanh(c&#7511;)</p><p>All four transformations take the same input and are computed as a single fused matrix multiplication in practice, then split.</p><p>The two states do different jobs. The <strong>cell state</strong> is long-term memory, updated additively so information can persist for many steps. The <strong>hidden state</strong> is the working output &mdash; passed to the next layer, to the prediction head, and to the next step's gate computations.</p>
                 </div>
                 <div>
-                    <h3>What comes out, and what you use</h3>
+                    <h3 id="vz-s-what-comes-out-and-what-you-use">What comes out, and what you use</h3>
                     <p>For a 20-word sentence, a single-layer LSTM with 256 hidden units produces a 20&times;256 tensor: one hidden state per word.</p><p>Which part you use depends on the task:</p><p><strong>Classification.</strong> The final hidden state summarises the whole sentence &mdash; or better, pool over all states with a mean or max, since the final state is biased towards the end of the input.</p><p><strong>Tagging</strong> (named entities, part of speech). Use every hidden state, one prediction per word.</p><p><strong>Generation.</strong> Feed each hidden state to an output layer over the vocabulary, and the predicted token becomes the next step's input.</p><p><strong>As an encoder.</strong> The final state (or all states, with attention) is passed to a decoder.</p><pre><code class="language-python">lstm = nn.LSTM(300, 256, batch_first=True)
 out, (h, c) = lstm(embedded)      # out: (batch, seq, 256)
 
 pooled = out.mean(dim=1)          # better than h[-1] for classification</code></pre>
                 </div>
                 <div>
-                    <h3>Interactive Exploration</h3>
+                    <h3 id="vz-s-interactive-exploration">Interactive Exploration</h3>
                     <ul><li><strong>Run the Simulation:</strong> Watch the blue data ($X_t$) enter the cell, merge with the past states, and then split into the Cyan conveyor belt ($C_t$) and the Green focus state ($H_t$).</li><li><strong>Check Many-to-One vs Many-to-Many:</strong> In Many-to-One (like Sentiment Analysis), only the final $H_t$ is pushed up to the classifier to make the final $Y$ decision. In Many-to-Many (like Language Translation or Text Generation), an output is generated at every step.</li></ul>
                 </div>
                 <div>
-                    <h3>Details that matter with real text</h3>
+                    <h3 id="vz-s-details-that-matter-with-real-text">Details that matter with real text</h3>
                     <p><strong>Pack variable-length sequences.</strong> Sentences in a batch have different lengths, so short ones are padded. Without <code>pack_padded_sequence</code>, the LSTM processes the padding, and the final hidden state describes the padding rather than the last real word.</p><pre><code class="language-python">from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 packed = pack_padded_sequence(embedded, lengths, batch_first=True,
@@ -574,15 +571,15 @@ out, (h, c) = lstm(packed)
 out, _ = pad_packed_sequence(out, batch_first=True)</code></pre><p><strong>Consider bidirectionality.</strong> For classification and tagging, where the whole sentence is available, running one LSTM forward and another backward and concatenating gives each position both left and right context. It typically helps materially. Never use it for generation or streaming, where the future does not exist.</p><p><strong>Clip gradients.</strong> <code>clip_grad_norm_</code> with a threshold of 1&ndash;5. Recurrent models are the classic case for it, and omitting it eventually produces a <code>NaN</code> run.</p><p><strong>Keep it shallow.</strong> One or two layers. Deep recurrent stacks are hard to train and rarely repay the cost.</p>
                 </div>
                 <div>
-                    <h3>Where it beats and loses to a transformer</h3>
+                    <h3 id="vz-s-where-it-beats-and-loses-to-a-transformer">Where it beats and loses to a transformer</h3>
                     <p><strong>An LSTM wins</strong> when memory must be bounded &mdash; streaming inference carries one fixed-size state regardless of how much text has passed, while a transformer's KV cache grows with every token. It also wins on small datasets, where its inductive bias helps and a transformer trained from scratch overfits, and on-device, where it is small and needs no attention kernels.</p><p><strong>A transformer wins</strong> on long-range dependencies (any two positions are one step apart), on parallelism (all positions computed at once, so training scales), and consequently on anything requiring scale.</p><div class="vz-table-wrap"><table><thead><tr><th>Task</th><th>Reasonable choice</th></tr></thead><tbody><tr><td>Sentiment on a few thousand labelled reviews</td><td>LSTM, or a fine-tuned small transformer</td></tr><tr><td>Streaming transcription with bounded memory</td><td>LSTM</td></tr><tr><td>Document-level question answering</td><td>Transformer</td></tr><tr><td>On-device text classification</td><td>LSTM or a distilled transformer</td></tr><tr><td>Anything generative at quality</td><td>Transformer</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>Does an LSTM read left to right?</strong> Yes, unless bidirectional, in which case a second pass reads right to left and the outputs are concatenated.</p><p><strong>Should I use the last hidden state or pool?</strong> Pool, for classification &mdash; the last state over-weights the end of the sequence.</p><p><strong>How long a text can it handle?</strong> Hundreds of tokens reliably. Beyond that, information from the start is largely gone.</p><p><strong>Do I need embeddings before the LSTM?</strong> Yes &mdash; token ids must become vectors first, either from a learned embedding layer or pretrained vectors.</p><p><strong>Why is my final hidden state meaningless?</strong> Almost certainly unpacked padding: the state describes the pad tokens.</p><p><strong>One layer or two?</strong> Two at most for most tasks; the second sometimes helps and often does not.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>At each token the cell computes four transformations, updates the cell state additively, and emits a gated hidden state.</li><li>The cell state carries long-term memory; the hidden state is the working output at each step.</li><li>"Not ... good" is the canonical demonstration: the negation is stored and applied several steps later.</li><li>Pool over hidden states for classification; use all of them for tagging.</li><li>Pack variable-length batches, clip gradients, keep it shallow, and consider bidirectionality when the whole input is available.</li></ul>
                 </div>
             </div>

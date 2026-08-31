@@ -244,21 +244,18 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Half the sentence is a subject. Half of it is a WHERE clause.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The idea in brief</h3>
-                    <p>Similarity search compares meaning, and that is all it does. Ask it for "papers about attention published after 2020" and the words <em>published after 2020</em> are treated as more subject matter to match, not as a rule to enforce. A 2017 paper that is squarely about attention will score well and be returned, because nothing in a cosine score knows what a year is.</p>
-                </div>
-                <div>
-                    <h3>Two questions in one sentence</h3>
+                    <h3 id="vz-s-two-questions-in-one-sentence">Two questions in one sentence</h3>
                     <p>A self-query retriever hands the sentence to an LLM along with a description of the metadata each document carries, and asks it to return two things: the <strong>semantic query</strong> &mdash; the part that should be embedded and compared &mdash; and a <strong>structured filter</strong> over the metadata, in the form of real comparisons like <code>year &gt; 2020</code>. The filter runs first as an ordinary database-style predicate; similarity then ranks only the documents that survived it. The constraint becomes a guarantee rather than a hint.</p>
                 </div>
                 <div>
-                    <h3>Turning a question into a filter plus a search</h3>
+                    <h3 id="vz-s-turning-a-question-into-a-filter-plus-a-search">Turning a question into a filter plus a search</h3>
                     <p>Many questions contain two different kinds of requirement, and a plain vector search can only handle one of them.</p><blockquote>"What did the 2023 security reports say about phishing?"</blockquote><p>"Phishing" is a <strong>semantic</strong> requirement &mdash; find passages about it. "2023" and "security reports" are <strong>structured</strong> requirements &mdash; filter on a date field and a document-type field.</p><p>Embedding the whole question and searching gives poor results: the year and the document type become part of a blended vector, so documents from 2019 with the word "2023" in the body may rank above the right ones.</p><p>A self-query retriever uses a language model to split the question:</p><p class="mono-font">"What did the 2023 security reports say about phishing?"</p>
 <p class="mono-font">&rarr; query: "phishing" &nbsp;+&nbsp; filter: year = 2023 AND type = "security_report"</p><p>Then it runs a filtered vector search: the filter constrains the candidate set, and the semantic query orders what remains.</p>
                 </div>
                 <div>
-                    <h3>What it needs to work</h3>
+                    <h3 id="vz-s-what-it-needs-to-work">What it needs to work</h3>
                     <p>Two things, and the first is the part that is easy to under-invest in.</p><p><strong>Metadata on every document, populated at indexing time.</strong> The filter can only reference fields that exist. Adding a date field later means re-indexing.</p><p><strong>A schema description given to the model,</strong> so it knows which fields exist and what values they take:</p><pre><code class="language-python">metadata_fields = [
     {&quot;name&quot;: &quot;year&quot;, &quot;type&quot;: &quot;integer&quot;, &quot;description&quot;: &quot;Publication year&quot;},
     {&quot;name&quot;: &quot;doc_type&quot;, &quot;type&quot;: &quot;string&quot;,
@@ -268,7 +265,7 @@
 ]</code></pre><p>The model is prompted with that schema and the user's question, and asked to return a structured object with a query string and a filter expression. Constraining the output to a JSON schema is worth doing &mdash; it converts a class of malformed-filter failures into a validation error.</p>
                 </div>
                 <div>
-                    <h3>The failure modes</h3>
+                    <h3 id="vz-s-the-failure-modes">The failure modes</h3>
                     <p>This is a language model producing a filter, so it fails in language-model ways, and each failure needs a specific guard.</p><p><strong>Invented field names.</strong> The model filters on <code>publication_date</code> when the schema says <code>year</code>. Validate the filter against the schema and drop or repair unknown fields.</p><p><strong>Invented values.</strong> A filter for <code>doc_type = "reports"</code> when the actual value is <code>"report"</code>. Enumerate allowed values in the schema, and fuzzy-match or reject.</p><p><strong>Over-filtering.</strong> The model adds a constraint the user did not intend, and the result set is empty. The standard remedy is to <strong>fall back to an unfiltered search</strong> when the filtered one returns nothing, and to say so in the response.</p><p><strong>Under-filtering.</strong> The model ignores a constraint the user did state, and irrelevant results come back. Harder to detect automatically; it shows up in evaluation.</p><p><strong>Latency.</strong> An extra model call before retrieval begins, adding several hundred milliseconds. Cache the parse for repeated queries.</p><p>The practical shape that results:</p><pre><code class="language-python">parsed = parse_query(question, schema)          # LLM call
 parsed.filter = validate(parsed.filter, schema) # drop unknown fields/values
 
@@ -277,27 +274,27 @@ if not results:
     results = index.search(parsed.query, k=10)  # graceful degradation</code></pre>
                 </div>
                 <div>
-                    <h3>Exploration guide</h3>
-                    <ol><li><strong>Read the parse for the first query.</strong> Note what was removed from the semantic half: only <em>attention</em> is left to match on, because the date has become a filter instead.</li><li><strong>Turn the filter off.</strong> This is plain similarity search over everything. A 2017 paper takes the top spot &mdash; it is genuinely the best match for "attention", and it breaks the constraint the reader stated.</li><li><strong>Turn it back on.</strong> The 2017 paper is struck out with the reason it failed, and the top result is now both about attention and inside the requested date range.</li><li><strong>Try "short surveys on retrieval".</strong> Two constraints this time, on different fields and different types &mdash; a number and a category &mdash; combined with AND.</li><li><strong>Try "anything about attention".</strong> No constraint in the sentence, so the filter is empty and the retriever degrades gracefully into ordinary similarity search.</li></ol>
+                    <h3 id="vz-s-exploration-guide">Exploration guide</h3>
+                    <ol><li><strong>Read the parse for the first query.</strong> Note what was removed from the semantic half: only <em>attention</em> is left to match on, because the date has become a filter instead.</li><li><strong>Turn the filter off.</strong> This is plain similarity search over everything. A 2017 paper takes the top spot &mdash; it is genuinely the best match for "attention", and it breaks the constraint the reader stated.</li><li><strong>Turn it back on.</strong> The 2017 paper is struck out with the reason it failed, and the top result is now both about attention and inside the requested date range.</li><li><strong>Try "short surveys on retrieval".</strong> Two constraints this time, on different fields and different types &mdash; a number and a category &mdash; combined with AND.<button class="vz-run" type="button" data-vz-run="0" aria-label="Run this experiment in the visualisation: Try &quot;short surveys on retrieval&quot;"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Try "anything about attention".</strong> No constraint in the sentence, so the filter is empty and the retriever degrades gracefully into ordinary similarity search.<button class="vz-run" type="button" data-vz-run="1" aria-label="Run this experiment in the visualisation: Try &quot;anything about attention&quot;"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li></ol>
                 </div>
                 <div>
-                    <h3>The short of it</h3>
+                    <h3 id="vz-s-the-short-of-it">The short of it</h3>
                     <p>Embeddings compare meaning and cannot enforce a rule, so any constraint left inside the query text is at best a weak hint. Self-querying separates the sentence into the part worth embedding and the part worth executing as a filter, which turns "after 2020" from a phrase competing for cosine similarity into a predicate that simply removes the documents that fail it. The trade is an extra LLM call before retrieval, and a hard dependency on documents actually carrying the metadata the filter names.</p>
                 </div>
                 <div>
-                    <h3>Where it earns its place</h3>
+                    <h3 id="vz-s-where-it-earns-its-place">Where it earns its place</h3>
                     <p><strong>Time-bounded questions.</strong> "Last quarter", "since the policy changed", "in 2023". Dates are exactly the kind of constraint embeddings handle badly and filters handle perfectly.</p><p><strong>Faceted corpora.</strong> Documents with meaningful categories &mdash; department, product line, region, document type, author. Users naturally phrase questions that reference them.</p><p><strong>Numeric constraints.</strong> "Products under &pound;50", "incidents affecting more than 100 users". A vector search cannot express an inequality.</p><p><strong>Mixed catalogues.</strong> E-commerce is the canonical case: "waterproof jacket under &pound;80 in medium" is one semantic term and three filters.</p><p>Where it is unnecessary: a homogeneous corpus with no meaningful metadata, or an interface where the user already selects filters in the UI. If the filters are available as controls, use the controls &mdash; they are free and cannot be hallucinated.</p>
                 </div>
                 <div>
-                    <h3>Related retrieval strategies</h3>
+                    <h3 id="vz-s-related-retrieval-strategies">Related retrieval strategies</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Strategy</th><th>What it adds</th></tr></thead><tbody><tr><td>Self-query</td><td>Extracts filters from the question</td></tr><tr><td>Multi-query</td><td>Rewrites the question several ways and unions the results</td></tr><tr><td>HyDE</td><td>Generates a hypothetical answer and searches with that</td></tr><tr><td>Parent document</td><td>Retrieves small, returns large</td></tr><tr><td>Reranking</td><td>Reorders candidates with a cross-encoder</td></tr></tbody></table></div><p>These compose. A realistic pipeline: self-query to extract filters, multi-query to broaden the semantic search, hybrid retrieval over the filtered set, reciprocal rank fusion, then a cross-encoder rerank.</p><p>Each stage adds latency, so the order to add them in is by measured benefit. In most systems, hybrid search and reranking are the largest gains; self-query matters specifically when the corpus has metadata users refer to.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>Does it need a large model?</strong> No &mdash; extracting a filter from a question is a small structured task, and a fast, cheap model handles it well. Use structured output constraints.</p><p><strong>What if the model produces an invalid filter?</strong> Validate against the schema and fall back to an unfiltered search. Never pass an unvalidated filter to the store.</p><p><strong>How much latency does it add?</strong> One model call, typically 200&ndash;600ms. Cache by query text.</p><p><strong>Can I use it without a vector database?</strong> The filtering needs a store that supports metadata predicates. Most do; plain in-memory vector arrays generally do not.</p><p><strong>Should filters be hard or soft?</strong> Hard for correctness constraints such as permissions and dates. Consider soft (a score boost) for preferences, where over-filtering to zero results is worse than imperfect ordering.</p><p><strong>Does it replace hybrid search?</strong> No &mdash; it constrains the candidate set. Hybrid search still decides the ordering within it.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>Questions often mix a semantic requirement with structured constraints; embeddings handle only the first.</li><li>A model parses the question into a query string plus a metadata filter, which is then applied at search time.</li><li>It requires metadata populated at indexing time and a schema description in the prompt.</li><li>Validate the generated filter against the schema, and fall back to unfiltered search when it returns nothing.</li><li>Most valuable for dates, numeric constraints and faceted corpora; unnecessary when the UI already offers filters.</li></ul>
                 </div>
             </div>

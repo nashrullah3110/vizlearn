@@ -290,32 +290,29 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">What does a vector database index actually do, and why can&#x27;t it just compare every vector?</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Why exact search stops working</h3>
-                    <p>A flat index stores the vectors and compares the query with every one. It is exact, trivially correct, and the right answer for small collections &mdash; and the cost is O(n&middot;d) per query, so a million 768-dimensional vectors is around 768 million multiply-adds for a single search.</p><p>It is also the ground truth. To measure any approximate index's recall you need the true neighbours, and a flat search over a sample is how you get them.</p>
-                </div>
-                <div>
-                    <h3>What an index buys and what it costs</h3>
+                    <h3 id="vz-s-what-an-index-buys-and-what-it-costs">What an index buys and what it costs</h3>
                     <p>Every approximate index prunes: it organises vectors so that most can be skipped without being compared. That turns a linear scan into something closer to logarithmic, and introduces the possibility of missing a genuine neighbour because the structure routed the search elsewhere.</p><p>So the metric is <strong>recall@k</strong>: of the k true nearest neighbours, how many did the index return? 0.95 is typical and usually fine for RAG, where a reranker sees the top 50 anyway. It is not fine for deduplication or exact matching.</p>
                 </div>
                 <div>
-                    <h3>The families, briefly</h3>
+                    <h3 id="vz-s-the-families-briefly">The families, briefly</h3>
                     <p><strong>IVF</strong> clusters the vectors and searches only the nearest few clusters. Cheap to build, and it misses neighbours that sit just across a cluster boundary.</p><p><strong>HNSW</strong> builds a navigable small-world graph and walks it greedily. Best recall-for-latency, and the highest memory &mdash; it stores the graph as well as the vectors. This is the default in most vector databases; see <a href="ann_indexing_hnsw_and_ivf.html">ANN indexing</a>.</p><p><strong>Product quantization</strong> compresses each vector into a short code, cutting memory by an order of magnitude at some cost to recall. Usually combined with IVF rather than used alone.</p><p>Also note what an index does <em>not</em> do: filtering by metadata is a separate problem, and combining it with vector search is where most vector databases differ from each other &mdash; see <a href="permission_filtering_in_rag.html">permission filtering</a>.</p>
                 </div>
                 <div>
-                    <h3>Measuring recall, which needs a ground truth</h3>
+                    <h3 id="vz-s-measuring-recall-which-needs-a-ground-truth">Measuring recall, which needs a ground truth</h3>
                     <p>An approximate index is a lossy structure, so "is it working?" is a measurement rather than an assumption. The measurement needs the true answers, which means a flat exact search over a sample &mdash; typically a few hundred held-out queries, run once, stored.</p><p>Then recall@k is the overlap between what the index returned and what the exact search returned. Track it as a deployment check: an index rebuilt with different parameters, or a library upgraded, can quietly lose recall while every latency dashboard stays green.</p><p>What counts as good depends on what sits downstream. For RAG feeding a reranker that sees the top 50, 0.9 is comfortable &mdash; a missed neighbour at rank 40 changes nothing. For deduplication, near-duplicate detection or anything where a miss is a correctness bug rather than a quality one, approximate search is the wrong tool and a flat index over a filtered subset is usually fast enough.</p>
                 </div>
                 <div>
-                    <h3>Filtering, updates and the parts that are not the ANN algorithm</h3>
+                    <h3 id="vz-s-filtering-updates-and-the-parts-that-are-not-the">Filtering, updates and the parts that are not the ANN algorithm</h3>
                     <p>Two problems decide most real vector-database choices, and neither is about nearest-neighbour search.</p><p><strong>Metadata filtering.</strong> Restricting to a tenant, a date range or a permission set fights the index, because the graph or the clustering was built over everything. Pre-filtering can disconnect a graph traversal; post-filtering silently returns fewer results. How a database handles this is the main thing that distinguishes them &mdash; see <a href="permission_filtering_in_rag.html">permission filtering</a>.</p><p><strong>Updates and deletes.</strong> HNSW does not delete gracefully: removing a node can disconnect the graph, so implementations tombstone and rebuild periodically. If your corpus changes hourly, the rebuild cost may matter more than query latency, and IVF's cheaper updates start to look attractive despite worse recall-for-latency.</p><p>Benchmarks almost always measure static-corpus query performance, which is the easy half.</p>
                 </div>
                 <div>
-                    <h3>What a vector database stores</h3>
+                    <h3 id="vz-s-what-a-vector-database-stores">What a vector database stores</h3>
                     <p>Three things per record, and all three matter:</p><p><strong>The vector</strong> &mdash; the embedding, typically 384 to 1,536 floats.</p><p><strong>The payload</strong> &mdash; the text itself, or a reference to it, so the retrieved chunk can be put in a prompt.</p><p><strong>The metadata</strong> &mdash; source, date, document type, permissions, heading path. This is what makes filtering possible, and it must be populated at indexing time; adding a field later means re-indexing.</p><p>The index is the structure built over the vectors so that a nearest-neighbour query does not have to compare against all of them. Everything else the database provides &mdash; persistence, filtering, updates, replication &mdash; is why you use one rather than a NumPy array.</p>
                 </div>
                 <div>
-                    <h3>The indexing pipeline</h3>
+                    <h3 id="vz-s-the-indexing-pipeline">The indexing pipeline</h3>
                     <pre><code class="language-python">for doc in documents:
     chunks = chunk(doc)                                   # 1. split
     vecs = model.encode([c.text for c in chunks],         # 2. embed, batched
@@ -330,35 +327,35 @@
     ])</code></pre><p>Four things in that snippet are the ones that go wrong in practice.</p><p><strong>Batch the embedding calls.</strong> One call per chunk is dominated by overhead; batches of 32&ndash;128 are several times faster.</p><p><strong>Normalise once, here.</strong> Then every query is a dot product rather than a cosine computation.</p><p><strong>Use deterministic ids</strong> derived from the source and chunk position, so re-indexing a changed document replaces its chunks rather than duplicating them.</p><p><strong>Upsert, not insert.</strong> Re-running the pipeline should be idempotent, and it will be run again.</p>
                 </div>
                 <div>
-                    <h3>Keeping the index fresh</h3>
+                    <h3 id="vz-s-keeping-the-index-fresh">Keeping the index fresh</h3>
                     <p>Documents change, and a stale index is a correctness problem rather than a performance one &mdash; a retrieved chunk from a superseded policy will be used confidently.</p><p>Three strategies:</p><p><strong>Full rebuild.</strong> Re-index everything on a schedule. Simple, and it wastes work and leaves a window where the index is being rebuilt.</p><p><strong>Incremental upsert.</strong> Track a content hash per document; re-embed only what changed. This is what most systems should do.</p><p><strong>Change-data capture.</strong> Subscribe to source-system events and update on write. Lowest latency, most integration work.</p><p>The detail that catches people: <strong>deletions</strong>. When a document is removed, its chunks must be removed too. Most indexes handle deletes with tombstones, so space and quality degrade until a compaction or rebuild. Plan for periodic rebuilds even with incremental updates.</p><p>Also plan for <strong>re-embedding</strong>. Changing the embedding model invalidates the entire index, because vectors from different models are not comparable. Record which model produced the index, and treat a model upgrade as a full rebuild &mdash; ideally into a new collection, with an atomic switch.</p>
                 </div>
                 <div>
-                    <h3>Things to try</h3>
+                    <h3 id="vz-s-things-to-try">Things to try</h3>
                     <ol><li>Set <strong>clusters probed</strong> to 1. Recall collapses &mdash; most true neighbours live in clusters the search never opened.</li><li>Raise probes until recall reaches 1.0. You are now comparing against the whole corpus: an exact search with extra steps.</li><li>Raise <strong>clusters</strong> with probes fixed. Finer clusters mean fewer comparisons and lower recall &mdash; the same trade from the other direction.</li></ol>
                 </div>
                 <div>
-                    <h3>What to remember</h3>
+                    <h3 id="vz-s-what-to-remember">What to remember</h3>
                     <p>Without an index, finding the nearest vector means comparing against every stored vector. An index prunes most of them and pays for it in recall, so the metric is recall@k measured against an exact search. Recall, latency and memory are the three knobs, and every index type exposes them under different names.</p>
                 </div>
                 <div>
-                    <h3>Filtering, and the interaction that surprises people</h3>
+                    <h3 id="vz-s-filtering-and-the-interaction-that-surprises-peo">Filtering, and the interaction that surprises people</h3>
                     <p>Real queries carry constraints: only this user's documents, only from the last year, only policies.</p><p>Two ways to apply them:</p><p><strong>Pre-filter</strong> &mdash; restrict the candidate set, then search within it. Correct, and it can defeat the index structure, because the graph or clusters were built over everything.</p><p><strong>Post-filter</strong> &mdash; search, then discard non-matching results. Fast, and it can return fewer than k results, or none, when the top matches are all filtered away.</p><p>Modern vector databases implement <strong>filtered search</strong> that navigates the index while respecting the predicate, which is the right answer and why using a real database beats a raw index library once filtering matters.</p><p>For permissions specifically, the filter must be applied <em>inside</em> the search, server-side. Retrieving first and filtering in the application means documents the user cannot see have already influenced which results came back &mdash; and in the worst case, their content has already crossed a trust boundary.</p>
                 </div>
                 <div>
-                    <h3>Choosing a store</h3>
+                    <h3 id="vz-s-choosing-a-store">Choosing a store</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Store</th><th>Character</th></tr></thead><tbody><tr><td>FAISS</td><td>A library, not a service &mdash; fast, in-process, no persistence layer</td></tr><tr><td>Qdrant</td><td>Rust, strong filtering, good defaults</td></tr><tr><td>Weaviate</td><td>Built-in hybrid search and modules</td></tr><tr><td>Milvus</td><td>Built for very large scale, more operational weight</td></tr><tr><td>pgvector</td><td>Postgres extension &mdash; one database for everything</td></tr><tr><td>Pinecone / hosted</td><td>Managed, no operations, per-vector pricing</td></tr><tr><td>Elasticsearch / OpenSearch</td><td>Strong BM25 plus vector support &mdash; hybrid in one system</td></tr></tbody></table></div><p>Two observations that save a lot of unnecessary infrastructure.</p><p><strong>Below about 100,000 vectors, you may not need any of these.</strong> A NumPy array plus a dot product is exact and fast, and a million-vector brute-force search takes tens of milliseconds with a good BLAS.</p><p><strong>pgvector is often the right answer</strong> for a system that already uses Postgres. One database to operate, transactional consistency with the rest of the data, and SQL for the filtering. It is slower than a dedicated store at very large scale, and that scale is further away than most projects reach.</p>
                 </div>
                 <div>
-                    <h3>Operational details worth deciding up front</h3>
+                    <h3 id="vz-s-operational-details-worth-deciding-up-front">Operational details worth deciding up front</h3>
                     <p><strong>Collection layout.</strong> One collection per tenant isolates cleanly and multiplies index overhead; one collection with a tenant field in the metadata scales better and relies on filtering being correct.</p><p><strong>Backups.</strong> The index is derivable from the documents, so the question is whether re-indexing is acceptable as recovery. For a large corpus that may be hours, which argues for snapshotting.</p><p><strong>Monitoring.</strong> Track query latency percentiles, recall against a periodic exact-search sample, index size, and the age of the oldest un-refreshed document.</p><p><strong>Cost.</strong> Memory-resident indexes are priced by vector count and dimension. Reducing dimensions from 1,536 to 384 is a fourfold saving and often a small accuracy cost &mdash; some models support truncating dimensions deliberately.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>Do I need a vector database?</strong> Below 100k vectors, no. Above that, yes &mdash; as much for filtering, persistence and updates as for the index.</p><p><strong>How do I handle document updates?</strong> Deterministic ids plus upsert, driven by a content hash. And plan periodic rebuilds to clean up deletions.</p><p><strong>What happens if I change embedding models?</strong> The whole index must be rebuilt. Version it and switch atomically.</p><p><strong>Should the text live in the vector store?</strong> Convenient, and for large documents a reference to a document store is cleaner. Either way the retrieved text must be reachable.</p><p><strong>How do I enforce permissions?</strong> Filter inside the search, server-side, on metadata written at indexing time. Never filter after retrieval.</p><p><strong>Can I store several vectors per document?</strong> Yes, and it is common &mdash; one per chunk, or several representations (dense, sparse, per-language) per chunk.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>Store the vector, the text and the metadata &mdash; and populate metadata at indexing time, because adding it later means re-indexing.</li><li>Batch the embedding calls, normalise once, use deterministic ids, and upsert.</li><li>Update incrementally by content hash, and rebuild periodically to reclaim deleted space.</li><li>Filtering must happen inside the search for permissions to be enforced correctly.</li><li>Below 100k vectors a plain array is enough; pgvector is often the pragmatic choice above that.</li></ul>
                 </div>
             </div>

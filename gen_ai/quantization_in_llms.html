@@ -539,40 +539,37 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">A 70B-parameter model in full 32-bit precision needs about <strong>280 GB</strong> just to hold its weights &mdash; far beyond any single GPU. <strong>Quantization</strong> stores those same weights in fewer bits, and it is the single technique most responsible for large models running on ordinary hardware.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The Core Idea: A Coarser Ruler</h3>
-                    <p>A 32-bit float can express billions of distinct values. An 8-bit integer can express 256, and a 4-bit integer just 16. Quantization finds the range your weights actually occupy and divides it into that many evenly spaced levels:</p><p>scale = (max &minus; min) / (2<sup>bits</sup> &minus; 1) &nbsp;&nbsp;&nbsp; q = round(w / scale)</p><p>Every weight is then snapped to its nearest level. The difference between where a weight <em>was</em> and where it <em>landed</em> is the quantization error &mdash; unavoidable, and the entire subject in one sentence.</p>
-                </div>
-                <div>
-                    <h3>Symmetric vs Asymmetric</h3>
+                    <h3 id="vz-s-symmetric-vs-asymmetric">Symmetric vs Asymmetric</h3>
                     <ul><li><strong>Symmetric</strong> centres the grid on zero, using a range of &plusmn;max(|w|). Simpler and faster, since zero maps exactly to zero &mdash; but if your weights are lopsided, half the levels are wasted on values that never occur.</li><li><strong>Asymmetric</strong> fits the grid to the actual min and max, adding a <em>zero-point</em> offset. It uses every level, at the cost of slightly more arithmetic at inference.</li></ul><p>Toggle between them with the outlier enabled and watch the step size and RMS error change.</p>
                 </div>
                 <div>
-                    <h3>Outliers Are the Real Enemy</h3>
+                    <h3 id="vz-s-outliers-are-the-real-enemy">Outliers Are the Real Enemy</h3>
                     <p>Quantization error does not grow smoothly with bit-width &mdash; it is dominated by <strong>range</strong>. A single weight far from the others stretches the min-max span, and since the step size is that span divided by a fixed number of levels, <em>every other weight</em> gets a coarser grid.</p><p>Tick "Inject an outlier" and watch the step size jump while the ordinary weights suddenly land further from home. This is not a toy effect: emergent outlier features in large transformers are precisely why naive INT8 broke down, and why methods like LLM.int8(), GPTQ and AWQ exist &mdash; they isolate or protect the outliers instead of letting them ruin the scale for everyone.</p>
                 </div>
                 <div>
-                    <h3>Storing weights in fewer bits</h3>
+                    <h3 id="vz-s-storing-weights-in-fewer-bits">Storing weights in fewer bits</h3>
                     <p>A model's weights are numbers, and how precisely each is stored is a choice. Quantisation stores them with fewer bits.</p><div class="vz-table-wrap"><table><thead><tr><th>Precision</th><th>Bits</th><th>7B model size</th></tr></thead><tbody><tr><td>FP32</td><td>32</td><td>28GB</td></tr><tr><td>FP16 / BF16</td><td>16</td><td>14GB</td></tr><tr><td>INT8</td><td>8</td><td>7GB</td></tr><tr><td>INT4</td><td>4</td><td>3.5GB</td></tr></tbody></table></div><p>The arithmetic is what makes this matter: a 70B model in 16-bit needs 140GB and does not fit on a single GPU. At 4-bit it is 35GB and fits on one. Quantisation is frequently the difference between a model being deployable and not.</p><p>Speed also improves, and for a reason worth understanding: generation is <strong>memory-bandwidth-bound</strong>, not compute-bound. Every token requires reading all the weights, so halving their size roughly halves the time spent waiting for memory.</p>
                 </div>
                 <div>
-                    <h3>The trade, measured</h3>
+                    <h3 id="vz-s-the-trade-measured">The trade, measured</h3>
                     <p>Quality loss is real and, at the sizes people use, modest.</p><div class="vz-table-wrap"><table><thead><tr><th>Precision</th><th>Typical quality impact</th></tr></thead><tbody><tr><td>FP16 / BF16</td><td>None &mdash; the standard baseline</td></tr><tr><td>INT8</td><td>Very small, often unmeasurable</td></tr><tr><td>INT4</td><td>Small but present; more visible on reasoning tasks</td></tr><tr><td>INT3 and below</td><td>Noticeable degradation</td></tr></tbody></table></div><p>Two patterns hold across evaluations. Larger models tolerate quantisation better &mdash; a 70B model at 4-bit generally beats a 13B model at 16-bit, and it is the better use of the same memory. And degradation appears first on tasks with narrow margins: multi-step reasoning and code, rather than fluent prose.</p><p>The practical guidance follows: <strong>prefer a larger model quantised over a smaller model at full precision.</strong></p>
                 </div>
                 <div>
-                    <h3>How it works, and why outliers matter</h3>
+                    <h3 id="vz-s-how-it-works-and-why-outliers-matter">How it works, and why outliers matter</h3>
                     <p>The basic operation maps a range of floats onto a small set of integers:</p><p class="mono-font">q = round((w &minus; zero_point) / scale)</p><p>Applied per tensor, this fails on transformers for a specific reason: their weight and activation distributions contain <strong>outliers</strong>, values far larger than the rest. One outlier in a tensor forces the scale to cover its range, and every other value collapses into a handful of levels.</p><p>The methods that work all address this:</p><p><strong>Group-wise quantisation.</strong> Use a separate scale per block of 64 or 128 values rather than per tensor, so an outlier only damages its own group. This is the foundation of most 4-bit formats.</p><p><strong>GPTQ</strong> quantises layer by layer, adjusting the remaining weights to compensate for the error introduced &mdash; a one-shot method needing a small calibration set.</p><p><strong>AWQ</strong> identifies the weights that matter most for activations and protects them at higher precision.</p><p><strong>LLM.int8()</strong> keeps outlier dimensions in 16-bit and quantises the rest to 8-bit.</p><p><strong>NF4</strong> (used by QLoRA) uses quantisation levels spaced according to a normal distribution, which fits weight distributions better than uniform spacing.</p>
                 </div>
                 <div>
-                    <h3>Try it yourself</h3>
+                    <h3 id="vz-s-try-it-yourself">Try it yourself</h3>
                     <ol><li><strong>Step from FP32 down to INT4.</strong> Levels fall from billions to 16, the horizontal grid lines thin out, and the green dots drift visibly away from the grey ones.</li><li><strong>Watch RMS error against memory saved.</strong> FP16 is nearly free &mdash; huge savings, negligible error. That is why it is the default almost everywhere.</li><li><strong>Now enable the outlier at INT4.</strong> Step size roughly doubles and every ordinary weight is punished for one extreme value.</li><li><strong>Switch to asymmetric with the outlier on.</strong> Error usually improves, because the grid stops wasting levels on an empty side of the range.</li><li><strong>Pick 70B and compare FP16 to INT4.</strong> 140 GB versus roughly 35 GB &mdash; the difference between a multi-GPU server and a single high-end card. That is the whole reason anyone tolerates the error.</li></ol>
                 </div>
                 <div>
-                    <h3>Summing up</h3>
+                    <h3 id="vz-s-summing-up">Summing up</h3>
                     <p>Quantization buys memory and speed with precision. The surprise is how cheap the trade is: 8-bit is usually indistinguishable from full precision, and modern 4-bit methods come remarkably close. The size numbers here count weights only &mdash; real deployments also need memory for activations and the KV cache, which grows with context length.</p>
                 </div>
                 <div>
-                    <h3>Post-training versus quantisation-aware</h3>
+                    <h3 id="vz-s-post-training-versus-quantisation-aware">Post-training versus quantisation-aware</h3>
                     <p><strong>Post-training quantisation (PTQ)</strong> takes a trained model and converts it, using a small calibration dataset to choose scales. Minutes to hours, no training required, and it is what almost everyone uses.</p><p><strong>Quantisation-aware training (QAT)</strong> simulates quantisation during training so the model learns weights that survive it. Better quality at low bit widths, and it requires the full training pipeline &mdash; usually only worth it for very aggressive quantisation or for models shipped at enormous volume.</p><p>For LLMs, PTQ with a good method (GPTQ, AWQ) at 4-bit is the standard path.</p><div class="vz-table-wrap"><table><thead><tr><th>Format</th><th>Character</th></tr></thead><tbody><tr><td>GGUF</td><td>CPU and Apple Silicon inference, llama.cpp ecosystem</td></tr><tr><td>GPTQ</td><td>GPU inference, widely supported</td></tr><tr><td>AWQ</td><td>GPU inference, often slightly better than GPTQ at 4-bit</td></tr><tr><td>bitsandbytes NF4</td><td>Simple to use in transformers; the QLoRA default</td></tr></tbody></table></div><pre><code class="language-python">from transformers import AutoModelForCausalLM, BitsAndBytesConfig
 import torch
 
@@ -585,15 +582,15 @@ cfg = BitsAndBytesConfig(
 model = AutoModelForCausalLM.from_pretrained(&quot;model-name&quot;, quantization_config=cfg)</code></pre><p>Note <code>compute_dtype</code>: weights are <em>stored</em> in 4-bit and de-quantised to bfloat16 for the actual multiplication. The saving is in memory and bandwidth, not in the arithmetic.</p>
                 </div>
                 <div>
-                    <h3>What else can be quantised</h3>
+                    <h3 id="vz-s-what-else-can-be-quantised">What else can be quantised</h3>
                     <p><strong>Weights</strong> are the usual target &mdash; they dominate memory and are static, so quantising them is straightforward.</p><p><strong>Activations</strong> are harder, because they vary per input and contain worse outliers. Weight-only quantisation is much more common for this reason.</p><p><strong>The KV cache</strong> is increasingly quantised, and for long contexts it can exceed the weights in size. 8-bit cache quantisation is a meaningful saving with a small quality cost.</p><p><strong>Gradients and optimiser state</strong> during training &mdash; 8-bit optimisers reduce Adam's memory, which is twice the model size in 32-bit.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>Which precision should I use?</strong> 4-bit for local inference where memory binds, 8-bit when quality matters more than memory, 16-bit when memory is not a constraint.</p><p><strong>Does quantisation make inference faster?</strong> Usually yes, because generation is bandwidth-bound and smaller weights mean less to read.</p><p><strong>Is a quantised large model better than a small one at full precision?</strong> Generally yes, for the same memory budget. This is a well-replicated result.</p><p><strong>Can I fine-tune a quantised model?</strong> With QLoRA, yes &mdash; the frozen base is 4-bit and the trained adapters are higher precision.</p><p><strong>Which format for a Mac?</strong> GGUF via llama.cpp or Ollama, which handles Apple Silicon well.</p><p><strong>Does it affect long-context behaviour?</strong> Quantising the KV cache can degrade recall over very long contexts more than it affects short-prompt quality.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>Quantisation stores weights in fewer bits: 4-bit is a quarter the memory of 16-bit.</li><li>Generation is memory-bandwidth-bound, so smaller weights are also faster.</li><li>Outliers break naive per-tensor quantisation; group-wise scales, GPTQ, AWQ and NF4 all address them.</li><li>8-bit is nearly free in quality; 4-bit costs a little, mostly on reasoning tasks.</li><li>For a fixed memory budget, a larger quantised model usually beats a smaller full-precision one.</li></ul>
                 </div>
             </div>

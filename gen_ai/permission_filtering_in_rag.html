@@ -290,32 +290,29 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">How do you stop a RAG system retrieving documents the user is not allowed to see?</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Why post-filtering quietly fails</h3>
-                    <p>Retrieve the top 10 by similarity, then remove what the user may not see. If eight were restricted you return two, and nothing reports that the result set collapsed. The generator answers from thin evidence and sounds no less confident.</p><p>Over-fetching &mdash; retrieve 100, filter, keep 10 &mdash; makes it less likely and never fixes it. A user with access to 0.1% of the corpus needs an enormous k, and the failure is worst exactly for the most restricted users.</p>
-                </div>
-                <div>
-                    <h3>Pre-filtering, and why it is harder than it looks</h3>
+                    <h3 id="vz-s-pre-filtering-and-why-it-is-harder-than-it-looks">Pre-filtering, and why it is harder than it looks</h3>
                     <p>Pre-filtering restricts the candidate set before ranking, so the top k is k <em>permitted</em> results. That is the correct behaviour and it fights the index: an HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search &mdash; you traverse into a region where everything is filtered out and the walk stalls.</p><p>Vector databases handle this differently, which is one of the real differences between them. Options include filtered graph traversal, per-tenant sub-indexes (clean, and costly at many tenants), and falling back to a flat scan when the filter is very selective &mdash; which is often genuinely fastest, because the permitted set is small.</p>
                 </div>
                 <div>
-                    <h3>Where the permissions live</h3>
+                    <h3 id="vz-s-where-the-permissions-live">Where the permissions live</h3>
                     <p>Baking an access list into each chunk's metadata at index time is fast and goes stale the moment someone leaves a group &mdash; and stale permissions fail open, which is the wrong direction.</p><p>The usual compromise: index a stable <em>group</em> identifier with each chunk, resolve the user's groups per request from the identity system, and filter on the intersection. Group membership changes are then reflected immediately without re-indexing anything.</p><p>Two more things to say. Deleted documents must leave the index, not just be filtered out. And the filter belongs on the server, derived from the authenticated session &mdash; never from a client-supplied user id, which is trivially forged.</p>
                 </div>
                 <div>
-                    <h3>Why pre-filtering fights the index</h3>
+                    <h3 id="vz-s-why-pre-filtering-fights-the-index">Why pre-filtering fights the index</h3>
                     <p>Pre-filtering is the correct behaviour and it is genuinely hard to implement, because an ANN index was built over the whole corpus and does not know about your predicate.</p><p>Walking an HNSW graph while skipping most nodes can <strong>disconnect the traversal</strong>: the search reaches a region where every neighbour is filtered out and stalls, returning far fewer results than asked for even though plenty of permitted documents exist elsewhere in the graph.</p><p>The strategies databases use, all with trade-offs: filtered traversal that keeps searching past excluded nodes; per-tenant sub-indexes, which are clean and expensive once tenants number in the thousands; and falling back to a flat scan when the filter is selective &mdash; which is often genuinely fastest, since a user with access to 0.1% of a million documents is a thousand-vector brute force.</p>
                 </div>
                 <div>
-                    <h3>Getting the model right, and failing closed</h3>
+                    <h3 id="vz-s-getting-the-model-right-and-failing-closed">Getting the model right, and failing closed</h3>
                     <p>Two design rules cover most of the damage.</p><p><strong>Derive the filter from the session, never the request.</strong> A client-supplied user or group id is trivially forged. The filter must be built server-side from the authenticated identity.</p><p><strong>Index groups, resolve membership per query.</strong> Baking a user list into each chunk means a departure leaves the index granting access until the next re-index &mdash; and stale permissions fail <em>open</em>, which is the wrong direction. Indexing a stable group id and resolving the user's groups per request makes revocation immediate.</p><p>Also: filtering is not deletion. A document removed for legal or privacy reasons must leave the index and any cached answers derived from it, or it remains recoverable by anyone who can still see it &mdash; which is a different and worse problem than a missing result.</p>
                 </div>
                 <div>
-                    <h3>The failure mode that matters most</h3>
+                    <h3 id="vz-s-the-failure-mode-that-matters-most">The failure mode that matters most</h3>
                     <p>A RAG system retrieves documents and puts them in a prompt. If the retrieval does not respect who is asking, the model will faithfully summarise a document the user was never allowed to see &mdash; and it will do so fluently, with a citation.</p><p>That is a data breach with a helpful tone, and it is the most consequential thing that can go wrong in an enterprise retrieval system. Unlike a hallucination, it is not a quality problem; it is a security one.</p><p>The requirement is straightforward to state and easy to implement incorrectly: <strong>the set of documents considered must be exactly the set this user may read</strong>.</p>
                 </div>
                 <div>
-                    <h3>Where the filter has to be applied</h3>
+                    <h3 id="vz-s-where-the-filter-has-to-be-applied">Where the filter has to be applied</h3>
                     <p>There are three places it could go, and only one is correct.</p><p><strong>After generation</strong> &mdash; check the answer for leaked content. Hopeless: the content is already in the output, and paraphrase makes detection unreliable.</p><p><strong>After retrieval, before the prompt</strong> &mdash; retrieve k documents, discard the ones the user cannot see, pass the rest. Better, and still wrong in two ways: the unauthorised documents occupied slots, so fewer authorised ones were considered; and their content has already been loaded into the application's memory.</p><p><strong>Inside the search</strong> &mdash; the index only ever considers documents matching the user's permissions. This is the correct answer, and it requires the store to support filtered search.</p><pre><code class="language-python">results = store.search(
     query_vector=q,
     k=10,
@@ -323,35 +320,35 @@
 )</code></pre><p>The difference between the second and third options is not theoretical. With post-filtering, a user in a small group querying a corpus dominated by other groups' documents may get zero results while relevant authorised documents exist &mdash; because all ten retrieved slots went to documents they cannot see.</p>
                 </div>
                 <div>
-                    <h3>Modelling permissions in metadata</h3>
+                    <h3 id="vz-s-modelling-permissions-in-metadata">Modelling permissions in metadata</h3>
                     <p>The filter can only express what the metadata records, so the model has to be decided at indexing time.</p><div class="vz-table-wrap"><table><thead><tr><th>Model</th><th>Metadata</th><th>Filter</th></tr></thead><tbody><tr><td>Group-based</td><td><code>acl: [group_ids]</code></td><td>user's groups intersect the list</td></tr><tr><td>Role-based</td><td><code>min_role: "manager"</code></td><td>user's role rank is sufficient</td></tr><tr><td>Owner-based</td><td><code>owner_id</code></td><td>owner matches, or is shared with</td></tr><tr><td>Attribute-based</td><td><code>region</code>, <code>department</code>, <code>classification</code></td><td>several predicates combined</td></tr><tr><td>Row-level via source</td><td>Reference to the source system</td><td>Resolve at query time</td></tr></tbody></table></div><p><strong>Group-based ACLs</strong> cover most cases and are what most source systems already provide. Store the list of group ids permitted to read each document, and filter on intersection with the requesting user's groups.</p><p>Two hard parts:</p><p><strong>Inherited permissions.</strong> A document in a restricted folder inherits its restriction. The indexing pipeline must resolve inheritance and write the effective ACL, not the document's own.</p><p><strong>Permission changes.</strong> When someone leaves a group, or a document is reclassified, the index is stale and will over-share until it is updated. Permissions change far more often than document content, so they need their own refresh path &mdash; ideally event-driven, and at minimum on a short schedule.</p>
                 </div>
                 <div>
-                    <h3>Things to try</h3>
+                    <h3 id="vz-s-things-to-try">Things to try</h3>
                     <ol><li>Drop <strong>corpus visible</strong> to 5%. Post-filtering returns almost nothing while pre-filtering still returns k &mdash; the control fails worst for the most restricted user.</li><li>Raise <strong>over-fetch</strong> to 500. The shortfall shrinks and never disappears, which is why over-fetching is a mitigation rather than a fix.</li><li>Set visibility to 100%. All three strategies agree, which is exactly why this bug survives testing on an admin account.</li></ol>
                 </div>
                 <div>
-                    <h3>What to remember</h3>
+                    <h3 id="vz-s-what-to-remember">What to remember</h3>
                     <p>Permission filtering has to happen inside the search, not around it. Post-filtering ranks first and drops afterwards, so it silently returns fewer results than requested and degrades worst for the most restricted users. Filtering after generation is not a control at all &mdash; the model has already read the text. Index a group id and resolve membership per request, because stale permissions fail open.</p>
                 </div>
                 <div>
-                    <h3>Late-binding permissions</h3>
+                    <h3 id="vz-s-late-binding-permissions">Late-binding permissions</h3>
                     <p>An alternative to storing ACLs in the index is to resolve them at query time against the source system.</p><p><strong>Store only a reference</strong> &mdash; the source id &mdash; and after retrieving candidates, ask the source system which of them this user may read.</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>ACLs in the index</th><th>Resolve at query time</th></tr></thead><tbody><tr><td>Staleness</td><td>Possible, needs refresh</td><td>None &mdash; always current</td></tr><tr><td>Latency</td><td>None extra</td><td>An extra call per query</td></tr><tr><td>Correctness during changes</td><td>Window of over-sharing</td><td>Correct immediately</td></tr><tr><td>Filtering inside the search</td><td>Yes</td><td>No &mdash; post-filter only</td></tr></tbody></table></div><p>The trade is sharp: resolving at query time is always correct and forces post-filtering, which brings back the slot-wastage problem.</p><p>The pragmatic combination used in practice is <strong>both</strong>: filter inside the search using indexed ACLs to get a correct-enough candidate set efficiently, then verify the final selection against the source system before showing anything. The index filter does the heavy lifting; the verification catches the staleness window.</p>
                 </div>
                 <div>
-                    <h3>Failure modes to test for explicitly</h3>
+                    <h3 id="vz-s-failure-modes-to-test-for-explicitly">Failure modes to test for explicitly</h3>
                     <p>Permission bugs do not announce themselves, so they have to be tested deliberately:</p><ul><li><strong>A user with no groups</strong> should retrieve nothing, not everything. A missing or empty filter that matches all documents is the classic catastrophic bug.</li><li><strong>A filter on a field that does not exist</strong> should fail closed, not open. Some stores silently ignore unknown fields.</li><li><strong>Inherited restrictions</strong> on documents in restricted containers.</li><li><strong>Deleted users and revoked groups.</strong></li><li><strong>Documents with no ACL recorded</strong> &mdash; decide whether the default is deny (correct) or allow (dangerous), and make it explicit.</li><li><strong>Cached results.</strong> A cache keyed only on the query text will serve one user's authorised results to another. Cache keys must include the permission context.</li></ul><p>That last one is worth stating plainly because caching is added later, as a performance improvement, by someone who is not thinking about permissions.</p>
                 </div>
                 <div>
-                    <h3>What else leaks</h3>
+                    <h3 id="vz-s-what-else-leaks">What else leaks</h3>
                     <p>Retrieval is the main channel and not the only one.</p><p><strong>Conversation history</strong> carries content forward. If a user's permissions change mid-session, earlier retrieved content is still in the context.</p><p><strong>Logs and traces.</strong> Prompt logging captures retrieved document content, so log storage inherits the documents' classification.</p><p><strong>Embeddings themselves.</strong> Research has shown that text can be partially reconstructed from its embedding, so a vector store holding sensitive content is itself sensitive and needs the same protections as the documents.</p><p><strong>Aggregate answers.</strong> A user may be permitted to see individual documents but not a synthesis that reveals a pattern across them. This is a policy question rather than a technical one, and worth asking.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>Can I filter after retrieval?</strong> It is not secure enough and it wastes retrieval slots. Filter inside the search.</p><p><strong>What if my vector store does not support filtered search?</strong> Over-retrieve heavily and post-filter as an interim measure, and treat it as a reason to change store.</p><p><strong>How do I keep permissions fresh?</strong> Event-driven updates from the source system, with a scheduled reconciliation as a backstop. Permissions change more often than content.</p><p><strong>Should documents with no ACL be readable?</strong> Default deny. An explicit allow-all marker is safer than an absent field.</p><p><strong>Does the embedding leak content?</strong> Partially reconstructable, so treat the vector store as holding the data itself.</p><p><strong>How do I cache safely?</strong> Include the user's permission context in the cache key, or cache only at the query-embedding level rather than the results level.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>An unfiltered retrieval will faithfully summarise documents the user may not read.</li><li>Apply the filter <em>inside</em> the search; post-filtering both leaks and wastes retrieval slots.</li><li>Store effective ACLs at indexing time, resolving inheritance, and refresh them independently of content.</li><li>Default to deny for documents with no recorded permissions, and test the no-groups case explicitly.</li><li>Caches, logs, conversation history and the vectors themselves are all additional leak channels.</li></ul>
                 </div>
             </div>

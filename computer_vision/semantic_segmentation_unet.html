@@ -229,56 +229,53 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Classification asks what's in the image. Segmentation asks, for every single pixel.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The idea in brief</h3>
-                    <p>Semantic segmentation labels every pixel with a class, not just the image as a whole. A CNN classifier's usual move — <a href="downsampling_in_cnn.html" style="color: var(--accent-primary)">pool down repeatedly</a> to build up wide receptive fields and semantic context — is exactly what a segmentation decoder then has to undo, pixel by pixel, to produce a full-resolution output mask.</p>
-                </div>
-                <div>
-                    <h3>What pooling actually destroys</h3>
+                    <h3 id="vz-s-what-pooling-actually-destroys">What pooling actually destroys</h3>
                     <p>Max or majority pooling is a real, lossy operation: a 2&times;2 block of pixels becomes one pixel, and whatever varied within that block is gone for good. Naively upsampling the coarse result back up — nearest-neighbour or bilinear, with nothing else — cannot recover that lost detail, because the information needed to recover it no longer exists anywhere in the coarse map. <strong>U-Net's skip connections</strong> route the encoder's full-resolution feature maps directly across to the matching decoder stage, so the fine spatial detail pooling destroyed never has to be reconstructed from nothing — it's simply still there, carried across.</p>
                 </div>
                 <div>
-                    <h3>Labelling every pixel</h3>
+                    <h3 id="vz-s-labelling-every-pixel">Labelling every pixel</h3>
                     <p>Classification gives one label per image. Detection gives a box per object. <strong>Semantic segmentation</strong> gives a label to every single pixel &mdash; road, building, sky, person &mdash; producing an output the same size as the input.</p><p>Three related tasks are easy to confuse:</p><div class="vz-table-wrap"><table><thead><tr><th>Task</th><th>Output</th><th>Distinguishes individual objects?</th></tr></thead><tbody><tr><td>Semantic segmentation</td><td>A class per pixel</td><td>No &mdash; all cars are "car"</td></tr><tr><td>Instance segmentation</td><td>A mask per object</td><td>Yes</td></tr><tr><td>Panoptic segmentation</td><td>Both, combined</td><td>Yes, plus background classes</td></tr></tbody></table></div><p>The architectural difficulty is a genuine tension. Recognising <em>what</em> something is needs a wide view and abstract features, which means downsampling. Knowing <em>exactly which pixels</em> it occupies needs full resolution, which downsampling destroys.</p>
                 </div>
                 <div>
-                    <h3>U-Net's answer: go down, come back up, and remember</h3>
+                    <h3 id="vz-s-u-net-s-answer-go-down-come-back-up-and-remember">U-Net's answer: go down, come back up, and remember</h3>
                     <p>U-Net is shaped like a U, and the shape is the idea.</p><p><strong>The encoder</strong> (the left side) is a standard convolutional stack: convolutions and downsampling, halving the resolution and doubling the channels at each stage. By the bottom it has a rich, abstract, low-resolution representation &mdash; it knows what is in the image.</p><p><strong>The decoder</strong> (the right side) upsamples back to full resolution, halving the channels at each stage.</p><p><strong>The skip connections</strong> are what make it work. At each level, the encoder's feature map is concatenated onto the decoder's, so the decoder has both the semantic information from the deep path and the fine spatial detail from the corresponding shallow one.</p><p>Without those connections, the output is correct in category and blurry at the edges, because the boundary information was thrown away during downsampling and there is no way to invent it back. With them, boundaries are sharp.</p><p>Note that U-Net <em>concatenates</em> rather than adds, unlike ResNet. Concatenation preserves both sources separately and lets the following convolution decide how to combine them.</p>
                 </div>
                 <div>
-                    <h3>Why it works on small datasets</h3>
+                    <h3 id="vz-s-why-it-works-on-small-datasets">Why it works on small datasets</h3>
                     <p>U-Net was designed for biomedical images, where a dataset might contain thirty annotated examples. Several of its properties make that feasible.</p><ul><li><strong>It is fully convolutional</strong>, with no dense layers, so it accepts any input size and has relatively few parameters.</li><li><strong>Heavy augmentation</strong> &mdash; particularly elastic deformation, which is realistic for tissue &mdash; multiplies the effective dataset.</li><li><strong>Every pixel is a training example.</strong> A single 512&times;512 image provides 262,144 labelled pixels, which is why so few images can be enough.</li><li><strong>Patch-based training</strong> lets large images be processed in tiles, with overlap to avoid edge artefacts.</li></ul><p>The encoder is now usually replaced with a pretrained backbone &mdash; ResNet, EfficientNet &mdash; which improves results further. That variant is what most segmentation libraries give you by default.</p>
                 </div>
                 <div>
-                    <h3>Guided tour</h3>
+                    <h3 id="vz-s-guided-tour">Guided tour</h3>
                     <ol><li><strong>Read all three masks at 1 downsampling level.</strong> The no-skip reconstruction is already visibly blockier at the boundary than the ground truth circle.</li><li><strong>Push depth to 3 levels.</strong> The no-skip mask's pixel accuracy drops further — each extra pooling level throws away more boundary detail that nearest-neighbour upsampling has no way to invent back.</li><li><strong>Compare against the with-skip mask.</strong> It matches the ground truth exactly, at any depth — because this simplified version literally routes the original full-resolution mask across, rather than a pooled-and-corrupted feature map.</li></ol>
                 </div>
                 <div>
-                    <h3>What this simplification doesn't show</h3>
+                    <h3 id="vz-s-what-this-simplification-doesn-t-show">What this simplification doesn't show</h3>
                     <p>A real U-Net's skip connections carry learned <em>feature maps</em> across, not the raw ground-truth labels — its decoder still has to learn to fuse coarse semantic features with fine spatial ones, and that fusion is imperfect. A trained U-Net does not hit 100% pixel accuracy just because it has skip connections. What this toy demonstrates honestly is the underlying mechanism: recovering resolution that pooling destroyed by carrying it across directly, rather than trying to hallucinate it back from a coarse map alone — that mechanism is exactly why U-Net needs skip connections at all.</p>
                 </div>
                 <div>
-                    <h3>What to remember</h3>
+                    <h3 id="vz-s-what-to-remember">What to remember</h3>
                     <p>Downsampling for context and needing pixel-precise output are in direct tension — the same pooling that builds semantic understanding destroys the spatial detail a segmentation mask needs back. Skip connections resolve that tension not by improving the upsampling step, but by making it partly unnecessary: the fine detail rides across the encoder-decoder bridge instead of being reconstructed from a coarse map that no longer contains it.</p>
                 </div>
                 <div>
-                    <h3>Losses for segmentation</h3>
+                    <h3 id="vz-s-losses-for-segmentation">Losses for segmentation</h3>
                     <p>Segmentation has a characteristic problem: class imbalance within the image. A tumour might occupy 1% of the pixels, and a model that predicts "background" everywhere scores 99% pixel accuracy.</p><p>The standard losses respond to this directly:</p><div class="vz-table-wrap"><table><thead><tr><th>Loss</th><th>Behaviour</th></tr></thead><tbody><tr><td>Cross-entropy</td><td>Per-pixel classification; dominated by the majority class</td></tr><tr><td>Weighted cross-entropy</td><td>Rare classes weighted up</td></tr><tr><td>Dice loss</td><td>Optimises overlap directly; good for small foregrounds</td></tr><tr><td>Focal loss</td><td>Down-weights easy pixels, focuses on hard ones</td></tr><tr><td>Dice + cross-entropy</td><td>The common practical combination</td></tr></tbody></table></div><p>Dice loss is derived from the Dice coefficient, <code>2|A∩B| / (|A|+|B|)</code>, and because it is a ratio it is largely insensitive to how much background there is. Combining it with cross-entropy is the most common default in medical segmentation, because the two have complementary gradient behaviour.</p><p>For evaluation, <strong>mean IoU</strong> across classes is the standard metric, with the Dice coefficient (equivalent to F1 over pixels) more common in medical work. Pixel accuracy is reported occasionally and should be treated with the same suspicion as accuracy on any imbalanced problem.</p>
                 </div>
                 <div>
-                    <h3>Alternatives and refinements</h3>
+                    <h3 id="vz-s-alternatives-and-refinements">Alternatives and refinements</h3>
                     <p><strong>DeepLab</strong> uses dilated convolutions to widen the receptive field without downsampling at all, plus an atrous spatial pyramid that looks at several dilation rates in parallel. Strong on natural scenes.</p><p><strong>FCN</strong> was the earlier fully-convolutional approach: take a classifier, replace the dense layers with convolutions, and upsample. Simpler and less precise at boundaries.</p><p><strong>SegFormer and Mask2Former</strong> bring transformers to segmentation, with strong results at higher training cost.</p><p><strong>Segment Anything (SAM)</strong> is a promptable foundation model that produces high-quality masks with no task-specific training, and is increasingly used to accelerate annotation rather than replace task-specific models.</p><p>For most applied projects, a U-Net with a pretrained encoder remains the pragmatic starting point, and <code>segmentation_models_pytorch</code> gives it in a few lines.</p>
                 </div>
                 <div>
-                    <h3>Common mistakes</h3>
+                    <h3 id="vz-s-common-mistakes">Common mistakes</h3>
                     <ul><li><strong>Resizing masks with bilinear interpolation.</strong> This blends label values into meaningless intermediates &mdash; class 3.7. Always use nearest-neighbour for masks.</li><li><strong>Augmenting the image and not the mask,</strong> or applying different random parameters to each.</li><li><strong>Reporting pixel accuracy</strong> on an imbalanced problem.</li><li><strong>Ignoring the ignore label.</strong> Many datasets mark unlabelled pixels with a special value that must be excluded from the loss.</li><li><strong>Tiling without overlap,</strong> which produces visible seams at tile boundaries.</li><li><strong>Forgetting that the output needs an argmax</strong> across the channel dimension to become a label map.</li></ul>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>How many annotated images do I need?</strong> Tens can work with heavy augmentation and a pretrained encoder; hundreds for reliable results on natural scenes.</p><p><strong>Why concatenate instead of add in the skip connections?</strong> Concatenation keeps both feature sets intact and lets the next convolution learn how to weigh them. Addition assumes they are directly comparable.</p><p><strong>What input size should I use?</strong> Any multiple of the total downsampling factor &mdash; typically 32. Mismatched sizes cause shape errors in the decoder.</p><p><strong>How do I handle very large images?</strong> Tile with overlap and blend the predictions, or downsample if fine detail is not required.</p><p><strong>Can U-Net do instance segmentation?</strong> Not directly &mdash; it does not separate touching objects of the same class. Mask R-CNN or a watershed post-processing step handles that.</p><p><strong>Is U-Net outdated?</strong> No. It remains the default in medical imaging and is a strong, cheap baseline everywhere else.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>Semantic segmentation assigns a class to every pixel; the output is the same size as the input.</li><li>The tension is between semantic depth (needs downsampling) and spatial precision (needs resolution).</li><li>U-Net downsamples, upsamples, and concatenates matching encoder features into the decoder &mdash; which is what keeps boundaries sharp.</li><li>It works on tiny datasets because every pixel is a training example and augmentation goes a long way.</li><li>Use Dice plus cross-entropy for imbalanced foregrounds, evaluate with mean IoU, and never interpolate masks bilinearly.</li></ul>
                 </div>
             </div>

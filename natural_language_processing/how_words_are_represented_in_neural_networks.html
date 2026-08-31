@@ -487,48 +487,45 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The four stages every word passes through before a network can compute with it.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The Chain of Translations</h3>
-                    <p>A neural network is a pile of multiplications and additions — it can only consume numbers. So every word goes through a chain of translations: <strong>word &rarr; token ID &rarr; one-hot vector &rarr; dense embedding</strong>. Each stage exists to fix a shortcoming of the previous one.</p>
-                </div>
-                <div>
-                    <h3>Token IDs and Their Trap</h3>
+                    <h3 id="vz-s-token-ids-and-their-trap">Token IDs and Their Trap</h3>
                     <p>The dictionary lookup ("cat" &rarr; 1, "dog" &rarr; 3) is compact, but the raw integers smuggle in a false claim: that "dog" (3) is somehow three times "cat" (1), or that words with adjacent IDs are related. The IDs are arbitrary labels, and arithmetic on labels is meaningless — a network fed raw IDs will happily learn those fake relationships.</p>
                 </div>
                 <div>
-                    <h3>One-Hot: Honest but Wasteful</h3>
+                    <h3 id="vz-s-one-hot-honest-but-wasteful">One-Hot: Honest but Wasteful</h3>
                     <p>One-hot encoding fixes the fake-ordering problem: each word becomes a vector of zeros with a single 1 at its index. Now no word is numerically "bigger" than another. The costs:</p><ul><li><strong>Size:</strong> the vector is as long as the vocabulary — 50,000 dimensions for a modest one.</li><li><strong>No similarity:</strong> every pair of one-hot vectors is exactly the same distance apart. "cat" is as far from "kitten" as from "carburetor".</li></ul>
                 </div>
                 <div>
-                    <h3>Dense Embeddings: Small and Meaningful</h3>
+                    <h3 id="vz-s-dense-embeddings-small-and-meaningful">Dense Embeddings: Small and Meaningful</h3>
                     <p>An embedding layer maps each token ID to a short vector of <em>learned</em> real numbers (4 dims in the demo; 300–4096 in practice). Because these values are trained rather than assigned, words used in similar contexts drift toward similar vectors — similarity becomes measurable with a dot product. This single idea underpins everything from word2vec to the input layer of GPT.</p>
                 </div>
                 <div>
-                    <h3>From an index to a vector</h3>
+                    <h3 id="vz-s-from-an-index-to-a-vector">From an index to a vector</h3>
                     <p>Inside a network, a word is a row of a matrix. The path from text to that row is short:</p><ol><li>The tokeniser maps the word (or subword) to an integer id.</li><li>That id indexes the <strong>embedding matrix</strong>, of shape (vocabulary size &times; embedding dimension).</li><li>The selected row is the word's vector, and it is what every subsequent layer operates on.</li></ol><p class="mono-font">"cat" &rarr; id 2317 &rarr; row 2317 of a 50,000 &times; 768 matrix &rarr; 768 numbers</p><p>That matrix is <strong>learned</strong>. It starts as small random values and is updated by gradient descent along with everything else, so the geometry that emerges &mdash; which words end up near which &mdash; is a product of the training objective, not of anything designed.</p><p>Mathematically the lookup is equivalent to multiplying a one-hot vector by the matrix, which is why embeddings are sometimes described that way. Implementations never do it: <code>nn.Embedding</code> is a row lookup, because multiplying by a vector of 49,999 zeros is wasted work.</p>
                 </div>
                 <div>
-                    <h3>Why not one-hot all the way through</h3>
+                    <h3 id="vz-s-why-not-one-hot-all-the-way-through">Why not one-hot all the way through</h3>
                     <p>A one-hot representation has two defects that the embedding fixes.</p><p><strong>Size.</strong> 50,000 dimensions per token, of which one is non-zero. A first layer taking that input needs 50,000 weights per unit.</p><p><strong>No similarity.</strong> Every pair of words is exactly equidistant. "Cat" is as far from "dog" as from "bureaucracy", so nothing a model learns about one word transfers to a related one.</p><p>An embedding of 768 dimensions is 65 times smaller and places related words near each other, so evidence generalises. That combination &mdash; compact and meaningfully arranged &mdash; is what makes the representation useful.</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>One-hot</th><th>Embedding</th></tr></thead><tbody><tr><td>Dimensions</td><td>Vocabulary size</td><td>100&ndash;1,024</td></tr><tr><td>Values</td><td>One 1, rest 0</td><td>All non-zero</td></tr><tr><td>Similar words</td><td>Equidistant</td><td>Nearby</td></tr><tr><td>Learned</td><td>No</td><td>Yes</td></tr><tr><td>Unseen word</td><td>Impossible to represent</td><td>Handled by subword pieces</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3>Static and contextual</h3>
+                    <h3 id="vz-s-static-and-contextual">Static and contextual</h3>
                     <p><strong>Static embeddings</strong> (Word2Vec, GloVe, and the embedding layer of a small model) give one vector per word, fixed after training. "Bank" gets a single vector that averages the river and the financial senses into something that is neither.</p><p><strong>Contextual embeddings</strong> are what a transformer produces at each layer: the vector for "bank" in "river bank" has absorbed information from "river" and differs from the same token in "savings bank".</p><p>The embedding table still exists in a transformer &mdash; it supplies the input to layer one. Everything after that is contextual, refined by each block. So a transformer has both: a static lookup at the bottom, and increasingly context-dependent representations above it.</p><p>A detail worth knowing: the output projection to vocabulary size is frequently <strong>tied</strong> to the embedding matrix, using the same weights transposed. It saves a large number of parameters (50,000 × 768 is 38 million) and usually improves quality slightly, on the reasoning that the input and output spaces describe the same vocabulary.</p>
                 </div>
                 <div>
-                    <h3>Try it yourself</h3>
+                    <h3 id="vz-s-try-it-yourself">Try it yourself</h3>
                     <ol><li><strong>Click "cat".</strong> Follow all four stages — note the one-hot row has a single lit cell at index 1, and the embedding is just 4 numbers.</li><li><strong>Click "dog" as the second word.</strong> The similarity panel shows a high cosine score — the demo embeddings encode that cats and dogs are both animals.</li><li><strong>Compare "cat" with "on".</strong> An animal versus a preposition: the similarity collapses. One-hot vectors could never express this difference — embeddings do it natively.</li></ol>
                 </div>
                 <div>
-                    <h3>Worth remembering</h3>
+                    <h3 id="vz-s-worth-remembering">Worth remembering</h3>
                     <p>Word representation is a ladder: IDs are compact but lie about order, one-hot is honest but huge and similarity-blind, and dense embeddings are small, learned, and encode meaning as geometry. Modern NLP starts at the top of that ladder.</p>
                 </div>
                 <div>
-                    <h3>What the geometry contains</h3>
+                    <h3 id="vz-s-what-the-geometry-contains">What the geometry contains</h3>
                     <p>The arrangement that emerges from training is genuinely structured, in ways that can be measured.</p><p><strong>Neighbourhoods are semantic.</strong> The nearest vectors to "January" are the other months. The nearest to "hospital" are clinic, doctor, patient.</p><p><strong>Directions carry relations.</strong> The offset from "man" to "woman" is roughly the offset from "king" to "queen", which is what makes the famous analogy arithmetic work. It works cleanly for a small number of well-chosen relations and is frequently overstated.</p><p><strong>Frequency affects magnitude.</strong> Rare words often have longer vectors than common ones, which is one reason cosine similarity &mdash; which ignores length &mdash; is preferred to the dot product for comparing them.</p><p><strong>Bias is encoded too.</strong> The vectors reproduce the statistical associations of the training corpus, including its prejudices. This is a documented and repeatedly reproduced finding, and it matters whenever embeddings feed decisions about people.</p><p>Individual dimensions are not interpretable. Directions in the space often are, and probing classifiers can find them &mdash; there is a direction that separates singular from plural, another that tracks sentiment.</p>
                 </div>
                 <div>
-                    <h3>Practical notes</h3>
+                    <h3 id="vz-s-practical-notes">Practical notes</h3>
                     <pre><code class="language-python">import torch.nn as nn
 
 emb = nn.Embedding(num_embeddings=50_000, embedding_dim=768,
@@ -536,11 +533,11 @@ emb = nn.Embedding(num_embeddings=50_000, embedding_dim=768,
 x = emb(token_ids)                        # (batch, seq) -&gt; (batch, seq, 768)</code></pre><p><code>padding_idx</code> matters: it keeps that row fixed at zero and excludes it from gradient updates, so padding contributes nothing.</p><p>Three further points that come up in real work:</p><p><strong>The embedding table is often the largest single parameter block</strong> in a small model. 50,000 × 768 is 38 million weights, which may exceed all the transformer layers in a compact model.</p><p><strong>Freezing pretrained embeddings</strong> is worth trying with small datasets &mdash; there is far less to overfit. Fine-tune them when you have enough data or a specialised vocabulary.</p><p><strong>Dimension is a real trade-off.</strong> 100&ndash;300 for word vectors, 768&ndash;4,096 in transformers. Larger captures more and costs memory and compute at every layer.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>Is the embedding matrix the same as a one-hot multiplication?</strong> Mathematically yes, computationally no &mdash; it is implemented as a row lookup.</p><p><strong>Are embeddings trained or downloaded?</strong> Both are used. For text, downloading pretrained is almost always better. For categorical features in your own model, trained jointly.</p><p><strong>What dimension should I use?</strong> 300 for standalone word vectors; whatever the pretrained model uses otherwise. For categorical features, roughly the fourth root of the cardinality as a starting point.</p><p><strong>How are unseen words handled?</strong> Subword tokenisation splits them into known pieces, so there is always something to look up.</p><p><strong>Can I inspect what a dimension means?</strong> Not usefully. Directions in the space are more interpretable than axes, and probing is the tool for finding them.</p><p><strong>Why tie the input and output embeddings?</strong> It saves tens of millions of parameters and typically helps slightly, since both describe the same vocabulary.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>A word becomes an integer id, which indexes a learned embedding matrix; the selected row is its vector.</li><li>The lookup is equivalent to a one-hot multiplication and is implemented as indexing.</li><li>Embeddings are compact and place similar words nearby, so learning transfers between related words.</li><li>Transformers keep a static table at the input and produce contextual representations above it.</li><li>The geometry encodes semantics, relational directions, frequency effects and corpus bias.</li></ul>
                 </div>
             </div>

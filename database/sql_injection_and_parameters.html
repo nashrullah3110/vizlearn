@@ -288,34 +288,31 @@ SELECT id, name, role FROM users WHERE name = 'Ada';
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The oldest widespread vulnerability in web software, why it happens, and the single correct fix.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The mechanism</h3>
-                    <p>Build a query by pasting user input into a string:</p><pre><code>&quot;SELECT * FROM users WHERE name = &#x27;&quot; + name + &quot;&#x27;&quot;</code></pre><p>With <code>name = "Ada"</code> this produces a sensible query. With <code>name = "' OR '1'='1"</code> it produces:</p><pre><code>SELECT * FROM users WHERE name = &#x27;&#x27; OR &#x27;1&#x27;=&#x27;1&#x27;</code></pre><p>The quote closed the string early, and everything after it became <strong>syntax</strong> rather than data. The database is not confused or exploited &mdash; it is correctly executing the query it was given. The bug happened before it arrived.</p><p>Run the variants above to see it: the same lookup, safe and unsafe, with a normal value and then a crafted one.</p>
-                </div>
-                <div>
-                    <h3>What can be done through it</h3>
+                    <h3 id="vz-s-what-can-be-done-through-it">What can be done through it</h3>
                     <p>A closed quote gives an attacker the whole language.</p><p><strong>Authentication bypass.</strong> <code>' OR '1'='1</code> as a password makes the <code>WHERE</code> clause true for every row.</p><p><strong>Reading other tables.</strong> A <code>UNION SELECT</code> appends results from anywhere the database user can read.</p><p><strong>Writing.</strong> If the driver allows multiple statements, a semicolon starts a new one.</p><p><strong>Blind extraction.</strong> Even with no output at all, a condition that changes whether the page errors, or how long it takes, leaks one bit per request &mdash; and one bit per request is enough to read a password hash.</p>
                 </div>
                 <div>
-                    <h3>The fix</h3>
+                    <h3 id="vz-s-the-fix">The fix</h3>
                     <p>Send the query and the values separately:</p><pre><code>cursor.execute(&quot;SELECT * FROM users WHERE name = ?&quot;, (name,))</code></pre><p>The <code>?</code> is a <strong>placeholder</strong>. The database receives the query text and the value through different channels, parses the statement first, and then binds the value into an already-parsed plan.</p><p>The value therefore cannot alter the structure of the query, because parsing has already finished by the time it arrives. <code>' OR '1'='1</code> becomes a search for a user whose name is literally <code>' OR '1'='1</code>, which finds nothing.</p><p>This is not a filter that might miss something. It is a structural guarantee: there is no input for which a bound parameter becomes syntax.</p>
                 </div>
                 <div>
-                    <h3>Why escaping is not the fix</h3>
+                    <h3 id="vz-s-why-escaping-is-not-the-fix">Why escaping is not the fix</h3>
                     <p>Escaping tries to neutralise dangerous characters in the input. It fails for reasons that are not obvious in advance:</p><p><strong>Numeric contexts have no quotes.</strong> <code>WHERE id = " + id</code> needs no quote to escape, and <code>1 OR 1=1</code> needs no special characters at all.</p><p><strong>Character sets.</strong> Multi-byte encodings have historically allowed a byte sequence that becomes a quote after the escaping function has run.</p><p><strong>It is a blacklist.</strong> Every blacklist is a claim to have thought of everything.</p><p><strong>It is per-engine.</strong> Rules differ between MySQL, PostgreSQL and SQLite, and code that moves between them silently stops being correct.</p><p>Parameterisation avoids all of this by never putting the value in the query text at all.</p>
                 </div>
                 <div>
-                    <h3>Identifiers cannot be parameterised</h3>
+                    <h3 id="vz-s-identifiers-cannot-be-parameterised">Identifiers cannot be parameterised</h3>
                     <p>This is the real limitation. A placeholder can stand for a *value*, not for a table or column name:</p><pre><code>&quot;ORDER BY &quot; + column      -- cannot be parameterised</code></pre><p>The correct approach is an <strong>allowlist</strong>: map the user's input to a known-good identifier and reject anything unrecognised.</p><pre><code>allowed = {&quot;name&quot;: &quot;name&quot;, &quot;date&quot;: &quot;created_at&quot;}
 column = allowed.get(user_input)
 if column is None: reject()</code></pre><p>Never sanitise an identifier by escaping. Choose it from a fixed set.</p>
                 </div>
                 <div>
-                    <h3>The other layers</h3>
+                    <h3 id="vz-s-the-other-layers">The other layers</h3>
                     <p>Parameterise everywhere, and then:</p><p><strong>Least privilege.</strong> The application's database user should not own the schema or be able to <code>DROP</code>. It limits the damage of any bug, not just this one.</p><p><strong>Do not show database errors.</strong> Error text is how blind extraction is made fast.</p><p><strong>ORMs help but do not immunise.</strong> Their query builders parameterise by default, and every one of them has a raw-SQL escape hatch that does not. The escape hatch is where the vulnerabilities are.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>"It is an internal tool."</strong> Internal input is still input, and internal tools get exposed.</p><p><strong>Parameterising most of a query.</strong> One concatenated fragment is enough.</p><p><strong>Trusting a value because it came from a dropdown.</strong> The dropdown is in the client. The request is not.</p><p><strong>Escaping instead of binding.</strong> Even when correct today, it is one encoding change from not being.</p>
                 </div>
             </div>

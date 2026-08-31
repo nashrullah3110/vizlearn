@@ -553,32 +553,29 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Fine-tuning a 7B model the traditional way means updating all 7 billion weights &mdash; and storing optimizer state for each, which typically needs <strong>four to six times</strong> the model's own size in GPU memory. <strong>LoRA</strong> (Low-Rank Adaptation) sidesteps this almost entirely, and it has become the default way to adapt large models.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The Insight: Updates Are Low-Rank</h3>
-                    <p>Fine-tuning changes a weight matrix from <span class="mono-font">W</span> to <span class="mono-font">W + &Delta;W</span>. The observation behind LoRA is that although <span class="mono-font">W</span> is enormously expressive, the <em>change</em> needed to specialise a model for one task has very low intrinsic rank &mdash; it does not need the full space.</p><p>So instead of learning a full <span class="mono-font">d &times; k</span> matrix, LoRA factorises the update into two thin matrices:</p><p>&Delta;W = B &middot; A &nbsp;&nbsp; where B is d&times;r and A is r&times;k, with r &lll; min(d, k)</p><p>The original weights are <strong>frozen</strong>. Only A and B are trained.</p>
-                </div>
-                <div>
-                    <h3>Why the Savings Are So Extreme</h3>
+                    <h3 id="vz-s-why-the-savings-are-so-extreme">Why the Savings Are So Extreme</h3>
                     <p>A full update on a 4096&times;4096 layer is <strong>16.7 million</strong> parameters. The LoRA version at rank 8 is <span class="mono-font">8 &times; (4096 + 4096) = 65,536</span> &mdash; about <strong>0.4%</strong>. The saving comes from replacing a product of dimensions with a sum of them.</p><p>The memory win is even larger than the parameter count suggests, because optimizers like Adam store two extra values per <em>trainable</em> parameter. Freezing 99.6% of the weights removes that overhead almost completely &mdash; which is what lets a 7B model be fine-tuned on a single consumer GPU.</p>
                 </div>
                 <div>
-                    <h3>Choosing the Rank</h3>
+                    <h3 id="vz-s-choosing-the-rank">Choosing the Rank</h3>
                     <p>Rank is the one hyperparameter that matters, and it is a capacity dial:</p><ul><li><strong>r = 1&ndash;4</strong> &mdash; extremely cheap; enough for style or tone adjustments.</li><li><strong>r = 8&ndash;16</strong> &mdash; the common default. Handles most instruction-tuning and domain adaptation.</li><li><strong>r = 64&ndash;128</strong> &mdash; for teaching genuinely new capabilities, approaching full fine-tuning behaviour at a fraction of the cost.</li></ul><p>Higher is not automatically better: past the task's intrinsic rank you are adding parameters that mostly learn noise. Note also that A is initialised randomly while B is initialised to <strong>zero</strong>, so <span class="mono-font">BA = 0</span> at the start and training begins from exactly the pretrained model.</p>
                 </div>
                 <div>
-                    <h3>The Practical Superpower: Swappable Adapters</h3>
+                    <h3 id="vz-s-the-practical-superpower-swappable-adapters">The Practical Superpower: Swappable Adapters</h3>
                     <p>Because the base model is untouched, a LoRA adapter is a small standalone file &mdash; often just a few megabytes. One copy of a 70B model in memory can serve many specialisations by swapping adapters, and they can be merged into the weights before deployment (<span class="mono-font">W' = W + BA</span>) so inference costs nothing extra.</p><p>Combine LoRA with a 4-bit quantized base and you get <strong>QLoRA</strong>, the recipe that made fine-tuning very large models possible on a single GPU.</p>
                 </div>
                 <div>
-                    <h3>Training a small update instead of the whole model</h3>
+                    <h3 id="vz-s-training-a-small-update-instead-of-the-whole-mod">Training a small update instead of the whole model</h3>
                     <p>Fine-tuning a 7-billion-parameter model conventionally means updating all 7 billion weights. With Adam, that requires the weights, their gradients, and two optimiser moments &mdash; roughly 4&times; the model in memory, so about 112GB in 32-bit. Beyond most hardware.</p><p>LoRA changes what is trained. The pretrained weights are <strong>frozen</strong>, and for each target matrix a small pair of matrices is trained alongside it:</p><p class="mono-font">h = W&#8320;x + BAx&nbsp;&nbsp;&nbsp;&nbsp;where A is r&times;d and B is d&times;r</p><p><code>W₀</code> never changes. <code>A</code> and <code>B</code> are the learned update, and their product has the same shape as <code>W₀</code> while containing far fewer parameters, because <code>r</code> &mdash; the <strong>rank</strong> &mdash; is small.</p><p>For a 4096&times;4096 weight matrix with r = 8:</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>Parameters</th></tr></thead><tbody><tr><td>Full matrix</td><td>16,777,216</td></tr><tr><td>A (8&times;4096) + B (4096&times;8)</td><td>65,536</td></tr><tr><td>Ratio</td><td>0.4%</td></tr></tbody></table></div><p>Across a whole model, LoRA typically trains 0.1&ndash;1% of the parameters &mdash; a few million instead of billions.</p>
                 </div>
                 <div>
-                    <h3>Why a low-rank update is enough</h3>
+                    <h3 id="vz-s-why-a-low-rank-update-is-enough">Why a low-rank update is enough</h3>
                     <p>The empirical claim behind the method is that <strong>the update needed to adapt a pretrained model to a task has low intrinsic rank</strong>. The base model already knows the language; adaptation is a comparatively small, structured change.</p><p>That is an observation rather than a theorem, and it has held up well: LoRA fine-tunes typically match full fine-tuning on task metrics, sometimes within noise, occasionally better because there is less capacity to overfit.</p><p>Two details make it practical:</p><p><strong>A is initialised randomly and B to zero</strong>, so <code>BA = 0</code> at the start and the model begins exactly as the pretrained one. Training then moves it gradually rather than disrupting it on the first step.</p><p><strong>The adapter can be merged.</strong> After training, <code>W₀ + BA</code> can be computed once and stored as a single matrix, so inference has <em>no</em> extra cost. Or the adapter can be kept separate and swapped &mdash; which is what allows one base model to serve many tasks.</p>
                 </div>
                 <div>
-                    <h3>The parameters that matter</h3>
+                    <h3 id="vz-s-the-parameters-that-matter">The parameters that matter</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Parameter</th><th>Meaning</th><th>Typical</th></tr></thead><tbody><tr><td><code>r</code></td><td>Rank of the update</td><td>8&ndash;64</td></tr><tr><td><code>alpha</code></td><td>Scaling applied to <code>BA</code></td><td>Often 2&times;<code>r</code></td></tr><tr><td><code>target_modules</code></td><td>Which matrices get adapters</td><td>Attention projections, often the FFN too</td></tr><tr><td><code>dropout</code></td><td>Dropout on the adapter</td><td>0.05&ndash;0.1</td></tr></tbody></table></div><p><strong>Rank</strong> is the capacity dial. 8 is enough for style and format adaptation; 32&ndash;64 for teaching genuinely new behaviour or a specialised domain. Larger is not automatically better &mdash; it adds capacity to overfit a small dataset.</p><p><strong>Which modules</strong> matters more than people expect. Adapting only the query and value projections was the original recipe; adapting all attention projections plus the feed-forward layers generally works better, at more parameters.</p><pre><code class="language-python">from peft import LoraConfig, get_peft_model
 
 config = LoraConfig(
@@ -591,31 +588,31 @@ model = get_peft_model(base_model, config)
 model.print_trainable_parameters()   # ~0.5% of total</code></pre>
                 </div>
                 <div>
-                    <h3>Things to try</h3>
+                    <h3 id="vz-s-things-to-try">Things to try</h3>
                     <ol><li><strong>Start at r = 8</strong> on a 4096&times;4096 layer and read the trainable fraction &mdash; well under 1%.</li><li><strong>Drag the rank to 128.</strong> Parameters climb steeply but remain a small slice of the full matrix. Even a large rank is cheap.</li><li><strong>Widen d and k while holding rank fixed.</strong> Full fine-tuning grows <em>quadratically</em>; LoRA grows only linearly. The bigger the model, the better LoRA looks.</li><li><strong>Watch the &Delta;W preview at r = 1</strong>, then raise the rank. At rank 1 every row is a scaled copy of a single pattern; higher ranks can express genuinely independent structure.</li><li><strong>Switch to 70B</strong> and compare the adapter file size to the full model. That gap is why model hubs host thousands of adapters instead of thousands of full checkpoints.</li></ol>
                 </div>
                 <div>
-                    <h3>Worth remembering</h3>
+                    <h3 id="vz-s-worth-remembering">Worth remembering</h3>
                     <p>LoRA does not make the model smaller &mdash; it makes the <em>update</em> smaller. By constraining the change to a low-rank subspace, it converts fine-tuning from an infrastructure project into something that runs on one GPU and ships as a few-megabyte file, with no inference penalty once merged.</p>
                 </div>
                 <div>
-                    <h3>QLoRA: fine-tuning on one consumer GPU</h3>
+                    <h3 id="vz-s-qlora-fine-tuning-on-one-consumer-gpu">QLoRA: fine-tuning on one consumer GPU</h3>
                     <p>LoRA reduces the <em>trainable</em> parameters. The frozen base model still has to be held in memory, and 7 billion parameters in 16-bit is 14GB before anything else.</p><p><strong>QLoRA</strong> quantises the frozen base to 4-bit &mdash; about 3.5GB &mdash; while training the LoRA adapters in higher precision. Gradients flow through the quantised weights without updating them.</p><p>That combination is what put fine-tuning a 7B model within reach of a single 24GB card, and a 70B model within reach of two.</p><div class="vz-table-wrap"><table><thead><tr><th>Approach</th><th>Memory for a 7B model</th></tr></thead><tbody><tr><td>Full fine-tuning (Adam, fp32)</td><td>~110GB</td></tr><tr><td>Full fine-tuning (mixed precision)</td><td>~60GB</td></tr><tr><td>LoRA (fp16 base)</td><td>~16GB</td></tr><tr><td>QLoRA (4-bit base)</td><td>~6GB</td></tr></tbody></table></div><p>The quality cost of the quantisation is small &mdash; measurably present, and generally acceptable given what it enables.</p>
                 </div>
                 <div>
-                    <h3>Adapters as deployable artefacts</h3>
+                    <h3 id="vz-s-adapters-as-deployable-artefacts">Adapters as deployable artefacts</h3>
                     <p>Because a LoRA adapter is a few megabytes rather than gigabytes, it changes how fine-tuned models are shipped.</p><p><strong>One base, many adapters.</strong> Serve a single base model in memory and load a small adapter per customer, per task or per tone. Serving frameworks support switching adapters per request, so a single deployment handles many fine-tunes.</p><p><strong>Cheap distribution.</strong> A 20MB adapter can be versioned in git and downloaded in seconds. A 14GB full fine-tune cannot.</p><p><strong>Cheap experimentation.</strong> Training several adapters and comparing them is affordable, where several full fine-tunes are not.</p><p>The trade: an unmerged adapter adds a small amount of inference latency, since <code>BAx</code> is computed alongside <code>W₀x</code>. Merging removes it and gives up the ability to swap.</p>
                 </div>
                 <div>
-                    <h3>When LoRA is not the answer</h3>
+                    <h3 id="vz-s-when-lora-is-not-the-answer">When LoRA is not the answer</h3>
                     <p><strong>You need new knowledge, not new behaviour.</strong> Fine-tuning of any kind is a poor way to add facts. Use retrieval.</p><p><strong>The domain is very far from pretraining.</strong> Adapting an English model to a low-resource language or to a genuinely novel modality may need more capacity than a low-rank update provides &mdash; consider full fine-tuning or continued pretraining.</p><p><strong>You have very little data.</strong> Below a few hundred examples, few-shot prompting is often better than any fine-tuning, and much cheaper to iterate.</p><p><strong>Absolute maximum quality with unlimited compute.</strong> Full fine-tuning still edges ahead on some tasks.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>What rank should I use?</strong> 8&ndash;16 for style and format; 32&ndash;64 for substantial behaviour change. Tune it on your evaluation set.</p><p><strong>What is <code>alpha</code> for?</strong> It scales the adapter's contribution by <code>alpha/r</code>. Setting it to twice the rank is a common convention that keeps the effective scale stable as rank changes.</p><p><strong>Which modules should I target?</strong> All attention projections plus the feed-forward layers is a strong default. Query and value only is cheaper and usually slightly worse.</p><p><strong>Can I combine several adapters?</strong> Yes &mdash; adapters can be summed or weighted, which sometimes composes their behaviours and sometimes interferes.</p><p><strong>Does merging change quality?</strong> No, if precision matches. Merging into a quantised base can lose a little.</p><p><strong>Is LoRA as good as full fine-tuning?</strong> On most task metrics, effectively yes. Occasionally better, because there is less capacity to overfit.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>Freeze the pretrained weights; train a small low-rank pair <code>BA</code> added to selected matrices.</li><li>Typically 0.1&ndash;1% of parameters are trained, with quality close to full fine-tuning.</li><li><code>B</code> starts at zero so training begins from the pretrained model exactly.</li><li>QLoRA quantises the frozen base to 4-bit, putting 7B fine-tuning on a single consumer GPU.</li><li>Adapters are megabytes: one base model can serve many, and merging removes the inference overhead.</li></ul>
                 </div>
             </div>

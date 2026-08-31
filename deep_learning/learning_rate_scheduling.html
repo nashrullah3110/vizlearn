@@ -596,20 +596,17 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">A single fixed learning rate has to be two things at once: big enough to cross the landscape early, small enough to settle at the end. A schedule lets it be both in turn.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Why one value cannot serve both phases</h3>
-                    <p>Early in training you are far from any good solution and want large steps. Late in training you are close, and large steps make you bounce around the minimum without ever landing in it. A fixed rate forces a compromise that is wrong at both ends.</p><p>The common schedules:</p><ul><li><strong>Step decay</strong> &mdash; multiply by 0.1 every k epochs. Blunt, predictable, still widely used.</li><li><strong>Exponential</strong> &mdash; <span class="mono-font">&eta; = &eta;<sub>0</sub> e<sup>&minus;kt</sup></span>, smooth throughout.</li><li><strong>Cosine annealing</strong> &mdash; a smooth curve down to nearly zero, currently the most common default.</li></ul>
-                </div>
-                <div>
-                    <h3>Step decay, concretely</h3>
+                    <h3 id="vz-s-step-decay-concretely">Step decay, concretely</h3>
                     <p>Start at <span class="mono-font">&eta;<sub>0</sub> = 0.1</span> and multiply by 0.1 every 30 epochs:</p><ul><li>Epochs 0&ndash;29: <span class="mono-font">&eta; = 0.1</span> &mdash; covering ground fast</li><li>Epochs 30&ndash;59: <span class="mono-font">&eta; = 0.01</span> &mdash; refining</li><li>Epochs 60+: <span class="mono-font">&eta; = 0.001</span> &mdash; settling</li></ul><p>The characteristic sign that it is working is a visible drop in loss immediately after each decay step: the model had been oscillating around a minimum it could not land in, and a smaller step lets it descend the rest of the way.</p>
                 </div>
                 <div>
-                    <h3>One rate does not fit the whole run</h3>
+                    <h3 id="vz-s-one-rate-does-not-fit-the-whole-run">One rate does not fit the whole run</h3>
                     <p>Early in training the weights are far from anything useful, and large steps make rapid progress. Late in training the model is close to a good solution, and large steps overshoot it repeatedly &mdash; the loss plateaus and bounces rather than settling.</p><p>A schedule changes the learning rate over the course of training to suit both phases: large early, small late.</p><p>The effect is not marginal. A well-scheduled run typically reaches a noticeably lower final loss than the best constant rate, and the schedule is one of the cheapest improvements available.</p><div class="vz-table-wrap"><table><thead><tr><th>Schedule</th><th>Shape</th></tr></thead><tbody><tr><td>Constant</td><td>Flat throughout</td></tr><tr><td>Step decay</td><td>Drops by a factor at fixed epochs</td></tr><tr><td>Exponential</td><td>Multiplied by a constant each epoch</td></tr><tr><td>Cosine</td><td>Smooth decay following half a cosine curve</td></tr><tr><td>One-cycle</td><td>Warm-up, then cosine decay to near zero</td></tr><tr><td>Reduce-on-plateau</td><td>Drops when validation stops improving</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3>Warm-up: why the first steps are different</h3>
+                    <h3 id="vz-s-warm-up-why-the-first-steps-are-different">Warm-up: why the first steps are different</h3>
                     <p>Starting at full learning rate is often the wrong thing to do, for two specific reasons.</p><p>Adam's variance estimate is built from an exponential moving average that starts at zero, so for the first few hundred steps it is unreliable and the effective step size can be far larger than intended.</p><p>And a randomly initialised model produces meaningless gradients; taking a large step along them damages the initialisation more than it helps.</p><p><strong>Warm-up</strong> ramps the rate linearly from near zero over the first few hundred to few thousand steps. It is effectively mandatory for transformers, and it is a large part of why very large models train stably at all.</p><p>Combining warm-up with cosine decay gives the shape almost every modern recipe uses: up quickly, then a long smooth descent to near zero.</p><pre><code class="language-python">sched = torch.optim.lr_scheduler.OneCycleLR(
     opt, max_lr=3e-4,
     total_steps=epochs * len(loader),
@@ -622,35 +619,35 @@ for batch in loader:
     sched.step()             # per batch for OneCycle, not per epoch</code></pre><p>Calling <code>sched.step()</code> once per epoch when the scheduler expects per-batch stepping is a common bug: the schedule finishes hundreds of times too slowly and the run behaves as if the rate were constant.</p>
                 </div>
                 <div>
-                    <h3>Finding the maximum rate</h3>
+                    <h3 id="vz-s-finding-the-maximum-rate">Finding the maximum rate</h3>
                     <p>The schedule needs a peak value, and there is a systematic way to find it rather than guessing.</p><p>Run a short <strong>learning-rate sweep</strong>: increase the rate exponentially from about 1e-7 to 1 over a few hundred batches, recording the loss. The curve falls, reaches a minimum, and then explodes upwards. Pick a value somewhat below the explosion point &mdash; often around the steepest descent.</p><p>That takes a minute or two of compute and is worth more than any other single act of tuning. The learning rate affects results more than the optimiser choice, the layer count or the width.</p>
                 </div>
                 <div>
-                    <h3>Try this above</h3>
+                    <h3 id="vz-s-try-this-above">Try this above</h3>
                     <ol><li>Set <strong>Initial LR</strong> high and run to the full <strong>Target Epochs</strong>. The fixed run makes rapid early progress then hovers, never quite settling.</li><li>Compare against the scheduled run from the same start &mdash; same early progress, but it converges instead of hovering.</li><li>Now set Initial LR very low. The schedule barely helps, because you never had steps large enough to need shrinking.</li><li>Raise <strong>Complexity (Degree)</strong> and watch how a harder fitting problem makes the difference between the two more pronounced.</li></ol>
                 </div>
                 <div>
-                    <h3>What usually goes wrong</h3>
+                    <h3 id="vz-s-what-usually-goes-wrong">What usually goes wrong</h3>
                     <p><strong>Decaying too early.</strong> Shrink the step before the model has reached a good region and it will crawl the rest of the way, converging neatly to somewhere mediocre.<strong>Scheduling on epochs when the real unit is updates.</strong> Change the batch size and an epoch contains a different number of steps, so a schedule tuned at one batch size silently becomes a different schedule at another.<strong>Tuning the schedule before the initial rate.</strong> The starting value matters more than the decay shape. Find a good &eta;<sub>0</sub> first, then decide how it should come down.</p>
                 </div>
                 <div>
-                    <h3>In one line</h3>
+                    <h3 id="vz-s-in-one-line">In one line</h3>
                     <p>Big steps to travel, small steps to arrive &mdash; and get the starting size right before tuning the decay.</p>
                 </div>
                 <div>
-                    <h3>Choosing a schedule</h3>
+                    <h3 id="vz-s-choosing-a-schedule">Choosing a schedule</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Situation</th><th>Schedule</th></tr></thead><tbody><tr><td>Transformers, language models</td><td>Linear warm-up then cosine decay</td></tr><tr><td>Vision, training from scratch</td><td>One-cycle, or cosine with warm-up</td></tr><tr><td>Fine-tuning</td><td>Low constant rate, or a short cosine decay</td></tr><tr><td>Unknown training length</td><td>Reduce-on-plateau</td></tr><tr><td>Reproducing a paper</td><td>Whatever it specifies &mdash; usually step decay</td></tr></tbody></table></div><p><strong>Cosine decay</strong> has become the default because it beats step decay in most comparisons and has one fewer thing to tune &mdash; no decision about where the drops go.</p><p><strong>Reduce-on-plateau</strong> is the pragmatic choice when you do not know how long training will take: it watches validation loss and cuts the rate by a factor (typically 10) when improvement stalls. It requires no total-steps estimate, which the cosine schedules do.</p><p><strong>Warm restarts</strong> (SGDR) repeatedly decay to near zero and jump back up. The jumps can knock the model out of a sharp minimum into a better basin, and each cycle's endpoint makes a useful ensemble member.</p>
                 </div>
                 <div>
-                    <h3>What a well-scheduled run looks like</h3>
+                    <h3 id="vz-s-what-a-well-scheduled-run-looks-like">What a well-scheduled run looks like</h3>
                     <ul><li>The loss falls fast during and just after warm-up.</li><li>It descends steadily through the middle of the cosine.</li><li>It flattens smoothly in the final phase as the rate approaches zero &mdash; and the final loss is meaningfully lower than the plateau a constant rate would have reached.</li></ul><p>Failures and their signatures:</p><div class="vz-table-wrap"><table><thead><tr><th>Symptom</th><th>Likely cause</th></tr></thead><tbody><tr><td>Loss spikes early</td><td>Warm-up too short, or peak rate too high</td></tr><tr><td>Loss plateaus and bounces</td><td>Rate too high for the current phase</td></tr><tr><td>Loss falls but never flattens</td><td>Training ended before the schedule did</td></tr><tr><td>Loss barely moves at all</td><td>Peak rate too low, or scheduler stepped per epoch instead of per batch</td></tr><tr><td>Sudden improvement at the very end</td><td>Normal &mdash; the final low-rate phase settling into a minimum</td></tr></tbody></table></div><p>That last row is worth expecting: a visible drop in the closing epochs is the schedule working as intended, not a fluke.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>Do I need a schedule with Adam?</strong> Yes. Adam adapts per-parameter scaling; it does not replace a global decay, and every large-model recipe uses both.</p><p><strong>How long should warm-up be?</strong> 5&ndash;10% of total steps, or a fixed few thousand steps for large models.</p><p><strong>Should I step the scheduler per batch or per epoch?</strong> It depends on the scheduler. OneCycle and cosine-with-total-steps expect per batch; StepLR and ReduceLROnPlateau expect per epoch. Read the documentation rather than guessing.</p><p><strong>What if I do not know the total number of steps?</strong> Use reduce-on-plateau, which needs no estimate.</p><p><strong>Can the rate go to exactly zero?</strong> Cosine schedules usually decay to a small floor rather than zero, since zero means no further learning at all.</p><p><strong>Does the schedule interact with batch size?</strong> Yes &mdash; larger batches generally want a proportionally larger peak rate, with a longer warm-up to match.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>Large steps early, small steps late &mdash; that is what a schedule provides, and it beats any constant rate.</li><li>Warm-up protects the first few hundred steps, when gradients are meaningless and Adam's statistics are unreliable.</li><li>Linear warm-up plus cosine decay is the modern default.</li><li>Find the peak rate with a short exponential sweep rather than by guessing.</li><li>Step the scheduler at the interval it expects &mdash; per batch or per epoch &mdash; or the schedule silently does nothing.</li></ul>
                 </div>
             </div>

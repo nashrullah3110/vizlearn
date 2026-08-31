@@ -459,19 +459,19 @@
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <div>
-                    <h3>Start here</h3>
+                    <h3 id="vz-s-start-here">Start here</h3>
                     <p><span class="mono-font kw">CASE</span> is an if/else that lives inside a SELECT list, evaluated once per row. A <span class="mono-font kw">VIEW</span> is a query with a name, so you can <span class="mono-font kw">SELECT</span> from it like a table without repeating the logic every time.</p>
                 </div>
                 <div>
-                    <h3>CASE, shape and rules</h3>
+                    <h3 id="vz-s-case-shape-and-rules">CASE, shape and rules</h3>
                     <p>CASE WHEN cond1 THEN v1 WHEN cond2 THEN v2 ELSE v3 END</p><p>Conditions are checked top to bottom and the first match wins — order matters when ranges overlap. Without an ELSE, a row matching nothing gets NULL, silently, which is a common source of "why is this column empty" bugs.</p>
                 </div>
                 <div>
-                    <h3>Views: a name for a query, not a copy of it</h3>
+                    <h3 id="vz-s-views-a-name-for-a-query-not-a-copy-of-it">Views: a name for a query, not a copy of it</h3>
                     <p>A plain view stores no data. Every time you query it, the underlying SELECT runs again against the current table — which is the whole point of the raise experiment below. This is different from a <strong>materialized view</strong>, which does store a snapshot and has to be refreshed explicitly to catch up with changes underneath it.</p>
                 </div>
                 <div>
-                    <h3>CASE: if/else inside a query</h3>
+                    <h3 id="vz-s-case-if-else-inside-a-query">CASE: if/else inside a query</h3>
                     <p><code>CASE</code> is SQL's conditional expression. It returns a value, so it can appear anywhere a value can &mdash; in <code>SELECT</code>, in <code>ORDER BY</code>, inside an aggregate, even in <code>WHERE</code>.</p><pre><code class="language-sql">SELECT name,
        salary,
        CASE
@@ -482,7 +482,7 @@
 FROM   employees;</code></pre><p>Two rules that explain most <code>CASE</code> behaviour. Conditions are evaluated <strong>in order</strong> and the first match wins &mdash; so overlapping conditions are fine as long as the more specific one comes first. And with no <code>ELSE</code>, unmatched rows get NULL, which is a common source of unexpected blanks.</p><p>There is also a shorter form for equality against one expression:</p><pre><code class="language-sql">CASE status WHEN &#x27;A&#x27; THEN &#x27;Active&#x27; WHEN &#x27;C&#x27; THEN &#x27;Closed&#x27; ELSE &#x27;Unknown&#x27; END</code></pre>
                 </div>
                 <div>
-                    <h3>Conditional aggregation: the pattern worth learning</h3>
+                    <h3 id="vz-s-conditional-aggregation-the-pattern-worth-learni">Conditional aggregation: the pattern worth learning</h3>
                     <p>Putting <code>CASE</code> inside an aggregate turns rows into columns, which is how summary reports are built without a pivot feature.</p><pre><code class="language-sql">SELECT region,
        COUNT(*)                                                  AS total,
        SUM(CASE WHEN status = &#x27;complete&#x27; THEN 1 ELSE 0 END)      AS completed,
@@ -492,7 +492,7 @@ FROM   orders
 GROUP  BY region;</code></pre><p>Note the last line: with no <code>ELSE</code>, non-complete orders become NULL, and <code>AVG</code> skips NULLs &mdash; so the average is computed over completed orders only. That interaction between <code>CASE</code> and aggregate NULL-skipping is the trick that makes this pattern so compact.</p><p>PostgreSQL offers a cleaner spelling with <code>FILTER</code>:</p><pre><code class="language-sql">COUNT(*) FILTER (WHERE status = &#x27;complete&#x27;) AS completed</code></pre><p><code>CASE</code> is also how you sort in a business order rather than alphabetically, and how you avoid division by zero (<code>CASE WHEN n = 0 THEN NULL ELSE x / n END</code>, though <code>NULLIF</code> is neater).</p>
                 </div>
                 <div>
-                    <h3>Views: a name for a query</h3>
+                    <h3 id="vz-s-views-a-name-for-a-query">Views: a name for a query</h3>
                     <p>A view is a stored <code>SELECT</code> that behaves like a table:</p><pre><code class="language-sql">CREATE VIEW active_customers AS
 SELECT c.id, c.name, c.email, COUNT(o.id) AS order_count
 FROM   customers c
@@ -503,15 +503,15 @@ GROUP  BY c.id, c.name, c.email;
 SELECT * FROM active_customers WHERE order_count &gt; 5;</code></pre><p>It stores no data. Every query against it re-runs the underlying <code>SELECT</code>, with the outer conditions merged in by the planner &mdash; so the filter above is applied efficiently rather than after materialising every active customer.</p><p>Views earn their keep in three ways: they hide complexity behind a name, they present a stable interface while the tables underneath change, and they restrict access &mdash; grant a user the view instead of the table and they see only the rows and columns it exposes.</p><p>Their limits are worth knowing too. A simple view can be updatable; anything with joins, aggregates or <code>DISTINCT</code> generally is not, and needs an <code>INSTEAD OF</code> trigger to accept writes. And views stack: a view built on three views built on four views is a maintenance problem and often an unpredictable query plan.</p>
                 </div>
                 <div>
-                    <h3>Guided experiments</h3>
+                    <h3 id="vz-s-guided-experiments">Guided experiments</h3>
                     <ol><li><strong>Read the bands.</strong> Each row gets a label from CASE based purely on its salary and the two thresholds.</li><li><strong>Move a threshold.</strong> Drag Senior down and someone's label flips from mid to senior immediately — the CASE logic is re-evaluated on every row, every time.</li><li><strong>Create the view.</strong> Press the button. A second panel appears, querying pay_bands — identical to the first table, because it is the same logic under a name.</li><li><strong>Give Grace a raise.</strong> Her underlying salary changes, and pay_bands updates on the very next read — no refresh, no re-creation. The view is not a stored answer, it is the query, run again.</li></ol>
                 </div>
                 <div>
-                    <h3>Where that leaves you</h3>
+                    <h3 id="vz-s-where-that-leaves-you">Where that leaves you</h3>
                     <p>CASE is a per-row branch inside SELECT that returns the first matching value or NULL if nothing matches and there is no ELSE. A view is a saved query, not saved data — it re-runs against live tables on every read, which is what makes it stay correct as the underlying data changes and is exactly the property a materialized view trades away for speed.</p>
                 </div>
                 <div>
-                    <h3>Materialised views</h3>
+                    <h3 id="vz-s-materialised-views">Materialised views</h3>
                     <p>A <strong>materialised view</strong> stores the result rather than re-running it:</p><pre><code class="language-sql">CREATE MATERIALIZED VIEW monthly_revenue AS
 SELECT DATE_TRUNC(&#x27;month&#x27;, order_date) AS month, SUM(total) AS revenue
 FROM   orders GROUP BY 1;
@@ -519,15 +519,15 @@ FROM   orders GROUP BY 1;
 REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_revenue;</code></pre><p>Queries against it are as fast as querying a table, because it is one. The trade is staleness: the data is only as current as the last refresh, and the refresh itself costs whatever the underlying query costs.</p><p>Use one when an expensive aggregate is read far more often than the data changes &mdash; dashboards, reports, leaderboards. <code>CONCURRENTLY</code> lets readers keep using the old copy while the new one builds, at the cost of requiring a unique index on the view.</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>View</th><th>Materialised view</th></tr></thead><tbody><tr><td>Stores data</td><td>No</td><td>Yes</td></tr><tr><td>Always current</td><td>Yes</td><td>Only as of the last refresh</td></tr><tr><td>Query speed</td><td>Cost of the underlying query</td><td>Cost of reading a table</td></tr><tr><td>Can be indexed</td><td>No (the underlying tables are)</td><td>Yes</td></tr><tr><td>Maintenance</td><td>None</td><td>Refresh schedule</td></tr></tbody></table></div><p>MySQL has no materialised views; the usual substitute is a summary table maintained by a scheduled job or triggers.</p>
                 </div>
                 <div>
-                    <h3>Common mistakes</h3>
+                    <h3 id="vz-s-common-mistakes">Common mistakes</h3>
                     <ul><li><strong>Forgetting <code>ELSE</code></strong> and getting NULLs where a default was intended.</li><li><strong>Ordering conditions wrongly.</strong> <code>WHEN salary &gt; 50000 THEN 'mid' WHEN salary &gt; 80000 THEN 'senior'</code> never returns 'senior', because the first condition already caught those rows.</li><li><strong>Mixing return types</strong> across branches. Some engines coerce, some raise an error, and the coercion is rarely what you want.</li><li><strong>Views over views over views.</strong> Convenient to write, painful to debug, and easy for the planner to handle badly.</li><li><strong>Treating a view as a cache.</strong> It is not one &mdash; that is what a materialised view or a summary table is for.</li><li><strong>Putting a <code>CASE</code> on an indexed column in <code>WHERE</code></strong>, which prevents the index being used.</li></ul>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>Can <code>CASE</code> be used in <code>ORDER BY</code>?</strong> Yes, and it is the standard way to sort by a custom business order.</p><p><strong>Are views slower than the equivalent query?</strong> No &mdash; the planner inlines the definition and optimises the whole thing together.</p><p><strong>Can I update through a view?</strong> Simple single-table views, usually yes. Anything with a join or aggregate needs an <code>INSTEAD OF</code> trigger.</p><p><strong>Do views improve security?</strong> Yes, genuinely &mdash; granting access to a view instead of a table is a standard way to expose a subset of columns or rows.</p><p><strong>How often should a materialised view refresh?</strong> As rarely as the freshness requirement allows. Hourly for most dashboards; nightly for reporting. Refresh cost and staleness tolerance are the only two inputs.</p><p><strong>Is <code>COALESCE</code> just a shorter <code>CASE</code>?</strong> Effectively yes: <code>COALESCE(a, b)</code> is <code>CASE WHEN a IS NOT NULL THEN a ELSE b END</code>. Use <code>COALESCE</code> when that is all you need.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li><code>CASE</code> returns a value and can appear anywhere a value can; the first matching condition wins.</li><li>With no <code>ELSE</code>, unmatched rows return NULL &mdash; often useful inside aggregates, often a bug elsewhere.</li><li>Conditional aggregation (<code>SUM(CASE WHEN ...)</code>) turns rows into report columns.</li><li>A view names a query and stores nothing; it hides complexity and can restrict access.</li><li>A materialised view stores the result and needs refreshing &mdash; use it when reads far outnumber changes.</li></ul>
                 </div>
             </div>

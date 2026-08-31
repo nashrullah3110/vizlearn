@@ -541,6 +541,11 @@ SEQUENCE = {
     ],
     "sklearn": [
         "sklearn/what_is_scikit_learn.html",
+        "sklearn/loading_and_shaping_data.html",
+        "sklearn/train_test_split.html",
+        "sklearn/linear_regression.html",
+        "sklearn/regression_metrics.html",
+        "sklearn/logistic_regression.html",
     ],
     "pydantic": [
         "pydantic/what_is_pydantic.html",

@@ -4460,6 +4460,46 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Linear Regression",
+  "path": "sklearn/linear_regression.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Loading and Shaping Data",
+  "path": "sklearn/loading_and_shaping_data.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Logistic Regression",
+  "path": "sklearn/logistic_regression.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Regression Metrics",
+  "path": "sklearn/regression_metrics.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Splitting Train and Test",
+  "path": "sklearn/train_test_split.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "fit, predict, transform",
   "path": "sklearn/what_is_scikit_learn.html",
   "category": "scikit-learn",

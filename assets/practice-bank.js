@@ -19973,6 +19973,261 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "sklearn/linear_regression.html",
+  "title": "Linear Regression",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "What does coef_ contain?",
+    "o": [
+     "The predictions",
+     "One coefficient per feature, in column order",
+     "The residuals",
+     "The R-squared value"
+    ],
+    "a": 1,
+    "w": "One number per column of X, in the same order as the columns, plus intercept_ as a single separate number."
+   },
+   {
+    "t": "A feature's coefficient is ten times larger than another's. What does that tell you?",
+    "o": [
+     "It is ten times more important",
+     "Nothing, until you know the features are on the same scale",
+     "The model is overfitting",
+     "That feature should be removed"
+    ],
+    "a": 1,
+    "w": "A coefficient is in units of target per unit of feature. Change the feature's units and the coefficient changes while the model stays identical."
+   },
+   {
+    "t": "What does a negative R-squared mean?",
+    "o": [
+     "An error in the calculation",
+     "The model is worse than always predicting the mean",
+     "The correlation is negative",
+     "R-squared cannot be negative"
+    ],
+    "a": 1,
+    "w": "R-squared compares the model against the mean baseline. Below zero means the baseline would have done better, which is common on a test set after overfitting."
+   },
+   {
+    "t": "Can a linear model fit a curved relationship?",
+    "o": [
+     "No, never",
+     "Yes, if you give it a curved feature such as x**2",
+     "Only with a different solver",
+     "Only in one dimension"
+    ],
+    "a": 1,
+    "w": "\"Linear\" refers to the coefficients. Adding x**2 as a column lets the same model fit a parabola exactly."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/loading_and_shaping_data.html",
+  "title": "Loading and Shaping Data",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "What shape must X have?",
+    "o": [
+     "1-D, one entry per sample",
+     "2-D, samples as rows and features as columns",
+     "2-D, features as rows and samples as columns",
+     "Any shape - scikit-learn infers it"
+    ],
+    "a": 1,
+    "w": "Rows are samples and columns are features, which is why a single feature still needs reshape(-1, 1)."
+   },
+   {
+    "t": "What does return_X_y=True change?",
+    "o": [
+     "It shuffles the data",
+     "It returns the two arrays directly instead of a Bunch",
+     "It splits into train and test",
+     "It returns a DataFrame"
+    ],
+    "a": 1,
+    "w": "It skips the Bunch wrapper, which is what makes `X, y = load_iris(return_X_y=True)` a one-liner."
+   },
+   {
+    "t": "Which prefix generates synthetic data with properties you choose?",
+    "o": [
+     "load_",
+     "fetch_",
+     "make_",
+     "build_"
+    ],
+    "a": 2,
+    "w": "make_classification, make_regression and make_blobs construct data with a known structure, which is ideal for testing whether a technique behaves as expected."
+   },
+   {
+    "t": "\"Found input variables with inconsistent numbers of samples\" means what?",
+    "o": [
+     "X is 1-D",
+     "X and y have different numbers of rows",
+     "There are missing values",
+     "The features are on different scales"
+    ],
+    "a": 1,
+    "w": "The numbers in the brackets are the two row counts. It usually means a filter was applied to one of the two and not the other."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/logistic_regression.html",
+  "title": "Logistic Regression",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "Why is it called regression when it classifies?",
+    "o": [
+     "Historical accident with no meaning",
+     "It fits a linear model to the log-odds, then squashes that into a probability",
+     "It can also do regression",
+     "It regresses towards the mean"
+    ],
+    "a": 1,
+    "w": "The linear part predicts log-odds, which is unbounded and so suitable for a linear fit. The logistic function converts that to a probability between 0 and 1."
+   },
+   {
+    "t": "What is predict() doing that predict_proba() is not?",
+    "o": [
+     "Fitting again",
+     "Applying a 0.5 threshold and discarding the confidence",
+     "Scaling the features",
+     "Averaging the classes"
+    ],
+    "a": 1,
+    "w": "predict is predict_proba plus a threshold. The 0.5 is a default choice, and changing it is often the highest-value adjustment available."
+   },
+   {
+    "t": "What does a ConvergenceWarning mean here?",
+    "o": [
+     "The data has missing values",
+     "The solver hit max_iter before finishing, and returned the model anyway",
+     "The classes are imbalanced",
+     "The model failed to fit"
+    ],
+    "a": 1,
+    "w": "It does not raise. You get whatever coefficients the solver had reached, which is why scaling the features is the fix rather than raising max_iter."
+   },
+   {
+    "t": "In LogisticRegression, what does a small C mean?",
+    "o": [
+     "Weak regularisation",
+     "Strong regularisation",
+     "Fewer classes",
+     "Fewer iterations"
+    ],
+    "a": 1,
+    "w": "C is inverted relative to alpha in Ridge and Lasso: small C penalises coefficient size heavily. It catches almost everyone once."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/regression_metrics.html",
+  "title": "Regression Metrics",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "Which metric is expressed in the target's own units?",
+    "o": [
+     "R-squared",
+     "MAE",
+     "MAPE",
+     "MSE"
+    ],
+    "a": 1,
+    "w": "MAE is an average of absolute differences, so predicting pounds gives an MAE in pounds. RMSE is too, since the square root undoes the squaring."
+   },
+   {
+    "t": "Two models have the same total absolute error. Which metric distinguishes them?",
+    "o": [
+     "MAE",
+     "RMSE",
+     "Neither",
+     "MAPE"
+    ],
+    "a": 1,
+    "w": "Squaring makes RMSE larger when the error is concentrated in a few large misses rather than spread evenly."
+   },
+   {
+    "t": "What does a negative R-squared mean?",
+    "o": [
+     "A bug",
+     "The model is worse than always predicting the mean",
+     "The predictions are negative",
+     "It cannot be negative"
+    ],
+    "a": 1,
+    "w": "R-squared is measured against the mean baseline, and a model can do worse than that - commonly on a test set after overfitting."
+   },
+   {
+    "t": "Why is it spelled neg_mean_absolute_error?",
+    "o": [
+     "It returns the negative of the predictions",
+     "The helpers always maximise, so error metrics are negated",
+     "It is a typo kept for compatibility",
+     "It measures negative errors only"
+    ],
+    "a": 1,
+    "w": "Negating lets one code path rank every metric by taking the largest, without knowing whether bigger or smaller is better for that metric."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/train_test_split.html",
+  "title": "Splitting Train and Test",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "What order does train_test_split return its four objects in?",
+    "o": [
+     "X_train, y_train, X_test, y_test",
+     "X_train, X_test, y_train, y_test",
+     "train, test, X, y",
+     "y_train, y_test, X_train, X_test"
+    ],
+    "a": 1,
+    "w": "Both X pieces come before either y piece. Getting this wrong can produce a program that runs and reports a meaningless number."
+   },
+   {
+    "t": "Why pass random_state?",
+    "o": [
+     "It improves the score",
+     "It makes the split reproducible, so two runs are comparable",
+     "It stratifies the split",
+     "It is required"
+    ],
+    "a": 1,
+    "w": "Without it every run is a different split and therefore a different experiment - you cannot tell whether a change or the split moved the score."
+   },
+   {
+    "t": "What does stratify=y do?",
+    "o": [
+     "Sorts the data by class",
+     "Keeps each class in the same proportion in both halves",
+     "Removes rare classes",
+     "Balances the classes by resampling"
+    ],
+    "a": 1,
+    "w": "It samples within each class. It matters most when a class is rare, where a plain split can leave almost none of it in the test set."
+   },
+   {
+    "t": "Why must scaling happen after the split?",
+    "o": [
+     "It is faster that way",
+     "Otherwise the scaler learns from the test rows and the test score is no longer honest",
+     "Scalers cannot handle the full dataset",
+     "It does not matter"
+    ],
+    "a": 1,
+    "w": "Anything fitted on the whole dataset has seen the test set. Information reaches the model through the transformer's parameters, and the score comes out too high."
+   }
+  ]
+ },
+ {
   "path": "sklearn/what_is_scikit_learn.html",
   "title": "fit, predict, transform",
   "cat": "scikit-learn",

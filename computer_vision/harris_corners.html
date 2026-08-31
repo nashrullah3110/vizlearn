@@ -231,30 +231,27 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">What makes a point in an image worth remembering, and the determinant that measures it.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The question behind the detector</h3>
-                    <p>To match two photographs of the same scene, you need points you can recognise in both. Which points are those?</p><p>The Harris insight is to ask what happens when you shift a small window slightly in every direction.</p><p><strong>Flat region.</strong> Shift it anywhere and the contents barely change. There is nothing to lock onto: this window could be almost anywhere.</p><p><strong>Edge.</strong> Shift it along the edge and nothing changes; shift it across and everything does. It is locatable in one direction and free to slide in the other &mdash; the aperture problem.</p><p><strong>Corner.</strong> Shift it in any direction at all and the contents change. Its position is pinned in both directions, and that is exactly what a landmark needs to be.</p>
-                </div>
-                <div>
-                    <h3>Making it arithmetic</h3>
+                    <h3 id="vz-s-making-it-arithmetic">Making it arithmetic</h3>
                     <p>The change under a small shift is captured by how the image gradient behaves across the window. Collect the gradients into the <strong>structure tensor</strong>:</p><pre><code>M  =  [ sum(Ix*Ix)   sum(Ix*Iy) ]
       [ sum(Ix*Iy)   sum(Iy*Iy) ]</code></pre><p>Its two eigenvalues say how strongly the intensity varies along the two principal directions:</p><div class="vz-table-wrap"><table><thead><tr><th>&lambda;1</th><th>&lambda;2</th><th>Meaning</th></tr></thead><tbody><tr><td>small</td><td>small</td><td>flat</td></tr><tr><td>large</td><td>small</td><td>edge</td></tr><tr><td>large</td><td>large</td><td><strong>corner</strong></td></tr></tbody></table></div><p>Computing eigenvalues at every pixel would be slow, so Harris uses a combination that behaves the same way without them:</p><pre><code>R  =  det(M) - k * trace(M)^2
      =  (l1*l2) - k*(l1+l2)^2</code></pre><p><code>R</code> is large and positive only when both eigenvalues are large, strongly negative at an edge, and near zero on flat ground. The determinant multiplies the eigenvalues, so one small eigenvalue kills it; the trace term subtracts a penalty that grows when the two are unbalanced.</p><p><code>k</code> sets how strictly that balance is enforced &mdash; conventionally between 0.04 and 0.06. Drag it high in the visualisation and detections thin out to the sharpest corners; drag it low and edges start to survive.</p>
                 </div>
                 <div>
-                    <h3>Reading the visualisation</h3>
+                    <h3 id="vz-s-reading-the-visualisation">Reading the visualisation</h3>
                     <p>Highlighted pixels are those whose response clears the threshold.</p><p>Set the threshold low and whole edges light up, which is the failure mode <code>R</code> is designed to avoid, appearing because the threshold is admitting weakly negative and near-zero responses. Raise it and only the rectangle's four corners and the triangle's points remain &mdash; the genuinely distinctive positions.</p><p>The window radius controls how much context each decision uses. A small window is sensitive to noise and finds many tiny corners. A large one is stable but blurs nearby corners into a single response and misses fine structure.</p>
                 </div>
                 <div>
-                    <h3>What it is and is not invariant to</h3>
+                    <h3 id="vz-s-what-it-is-and-is-not-invariant-to">What it is and is not invariant to</h3>
                     <p><strong>Rotation: yes.</strong> The eigenvalues of the structure tensor do not depend on the coordinate frame, so a rotated corner is still a corner with the same response. This is the property that makes Harris useful for matching.</p><p><strong>Illumination: mostly.</strong> A constant brightness offset does not change gradients at all. A contrast scaling multiplies them, which scales <code>R</code>, so a relative threshold is needed rather than an absolute one.</p><p><strong>Scale: no.</strong> This is the significant gap. A corner viewed from twice as far is a smaller corner, and a fixed window either sees only part of it or swamps it with context.</p><p>That gap is what <strong>SIFT</strong> addressed, by searching over scales as well as positions and recording the scale at which each keypoint is most distinctive, then describing the local gradient pattern so keypoints can be matched rather than merely found. <strong>ORB</strong> does something similar much faster using FAST corners and binary descriptors, which is why it turns up in real-time systems.</p>
                 </div>
                 <div>
-                    <h3>Where corners are used</h3>
+                    <h3 id="vz-s-where-corners-are-used">Where corners are used</h3>
                     <p>Panorama stitching, structure from motion, visual SLAM, camera calibration and image registration all rest on finding the same physical points in several images and solving for the transform between them. Detection is the first step; [template matching](template_matching.html) is the alternative that does not survive rotation.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>An absolute threshold.</strong> Response scales with contrast, so a threshold tuned on one image fails on a darker one. Threshold relative to the maximum, as this page does.</p><p><strong>No non-maximum suppression.</strong> A corner produces a cluster of high responses, not one pixel.</p><p><strong>Expecting scale invariance.</strong> If the camera distance varies, use a scale-invariant detector.</p><p><strong>Corners on a blurred image.</strong> Blur destroys the gradients the whole method depends on, so denoise gently or not at all before detecting.</p>
                 </div>
             </div>
