@@ -8425,6 +8425,13 @@ over three items each is nine iterations.
 reads well &mdash; the loop handles the structure and the comprehension handles
 one row.
 
+<strong>Is there a limit on nesting depth?</strong> Python allows about twenty
+levels of indentation, which is far past readability. Treat three as the
+practical ceiling.
+
+<strong>How do I loop over two grids together?</strong> `zip` the outer
+sequences, then loop the pair: `for row_a, row_b in zip(a, b)`.
+
 ## Recap in one screen
 
 - The inner loop runs completely on every pass of the outer one; the bodies
@@ -8605,6 +8612,10 @@ outer scope.
 <strong>Why can a method not see class attributes directly?</strong> Because a
 class body is not an enclosing scope for its methods. Reach them through
 `self.` or the class name.
+
+<strong>What scope does a lambda have?</strong> The same as any function: its
+own local scope, with the enclosing one visible. That is why the loop-capture
+trap applies to lambdas exactly as it does to `def`.
 
 ## Recap in one screen
 
