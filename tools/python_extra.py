@@ -7164,6 +7164,10 @@ tests what it bound.
 comparable. For structural patterns it is usually faster than the equivalent
 checks, and speed is not the reason to choose it.
 
+<strong>Can I match against a set of allowed values?</strong> Use `|` between
+literals in one case, or a guard with `in` when the collection is built
+elsewhere.
+
 ## Recap in one screen
 
 - `match` tests patterns, not conditions; the pattern checks shape and binds
@@ -7409,6 +7413,13 @@ expression uses.
 <strong>Is there a way to skip an item from the expression?</strong> No. An
 expression must produce something, so skipping is the filter's job. That
 separation is the reason for the two positions.
+
+<strong>Do comprehensions with filters build the list lazily?</strong> No, a
+list comprehension builds the whole thing. Use a generator expression when the
+filtering should happen on demand.
+
+<strong>Can I filter on the index?</strong> Only by supplying one:
+`[x for i, x in enumerate(items) if i % 2 == 0]`.
 
 ## Recap in one screen
 
