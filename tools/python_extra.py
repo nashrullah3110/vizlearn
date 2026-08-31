@@ -7647,6 +7647,14 @@ reliable.
 <strong>Why does `print(f())` show `None` for my function?</strong> Because the
 function returned nothing. Usually a `return` is missing on one branch.
 
+<strong>How should a function signal "no result"?</strong> Return `None` when
+absence is ordinary and the caller will branch on it. Raise when absence means
+something has gone wrong and the caller has no sensible alternative.
+
+<strong>Is there a way to make `None` falsy checks safe?</strong> Not by
+changing `None`. The fix is always to say which question you are asking &mdash;
+emptiness or absence.
+
 ## Recap in one screen
 
 - The falsy values are `None`, `False`, `0`, `0.0`, `""`, `[]`, `{}` and
@@ -8023,6 +8031,10 @@ initialised version from `sys.modules`. There is no good reason to.
 <strong>What does `if TYPE_CHECKING:` do?</strong> Guards imports that exist
 only for type hints, so they cost nothing at runtime and cannot cause a
 circular import.
+
+<strong>Should I import inside a function to speed up startup?</strong> Only
+for genuinely heavy optional dependencies. For anything else the cost is
+already paid once and the hidden dependency is not worth it.
 
 ## Recap in one screen
 
