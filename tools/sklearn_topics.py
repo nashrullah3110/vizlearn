@@ -896,3 +896,276 @@ One line, four objects, and three arguments worth setting deliberately every tim
          "why": "Anything fitted on the whole dataset has seen the test set. Information reaches the model through the transformer's parameters, and the score comes out too high."},
     ],
 )
+
+
+# ---------------------------------------------------------------------------
+# 4. Linear regression
+# ---------------------------------------------------------------------------
+topic(
+    "linear_regression",
+    "Linear Regression",
+    "Regression",
+    "The simplest useful model, and the one whose fitted parameters you can "
+    "actually read - with one caveat about reading them.",
+    _svg(_box(16, 18, 128, 58, S, B) +
+         _dots([(30, 66), (50, 58), (70, 47), (90, 40), (110, 30), (130, 24)]) +
+         '<path d="M26 70 L136 22" stroke="var(--accent-primary)" '
+         'stroke-width="2"/>' + _txt(80, 86, "y = a + b x", A, 8)),
+    [
+        ("Fitting a line, and reading it back",
+         "Two learned numbers, and together they are the whole model.",
+         '''from sklearn.linear_model import LinearRegression
+import numpy as np
+
+# price = 40 + 25 * rooms, with a little noise
+rooms = np.array([[1], [2], [3], [4], [5], [6]])
+price = np.array([66, 89, 115, 140, 168, 190])
+
+model = LinearRegression().fit(rooms, price)
+
+print("slope     (coef_)     : %.2f" % model.coef_[0])
+print("intercept (intercept_): %.2f" % model.intercept_)
+print()
+print("so the line it found is: price = %.1f + %.1f * rooms"
+      % (model.intercept_, model.coef_[0]))
+'''),
+
+        ("More features, more coefficients",
+         "One coefficient per column, in the same order as the columns.",
+         '''from sklearn.linear_model import LinearRegression
+import numpy as np
+
+# two features now: rooms and area
+X = np.array([[1, 40], [2, 55], [3, 75], [4, 90], [5, 110], [6, 130]])
+y = np.array([66, 89, 115, 140, 168, 190])
+
+model = LinearRegression().fit(X, y)
+
+for name, c in zip(["rooms", "area"], model.coef_):
+    print("%-6s coefficient: %8.3f" % (name, c))
+print("intercept        : %8.3f" % model.intercept_)
+print()
+print("one coefficient per column of X, in the same order")
+'''),
+
+        ("Predictions and residuals",
+         "What the model says, what the data said, and the gap - which is the "
+         "thing the fit was minimising.",
+         '''from sklearn.linear_model import LinearRegression
+import numpy as np
+
+rooms = np.array([[1], [2], [3], [4], [5], [6]])
+price = np.array([66, 89, 115, 140, 168, 190])
+
+model = LinearRegression().fit(rooms, price)
+pred = model.predict(rooms)
+
+print(" rooms  actual  predicted  residual")
+for r, a, p in zip(rooms.ravel(), price, pred):
+    print("%6d %7d %10.1f %9.1f" % (r, a, p, a - p))
+print()
+print("residuals sum to about zero: %.10f" % (price - pred).sum())
+'''),
+
+        ("score() on a regressor is R-squared",
+         "And it is worth computing once by hand, because the definition "
+         "explains what a negative value would mean.",
+         '''from sklearn.linear_model import LinearRegression
+import numpy as np
+
+rooms = np.array([[1], [2], [3], [4], [5], [6]])
+price = np.array([66, 89, 115, 140, 168, 190])
+model = LinearRegression().fit(rooms, price)
+
+print("score() on a regressor is R-squared:", round(model.score(rooms, price), 4))
+
+# R-squared compares the model against always predicting the mean.
+mean_only = np.full_like(price, price.mean(), dtype=float)
+ss_res = ((price - model.predict(rooms)) ** 2).sum()
+ss_tot = ((price - mean_only) ** 2).sum()
+print("computed by hand              :", round(1 - ss_res / ss_tot, 4))
+'''),
+
+        ("A big coefficient does not mean an important feature",
+         "The same model twice, with one feature's units changed. Watch the "
+         "coefficient move and the fit stay identical.",
+         '''from sklearn.linear_model import LinearRegression
+import numpy as np
+
+# Same information, different units: area in square metres, then in hectares.
+X_m2 = np.array([[40.0], [55.0], [75.0], [90.0], [110.0], [130.0]])
+y = np.array([66, 89, 115, 140, 168, 190])
+
+X_ha = X_m2 / 10000.0
+
+for label, X in [("area in m2", X_m2), ("area in hectares", X_ha)]:
+    m = LinearRegression().fit(X, y)
+    print("%-18s coef_ = %12.4f   R2 = %.4f" % (label, m.coef_[0], m.score(X, y)))
+
+print()
+print("identical model, coefficient 10000x apart - size means nothing")
+print("until the features are on the same scale.")
+'''),
+
+        ("Linear in the coefficients, not in the data",
+         "A straight line fits a curve badly, and the same linear model fits it "
+         "exactly once you give it the right feature.",
+         '''from sklearn.linear_model import LinearRegression
+import numpy as np
+
+x = np.arange(1, 11).reshape(-1, 1)
+y = (x.ravel() ** 2).astype(float)      # a curve, not a line
+
+lin = LinearRegression().fit(x, y)
+print("straight line on a curve, R2 =", round(lin.score(x, y), 3))
+
+# Give it x squared as a feature and the same linear model fits exactly.
+X2 = np.hstack([x, x ** 2])
+poly = LinearRegression().fit(X2, y)
+print("with x**2 as a second feature, R2 =", round(poly.score(X2, y), 3))
+print()
+print("'linear' means linear in the coefficients, not in the data.")
+'''),
+    ],
+    [
+        "<code class='mono-font'>coef_</code> holds one number per feature, in "
+        "column order; <code class='mono-font'>intercept_</code> is the value "
+        "when every feature is zero.",
+        "The fit minimises the sum of the squared residuals - which is why a "
+        "single outlier moves the line further than several small errors.",
+        "<code class='mono-font'>score()</code> returns R&sup2;: 1.0 is perfect, "
+        "0.0 is no better than predicting the mean, and negative is worse than "
+        "that.",
+        "A coefficient's <em>size</em> depends on the feature's units, so it is "
+        "not a measure of importance unless the features were scaled first.",
+        "\"Linear\" describes the coefficients, not the data - add "
+        "<code class='mono-font'>x**2</code> as a feature and a linear model "
+        "fits a curve.",
+        "With more features than samples, or perfectly correlated columns, the "
+        "solution is not unique and the coefficients become unstable.",
+    ],
+    """title: Linear Regression: A Practical Guide
+intro: The model whose parameters you can read, whose failures are visible, and whose coefficients are misread more often than any other number in the library.
+
+## What it is fitting
+
+Linear regression finds one number per feature, plus an intercept, such that adding them up predicts the target as closely as possible.
+
+For one feature that is a straight line through a scatter of points. For three features it is a plane in four dimensions, which nobody can picture and which behaves exactly the same way arithmetically: multiply each feature by its coefficient, add the intercept, and that is the prediction.
+
+"As closely as possible" has a precise meaning: it minimises the sum of the *squared* differences between predictions and actuals. Squaring is what makes the problem solvable in one step rather than by search &mdash; there is a formula, and scikit-learn uses it &mdash; and it is also why the model is sensitive to outliers. A residual of 10 contributes a hundred times more than a residual of 1, so one badly wrong point pulls the line further than a dozen slightly wrong ones.
+
+## Reading the fitted model
+
+`coef_` is an array with one entry per column of `X`, in the same order as the columns. `intercept_` is a single number: the prediction when every feature is zero.
+
+Together they are the entire model. There is nothing else stored, no data kept, no lookup table &mdash; which is why a fitted linear regression is a few numbers regardless of whether it was trained on a hundred rows or a hundred million.
+
+That readability is the model's main practical advantage. A coefficient of 25.2 on `rooms` says: holding the other features fixed, one more room is associated with 25.2 more units of price. The phrase "holding the other features fixed" is doing real work in that sentence and is the part people drop &mdash; a coefficient is not the effect of a feature on its own, it is the effect after the other features in the model have accounted for what they can.
+
+The intercept is often meaningless in isolation. A house with zero rooms and zero area does not exist, so the intercept is where the line happens to cross rather than a prediction anyone would make. It matters for the arithmetic and rarely for the interpretation.
+
+## The coefficient trap
+
+This is the most commonly repeated mistake about linear models, and it is worth being blunt: **the size of a coefficient tells you nothing about the importance of a feature.**
+
+A coefficient is expressed in units of target per unit of feature. Measure area in square metres and the coefficient is some number; measure the same area in hectares and the coefficient is ten thousand times larger. The model is identical, the predictions are identical, the R&sup2; is identical. Only the units changed.
+
+So comparing coefficients across features only means something if the features are on the same scale. Standardising them first &mdash; subtracting the mean and dividing by the standard deviation &mdash; makes the coefficients comparable, and they then answer "how much does the prediction move per standard deviation of this feature", which is a question worth asking.
+
+Even then, "importance" is slippery. Two correlated features share the credit between them in a way that depends on the noise, so a feature can have a small coefficient because a correlated one absorbed the signal rather than because it does not matter. Permutation importance answers the question more honestly, and this track's tree modules cover the alternatives.
+
+## R-squared, and what a negative value means
+
+`score()` on a regressor returns R&sup2;, and its definition is a comparison rather than an absolute measure: how much of the variation in the target the model accounts for, relative to a baseline that always predicts the mean.
+
+1.0 means the predictions are exact. 0.0 means the model does exactly as well as always guessing the average &mdash; which is to say it has learned nothing useful. Values in between are the usual case.
+
+A **negative** R&sup2; surprises people and is entirely possible. It means the model is worse than predicting the mean, which happens routinely on a test set when a model has overfitted, and always indicates something is wrong rather than merely weak.
+
+The number's weakness is that it is unitless and therefore not directly meaningful. An R&sup2; of 0.85 does not tell you whether the predictions are wrong by pounds or by thousands of pounds, and that is usually the question that matters. The next module covers the metrics that answer it.
+
+## What "linear" actually restricts
+
+The name misleads. Linear regression is linear in its *coefficients*, not in the data, and the distinction is what makes it far more flexible than it appears.
+
+Adding `x**2` as an extra column lets a linear model fit a parabola exactly. Adding `x1 * x2` lets it capture an interaction between two features. Adding `log(x)` lets it fit a curve that flattens. In every case the model is still linear &mdash; it is still multiplying each column by a coefficient and adding &mdash; because the non-linearity is in the *feature*, not in the fitting.
+
+`PolynomialFeatures` automates this by generating all the powers and products up to a degree you choose. It is genuinely useful and it grows quickly: degree 3 on ten features produces 286 columns, most of them useless, and the model will happily fit noise with them. Which is the standard trade this track keeps returning to.
+
+## When it is the wrong model
+
+Three situations where linear regression struggles, and knowing them saves fitting it and being puzzled.
+
+**Genuinely non-linear relationships**, unless you construct the features to capture them. A tree-based model finds them without being told what shape to look for, which is why gradient boosting is the usual default on tabular data.
+
+**More features than samples.** The solution is no longer unique &mdash; infinitely many coefficient sets fit the training data perfectly &mdash; and plain linear regression has no principle for choosing between them. Ridge and Lasso add one, which is exactly what regularisation is for.
+
+**Highly correlated features.** Two columns carrying almost the same information make the coefficients unstable: small changes in the data produce large swings in how the credit is divided, and the individual numbers stop being interpretable even though the predictions remain fine.
+
+For the second and third, `Ridge` is the drop-in replacement and is a better default than plain `LinearRegression` for anything with many features. It uses the same interface, adds one hyperparameter, and gives up a little training accuracy for coefficients that do not move around.
+
+## Ridge and Lasso, in one paragraph each
+
+Two variants solve the problems at the end of the previous section, and both are one-line replacements.
+
+**Ridge** adds a penalty proportional to the sum of the squared coefficients. The effect is to shrink them all towards zero, more so as `alpha` increases, which stops any one of them growing large to chase noise. It handles correlated features gracefully &mdash; rather than one coefficient swinging positive and another negative, both end up moderate and stable. `Ridge(alpha=1.0)` is a sensible default and a better starting point than plain `LinearRegression` whenever there are more than a handful of features.
+
+**Lasso** penalises the sum of the *absolute* coefficients instead, and that change has a striking consequence: it drives some coefficients to exactly zero rather than merely small. So it selects features as well as fitting them, and the fitted model names the columns it decided to ignore. The cost is that among correlated features it tends to pick one arbitrarily and zero the rest, which makes the selection unstable even when the predictions are fine.
+
+`ElasticNet` combines the two penalties for when you want both properties. All three take `alpha`, all three need the features scaled first &mdash; a penalty on coefficient size is meaningless when the coefficients are in incomparable units &mdash; and all three are tuned with the cross-validated search covered later in this track.
+
+## The assumptions, and which ones matter in practice
+
+Textbooks list four or five assumptions behind linear regression. For prediction, which is what this library is for, they matter less than the textbooks imply, and it is worth knowing which is which.
+
+**Linearity** is the one that genuinely matters. If the relationship curves and you have not given the model a curved feature, the predictions will be systematically wrong in a pattern &mdash; too low at the ends and too high in the middle, or the reverse. Plotting residuals against predictions makes it obvious: a good fit shows a shapeless cloud, and a missed curve shows an arc.
+
+**Independent errors** matters for time series and grouped data, and is the reason those need different splitting. Nothing about the fit detects it.
+
+**Constant error variance** and **normally distributed errors** are assumptions of the *inference* &mdash; the p-values and confidence intervals that scikit-learn does not compute. If you only want predictions, violating them costs you accuracy in some regions rather than validity. If you want to make a claim about whether a coefficient is significantly different from zero, you want `statsmodels`, and then they matter.
+
+The practical version: look at the residuals for a pattern. A pattern means a missing feature or the wrong shape of model, and no amount of regularisation fixes either.
+
+## Things to try
+
+1. <strong>Add an outlier.</strong> In the first editor, change one price to 400 and watch the slope move. Squared errors mean one bad point has a large vote.
+2. <strong>Read the units.</strong> The fifth editor makes the coefficient trap concrete. Fit both, then look at the R&sup2; column and note it does not move.
+3. <strong>Fit the curve.</strong> In the last editor, try degree three by adding `x ** 3` as a third column and check whether R&sup2; improves on data that is genuinely quadratic.
+4. <strong>Break it deliberately.</strong> Give the model two identical columns and look at the two coefficients. The sum is stable; the split between them is not.
+
+## Where this leaves you
+
+Two learned arrays, one formula, and a score that compares the model against guessing the mean. The coefficients are readable, which is the model's great advantage, and readable in a way that requires care about units before any of them can be compared.
+""",
+    [
+        {"q": "What does coef_ contain?",
+         "options": ["The predictions",
+                     "One coefficient per feature, in column order",
+                     "The residuals",
+                     "The R-squared value"],
+         "answer": 1,
+         "why": "One number per column of X, in the same order as the columns, plus intercept_ as a single separate number."},
+        {"q": "A feature's coefficient is ten times larger than another's. What does that tell you?",
+         "options": ["It is ten times more important",
+                     "Nothing, until you know the features are on the same scale",
+                     "The model is overfitting",
+                     "That feature should be removed"],
+         "answer": 1,
+         "why": "A coefficient is in units of target per unit of feature. Change the feature's units and the coefficient changes while the model stays identical."},
+        {"q": "What does a negative R-squared mean?",
+         "options": ["An error in the calculation",
+                     "The model is worse than always predicting the mean",
+                     "The correlation is negative",
+                     "R-squared cannot be negative"],
+         "answer": 1,
+         "why": "R-squared compares the model against the mean baseline. Below zero means the baseline would have done better, which is common on a test set after overfitting."},
+        {"q": "Can a linear model fit a curved relationship?",
+         "options": ["No, never",
+                     "Yes, if you give it a curved feature such as x**2",
+                     "Only with a different solver",
+                     "Only in one dimension"],
+         "answer": 1,
+         "why": "\"Linear\" refers to the coefficients. Adding x**2 as a column lets the same model fit a parabola exactly."},
+    ],
+)

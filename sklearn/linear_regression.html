@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Linear Regression | VizLearn</title>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-ZT6JM33V5J');
+    </script>
+    <!-- The font stylesheet is render-blocking and lives on another origin, so
+         the browser cannot paint until it has done DNS, TCP and TLS for two
+         hosts it has not met. Warming both connections while the HTML is still
+         parsing takes that off the critical path. gstatic serves the font
+         files themselves and is fetched anonymously, hence crossorigin. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'light';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+                .py-note {
+            border-left: 2px solid var(--border-subtle);
+            padding-left: 0.9rem;
+            line-height: 1.7;
+        }
+        .py-note code { color: var(--accent-primary); }
+        .vz-pt-lead { margin-top: 0.5rem; max-width: 60ch; color: var(--text-muted); }
+
+        /* A step is numbered so the sequence reads as a sequence rather than
+           as six unrelated demos. */
+        .vz-step-head { display: flex; align-items: baseline; gap: 0.6rem; }
+        .vz-step-n {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+            font-weight: 700; color: var(--accent-primary);
+            border: 1px solid var(--border-subtle); border-radius: 5px;
+            padding: 0.1rem 0.4rem; flex: none;
+        }
+        .vz-step-blurb {
+            margin: 0.55rem 0 0.9rem; line-height: 1.7;
+            color: var(--text-muted); max-width: 68ch;
+        }
+        .vz-step-blurb code {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.85em;
+            color: var(--accent-primary);
+        }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen light-mode">
+<!-- Light is the default, so it ships on the tag: the theme script runs at the
+     bottom of the body, and waiting for it would flash dark on every load.
+     This removes the class before any content is parsed for readers who chose
+     dark, so neither theme flashes the other. -->
+<script>if(localStorage.getItem("theme")==="dark")document.body.classList.remove("light-mode");</script>
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-3 md:gap-4">
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <svg class="vz-icon text-sm" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/></svg>
+                    <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)" aria-label="Back to Home">
+                        <svg class="vz-icon text-xs" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.2 288 416 288c17.7 0 32-14.3 32-32s-14.3-32-32-32l-306.7 0L214.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <svg class="vz-icon hidden dark-icon" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M361.5 1.2c5 2.1 8.6 6.6 9.6 11.9L391 121l107.9 19.8c5.3 1 9.8 4.6 11.9 9.6s1.5 10.7-1.6 15.2L446.9 256l62.3 90.3c3.1 4.5 3.7 10.2 1.6 15.2s-6.6 8.6-11.9 9.6L391 391 371.1 498.9c-1 5.3-4.6 9.8-9.6 11.9s-10.7 1.5-15.2-1.6L256 446.9l-90.3 62.3c-4.5 3.1-10.2 3.7-15.2 1.6s-8.6-6.6-9.6-11.9L121 391 13.1 371.1c-5.3-1-9.8-4.6-11.9-9.6s-1.5-10.7 1.6-15.2L65.1 256 2.8 165.7c-3.1-4.5-3.7-10.2-1.6-15.2s6.6-8.6 11.9-9.6L121 121 140.9 13.1c1-5.3 4.6-9.8 9.6-11.9s10.7-1.5 15.2 1.6L256 65.1 346.3 2.8c4.5-3.1 10.2-3.7 15.2-1.6zM160 256a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zm224 0a128 128 0 1 0 -256 0 128 128 0 1 0 256 0z"/></svg>
+                        <svg class="vz-icon hidden light-icon" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M223.5 32C100 32 0 132.3 0 256S100 480 223.5 480c60.6 0 115.5-24.2 155.8-63.4c5-4.9 6.3-12.5 3.1-18.7s-10.1-9.7-17-8.5c-9.8 1.7-19.8 2.6-30.1 2.6c-96.9 0-175.5-78.8-175.5-176c0-65.8 36-123.1 89.3-153.3c6.1-3.5 9.2-10.5 7.7-17.3s-7.3-11.9-14.3-12.5c-6.3-.5-12.6-.8-19-.8z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+        <div class="mb-8 animate-fade-in">
+            <nav class="flex flex-wrap items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)" aria-label="Breadcrumb"><a href="../index.html" class="hover:text-green-400 transition-colors">Home</a><span aria-hidden="true">/</span><a href="../sklearn/" class="hover:text-green-400 transition-colors">scikit-learn</a><span aria-hidden="true">/</span><span aria-current="page">Regression</span></nav>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Linear Regression</h1>
+            <p class="vz-pt-lead">The simplest useful model, and the one whose fitted parameters you can actually read - with one caveat about reading them.</p>
+        </div>
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
+                <div class="card-container">
+                    <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
+                    <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
+                        <div class="py-note"><code class='mono-font'>coef_</code> holds one number per feature, in column order; <code class='mono-font'>intercept_</code> is the value when every feature is zero.</div>
+                        <div class="py-note">The fit minimises the sum of the squared residuals - which is why a single outlier moves the line further than several small errors.</div>
+                        <div class="py-note"><code class='mono-font'>score()</code> returns R&sup2;: 1.0 is perfect, 0.0 is no better than predicting the mean, and negative is worse than that.</div>
+                        <div class="py-note">A coefficient's <em>size</em> depends on the feature's units, so it is not a measure of importance unless the features were scaled first.</div>
+                        <div class="py-note">"Linear" describes the coefficients, not the data - add <code class='mono-font'>x**2</code> as a feature and a linear model fits a curve.</div>
+                        <div class="py-note">With more features than samples, or perfectly correlated columns, the solution is not unique and the coefficients become unstable.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <!-- auto-article-vizlearn -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full" data-vz-prose>
+        <div class="card-container animate-fade-in">
+<!-- VIZLEARN:ARTICLE:BEGIN (generated by tools/build_articles.py) -->
+            <div class="card-header">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Linear Regression: A Practical Guide</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">The model whose parameters you can read, whose failures are visible, and whose coefficients are misread more often than any other number in the library.</p>
+            </div>
+            <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <div>
+                    <h3>What it is fitting</h3>
+                    <p>Linear regression finds one number per feature, plus an intercept, such that adding them up predicts the target as closely as possible.</p><p>For one feature that is a straight line through a scatter of points. For three features it is a plane in four dimensions, which nobody can picture and which behaves exactly the same way arithmetically: multiply each feature by its coefficient, add the intercept, and that is the prediction.</p><p>"As closely as possible" has a precise meaning: it minimises the sum of the *squared* differences between predictions and actuals. Squaring is what makes the problem solvable in one step rather than by search &mdash; there is a formula, and scikit-learn uses it &mdash; and it is also why the model is sensitive to outliers. A residual of 10 contributes a hundred times more than a residual of 1, so one badly wrong point pulls the line further than a dozen slightly wrong ones.</p>
+                </div>
+                <div>
+                    <h3>Fitting a line, and reading it back</h3>
+                    <p>Two learned numbers, and together they are the whole model.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LinearRegression
+import numpy as np
+
+# price = 40 + 25 * rooms, with a little noise
+rooms = np.array([[1], [2], [3], [4], [5], [6]])
+price = np.array([66, 89, 115, 140, 168, 190])
+
+model = LinearRegression().fit(rooms, price)
+
+print("slope     (coef_)     : %.2f" % model.coef_[0])
+print("intercept (intercept_): %.2f" % model.intercept_)
+print()
+print("so the line it found is: price = %.1f + %.1f * rooms"
+      % (model.intercept_, model.coef_[0]))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>More features, more coefficients</h3>
+                    <p>One coefficient per column, in the same order as the columns.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LinearRegression
+import numpy as np
+
+# two features now: rooms and area
+X = np.array([[1, 40], [2, 55], [3, 75], [4, 90], [5, 110], [6, 130]])
+y = np.array([66, 89, 115, 140, 168, 190])
+
+model = LinearRegression().fit(X, y)
+
+for name, c in zip(["rooms", "area"], model.coef_):
+    print("%-6s coefficient: %8.3f" % (name, c))
+print("intercept        : %8.3f" % model.intercept_)
+print()
+print("one coefficient per column of X, in the same order")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Predictions and residuals</h3>
+                    <p>What the model says, what the data said, and the gap - which is the thing the fit was minimising.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LinearRegression
+import numpy as np
+
+rooms = np.array([[1], [2], [3], [4], [5], [6]])
+price = np.array([66, 89, 115, 140, 168, 190])
+
+model = LinearRegression().fit(rooms, price)
+pred = model.predict(rooms)
+
+print(" rooms  actual  predicted  residual")
+for r, a, p in zip(rooms.ravel(), price, pred):
+    print("%6d %7d %10.1f %9.1f" % (r, a, p, a - p))
+print()
+print("residuals sum to about zero: %.10f" % (price - pred).sum())</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>score() on a regressor is R-squared</h3>
+                    <p>And it is worth computing once by hand, because the definition explains what a negative value would mean.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LinearRegression
+import numpy as np
+
+rooms = np.array([[1], [2], [3], [4], [5], [6]])
+price = np.array([66, 89, 115, 140, 168, 190])
+model = LinearRegression().fit(rooms, price)
+
+print("score() on a regressor is R-squared:", round(model.score(rooms, price), 4))
+
+# R-squared compares the model against always predicting the mean.
+mean_only = np.full_like(price, price.mean(), dtype=float)
+ss_res = ((price - model.predict(rooms)) ** 2).sum()
+ss_tot = ((price - mean_only) ** 2).sum()
+print("computed by hand              :", round(1 - ss_res / ss_tot, 4))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>A big coefficient does not mean an important feature</h3>
+                    <p>The same model twice, with one feature's units changed. Watch the coefficient move and the fit stay identical.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LinearRegression
+import numpy as np
+
+# Same information, different units: area in square metres, then in hectares.
+X_m2 = np.array([[40.0], [55.0], [75.0], [90.0], [110.0], [130.0]])
+y = np.array([66, 89, 115, 140, 168, 190])
+
+X_ha = X_m2 / 10000.0
+
+for label, X in [("area in m2", X_m2), ("area in hectares", X_ha)]:
+    m = LinearRegression().fit(X, y)
+    print("%-18s coef_ = %12.4f   R2 = %.4f" % (label, m.coef_[0], m.score(X, y)))
+
+print()
+print("identical model, coefficient 10000x apart - size means nothing")
+print("until the features are on the same scale.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Linear in the coefficients, not in the data</h3>
+                    <p>A straight line fits a curve badly, and the same linear model fits it exactly once you give it the right feature.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LinearRegression
+import numpy as np
+
+x = np.arange(1, 11).reshape(-1, 1)
+y = (x.ravel() ** 2).astype(float)      # a curve, not a line
+
+lin = LinearRegression().fit(x, y)
+print("straight line on a curve, R2 =", round(lin.score(x, y), 3))
+
+# Give it x squared as a feature and the same linear model fits exactly.
+X2 = np.hstack([x, x ** 2])
+poly = LinearRegression().fit(X2, y)
+print("with x**2 as a second feature, R2 =", round(poly.score(X2, y), 3))
+print()
+print("'linear' means linear in the coefficients, not in the data.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Reading the fitted model</h3>
+                    <p><code>coef_</code> is an array with one entry per column of <code>X</code>, in the same order as the columns. <code>intercept_</code> is a single number: the prediction when every feature is zero.</p><p>Together they are the entire model. There is nothing else stored, no data kept, no lookup table &mdash; which is why a fitted linear regression is a few numbers regardless of whether it was trained on a hundred rows or a hundred million.</p><p>That readability is the model's main practical advantage. A coefficient of 25.2 on <code>rooms</code> says: holding the other features fixed, one more room is associated with 25.2 more units of price. The phrase "holding the other features fixed" is doing real work in that sentence and is the part people drop &mdash; a coefficient is not the effect of a feature on its own, it is the effect after the other features in the model have accounted for what they can.</p><p>The intercept is often meaningless in isolation. A house with zero rooms and zero area does not exist, so the intercept is where the line happens to cross rather than a prediction anyone would make. It matters for the arithmetic and rarely for the interpretation.</p>
+                </div>
+                <div>
+                    <h3>The coefficient trap</h3>
+                    <p>This is the most commonly repeated mistake about linear models, and it is worth being blunt: <strong>the size of a coefficient tells you nothing about the importance of a feature.</strong></p><p>A coefficient is expressed in units of target per unit of feature. Measure area in square metres and the coefficient is some number; measure the same area in hectares and the coefficient is ten thousand times larger. The model is identical, the predictions are identical, the R&sup2; is identical. Only the units changed.</p><p>So comparing coefficients across features only means something if the features are on the same scale. Standardising them first &mdash; subtracting the mean and dividing by the standard deviation &mdash; makes the coefficients comparable, and they then answer "how much does the prediction move per standard deviation of this feature", which is a question worth asking.</p><p>Even then, "importance" is slippery. Two correlated features share the credit between them in a way that depends on the noise, so a feature can have a small coefficient because a correlated one absorbed the signal rather than because it does not matter. Permutation importance answers the question more honestly, and this track's tree modules cover the alternatives.</p>
+                </div>
+                <div>
+                    <h3>R-squared, and what a negative value means</h3>
+                    <p><code>score()</code> on a regressor returns R&sup2;, and its definition is a comparison rather than an absolute measure: how much of the variation in the target the model accounts for, relative to a baseline that always predicts the mean.</p><p>1.0 means the predictions are exact. 0.0 means the model does exactly as well as always guessing the average &mdash; which is to say it has learned nothing useful. Values in between are the usual case.</p><p>A <strong>negative</strong> R&sup2; surprises people and is entirely possible. It means the model is worse than predicting the mean, which happens routinely on a test set when a model has overfitted, and always indicates something is wrong rather than merely weak.</p><p>The number's weakness is that it is unitless and therefore not directly meaningful. An R&sup2; of 0.85 does not tell you whether the predictions are wrong by pounds or by thousands of pounds, and that is usually the question that matters. The next module covers the metrics that answer it.</p>
+                </div>
+                <div>
+                    <h3>What "linear" actually restricts</h3>
+                    <p>The name misleads. Linear regression is linear in its *coefficients*, not in the data, and the distinction is what makes it far more flexible than it appears.</p><p>Adding <code>x**2</code> as an extra column lets a linear model fit a parabola exactly. Adding <code>x1 * x2</code> lets it capture an interaction between two features. Adding <code>log(x)</code> lets it fit a curve that flattens. In every case the model is still linear &mdash; it is still multiplying each column by a coefficient and adding &mdash; because the non-linearity is in the *feature*, not in the fitting.</p><p><code>PolynomialFeatures</code> automates this by generating all the powers and products up to a degree you choose. It is genuinely useful and it grows quickly: degree 3 on ten features produces 286 columns, most of them useless, and the model will happily fit noise with them. Which is the standard trade this track keeps returning to.</p>
+                </div>
+                <div>
+                    <h3>When it is the wrong model</h3>
+                    <p>Three situations where linear regression struggles, and knowing them saves fitting it and being puzzled.</p><p><strong>Genuinely non-linear relationships</strong>, unless you construct the features to capture them. A tree-based model finds them without being told what shape to look for, which is why gradient boosting is the usual default on tabular data.</p><p><strong>More features than samples.</strong> The solution is no longer unique &mdash; infinitely many coefficient sets fit the training data perfectly &mdash; and plain linear regression has no principle for choosing between them. Ridge and Lasso add one, which is exactly what regularisation is for.</p><p><strong>Highly correlated features.</strong> Two columns carrying almost the same information make the coefficients unstable: small changes in the data produce large swings in how the credit is divided, and the individual numbers stop being interpretable even though the predictions remain fine.</p><p>For the second and third, <code>Ridge</code> is the drop-in replacement and is a better default than plain <code>LinearRegression</code> for anything with many features. It uses the same interface, adds one hyperparameter, and gives up a little training accuracy for coefficients that do not move around.</p>
+                </div>
+                <div>
+                    <h3>Ridge and Lasso, in one paragraph each</h3>
+                    <p>Two variants solve the problems at the end of the previous section, and both are one-line replacements.</p><p><strong>Ridge</strong> adds a penalty proportional to the sum of the squared coefficients. The effect is to shrink them all towards zero, more so as <code>alpha</code> increases, which stops any one of them growing large to chase noise. It handles correlated features gracefully &mdash; rather than one coefficient swinging positive and another negative, both end up moderate and stable. <code>Ridge(alpha=1.0)</code> is a sensible default and a better starting point than plain <code>LinearRegression</code> whenever there are more than a handful of features.</p><p><strong>Lasso</strong> penalises the sum of the *absolute* coefficients instead, and that change has a striking consequence: it drives some coefficients to exactly zero rather than merely small. So it selects features as well as fitting them, and the fitted model names the columns it decided to ignore. The cost is that among correlated features it tends to pick one arbitrarily and zero the rest, which makes the selection unstable even when the predictions are fine.</p><p><code>ElasticNet</code> combines the two penalties for when you want both properties. All three take <code>alpha</code>, all three need the features scaled first &mdash; a penalty on coefficient size is meaningless when the coefficients are in incomparable units &mdash; and all three are tuned with the cross-validated search covered later in this track.</p>
+                </div>
+                <div>
+                    <h3>The assumptions, and which ones matter in practice</h3>
+                    <p>Textbooks list four or five assumptions behind linear regression. For prediction, which is what this library is for, they matter less than the textbooks imply, and it is worth knowing which is which.</p><p><strong>Linearity</strong> is the one that genuinely matters. If the relationship curves and you have not given the model a curved feature, the predictions will be systematically wrong in a pattern &mdash; too low at the ends and too high in the middle, or the reverse. Plotting residuals against predictions makes it obvious: a good fit shows a shapeless cloud, and a missed curve shows an arc.</p><p><strong>Independent errors</strong> matters for time series and grouped data, and is the reason those need different splitting. Nothing about the fit detects it.</p><p><strong>Constant error variance</strong> and <strong>normally distributed errors</strong> are assumptions of the *inference* &mdash; the p-values and confidence intervals that scikit-learn does not compute. If you only want predictions, violating them costs you accuracy in some regions rather than validity. If you want to make a claim about whether a coefficient is significantly different from zero, you want <code>statsmodels</code>, and then they matter.</p><p>The practical version: look at the residuals for a pattern. A pattern means a missing feature or the wrong shape of model, and no amount of regularisation fixes either.</p>
+                </div>
+                <div>
+                    <h3>Things to try</h3>
+                    <ol><li><strong>Add an outlier.</strong> In the first editor, change one price to 400 and watch the slope move. Squared errors mean one bad point has a large vote.</li><li><strong>Read the units.</strong> The fifth editor makes the coefficient trap concrete. Fit both, then look at the R&sup2; column and note it does not move.</li><li><strong>Fit the curve.</strong> In the last editor, try degree three by adding <code>x ** 3</code> as a third column and check whether R&sup2; improves on data that is genuinely quadratic.</li><li><strong>Break it deliberately.</strong> Give the model two identical columns and look at the two coefficients. The sum is stable; the split between them is not.</li></ol>
+                </div>
+                <div>
+                    <h3>Where this leaves you</h3>
+                    <p>Two learned arrays, one formula, and a score that compares the model against guessing the mean. The coefficients are readable, which is the model's great advantage, and readable in a way that requires care about units before any of them can be compared.</p>
+                </div>
+            </div>
+<!-- VIZLEARN:ARTICLE:END -->
+        </div>
+    </section>
+
+    <script>
+        (function () {
+            var btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            var sun = btn.querySelector('.dark-icon');
+            var moon = btn.querySelector('.light-icon');
+
+            function paint(theme) {
+                if (theme === 'light') {
+                    document.body.classList.add('light-mode');
+                    moon.classList.remove('hidden');
+                    sun.classList.add('hidden');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    sun.classList.remove('hidden');
+                    moon.classList.add('hidden');
+                }
+            }
+
+            paint(localStorage.getItem('theme') || 'light');
+
+            btn.addEventListener('click', function () {
+                var next = document.body.classList.contains('light-mode') ? 'dark' : 'light';
+                localStorage.setItem('theme', next);
+                paint(next);
+            });
+        })();
+    </script>
+
+</body>
+</html>
