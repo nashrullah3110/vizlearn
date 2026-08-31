@@ -2922,6 +2922,12 @@ Feature selection is usually last among the transformers and before the model, s
 
 A `Pipeline` executes its steps in the order given, so writing them in the wrong order produces either an error or a silently worse model. The sequence that covers most cases is: impute, encode, transform skew, scale, select, fit.
 
+<strong>Should I scale the target as well?</strong> Rarely for regression - it changes the units your errors are reported in. When it genuinely helps, `TransformedTargetRegressor` does it and inverts the transformation on `predict`, so the predictions come back in the original units.
+
+<strong>Does scaling help accuracy on trees, ever?</strong> No. Exactly zero, which the last editor demonstrates. It is harmless and pointless.
+
+<strong>What about one-hot columns - do those get scaled?</strong> They are already 0 and 1, so standardising them mostly adds noise to the interpretation. It is common to scale only the numeric columns, which is what a `ColumnTransformer` is for.
+
 ## Things to try
 
 1. <strong>Run the second editor.</strong> 0.69 against 0.95, from one line. That is the argument in a single number.
