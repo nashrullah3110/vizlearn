@@ -3890,6 +3890,24 @@ The distinction is not how predictive a feature is. It is whether the value woul
 
 <strong>Can I fix a leak by removing the column?</strong> Usually, and check what else was derived from it. Aggregates, ratios and encodings built on a leaky column carry the leak with them.
 
+## A checklist before you trust a number
+
+Six questions, in the order they are cheapest to answer. Running through them takes a few minutes and catches the large majority of leaks.
+
+**Did anything fit before the split?** Scaler, imputer, encoder, selector, vectoriser. If it learned from data and it ran before `train_test_split`, the number is compromised. The fix is a pipeline.
+
+**Are there duplicate rows?** Count them, including near-duplicates that differ only in an id or a timestamp.
+
+**Can one entity produce several rows?** If so, the split must group them. This is the one people most often get wrong on data that looks tabular and independent.
+
+**Does the data have an order?** Timestamps, sequence numbers, anything where later rows could not have informed earlier ones. Then the split is forward-only.
+
+**For every feature: would it exist at prediction time?** Asked column by column, with someone who knows the source system. This is the slow one and the one that catches target leakage, which nothing else will.
+
+**Is the score plausible?** Compared against a dummy, against published results on similar problems, and against what a domain expert would guess. Surprise is the signal.
+
+A model that survives all six is not guaranteed honest, but the remaining routes are narrow and unusual. A model that has not been through them has an unknown probability of being wrong in the most expensive direction.
+
 ## Things to try
 
 1. <strong>Run the first editor.</strong> 0.643 becomes 1.000 from one extra column, and every fold agrees.
