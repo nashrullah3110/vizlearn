@@ -3908,6 +3908,10 @@ Six questions, in the order they are cheapest to answer. Running through them ta
 
 A model that survives all six is not guaranteed honest, but the remaining routes are narrow and unusual. A model that has not been through them has an unknown probability of being wrong in the most expensive direction.
 
+<strong>What if I find a leak after deploying?</strong> Retrain without the leaking feature and re-measure honestly before deciding whether the model is still worth running. The old score should be treated as never having existed rather than as a target to recover.
+
+<strong>Is leakage always accidental?</strong> Mostly, and there is a well-known variety that is not: tuning against the test set until the number is satisfactory. That is leakage through the researcher rather than through the data, and it produces the same inflated result.
+
 ## Things to try
 
 1. <strong>Run the first editor.</strong> 0.643 becomes 1.000 from one extra column, and every fold agrees.
