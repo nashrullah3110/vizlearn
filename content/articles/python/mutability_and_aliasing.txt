@@ -128,3 +128,135 @@ state neither of them knows about.
 The same reasoning applies on the way out: returning `self.items` directly hands
 callers a handle on your internals. Returning `list(self.items)` or a tuple keeps
 the boundary intact.
+
+## Names are labels, not boxes
+
+The mental model that makes all of this predictable is that a name does not
+contain a value. It refers to one.
+
+`a = [1, 2]` creates a list and points the name `a` at it. `b = a` does not
+copy anything; it points a second name at the same list. There is one list and
+two labels, and a change made through either is visible through both.
+
+Assignment moves a label. Mutation changes the thing the label points at. That
+is the whole distinction, and it explains why `b = a` followed by `b = [9]`
+leaves `a` alone while `b = a` followed by `b.append(9)` does not.
+
+`id()` shows the identity behind a name and `is` compares identities rather
+than values, which is the direct way to check whether two names refer to one
+object.
+
+## Which types can be changed
+
+**Mutable**: lists, dictionaries, sets, and most objects you define. These can
+be modified in place, so aliasing matters.
+
+**Immutable**: numbers, strings, tuples, frozensets, booleans, `None`. These
+cannot be changed at all, so aliasing is invisible and harmless &mdash; two
+names for the same string can never disagree, because neither can alter it.
+
+That split explains why the problem never arises with numbers and constantly
+arises with lists. It also explains why immutable types can be dictionary keys:
+a key whose value could change would break the hash table that finds it.
+
+A tuple is immutable in a specific and narrow sense: the tuple cannot be
+re-pointed, but a mutable object inside it can still be changed. `t = ([1], 2)`
+forbids `t[0] = ...` and permits `t[0].append(3)`, which surprises people and
+is consistent once names-as-labels is the model.
+
+## Function arguments
+
+Python passes references. The function receives another name for the same
+object, so mutating the argument affects the caller and rebinding it does not.
+
+```python
+def add_one(items):
+    items.append(1)      # the caller sees this
+
+def replace(items):
+    items = [1]          # the caller sees nothing
+```
+
+Both look like they modify the argument and only one does, which is the single
+most common source of confusion about how Python passes things.
+
+The practical guidance follows from it. A function that modifies its argument
+should say so in its name and return `None`, following the convention the
+standard library uses &mdash; `list.sort` mutates and returns nothing, `sorted`
+returns a new list. A function that should not modify its argument should copy
+first, or simply not mutate.
+
+## Default arguments
+
+A default value is evaluated **once**, when the function is defined, not each
+time it is called. A mutable default is therefore shared across every call:
+
+```python
+def add(item, target=[]):     # the same list, every call
+    target.append(item)
+    return target
+```
+
+The second call sees what the first left behind. This is the most famous
+gotcha in the language, and the fix is fixed:
+
+```python
+def add(item, target=None):
+    if target is None:
+        target = []
+```
+
+The reason it works this way is consistency &mdash; defaults are ordinary
+expressions evaluated at definition time, like everything else in the `def`
+line &mdash; but the effect is a trap, and linters flag it for good reason.
+
+## Copying, and how deep
+
+`list(x)`, `x[:]` and `x.copy()` all make a **shallow** copy: a new outer
+container holding references to the same inner objects.
+
+That is sufficient when the contents are immutable, and insufficient the moment
+they are not. A shallow copy of a list of lists gives you a new outer list whose
+items are still shared, so appending to `copy[0]` is visible through the
+original.
+
+`copy.deepcopy(x)` duplicates the whole structure recursively. It is correct and
+it is slow, and it can fail or behave oddly on objects holding file handles,
+connections or locks.
+
+The middle path is usually best: build the new structure explicitly with a
+comprehension, so it is obvious what is being copied and what is being shared.
+
+## Where this bites in practice
+
+**Configuration dictionaries** passed to several functions, one of which adds a
+key, changing the config everyone else sees.
+
+**Class attributes** holding a mutable default, which are shared by every
+instance rather than being per-instance &mdash; the same mechanism as the
+mutable default argument.
+
+**Caching a slice** of a large structure and mutating it later.
+
+**Building rows** by appending to one dictionary that is reused each iteration,
+so every row in the result is the same object showing the last values.
+
+That last one is worth recognising: a loop that appends the same dict to a list
+produces a list of identical references, and the symptom is a table where every
+row matches the final one.
+
+## Common mistakes
+
+**Expecting `b = a` to copy**, for any mutable type.
+
+**Mutable default arguments**, and the class-attribute version of the same.
+
+**Shallow-copying nested data** and assuming the inner items are independent.
+
+**Assigning the result of an in-place method**, since `sort`, `append`,
+`update` and `extend` all return `None`.
+
+**Reusing one accumulator object** inside a loop and appending it repeatedly.
+
+**Reaching for `deepcopy` reflexively**, when constructing the new shape
+directly would be clearer and faster.

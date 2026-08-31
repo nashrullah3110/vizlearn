@@ -121,3 +121,128 @@ names that happen to be defined in the builtin scope, and assigning to any of
 them inside your code hides the original for the rest of that scope. It is legal
 and it produces confusing failures later, usually when something calls `list(x)`
 and gets a `TypeError` about your list not being callable.
+
+## The rule, and its name
+
+Python resolves a name by looking in four places, in order: the **local**
+function, any **enclosing** functions, the **global** module, and finally the
+**built-ins**. The first match wins, and the acronym LEGB is how it is usually
+remembered.
+
+The consequence that matters is that a function can read a global without doing
+anything special, and cannot assign to one without saying so. Reading walks
+outward; assignment always creates or updates a local unless declared
+otherwise.
+
+That asymmetry is deliberate. It means a function's assignments cannot silently
+change the module around it, so reading a function tells you what it modifies.
+
+## Assignment makes a variable local, everywhere in the function
+
+The subtle part is that the decision is made for the **whole function** at
+compile time, not line by line.
+
+```python
+count = 0
+
+def bump():
+    print(count)     # UnboundLocalError
+    count = count + 1
+```
+
+The `print` fails even though the assignment is below it. Because `count` is
+assigned somewhere in the body, it is local throughout, and it has no value yet
+when the `print` runs.
+
+The error message names the variable and not the cause, which makes this one of
+the more confusing beginner errors. The fix is either `global count`, or &mdash;
+usually better &mdash; returning the new value instead of mutating a module
+variable.
+
+## global and nonlocal
+
+`global name` declares that assignment should target the module level.
+`nonlocal name` targets the nearest enclosing function, which is what closures
+need when they must update captured state.
+
+Both work, and both are worth treating as a signal rather than a tool. A
+function that needs `global` is usually one that would be clearer taking a
+parameter and returning a result, because that version can be tested, called
+twice, and read without knowing what else touches the same name.
+
+`nonlocal` has fewer good alternatives, since a counter shared by an inner
+function has to live somewhere, but a small class or a `functools.partial` is
+often clearer than a closure mutating captured state.
+
+## Mutation is not assignment
+
+The rule constrains assignment, not modification.
+
+```python
+items = []
+
+def add():
+    items.append(1)      # fine: no assignment, so no local created
+```
+
+`append` modifies the object the global name refers to, which needs no
+declaration. Rebinding `items` to a new list would.
+
+So a function can change a module-level list or dictionary freely and silently.
+That is a genuine hazard, and it is the reason the mutability module's advice
+about not modifying shared structures matters here too: the scope rules will not
+protect you, because nothing was assigned.
+
+## Comprehensions and loops
+
+A comprehension has its own scope. The loop variable inside it does not leak,
+so `[x for x in range(3)]` leaves no `x` behind. That was a change in Python 3
+and is why old examples sometimes rely on the leak.
+
+An ordinary `for` loop does **not** have its own scope. Its variable survives
+the loop and holds the last value, which is occasionally useful and a common
+source of accidental reuse.
+
+Neither `if` nor `with` nor `try` creates a scope either. A name first assigned
+inside an `if` branch exists after it &mdash; or does not, if the branch did not
+run, which produces a `NameError` that depends on the data.
+
+## Closures capture names, not values
+
+An inner function remembers the variable, not what it held at the time:
+
+```python
+fns = [lambda: i for i in range(3)]
+[f() for f in fns]        # [2, 2, 2]
+```
+
+All three lambdas refer to the same `i`, which by the time they are called is
+`2`.
+
+The fix is a default argument, which is evaluated at definition time and so
+captures the value:
+
+```python
+fns = [lambda i=i: i for i in range(3)]   # [0, 1, 2]
+```
+
+This is the same mechanism as the mutable-default trap, working in your favour
+for once.
+
+## Common mistakes
+
+**Reading a name that is assigned later in the function**, which raises
+`UnboundLocalError` rather than reading the global.
+
+**Reaching for `global`** where a parameter and a return value would do.
+
+**Assuming mutation needs a declaration**, which it does not &mdash; so
+functions can change shared containers silently.
+
+**Expecting a `for` variable to be scoped to the loop**, which it is not.
+
+**Capturing a loop variable in a closure**, and finding every function sees the
+final value.
+
+**Shadowing a builtin** &mdash; naming a variable `list`, `dict`, `id`, `type`
+or `sum` &mdash; which works until the builtin is needed in the same scope.

@@ -155,3 +155,138 @@ A small class or a dataclass takes over when there are more than about three
 fields, or when you find yourself writing a comment to remember what position
 three was. Names beat positions the moment positions stop being obvious, and a
 named tuple is the halfway house that keeps tuple behaviour while adding them.
+
+## Why immutability is the point
+
+A tuple cannot be changed after it is made, and that constraint is what makes
+it useful rather than a limitation to work around.
+
+It means a tuple can be a dictionary key or a set member, because its hash
+cannot change underneath the container. That single property is why coordinates,
+database keys and cache lookups are tuples rather than lists.
+
+It means a tuple passed to a function cannot be modified by it, so no defensive
+copy is needed.
+
+And it means the shape is a promise. A list might have three items now and four
+later; a tuple of three says the shape is fixed, which is why functions return
+tuples for "several results" and lists for "a collection of similar things".
+
+The rough guide: a list is a variable number of the same kind of thing, a tuple
+is a fixed number of possibly different things.
+
+## The comma makes the tuple
+
+Parentheses are grouping; the comma is what creates a tuple.
+
+```python
+t = 1, 2, 3        # a tuple
+t = (1, 2, 3)      # the same tuple
+t = (1)            # just the integer 1
+t = (1,)           # a one-item tuple
+```
+
+The one-item case is where this matters, and the trailing comma is easy to omit
+and hard to see. A function that returns `(value)` returns the value; returning
+`(value,)` returns a tuple containing it, and code expecting to unpack will
+behave very differently between the two.
+
+The same rule explains why a stray comma at the end of a line can silently turn
+a value into a tuple &mdash; `x = compute(),` is a one-item tuple, and the
+error appears wherever `x` is used.
+
+## Unpacking is structural
+
+Unpacking assigns by position, and the shape has to match:
+
+```python
+x, y = point
+name, (lat, lon) = record
+```
+
+The second form matches nested structure, which is how you pull apart a tuple
+of tuples in one statement.
+
+A mismatch raises `ValueError`, and that is a feature: it fails at the
+assignment, naming the counts, rather than producing something wrong that fails
+later.
+
+Starred unpacking handles a variable middle:
+
+```python
+first, *rest = items
+first, *middle, last = items
+```
+
+`rest` is always a list, even when it captures nothing, and only one star is
+allowed &mdash; two would be ambiguous about where the split falls.
+
+## Where unpacking shows up
+
+It is not a tuple feature. It works on any iterable, and it appears constantly:
+
+**In loops** over pairs &mdash; `for k, v in d.items()` and
+`for i, x in enumerate(xs)` are both unpacking.
+
+**In swaps** &mdash; `a, b = b, a` builds a tuple on the right and unpacks it
+on the left, which is why no temporary is needed and why the order is safe.
+
+**In multiple returns** &mdash; a function returning `x, y` returns one tuple,
+and the caller unpacking it is what makes it feel like two values.
+
+**In function calls** &mdash; `f(*args)` is the spreading counterpart.
+
+**Ignoring parts** &mdash; `_, value = pair` is the convention for "I do not
+need this one".
+
+## Named tuples, when positions stop being obvious
+
+A tuple of two is readable. A tuple of six is a puzzle, and `row[4]` tells the
+reader nothing.
+
+```python
+from collections import namedtuple
+Point = namedtuple("Point", "x y")
+p = Point(1, 2)
+p.x           # and p[0] still works
+```
+
+`typing.NamedTuple` is the modern spelling with annotations, and a frozen
+dataclass is the next step up when methods are wanted too.
+
+The migration path is gentle: a named tuple is still a tuple, so existing code
+that indexes or unpacks it keeps working while new code uses the names. That
+makes it a low-risk improvement to a function that has grown to return four
+things.
+
+## The immutability is shallow
+
+A tuple fixes its references, not the objects behind them:
+
+```python
+t = ([1, 2], "a")
+t[0].append(3)      # allowed
+t[0] = [9]          # TypeError
+```
+
+The list inside is still mutable. That surprises people, and it has a practical
+consequence: a tuple containing a list is **not hashable**, so it cannot be a
+dictionary key even though tuples usually can. The error appears at insertion
+and names unhashability rather than the nested list.
+
+## Common mistakes
+
+**Forgetting the trailing comma** for a one-item tuple.
+
+**A stray comma** turning a value into a tuple silently.
+
+**Unpacking the wrong number of items**, which raises &mdash; usually because
+the data's shape is not what was assumed.
+
+**Using a tuple with a mutable item as a key**, which raises on insertion.
+
+**Indexing a long tuple** where a named tuple or dataclass would say what the
+field is.
+
+**Assuming a tuple is faster in a way that matters** &mdash; it is marginally
+lighter, and that is rarely the reason to choose one.

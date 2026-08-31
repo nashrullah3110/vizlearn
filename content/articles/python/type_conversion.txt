@@ -129,3 +129,123 @@ That refusal is a feature. Languages that do guess produce a class of bug where
 a number arrives as a string from a form or a file and everything continues to
 work until the arithmetic silently becomes concatenation. In Python that fails
 at once, at the line responsible.
+
+## Conversion is explicit, and mostly one-way
+
+Python does very little type juggling on its own. `"3" + 4` raises rather than
+guessing whether you meant `7` or `"34"`, which is a deliberate choice and the
+reason the conversions have to be written.
+
+The exception is numbers, where mixing types converts upward automatically:
+`1 + 2.5` gives a float, and `True + 1` gives `2`, because `bool` is a subclass
+of `int`. That last one surprises people and is occasionally useful &mdash;
+`sum(flags)` counts the true ones.
+
+Everything else is a call. The type's name is the constructor, so there is
+nothing to memorise: `int`, `float`, `str`, `list`, `tuple`, `set`, `dict`,
+`bool` all convert to themselves.
+
+## What each one refuses
+
+The failures are as informative as the successes.
+
+`int("3.5")` raises. Converting text to an integer accepts only text that is
+exactly an integer &mdash; no decimal point, no thousands separator, no
+currency symbol. `int(float("3.5"))` is the two-step version, and it truncates
+rather than rounding.
+
+`int(3.7)` gives `3`. Conversion from a float **truncates toward zero**, so
+`int(-3.7)` is `-3`, not `-4`. `round`, `math.floor` and `math.ceil` are the
+functions that do what their names say, and `round` has its own surprise
+covered below.
+
+`float("1,234")` raises, because the comma is not part of the number's syntax.
+Locale-formatted numbers must be cleaned before conversion.
+
+`list("abc")` gives `['a', 'b', 'c']`, which is correct and is not what someone
+wrapping a single string in a list intended. `["abc"]` is that.
+
+## Converting user input
+
+Every conversion of text that came from outside the program is a possible
+failure, and the shape that handles it is a `try` around the conversion and
+nothing else:
+
+```python
+try:
+    n = int(raw.strip())
+except ValueError:
+    n = None
+```
+
+Two details matter. `strip()` first, because a trailing space or newline is the
+commonest reason a valid-looking number will not convert. And keep the `try`
+narrow, so it catches the conversion failing rather than a mistake three lines
+later.
+
+`ValueError` is what conversion raises for a bad value; `TypeError` is what it
+raises for a value of the wrong kind entirely, such as `int(None)`. Catching
+one and not the other is usually correct, and catching bare `Exception` hides
+both.
+
+## Truthiness is a conversion too
+
+`bool(x)` follows fixed rules: zero, empty containers, empty strings and `None`
+are false; everything else is true.
+
+That means `if items:` and `if len(items) > 0:` agree for containers, and the
+first is idiomatic. It also means `if x:` and `if x is not None:` disagree
+whenever `x` might legitimately be `0` or `""`, which is the most common
+truthiness bug.
+
+Custom objects are true by default, and define their own answer with
+`__bool__` or `__len__`. An object defining `__len__` is false when empty,
+which is why an empty custom collection behaves like an empty list without
+extra work.
+
+## Numbers that do not convert cleanly
+
+`0.1 + 0.2` is not `0.3`, and `int` will not save you from it. Floating point
+represents most decimal fractions approximately, and the error is inherent
+rather than a bug in the conversion.
+
+For money and anything else where exactness matters, `decimal.Decimal` is the
+type to use &mdash; constructed from a **string**, because
+`Decimal(0.1)` inherits the float's error before `Decimal` ever sees it.
+
+`round` uses banker's rounding: exact halves go to the nearest even number, so
+`round(0.5)` is `0` and `round(1.5)` is `2`. It is deliberate, it removes the
+upward bias of always rounding halves up, and it is not what most people
+expect.
+
+## Strings from objects
+
+`str(x)` and `repr(x)` both produce text and answer different questions.
+`str` is for people and `repr` is for programmers &mdash; ideally something
+that could be pasted back into code.
+
+For a class you define, `__str__` and `__repr__` control them. Defining only
+`__repr__` is the pragmatic choice: `str` falls back to it, so one method gives
+readable output everywhere including in lists and debuggers, where `str` is not
+what gets called.
+
+`f"{x}"` uses `str`; `f"{x!r}"` uses `repr`. That `!r` is worth knowing for log
+messages, because it quotes strings and so makes an empty or space-padded value
+visible where `str` would render it as nothing.
+
+## Common mistakes
+
+**`int("3.5")`**, which raises rather than truncating.
+
+**Assuming `int()` rounds**, when it truncates toward zero.
+
+**Converting without a `try`** on anything that came from a user or a file.
+
+**`list("word")`** where `["word"]` was meant.
+
+**Using truthiness to test for `None`**, so zero takes the wrong branch.
+
+**`Decimal(0.1)`**, which preserves the float error the type was chosen to
+avoid.
+
+**Expecting `round` to round halves up**, which it does not.

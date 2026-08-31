@@ -116,3 +116,127 @@ A comprehension carrying a filter, a conditional expression and a nested loop is
 a program written on one line. It will be correct and it will cost every future
 reader - including you - a slow minute. The loop version is four lines that
 never need decoding, and no reviewer has ever objected to it.
+
+## Two different ifs
+
+A comprehension can carry an `if` in two places, and they do opposite things.
+
+An `if` **after** the `for` is a filter. It decides which items survive, so the
+result is shorter than the input:
+
+```python
+[x for x in values if x > 0]
+```
+
+An `if` **before** the `for` is part of the expression &mdash; a conditional
+expression choosing what to produce. Every item survives, so the result is the
+same length:
+
+```python
+[x if x > 0 else 0 for x in values]
+```
+
+The second form requires an `else`, because an expression must produce
+something for every item. The first must not have one, because a filter is a
+yes-or-no question.
+
+That asymmetry is the single most useful thing to know about comprehensions
+with conditions, and it explains the error people hit: writing
+`[x for x in values if x > 0 else 0]` is a syntax error, because a filter
+cannot have an alternative.
+
+## Choosing between them
+
+The question to ask is whether the output should be shorter than the input.
+
+"Give me the positive numbers" is a filter. "Replace negatives with zero" is a
+transform. They sound similar and produce different lengths, and picking the
+wrong one produces a result that is correct in content and wrong in shape
+&mdash; which surfaces later as a mismatch against a parallel list.
+
+That is worth stating because parallel lists are common: if `names` and
+`scores` correspond by position, filtering one and not the other silently
+breaks the correspondence, and `zip` will then truncate to the shorter without
+complaint.
+
+When both are wanted &mdash; transform some items and drop others &mdash; both
+clauses appear, and the reading gets harder:
+
+```python
+[x * 2 if x > 10 else x for x in values if x is not None]
+```
+
+That is legal and near the limit. A loop or a named function is usually kinder
+past that point.
+
+## Multiple filters
+
+Several `if` clauses in a row are combined with `and`:
+
+```python
+[x for x in values if x is not None if x > 0]
+```
+
+which is the same as `if x is not None and x > 0`. The chained form is
+occasionally clearer because each condition sits on its own, and it makes the
+short-circuiting explicit &mdash; the second test never sees a `None`.
+
+That is a real use rather than a curiosity: filtering out missing values and
+then testing the remaining ones is a two-step operation, and writing it as two
+clauses says so.
+
+## Filtering a dictionary
+
+The same rules apply to dict and set comprehensions, and the filter is where
+most dictionary work happens:
+
+```python
+{k: v for k, v in d.items() if v is not None}
+```
+
+That is the idiom for dropping empty entries, and it is better than deleting
+during iteration, which raises.
+
+Both the key and the value can be transformed, and the filter can test either:
+
+```python
+{k.lower(): v for k, v in d.items() if k.startswith("cfg_")}
+```
+
+The thing to watch is that transforming keys can collide. Two keys that differ
+only in case become one after lowering, and the last one silently wins &mdash;
+no error, and a dictionary shorter than the input.
+
+## Readability limits
+
+A comprehension is a good tool for one transformation and one filter over one
+collection. Beyond that it stops earning its place.
+
+The signals that it has gone too far: more than two `for` clauses, a
+conditional expression plus a filter plus a nested call, a line that wraps, or
+any need to pause and work out which `if` is which.
+
+The alternatives are not a defeat. A `for` loop with a body is perfectly good
+Python and is easier to debug, because you can put a `print` or a breakpoint
+inside it. A generator function with a name says what the transformation is
+for. `filter` and `map` exist, though a comprehension usually reads better than
+either.
+
+The honest summary is that comprehensions are for the common, small case, and
+their density is a cost that has to be paid back in clarity.
+
+## Common mistakes
+
+**Putting `else` on a filter**, which is a syntax error and means the transform
+form was wanted.
+
+**Filtering one of two parallel lists**, breaking the correspondence silently.
+
+**Transforming keys that collide**, producing a shorter dictionary with no
+warning.
+
+**Stacking a transform, a filter and a nested loop** in one expression, which
+is legal and unreadable.
+
+**Using a comprehension for side effects** &mdash; building a list of `None`
+from a function called for its printing &mdash; where a loop is what was meant.

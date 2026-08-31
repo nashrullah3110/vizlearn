@@ -110,3 +110,147 @@ there is a better tool: a context manager. `with open(...)` closes the file
 whether the block succeeded or raised, without the extra indentation and without
 the risk of forgetting. Reach for `finally` when there is no context manager for
 what you are doing, and for `with` when there is.
+
+## Catch what you can handle
+
+The instinct when something raises is to wrap it in `try` and move on. The
+question worth asking first is what the `except` block will actually do about
+it.
+
+If the answer is "log it and continue with a sensible default", catching is
+right. If the answer is "print something and carry on with data that is now
+wrong", the exception was doing its job by stopping the program, and catching it
+has converted a loud failure into a quiet one.
+
+A caught exception should leave the program in a state you could defend. When
+it cannot, letting it propagate is the better choice &mdash; a traceback that
+reaches the user is more useful than a program that continues incorrectly.
+
+## Name the exception
+
+`except Exception:` catches everything, including the ones you did not think
+about: a typo raising `NameError`, an `AttributeError` from a refactor, a
+`KeyError` from a renamed field.
+
+Those are bugs, and catching them means they surface as whatever your handler
+does &mdash; often a generic message &mdash; instead of as a traceback pointing
+at the line.
+
+Naming the exception documents what you expect to go wrong:
+
+```python
+try:
+    value = int(raw)
+except ValueError:
+    value = None
+```
+
+Several can be named together with a tuple, `except (ValueError, TypeError):`,
+which is the right form when the handling is the same.
+
+Bare `except:` is worse still, because it also catches `KeyboardInterrupt` and
+`SystemExit`, so a script becomes impossible to stop with Ctrl-C.
+
+## Keep the try small
+
+Everything inside the `try` is protected, including the lines you did not mean
+to protect:
+
+```python
+try:
+    row = parse(line)
+    total += row.amount      # a typo here is caught as a parse failure
+except ValueError:
+    skipped += 1
+```
+
+If `row.amount` raises, the handler records a skipped row and the real bug is
+invisible.
+
+The narrow version puts only the risky call inside and everything else after,
+which keeps the handler honest about what it is handling.
+
+## else and finally
+
+`else` runs when the `try` block did **not** raise. It is where the code that
+depends on success belongs, and it is what keeps the `try` narrow:
+
+```python
+try:
+    value = int(raw)
+except ValueError:
+    log("bad input")
+else:
+    process(value)
+```
+
+`finally` runs either way, and is for cleanup that must happen whether or not
+things went well. In practice `with` handles most of what `finally` used to,
+which is why it appears less often in modern code.
+
+The one thing to know about `finally` is that a `return` inside it silently
+discards any exception in flight, which is almost never intended.
+
+## The exception object carries the detail
+
+`except KeyError as e` gives you the exception, and `e` names the key. `except
+ValueError as e` gives the value that would not parse.
+
+Discarding it and printing "something went wrong" throws away the only part
+that would have helped whoever reads the log. The message costs nothing to
+include and is the difference between a report you can act on and one you
+cannot.
+
+For unexpected failures, `logging.exception(...)` inside the handler records the
+full traceback along with your message, which is what you want in anything that
+runs unattended.
+
+## Raising, and re-raising
+
+`raise` on its own inside an `except` re-raises the current exception with its
+original traceback, which is how you log and still fail:
+
+```python
+except ValueError:
+    log("could not parse row %d", n)
+    raise
+```
+
+`raise NewError(...) from e` chains, so the traceback shows both what went
+wrong and what it was doing at the time. That is the right way to convert a
+low-level failure into a domain one without losing the cause.
+
+Defining your own exception is a small class inheriting from `Exception`, and
+it is worth doing as soon as callers might want to catch your failure
+specifically rather than by message.
+
+## EAFP and LBYL
+
+Python's convention is "easier to ask forgiveness than permission": attempt the
+operation and handle the failure, rather than checking first.
+
+The reason is not style. Checking first has a race &mdash; a file that exists
+when you check may not when you open it &mdash; and it duplicates the check the
+operation performs anyway.
+
+The exception is when the failure is expected and frequent. Exceptions are
+cheap to set up and expensive to raise, so a loop where most iterations fail is
+faster with a check. `d.get(k)` over `try: d[k]` is the everyday example, and it
+reads better too.
+
+## Common mistakes
+
+**Catching `Exception`** and hiding bugs.
+
+**A bare `except:`**, which also swallows Ctrl-C.
+
+**A `try` wrapping more than the risky call.**
+
+**Discarding the exception object**, losing the only detail.
+
+**`except: pass`**, which is silence by design and almost always wrong.
+
+**Catching what you cannot handle**, turning a loud failure into a quiet one.
+
+**Using exceptions for ordinary control flow** in a hot loop, where a check is
+cheaper.

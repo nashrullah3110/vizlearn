@@ -140,3 +140,129 @@ indentation alone pushes the real work off the right of the screen.
 Pulling the inner loops into a named function costs nothing at runtime and
 gives each level a name that says what it is iterating over. It also gives you
 `return`, which is the cleanest way out of nested loops there is.
+
+## What the nesting costs
+
+A loop inside a loop runs the inner body once for every combination, so the
+work is the product of the two lengths. Ten by ten is a hundred and unnoticeable;
+ten thousand by ten thousand is a hundred million and is a different program.
+
+That multiplication is the thing to notice before writing the second `for`. It
+is not a reason to avoid nesting &mdash; some problems are genuinely
+two-dimensional &mdash; but it is a reason to know which sizes you are
+multiplying.
+
+The related cost is readability. Two levels is normal. Three is hard to follow.
+Four almost always means the inner part wants to be a function, and giving it a
+name usually reveals that it was doing something describable all along.
+
+## The quadratic pattern worth recognising
+
+The commonest accidental nesting is a lookup: for each item in one collection,
+search another for a match.
+
+```python
+for order in orders:
+    for customer in customers:
+        if customer.id == order.customer_id:
+            ...
+```
+
+That is `len(orders) * len(customers)` comparisons, and it is the classic
+quadratic loop. Building a dictionary first turns it linear:
+
+```python
+by_id = {c.id: c for c in customers}
+for order in orders:
+    customer = by_id.get(order.customer_id)
+```
+
+One pass to build the index, one to use it. On a thousand of each, the first
+version does a million comparisons and the second does two thousand operations.
+
+The signal to look for is an inner loop whose only purpose is to find a match.
+Almost every one of those is a dictionary waiting to be built.
+
+## itertools.product
+
+When the nesting really is "every combination", `itertools.product` says so
+directly:
+
+```python
+from itertools import product
+for size, colour in product(sizes, colours):
+    ...
+```
+
+One level of indentation instead of two, and the intent is in the function name
+rather than inferred from the shape.
+
+It also composes: `product(a, b, c)` handles three dimensions without three
+levels, and `repeat=` handles the same collection several times.
+
+The related tools cover the neighbouring cases. `combinations` gives unordered
+pairs without repeats, which is what "every pair of items" usually means and
+which a naive double loop gets wrong by including both `(a, b)` and `(b, a)`.
+`permutations` keeps the order. `zip` pairs by position rather than combining.
+
+Choosing among those four is usually the real question when a double loop feels
+awkward.
+
+## Breaking out of both
+
+`break` leaves the innermost loop only, which is a frequent surprise.
+
+Three ways out. A flag checked by the outer loop, which works and adds
+bookkeeping. Extracting the loops into a function and using `return`, which is
+usually cleanest because the search now has a name. Or `for ... else`, where the
+`else` runs only if no `break` happened &mdash; useful for "did we find it"
+without a flag.
+
+The function version is worth preferring because a double loop that terminates
+early is nearly always a search, and a search is a thing that deserves a name
+and a test.
+
+## Comprehensions with two fors
+
+The order of `for` clauses in a nested comprehension is the same as the
+statement version, outermost first:
+
+```python
+[cell for row in grid for cell in row]
+```
+
+Reading it as "for row in grid, for cell in row, take cell" makes it parse. It
+is the flattening idiom, and it is worth knowing on sight.
+
+The confusion is that the expression comes first and the loops after, so the
+reading order is not the writing order. At one level that is fine. At two it is
+already dense, and at three a generator function is clearer &mdash; and can be
+given a name.
+
+A filter can attach to either level, and which one it attaches to changes the
+result:
+
+```python
+[c for row in grid if row for c in row]     # skip empty rows
+[c for row in grid for c in row if c]       # skip empty cells
+```
+
+Both are legal, they mean different things, and the difference is a single word
+of position.
+
+## Common mistakes
+
+**Not noticing the multiplication**, so a loop that was fine on test data is
+unusable on real data.
+
+**Searching in an inner loop** where a dictionary index would be linear.
+
+**Expecting `break` to leave both loops**, which it does not.
+
+**Reusing the same variable name** in both loops, so the inner one shadows the
+outer.
+
+**Modifying the collection being iterated**, which skips items or raises.
+
+**Three or more levels**, where extracting a function would name the inner
+work.

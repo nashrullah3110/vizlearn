@@ -116,3 +116,133 @@ by keyword, whether or not it has a default. That is the mechanism behind
 keyword-only parameters, and it is why library authors sometimes write a bare
 `*` in a signature: it turns everything after it into a name you have to say
 out loud at the call site.
+
+## The star is unpacking, in both directions
+
+`*` and `**` do the same job in two contexts, which is why they look confusing
+until the symmetry is noticed.
+
+In a **definition**, they collect: `*args` gathers leftover positional
+arguments into a tuple, `**kwargs` gathers leftover keyword arguments into a
+dictionary.
+
+In a **call**, they spread: `f(*items)` passes each element as a separate
+positional argument, `f(**mapping)` passes each key as a keyword argument.
+
+Collect and spread are inverses, which is what makes the passthrough pattern
+work &mdash; a wrapper collects whatever it was given and spreads the same
+thing onward, without knowing or caring what it is.
+
+The names are convention, not syntax. `*a` and `**kw` work identically, and
+`args` and `kwargs` are used because everyone recognises them.
+
+## The order of parameters
+
+Python enforces an order in a definition: positional parameters, then `*args`,
+then keyword-only parameters, then `**kwargs`.
+
+Anything after `*args` is **keyword-only** &mdash; it cannot be supplied
+positionally, because the star has already swallowed everything positional.
+That is a feature, and it is available deliberately with a bare star:
+
+```python
+def connect(host, *, timeout=30, retries=3):
+    ...
+```
+
+Here `timeout` and `retries` must be named at the call site. For arguments
+whose meaning is not obvious from position &mdash; and booleans and numbers
+rarely are &mdash; forcing the name makes every call self-documenting, and it
+means the parameters can be reordered later without breaking callers.
+
+A `/` in the parameter list does the reverse, marking everything before it as
+positional-only. It appears mostly in the standard library, where it keeps
+parameter names from becoming part of the public interface.
+
+## The passthrough pattern
+
+The commonest real use of both is a wrapper that adds something and forwards
+the rest:
+
+```python
+def logged(func):
+    def wrapper(*args, **kwargs):
+        print("calling", func.__name__)
+        return func(*args, **kwargs)
+    return wrapper
+```
+
+`wrapper` accepts any signature and passes it on unchanged, which is exactly
+what a decorator needs.
+
+The cost is that the wrapper's signature is now uninformative: help and editor
+completion show `(*args, **kwargs)` rather than the real parameters.
+`functools.wraps` restores the name and docstring, and `inspect.signature`
+follows the wrapped function, which is why the standard library provides it and
+why decorators without it are mildly unhelpful.
+
+## When it is the wrong tool
+
+`**kwargs` on a function that is not a wrapper is usually a design smell.
+
+It makes the signature say nothing about what is accepted, so the only way to
+find out is to read the body. It silently swallows misspelled arguments &mdash;
+a call passing `timout=5` raises no error and quietly uses the default. And it
+defeats editors, type checkers and documentation tools together.
+
+Named parameters with defaults do the same job and say what they take. The rule
+of thumb: use `**kwargs` when forwarding to something else, and name the
+parameters when the function is the destination.
+
+The same applies to `*args` where a single list parameter would do. `f(items)`
+is clearer than `f(*items)` when the function wants a collection rather than a
+variable number of things.
+
+## Defaults inside a passthrough
+
+A wrapper that wants to override a default has to be careful about the order:
+
+```python
+def wrapper(*args, **kwargs):
+    kwargs.setdefault("timeout", 30)     # caller wins
+    kwargs["timeout"] = 30               # wrapper wins
+```
+
+`setdefault` respects an explicit argument from the caller; direct assignment
+overrides it. Which is right depends on whether the wrapper is providing a
+default or enforcing a policy, and the two are easy to confuse when reading
+someone else's code.
+
+## Reading an unfamiliar signature
+
+Given a definition, three questions resolve most of it.
+
+What must be supplied positionally, and in what order? Everything before `*` or
+`*args`.
+
+What may be supplied either way? Parameters with defaults before the star.
+
+What must be named? Everything after the star.
+
+And if there is `**kwargs`, the honest answer is that the signature does not
+tell you and the body must be read &mdash; which is precisely the cost of using
+it where named parameters would have done.
+
+## Common mistakes
+
+**Using `**kwargs` on a leaf function**, hiding what it accepts and silencing
+typos.
+
+**Forgetting that arguments after `*args` are keyword-only**, and getting a
+confusing error at the call site.
+
+**Omitting `functools.wraps`** in a decorator, so the wrapped function loses its
+name and docstring.
+
+**Spreading a dictionary with non-string keys** into `**`, which raises.
+
+**Passing a list where the function collects with `*`**, or the reverse, which
+produces a tuple containing one list.
+
+**Mutating `kwargs`** and being surprised that the caller's dictionary is
+unaffected &mdash; `**` builds a new dictionary, so it is a copy.

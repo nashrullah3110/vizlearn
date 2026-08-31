@@ -194,7 +194,7 @@
         break
 else:
     print(&quot;not found&quot;)</code></pre><p>The <code>else</code> runs if the loop ran to completion without hitting <code>break</code>. Iterate zero times? The else runs. Iterate a million times and finish? The else runs. Break out on the first pass? It does not.</p><p>The keyword is badly chosen. If it were called <code>nobreak</code>, nobody would ever have been confused by it, and reading it that way in your head is the fastest way to make it click.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-what-it-replaces">What it replaces</a></li><li><a href="#vz-s-where-it-genuinely-reads-well">Where it genuinely reads well</a></li><li><a href="#vz-s-while-else-too">while/else too</a></li><li><a href="#vz-s-should-you-use-it">Should you use it</a></li><li><a href="#vz-s-the-name-is-the-whole-problem">The name is the whole problem</a></li><li><a href="#vz-s-the-shape-it-belongs-to">The shape it belongs to</a></li><li><a href="#vz-s-when-not-to-use-it">When not to use it</a></li><li><a href="#vz-s-knowing-it-matters-more-than-using-it">Knowing it matters more than using it</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-what-it-replaces">What it replaces</a></li><li><a href="#vz-s-where-it-genuinely-reads-well">Where it genuinely reads well</a></li><li><a href="#vz-s-while-else-too">while/else too</a></li><li><a href="#vz-s-the-name-is-the-whole-problem">The name is the whole problem</a></li><li><a href="#vz-s-the-shape-it-belongs-to">The shape it belongs to</a></li><li><a href="#vz-s-when-not-to-use-it">When not to use it</a></li><li><a href="#vz-s-knowing-it-matters-more-than-using-it">Knowing it matters more than using it</a></li><li><a href="#vz-s-what-it-actually-means">What it actually means</a></li><li><a href="#vz-s-the-problem-it-solves">The problem it solves</a></li><li><a href="#vz-s-where-a-function-is-better">Where a function is better</a></li><li><a href="#vz-s-the-while-version">The while version</a></li><li><a href="#vz-s-when-not-to-use-it">When not to use it</a></li><li><a href="#vz-s-common-mistakes">Common mistakes</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -366,10 +366,6 @@ else:
                     <p>The same rule applies to <code>while</code>: the else runs when the condition became false, and not when a <code>break</code> ended the loop. That maps onto retry loops neatly &mdash; the else is where "we exhausted every attempt" lives.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-should-you-use-it">Should you use it</h3>
-                    <p>It is a genuine tool and it is also unfamiliar to many readers. Inside a small function whose whole point is the search, it reads well and saves a flag. Buried in a long function among other loops, a comment or a flag may serve the next person better. Knowing it matters more than using it, because you will meet it in other people's code and it must not be a mystery.</p>
-                </div>
-                <div>
                     <h3 id="vz-s-the-name-is-the-whole-problem">The name is the whole problem</h3>
                     <p>Nothing about the word "else" suggests "if the loop was not broken out of", and that mismatch is why the feature has a reputation for being confusing rather than for being useful. The behaviour itself is simple and has no edge cases.</p><p>Guido van Rossum has said the keyword was a mistake and that something like <code>nobreak</code> would have been clearer. Reading it that way in your head is genuinely all it takes; the confusion disappears immediately and does not come back.</p>
                 </div>
@@ -388,6 +384,49 @@ else:
                 <div>
                     <h3 id="vz-s-knowing-it-matters-more-than-using-it">Knowing it matters more than using it</h3>
                     <p>The reason to learn this feature is that you will read it. It appears in the standard library and in other people's code, and an unfamiliar construct in someone else's loop is exactly the kind of thing that makes a reader guess. Guessing wrong here is easy, because the plain-English reading of "else" is the opposite of the truth in the case people usually check first - the empty sequence, where the else still runs.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-what-it-actually-means">What it actually means</h3>
+                    <p>The <code>else</code> on a loop runs when the loop finished <strong>without breaking</strong>. It has nothing to do with the loop body running or not.</p><p>That name is the whole problem. Every other <code>else</code> in the language pairs with a condition and runs when it is false. This one pairs with <code>break</code> and runs when it did not happen, which is closer to <code>nobreak</code> than to <code>else</code> &mdash; a name Python's own designers have said would have been better.</p><p>Once read as "else: no break happened", the behaviour stops being surprising:</p><pre><code class="language-python">for item in items:
+    if matches(item):
+        found = item
+        break
+else:
+    found = None</code></pre><p>The <code>else</code> runs when the loop ran to completion, which here means nothing matched.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-the-problem-it-solves">The problem it solves</h3>
+                    <p>Searching a collection has two outcomes, and only one of them has a natural place to put code.</p><p>Without <code>else</code>, the "not found" case needs a flag:</p><pre><code class="language-python">found = None
+for item in items:
+    if matches(item):
+        found = item
+        break</code></pre><p>which works, and adds a variable whose only job is to remember whether something happened. The flag has to be initialised before the loop, set inside it, and tested after, and each of those is a place to get it wrong &mdash; particularly forgetting to reset it inside an outer loop.</p><p><code>for ... else</code> removes the flag entirely, which is a genuine simplification for exactly this shape.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-where-a-function-is-better">Where a function is better</h3>
+                    <p>Very often the loop is a search, and a search deserves a name:</p><pre><code class="language-python">def find(items):
+    for item in items:
+        if matches(item):
+            return item
+    return None</code></pre><p>The <code>return</code> ends the loop and the function together, so no <code>break</code>, no flag and no <code>else</code> is needed. The "not found" case is the final <code>return</code>, which reads as the fallthrough it is.</p><p>That version is usually clearer, and it has the advantage of being testable on its own. When a loop with <code>else</code> is doing a search inside a longer function, extracting it is the better refactor.</p><p><code>next(gen, default)</code> compresses the same thing to one line when the search fits a generator expression, and is the most idiomatic form for a simple find.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-the-while-version">The while version</h3>
+                    <p><code>while ... else</code> works the same way: the <code>else</code> runs if the loop ended because the condition became false, and not if it ended by <code>break</code>.</p><p>It is rarer, and the natural use is a retry loop &mdash; try a few times, break on success, and the <code>else</code> handles "we never succeeded".</p><pre><code class="language-python">attempts = 0
+while attempts &lt; 3:
+    if try_once():
+        break
+    attempts += 1
+else:
+    give_up()</code></pre><p>That reads reasonably, and the same caveat applies: many readers will not know the construct, so a comment or a differently-shaped function may serve better.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-when-not-to-use-it">When not to use it</h3>
+                    <p>If the loop contains no <code>break</code>, the <code>else</code> always runs and is decoration. It means exactly what putting the code after the loop means, while making the reader stop and check. Delete it.</p><p>If the loop is inside a function that could simply <code>return</code>, the function version is clearer.</p><p>And if the surrounding function is long, the construct's unfamiliarity works against it &mdash; a reader who has to look up what <code>else</code> means here has been slowed down more than the flag would have cost.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-common-mistakes">Common mistakes</h3>
+                    <p><strong>Reading it as "if the loop did not run"</strong>, which is what it looks like and not what it does. An empty collection runs the <code>else</code>, because nothing broke.</p><p><strong>Putting an <code>else</code> on a loop with no <code>break</code></strong>, where it is unconditional.</p><p><strong>Using it where a function and <code>return</code> would be plainer.</strong></p><p><strong>Assuming <code>continue</code> skips it</strong> &mdash; only <code>break</code> does. A loop that <code>continue</code>s through every item still finishes normally and still runs the <code>else</code>.</p><p><strong>Forgetting it exists</strong> and writing the flag version, which is the commonest outcome and is not a serious problem.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

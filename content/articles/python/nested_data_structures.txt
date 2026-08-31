@@ -102,3 +102,148 @@ and is the fastest way to understand something you have just fetched.
 The one asymmetry: JSON object keys are always strings. A dictionary keyed by
 integers survives the round trip as string keys, which is a small surprise that
 shows up when a lookup that worked before saving fails after loading.
+
+## Why nesting happens
+
+Nested data is not a design choice so much as what arrives. An API returns a
+user containing a settings object containing a notifications object. A CSV
+grouped by region gives a dictionary of lists. A configuration file has
+sections within sections.
+
+The shape reflects the domain, and fighting it usually produces worse code than
+learning to walk it.
+
+Two questions make any nested structure tractable. What is at each level &mdash;
+a dictionary keyed by something, or a list indexed by position? And how deep
+does the part I actually need sit?
+
+Answering those turns "I have no idea what this is" into a path, and a path is
+something you can write down and test.
+
+## Reading a path defensively
+
+Chained subscripting fails at the first missing link, and the error names the
+key rather than the path, which is unhelpful when the same key appears at three
+levels.
+
+Chained `get` with a dictionary default is the usual defence, because each step
+substitutes an empty dictionary that the next step can safely query. It reads
+badly past two levels and is still better than a nest of `if` statements.
+
+Past three levels, a small helper is worth writing once:
+
+```python
+def dig(data, *keys, default=None):
+    for k in keys:
+        if not isinstance(data, dict):
+            return default
+        data = data.get(k, default if k == keys[-1] else {})
+    return data
+```
+
+The value of the helper is not brevity but the single place to change behaviour
+&mdash; whether a missing key is an error or a default, and whether a
+non-dictionary partway down is a bug worth raising on.
+
+## Lists and dictionaries need different care
+
+A missing dictionary key has a natural default; a missing list index does not.
+
+`d.get("k", [])` is meaningful. There is no equivalent for `lst[5]` when the
+list has three items, because an index does not name anything &mdash; it
+identifies a position that either exists or does not.
+
+That asymmetry matters when walking mixed structures. Guarding a dictionary
+access with `get` is cheap; guarding a list access needs a length check, a
+`try`, or a slice, since `lst[5:6]` gives an empty list rather than raising.
+
+It also means that data indexed by position is more fragile than data keyed by
+name, which is an argument for converting positional records into dictionaries
+early &mdash; with `zip` against a header row, for instance &mdash; and working
+with names from then on.
+
+## Walking without knowing the shape
+
+When the structure is genuinely unknown, recursion is the tool, and it needs
+exactly two things: a check for what to do at a leaf, and a rule for how to
+descend.
+
+```python
+def walk(node, path=()):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            yield from walk(v, path + (k,))
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            yield from walk(v, path + (i,))
+    else:
+        yield path, node
+```
+
+That yields every leaf with the path that reached it, which is enough to
+answer most exploratory questions: what keys exist, where a value appears, how
+deep the thing goes.
+
+The caution is cyclic references, where a structure contains itself and the
+recursion never ends. Data from JSON cannot do that; data built in memory can.
+
+## Building nested shapes
+
+Building is where `setdefault` and `defaultdict` earn their place, because the
+container has to exist before anything can be added to it.
+
+Nested defaults compose, so a dictionary of dictionaries of lists can be
+declared once and then written to without any existence checks. The cost is
+that reading a missing key creates it, so such a structure grows when you
+inspect it &mdash; which is fine while building and a nuisance afterwards.
+
+Converting back to a plain dictionary when the building is done is a small
+courtesy to whatever comes next, and it turns silent creation back into a
+`KeyError`.
+
+## Flattening
+
+Most questions about nested data are really questions about a flattened view of
+it: a total, a count, a list of everything matching a condition.
+
+Nested comprehensions do this, and their reading order is the thing people get
+wrong. The `for` clauses appear in the same order they would as nested loops,
+outermost first, and the expression comes at the front. Reading it as "the
+expression, for the outer thing, for the inner thing" makes it parse.
+
+Past two levels, a generator function is clearer than a comprehension, and it
+has the advantage of a name that says what the flattening is for.
+
+## When to stop nesting
+
+Data more than three or four levels deep is usually telling you something.
+
+Sometimes it is genuinely hierarchical, and the depth is honest. More often it
+is several concerns tangled together, and the code that walks it is
+correspondingly hard to follow.
+
+Two ways out. Flatten early, converting the part you need into a flat list of
+records at the boundary, and work with that. Or give the shapes names &mdash; a
+dataclass per level &mdash; so the code says `user.settings.theme` and the
+structure is checked rather than assumed.
+
+The second is more work up front and pays for itself the moment more than one
+function touches the data.
+
+## Common mistakes
+
+**Chained subscripting on data you did not create**, which raises at the first
+gap.
+
+**Assuming a key exists because it did in the example response**, when optional
+fields are simply absent rather than null.
+
+**Using `get` on a list**, which does not exist.
+
+**Building with `setdefault` and then treating the result as read-only**, so
+inspection quietly adds keys.
+
+**Nested comprehensions past two levels**, which stop being readable.
+
+**Mutating a nested structure while walking it**, which raises or skips
+entries.

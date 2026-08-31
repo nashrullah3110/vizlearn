@@ -95,3 +95,132 @@ def grade(score):
 The bands are now data, which means they can be changed, tested and displayed
 without touching the logic. That is usually the real win, and it is easy to
 miss while arguing about one-liners.
+
+## It is an expression, and that is the whole point
+
+`a if cond else b` produces a value. A statement `if` does not.
+
+That difference decides where each belongs. Anywhere a value is needed &mdash;
+inside a function call, in a comprehension, as a default, in an f-string, as a
+dictionary value &mdash; only the expression form fits, because a statement
+cannot appear there at all.
+
+```python
+label = "adult" if age >= 18 else "minor"
+print(f"{count} item{'s' if count != 1 else ''}")
+rows = [x if x > 0 else 0 for x in values]
+```
+
+Each of those would need a temporary variable and three or four lines in
+statement form, and the temporary would exist only to be used once.
+
+The `else` is mandatory, which is a deliberate design decision: an expression
+must produce a value on every path, and there is no sensible value for "the
+condition was false and you did not say what to do".
+
+## Reading order
+
+The order is unusual and is the main reason people find it awkward: the value
+comes first, then the condition, then the alternative.
+
+Most languages put the condition first. Python's order reads as English &mdash;
+"give me the discount price, if they are a member, otherwise the normal price"
+&mdash; which is natural in a sentence and unfamiliar as code.
+
+Evaluation is not left to right. The condition is evaluated first, then exactly
+one of the two branches. The other branch is never evaluated, which matters
+when a branch would raise or is expensive:
+
+```python
+value = d[k] if k in d else default        # safe
+value = compute() if cached is None else cached   # compute() runs only if needed
+```
+
+That short-circuiting is the same behaviour `and` and `or` have, and it is what
+makes the form safe to use as a guard.
+
+## Where it stops being readable
+
+The form is readable at one level and hard at two.
+
+```python
+size = "small" if n < 10 else "medium" if n < 100 else "large"
+```
+
+This works, and it chains right to left, so it is really "small, or else
+(medium, or else large)". Two levels is about the limit at which most readers
+can still parse it at a glance; three is a puzzle.
+
+The alternatives are better past that point. A statement `if`/`elif` chain says
+the same thing in more lines and fewer questions. A dictionary lookup handles
+mapping one value to another. `bisect` on a list of thresholds handles ranges,
+and is the tool that scales to twenty bands.
+
+The useful test: if you paused to work out which `else` binds to which `if`, so
+will the next reader.
+
+## The idioms it replaces
+
+Three patterns that used to be written the long way:
+
+**A default for a possibly-missing value.** `x if x is not None else fallback`.
+Note the explicit `is not None` &mdash; using `x if x else fallback` also
+replaces zero, empty strings and empty lists, which is usually a bug.
+
+**A guard against an operation that would raise.** `total / n if n else 0`.
+
+**Singular and plural in a message**, which is the f-string case above and is
+the most common everyday use.
+
+For the first of those, `or` is a tempting shorthand &mdash; `x or fallback`
+&mdash; and carries exactly the same trap: it treats every falsy value as
+missing. When zero is a legitimate value, `or` is wrong and the explicit
+conditional is right.
+
+## Against or, and against and/or
+
+Before the conditional expression existed, people wrote `cond and a or b`,
+which mostly works and fails when `a` is falsy &mdash; in that case it returns
+`b` regardless of the condition.
+
+That construction still appears in older code, and recognising it is worth
+something, but there is no reason to write it now.
+
+`or` for defaults remains idiomatic where every falsy value genuinely should be
+replaced &mdash; an empty name field becoming "Anonymous", for instance. The
+distinction to hold is between "missing" and "falsy", which coincide often
+enough to hide the difference and not always.
+
+## In comprehensions
+
+The one place the syntax genuinely confuses is that a comprehension can carry
+both a conditional expression and a filter, and they sit in different places:
+
+```python
+[x if x > 0 else 0 for x in values]      # transform: same length
+[x for x in values if x > 0]             # filter: shorter
+```
+
+The first replaces values and keeps the length. The second removes items. The
+`if` before `for` is part of the expression; the `if` after the `for` is a
+filter.
+
+Both together is legal and reads badly, which is usually a sign the operation
+wants a named function or an ordinary loop.
+
+## Common mistakes
+
+**Omitting the `else`**, which is a syntax error rather than an implicit
+`None`.
+
+**Nesting more than one level**, which is technically fine and practically
+unreadable.
+
+**Using truthiness where `is not None` was meant**, so zero and empty string
+take the fallback.
+
+**Confusing the transform `if` with the filter `if`** in a comprehension, and
+getting a list of the wrong length.
+
+**Reaching for it when a dictionary lookup or `elif` chain is clearer**,
+particularly for more than two outcomes.

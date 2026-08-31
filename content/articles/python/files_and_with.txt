@@ -107,3 +107,124 @@ you want for images, archives, and anything you are copying rather than reading.
 The mistake in the other direction is more common: opening a text file in binary
 mode and then being puzzled that comparisons against strings all fail, because
 `b"abc"` and `"abc"` are different types that never compare equal.
+
+## What `with` actually does
+
+`with` is not file syntax. It works with any object that defines
+`__enter__` and `__exit__`, and it guarantees that the exit step runs when the
+block ends &mdash; whether it ends normally, by `return`, or by an exception.
+
+For a file, the exit step closes it. For a lock, it releases. For a database
+connection, it commits or rolls back.
+
+That guarantee is the point. Code that opens and closes by hand is correct
+until something between the two raises, and then the file stays open. In a
+short script the interpreter cleans up on exit and nothing appears wrong; in a
+long-running process, file handles leak until the operating system refuses to
+open more.
+
+Because the mechanism is general, `with` is worth recognising as a shape rather
+than a file idiom &mdash; anything that needs cleaning up afterwards is a
+candidate.
+
+## Reading: three shapes, three purposes
+
+`f.read()` returns the entire contents as one string. Simple, and it needs
+memory proportional to the file.
+
+`f.readlines()` returns a list of lines, with the newline characters still
+attached, and has the same memory cost.
+
+Iterating the file object &mdash; `for line in f` &mdash; yields one line at a
+time and never holds more than one in memory. It is the right default, and the
+only one that works on a file larger than RAM.
+
+The newline is the detail people trip over. Every line except possibly the last
+ends with `\n`, so comparisons fail and printed output double-spaces.
+`line.rstrip("\n")` removes exactly the newline; a bare `strip()` also removes
+leading and trailing spaces, which is usually convenient and occasionally
+destroys meaningful indentation.
+
+## Modes, and the destructive one
+
+`r` reads and is the default. `w` **truncates the file to nothing** before
+writing. `a` appends. `x` creates and fails if the file exists.
+
+The one to be careful with is `w`, because it destroys the file's contents at
+the moment of opening, before a single byte is written. A script that opens for
+writing and then crashes has already emptied the file.
+
+`x` is the safe version when the intent is to create something new, since it
+refuses rather than overwriting. It is under-used, and it converts a silent
+data loss into an error.
+
+Adding `+` to any mode allows both reading and writing, with position rules that
+are easy to get wrong; when a program needs both, it is usually clearer to read
+the file, close it, and write a new one.
+
+## Writing safely
+
+The pattern for not losing data when writing goes wrong is to write to a
+temporary file and rename it into place once it is complete.
+
+Renaming within a filesystem is atomic, so any reader sees either the old file
+or the new one, never a half-written one. Without it, a crash partway through
+leaves a truncated file that looks valid.
+
+That matters for anything another process reads, anything run on a schedule,
+and anything whose loss would be noticed. For a scratch file it is
+over-engineering.
+
+`f.write()` does not add newlines. `print(..., file=f)` does, which is often
+the more convenient way to write text line by line.
+
+## Encoding
+
+`open()` uses the platform's default encoding unless told otherwise, and that
+default differs between machines. The same script can read a file correctly on
+one computer and raise `UnicodeDecodeError` on another.
+
+Passing `encoding="utf-8"` explicitly removes the variability, and it should be
+considered mandatory for anything that leaves your own machine.
+
+When a file's encoding is genuinely unknown, `errors="replace"` substitutes a
+placeholder for undecodable bytes rather than raising, which is right for
+inspection and wrong for anything that will be written back out &mdash; the
+replacement is lossy and permanent.
+
+The related symptom is mojibake: text that decodes without error into the wrong
+characters, usually because a Windows-encoded file was read as UTF-8 or the
+reverse. That produces no exception at all, which is why the encoding is worth
+stating rather than discovering.
+
+## Paths
+
+`pathlib` replaces most of what string manipulation used to do with filenames,
+and it does so more safely.
+
+`Path("data") / "raw" / "file.csv"` builds a path with the right separator for
+the platform. `p.exists()`, `p.suffix`, `p.stem`, `p.parent` answer the usual
+questions without parsing. `p.read_text()` and `p.write_text()` handle the open
+and close for small files in one call.
+
+The habit worth forming is to accept and pass `Path` objects rather than
+strings, converting at the edges. String paths work and reintroduce the
+separator and joining bugs that `pathlib` exists to remove.
+
+## Common mistakes
+
+**Opening without `with`**, so a raised exception leaves the file open.
+
+**Opening with `w` when `a` or `x` was meant**, which empties the file
+immediately.
+
+**Forgetting the newline** when reading, or forgetting to add one when writing.
+
+**Relying on the default encoding**, which differs by platform.
+
+**Reading a large file with `read()`** when iteration would do.
+
+**Writing in place** without a temporary file, so a crash truncates the
+original.
+
+**Building paths with string concatenation**, which breaks across platforms.

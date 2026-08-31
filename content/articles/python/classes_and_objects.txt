@@ -116,3 +116,137 @@ That gives you `__init__`, a readable `__repr__` and equality comparison for
 free, which is three of the things you would otherwise write by hand and one -
 `__repr__` - that people usually skip and then miss the first time they print a
 list of them.
+
+## What a class is for
+
+A class bundles data with the functions that operate on it, and the useful test
+for whether you need one is whether several functions keep taking the same
+group of arguments.
+
+```python
+def area(w, h): ...
+def perimeter(w, h): ...
+def scale(w, h, factor): ...
+```
+
+Three functions all taking `w, h` is a `Rectangle` asking to exist. The class
+version removes the repeated arguments and gives the pair a name.
+
+The opposite is also true and more often ignored: a class with one method and
+no state is a function with extra steps. If nothing is remembered between calls,
+a function is the simpler thing.
+
+## self is not magic
+
+`self` is the instance, passed as the first argument. Python passes it
+automatically when a method is called on an object, so `r.area()` is really
+`Rectangle.area(r)`.
+
+Knowing that explains several things that otherwise look arbitrary: why `self`
+appears in the definition and not the call, why forgetting it produces an
+argument-count error, and why the name is a convention rather than a keyword
+&mdash; it can be called anything, and calling it anything else will confuse
+every reader.
+
+It also explains why attributes must be written `self.width` and not `width`.
+The bare name is a local variable in the method; the attribute lives on the
+instance and has to be reached through it.
+
+## Instance state versus class state
+
+An assignment inside `__init__` creates a **per-instance** attribute. An
+assignment in the class body creates a **class attribute**, shared by every
+instance:
+
+```python
+class Basket:
+    items = []            # shared by all baskets - almost always a bug
+    def __init__(self):
+        self.items = []   # one per basket - what was meant
+```
+
+The first version gives every basket the same list, so adding to one adds to
+all. It is the same mechanism as the mutable default argument, and it produces
+the same class of confusing bug.
+
+Class attributes are right for genuine constants shared by the type &mdash; a
+default rate, a set of valid statuses, a counter of instances created &mdash;
+and wrong for anything an instance should own.
+
+## The methods worth defining
+
+`__init__` sets up state and should do little else. Work that can fail belongs
+in a classmethod constructor or a separate call, because an exception in
+`__init__` leaves a half-built object.
+
+`__repr__` decides what the object looks like in a debugger, a list, or a log.
+Defining it is the highest-value five minutes available, because it changes
+every future debugging session. Aim for something that shows the identifying
+fields.
+
+`__eq__` decides what equality means. Without it, two objects with identical
+contents are unequal, because the default compares identity. Defining `__eq__`
+without `__hash__` makes the object unhashable, which is deliberate &mdash; a
+mutable object that compares by value cannot safely be a dictionary key.
+
+`__str__` is optional; `str` falls back to `__repr__`, so one well-written
+`__repr__` covers both.
+
+## Dataclasses
+
+For a class that is mostly data, `@dataclass` writes `__init__`, `__repr__` and
+`__eq__` from the annotations:
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Point:
+    x: float
+    y: float
+```
+
+That is the whole class, and it behaves better than most hand-written
+equivalents because the generated methods are complete and consistent.
+
+`frozen=True` makes instances immutable and hashable, which is the right choice
+for value objects. `field(default_factory=list)` is how a mutable default is
+declared safely &mdash; the dataclass machinery refuses a plain `[]`, which is
+one of the few places Python protects you from that trap.
+
+`NamedTuple` is the lighter alternative when the object is genuinely a tuple
+with names, and a plain dictionary is the right answer when the shape is not
+fixed.
+
+## Properties, when an attribute needs logic
+
+A property makes a method look like an attribute, which lets a plain attribute
+grow validation or computation later without changing every caller:
+
+```python
+@property
+def area(self):
+    return self.width * self.height
+```
+
+The convention that makes this work is to start with plain attributes and add a
+property only when there is a reason. Writing getters and setters for every
+field up front is a habit from languages that cannot change an attribute into a
+property later; Python can, so the ceremony buys nothing.
+
+## Common mistakes
+
+**A mutable class attribute**, shared by every instance.
+
+**Forgetting `self`** in a method definition, or in an attribute reference.
+
+**No `__repr__`**, so debugging shows an object and a memory address.
+
+**Defining `__eq__` without `__hash__`**, making instances unusable in sets.
+
+**Doing work that can fail in `__init__`**, leaving half-built objects.
+
+**A class with no state**, which is a function.
+
+**Getters and setters everywhere**, where properties exist for exactly the case
+that needs them.

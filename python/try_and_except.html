@@ -385,6 +385,52 @@ except ValueError:
                     <h3>Cleanup belongs to <code>with</code></h3>
                     <p><code>finally</code> guarantees that cleanup runs, and for files, locks and connections there is a better tool: a context manager. <code>with open(...)</code> closes the file whether the block succeeded or raised, without the extra indentation and without the risk of forgetting. Reach for <code>finally</code> when there is no context manager for what you are doing, and for <code>with</code> when there is.</p>
                 </div>
+                <div>
+                    <h3>Catch what you can handle</h3>
+                    <p>The instinct when something raises is to wrap it in <code>try</code> and move on. The question worth asking first is what the <code>except</code> block will actually do about it.</p><p>If the answer is "log it and continue with a sensible default", catching is right. If the answer is "print something and carry on with data that is now wrong", the exception was doing its job by stopping the program, and catching it has converted a loud failure into a quiet one.</p><p>A caught exception should leave the program in a state you could defend. When it cannot, letting it propagate is the better choice &mdash; a traceback that reaches the user is more useful than a program that continues incorrectly.</p>
+                </div>
+                <div>
+                    <h3>Name the exception</h3>
+                    <p><code>except Exception:</code> catches everything, including the ones you did not think about: a typo raising <code>NameError</code>, an <code>AttributeError</code> from a refactor, a <code>KeyError</code> from a renamed field.</p><p>Those are bugs, and catching them means they surface as whatever your handler does &mdash; often a generic message &mdash; instead of as a traceback pointing at the line.</p><p>Naming the exception documents what you expect to go wrong:</p><pre><code class="language-python">try:
+    value = int(raw)
+except ValueError:
+    value = None</code></pre><p>Several can be named together with a tuple, <code>except (ValueError, TypeError):</code>, which is the right form when the handling is the same.</p><p>Bare <code>except:</code> is worse still, because it also catches <code>KeyboardInterrupt</code> and <code>SystemExit</code>, so a script becomes impossible to stop with Ctrl-C.</p>
+                </div>
+                <div>
+                    <h3>Keep the try small</h3>
+                    <p>Everything inside the <code>try</code> is protected, including the lines you did not mean to protect:</p><pre><code class="language-python">try:
+    row = parse(line)
+    total += row.amount      # a typo here is caught as a parse failure
+except ValueError:
+    skipped += 1</code></pre><p>If <code>row.amount</code> raises, the handler records a skipped row and the real bug is invisible.</p><p>The narrow version puts only the risky call inside and everything else after, which keeps the handler honest about what it is handling.</p>
+                </div>
+                <div>
+                    <h3>else and finally</h3>
+                    <p><code>else</code> runs when the <code>try</code> block did <strong>not</strong> raise. It is where the code that depends on success belongs, and it is what keeps the <code>try</code> narrow:</p><pre><code class="language-python">try:
+    value = int(raw)
+except ValueError:
+    log(&quot;bad input&quot;)
+else:
+    process(value)</code></pre><p><code>finally</code> runs either way, and is for cleanup that must happen whether or not things went well. In practice <code>with</code> handles most of what <code>finally</code> used to, which is why it appears less often in modern code.</p><p>The one thing to know about <code>finally</code> is that a <code>return</code> inside it silently discards any exception in flight, which is almost never intended.</p>
+                </div>
+                <div>
+                    <h3>The exception object carries the detail</h3>
+                    <p><code>except KeyError as e</code> gives you the exception, and <code>e</code> names the key. <code>except ValueError as e</code> gives the value that would not parse.</p><p>Discarding it and printing "something went wrong" throws away the only part that would have helped whoever reads the log. The message costs nothing to include and is the difference between a report you can act on and one you cannot.</p><p>For unexpected failures, <code>logging.exception(...)</code> inside the handler records the full traceback along with your message, which is what you want in anything that runs unattended.</p>
+                </div>
+                <div>
+                    <h3>Raising, and re-raising</h3>
+                    <p><code>raise</code> on its own inside an <code>except</code> re-raises the current exception with its original traceback, which is how you log and still fail:</p><pre><code class="language-python">except ValueError:
+    log(&quot;could not parse row %d&quot;, n)
+    raise</code></pre><p><code>raise NewError(...) from e</code> chains, so the traceback shows both what went wrong and what it was doing at the time. That is the right way to convert a low-level failure into a domain one without losing the cause.</p><p>Defining your own exception is a small class inheriting from <code>Exception</code>, and it is worth doing as soon as callers might want to catch your failure specifically rather than by message.</p>
+                </div>
+                <div>
+                    <h3>EAFP and LBYL</h3>
+                    <p>Python's convention is "easier to ask forgiveness than permission": attempt the operation and handle the failure, rather than checking first.</p><p>The reason is not style. Checking first has a race &mdash; a file that exists when you check may not when you open it &mdash; and it duplicates the check the operation performs anyway.</p><p>The exception is when the failure is expected and frequent. Exceptions are cheap to set up and expensive to raise, so a loop where most iterations fail is faster with a check. <code>d.get(k)</code> over <code>try: d[k]</code> is the everyday example, and it reads better too.</p>
+                </div>
+                <div>
+                    <h3>Common mistakes</h3>
+                    <p><strong>Catching <code>Exception</code></strong> and hiding bugs.</p><p><strong>A bare <code>except:</code></strong>, which also swallows Ctrl-C.</p><p><strong>A <code>try</code> wrapping more than the risky call.</strong></p><p><strong>Discarding the exception object</strong>, losing the only detail.</p><p><strong><code>except: pass</code></strong>, which is silence by design and almost always wrong.</p><p><strong>Catching what you cannot handle</strong>, turning a loud failure into a quiet one.</p><p><strong>Using exceptions for ordinary control flow</strong> in a hot loop, where a check is cheaper.</p>
+                </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->
         </div>

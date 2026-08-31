@@ -381,6 +381,37 @@ except (ValueError, TypeError):
                     <h3>Implicit conversion, and where Python refuses</h3>
                     <p>Python converts numeric types automatically when it can do so without losing information: <code>1 + 2.0</code> gives <code>3.0</code>, and comparing an int with a float works as expected. It refuses to convert between strings and numbers, which is why <code>"3" + 4</code> raises rather than guessing whether you meant <code>7</code> or <code>"34"</code>.</p><p>That refusal is a feature. Languages that do guess produce a class of bug where a number arrives as a string from a form or a file and everything continues to work until the arithmetic silently becomes concatenation. In Python that fails at once, at the line responsible.</p>
                 </div>
+                <div>
+                    <h3>Conversion is explicit, and mostly one-way</h3>
+                    <p>Python does very little type juggling on its own. <code>"3" + 4</code> raises rather than guessing whether you meant <code>7</code> or <code>"34"</code>, which is a deliberate choice and the reason the conversions have to be written.</p><p>The exception is numbers, where mixing types converts upward automatically: <code>1 + 2.5</code> gives a float, and <code>True + 1</code> gives <code>2</code>, because <code>bool</code> is a subclass of <code>int</code>. That last one surprises people and is occasionally useful &mdash; <code>sum(flags)</code> counts the true ones.</p><p>Everything else is a call. The type's name is the constructor, so there is nothing to memorise: <code>int</code>, <code>float</code>, <code>str</code>, <code>list</code>, <code>tuple</code>, <code>set</code>, <code>dict</code>, <code>bool</code> all convert to themselves.</p>
+                </div>
+                <div>
+                    <h3>What each one refuses</h3>
+                    <p>The failures are as informative as the successes.</p><p><code>int("3.5")</code> raises. Converting text to an integer accepts only text that is exactly an integer &mdash; no decimal point, no thousands separator, no currency symbol. <code>int(float("3.5"))</code> is the two-step version, and it truncates rather than rounding.</p><p><code>int(3.7)</code> gives <code>3</code>. Conversion from a float <strong>truncates toward zero</strong>, so <code>int(-3.7)</code> is <code>-3</code>, not <code>-4</code>. <code>round</code>, <code>math.floor</code> and <code>math.ceil</code> are the functions that do what their names say, and <code>round</code> has its own surprise covered below.</p><p><code>float("1,234")</code> raises, because the comma is not part of the number's syntax. Locale-formatted numbers must be cleaned before conversion.</p><p><code>list("abc")</code> gives <code>['a', 'b', 'c']</code>, which is correct and is not what someone wrapping a single string in a list intended. <code>["abc"]</code> is that.</p>
+                </div>
+                <div>
+                    <h3>Converting user input</h3>
+                    <p>Every conversion of text that came from outside the program is a possible failure, and the shape that handles it is a <code>try</code> around the conversion and nothing else:</p><pre><code class="language-python">try:
+    n = int(raw.strip())
+except ValueError:
+    n = None</code></pre><p>Two details matter. <code>strip()</code> first, because a trailing space or newline is the commonest reason a valid-looking number will not convert. And keep the <code>try</code> narrow, so it catches the conversion failing rather than a mistake three lines later.</p><p><code>ValueError</code> is what conversion raises for a bad value; <code>TypeError</code> is what it raises for a value of the wrong kind entirely, such as <code>int(None)</code>. Catching one and not the other is usually correct, and catching bare <code>Exception</code> hides both.</p>
+                </div>
+                <div>
+                    <h3>Truthiness is a conversion too</h3>
+                    <p><code>bool(x)</code> follows fixed rules: zero, empty containers, empty strings and <code>None</code> are false; everything else is true.</p><p>That means <code>if items:</code> and <code>if len(items) &gt; 0:</code> agree for containers, and the first is idiomatic. It also means <code>if x:</code> and <code>if x is not None:</code> disagree whenever <code>x</code> might legitimately be <code>0</code> or <code>""</code>, which is the most common truthiness bug.</p><p>Custom objects are true by default, and define their own answer with <code>__bool__</code> or <code>__len__</code>. An object defining <code>__len__</code> is false when empty, which is why an empty custom collection behaves like an empty list without extra work.</p>
+                </div>
+                <div>
+                    <h3>Numbers that do not convert cleanly</h3>
+                    <p><code>0.1 + 0.2</code> is not <code>0.3</code>, and <code>int</code> will not save you from it. Floating point represents most decimal fractions approximately, and the error is inherent rather than a bug in the conversion.</p><p>For money and anything else where exactness matters, <code>decimal.Decimal</code> is the type to use &mdash; constructed from a <strong>string</strong>, because <code>Decimal(0.1)</code> inherits the float's error before <code>Decimal</code> ever sees it.</p><p><code>round</code> uses banker's rounding: exact halves go to the nearest even number, so <code>round(0.5)</code> is <code>0</code> and <code>round(1.5)</code> is <code>2</code>. It is deliberate, it removes the upward bias of always rounding halves up, and it is not what most people expect.</p>
+                </div>
+                <div>
+                    <h3>Strings from objects</h3>
+                    <p><code>str(x)</code> and <code>repr(x)</code> both produce text and answer different questions. <code>str</code> is for people and <code>repr</code> is for programmers &mdash; ideally something that could be pasted back into code.</p><p>For a class you define, <code>__str__</code> and <code>__repr__</code> control them. Defining only <code>__repr__</code> is the pragmatic choice: <code>str</code> falls back to it, so one method gives readable output everywhere including in lists and debuggers, where <code>str</code> is not what gets called.</p><p><code>f"{x}"</code> uses <code>str</code>; <code>f"{x!r}"</code> uses <code>repr</code>. That <code>!r</code> is worth knowing for log messages, because it quotes strings and so makes an empty or space-padded value visible where <code>str</code> would render it as nothing.</p>
+                </div>
+                <div>
+                    <h3>Common mistakes</h3>
+                    <p><strong><code>int("3.5")</code></strong>, which raises rather than truncating.</p><p><strong>Assuming <code>int()</code> rounds</strong>, when it truncates toward zero.</p><p><strong>Converting without a <code>try</code></strong> on anything that came from a user or a file.</p><p><strong><code>list("word")</code></strong> where <code>["word"]</code> was meant.</p><p><strong>Using truthiness to test for <code>None</code></strong>, so zero takes the wrong branch.</p><p><strong><code>Decimal(0.1)</code></strong>, which preserves the float error the type was chosen to avoid.</p><p><strong>Expecting <code>round</code> to round halves up</strong>, which it does not.</p>
+                </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->
         </div>

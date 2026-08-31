@@ -383,6 +383,46 @@ class Point:
     x: float
     y: float</code></pre><p>That gives you <code>__init__</code>, a readable <code>__repr__</code> and equality comparison for free, which is three of the things you would otherwise write by hand and one - <code>__repr__</code> - that people usually skip and then miss the first time they print a list of them.</p>
                 </div>
+                <div>
+                    <h3>What a class is for</h3>
+                    <p>A class bundles data with the functions that operate on it, and the useful test for whether you need one is whether several functions keep taking the same group of arguments.</p><pre><code class="language-python">def area(w, h): ...
+def perimeter(w, h): ...
+def scale(w, h, factor): ...</code></pre><p>Three functions all taking <code>w, h</code> is a <code>Rectangle</code> asking to exist. The class version removes the repeated arguments and gives the pair a name.</p><p>The opposite is also true and more often ignored: a class with one method and no state is a function with extra steps. If nothing is remembered between calls, a function is the simpler thing.</p>
+                </div>
+                <div>
+                    <h3>self is not magic</h3>
+                    <p><code>self</code> is the instance, passed as the first argument. Python passes it automatically when a method is called on an object, so <code>r.area()</code> is really <code>Rectangle.area(r)</code>.</p><p>Knowing that explains several things that otherwise look arbitrary: why <code>self</code> appears in the definition and not the call, why forgetting it produces an argument-count error, and why the name is a convention rather than a keyword &mdash; it can be called anything, and calling it anything else will confuse every reader.</p><p>It also explains why attributes must be written <code>self.width</code> and not <code>width</code>. The bare name is a local variable in the method; the attribute lives on the instance and has to be reached through it.</p>
+                </div>
+                <div>
+                    <h3>Instance state versus class state</h3>
+                    <p>An assignment inside <code>__init__</code> creates a <strong>per-instance</strong> attribute. An assignment in the class body creates a <strong>class attribute</strong>, shared by every instance:</p><pre><code class="language-python">class Basket:
+    items = []            # shared by all baskets - almost always a bug
+    def __init__(self):
+        self.items = []   # one per basket - what was meant</code></pre><p>The first version gives every basket the same list, so adding to one adds to all. It is the same mechanism as the mutable default argument, and it produces the same class of confusing bug.</p><p>Class attributes are right for genuine constants shared by the type &mdash; a default rate, a set of valid statuses, a counter of instances created &mdash; and wrong for anything an instance should own.</p>
+                </div>
+                <div>
+                    <h3>The methods worth defining</h3>
+                    <p><code>__init__</code> sets up state and should do little else. Work that can fail belongs in a classmethod constructor or a separate call, because an exception in <code>__init__</code> leaves a half-built object.</p><p><code>__repr__</code> decides what the object looks like in a debugger, a list, or a log. Defining it is the highest-value five minutes available, because it changes every future debugging session. Aim for something that shows the identifying fields.</p><p><code>__eq__</code> decides what equality means. Without it, two objects with identical contents are unequal, because the default compares identity. Defining <code>__eq__</code> without <code>__hash__</code> makes the object unhashable, which is deliberate &mdash; a mutable object that compares by value cannot safely be a dictionary key.</p><p><code>__str__</code> is optional; <code>str</code> falls back to <code>__repr__</code>, so one well-written <code>__repr__</code> covers both.</p>
+                </div>
+                <div>
+                    <h3>Dataclasses</h3>
+                    <p>For a class that is mostly data, <code>@dataclass</code> writes <code>__init__</code>, <code>__repr__</code> and <code>__eq__</code> from the annotations:</p><pre><code class="language-python">from dataclasses import dataclass
+
+@dataclass
+class Point:
+    x: float
+    y: float</code></pre><p>That is the whole class, and it behaves better than most hand-written equivalents because the generated methods are complete and consistent.</p><p><code>frozen=True</code> makes instances immutable and hashable, which is the right choice for value objects. <code>field(default_factory=list)</code> is how a mutable default is declared safely &mdash; the dataclass machinery refuses a plain <code>[]</code>, which is one of the few places Python protects you from that trap.</p><p><code>NamedTuple</code> is the lighter alternative when the object is genuinely a tuple with names, and a plain dictionary is the right answer when the shape is not fixed.</p>
+                </div>
+                <div>
+                    <h3>Properties, when an attribute needs logic</h3>
+                    <p>A property makes a method look like an attribute, which lets a plain attribute grow validation or computation later without changing every caller:</p><pre><code class="language-python">@property
+def area(self):
+    return self.width * self.height</code></pre><p>The convention that makes this work is to start with plain attributes and add a property only when there is a reason. Writing getters and setters for every field up front is a habit from languages that cannot change an attribute into a property later; Python can, so the ceremony buys nothing.</p>
+                </div>
+                <div>
+                    <h3>Common mistakes</h3>
+                    <p><strong>A mutable class attribute</strong>, shared by every instance.</p><p><strong>Forgetting <code>self</code></strong> in a method definition, or in an attribute reference.</p><p><strong>No <code>__repr__</code></strong>, so debugging shows an object and a memory address.</p><p><strong>Defining <code>__eq__</code> without <code>__hash__</code></strong>, making instances unusable in sets.</p><p><strong>Doing work that can fail in <code>__init__</code></strong>, leaving half-built objects.</p><p><strong>A class with no state</strong>, which is a function.</p><p><strong>Getters and setters everywhere</strong>, where properties exist for exactly the case that needs them.</p>
+                </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->
         </div>
