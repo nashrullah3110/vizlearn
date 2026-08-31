@@ -171,9 +171,6 @@ type((5,))  # tuple
 
 A single-element tuple needs the trailing comma. It looks like a typo and is not. This bites when a function is supposed to return one item as a tuple and quietly returns the item instead.
 
-## When to reach for which
-
-Use a list when the collection will grow, shrink or be sorted in place. Use a tuple when the group is fixed at creation and its positions mean something: a coordinate, an RGB colour, a row from a database. If you find yourself never mutating a list, a tuple states that intent and gets you hashability for free.
 """,
     [{"q": "Why can a tuple be a dictionary key when a list cannot?",
       "options": ["Tuples are smaller", "Tuples are hashable because they cannot change",
@@ -565,9 +562,6 @@ total = sum(n * n for n in range(10_000))
 
 The comprehension builds the whole list first &mdash; every element in memory &mdash; then sums it. The generator produces one value at a time and never builds a list at all. When the result is consumed immediately by `sum`, `any`, `max` or a `for`, the generator is the better default, and the size difference is measurable: the page prints both.
 
-## The rule of thumb
-
-Use a comprehension when it fits on one line and reads as a sentence. When you need a second `for`, a filter, and a conditional expression at once, write the loop. Comprehensions are for making simple transformations obvious, not for proving a loop can be compressed.
 """,
     [{"q": "Where does the filtering `if` go in a comprehension?",
       "options": ["Before the expression", "At the end, after the for clause",

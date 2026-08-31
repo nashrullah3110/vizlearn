@@ -47,10 +47,6 @@ total = sum(n * n for n in range(10_000))
 
 The comprehension builds the whole list first &mdash; every element in memory &mdash; then sums it. The generator produces one value at a time and never builds a list at all. When the result is consumed immediately by `sum`, `any`, `max` or a `for`, the generator is the better default, and the size difference is measurable: the page prints both.
 
-## The rule of thumb
-
-Use a comprehension when it fits on one line and reads as a sentence. When you need a second `for`, a filter, and a conditional expression at once, write the loop. Comprehensions are for making simple transformations obvious, not for proving a loop can be compressed.
-
 ## A worked example, step by step
 
 Take a list of records and pull out the names of everyone who passed:
@@ -123,19 +119,6 @@ things, updates something outside itself, or needs a `try`, the loop is not just
 acceptable but correct, because those are exactly the things a comprehension
 cannot contain and should not be contorted into.
 
-## Building something other than a list
-
-The same syntax makes dictionaries and sets, and swapping the brackets for
-round ones makes a generator that builds nothing at all. Choosing between them
-is choosing what you need afterwards. If you are going to iterate the result
-once and throw it away, the generator does less work and uses a fixed amount of
-memory whatever the size of the input. If you need to index it, measure its
-length or walk it twice, you need the list.
-
-The habit worth forming is to write the generator version inside `sum`, `any`,
-`all`, `min`, `max` and `join`, because those consume exactly once, and to
-reach for the list only when the result has a life beyond that line.
-
 ## A note on nesting
 
 A comprehension containing a second `for` is a nested loop, and it is subject to
@@ -143,3 +126,137 @@ the same multiplication of work described elsewhere on this site. Flattening a
 list of lists is a fair use. Comparing every pair of items is not - it is the
 same quadratic cost written more compactly, and compactness is the last thing
 that helps when something is slow.
+
+## What a comprehension cannot contain
+
+The limits are not arbitrary; they follow from a comprehension being an
+expression, and knowing them tells you exactly when to stop trying.
+
+**No statements.** No assignment with `=`, no `return`, no `raise`, no `pass`.
+The walrus `:=` is the one exception, added precisely because naming an
+intermediate value was the one statement people genuinely needed.
+
+**No `try`.** If one item might raise, a comprehension cannot handle it. The
+whole thing fails and you lose the items already processed. A loop with a
+`try` inside is the only way to skip the bad ones and keep the rest, and that
+is a common enough requirement that it alone decides the shape of a lot of
+data-cleaning code.
+
+**No `break` or `continue`.** A filter can drop items, but nothing can stop the
+iteration early. `itertools.takewhile` covers the `break` case, and the
+trailing `if` covers `continue`.
+
+**Nothing useful for side effects.** A comprehension whose result is discarded
+&mdash; `[print(x) for x in items]` &mdash; builds a list of `None` to throw
+away, and hides the fact that iteration is the point. Write the loop.
+
+Each of those is a signal rather than an obstacle. When you find yourself
+wanting one, the answer is not a cleverer comprehension; it is that the job has
+outgrown the form.
+
+## Reading one somebody else wrote
+
+Comprehensions are written left to right and executed in a different order,
+which is what makes an unfamiliar one hard to parse. A reliable method:
+
+**Find the `for` clauses first.** Read them left to right; they are the loops,
+outermost first. Ignore everything before the first `for` while you do this.
+
+**Then the trailing `if`.** It filters whatever the loops produced, and it runs
+before the expression at the front.
+
+**Then the expression.** It applies last, to each surviving item, and it is
+what the result contains.
+
+**Finally the brackets.** Square gives a list, braces a set, braces with a
+colon a dict, round a generator that has not run yet.
+
+So `[f(x) for row in grid for x in row if x]` reads as: for each row in grid,
+for each x in row, keep the truthy ones, and collect `f(x)`. Four clauses, read
+in the order they execute, which is right to left except for the expression
+that comes first on the page.
+
+The value of having a method is that it also tells you when a comprehension is
+too much: if the method takes more than a few seconds, the loop version would
+have been read in one pass.
+
+## The cost, and where the loop wins
+
+A comprehension is usually a little faster than the equivalent loop, because
+the appending happens in the interpreter's own loop rather than through a
+method lookup on every pass. The difference is real and small, and it is almost
+never the deciding factor.
+
+Where the difference does matter is memory. A list comprehension over a large
+input builds the whole result before anything else happens; a generator
+expression does not. For a file with millions of lines, that is the difference
+between a program that runs and one that does not, and it costs one character
+to switch.
+
+Where the loop genuinely wins is everything the previous section listed, plus
+one more: debugging. You can put a `print` or a breakpoint inside a loop body.
+You cannot put one inside a comprehension without changing it into something
+else. When a transformation is producing the wrong answer and you do not know
+why, converting it to a loop for five minutes is often the fastest route to the
+cause.
+
+## The shape it replaces, and the one it does not
+
+A comprehension replaces exactly one loop shape: build an empty collection,
+iterate, append something derived from each item. Recognising that shape is how
+you know a comprehension applies without having to try it.
+
+The tell is that the accumulator is only ever appended to, and the thing
+appended depends only on the current item. Nothing reads the accumulator, no
+other variable is updated, and the loop body is a single expression.
+
+The shapes it does not replace are worth naming, because they look similar.
+
+**Accumulating.** A running total, a maximum so far, a count &mdash; anything
+where the next value depends on what came before. Comprehensions have no access
+to what they have already produced, which is why `sum`, `max` and `Counter`
+exist as separate tools.
+
+**Grouping.** Building a dictionary of lists needs to append to an entry that
+may already exist, which is a read of the accumulator. `setdefault` or
+`defaultdict` in a loop is the answer.
+
+**Two outputs.** Splitting one input into two lists in a single pass. A
+comprehension produces one collection, so this is either two comprehensions
+over the same data or one loop &mdash; and the loop reads the input once.
+
+## Questions people ask
+
+<strong>Is a comprehension faster than a loop?</strong> Slightly, for building
+a list. Not enough to choose one for that reason.
+
+<strong>Can I use two filters?</strong> Yes, and chained filters mean `and`.
+
+<strong>Why does my nested comprehension have the loops backwards?</strong>
+Because the clauses read outer-first, the same order as nested `for`
+statements. It is the guess most people get wrong.
+
+<strong>Can I reference the previous item?</strong> Not directly. Zip the list
+with a shifted copy of itself, or write the loop.
+
+<strong>Does the loop variable leak?</strong> No, a comprehension has its own
+scope. A `for` statement does not.
+
+<strong>Can I build a list of lists?</strong> Yes, with a comprehension in the
+expression slot: `[[f(x) for x in row] for row in grid]`.
+
+<strong>When should I definitely not use one?</strong> When the body needs a
+`try`, a `break`, an assignment, or exists for a side effect.
+
+## Recap in one screen
+
+- A comprehension states the shape of the result first, which is what makes it
+  clearer than a loop for a plain transformation.
+- The `for` clauses read outermost-first; the trailing filter runs before the
+  expression at the front.
+- It is an expression, so no statements, no `try`, no `break` &mdash; and those
+  limits are the signal to write the loop.
+- Round brackets give a generator that builds nothing, which is the right
+  default inside `sum`, `any`, `max` and `join`.
+- One `for`, one filter: past that, the loop is easier to read, to change and
+  to debug.

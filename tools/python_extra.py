@@ -526,19 +526,6 @@ things, updates something outside itself, or needs a `try`, the loop is not just
 acceptable but correct, because those are exactly the things a comprehension
 cannot contain and should not be contorted into.
 
-## Building something other than a list
-
-The same syntax makes dictionaries and sets, and swapping the brackets for
-round ones makes a generator that builds nothing at all. Choosing between them
-is choosing what you need afterwards. If you are going to iterate the result
-once and throw it away, the generator does less work and uses a fixed amount of
-memory whatever the size of the input. If you need to index it, measure its
-length or walk it twice, you need the list.
-
-The habit worth forming is to write the generator version inside `sum`, `any`,
-`all`, `min`, `max` and `join`, because those consume exactly once, and to
-reach for the list only when the result has a life beyond that line.
-
 ## A note on nesting
 
 A comprehension containing a second `for` is a nested loop, and it is subject to
@@ -9152,4 +9139,288 @@ should not if it is mutable, because then both accumulate into the same thing.
   site stops being a row of unlabelled values.
 - The signature is the part others read most; required parameters are
   requirements, and a default should be the right choice most of the time.
+""")
+
+
+extend("tuples_and_unpacking", """
+## A worked example: taking a row apart
+
+```python
+row = ("ana", 91, "physics")
+
+name, score, subject = row
+print(f"{name}: {score} in {subject}")
+
+name, *rest = row
+print(name, rest)
+```
+
+```
+ana: 91 in physics
+ana [91, 'physics']
+```
+
+The first unpacking names all three positions, which is what you want when the
+shape is known and fixed &mdash; and if the row ever gains a fourth field, the
+`ValueError` tells you at once rather than letting the extra value disappear.
+
+The second collects the tail, and the starred name is a **list** even though
+the source was a tuple. That asymmetry is deliberate: the collected part has no
+fixed length, so it gets the type that handles varying lengths.
+
+The names in the first line are doing the documenting. `row[1]` in code three
+screens away means nothing; `score` means something. That is the real argument
+for unpacking early &mdash; not brevity, but that it converts positions into
+names at the point where you still remember what the positions were.
+
+## Tuples compare position by position
+
+Comparison follows the same rule as sorting a dictionary word: compare the
+first elements, and only if they are equal look at the second.
+
+```python
+print((1, 2) < (1, 3), (1, 2) < (2, 0), ("a", 2) < ("a", 10))
+
+rows = [("bo", 78), ("ana", 91), ("ana", 43)]
+print(sorted(rows))
+```
+
+```
+True True True
+[('ana', 43), ('ana', 91), ('bo', 78)]
+```
+
+The second comparison is the one worth noticing: `(1, 2) < (2, 0)` is true even
+though 2 is greater than 0, because the first elements already decided it. The
+later positions are never consulted once an earlier one differs.
+
+This is exactly why a tuple works as a sort key. `key=lambda r: (-r.score,
+r.name)` sorts by score and breaks ties by name, and it does so because tuple
+comparison stops at the first difference. Every multi-level sort in the track
+relies on this one rule.
+
+It also means comparison fails the same way unpacking does when the types do
+not line up: `(1, "a") < (1, 2)` raises, because once the first elements tie
+Python has to compare a string with an integer.
+
+## Tuples you use without noticing
+
+A good deal of Python hands you tuples whether you asked for them or not, and
+recognising them explains several pieces of syntax at once.
+
+A function returning several values returns a tuple; `return a, b` builds one
+and the caller unpacks it. `*args` collects into a tuple, not a list, which is
+why you cannot append to it inside the function. `dict.items()`, `enumerate`
+and `zip` all yield tuples, which is why `for k, v in ...` works for all three.
+An exception carries its arguments in `e.args`, a tuple. String formatting with
+`%` takes one, which is why `"%s" % (value,)` needs that trailing comma.
+
+And the swap, `a, b = b, a`, builds a tuple on the right and unpacks it on the
+left &mdash; there is no special swap syntax, just the ordinary rules applied
+in both directions in one statement.
+
+The common thread is that a tuple is Python's way of saying "a fixed group of
+things, in order". Wherever the language needs that, it uses one, which is why
+learning tuple behaviour pays off far outside the places you write the brackets
+yourself.
+
+## Immutable does not mean constant
+
+Two words get used interchangeably and mean different things, and the confusion
+causes real bugs.
+
+A tuple is **immutable**: the object cannot be changed after it is built. That
+is a property of the object.
+
+A name is **rebindable**: `point = (3, 4)` followed by `point = (5, 6)` is
+perfectly legal. The first tuple was never modified; the name now refers to a
+different one. Nothing about immutability stops a variable from being pointed
+somewhere else, and Python has no way to prevent that at all &mdash; the
+uppercase naming convention for constants is a request, not a rule.
+
+The practical consequence is that handing someone a tuple guarantees they
+cannot change *your* object. It does not guarantee that a name in their code
+still refers to it later, and it does not make the values inside it constant if
+those values are themselves mutable.
+
+This is the same distinction as "rebinding versus mutating" from elsewhere in
+the track, seen from the other side. Immutability removes one of the two
+operations; the other one is always available.
+
+## Questions people ask
+
+<strong>Do I need the brackets?</strong> Usually not &mdash; the comma makes
+the tuple. Brackets are for clarity and for cases where precedence would
+otherwise take over, such as inside a function call.
+
+<strong>How do I make a one-element tuple?</strong> `(5,)` with the trailing
+comma. `(5)` is just the number in brackets.
+
+<strong>Can I sort a tuple?</strong> `sorted(t)` returns a list. A tuple cannot
+be sorted in place, because that would change it.
+
+<strong>Are tuples faster than lists?</strong> Slightly to build and slightly
+smaller, and that is rarely the reason to pick one. Pick by whether the
+contents should be able to change.
+
+<strong>Can a tuple contain a list?</strong> Yes, and then it is not hashable
+&mdash; so it cannot be a dictionary key, even though it is a tuple.
+
+<strong>What does `ValueError: too many values to unpack` mean?</strong> The
+right-hand side had more items than you gave names for. Usually the data
+changed shape.
+
+<strong>Is `namedtuple` still worth using?</strong> Yes for a lightweight
+immutable record, though a frozen dataclass is often clearer for anything with
+behaviour attached.
+
+## Recap in one screen
+
+- A tuple is a fixed, ordered group whose positions carry meaning; that is what
+  makes it hashable and safe to hand around.
+- The comma makes the tuple, not the brackets &mdash; and a one-element tuple
+  needs the trailing comma.
+- Unpacking turns positions into names, and a wrong count raises immediately
+  rather than failing quietly later.
+- Comparison goes position by position and stops at the first difference, which
+  is what makes tuple sort keys work.
+- Immutability is shallow: a tuple containing a list is neither frozen nor
+  hashable.
+""")
+
+
+extend("list_comprehensions", """
+## What a comprehension cannot contain
+
+The limits are not arbitrary; they follow from a comprehension being an
+expression, and knowing them tells you exactly when to stop trying.
+
+**No statements.** No assignment with `=`, no `return`, no `raise`, no `pass`.
+The walrus `:=` is the one exception, added precisely because naming an
+intermediate value was the one statement people genuinely needed.
+
+**No `try`.** If one item might raise, a comprehension cannot handle it. The
+whole thing fails and you lose the items already processed. A loop with a
+`try` inside is the only way to skip the bad ones and keep the rest, and that
+is a common enough requirement that it alone decides the shape of a lot of
+data-cleaning code.
+
+**No `break` or `continue`.** A filter can drop items, but nothing can stop the
+iteration early. `itertools.takewhile` covers the `break` case, and the
+trailing `if` covers `continue`.
+
+**Nothing useful for side effects.** A comprehension whose result is discarded
+&mdash; `[print(x) for x in items]` &mdash; builds a list of `None` to throw
+away, and hides the fact that iteration is the point. Write the loop.
+
+Each of those is a signal rather than an obstacle. When you find yourself
+wanting one, the answer is not a cleverer comprehension; it is that the job has
+outgrown the form.
+
+## Reading one somebody else wrote
+
+Comprehensions are written left to right and executed in a different order,
+which is what makes an unfamiliar one hard to parse. A reliable method:
+
+**Find the `for` clauses first.** Read them left to right; they are the loops,
+outermost first. Ignore everything before the first `for` while you do this.
+
+**Then the trailing `if`.** It filters whatever the loops produced, and it runs
+before the expression at the front.
+
+**Then the expression.** It applies last, to each surviving item, and it is
+what the result contains.
+
+**Finally the brackets.** Square gives a list, braces a set, braces with a
+colon a dict, round a generator that has not run yet.
+
+So `[f(x) for row in grid for x in row if x]` reads as: for each row in grid,
+for each x in row, keep the truthy ones, and collect `f(x)`. Four clauses, read
+in the order they execute, which is right to left except for the expression
+that comes first on the page.
+
+The value of having a method is that it also tells you when a comprehension is
+too much: if the method takes more than a few seconds, the loop version would
+have been read in one pass.
+
+## The cost, and where the loop wins
+
+A comprehension is usually a little faster than the equivalent loop, because
+the appending happens in the interpreter's own loop rather than through a
+method lookup on every pass. The difference is real and small, and it is almost
+never the deciding factor.
+
+Where the difference does matter is memory. A list comprehension over a large
+input builds the whole result before anything else happens; a generator
+expression does not. For a file with millions of lines, that is the difference
+between a program that runs and one that does not, and it costs one character
+to switch.
+
+Where the loop genuinely wins is everything the previous section listed, plus
+one more: debugging. You can put a `print` or a breakpoint inside a loop body.
+You cannot put one inside a comprehension without changing it into something
+else. When a transformation is producing the wrong answer and you do not know
+why, converting it to a loop for five minutes is often the fastest route to the
+cause.
+
+## The shape it replaces, and the one it does not
+
+A comprehension replaces exactly one loop shape: build an empty collection,
+iterate, append something derived from each item. Recognising that shape is how
+you know a comprehension applies without having to try it.
+
+The tell is that the accumulator is only ever appended to, and the thing
+appended depends only on the current item. Nothing reads the accumulator, no
+other variable is updated, and the loop body is a single expression.
+
+The shapes it does not replace are worth naming, because they look similar.
+
+**Accumulating.** A running total, a maximum so far, a count &mdash; anything
+where the next value depends on what came before. Comprehensions have no access
+to what they have already produced, which is why `sum`, `max` and `Counter`
+exist as separate tools.
+
+**Grouping.** Building a dictionary of lists needs to append to an entry that
+may already exist, which is a read of the accumulator. `setdefault` or
+`defaultdict` in a loop is the answer.
+
+**Two outputs.** Splitting one input into two lists in a single pass. A
+comprehension produces one collection, so this is either two comprehensions
+over the same data or one loop &mdash; and the loop reads the input once.
+
+## Questions people ask
+
+<strong>Is a comprehension faster than a loop?</strong> Slightly, for building
+a list. Not enough to choose one for that reason.
+
+<strong>Can I use two filters?</strong> Yes, and chained filters mean `and`.
+
+<strong>Why does my nested comprehension have the loops backwards?</strong>
+Because the clauses read outer-first, the same order as nested `for`
+statements. It is the guess most people get wrong.
+
+<strong>Can I reference the previous item?</strong> Not directly. Zip the list
+with a shifted copy of itself, or write the loop.
+
+<strong>Does the loop variable leak?</strong> No, a comprehension has its own
+scope. A `for` statement does not.
+
+<strong>Can I build a list of lists?</strong> Yes, with a comprehension in the
+expression slot: `[[f(x) for x in row] for row in grid]`.
+
+<strong>When should I definitely not use one?</strong> When the body needs a
+`try`, a `break`, an assignment, or exists for a side effect.
+
+## Recap in one screen
+
+- A comprehension states the shape of the result first, which is what makes it
+  clearer than a loop for a plain transformation.
+- The `for` clauses read outermost-first; the trailing filter runs before the
+  expression at the front.
+- It is an expression, so no statements, no `try`, no `break` &mdash; and those
+  limits are the signal to write the loop.
+- Round brackets give a generator that builds nothing, which is the right
+  default inside `sum`, `any`, `max` and `join`.
+- One `for`, one filter: past that, the loop is easier to read, to change and
+  to debug.
 """)
