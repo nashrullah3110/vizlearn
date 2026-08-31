@@ -549,6 +549,12 @@ SEQUENCE = {
         "sklearn/classification_metrics.html",
         "sklearn/confusion_matrix.html",
         "sklearn/cross_validation.html",
+        "sklearn/scaling_features.html",
+        "sklearn/encoding_categoricals.html",
+        "sklearn/missing_values.html",
+        "sklearn/pipelines.html",
+        "sklearn/column_transformer.html",
+        "sklearn/data_leakage.html",
     ],
     "pydantic": [
         "pydantic/what_is_pydantic.html",

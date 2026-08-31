@@ -43,7 +43,7 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Limit and Offset in SQL - interactive visualization on VizLearn">
     <meta property="og:locale" content="en_US">
-    <meta property="article:modified_time" content="2026-08-31">
+    <meta property="article:modified_time" content="2026-09-01">
     <meta property="article:published_time" content="2026-07-27">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Limit and Offset in SQL">
@@ -57,7 +57,7 @@
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7551664560637561" crossorigin="anonymous"></script>
 
     <meta name="author" content="Ashish Jangra">
-    <meta name="last-modified" content="2026-08-31">
+    <meta name="last-modified" content="2026-09-01">
 
     <script type="application/ld+json">
 {
@@ -74,7 +74,7 @@
   "educationalLevel": "Beginner",
   "typicalAgeRange": "16-",
   "datePublished": "2026-07-27",
-  "dateModified": "2026-08-31",
+  "dateModified": "2026-09-01",
   "author": {
     "@type": "Person",
     "name": "Ashish Jangra"
@@ -387,7 +387,7 @@
                 <span style="color: var(--accent-primary)">Pagination Lab</span>
             </div>
             <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Limit and Offset in SQL</h1>
-            <!-- VIZLEARN:BYLINE:BEGIN --><p class="vz-byline"><a class="vz-byline-track" href="../database/">Databases &amp; SQL</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>By <a class="vz-byline-author" rel="author" href="../about.html">Ashish Jangra</a></span><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>Updated <time datetime="2026-08-31">31 August 2026</time></span></p><!-- VIZLEARN:BYLINE:END -->
+            <!-- VIZLEARN:BYLINE:BEGIN --><p class="vz-byline"><a class="vz-byline-track" href="../database/">Databases &amp; SQL</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>By <a class="vz-byline-author" rel="author" href="../about.html">Ashish Jangra</a></span><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>Updated <time datetime="2026-09-01">1 September 2026</time></span></p><!-- VIZLEARN:BYLINE:END -->
             <p class="mt-2 text-sm max-w-2xl" style="color: var(--text-muted)">
                 Return a slice of a result set instead of all of it. Page through real data, then discover the two traps: pagination without ORDER BY, and why large OFFSETs get slower and slower.
             </p>
@@ -482,29 +482,26 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Two small keywords behind every "Next page" button &mdash; and two traps that bite at scale.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Quick Context</h3>
-                    <p><span class="mono-font kw">LIMIT n</span> returns at most <span class="mono-font">n</span> rows. <span class="mono-font kw">OFFSET m</span> throws away the first <span class="mono-font">m</span> rows before it starts counting. Together they cut a window out of a result set, which is how page 3 of a product listing gets built.<p>Syntax varies: PostgreSQL, MySQL and SQLite use <span class="mono-font">LIMIT ... OFFSET ...</span>; SQL Server uses <span class="mono-font">OFFSET ... FETCH NEXT ... ROWS ONLY</span>; older Oracle used <span class="mono-font">ROWNUM</span>. The idea is identical.</p></p>
-                </div>
-                <div>
-                    <h3>Trap 1: LIMIT without ORDER BY is meaningless</h3>
+                    <h3 id="vz-s-trap-1-limit-without-order-by-is-meaningless">Trap 1: LIMIT without ORDER BY is meaningless</h3>
                     <pre><code class="language-sql">SELECT * FROM articles LIMIT 10;      -- ten arbitrary articles</code></pre><p>Without <code>ORDER BY</code>, the database is free to return any ten rows, and which ten can change between runs as the plan, the cache or the storage layout changes. On a small test table this looks stable and deterministic, which is exactly why it reaches production before failing.</p><p>If you want the newest, say so. If you want a sample, say that too &mdash; <code>ORDER BY RANDOM()</code> on small tables, or a <code>TABLESAMPLE</code> clause on large ones.</p>
                 </div>
                 <div>
-                    <h3>Trap 2: Deep OFFSET Gets Slower and Slower</h3>
+                    <h3 id="vz-s-trap-2-deep-offset-gets-slower-and-slower">Trap 2: Deep OFFSET Gets Slower and Slower</h3>
                     <p>The database cannot jump straight to row 100,000. It must generate and discard every row before the offset. Watch the "rows scanned" figure in this lab climb while "rows returned" stays fixed &mdash; the red portion of the bar is pure wasted work.</p><p>At page 5 nobody notices. At <span class="mono-font">OFFSET 500000</span> the query is reading half a million rows to hand back ten. This is why deep pagination is a classic source of slow queries.</p><p>The fix is <strong>keyset pagination</strong> (also called seek pagination): instead of counting rows to skip, remember the last value you saw and filter on it.</p><p>Keyset stays fast at any depth, and it does not skip or duplicate rows when data changes underneath you. The trade-off is that you can only move forward and backward, not jump to an arbitrary page number.</p>
                 </div>
                 <div>
-                    <h3>Cutting the result down</h3>
+                    <h3 id="vz-s-cutting-the-result-down">Cutting the result down</h3>
                     <p><code>LIMIT</code> caps how many rows come back. <code>OFFSET</code> skips some first. Together they are how nearly every "page 3 of results" in the world is implemented.</p><pre><code class="language-sql">SELECT * FROM articles ORDER BY published_at DESC LIMIT 20;             -- newest 20
 SELECT * FROM articles ORDER BY published_at DESC LIMIT 20 OFFSET 40;   -- page 3</code></pre><p>The dialects differ more than you would expect for something this simple:</p><div class="vz-table-wrap"><table><thead><tr><th>Engine</th><th>Syntax</th></tr></thead><tbody><tr><td>PostgreSQL, MySQL, SQLite</td><td><code>LIMIT 20 OFFSET 40</code></td></tr><tr><td>MySQL (older shorthand)</td><td><code>LIMIT 40, 20</code> &mdash; offset first</td></tr><tr><td>SQL Server, Oracle 12c+</td><td><code>OFFSET 40 ROWS FETCH NEXT 20 ROWS ONLY</code></td></tr><tr><td>Standard SQL</td><td><code>OFFSET 40 ROWS FETCH FIRST 20 ROWS ONLY</code></td></tr></tbody></table></div><p>Note the reversed argument order in MySQL's comma form &mdash; a reliable source of off-by-a-page bugs when translating between dialects.</p><p><code>LIMIT</code> runs last, after <code>ORDER BY</code>, which is what makes "the top 10" meaningful. It also means the database may have had to produce and sort every row before discarding all but ten &mdash; unless an index lets it stop early.</p>
                 </div>
                 <div>
-                    <h3>Trap 2: ties make pagination unstable</h3>
+                    <h3 id="vz-s-trap-2-ties-make-pagination-unstable">Trap 2: ties make pagination unstable</h3>
                     <p>Even with <code>ORDER BY</code>, duplicates in the sort key break paging:</p><pre><code class="language-sql">SELECT * FROM articles ORDER BY published_at DESC LIMIT 20 OFFSET 20;</code></pre><p>If fifty articles share a publication date, the engine picks arbitrarily among them for each page. Page 1 and page 2 can both include the same article, and another article can be missed entirely &mdash; a bug that looks like data loss and is actually a sorting detail.</p><p>The fix is a unique tiebreaker as the final sort key:</p><pre><code class="language-sql">ORDER BY published_at DESC, id DESC</code></pre><p>Now the order is total, and the same query returns the same page every time.</p>
                 </div>
                 <div>
-                    <h3>Trap 3: deep OFFSET gets slower and slower</h3>
+                    <h3 id="vz-s-trap-3-deep-offset-gets-slower-and-slower">Trap 3: deep OFFSET gets slower and slower</h3>
                     <p><code>OFFSET 100000</code> does not skip cheaply. The engine must generate the first 100,000 rows in order, then throw them away. Page 1 is instant; page 5,000 is a table scan.</p><p><strong>Keyset pagination</strong> avoids the problem by remembering the last row seen instead of counting from the start:</p><pre><code class="language-sql">-- page 1
 SELECT * FROM articles ORDER BY published_at DESC, id DESC LIMIT 20;
 
@@ -515,19 +512,19 @@ ORDER  BY published_at DESC, id DESC
 LIMIT  20;</code></pre><p>With an index on <code>(published_at DESC, id DESC)</code> the engine seeks directly to that position, so page 5,000 costs the same as page 1. Rows inserted between requests no longer shift the window either, so nothing is duplicated or skipped.</p><p>The limitation is that you can only step forward and backward, not jump to an arbitrary page number. For feeds, timelines and infinite scroll that is not a limitation at all. Keep <code>OFFSET</code> for admin tables where someone genuinely clicks "page 47" and the table is small.</p>
                 </div>
                 <div>
-                    <h3>Exploration guide</h3>
+                    <h3 id="vz-s-exploration-guide">Exploration guide</h3>
                     <ol><li><strong>Set LIMIT to 4 and step the page buttons.</strong> The highlighted window slides down the full result set &mdash; OFFSET is just where the window starts.</li><li><strong>Push OFFSET high</strong> and watch the red "skipped" portion of the cost bar grow while the green returned portion stays the same size.</li><li><strong>Switch to "no ORDER BY" and re-run repeatedly.</strong> The returned rows change even though the query text does not.</li><li><strong>Set OFFSET beyond the table size.</strong> You get zero rows &mdash; not an error. A common cause of mysteriously blank final pages.</li></ol>
                 </div>
                 <div>
-                    <h3>Worth remembering</h3>
+                    <h3 id="vz-s-worth-remembering">Worth remembering</h3>
                     <p>LIMIT and OFFSET slice a result set, but only after ORDER BY has made that set deterministic. Offset pagination is fine for the first few pages and quietly quadratic beyond them &mdash; reach for keyset pagination when the data gets big.</p>
                 </div>
                 <div>
-                    <h3>Getting a total count without paying twice</h3>
+                    <h3 id="vz-s-getting-a-total-count-without-paying-twice">Getting a total count without paying twice</h3>
                     <p>Pagination interfaces usually want "showing 21&ndash;40 of 1,203", which means a second query:</p><pre><code class="language-sql">SELECT COUNT(*) FROM articles WHERE status = &#x27;published&#x27;;</code></pre><p>On a large table that count can cost more than the page itself, because it has to touch every matching row. Three ways out:</p><ul><li><strong>Do not show an exact total.</strong> "Showing 21&ndash;40" with a next button is usually enough, and it is what most large sites do.</li><li><strong>Use an approximate count.</strong> PostgreSQL's <code>reltuples</code> in <code>pg_class</code>, or <code>EXPLAIN</code>'s row estimate, is instant and close enough for "about 1,200 results".</li><li><strong>Cache it.</strong> Store the count and refresh it periodically, or maintain it with a trigger if it must be exact.</li></ul><p>A fourth option in some engines is a window function that returns the total alongside each page row &mdash; <code>COUNT(*) OVER ()</code> &mdash; which computes the full set once rather than twice. It is convenient, but it still processes every matching row.</p>
                 </div>
                 <div>
-                    <h3>Top-N per group, the query LIMIT cannot do</h3>
+                    <h3 id="vz-s-top-n-per-group-the-query-limit-cannot-do">Top-N per group, the query LIMIT cannot do</h3>
                     <p><code>LIMIT</code> applies to the whole result, not per group. "The three newest articles in each category" therefore needs a window function:</p><pre><code class="language-sql">WITH ranked AS (
   SELECT *,
          ROW_NUMBER() OVER (PARTITION BY category_id
@@ -543,11 +540,11 @@ CROSS  JOIN LATERAL (
        ) a;</code></pre>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>Does <code>LIMIT</code> speed up a query?</strong> It can, substantially, when an index supplies the order and the engine can stop early. When a sort or aggregation must complete first, it only reduces what is sent back.</p><p><strong>Is <code>LIMIT 1</code> the right way to get one row?</strong> With <code>ORDER BY</code>, yes. Without it, you are asking for an arbitrary row.</p><p><strong>Can I use <code>LIMIT</code> in a subquery?</strong> Yes, and it is common for "the latest row per something" patterns &mdash; though the outer query may reorder the results, so keep the final <code>ORDER BY</code> outside.</p><p><strong>Why does page 2 repeat a row from page 1?</strong> Ties in the sort key, or rows inserted between the two requests. A unique tiebreaker fixes the first; keyset pagination fixes both.</p><p><strong>What is a good page size?</strong> 20&ndash;50 for user interfaces; larger for API consumers who will page through everything anyway. Very large pages defeat the purpose and stress memory on both sides.</p><p><strong>Does <code>OFFSET 0</code> cost anything?</strong> No, though in some older PostgreSQL versions <code>OFFSET 0</code> was used deliberately as an optimisation fence to stop the planner inlining a subquery.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li><code>LIMIT</code> caps rows, <code>OFFSET</code> skips them, and both run last.</li><li><code>LIMIT</code> without <code>ORDER BY</code> returns arbitrary rows, however stable it looks in testing.</li><li>Ties in the sort key make pages overlap &mdash; always add a unique tiebreaker.</li><li>Deep <code>OFFSET</code> reads and discards everything before it; keyset pagination is O(1) per page.</li><li>Exact total counts are expensive; approximate or cache them.</li></ul>
                 </div>
             </div>

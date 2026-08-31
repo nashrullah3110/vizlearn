@@ -20075,6 +20075,159 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "sklearn/column_transformer.html",
+  "title": "Different Columns, Different Treatment",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "What happens to a column not named in any transformer?",
+    "o": [
+     "It is passed through unchanged",
+     "It is dropped, silently",
+     "It raises an error",
+     "It is scaled by default"
+    ],
+    "a": 1,
+    "w": "remainder defaults to \"drop\". A column added to the source data will simply not reach the model, with no warning."
+   },
+   {
+    "t": "Why pass [\"city\"] rather than \"city\"?",
+    "o": [
+     "Style only",
+     "A list selects a 2-D DataFrame; a bare string selects a 1-D Series and raises",
+     "Lists are faster",
+     "A string selects every matching column"
+    ],
+    "a": 1,
+    "w": "The error says \"Expected a 2-dimensional container\". Transformers want two dimensions, which is the same X-must-be-2-D rule from the start of the track."
+   },
+   {
+    "t": "How do you impute AND scale the numeric columns only?",
+    "o": [
+     "Two ColumnTransformers in sequence",
+     "Put a Pipeline as the transformer for that column group",
+     "It cannot be done",
+     "Use remainder"
+    ],
+    "a": 1,
+    "w": "A ColumnTransformer entry accepts any transformer, including a Pipeline - which is how a branch gets several steps."
+   },
+   {
+    "t": "What does pre__num__simpleimputer__strategy address?",
+    "o": [
+     "A column named strategy",
+     "The strategy of the imputer inside the num branch of the step named pre",
+     "The pipeline's own strategy",
+     "Nothing - it is invalid"
+    ],
+    "a": 1,
+    "w": "The double underscores compose outside in. pipe.get_params().keys() lists every valid key."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/encoding_categoricals.html",
+  "title": "Encoding Categories",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "Why is numbering cities 0, 1, 2 a problem?",
+    "o": [
+     "It is slower",
+     "It asserts an order and spacing that do not exist",
+     "scikit-learn rejects it",
+     "It uses more memory"
+    ],
+    "a": 1,
+    "w": "The numbers claim berlin > paris > london and that the gaps are equal. A linear model fits one coefficient to that invented scale."
+   },
+   {
+    "t": "What does handle_unknown=\"ignore\" do?",
+    "o": [
+     "Drops the row",
+     "Encodes an unseen category as all zeros",
+     "Adds a new column",
+     "Raises a warning and continues"
+    ],
+    "a": 1,
+    "w": "All zeros honestly represents \"none of the categories I know\". Without it, cross-validation crashes on any fold that isolates a rare category."
+   },
+   {
+    "t": "When is OrdinalEncoder the right choice?",
+    "o": [
+     "Always - it is more compact",
+     "When the categories have a genuine order, and you pass categories= to state it",
+     "Only for the target",
+     "When there are more than 100 categories"
+    ],
+    "a": 1,
+    "w": "Left to itself it sorts alphabetically, which turned small into 2 and large into 0 in the editor above."
+   },
+   {
+    "t": "What is LabelEncoder for?",
+    "o": [
+     "Encoding feature columns",
+     "Encoding the target",
+     "One-hot encoding",
+     "Handling unknown categories"
+    ],
+    "a": 1,
+    "w": "It takes only 1-D input and has no handle_unknown, so applying it to features gives an ordinal encoding that raises on any new category."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/data_leakage.html",
+  "title": "Leakage in a scikit-learn Workflow",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "What makes leakage harder to catch than other failures?",
+    "o": [
+     "It raises no error",
+     "It makes the score better, so it does not feel like a problem",
+     "It only appears in production",
+     "It requires special tooling"
+    ],
+    "a": 1,
+    "w": "Every other failure makes results look worse or ambiguous. Leakage makes them look excellent, so it passes review."
+   },
+   {
+    "t": "Does cross-validation protect against a leaked column?",
+    "o": [
+     "Yes, that is what it is for",
+     "No - the leak is in the data, so it is inside every fold",
+     "Only with enough folds",
+     "Only with stratification"
+    ],
+    "a": 1,
+    "w": "Cross-validation guards against a score depending on which rows were held out. A column derived from the target inflates all of them equally."
+   },
+   {
+    "t": "Rows from one patient appear in both train and test. What is the effect?",
+    "o": [
+     "None, if the rows differ",
+     "The model can recognise the patient rather than learn the pattern, inflating the score",
+     "The model underfits",
+     "It only matters for time series"
+    ],
+    "a": 1,
+    "w": "With a label that is random per person, shuffled folds scored 0.87 and GroupKFold 0.335. The first number was recognition, not learning."
+   },
+   {
+    "t": "What is the single most effective check for target leakage?",
+    "o": [
+     "Cross-validate with more folds",
+     "Ask whether each feature would be known at prediction time",
+     "Scale the features",
+     "Use a simpler model"
+    ],
+    "a": 1,
+    "w": "Target leakage is a fact about what a column means and when it is written, so it needs domain knowledge rather than code."
+   }
+  ]
+ },
+ {
   "path": "sklearn/linear_regression.html",
   "title": "Linear Regression",
   "cat": "scikit-learn",
@@ -20228,6 +20381,108 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "sklearn/missing_values.html",
+  "title": "Missing Values",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "What does SimpleImputer learn during fit?",
+    "o": [
+     "Which rows to drop",
+     "One fill value per column, stored in statistics_",
+     "A model of each column",
+     "Nothing - it fills at transform time"
+    ],
+    "a": 1,
+    "w": "One number per column, computed from the data it was fitted on - which is why it must be fitted on the training half only."
+   },
+   {
+    "t": "Why prefer median over mean for numeric columns?",
+    "o": [
+     "It is faster",
+     "It is unaffected by outliers and always lands on a plausible value",
+     "It handles categories",
+     "It is the default"
+    ],
+    "a": 1,
+    "w": "With values of 1, 2 and 100 the mean is 34.33 - a number nothing like any observation. The median is 2."
+   },
+   {
+    "t": "What does add_indicator=True do?",
+    "o": [
+     "Marks the imputer as fitted",
+     "Appends a column recording where values were missing",
+     "Raises if too much is missing",
+     "Drops rows with gaps"
+    ],
+    "a": 1,
+    "w": "It preserves the fact of absence, which is frequently informative. In the last editor it took the score from 0.77 to 0.987."
+   },
+   {
+    "t": "Which estimator handles NaN without an imputer?",
+    "o": [
+     "LogisticRegression",
+     "HistGradientBoostingClassifier",
+     "KNeighborsClassifier",
+     "RandomForestClassifier"
+    ],
+    "a": 1,
+    "w": "It learns which side of each split the missing rows belong on, which uses the missingness rather than filling over it."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/pipelines.html",
+  "title": "Pipelines in scikit-learn",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "What does a pipeline's predict() do to the transformers?",
+    "o": [
+     "Refits them",
+     "Only calls transform",
+     "Skips them",
+     "Fits and transforms"
+    ],
+    "a": 1,
+    "w": "fit fits them; predict only transforms. That asymmetry is what stops the held-out data influencing the transformation."
+   },
+   {
+    "t": "How do you tune C on a step named clf?",
+    "o": [
+     "\"C\"",
+     "\"clf.C\"",
+     "\"clf__C\"",
+     "\"clf-C\""
+    ],
+    "a": 2,
+    "w": "Two underscores between the step name and the parameter. Nesting goes deeper with more of them."
+   },
+   {
+    "t": "What does setting a step to \"passthrough\" do?",
+    "o": [
+     "Removes it permanently",
+     "Makes it a no-op, so the step can be tuned in or out",
+     "Runs it twice",
+     "Skips fitting but still transforms"
+    ],
+    "a": 1,
+    "w": "It turns the step into an identity, which lets a search treat the existence of the step as a hyperparameter."
+   },
+   {
+    "t": "Why pickle the pipeline rather than the model?",
+    "o": [
+     "It is smaller",
+     "The preprocessing is part of the model - without it the deployed model gets raw features",
+     "Models cannot be pickled",
+     "It is faster to load"
+    ],
+    "a": 1,
+    "w": "A model fitted on scaled features and served raw ones produces confident nonsense, and nothing raises to tell you."
+   }
+  ]
+ },
+ {
   "path": "sklearn/regression_metrics.html",
   "title": "Regression Metrics",
   "cat": "scikit-learn",
@@ -20275,6 +20530,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Negating lets one code path rank every metric by taking the largest, without knowing whether bigger or smaller is better for that metric."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/scaling_features.html",
+  "title": "Scaling Features",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "Which of these is unaffected by feature scaling?",
+    "o": [
+     "k-nearest neighbours",
+     "Random forest",
+     "SVM with an RBF kernel",
+     "Ridge regression"
+    ],
+    "a": 1,
+    "w": "Trees split one column at a time on a threshold, and a monotonic rescaling moves the threshold identically. The measured change is exactly zero."
+   },
+   {
+    "t": "After scaling correctly, what should the test set's mean be?",
+    "o": [
+     "Exactly zero",
+     "Whatever it happens to be - it is transformed with the training set's numbers",
+     "One",
+     "The same as the training mean"
+    ],
+    "a": 1,
+    "w": "A test set that comes out perfectly centred is evidence the scaler was fitted on it, which compromises the evaluation."
+   },
+   {
+    "t": "Why prefer RobustScaler when the data has outliers?",
+    "o": [
+     "It removes the outliers",
+     "It centres on the median and divides by the IQR, so extreme values do not distort the rest",
+     "It is faster",
+     "It bounds the output to 0-1"
+    ],
+    "a": 1,
+    "w": "Median and IQR ignore the tails. MinMaxScaler does the opposite - one outlier defines the range and compresses everything else."
+   },
+   {
+    "t": "What does Normalizer do?",
+    "o": [
+     "Scales each column to mean 0",
+     "Scales each row to unit length",
+     "Removes outliers",
+     "Maps every column to 0-1"
+    ],
+    "a": 1,
+    "w": "It works on rows rather than columns, making samples comparable in direction rather than magnitude. It is not a substitute for the column scalers."
    }
   ]
  },

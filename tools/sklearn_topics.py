@@ -3295,7 +3295,7 @@ One-hot for unordered categories with `handle_unknown="ignore"`, ordinal with an
 # ---------------------------------------------------------------------------
 topic(
     "pipelines",
-    "Pipelines",
+    "Pipelines in scikit-learn",
     "Preparing Data",
     "One object holding every step, so that what is fitted on the training "
     "fold stays fitted on the training fold - by construction rather than by "
@@ -3625,7 +3625,7 @@ One object, fitted once, holding every step that learns anything. It makes cross
 # ---------------------------------------------------------------------------
 topic(
     "data_leakage",
-    "Data Leakage",
+    "Leakage in a scikit-learn Workflow",
     "Preparing Data",
     "The failure that produces excellent scores and useless models, and the "
     "five shapes it comes in.",

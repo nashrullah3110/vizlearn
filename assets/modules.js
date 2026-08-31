@@ -4476,6 +4476,30 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Different Columns, Different Treatment",
+  "path": "sklearn/column_transformer.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Encoding Categories",
+  "path": "sklearn/encoding_categoricals.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Leakage in a scikit-learn Workflow",
+  "path": "sklearn/data_leakage.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "Linear Regression",
   "path": "sklearn/linear_regression.html",
   "category": "scikit-learn",
@@ -4500,8 +4524,32 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Missing Values",
+  "path": "sklearn/missing_values.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Pipelines in scikit-learn",
+  "path": "sklearn/pipelines.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "Regression Metrics",
   "path": "sklearn/regression_metrics.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Scaling Features",
+  "path": "sklearn/scaling_features.html",
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
