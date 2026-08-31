@@ -52,33 +52,6 @@ text.count("l")              # 3
 
 Two habits that prevent real bugs. Always `.strip()` user input and data read from files &mdash; trailing whitespace and newlines are the single most common cause of "but they look identical" comparison failures. And normalise case before comparing: `a.lower() == b.lower()`, or `a.casefold() == b.casefold()` for correct handling of non-English text.
 
-## Text, and why it cannot be changed
-
-A string is a sequence of characters, and in Python it is <strong>immutable</strong> &mdash; every operation that looks like a change actually produces a new string.
-
-```python
-name = "python"
-name.upper()        # 'PYTHON'
-print(name)         # 'python'  -- unchanged
-name = name.upper() # to keep the result, assign it
-```
-
-That trips people up constantly, and it is worth knowing why the language works this way. Immutable strings can be used as dictionary keys, shared safely between parts of a program without defensive copying, and cached by the interpreter.
-
-The practical consequence is a performance one:
-
-```python
-# slow: each += copies the whole string so far
-result = ""
-for word in words:
-    result += word          # quadratic on long inputs
-
-# fast: collect, then join once
-result = "".join(words)
-```
-
-`join` is the idiomatic way to build text from pieces, and the separator is the string you call it on: `", ".join(names)`.
-
 ## f-strings, and formatting numbers
 
 f-strings are the modern way to build text, and they take expressions, not just names:
@@ -148,8 +121,124 @@ One more subtlety: `len("café")` is 4 characters, but the UTF-8 encoding is 5 b
 - <strong>Building strings with `+=` in a loop.</strong> Use `"".join(parts)`.
 - <strong>Comparing unstripped input.</strong> `"yes\n" == "yes"` is False.
 - <strong>Using `+` to join a number to text.</strong> `"Total: " + 5` raises `TypeError`; use an f-string.
-- <strong>Forgetting `find` returns -1 rather than raising,</strong> so `if text.find(x):` is true for a match at index 0 and false for a match at index... no, it is false only at index 0. Use `in` instead.
+- <strong>Testing the result of `find` for truth.</strong> It returns -1 when the substring is absent, which is truthy, and 0 when the match is at the very start, which is falsy &mdash; so `if text.find(x):` is exactly backwards in both cases. Use `in` for a yes-or-no test, and compare against -1 when you want the position.
 - <strong>Ignoring encodings</strong> until a file with an accented character arrives.
+
+## Why immutability is a feature
+
+"Cannot be changed" reads as a restriction, and it buys three things the
+language relies on.
+
+**Strings can be dictionary keys.** A key's hash decides where its entry is
+stored, so a key whose contents could change would end up filed under a hash
+that no longer matches it. Every dictionary you index by name depends on
+strings being immutable, which is the same rule that stops a list from being a
+key.
+
+**Strings can be shared without copying.** Passing a string to a function costs
+nothing regardless of length, because nothing is duplicated and no caller has
+to worry that the callee will edit it underneath them. Python takes advantage
+of this internally: identical short strings in your source are often the same
+object.
+
+**Strings are safe across threads.** Nothing can observe a half-modified
+string, because there is no modification to observe.
+
+The cost is one specific case: building a string piece by piece. Each `+=`
+copies everything accumulated so far, so a loop over `n` pieces does work
+proportional to `n` squared. That is the entire reason `join` exists, and it is
+worth reaching for by reflex rather than after measuring &mdash; `"".join(parts)`
+is no harder to write than the loop it replaces.
+
+Everywhere else, the guarantee that a string you were handed is the string you
+still have is worth considerably more than the ability to edit one in place.
+
+## Characters, bytes, and the length that surprises people
+
+A Python string holds Unicode code points, and a file or a network holds bytes.
+The two are different units, and treating them as the same is behind most
+text-handling bugs.
+
+```python
+print(len("café"), len("café".encode("utf-8")))
+```
+
+```
+4 5
+```
+
+Four characters, five bytes &mdash; the accented `e` needs two. That gap is
+why truncating text to "100 characters" and truncating to "100 bytes" are
+different operations, and why a field limit expressed in bytes can reject a
+string that looks well within it.
+
+Three habits follow. Decode as early as possible and encode as late as
+possible, so the middle of your program works in `str` and never in `bytes`.
+Name the encoding explicitly on every file you open, because the default varies
+by platform and that is precisely how a script that works on one machine raises
+`UnicodeDecodeError` on another. And when comparing text that came from
+different sources, normalise it first &mdash; the same visible character can be
+one code point or two, and `unicodedata.normalize("NFC", text)` collapses them
+so that strings which look identical compare equal.
+
+For English-only data none of this ever surfaces, which is exactly why it is
+worth knowing before the first name with an accent in it arrives.
+
+## Slicing does not raise, and what that hides
+
+Indexing asserts that a position exists; slicing does not.
+
+```python
+print(repr("abc"[10:20]))
+```
+
+```
+''
+```
+
+An out-of-range slice returns whatever exists, which is often nothing, and
+never raises. That is genuinely convenient &mdash; taking "the first ten
+characters" of something that might be shorter needs no length check &mdash;
+and it is a place bugs hide, because an empty result looks like legitimate data
+rather than a mistake.
+
+The practical rule is to choose based on whether absence is a bug. If a
+position must exist, index it and let `IndexError` say so at the line
+responsible. If fewer characters than asked for is an ordinary outcome, slice
+and let it clamp.
+
+When a slice with computed bounds comes back empty, do not assume the input was
+empty. Print the bounds. An off-by-one that produces `s[5:5]` is
+indistinguishable in the output from a string that genuinely had nothing to
+give, and the two have completely different causes.
+
+## split and join, which most text work is made of
+
+Two methods do the bulk of real string handling, and they are inverses of each
+other.
+
+`split` breaks text into a list. With no argument it splits on any run of
+whitespace and discards the empties, which is what you want for text typed by a
+person &mdash; two spaces between words does not produce a phantom entry. With
+an argument it splits on exactly that separator, every time it occurs, and does
+produce empty strings between adjacent separators. That difference is the one
+to remember: `"a  b".split()` gives two items, `"a  b".split(" ")` gives three.
+
+`maxsplit` limits how many splits happen, counting from the left, which is how
+you take the first field and leave the rest intact:
+`line.split(":", 1)` gives exactly two pieces however many colons follow.
+`rsplit` does the same from the right, for taking a file extension or a last
+segment.
+
+`partition` is the version that never needs a length check: it splits once and
+always returns three pieces, so `key, sep, value = line.partition("=")` works
+whether or not the separator was there. When it was absent, `sep` and `value`
+are empty and the unpacking still succeeds.
+
+`join` goes the other way and is called on the separator, not on the list,
+which reads backwards until you have written it a few times. Think of it as
+"put this between them". It requires strings, so a list of numbers needs
+converting first: `", ".join(str(n) for n in nums)`.
 
 ## Questions people ask
 
