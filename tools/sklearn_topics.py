@@ -1416,6 +1416,10 @@ Neither of these appears in a metric, and both change what you do next.
 
 <strong>How do I see every valid scoring name?</strong> `sorted(sklearn.metrics.get_scorer_names())`, which is quicker than guessing at the spelling.
 
+<strong>Should I report one metric or several?</strong> Several, and always with the baseline beside them. MAE answers "how wrong, typically", RMSE answers "are there occasional disasters", and the dummy answers "compared to what". Any one of the three alone is easy to misread, and together they take one extra line to produce.
+
+<strong>My R-squared is high and the predictions look bad. How?</strong> Almost always a target with large variance, where beating the mean is easy and still leaves errors that matter in absolute terms. Look at MAE next to the mean of the target.
+
 ## Things to try
 
 1. <strong>Run the second editor.</strong> Same total error, same MAE, RMSE more than twice as large. That single comparison is the whole argument for choosing between them.
