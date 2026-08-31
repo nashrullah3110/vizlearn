@@ -1081,22 +1081,6 @@ is doing you a favour by making that visible.
 
 
 add("enumerate_function", """
-## What it replaces, and why that matters
-
-Before `enumerate`, keeping a counter alongside a loop meant one of two things:
-initialising `i = 0` and remembering to increment it at the bottom of the body,
-or looping over `range(len(items))` and indexing back into the list.
-
-Both work. Both have a specific failure. The manual counter breaks the moment
-the body has an early `continue` above the increment, and the bug is invisible -
-the loop still runs, the numbers are just wrong. The `range(len(...))` version
-puts an index between you and the value, so every use is `items[i]` rather than
-`item`, which is noisier and offers an off-by-one error where none needs to
-exist.
-
-`enumerate` removes the counter entirely. There is nothing to forget to
-increment and nothing to index.
-
 ## The start argument
 
 ```python
@@ -1716,17 +1700,6 @@ on screen.
 
 
 add("slicing_step_negatives", """
-## Why the stop is excluded
-
-Excluding the stop looks arbitrary until you notice what it buys. The length of
-`a[i:j]` is exactly `j - i`, with no adjustment. `a[:n]` and `a[n:]` split a
-sequence with nothing lost and nothing repeated. And `a[i:i]` is empty, which is
-the sensible answer for a zero-width slice.
-
-Every one of those becomes an off-by-one special case if the stop is inclusive.
-The convention is the same one `range` uses, which is why the two compose so
-predictably.
-
 ## Slicing does not raise
 
 `a[5:99]` on a three-item list returns what exists, and `a[99:]` returns an empty
@@ -5493,4 +5466,634 @@ any iterable, which is occasionally why it is chosen.
 - The bugs arrive through config dicts, shared defaults, lists of records and
   snapshots, not through code that obviously copies.
 - Making the data immutable removes the question entirely.
+""")
+
+
+extend("enumerate_function", """
+## The off-by-one that start= invites
+
+`start=1` changes the number you are handed and nothing else. The item is still
+the same item, and the position it occupies in the list is still one lower:
+
+```python
+names = ["ana", "bo", "cy"]
+
+for n, name in enumerate(names, start=1):
+    print(n, name, names[n - 1], names[n] if n < len(names) else "-")
+```
+
+```
+1 ana ana bo
+2 bo bo cy
+3 cy cy -
+```
+
+The third column is the item, reached correctly with `n - 1`. The fourth shows
+what indexing with `n` gives you: the *next* item, and eventually the end of
+the list.
+
+This is why `start=` is for display and not for access. The moment you use the
+number both to print and to index, you have two meanings for one variable and
+one of them is wrong. If you genuinely need both, take the real index and add
+one where you print it:
+
+```python
+for i, name in enumerate(names):
+    print(i + 1, name, names[i])
+```
+
+Wordier by one character, and it cannot be got wrong.
+
+## A worked example: numbering only what matters
+
+The awkward case is numbering output when some items are skipped, because the
+enumerate counter keeps advancing whether you used it or not:
+
+```python
+lines = ["alpha", "", "beta", "", "gamma"]
+
+shown = 0
+for line in lines:
+    if not line:
+        continue
+    shown += 1
+    print(shown, line)
+```
+
+```
+1 alpha
+2 beta
+3 gamma
+```
+
+Written with `enumerate` and a `continue`, the numbers would have come out 1, 3
+and 5, because `enumerate` counts positions in the input and not lines
+produced. Neither is wrong; they answer different questions.
+
+The rule that falls out: `enumerate` numbers the *source*. If you want to
+number the *output*, and the loop can skip items, you are back to a counter
+&mdash; and that is one of the few remaining places a manual counter is the
+right answer.
+
+A middle ground worth knowing: filter first, then enumerate the result.
+`for n, line in enumerate((l for l in lines if l), start=1)` numbers what
+survives, and keeps the counter out of the body.
+
+## Both numbers at once
+
+Occasionally you want the position *and* the item *and* something from a second
+sequence, which is where `enumerate` and `zip` combine:
+
+```python
+names = ["ana", "bo"]
+scores = [91, 78]
+
+for i, (name, score) in enumerate(zip(names, scores)):
+    print(i, name, score)
+```
+
+```
+0 ana 91
+1 bo 78
+```
+
+The brackets around `(name, score)` are doing real work. `enumerate` yields
+`(index, item)` where the item is the tuple `zip` produced, so the pattern on
+the left has to have the same shape: a number, then a pair. Leaving the
+brackets out is a `ValueError` about unpacking, and it is one of the clearer
+error messages you will meet.
+
+The order matters too. `zip(enumerate(names), scores)` also works and gives you
+`((0, "ana"), 91)`, which unpacks as `for (i, name), score in ...`. Both are
+legal; the first reads better because the index stays at the front where a
+reader expects it.
+
+## Why wanting the index is usually a question worth checking
+
+`enumerate` makes the index easy to get, which makes it worth asking, each
+time, whether you actually need it. A surprising share of loops that ask for a
+position are working around something else.
+
+**Comparing an item with its neighbour.** The index is being used to reach
+`items[i - 1]` or `items[i + 1]`. What you want is consecutive pairs, and
+`zip(items, items[1:])` or `itertools.pairwise` gives them without any index or
+any bounds check at the ends.
+
+**Walking two sequences together.** The index is being used to index both.
+`zip` pairs them directly, and removes the possibility of the two lookups
+disagreeing.
+
+**Building a lookup of where things are.** The loop collects positions into a
+dictionary. A dict comprehension over `enumerate` says it in one line, and
+often the real question is "does this contain x" or "which comes first", both
+of which have direct answers.
+
+**Modifying the list while walking it.** The index is being used to assign back
+with `items[i] = ...`. This works and is the one case where the index is
+genuinely required &mdash; but building a new list with a comprehension is
+usually clearer, and removing items by index while iterating is a bug in
+waiting.
+
+What is left after those is the honest use: displaying a number to a person,
+reporting which record failed, or writing into a pre-sized structure. Those are
+real, and `enumerate` is exactly right for them.
+
+## Where you will actually meet it
+
+Three situations account for most real uses, and they share a shape: the number
+is going somewhere a human will read it.
+
+**Reporting which line failed.** Parsing a file and validating rows, the index
+is what turns "invalid date" into "line 47: invalid date". Without it the error
+message is useless on a file of any size, and `start=1` matters because people
+count lines from one and so does every text editor.
+
+**Progress through a long job.** `if n % 1000 == 0: print(n)` inside a loop
+over a large iterable gives you a heartbeat, and because `enumerate` is lazy it
+costs nothing on a stream you are already reading.
+
+**Numbered output.** Menus, ranked results, numbered steps, table rows. Here
+the number is presentation, which is precisely the case `start=1` exists for
+and precisely the case where using it to index would be wrong.
+
+The common thread is that the index is an output rather than a mechanism. When
+the number is being printed, `enumerate` is the tool. When the number is being
+used to reach back into the data, there is usually a way to get the data
+directly instead.
+
+## Numbering things that are not lists
+
+`enumerate` takes any iterable, and the interesting cases are the ones that are
+not sequences, because the position it hands you means something slightly
+different in each.
+
+Over a **file**, the number is the line number, and it is the reason
+`enumerate(f, start=1)` appears in every script that reports problems in a data
+file. Nothing else gives you that number without reading the file twice.
+
+Over a **generator**, the number counts what has been produced so far. It is
+the only way to know how far a stream has got, since a generator has no length
+and no position you can ask for.
+
+Over a **dictionary**, the number is the position in insertion order, which is
+well defined since Python 3.7 and is occasionally what you want &mdash;
+numbering the entries of a config for display, say.
+
+Over a **set**, the number is the position in an arbitrary order. It is stable
+within a single run and must not be relied on across runs or between machines,
+because it depends on hash values. If a number over a set matters, sort it
+first and enumerate the sorted result.
+
+Over a **string**, the number is the character position, which makes
+`enumerate(text)` a reasonable way to find where something occurs &mdash;
+though `str.find` is usually the direct answer.
+
+The pattern across all of them is that `enumerate` counts iterations, not
+positions in storage. For a list those are the same thing, and for everything
+else the distinction is the whole point.
+
+## The name, and where it came from
+
+"Enumerate" means to list things one by one, and in older languages an
+enumerator was the object that walked a collection. Python's `enumerate` keeps
+the sense of walking while adding the numbering, which is why the name is about
+the traversal rather than about counting.
+
+It arrived in Python 2.3, and the release note for it is unusually direct about
+the motivation: the `range(len(...))` idiom was common, awkward, and a frequent
+source of small errors. The feature exists specifically to remove a pattern
+people kept writing, which is worth knowing because it tells you what the
+intended use is. If your loop looks like the pattern it replaced, use it. If it
+does not, the index it offers is probably not the thing you need.
+
+## Questions people ask
+
+<strong>Does `enumerate` build a list?</strong> No. It yields pairs on demand,
+so it works on files, generators and anything else iterable.
+
+<strong>Can I use it on a dictionary?</strong> Yes, and you get positions
+alongside keys. `enumerate(d.items())` when you want the pairs too.
+
+<strong>What if I only want the index?</strong> Then you probably want
+`range(len(items))` &mdash; but check first, because wanting only the index is
+usually a sign the loop is doing something else.
+
+<strong>How do I name the unused half?</strong> `_` by convention, for either
+position: `for _, item in enumerate(items)` is legal though pointless.
+
+<strong>Does `start=` accept a negative number?</strong> Yes. It is just the
+number to begin counting from, and nothing validates it.
+
+<strong>Is `enumerate` slower than a manual counter?</strong> No, it is faster
+&mdash; the counting happens in C rather than in a bytecode `+= 1`.
+
+<strong>Can I enumerate backwards?</strong> Not directly.
+`enumerate(reversed(items))` numbers from zero at the end; to get the original
+indices descending, zip a reversed range instead.
+
+<strong>Can I unpack a nested item directly?</strong> Yes, with brackets:
+`for i, (a, b) in enumerate(pairs)`. The pattern on the left has to match the
+shape of what is yielded.
+
+<strong>Why is my counter wrong when I use `continue`?</strong> If it is a
+manual counter placed after the `continue`, it never runs for skipped items.
+`enumerate` has no such problem, because the counting is not in your loop body.
+
+## Recap in one screen
+
+- `enumerate` yields `(position, item)`; the `for i, x` on the left is ordinary
+  tuple unpacking.
+- It removes both the manual counter and the `range(len(...))` indexing, along
+  with the mistakes each invites.
+- `start=` changes the label, not the position &mdash; never use that number to
+  index back into the sequence.
+- It is lazy and works on anything iterable, including files too large to hold.
+- If the loop skips items and you want to number the output, use a counter;
+  `enumerate` counts the input.
+""")
+
+
+extend("nested_data_structures", """
+## A worked example: from rows to a report
+
+Most work with nested data is the same journey &mdash; records in, grouped
+summary out. Here it is end to end:
+
+```python
+orders = [
+    {"customer": "ana", "items": [{"name": "pen", "price": 2},
+                                  {"name": "pad", "price": 5}]},
+    {"customer": "bo", "items": [{"name": "pen", "price": 2}]},
+]
+
+totals = {}
+for order in orders:
+    total = sum(item["price"] for item in order["items"])
+    totals[order["customer"]] = totals.get(order["customer"], 0) + total
+
+for customer, total in sorted(totals.items(), key=lambda kv: -kv[1]):
+    print(f"{customer:<6}{total:>4}")
+```
+
+```
+ana      7
+bo       2
+```
+
+Three moves, each from elsewhere in the track. The generator expression sums a
+list-valued field without building an intermediate list. `totals.get(key, 0)`
+accumulates without a first-time special case. And `sorted` with a negated key
+puts the largest first.
+
+What makes it readable is that each level is handled at one depth. The inner
+sum works on one order's items and knows nothing about customers; the outer
+loop works on orders and knows nothing about prices. When nested-data code
+becomes hard to follow, it is almost always because one expression is reaching
+through three levels at once.
+
+## Naming the path
+
+The single most useful habit with nested data is refusing to repeat a long path.
+`record["user"]["profile"]["display_name"]` written in four places is four
+places to update when the API changes, and four chances to typo a key into a
+`KeyError` that names only the last one.
+
+A one-line function fixes it:
+
+```python
+def display_name(record):
+    return record["user"]["profile"]["display_name"]
+```
+
+The path now exists once. It has a name that says what it means, so the call
+sites read as intent rather than as navigation. It has somewhere to put a
+default or a `try`. And when the shape changes &mdash; and it will &mdash;
+there is one line to edit.
+
+This is worth doing at two levels of nesting, not four. The instinct to wait
+until it gets bad is why it usually does.
+
+## Where the shape comes from, and what it costs
+
+Nested data almost always arrives rather than being designed: it is the shape
+some API returns, or the shape JSON has, or the shape a database join produced.
+That has a consequence worth being deliberate about.
+
+Data in the shape it arrived in is convenient for reading once and awkward for
+everything else. Nothing validates it, so a missing key is discovered at the
+point of use rather than at the point of parsing. Nothing names it, so every
+function that touches it has to know the layout. And nothing stops two parts of
+the program disagreeing about whether a field is optional.
+
+The alternative is to convert at the boundary: read the nested structure once,
+pull out what you need, and build objects &mdash; dataclasses, named tuples, or
+just flatter dictionaries with the names you chose. Everything downstream then
+works with a shape you defined, validated once, at a known place.
+
+For a script that reads a file and prints a summary, this is overkill and the
+raw structure is fine. For anything long-lived, converting at the edge is the
+difference between a program where a shape change breaks one function and one
+where it breaks eleven.
+
+## Depth, and when to stop nesting
+
+Reading nested data is unavoidable. *Building* deeply nested data is a choice,
+and usually a poor one past two levels.
+
+A dictionary of dictionaries of lists is hard to inspect, hard to iterate
+without three loops, and impossible to query except by walking. The alternative
+is usually a flat list of records where the nesting becomes fields: instead of
+`by_region[region][city] = [names]`, a list of
+`{"region": ..., "city": ..., "name": ...}` rows.
+
+Flat records are longer to write and enormously easier to work with. They sort
+by any field, filter with one comprehension, group by whichever key the current
+question needs rather than the one you committed to when you built the
+structure, and convert directly to CSV or a dataframe. The nesting you actually
+need can be produced on demand with a grouping, which is three lines.
+
+The heuristic: nest when the structure reflects genuine containment that will
+never be queried the other way round. Flatten when you can imagine wanting a
+different grouping later &mdash; which, for anything resembling a report, you
+will.
+
+## Failing at the boundary rather than in the middle
+
+The characteristic problem with nested data is that a shape mistake surfaces
+far from where it entered. A key that is missing from an API response is
+discovered three functions later, as a `KeyError` naming a key that looks
+correct, in code that has nothing to do with fetching.
+
+The remedy is to check the shape once, where the data arrives, rather than
+defending against it everywhere afterwards. What that check looks like depends
+on how much the data matters.
+
+At the simplest, a few lines that pull out the fields you need and raise a
+clear error if they are absent. The error then says "response is missing
+`user.profile.name`" at the point of parsing, which is a diagnosis rather than
+a symptom.
+
+A step up, build the values into a dataclass or a `NamedTuple`. Construction
+fails immediately if a field is missing, the resulting object has known
+attributes rather than arbitrary keys, and every function downstream can be
+written against a shape that is guaranteed rather than hoped for.
+
+Further still, a validation library &mdash; Pydantic being the common choice
+&mdash; declares the expected shape as types and reports every problem at once,
+with the path to each. That is worth it when the data comes from outside your
+control and the cost of processing something malformed is high.
+
+All three are the same idea at different sizes: convert once, at the edge, and
+let everything inside the boundary assume the data is what it claims to be. The
+alternative &mdash; a `.get` chain at every use site &mdash; spreads the
+uncertainty through the whole program and never actually resolves it.
+
+## Questions people ask
+
+<strong>How do I get a value several levels down safely?</strong> Chain `.get`
+with `{}` defaults, or wrap the direct path in `try`/`except KeyError` when
+absence is genuinely exceptional.
+
+<strong>Why does `.get("a", {}).get("b")` work but `.get("a").get("b")`
+not?</strong> Because the second returns `None` when the key is missing, and
+`None` has no `.get`. The `{}` keeps a dictionary in the chain.
+
+<strong>How do I see the shape of something I just parsed?</strong>
+`print(json.dumps(data, indent=2))` for JSON-compatible data, and
+`pprint.pprint` for anything else.
+
+<strong>Can I flatten an arbitrarily deep structure?</strong> Yes, with
+recursion or a stack &mdash; but if the depth is unknown, that is usually a
+sign the data wants to be flat records instead.
+
+<strong>Are nested comprehensions read inside-out?</strong> No. The `for`
+clauses read left to right in the same order as the equivalent nested loops.
+
+<strong>Why did my copy of a nested structure change?</strong> Because the copy
+was shallow and the inner structures are shared.
+
+<strong>Do JSON keys stay integers?</strong> No. They come back as strings,
+which is a common surprise after a save-and-load round trip.
+
+<strong>Should I use dotted access instead of brackets?</strong> Libraries that
+turn dictionaries into attribute access look convenient and hide typos, since a
+missing attribute and a missing key report differently. A dataclass gives you
+the same ergonomics with the checking.
+
+<strong>What is the fastest way to search nested data?</strong> Build an index
+once &mdash; a dictionary keyed by whatever you search on &mdash; rather than
+walking the structure on every lookup.
+
+<strong>Is there a standard way to walk a structure of unknown depth?</strong>
+Recursion, with a check on each value for whether it is a dictionary, a list,
+or a leaf. The standard library has no general walker, because what to do at
+each node depends entirely on the task.
+
+## Recap in one screen
+
+- Most real data is a list of records; the moves are index, key lookup, and an
+  inner loop, composed to whatever depth is needed.
+- Chain `.get(key, {})` for optional paths, and `try`/`except KeyError` when a
+  missing value is exceptional rather than expected.
+- Give a repeated path a named function at two levels of nesting, not four.
+- Convert at the boundary into shapes you defined, unless the script is small
+  enough that the raw structure will do.
+- Prefer flat records over deep nesting for anything you might want to group a
+  different way later.
+""")
+
+
+extend("slicing_step_negatives", """
+## A worked example: the three arguments together
+
+Every rule on this page in one block, with the results printed rather than
+described:
+
+```python
+s = "abcdefgh"
+
+print(s[2:5])
+print(s[-3:])
+print(s[::2])
+print(s[::-1])
+print(s[5:2:-1])
+print(s[2:99], repr(s[99:]))
+```
+
+```
+cde
+fgh
+aceg
+hgfedcba
+fed
+cdefgh ''
+```
+
+Read them in order. `s[2:5]` starts at 2 and stops before 5. `s[-3:]` counts
+from the right. `s[::2]` takes every second character from the whole string.
+`s[::-1]` reverses. `s[5:2:-1]` walks backwards from 5 down to but not
+including 2, which is where the exclusive stop starts feeling strange &mdash;
+the item at index 2 is missing from the result even though 2 is written on the
+left of the colon.
+
+The last line is the forgiveness: an end past the length is clamped, and a
+start past the length gives an empty string rather than an error.
+
+## Why a negative step reverses the roles
+
+`s[2:5:-1]` returns nothing, and the reason is worth spelling out because it is
+the one part of slicing people memorise rather than understand.
+
+A slice always moves from the start value towards the stop value, in the
+direction the step specifies. With a positive step it moves right, so the start
+must be to the left of the stop. With a negative step it moves left, so the
+start must be to the *right* of the stop. `s[2:5:-1]` asks to begin at 2 and
+walk leftwards until it reaches 5, which it never will, so the result is empty
+immediately.
+
+That also explains the defaults. When the step is negative and you leave the
+ends off, the omitted start becomes the end of the sequence and the omitted
+stop becomes "past the beginning" &mdash; which is why `s[::-1]` gives you
+everything reversed, including the first character. Writing `s[::-1]` and
+`s[len(s):0:-1]` are not the same: the second stops before index 0 and drops
+the first character.
+
+The practical consequence is that there is no way to write "reversed, ending at
+the very beginning" with an explicit stop, because the stop would have to be
+-1, and -1 already means the last item. Omitting it is the only way to say it,
+which is exactly why the idiom is `[::-1]` and not something more explicit.
+
+## Slice objects, and the syntax behind the colons
+
+The bracket syntax is shorthand. `a[1:5:2]` is `a[slice(1, 5, 2)]`, and
+`slice` is an ordinary object you can build, store and pass around.
+
+That is occasionally useful in its own right &mdash; naming a slice you use
+repeatedly, `HEADER = slice(0, 4)`, makes the call sites say what they mean.
+More often it is useful as an explanation. It is why `a[1:5]` and
+`a[slice(1, 5)]` behave identically, why a class can support slicing by
+handling a `slice` in its `__getitem__`, and why the ellipsis and comma forms
+that NumPy uses are possible at all: `a[1:5, ::2]` passes a tuple of slices,
+which plain Python lists reject and NumPy arrays understand.
+
+`indices()` on a slice object resolves it against a length, returning the
+concrete start, stop and step after clamping and negative-index conversion.
+`slice(1, 99).indices(5)` gives `(1, 5, 1)`, which is the arithmetic the
+forgiving behaviour is built on, made visible.
+
+## Slicing is a protocol, not a list feature
+
+Everything on this page works on any sequence, and knowing that is what makes
+the syntax worth learning properly rather than memorising for lists.
+
+Strings, tuples, bytes, bytearrays and `range` all slice with the same three
+numbers and the same rules, and each returns its own type &mdash; slicing a
+tuple gives a tuple, slicing a `range` gives a `range`, computed rather than
+materialised. `bytes` slicing is how binary formats are parsed, taking a
+header, a length field and a payload by offset.
+
+Beyond the builtins, any class can support it by handling a `slice` object in
+`__getitem__`, and the libraries that do have extended the idea considerably.
+NumPy accepts a tuple of slices, `a[1:5, ::2]`, to take a rectangle out of a
+two-dimensional array, and its slices are *views* rather than copies &mdash;
+writing into one changes the original, which is the opposite of the list
+behaviour and a genuine trap when moving between them. pandas uses the same
+brackets with labels rather than positions in `.loc`, where the stop is
+inclusive, breaking the one rule you had learned to rely on.
+
+The lesson is not to distrust slicing but to check two things when a new type
+supports it: whether the result is a copy or a view, and whether the stop is
+excluded. Those two answers differ across the ecosystem and everything else
+stays the same.
+
+## Idioms worth recognising on sight
+
+A handful of slices appear often enough to read as single symbols rather than
+as arithmetic. Knowing them saves parsing the numbers every time.
+
+`a[::-1]` reverses. `a[:]` copies a list, and is also the left-hand side of
+`a[:] = b`, which replaces the contents of `a` in place rather than rebinding
+the name &mdash; the difference that matters when someone else holds a
+reference to `a`.
+
+`a[:n]` and `a[n:]` are "the first n" and "everything after the first n", and
+together they cover the whole sequence exactly once. `a[-n:]` is the last n,
+and `a[:-n]` is everything except the last n, which is how you drop a known
+suffix without computing a length.
+
+`a[::n]` takes every nth item, and `a[i::n]` takes every nth starting from `i`
+&mdash; the pair of them is how you deinterleave two sequences that were
+interleaved into one, with `a[::2]` and `a[1::2]`.
+
+`s[:0]` is an empty sequence of the same type, occasionally useful as a
+starting value when you need "an empty one of whatever this is" without naming
+the type.
+
+## Choosing between an index and a slice
+
+The two look similar and they fail differently, which is the basis for choosing
+between them.
+
+`a[i]` asserts that position `i` exists. If it does not, you get an
+`IndexError` naming the problem at the line that caused it. `a[i:i+1]` makes no
+such assertion: out of range, it hands back an empty sequence and the program
+carries on with nothing.
+
+So the choice is about whether absence is a bug. Taking the first item of a list
+that is documented to be non-empty should be `a[0]`, because an empty list
+means something upstream is wrong and you want to hear about it. Taking "up to
+ten results" from a list that might have three should be `a[:10]`, because
+having fewer is expected and the clamping is exactly right.
+
+The mistake in one direction is a crash on data that was always going to be
+short. The mistake in the other is a silent empty result that gets reported as
+zero, saved as an empty file, or treated as "no matches found" &mdash; and
+those are much harder to trace, because there is no error to start from.
+
+One practical consequence: when a slice with computed bounds returns nothing,
+do not assume the data was empty. Print the bounds. An off-by-one that produces
+`a[5:5]` looks identical in the output to a list that genuinely had nothing to
+give.
+
+## Questions people ask
+
+<strong>Is `a[:]` the same as `a.copy()`?</strong> For a list, yes &mdash; both
+are shallow copies. For a string it returns the same object, since there is
+nothing to copy.
+
+<strong>Why does `a[::-1]` work on strings and `a.reverse()` not?</strong>
+`reverse` is a list method that mutates, and strings cannot be mutated.
+
+<strong>What is the difference between `a[::-1]` and `reversed(a)`?</strong>
+The slice builds a new sequence; `reversed` returns a lazy iterator and copies
+nothing.
+
+<strong>Can I slice a generator?</strong> No. Use `itertools.islice`, which
+takes the same start, stop and step but cannot go backwards.
+
+<strong>Does slicing a tuple give a tuple?</strong> Yes. A slice returns the
+same type as the thing sliced, for the built-in sequences.
+
+<strong>How do I take every nth item starting from the end?</strong>
+`a[::-n]` &mdash; the negative step both reverses and strides.
+
+<strong>Why is `a[1:3] = [1, 2, 3]` allowed?</strong> Because slice assignment
+replaces a section and may change the length. It is the mutating counterpart of
+the copying slice.
+
+<strong>Does slicing a list of objects copy the objects?</strong> No. The new
+list holds the same objects, which is the shallow-copy behaviour from elsewhere
+in the track.
+
+## Recap in one screen
+
+- Three numbers: start, stop, step; the stop is always excluded, exactly as in
+  `range`.
+- Negative indices count from the right, and can be mixed freely with positive
+  ones.
+- A negative step swaps the roles of start and stop, which is why `s[2:5:-1]`
+  is empty and `s[::-1]` reverses.
+- Slicing clamps rather than raising, which is convenient and occasionally
+  hides a wrong index.
+- A slice copies; assigning into a slice mutates, and can change the length.
 """)

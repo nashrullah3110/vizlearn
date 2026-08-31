@@ -33,39 +33,9 @@ s[::-1]   # reversed
 
 `[::-1]` is the standard reverse idiom and worth memorising as one symbol rather than parsing each time. A negative step walks backwards, so start and stop swap roles &mdash; which is why `s[5:2:-1]` gives you something and `s[2:5:-1]` gives you nothing.
 
-## Slicing forgives, indexing does not
-
-
-```python
-s[2:99]   # fine, gives what exists
-s[99]     # IndexError
-```
-
-
-A slice clamps to the available range and returns what it can, including an empty result. That is convenient and occasionally hides a bug, because an empty slice looks like valid data rather than a mistake.
-
-## Slices copy, and assignment mutates
-
-A slice of a list is a new list, so changing it leaves the original alone. But assigning <em>into</em> a slice changes the original in place, and can change its length:
-
-nums[1:3] = ["a", "b", "c"]
-
-replaces two items with three. That is a genuine feature and a genuine surprise.
-
 ## Reversing three ways
 
 `data[::-1]` builds a new reversed list. `reversed(data)` returns a lazy iterator and copies nothing. `data.reverse()` reorders in place and returns `None` &mdash; the same trap as `.sort()`.
-
-## Why the stop is excluded
-
-Excluding the stop looks arbitrary until you notice what it buys. The length of
-`a[i:j]` is exactly `j - i`, with no adjustment. `a[:n]` and `a[n:]` split a
-sequence with nothing lost and nothing repeated. And `a[i:i]` is empty, which is
-the sensible answer for a zero-width slice.
-
-Every one of those becomes an off-by-one special case if the stop is inclusive.
-The convention is the same one `range` uses, which is why the two compose so
-predictably.
 
 ## Slicing does not raise
 
@@ -109,3 +79,196 @@ Combining a negative step with negative indices is where slices become
 write-only. `a[-2::-1]` is "start at the second-to-last, walk backwards to the
 beginning" - correct, and not obvious on sight. When a slice needs a comment,
 `reversed()` and an explicit loop usually say it better.
+
+## A worked example: the three arguments together
+
+Every rule on this page in one block, with the results printed rather than
+described:
+
+```python
+s = "abcdefgh"
+
+print(s[2:5])
+print(s[-3:])
+print(s[::2])
+print(s[::-1])
+print(s[5:2:-1])
+print(s[2:99], repr(s[99:]))
+```
+
+```
+cde
+fgh
+aceg
+hgfedcba
+fed
+cdefgh ''
+```
+
+Read them in order. `s[2:5]` starts at 2 and stops before 5. `s[-3:]` counts
+from the right. `s[::2]` takes every second character from the whole string.
+`s[::-1]` reverses. `s[5:2:-1]` walks backwards from 5 down to but not
+including 2, which is where the exclusive stop starts feeling strange &mdash;
+the item at index 2 is missing from the result even though 2 is written on the
+left of the colon.
+
+The last line is the forgiveness: an end past the length is clamped, and a
+start past the length gives an empty string rather than an error.
+
+## Why a negative step reverses the roles
+
+`s[2:5:-1]` returns nothing, and the reason is worth spelling out because it is
+the one part of slicing people memorise rather than understand.
+
+A slice always moves from the start value towards the stop value, in the
+direction the step specifies. With a positive step it moves right, so the start
+must be to the left of the stop. With a negative step it moves left, so the
+start must be to the *right* of the stop. `s[2:5:-1]` asks to begin at 2 and
+walk leftwards until it reaches 5, which it never will, so the result is empty
+immediately.
+
+That also explains the defaults. When the step is negative and you leave the
+ends off, the omitted start becomes the end of the sequence and the omitted
+stop becomes "past the beginning" &mdash; which is why `s[::-1]` gives you
+everything reversed, including the first character. Writing `s[::-1]` and
+`s[len(s):0:-1]` are not the same: the second stops before index 0 and drops
+the first character.
+
+The practical consequence is that there is no way to write "reversed, ending at
+the very beginning" with an explicit stop, because the stop would have to be
+-1, and -1 already means the last item. Omitting it is the only way to say it,
+which is exactly why the idiom is `[::-1]` and not something more explicit.
+
+## Slice objects, and the syntax behind the colons
+
+The bracket syntax is shorthand. `a[1:5:2]` is `a[slice(1, 5, 2)]`, and
+`slice` is an ordinary object you can build, store and pass around.
+
+That is occasionally useful in its own right &mdash; naming a slice you use
+repeatedly, `HEADER = slice(0, 4)`, makes the call sites say what they mean.
+More often it is useful as an explanation. It is why `a[1:5]` and
+`a[slice(1, 5)]` behave identically, why a class can support slicing by
+handling a `slice` in its `__getitem__`, and why the ellipsis and comma forms
+that NumPy uses are possible at all: `a[1:5, ::2]` passes a tuple of slices,
+which plain Python lists reject and NumPy arrays understand.
+
+`indices()` on a slice object resolves it against a length, returning the
+concrete start, stop and step after clamping and negative-index conversion.
+`slice(1, 99).indices(5)` gives `(1, 5, 1)`, which is the arithmetic the
+forgiving behaviour is built on, made visible.
+
+## Slicing is a protocol, not a list feature
+
+Everything on this page works on any sequence, and knowing that is what makes
+the syntax worth learning properly rather than memorising for lists.
+
+Strings, tuples, bytes, bytearrays and `range` all slice with the same three
+numbers and the same rules, and each returns its own type &mdash; slicing a
+tuple gives a tuple, slicing a `range` gives a `range`, computed rather than
+materialised. `bytes` slicing is how binary formats are parsed, taking a
+header, a length field and a payload by offset.
+
+Beyond the builtins, any class can support it by handling a `slice` object in
+`__getitem__`, and the libraries that do have extended the idea considerably.
+NumPy accepts a tuple of slices, `a[1:5, ::2]`, to take a rectangle out of a
+two-dimensional array, and its slices are *views* rather than copies &mdash;
+writing into one changes the original, which is the opposite of the list
+behaviour and a genuine trap when moving between them. pandas uses the same
+brackets with labels rather than positions in `.loc`, where the stop is
+inclusive, breaking the one rule you had learned to rely on.
+
+The lesson is not to distrust slicing but to check two things when a new type
+supports it: whether the result is a copy or a view, and whether the stop is
+excluded. Those two answers differ across the ecosystem and everything else
+stays the same.
+
+## Idioms worth recognising on sight
+
+A handful of slices appear often enough to read as single symbols rather than
+as arithmetic. Knowing them saves parsing the numbers every time.
+
+`a[::-1]` reverses. `a[:]` copies a list, and is also the left-hand side of
+`a[:] = b`, which replaces the contents of `a` in place rather than rebinding
+the name &mdash; the difference that matters when someone else holds a
+reference to `a`.
+
+`a[:n]` and `a[n:]` are "the first n" and "everything after the first n", and
+together they cover the whole sequence exactly once. `a[-n:]` is the last n,
+and `a[:-n]` is everything except the last n, which is how you drop a known
+suffix without computing a length.
+
+`a[::n]` takes every nth item, and `a[i::n]` takes every nth starting from `i`
+&mdash; the pair of them is how you deinterleave two sequences that were
+interleaved into one, with `a[::2]` and `a[1::2]`.
+
+`s[:0]` is an empty sequence of the same type, occasionally useful as a
+starting value when you need "an empty one of whatever this is" without naming
+the type.
+
+## Choosing between an index and a slice
+
+The two look similar and they fail differently, which is the basis for choosing
+between them.
+
+`a[i]` asserts that position `i` exists. If it does not, you get an
+`IndexError` naming the problem at the line that caused it. `a[i:i+1]` makes no
+such assertion: out of range, it hands back an empty sequence and the program
+carries on with nothing.
+
+So the choice is about whether absence is a bug. Taking the first item of a list
+that is documented to be non-empty should be `a[0]`, because an empty list
+means something upstream is wrong and you want to hear about it. Taking "up to
+ten results" from a list that might have three should be `a[:10]`, because
+having fewer is expected and the clamping is exactly right.
+
+The mistake in one direction is a crash on data that was always going to be
+short. The mistake in the other is a silent empty result that gets reported as
+zero, saved as an empty file, or treated as "no matches found" &mdash; and
+those are much harder to trace, because there is no error to start from.
+
+One practical consequence: when a slice with computed bounds returns nothing,
+do not assume the data was empty. Print the bounds. An off-by-one that produces
+`a[5:5]` looks identical in the output to a list that genuinely had nothing to
+give.
+
+## Questions people ask
+
+<strong>Is `a[:]` the same as `a.copy()`?</strong> For a list, yes &mdash; both
+are shallow copies. For a string it returns the same object, since there is
+nothing to copy.
+
+<strong>Why does `a[::-1]` work on strings and `a.reverse()` not?</strong>
+`reverse` is a list method that mutates, and strings cannot be mutated.
+
+<strong>What is the difference between `a[::-1]` and `reversed(a)`?</strong>
+The slice builds a new sequence; `reversed` returns a lazy iterator and copies
+nothing.
+
+<strong>Can I slice a generator?</strong> No. Use `itertools.islice`, which
+takes the same start, stop and step but cannot go backwards.
+
+<strong>Does slicing a tuple give a tuple?</strong> Yes. A slice returns the
+same type as the thing sliced, for the built-in sequences.
+
+<strong>How do I take every nth item starting from the end?</strong>
+`a[::-n]` &mdash; the negative step both reverses and strides.
+
+<strong>Why is `a[1:3] = [1, 2, 3]` allowed?</strong> Because slice assignment
+replaces a section and may change the length. It is the mutating counterpart of
+the copying slice.
+
+<strong>Does slicing a list of objects copy the objects?</strong> No. The new
+list holds the same objects, which is the shallow-copy behaviour from elsewhere
+in the track.
+
+## Recap in one screen
+
+- Three numbers: start, stop, step; the stop is always excluded, exactly as in
+  `range`.
+- Negative indices count from the right, and can be mixed freely with positive
+  ones.
+- A negative step swaps the roles of start and stop, which is why `s[2:5:-1]`
+  is empty and `s[::-1]` reverses.
+- Slicing clamps rather than raising, which is convenient and occasionally
+  hides a wrong index.
+- A slice copies; assigning into a slice mutates, and can change the length.

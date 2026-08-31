@@ -2305,23 +2305,6 @@ for i, name in enumerate(names):
 
 says the same thing with neither problem.
 
-## What it actually produces
-
-`enumerate` yields tuples: `(0, "ana")`, `(1, "bo")`. The `for i, name` on the left is ordinary tuple unpacking, which is why the tuples are invisible in normal use. Loop without unpacking and you see them:
-
-for pair in enumerate(names):&nbsp;&nbsp;# (0, 'ana')
-
-`list(enumerate(x))` is the quickest way to see the whole thing at once.
-
-## start= renumbers the label
-
-for n, name in enumerate(names, start=1):
-
-This is for output humans read &mdash; line numbers, ranked lists, steps. It changes the number reported, not the position read: with `start=1`, the item labelled 1 is still `names[0]`. If you use `n` to index back into the list you will be off by one, which is a bug that only shows up on the first and last element.
-
-## It is lazy, and it takes any iterable
-
-`enumerate` does not build a list of pairs. It produces them one at a time as the loop asks, so it works on a file, a generator, or a sequence too large to hold in memory. It also works on strings, giving character positions.
 """,
     [{"q": "What does `enumerate(['a', 'b'])` yield?",
       "options": ["'a', 'b'", "0, 1", "(0, 'a') then (1, 'b')", "A dictionary"],
@@ -3698,25 +3681,6 @@ s[::-1]   # reversed
 
 `[::-1]` is the standard reverse idiom and worth memorising as one symbol rather than parsing each time. A negative step walks backwards, so start and stop swap roles &mdash; which is why `s[5:2:-1]` gives you something and `s[2:5:-1]` gives you nothing.
 
-## Slicing forgives, indexing does not
-
-
-```python
-s[2:99]   # fine, gives what exists
-s[99]     # IndexError
-```
-
-
-A slice clamps to the available range and returns what it can, including an empty result. That is convenient and occasionally hides a bug, because an empty slice looks like valid data rather than a mistake.
-
-## Slices copy, and assignment mutates
-
-A slice of a list is a new list, so changing it leaves the original alone. But assigning <em>into</em> a slice changes the original in place, and can change its length:
-
-nums[1:3] = ["a", "b", "c"]
-
-replaces two items with three. That is a genuine feature and a genuine surprise.
-
 ## Reversing three ways
 
 `data[::-1]` builds a new reversed list. `reversed(data)` returns a lazy iterator and copies nothing. `data.reverse()` reorders in place and returns `None` &mdash; the same trap as `.sort()`.
@@ -4364,9 +4328,6 @@ and summing across two levels is a single generator expression:
 
 sum(item["price"] for o in orders for item in o["items"])
 
-## Printing it
-
-Nested structures print as one dense line. `json.dumps(data, indent=2)` renders them readably and is the fastest way to see the shape of something you have just parsed. It only works for JSON-compatible types, which covers most data that arrived as JSON in the first place.
 """,
     [{"q": "`people[0]['langs'][1]` reads as:",
       "options": ["key, index, key", "index, key, index", "three indexes",
