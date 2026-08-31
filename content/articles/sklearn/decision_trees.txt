@@ -1,0 +1,238 @@
+title: Decision Trees: A Practical Guide
+intro: The only model in this track whose fitted form a person can read and check. That readability comes with an instability that explains why trees are almost always used in groups.
+
+## How it works
+
+A decision tree asks a series of yes/no questions about one feature at a time, and each answer sends the sample down a branch. At the bottom, a leaf holds a prediction: the majority class for a classifier, the mean target for a regressor.
+
+Fitting means choosing the questions. At each node the algorithm tries every feature and every threshold, scores how well each split separates the classes, and keeps the best. Then it repeats on each side, recursively, until a stopping rule fires.
+
+The scoring function is `criterion` &mdash; gini or entropy for classification, squared error for regression. It is the parameter people reach for first and the one that matters least: the editor above shows the three classification criteria within half a point of each other, which is typical. Depth and leaf size are the parameters that change the model.
+
+
+## The whole model, printed
+
+No other estimator can do this - the fitted model is a set of questions you can read.
+
+```python-run
+from sklearn.tree import DecisionTreeClassifier, export_text
+from sklearn.datasets import load_iris
+
+data = load_iris()
+tree = DecisionTreeClassifier(max_depth=2, random_state=0).fit(data.data,
+                                                               data.target)
+
+print(export_text(tree, feature_names=list(data.feature_names)))
+print("that is the entire model - a set of if/else questions")
+```
+
+## Which features it actually used
+
+feature_importances_ sums to 1, and features never split on get exactly zero.
+
+```python-run
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import load_iris
+
+data = load_iris()
+tree = DecisionTreeClassifier(max_depth=3, random_state=0).fit(data.data,
+                                                               data.target)
+
+for name, imp in sorted(zip(data.feature_names, tree.feature_importances_),
+                        key=lambda p: -p[1]):
+    print("%-22s %.4f" % (name, imp))
+print()
+print("sum:", round(tree.feature_importances_.sum(), 6))
+print("two of the four features are never used at all")
+```
+
+## The split criterion barely matters
+
+Which is worth knowing, because it is the parameter people reach for first and the one that changes least.
+
+```python-run
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import load_iris
+from sklearn.model_selection import cross_val_score
+
+X, y = load_iris(return_X_y=True)
+
+print("criterion   accuracy")
+for crit in ("gini", "entropy", "log_loss"):
+    s = cross_val_score(DecisionTreeClassifier(criterion=crit, random_state=0),
+                        X, y, cv=5).mean()
+    print("%-11s %.4f" % (crit, s))
+print()
+print("the split rule almost never matters. depth and leaf size do.")
+```
+
+## One tree is unstable
+
+Six resamples of the same data, six trees, and they do not agree.
+
+```python-run
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import make_classification
+import numpy as np
+
+X, y = make_classification(n_samples=200, n_features=8, n_informative=4,
+                           n_redundant=2, random_state=0)
+rng = np.random.RandomState(0)
+
+firsts, preds = [], []
+for _ in range(6):
+    idx = rng.choice(len(X), len(X), replace=True)      # a bootstrap sample
+    t = DecisionTreeClassifier(random_state=0).fit(X[idx], y[idx])
+    firsts.append(int(t.tree_.feature[0]))
+    preds.append(t.predict(X[:40]))
+
+print("feature chosen for the first split, six resamples:", firsts)
+disagree = sum(len(set(col)) > 1 for col in zip(*preds))
+print("of 40 rows, predictions disagree on:", disagree)
+print()
+print("resampling the same data changes the tree's structure and")
+print("its answers. That instability is what a forest averages away.")
+```
+
+## It cannot extrapolate
+
+A perfectly straight line, and a tree asked about values past the end of the training range.
+
+```python-run
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.linear_model import LinearRegression
+import numpy as np
+
+x = np.arange(0, 20).reshape(-1, 1).astype(float)
+y = 3.0 * x.ravel()                    # a perfectly straight line
+
+tree = DecisionTreeRegressor(max_depth=3, random_state=0).fit(x, y)
+lin = LinearRegression().fit(x, y)
+
+future = np.array([[25.0], [30.0]])
+print("truth at x=25, 30 :", [75.0, 90.0])
+print("linear model      :", lin.predict(future).round(1).tolist())
+print("decision tree     :", tree.predict(future).round(1).tolist())
+print()
+print("a tree predicts the average of a training leaf, so it cannot")
+print("extrapolate beyond the range it was shown.")
+```
+
+## Units are irrelevant to it
+
+One column multiplied by a million, and the cross-validated score does not move at all.
+
+```python-run
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import cross_val_score
+
+X, y = make_classification(n_samples=300, n_features=8, n_informative=3,
+                           random_state=0)
+
+base = cross_val_score(DecisionTreeClassifier(random_state=0), X, y, cv=5).mean()
+
+X2 = X.copy()
+X2[:, 0] *= 1_000_000
+scaled = cross_val_score(DecisionTreeClassifier(random_state=0), X2, y, cv=5).mean()
+
+print("original            :", round(base, 4))
+print("one column x1000000 :", round(scaled, 4))
+print()
+print("splits are thresholds on one column, so any monotonic change")
+print("of units leaves the tree identical.")
+```
+## What makes trees attractive
+
+**They are readable.** `export_text` prints the entire model, and for a shallow tree that output is something a domain expert can check line by line. No other model in this track offers that. When somebody has to justify a decision &mdash; a loan refusal, a clinical flag &mdash; being able to point at the path a case took is worth a great deal.
+
+**They need no preparation.** No scaling, because a split is a threshold on one column and units cannot affect which threshold is best. The last editor multiplies a column by a million and the cross-validated score does not move by a thousandth. No distributional assumptions, and outliers affect only the leaf they land in.
+
+**They find structure without being told.** Interactions between features come for free, because a split lower in the tree is conditioned on every split above it. Non-linear boundaries come for free, because a staircase of thresholds approximates any shape. A linear model needs to be handed `x1 * x2` and `x**2` explicitly; a tree discovers both.
+
+**They handle mixed data.** Numeric and categorical features side by side, no common scale needed.
+
+## What makes one tree a poor final answer
+
+**Left alone, it memorises.** The default stopping rule is to keep splitting until every leaf is pure, which on any dataset with noise means one leaf per training row. Training accuracy 1.0, and a lookup table. Every tree needs constraining, which is what `max_depth`, `min_samples_leaf` and `ccp_alpha` are for.
+
+**It is unstable.** This is the deeper problem. The fourth editor takes six bootstrap resamples of the same data, fits a tree to each, and finds them disagreeing on 18 of 40 predictions &mdash; with the first split falling on a different feature in one of the six.
+
+The cause is the greedy fitting. The best split is chosen at each node without regard to what comes below, and when two candidate splits score nearly the same, a handful of resampled rows decides between them. That choice then determines everything underneath, so a small change at the top rewrites the whole tree.
+
+The consequence is that a single tree's structure should not be over-interpreted. "The model says petal width is the key variable" is a statement about one fit on one sample, and a different sample might have said something else.
+
+**It cannot extrapolate.** A leaf predicts an average of training values, so beyond the range of the training data a tree returns a constant. The fifth editor fits a perfect straight line and asks for values past the end: the linear model gives 75 and 90, correctly, and the tree gives 54 for both. For anything with a trend &mdash; time, growth, prices &mdash; this is disqualifying on its own.
+
+**Axis-aligned splits.** Each split is on one feature, so a diagonal boundary has to be approximated by a staircase. Trees handle it, inefficiently, and a linear model handles a diagonal exactly.
+
+## Feature importances, and their bias
+
+`feature_importances_` reports how much each feature reduced the impurity across all the splits it appears in, normalised to sum to 1. Features never split on get exactly zero, which is a genuinely useful signal &mdash; the editor above shows two of iris's four features unused.
+
+Three cautions before trusting the numbers.
+
+**Correlated features split the credit arbitrarily.** If two columns carry the same information, whichever is chosen first takes the importance and the other looks worthless. Neither is, and the split between them is not stable.
+
+**High-cardinality features are favoured.** A column with many distinct values offers more candidate thresholds and so more chances to look good on the training data. This is the impurity-based measure's known bias, and it inflates the apparent importance of ids and continuous variables relative to binary ones.
+
+**It is measured on the training data.** A feature that helped fit noise still scores.
+
+`permutation_importance` avoids all three by measuring the drop in test-set score when a column is shuffled. It costs more and answers the question people actually mean.
+
+## Constraining it
+
+Four parameters, of which the middle two are usually the most useful.
+
+`max_depth` caps the number of questions. Simple, blunt, and the first thing to try.
+
+`min_samples_leaf` refuses to create a leaf with fewer than n samples. This is often better than depth, because it responds to the density of the data rather than imposing a fixed count &mdash; a tree can stay deep where there is data to support it.
+
+`min_samples_split` is the related control on splitting rather than on the resulting leaves.
+
+`ccp_alpha` grows the tree fully and then prunes back branches whose contribution does not justify their complexity. It is the most principled of the four, and the overfitting module found it giving the best test score of three constraints tried.
+
+The right values are found by cross-validation, not chosen. The overfitting module also showed that a constraint can make things worse: `min_samples_leaf=20` lowered the test score on data where `max_depth=3` raised it.
+
+## Where a single tree belongs
+
+Rarely as the final model. A random forest or a gradient booster beats it on almost any dataset, and the next modules cover both.
+
+It belongs when the model has to be explained &mdash; a shallow tree is a flowchart somebody can audit, and that is occasionally the requirement. It belongs as a fast baseline that tells you whether the problem has non-linear structure. And it belongs as the thing to understand first, because forests and boosting are both built out of trees, and their parameters are largely tree parameters.
+
+## Categorical features, and the one that is missing
+
+scikit-learn's `DecisionTreeClassifier` cannot take a string column. It requires numbers, which means categorical features have to be encoded before they reach it &mdash; and the choice of encoding interacts badly with how trees split.
+
+One-hot encoding a category with twenty values gives the tree twenty binary columns, and a split on a binary column separates one category from the other nineteen. Isolating a group of three categories then takes three levels of depth, which the depth budget has to pay for. The tree can express it; it is just expensive.
+
+Ordinal encoding gives one column and lets a single threshold separate a contiguous run of categories &mdash; but the run is contiguous in whatever arbitrary order the encoder chose, so the groups it can form cheaply are the wrong groups.
+
+Neither is the native answer, which is to consider arbitrary subsets of categories at each split. `HistGradientBoostingClassifier` supports that through `categorical_features`, and it is a genuine reason to prefer it on data with many categories. LightGBM and CatBoost handle it too, and it is one of the things they are known for.
+
+For a plain tree with a handful of categories, one-hot and enough depth is fine. For a high-cardinality column, it is a real limitation rather than a detail.
+
+## Reading the structure programmatically
+
+Beyond `export_text`, the fitted tree exposes its structure through `tree_`, and a few attributes answer useful questions directly.
+
+`tree_.node_count` and `get_n_leaves()` say how large the model is. A leaf count approaching the number of training rows is the clearest signal of memorisation available, and it costs one call.
+
+`tree_.feature` and `tree_.threshold` are arrays giving, per node, which feature was split on and at what value &mdash; which is how the instability demonstration above read the first split without parsing text.
+
+`get_depth()` says how deep it actually grew, which is often less than `max_depth` when another constraint bound first.
+
+`decision_path(X)` returns which nodes each sample passed through, which is the basis of any per-prediction explanation: for a given row, the path is the reason.
+
+These matter because they turn "the tree looks complicated" into numbers. A tree with 300 leaves on 400 training rows does not need a diagnosis; the leaf count is the diagnosis.
+
+## Things to try
+
+1. <strong>Read the model.</strong> The first editor prints the whole thing. Raise the depth to 4 and watch it stop being readable.
+2. <strong>Watch the instability.</strong> In the fourth editor, change `random_state` on the resampler and see how much the six trees disagree this time.
+3. <strong>Confirm the flat line.</strong> In the fifth editor, ask for x=100. The tree still says 54.
+4. <strong>Compare the importances.</strong> Fit at depth 1 and at depth 5 and see how the numbers redistribute.
+
+## Where this leaves you
+
+A model you can read, that needs no preparation, that finds interactions on its own, that memorises unless constrained, that changes when you resample, and that cannot see past the edge of its training data. The next two modules address the instability by using many of them at once.

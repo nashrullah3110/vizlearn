@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Decision Trees | VizLearn</title>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-ZT6JM33V5J');
+    </script>
+    <!-- The font stylesheet is render-blocking and lives on another origin, so
+         the browser cannot paint until it has done DNS, TCP and TLS for two
+         hosts it has not met. Warming both connections while the HTML is still
+         parsing takes that off the critical path. gstatic serves the font
+         files themselves and is fetched anonymously, hence crossorigin. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'light';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+                .py-note {
+            border-left: 2px solid var(--border-subtle);
+            padding-left: 0.9rem;
+            line-height: 1.7;
+        }
+        .py-note code { color: var(--accent-primary); }
+        .vz-pt-lead { margin-top: 0.5rem; max-width: 60ch; color: var(--text-muted); }
+
+        /* A step is numbered so the sequence reads as a sequence rather than
+           as six unrelated demos. */
+        .vz-step-head { display: flex; align-items: baseline; gap: 0.6rem; }
+        .vz-step-n {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+            font-weight: 700; color: var(--accent-primary);
+            border: 1px solid var(--border-subtle); border-radius: 5px;
+            padding: 0.1rem 0.4rem; flex: none;
+        }
+        .vz-step-blurb {
+            margin: 0.55rem 0 0.9rem; line-height: 1.7;
+            color: var(--text-muted); max-width: 68ch;
+        }
+        .vz-step-blurb code {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.85em;
+            color: var(--accent-primary);
+        }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen light-mode">
+<!-- Light is the default, so it ships on the tag: the theme script runs at the
+     bottom of the body, and waiting for it would flash dark on every load.
+     This removes the class before any content is parsed for readers who chose
+     dark, so neither theme flashes the other. -->
+<script>if(localStorage.getItem("theme")==="dark")document.body.classList.remove("light-mode");</script>
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-3 md:gap-4">
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <svg class="vz-icon text-sm" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/></svg>
+                    <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)" aria-label="Back to Home">
+                        <svg class="vz-icon text-xs" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.2 288 416 288c17.7 0 32-14.3 32-32s-14.3-32-32-32l-306.7 0L214.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <svg class="vz-icon hidden dark-icon" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M361.5 1.2c5 2.1 8.6 6.6 9.6 11.9L391 121l107.9 19.8c5.3 1 9.8 4.6 11.9 9.6s1.5 10.7-1.6 15.2L446.9 256l62.3 90.3c3.1 4.5 3.7 10.2 1.6 15.2s-6.6 8.6-11.9 9.6L391 391 371.1 498.9c-1 5.3-4.6 9.8-9.6 11.9s-10.7 1.5-15.2-1.6L256 446.9l-90.3 62.3c-4.5 3.1-10.2 3.7-15.2 1.6s-8.6-6.6-9.6-11.9L121 391 13.1 371.1c-5.3-1-9.8-4.6-11.9-9.6s-1.5-10.7 1.6-15.2L65.1 256 2.8 165.7c-3.1-4.5-3.7-10.2-1.6-15.2s6.6-8.6 11.9-9.6L121 121 140.9 13.1c1-5.3 4.6-9.8 9.6-11.9s10.7-1.5 15.2 1.6L256 65.1 346.3 2.8c4.5-3.1 10.2-3.7 15.2-1.6zM160 256a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zm224 0a128 128 0 1 0 -256 0 128 128 0 1 0 256 0z"/></svg>
+                        <svg class="vz-icon hidden light-icon" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M223.5 32C100 32 0 132.3 0 256S100 480 223.5 480c60.6 0 115.5-24.2 155.8-63.4c5-4.9 6.3-12.5 3.1-18.7s-10.1-9.7-17-8.5c-9.8 1.7-19.8 2.6-30.1 2.6c-96.9 0-175.5-78.8-175.5-176c0-65.8 36-123.1 89.3-153.3c6.1-3.5 9.2-10.5 7.7-17.3s-7.3-11.9-14.3-12.5c-6.3-.5-12.6-.8-19-.8z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+        <div class="mb-8 animate-fade-in">
+            <nav class="flex flex-wrap items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)" aria-label="Breadcrumb"><a href="../index.html" class="hover:text-green-400 transition-colors">Home</a><span aria-hidden="true">/</span><a href="../sklearn/" class="hover:text-green-400 transition-colors">scikit-learn</a><span aria-hidden="true">/</span><span aria-current="page">Models</span></nav>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Decision Trees</h1>
+            <p class="vz-pt-lead">The one model you can read end to end - and the one whose answer changes when you resample the data.</p>
+        </div>
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
+                <div class="card-container">
+                    <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
+                    <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
+                        <div class="py-note">A tree is a sequence of yes/no questions on one feature at a time; <code class='mono-font'>export_text</code> prints the whole model.</div>
+                        <div class="py-note">It needs <strong>no scaling</strong> and handles mixed feature ranges, because a split is a threshold on a single column.</div>
+                        <div class="py-note">It captures interactions and non-linearity without being told to look for them, which is why trees dominate on tabular data.</div>
+                        <div class="py-note">Left unconstrained it grows until every leaf is pure - a training score of 1.0 and a lookup table.</div>
+                        <div class="py-note">It is <strong>unstable</strong>: resampling the data changes the structure, which is exactly what ensembles average away.</div>
+                        <div class="py-note">It cannot extrapolate - predictions outside the training range are the nearest leaf's average, flat forever.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <!-- auto-article-vizlearn -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full" data-vz-prose>
+        <div class="card-container animate-fade-in">
+<!-- VIZLEARN:ARTICLE:BEGIN (generated by tools/build_articles.py) -->
+            <div class="card-header">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Decision Trees: A Practical Guide</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">The only model in this track whose fitted form a person can read and check. That readability comes with an instability that explains why trees are almost always used in groups.</p>
+            </div>
+            <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <div>
+                    <h3>How it works</h3>
+                    <p>A decision tree asks a series of yes/no questions about one feature at a time, and each answer sends the sample down a branch. At the bottom, a leaf holds a prediction: the majority class for a classifier, the mean target for a regressor.</p><p>Fitting means choosing the questions. At each node the algorithm tries every feature and every threshold, scores how well each split separates the classes, and keeps the best. Then it repeats on each side, recursively, until a stopping rule fires.</p><p>The scoring function is <code>criterion</code> &mdash; gini or entropy for classification, squared error for regression. It is the parameter people reach for first and the one that matters least: the editor above shows the three classification criteria within half a point of each other, which is typical. Depth and leaf size are the parameters that change the model.</p>
+                </div>
+                <div>
+                    <h3>The whole model, printed</h3>
+                    <p>No other estimator can do this - the fitted model is a set of questions you can read.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.tree import DecisionTreeClassifier, export_text
+from sklearn.datasets import load_iris
+
+data = load_iris()
+tree = DecisionTreeClassifier(max_depth=2, random_state=0).fit(data.data,
+                                                               data.target)
+
+print(export_text(tree, feature_names=list(data.feature_names)))
+print("that is the entire model - a set of if/else questions")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Which features it actually used</h3>
+                    <p>feature_importances_ sums to 1, and features never split on get exactly zero.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import load_iris
+
+data = load_iris()
+tree = DecisionTreeClassifier(max_depth=3, random_state=0).fit(data.data,
+                                                               data.target)
+
+for name, imp in sorted(zip(data.feature_names, tree.feature_importances_),
+                        key=lambda p: -p[1]):
+    print("%-22s %.4f" % (name, imp))
+print()
+print("sum:", round(tree.feature_importances_.sum(), 6))
+print("two of the four features are never used at all")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>The split criterion barely matters</h3>
+                    <p>Which is worth knowing, because it is the parameter people reach for first and the one that changes least.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import load_iris
+from sklearn.model_selection import cross_val_score
+
+X, y = load_iris(return_X_y=True)
+
+print("criterion   accuracy")
+for crit in ("gini", "entropy", "log_loss"):
+    s = cross_val_score(DecisionTreeClassifier(criterion=crit, random_state=0),
+                        X, y, cv=5).mean()
+    print("%-11s %.4f" % (crit, s))
+print()
+print("the split rule almost never matters. depth and leaf size do.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>One tree is unstable</h3>
+                    <p>Six resamples of the same data, six trees, and they do not agree.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import make_classification
+import numpy as np
+
+X, y = make_classification(n_samples=200, n_features=8, n_informative=4,
+                           n_redundant=2, random_state=0)
+rng = np.random.RandomState(0)
+
+firsts, preds = [], []
+for _ in range(6):
+    idx = rng.choice(len(X), len(X), replace=True)      # a bootstrap sample
+    t = DecisionTreeClassifier(random_state=0).fit(X[idx], y[idx])
+    firsts.append(int(t.tree_.feature[0]))
+    preds.append(t.predict(X[:40]))
+
+print("feature chosen for the first split, six resamples:", firsts)
+disagree = sum(len(set(col)) > 1 for col in zip(*preds))
+print("of 40 rows, predictions disagree on:", disagree)
+print()
+print("resampling the same data changes the tree's structure and")
+print("its answers. That instability is what a forest averages away.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>It cannot extrapolate</h3>
+                    <p>A perfectly straight line, and a tree asked about values past the end of the training range.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.tree import DecisionTreeRegressor
+from sklearn.linear_model import LinearRegression
+import numpy as np
+
+x = np.arange(0, 20).reshape(-1, 1).astype(float)
+y = 3.0 * x.ravel()                    # a perfectly straight line
+
+tree = DecisionTreeRegressor(max_depth=3, random_state=0).fit(x, y)
+lin = LinearRegression().fit(x, y)
+
+future = np.array([[25.0], [30.0]])
+print("truth at x=25, 30 :", [75.0, 90.0])
+print("linear model      :", lin.predict(future).round(1).tolist())
+print("decision tree     :", tree.predict(future).round(1).tolist())
+print()
+print("a tree predicts the average of a training leaf, so it cannot")
+print("extrapolate beyond the range it was shown.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Units are irrelevant to it</h3>
+                    <p>One column multiplied by a million, and the cross-validated score does not move at all.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import cross_val_score
+
+X, y = make_classification(n_samples=300, n_features=8, n_informative=3,
+                           random_state=0)
+
+base = cross_val_score(DecisionTreeClassifier(random_state=0), X, y, cv=5).mean()
+
+X2 = X.copy()
+X2[:, 0] *= 1_000_000
+scaled = cross_val_score(DecisionTreeClassifier(random_state=0), X2, y, cv=5).mean()
+
+print("original            :", round(base, 4))
+print("one column x1000000 :", round(scaled, 4))
+print()
+print("splits are thresholds on one column, so any monotonic change")
+print("of units leaves the tree identical.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>What makes trees attractive</h3>
+                    <p><strong>They are readable.</strong> <code>export_text</code> prints the entire model, and for a shallow tree that output is something a domain expert can check line by line. No other model in this track offers that. When somebody has to justify a decision &mdash; a loan refusal, a clinical flag &mdash; being able to point at the path a case took is worth a great deal.</p><p><strong>They need no preparation.</strong> No scaling, because a split is a threshold on one column and units cannot affect which threshold is best. The last editor multiplies a column by a million and the cross-validated score does not move by a thousandth. No distributional assumptions, and outliers affect only the leaf they land in.</p><p><strong>They find structure without being told.</strong> Interactions between features come for free, because a split lower in the tree is conditioned on every split above it. Non-linear boundaries come for free, because a staircase of thresholds approximates any shape. A linear model needs to be handed <code>x1 * x2</code> and <code>x**2</code> explicitly; a tree discovers both.</p><p><strong>They handle mixed data.</strong> Numeric and categorical features side by side, no common scale needed.</p>
+                </div>
+                <div>
+                    <h3>What makes one tree a poor final answer</h3>
+                    <p><strong>Left alone, it memorises.</strong> The default stopping rule is to keep splitting until every leaf is pure, which on any dataset with noise means one leaf per training row. Training accuracy 1.0, and a lookup table. Every tree needs constraining, which is what <code>max_depth</code>, <code>min_samples_leaf</code> and <code>ccp_alpha</code> are for.</p><p><strong>It is unstable.</strong> This is the deeper problem. The fourth editor takes six bootstrap resamples of the same data, fits a tree to each, and finds them disagreeing on 18 of 40 predictions &mdash; with the first split falling on a different feature in one of the six.</p><p>The cause is the greedy fitting. The best split is chosen at each node without regard to what comes below, and when two candidate splits score nearly the same, a handful of resampled rows decides between them. That choice then determines everything underneath, so a small change at the top rewrites the whole tree.</p><p>The consequence is that a single tree's structure should not be over-interpreted. "The model says petal width is the key variable" is a statement about one fit on one sample, and a different sample might have said something else.</p><p><strong>It cannot extrapolate.</strong> A leaf predicts an average of training values, so beyond the range of the training data a tree returns a constant. The fifth editor fits a perfect straight line and asks for values past the end: the linear model gives 75 and 90, correctly, and the tree gives 54 for both. For anything with a trend &mdash; time, growth, prices &mdash; this is disqualifying on its own.</p><p><strong>Axis-aligned splits.</strong> Each split is on one feature, so a diagonal boundary has to be approximated by a staircase. Trees handle it, inefficiently, and a linear model handles a diagonal exactly.</p>
+                </div>
+                <div>
+                    <h3>Feature importances, and their bias</h3>
+                    <p><code>feature_importances_</code> reports how much each feature reduced the impurity across all the splits it appears in, normalised to sum to 1. Features never split on get exactly zero, which is a genuinely useful signal &mdash; the editor above shows two of iris's four features unused.</p><p>Three cautions before trusting the numbers.</p><p><strong>Correlated features split the credit arbitrarily.</strong> If two columns carry the same information, whichever is chosen first takes the importance and the other looks worthless. Neither is, and the split between them is not stable.</p><p><strong>High-cardinality features are favoured.</strong> A column with many distinct values offers more candidate thresholds and so more chances to look good on the training data. This is the impurity-based measure's known bias, and it inflates the apparent importance of ids and continuous variables relative to binary ones.</p><p><strong>It is measured on the training data.</strong> A feature that helped fit noise still scores.</p><p><code>permutation_importance</code> avoids all three by measuring the drop in test-set score when a column is shuffled. It costs more and answers the question people actually mean.</p>
+                </div>
+                <div>
+                    <h3>Constraining it</h3>
+                    <p>Four parameters, of which the middle two are usually the most useful.</p><p><code>max_depth</code> caps the number of questions. Simple, blunt, and the first thing to try.</p><p><code>min_samples_leaf</code> refuses to create a leaf with fewer than n samples. This is often better than depth, because it responds to the density of the data rather than imposing a fixed count &mdash; a tree can stay deep where there is data to support it.</p><p><code>min_samples_split</code> is the related control on splitting rather than on the resulting leaves.</p><p><code>ccp_alpha</code> grows the tree fully and then prunes back branches whose contribution does not justify their complexity. It is the most principled of the four, and the overfitting module found it giving the best test score of three constraints tried.</p><p>The right values are found by cross-validation, not chosen. The overfitting module also showed that a constraint can make things worse: <code>min_samples_leaf=20</code> lowered the test score on data where <code>max_depth=3</code> raised it.</p>
+                </div>
+                <div>
+                    <h3>Where a single tree belongs</h3>
+                    <p>Rarely as the final model. A random forest or a gradient booster beats it on almost any dataset, and the next modules cover both.</p><p>It belongs when the model has to be explained &mdash; a shallow tree is a flowchart somebody can audit, and that is occasionally the requirement. It belongs as a fast baseline that tells you whether the problem has non-linear structure. And it belongs as the thing to understand first, because forests and boosting are both built out of trees, and their parameters are largely tree parameters.</p>
+                </div>
+                <div>
+                    <h3>Categorical features, and the one that is missing</h3>
+                    <p>scikit-learn's <code>DecisionTreeClassifier</code> cannot take a string column. It requires numbers, which means categorical features have to be encoded before they reach it &mdash; and the choice of encoding interacts badly with how trees split.</p><p>One-hot encoding a category with twenty values gives the tree twenty binary columns, and a split on a binary column separates one category from the other nineteen. Isolating a group of three categories then takes three levels of depth, which the depth budget has to pay for. The tree can express it; it is just expensive.</p><p>Ordinal encoding gives one column and lets a single threshold separate a contiguous run of categories &mdash; but the run is contiguous in whatever arbitrary order the encoder chose, so the groups it can form cheaply are the wrong groups.</p><p>Neither is the native answer, which is to consider arbitrary subsets of categories at each split. <code>HistGradientBoostingClassifier</code> supports that through <code>categorical_features</code>, and it is a genuine reason to prefer it on data with many categories. LightGBM and CatBoost handle it too, and it is one of the things they are known for.</p><p>For a plain tree with a handful of categories, one-hot and enough depth is fine. For a high-cardinality column, it is a real limitation rather than a detail.</p>
+                </div>
+                <div>
+                    <h3>Reading the structure programmatically</h3>
+                    <p>Beyond <code>export_text</code>, the fitted tree exposes its structure through <code>tree_</code>, and a few attributes answer useful questions directly.</p><p><code>tree_.node_count</code> and <code>get_n_leaves()</code> say how large the model is. A leaf count approaching the number of training rows is the clearest signal of memorisation available, and it costs one call.</p><p><code>tree_.feature</code> and <code>tree_.threshold</code> are arrays giving, per node, which feature was split on and at what value &mdash; which is how the instability demonstration above read the first split without parsing text.</p><p><code>get_depth()</code> says how deep it actually grew, which is often less than <code>max_depth</code> when another constraint bound first.</p><p><code>decision_path(X)</code> returns which nodes each sample passed through, which is the basis of any per-prediction explanation: for a given row, the path is the reason.</p><p>These matter because they turn "the tree looks complicated" into numbers. A tree with 300 leaves on 400 training rows does not need a diagnosis; the leaf count is the diagnosis.</p>
+                </div>
+                <div>
+                    <h3>Things to try</h3>
+                    <ol><li><strong>Read the model.</strong> The first editor prints the whole thing. Raise the depth to 4 and watch it stop being readable.</li><li><strong>Watch the instability.</strong> In the fourth editor, change <code>random_state</code> on the resampler and see how much the six trees disagree this time.</li><li><strong>Confirm the flat line.</strong> In the fifth editor, ask for x=100. The tree still says 54.</li><li><strong>Compare the importances.</strong> Fit at depth 1 and at depth 5 and see how the numbers redistribute.</li></ol>
+                </div>
+                <div>
+                    <h3>Where this leaves you</h3>
+                    <p>A model you can read, that needs no preparation, that finds interactions on its own, that memorises unless constrained, that changes when you resample, and that cannot see past the edge of its training data. The next two modules address the instability by using many of them at once.</p>
+                </div>
+            </div>
+<!-- VIZLEARN:ARTICLE:END -->
+        </div>
+    </section>
+
+    <script>
+        (function () {
+            var btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            var sun = btn.querySelector('.dark-icon');
+            var moon = btn.querySelector('.light-icon');
+
+            function paint(theme) {
+                if (theme === 'light') {
+                    document.body.classList.add('light-mode');
+                    moon.classList.remove('hidden');
+                    sun.classList.add('hidden');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    sun.classList.remove('hidden');
+                    moon.classList.add('hidden');
+                }
+            }
+
+            paint(localStorage.getItem('theme') || 'light');
+
+            btn.addEventListener('click', function () {
+                var next = document.body.classList.contains('light-mode') ? 'dark' : 'light';
+                localStorage.setItem('theme', next);
+                paint(next);
+            });
+        })();
+    </script>
+
+</body>
+</html>
