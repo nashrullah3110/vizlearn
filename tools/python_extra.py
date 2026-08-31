@@ -5075,6 +5075,13 @@ iterator and the first loop consumed it. Build a list if you need it twice.
 <strong>Does `zip` copy the data?</strong> No. It holds references and produces
 tuples on demand, so it works on generators and infinite sequences.
 
+<strong>Is `zip` the same as a database join?</strong> No, and the difference
+matters. A join matches rows by a key; `zip` matches them by position, and has
+no idea whether the things it paired belong together.
+
+<strong>Can I zip strings?</strong> Yes. A string is iterable, so
+`zip("abc", "xyz")` pairs the characters.
+
 ## Recap in one screen
 
 - `zip` walks several iterables in step and yields one tuple per position,
@@ -5273,6 +5280,14 @@ output.
 <strong>Can I have an `else` without an `if` filter?</strong> Only in the value
 slot, as part of a conditional expression. The trailing filter has no `else`.
 
+<strong>Can a comprehension call a function with side effects?</strong> It
+can, and it should not. A comprehension whose result is discarded is a loop
+written to look like an expression.
+
+<strong>Do comprehensions work in older Python?</strong> List comprehensions
+since 2.0, dict and set comprehensions since 2.7 and 3.0. Anything current
+supports all of them.
+
 ## Recap in one screen
 
 - The brackets choose the type: `[]` list, `{}` set, `{k: v}` dict, `()`
@@ -5453,6 +5468,10 @@ which is what you want.
 <strong>Is pickling and unpickling a valid deep copy?</strong> It usually
 produces one, and it is slower and fails on anything unpicklable. Use
 `deepcopy`, which is what it is for.
+
+<strong>Why does copying a nested list "sometimes" work?</strong> Because it
+works whenever nothing reaches past the top level afterwards. The copy was
+always shallow; the code simply had not yet touched the shared part.
 
 ## Recap in one screen
 
