@@ -2077,3 +2077,289 @@ The two failure modes need opposite treatments, which is why guessing between th
          "why": "Cross-validation estimates how a procedure performs. Once you accept the procedure, refit it once on everything - the k models are thrown away."},
     ],
 )
+
+
+# ---------------------------------------------------------------------------
+# 8. Classification metrics
+# ---------------------------------------------------------------------------
+topic(
+    "classification_metrics",
+    "Classification Metrics",
+    "Classification",
+    "Why accuracy is the wrong number more often than it is the right one, and "
+    "what to report instead.",
+    _svg(_box(14, 20, 60, 24, S, A) + _txt(44, 35, "precision", A, 8) +
+         _box(86, 20, 60, 24, S, A) + _txt(116, 35, "recall", A, 8) +
+         _box(14, 52, 132, 24, S, M) + _txt(80, 67, "accuracy: often useless", M, 8)),
+    [
+        ("The 98% model that predicts nothing",
+         "A classifier that never says yes, on data where yes is rare - and the "
+         "accuracy it reports.",
+         '''from sklearn.dummy import DummyClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+
+# 99 rows of one class for every 1 of the other.
+X, y = make_classification(n_samples=2000, n_features=10, weights=[0.99],
+                           random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+
+print("positives in the test set:", int(y_te.sum()), "of", len(y_te))
+print()
+lazy = DummyClassifier(strategy="most_frequent").fit(X_tr, y_tr)
+print("always predict the majority:",
+      round(accuracy_score(y_te, lazy.predict(X_te)), 4))
+print("it never predicts a positive:", int(lazy.predict(X_te).sum()))
+'''),
+
+        ("Precision and recall, from their definitions",
+         "Two fractions with the same numerator and different denominators, "
+         "which is the whole difference between them.",
+         '''from sklearn.metrics import precision_score, recall_score, f1_score
+import numpy as np
+
+# 10 actual positives; the model finds 6 of them and raises 2 false alarms.
+y_true = np.array([1]*10 + [0]*90)
+y_pred = np.zeros(100, dtype=int)
+y_pred[:6] = 1          # 6 true positives
+y_pred[10:12] = 1       # 2 false positives
+
+tp = int(((y_true == 1) & (y_pred == 1)).sum())
+fp = int(((y_true == 0) & (y_pred == 1)).sum())
+fn = int(((y_true == 1) & (y_pred == 0)).sum())
+print("true positives %d, false positives %d, false negatives %d" % (tp, fp, fn))
+print()
+print("precision = tp/(tp+fp) = %d/%d = %.3f"
+      % (tp, tp + fp, precision_score(y_true, y_pred)))
+print("recall    = tp/(tp+fn) = %d/%d = %.3f"
+      % (tp, tp + fn, recall_score(y_true, y_pred)))
+print("f1        = harmonic mean       = %.3f" % f1_score(y_true, y_pred))
+'''),
+
+        ("You can have either, at the other's expense",
+         "Two models on the same data: one flags almost nothing, the other "
+         "flags almost everything.",
+         '''from sklearn.metrics import precision_score, recall_score
+import numpy as np
+
+y_true = np.array([1]*10 + [0]*90)
+
+cautious = np.zeros(100, dtype=int)
+cautious[:3] = 1                       # flags 3, all correct
+
+eager = np.zeros(100, dtype=int)
+eager[:40] = 1                         # flags 40, catching all 10
+
+for label, pred in [("flags 3 cases", cautious), ("flags 40 cases", eager)]:
+    print("%-16s precision %.3f   recall %.3f"
+          % (label, precision_score(y_true, pred), recall_score(y_true, pred)))
+print()
+print("you can have either one at the expense of the other;")
+print("which you want is a question about the cost of each mistake.")
+'''),
+
+        ("classification_report, the one to print",
+         "Per-class precision, recall, f1 and support in a single call.",
+         '''from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+
+X, y = make_classification(n_samples=2000, n_features=10, weights=[0.95],
+                           random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+
+model = LogisticRegression(max_iter=1000).fit(X_tr, y_tr)
+print(classification_report(y_te, model.predict(X_te), digits=3))
+'''),
+
+        ("With three classes, the averaging matters",
+         "The rare class is never predicted correctly. Two of these three "
+         "averages hide that completely.",
+         '''from sklearn.metrics import f1_score
+import numpy as np
+
+# three classes, very different sizes
+y_true = np.array([0]*90 + [1]*8 + [2]*2)
+y_pred = np.array([0]*90 + [1]*6 + [0]*2 + [0]*2)
+
+for how in ("macro", "weighted", "micro"):
+    print("%-9s %.3f" % (how, f1_score(y_true, y_pred, average=how,
+                                       zero_division=0)))
+print()
+print("the rare class is predicted correctly zero times.")
+print("only the macro average makes that visible.")
+'''),
+
+        ("balanced_accuracy, when you want one number",
+         "The average recall across classes, which the lazy model cannot game.",
+         '''from sklearn.metrics import balanced_accuracy_score, accuracy_score
+import numpy as np
+
+y_true = np.array([1]*10 + [0]*990)
+majority = np.zeros(1000, dtype=int)
+
+print("accuracy of always-say-no          :",
+      round(accuracy_score(y_true, majority), 4))
+print("balanced accuracy of the same thing:",
+      round(balanced_accuracy_score(y_true, majority), 4))
+print()
+print("balanced accuracy averages the recall of each class,")
+print("so ignoring a class entirely scores 0.5 rather than 0.99.")
+'''),
+    ],
+    [
+        "<strong>Accuracy</strong> is the fraction predicted correctly, and it "
+        "is meaningless when one class dominates.",
+        "<strong>Precision</strong> is how many of the flagged cases were real; "
+        "<strong>recall</strong> is how many of the real cases were flagged.",
+        "<strong>F1</strong> is their harmonic mean - a single number that "
+        "punishes a low value on either side.",
+        "Always print <code class='mono-font'>classification_report</code>: the "
+        "per-class rows are where an ignored class shows up.",
+        "For several classes, <strong>macro</strong> averaging treats every "
+        "class equally and <strong>weighted</strong> lets the big ones dominate.",
+        "<code class='mono-font'>DummyClassifier</code> tells you what the "
+        "metric scores for doing nothing - always the first comparison.",
+    ],
+    """title: Classification Metrics: A Practical Guide
+intro: A model can be 99% accurate and completely useless. Which metric you report is a statement about which mistakes you are willing to make.
+
+## Why accuracy misleads
+
+Accuracy is the proportion of predictions that were correct, and it is the default that `score()` returns. On balanced data it is a reasonable summary. On imbalanced data it is close to worthless.
+
+The editor above makes the case in five lines. With 99 negatives for every positive, a `DummyClassifier` that always predicts the majority scores **0.9867** and never predicts a single positive. It has learned nothing, it would be useless for any purpose, and it beats plenty of real models on the metric.
+
+That situation is not exotic. Fraud, disease screening, equipment failure, click-through, churn, defect detection &mdash; the interesting class is rare in nearly every problem worth solving, and rarity is precisely what breaks accuracy. The rarer the thing you care about, the higher the score for ignoring it.
+
+So the first thing to do with any classification problem is count the classes, and the second is fit a dummy. If the dummy's score is close to the model's, the model has added nothing regardless of how high the number looks.
+
+## Precision and recall
+
+Both are fractions of the same numerator &mdash; the true positives, the cases you flagged that really were positive &mdash; and they differ in what they divide by.
+
+**Precision** divides by everything you flagged. It answers: *when this model says yes, how often is it right?* Low precision means false alarms.
+
+**Recall** divides by everything that was actually positive. It answers: *of the cases that were really there, how many did we catch?* Low recall means misses.
+
+The two names are unhelpful and the questions are not. It is worth reading them as those two sentences until the definitions stop needing to be looked up.
+
+Which one matters is decided entirely by the cost of each kind of mistake, and the costs are usually wildly different. A cancer screen that misses cases is far worse than one that produces false alarms sent for a second test, so recall dominates. A spam filter that deletes real mail is far worse than one that lets some spam through, so precision dominates. An email flagged wrongly is an annoyance; a tumour missed is a catastrophe. No metric knows that, and no default can.
+
+## They trade against each other
+
+You can always have more of one by accepting less of the other, and the third editor shows the extremes on identical data: a model flagging 3 cases has precision 1.000 and recall 0.300; one flagging 40 has precision 0.250 and recall 1.000.
+
+Neither is better. They are different operating points on the same underlying model, and choosing between them is the decision the metric exists to inform.
+
+That is why quoting one alone is misleading. A claim of "95% precision" says nothing without the recall beside it &mdash; a model that flags one obvious case and nothing else achieves it trivially. The pair together describes the behaviour; either alone can be manufactured.
+
+**F1** collapses the pair into one number by taking their harmonic mean, which is deliberately unforgiving: unlike an ordinary average, it stays low if either input is low. F1 of a model with precision 1.0 and recall 0.1 is 0.18, not 0.55. That property is what makes it useful as a single summary when you need to rank models, and it is still a summary &mdash; two models with the same F1 can behave very differently.
+
+## Print the report
+
+`classification_report` gives precision, recall, F1 and support &mdash; the number of true instances &mdash; for every class, plus the averages. It is one line and it should be the default thing you print after fitting a classifier.
+
+The per-class rows are the point. An aggregate can look healthy while one class is being ignored completely, and the row for that class shows it immediately: precision and recall both zero, with a support telling you how many cases that represents.
+
+`support` deserves attention on its own. A class with 4 examples in the test set produces metrics that move in steps of 25%, so a difference between two models on that class is noise. Reading the support column before believing a per-class number saves a lot of misplaced confidence.
+
+## Averaging across several classes
+
+With more than two classes, the per-class numbers have to be combined somehow, and the choice changes the answer substantially.
+
+**macro** averages the per-class scores, treating every class as equally important regardless of size. A class with 2 samples counts as much as one with 900.
+
+**weighted** averages them in proportion to support, so large classes dominate.
+
+**micro** pools all the predictions before computing, which for single-label classification makes it identical to accuracy.
+
+The fifth editor shows how far apart they can be: macro 0.612, weighted 0.949, micro 0.960, on predictions where the rarest class is never once identified correctly. Only macro reflects that failure. Weighted and micro report the performance on the big classes and let the small one disappear.
+
+The rule that follows: **use macro when the rare classes matter**, which is usually why they are interesting. Use weighted when you genuinely care about overall volume. Never report micro on imbalanced data and call it anything other than accuracy.
+
+## balanced_accuracy, for a single honest number
+
+`balanced_accuracy_score` averages the recall of each class. It is accuracy with the class-size distortion removed.
+
+Its virtue is that the lazy model cannot game it: always predicting the majority gives recall 1.0 on that class and 0.0 on the other, averaging to exactly 0.5 &mdash; which is what "no skill" should look like. The editor above shows 0.99 against 0.5 for the same predictions.
+
+It is the right default when you want one number for an imbalanced problem and do not want to think about precision and recall separately. It is still one number, and it still hides the trade-off, so it belongs alongside the report rather than instead of it.
+
+## Choosing, in practice
+
+A short procedure that covers most cases.
+
+Count the classes first. If they are roughly balanced, accuracy is fine and the rest of this page is optional. If they are not, it is not.
+
+Fit a `DummyClassifier` and record its score on whatever metric you plan to use. That is the floor, and a model that does not clear it convincingly has not earned anything.
+
+Decide which mistake is worse in the actual application, and say why in a sentence. If missing a case is worse, lead with recall. If a false alarm is worse, lead with precision. If they are comparable, F1 or balanced accuracy.
+
+Print `classification_report` regardless, and read the support column before trusting any per-class row.
+
+And remember that all of these are computed from `predict`, which applied a 0.5 threshold to a probability. Moving that threshold moves precision and recall in opposite directions without refitting anything &mdash; which is the subject of the next module, and often the cheapest improvement available.
+
+## Metrics that use the probability rather than the label
+
+Everything above is computed from `predict`, which has already committed to a label. Two metrics use `predict_proba` instead, and they measure something different: how well the model *ranks* cases, independently of where the threshold sits.
+
+**ROC AUC** is the probability that a randomly chosen positive is scored higher than a randomly chosen negative. 1.0 is perfect ranking, 0.5 is random. Its appeal is that it summarises every possible threshold at once, so it compares models without committing to an operating point. Its weakness is that it is computed across the whole range including thresholds nobody would use, and on heavily imbalanced data it stays flatteringly high &mdash; the enormous number of true negatives dominates the false positive rate.
+
+**Average precision**, the area under the precision-recall curve, is the better choice when positives are rare. It ignores true negatives entirely, so it cannot be inflated by having a great many of them, and it moves when the model's behaviour on the class you care about changes.
+
+The practical rule: report ROC AUC on roughly balanced problems, average precision on imbalanced ones, and neither as a substitute for the metric that reflects the actual decision. A high AUC means the ranking is good; it does not mean any particular threshold produces a useful precision and recall.
+
+## Multi-label and multi-class are different problems
+
+Two situations get confused because both involve more than two labels.
+
+**Multi-class** means each sample belongs to exactly one of several classes &mdash; a flower is setosa or versicolor or virginica. Everything on this page applies, with the averaging choice being the only addition.
+
+**Multi-label** means each sample can carry several labels at once &mdash; an article tagged both "politics" and "economics". Here `y` is a 2-D binary array rather than a 1-D vector, accuracy becomes exact-set-match and is brutally strict, and the averaging choices gain a fourth option, `samples`, which averages per row rather than per class.
+
+Confusing the two produces shape errors rather than silent wrongness, which is fortunate. `MultiLabelBinarizer` is the tool for getting from a list of tag lists to the array the estimators want.
+
+## Things to try
+
+1. <strong>Run the first editor.</strong> 0.9867, and not one positive predicted. Sit with the number before reading on.
+2. <strong>Change the balance.</strong> Set `weights=[0.5]` and re-run. Accuracy stops flattering the dummy immediately.
+3. <strong>Read the support column.</strong> In the fourth editor, note how few positives the metrics for class 1 are computed from.
+4. <strong>Break the macro average.</strong> In the fifth editor, make the model get the rare class right once and watch macro move far more than weighted.
+
+## Where this leaves you
+
+Accuracy for balanced problems only. Precision when false alarms cost, recall when misses cost, F1 or balanced accuracy when you need one number, and `classification_report` printed every time so an ignored class cannot hide behind an average.
+""",
+    [
+        {"q": "A classifier scores 99% accuracy on data that is 99% one class. What has it shown?",
+         "options": ["It is an excellent model",
+                     "Possibly nothing - always predicting the majority scores the same",
+                     "The data needs more features",
+                     "That accuracy is the right metric here"],
+         "answer": 1,
+         "why": "A DummyClassifier predicting the majority achieves it without learning anything. Fitting one is how you find out whether a score means anything."},
+        {"q": "What does recall measure?",
+         "options": ["How many flagged cases were correct",
+                     "How many of the real positives were found",
+                     "Overall correctness",
+                     "The false positive rate"],
+         "answer": 1,
+         "why": "Recall divides true positives by everything that was actually positive - it is about misses. Precision divides by everything flagged, and is about false alarms."},
+        {"q": "Why is F1 a harmonic mean rather than an ordinary one?",
+         "options": ["It is faster to compute",
+                     "It stays low when either precision or recall is low",
+                     "It handles more than two classes",
+                     "Convention only"],
+         "answer": 1,
+         "why": "Precision 1.0 with recall 0.1 gives F1 of 0.18, not 0.55. An ordinary average would let one good half disguise a bad one."},
+        {"q": "Which averaging makes an ignored rare class visible?",
+         "options": ["micro", "weighted", "macro", "all three equally"],
+         "answer": 2,
+         "why": "Macro treats every class equally regardless of size. Weighted and micro are dominated by the large classes, and micro equals accuracy for single-label problems."},
+    ],
+)
