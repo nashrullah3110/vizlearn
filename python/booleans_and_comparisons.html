@@ -288,9 +288,20 @@ print(bool([]), bool([1]))</script>
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Comparisons produce True or False, and combining them with and, or and not is how a program makes decisions. The details that catch people are short-circuiting and the difference between == and is.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-true-false-and-everything-that-behaves-like-them">True, False, and everything that behaves like them</h3>
+                    <h3>== compares value, is compares identity</h3>
+                    <p><code>==</code> asks "are these equal?" <code>is</code> asks "are these the same object?"</p><pre><code class="language-python">a = [1, 2, 3]
+b = [1, 2, 3]
+c = a
+
+a == b      # True  - same contents
+a is b      # False - two separate lists
+a is c      # True  - one list, two names</code></pre><p>Use <code>is</code> only for <code>None</code>, <code>True</code> and <code>False</code>, which are singletons &mdash; there is exactly one <code>None</code> object in a running program.</p><pre><code class="language-python">if result is None:      # correct
+if name == &quot;Ada&quot;:       # correct
+if count is 100:        # wrong, and modern Python warns about it</code></pre><p>The trap is that small integers and short strings are cached and reused by the interpreter, so <code>x is 100</code> sometimes appears to work &mdash; and then fails silently for <code>1000</code>, in production, months later.</p>
+                </div>
+                <div>
+                    <h3>True, False, and everything that behaves like them</h3>
                     <p>A boolean has two values, <code>True</code> and <code>False</code>, capitalised. They are what every comparison produces and what every <code>if</code> consumes.</p><pre><code class="language-python">5 &gt; 3           # True
 5 == 3          # False
 type(True)      # &lt;class &#x27;bool&#x27;&gt;
@@ -302,7 +313,7 @@ a is b     # the same object in memory
 a in items # membership</code></pre><p>Comparisons chain, exactly as in mathematics, and each operand is evaluated once:</p><pre><code class="language-python">if 0 &lt;= score &lt;= 100:        # clearer than score &gt;= 0 and score &lt;= 100</code></pre>
                 </div>
                 <div>
-                    <h3 id="vz-s-and-or-not-and-short-circuiting">and, or, not, and short-circuiting</h3>
+                    <h3>and, or, not, and short-circuiting</h3>
                     <pre><code class="language-python">True and False    # False - both must be true
 True or False     # True  - either will do
 not True          # False</code></pre><p>The important behaviour is <strong>short-circuiting</strong>: <code>and</code> stops at the first false operand, <code>or</code> at the first true one, and the rest is never evaluated. That is not an optimisation detail; it is how you write safe checks.</p><pre><code class="language-python">if user is not None and user.is_admin:     # user.is_admin never runs
@@ -310,25 +321,25 @@ not True          # False</code></pre><p>The important behaviour is <strong>shor
 port = config.get(&quot;port&quot;) or 8080     # careful: 0 is falsy, so 0 becomes 8080</code></pre><p>That second line shows the one caveat &mdash; when <code>0</code> or <code>""</code> are legitimate values, use an explicit <code>is None</code> test instead.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-truthiness">Truthiness</h3>
+                    <h3>Truthiness</h3>
                     <p>Every object can be used as a condition. These are false:</p><p class="mono-font">False&nbsp;&nbsp;None&nbsp;&nbsp;0&nbsp;&nbsp;0.0&nbsp;&nbsp;""&nbsp;&nbsp;[]&nbsp;&nbsp;{}&nbsp;&nbsp;()&nbsp;&nbsp;set()</p><p>Everything else is true, including <code>"False"</code>, <code>[0]</code> and <code>-1</code>.</p><pre><code class="language-python">if items:            # idiomatic &quot;is this non-empty&quot;
 if not items:        # &quot;is this empty&quot;</code></pre><p>Two useful builtins that fold a whole sequence into one boolean:</p><pre><code class="language-python">any(x &gt; 100 for x in values)     # True if at least one qualifies
 all(x &gt; 0 for x in values)       # True if every one does</code></pre><p>Both short-circuit, so <code>any()</code> stops at the first match &mdash; which makes them efficient as well as readable.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-guided-experiments">Guided experiments</h3>
+                    <h3>Guided experiments</h3>
                     <ol><li><strong>See short-circuiting.</strong> Write <span class="mono-font">False and print("ran")</span> and run it. Nothing prints. Change the first operand to True and the print executes.</li><li><strong>Guard an index.</strong> Try <span class="mono-font">items and items[0]</span> with an empty list, then flip the operands and watch it raise IndexError.</li><li><strong>Compare identity and value.</strong> Build two lists with the same contents and test both <span class="mono-font">==</span> and <span class="mono-font">is</span>. Same value, different objects.</li><li><strong>Chain a comparison.</strong> Run <span class="mono-font">1 &lt; 5 &lt; 10</span> and then <span class="mono-font">10 &lt; 5 &lt; 1</span> to confirm both bounds are actually being checked.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-trips-people-up">What trips people up</h3>
+                    <h3>What trips people up</h3>
                     <ul><li><strong>Using <span class="mono-font">is</span> to compare values.</strong> Works by accident for small integers and cached strings, then fails on the first value outside the cache.</li><li><strong>Putting the guard on the wrong side.</strong> Short-circuiting only protects what comes after it.</li><li><strong>Comparing floats with <span class="mono-font">==</span>.</strong> <span class="mono-font">0.1 + 0.2 == 0.3</span> is False, because binary floating point cannot represent those values exactly. Use <span class="mono-font">math.isclose</span>.</li><li><strong>Writing <span class="mono-font">if x == True</span>.</strong> Verbose and breaks for truthy-but-not-True values such as <span class="mono-font">1</span> or a non-empty list.</li></ul>
                 </div>
                 <div>
-                    <h3 id="vz-s-key-takeaway">Key takeaway</h3>
+                    <h3>Key takeaway</h3>
                     <p>Comparisons return booleans and can be chained the way they are written in mathematics. <span class="mono-font">and</span> and <span class="mono-font">or</span> short-circuit, which is what lets a guard on the left protect an expression on the right &mdash; so operand order matters. Use <span class="mono-font">==</span> for value and reserve <span class="mono-font">is</span> for None, True and False, and never compare floats for exact equality.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-comparing-different-types">Comparing different types</h3>
+                    <h3>Comparing different types</h3>
                     <pre><code class="language-python">1 == 1.0        # True  - numeric types compare across the boundary
 1 == True       # True  - because True IS 1
 &quot;1&quot; == 1        # False - text is never equal to a number
@@ -339,11 +350,11 @@ all(x &gt; 0 for x in values)       # True if every one does</code></pre><p>Both
 [1, 2] &lt; [1, 3]        # True  - element by element</code></pre><p>Strings compare by character code, which is why <code>"Zebra" &lt; "apple"</code> is true &mdash; all uppercase letters come before all lowercase ones. For human-friendly comparison, normalise the case first with <code>.casefold()</code>.</p><p>Ordering comparisons between unrelated types raise <code>TypeError</code> in Python 3: <code>1 &lt; "a"</code> fails rather than producing an arbitrary answer. That is deliberate, and it catches a class of bug that Python 2 silently allowed.</p><p>Floats bring their own caveat: <code>0.1 + 0.2 == 0.3</code> is <code>False</code>. Compare with <code>math.isclose(a, b)</code> instead.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-writing-conditions-that-read-well">Writing conditions that read well</h3>
+                    <h3>Writing conditions that read well</h3>
                     <ul><li><strong>Do not compare to <code>True</code>.</strong> <code>if is_ready:</code> beats <code>if is_ready == True:</code>, and both beat <code>if is_ready is True:</code>.</li><li><strong>Name complicated conditions.</strong> <code>is_eligible = age &gt;= 18 and has_id and not banned</code> then <code>if is_eligible:</code> &mdash; the name is documentation and the condition becomes testable.</li><li><strong>Prefer <code>in</code> over chains of <code>or</code>.</strong> <code>if status in ("open", "pending", "review"):</code>.</li><li><strong>Use <code>not in</code></strong> rather than <code>not x in y</code>, which parses correctly but reads badly.</li><li><strong>Apply De Morgan's law</strong> when a negation gets tangled: <code>not (a and b)</code> is <code>not a or not b</code>, and one of the two is usually clearer for the case at hand.</li></ul>
                 </div>
                 <div>
-                    <h3 id="vz-s-short-circuiting-made-visible">Short-circuiting, made visible</h3>
+                    <h3>Short-circuiting, made visible</h3>
                     <p>The claim that the second operand is "never evaluated" is worth seeing rather than taking on trust:</p><pre><code class="language-python">def check(label, value):
     print(&quot;  evaluated&quot;, label)
     return value
@@ -361,7 +372,7 @@ A or B, with A true:
 result True</code></pre><p><code>B</code> never prints in either case. <code>and</code> had its answer as soon as the left side was false, and <code>or</code> as soon as the left side was true, so neither looked further.</p><p>That is what makes <code>if user is not None and user.active</code> safe rather than merely lucky: the attribute access is not evaluated at all when the guard fails. It also means the right-hand side is the place for anything expensive or anything that might raise, and the left-hand side is the place for the cheap test that decides whether the expensive one is worth doing.</p><p>The corollary is that operand order carries meaning. Swapping the two halves of a guarded expression turns working code into an <code>AttributeError</code> on exactly the input the guard existed for, and nothing about the change looks dangerous.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-chained-comparisons-exactly">Chained comparisons, exactly</h3>
+                    <h3>Chained comparisons, exactly</h3>
                     <p><code>0 &lt;= score &lt;= 100</code> is not two comparisons joined with <code>and</code>, and the difference shows when the middle term does something:</p><pre><code class="language-python">def side(n):
     print(&quot;  evaluated&quot;, n)
     return n
@@ -371,23 +382,23 @@ print(1 &lt; side(5) &lt; 10)</code></pre><pre><code>  evaluated 5
 True</code></pre><p><code>side(5)</code> runs once. Written as <code>1 &lt; side(5) and side(5) &lt; 10</code> it would run twice, which matters when the expression is expensive or has a side effect.</p><p>The rule is that <code>a &lt; b &lt; c</code> evaluates <code>b</code> once and is equivalent to <code>a &lt; b and b &lt; c</code> with <code>b</code> computed a single time &mdash; and it short-circuits in the same way, so <code>c</code> is never evaluated if the first comparison fails.</p><p>Any comparison operators can be chained, including <code>==</code> and <code>in</code>, which is occasionally confusing rather than useful: <code>a == b == c</code> tests that all three are equal, but <code>a is b is c</code> and mixtures like <code>a &lt; b == c</code> are legal and rarely what anyone means at a glance. The idiomatic use is a range check, and that is where it should mostly stay.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-functions-that-return-a-boolean">Functions that return a boolean</h3>
+                    <h3>Functions that return a boolean</h3>
                     <p>A function whose job is to answer yes or no deserves a few specific habits, because these are the functions that end up inside every condition.</p><p><strong>Name it as a question.</strong> <code>is_valid</code>, <code>has_permission</code>, <code>can_retry</code>, <code>should_skip</code>. A reader then knows what <code>if user.can_retry():</code> means without looking, and the name reads correctly in both the positive and the negative form.</p><p><strong>Return an actual boolean.</strong> <code>return bool(matches)</code> rather than <code>return matches</code>, when the caller only wants the answer. Returning the underlying list works because of truthiness and quietly commits you to that being a list forever.</p><p><strong>Do not return <code>None</code> for "no".</strong> A function that returns <code>True</code> or <code>None</code> is usually a mistake rather than a design, and it makes the result unusable in anything that expects a boolean, such as <code>sum()</code> over conditions.</p><p><strong>Avoid the negative name.</strong> <code>is_not_ready</code> produces <code>if not is_not_ready</code>, which nobody can read. Name the positive and let the caller negate it.</p><p>These matter more than they look because a boolean function is used inside conditions, where a misleading name causes a logic error rather than a crash &mdash; the kind that produces plausible wrong answers.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-is-genuinely-belongs">Where <code>is</code> genuinely belongs</h3>
+                    <h3>Where <code>is</code> genuinely belongs</h3>
                     <p>The advice "use <code>is</code> only for <code>None</code>" is right and worth understanding rather than memorising, because the reason tells you the two other cases where it applies.</p><p><code>is</code> asks whether two names refer to the same object. That question has a definite answer for singletons &mdash; objects the language guarantees there is exactly one of. <code>None</code>, <code>True</code> and <code>False</code> are the three, which is why <code>x is None</code> is both correct and the convention.</p><p>For everything else, identity is an implementation detail. CPython caches small integers and short strings, so <code>x is 100</code> may be true and <code>x is 1000</code> false, for the same code, with no visible difference. Relying on that is relying on an optimisation that is free to change, and modern Python emits a <code>SyntaxWarning</code> when it sees a literal on the right of <code>is</code> for exactly this reason.</p><p>The second honest use is a sentinel: an object created with <code>object()</code> purely so that <code>arg is MISSING</code> can distinguish "no argument supplied" from "supplied <code>None</code>". Identity is the whole point there, because the sentinel is deliberately equal to nothing else.</p><p>The third is genuine identity questions &mdash; "is this the same list the caller gave me, or a copy?" &mdash; which is what <code>a is b</code> was designed to answer and what <code>id()</code> reports.</p><p>Everywhere else, <code>==</code> is the operator, and defining <code>__eq__</code> on your own classes is how you say what equality means for them.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-comparison-in-your-own-classes">Comparison in your own classes</h3>
+                    <h3>Comparison in your own classes</h3>
                     <p>By default, two instances of a class you wrote are equal only if they are the same object, because the inherited <code>__eq__</code> compares identity. Two <code>Point</code> objects both holding <code>(3, 4)</code> are not equal, which surprises people the first time they compare results in a test.</p><p>Defining <code>__eq__</code> fixes it, and brings one obligation with it: define <code>__hash__</code> as well, or the class becomes unhashable and cannot go in a set or be a dictionary key. Python removes the inherited hash deliberately when you define equality, because a hash that disagreed with equality would break every dictionary the object went into. The two must agree &mdash; objects that compare equal must hash the same.</p><p>Ordering is separate again. <code>&lt;</code> needs <code>__lt__</code>, and the other three operators are their own methods rather than being inferred, so an object with only <code>__lt__</code> sorts correctly and raises on <code>&gt;=</code>. <code>functools.total_ordering</code> fills the rest in, and <code>@dataclass(order=True)</code> writes all of them by comparing the fields in declaration order.</p><p>The shortcut worth knowing: a dataclass gives you <code>__eq__</code> and, if you ask, ordering and hashing too, all consistent with each other. Writing them by hand is only worth it when the comparison should ignore some fields or normalise them first.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Why is <code>True == 1</code>?</strong> Because <code>bool</code> is a subclass of <code>int</code>, with <code>True</code> equal to 1 and <code>False</code> to 0. It is what makes <code>sum(conditions)</code> count matches.</p><p><strong>When should I use <code>is</code>?</strong> For <code>None</code>, <code>True</code> and <code>False</code>, and when you genuinely mean "the same object". Everywhere else, <code>==</code>.</p><p><strong>Why does <code>0.1 + 0.2 == 0.3</code> return False?</strong> Binary floating point cannot represent 0.1 exactly. Use <code>math.isclose</code>.</p><p><strong>What does <code>bool(x)</code> do?</strong> Applies the truthiness rules and returns <code>True</code> or <code>False</code> &mdash; occasionally useful to normalise a value before storing it.</p><p><strong>Can I use <code>&&</code> and <code>||</code>?</strong> No. Python uses the words <code>and</code> and <code>or</code>; <code>&</code> and <code>|</code> are bitwise operators and behave differently.</p><p><strong>Is <code>if x != None</code> wrong?</strong> It usually works but <code>is not None</code> is the correct and conventional form, and it cannot be fooled by a class that overrides <code>__eq__</code>.</p><p><strong>Why does <code>[] == False</code> return False?</strong> Because equality and truthiness are different questions. An empty list is falsy, and it is not equal to <code>False</code>. <code>bool([]) == False</code> is True.</p><p><strong>Can I compare two dictionaries?</strong> With <code>==</code>, yes &mdash; they are equal if they hold the same keys and values, regardless of insertion order. Ordering comparisons like <code>&lt;</code> raise.</p><p><strong>What does <code>not not x</code> do?</strong> The same as <code>bool(x)</code>, more obscurely. Use <code>bool(x)</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Comparisons produce booleans, and booleans are integers &mdash; <code>sum(...)</code> over conditions counts them.</li><li><code>==</code> compares value; <code>is</code> compares identity, and is only for <code>None</code>, <code>True</code> and <code>False</code>.</li><li><code>and</code> and <code>or</code> short-circuit, which is what makes <code>if x and x.field</code> safe.</li><li>Falsy values: <code>False</code>, <code>None</code>, <code>0</code>, <code>0.0</code>, <code>""</code>, <code>[]</code>, <code>{}</code>, <code>()</code>, <code>set()</code>.</li><li><code>any()</code> and <code>all()</code> collapse a sequence of conditions into one answer, and stop early.</li><li>Compare floats with <code>math.isclose</code>, never with <code>==</code>.</li></ul>
                 </div>
             </div>

@@ -648,53 +648,56 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Why and how we transform 2D grids of pixels into 1D lists for Neural Networks.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-core-idea-unrolling-the-grid">The Core Idea: Unrolling the Grid</h3>
+                    <h3>The idea in brief</h3>
+                    <p>When you look at an image, you see a 2D grid of colors. However, standard Artificial Neural Networks (specifically <strong>Dense</strong> or <strong>Fully-Connected Layers</strong>) are structured to accept only a one-dimensional (1D) array or vector of numbers as input. Before a network can "look" at an image, the image must undergo <strong>Flattening</strong>.</p>
+                </div>
+                <div>
+                    <h3>The Core Idea: Unrolling the Grid</h3>
                     <p>Think of a digital image as a spreadsheet where each cell is a pixel holding a color value. "Flattening" is simply taking the first row of this spreadsheet, placing it down, taking the second row and appending it to the end of the first, and continuing until the whole grid forms a single, long line of numbers.</p><p>If the image is colored, it contains three channels: Red, Green, and Blue (RGB). The network needs separate input nodes for every color value of every pixel. The math for the total number of inputs is simple: <strong>Width &times; Height &times; Channels = Total Nodes.</strong></p>
                 </div>
                 <div>
-                    <h3 id="vz-s-an-image-is-a-grid-of-numbers">An image is a grid of numbers</h3>
+                    <h3>An image is a grid of numbers</h3>
                     <p>Before anything else, a picture has to become arithmetic. A greyscale image is a grid of brightness values from 0 (black) to 255 (white). A colour image is three such grids stacked &mdash; red, green and blue.</p><p>A 224&times;224 colour photograph is therefore a block of numbers with shape (224, 224, 3), or 150,528 values. That is what the network actually receives; there is no image in there, only a tensor.</p><p>Almost every pipeline rescales those values to 0&ndash;1 by dividing by 255, or standardises them per channel using the dataset's mean and standard deviation. The reason is the same as for tabular data: gradients and initialisation schemes assume inputs of roughly unit scale, and raw 0&ndash;255 values make the first layer's activations far too large.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-a-dense-layer-is-the-wrong-tool">Why a dense layer is the wrong tool</h3>
+                    <h3>Why a dense layer is the wrong tool</h3>
                     <p>Feed that image to an ordinary fully connected layer with 1,000 units and you need 150,528 &times; 1,000 = <strong>150 million weights in the first layer alone</strong>. Three problems follow immediately.</p><p><strong>It is unaffordable.</strong> That many parameters need enormous data and memory, and most of them will be fitting noise.</p><p><strong>It throws away the structure.</strong> Flattening the grid into a list destroys the fact that neighbouring pixels are related. To a dense layer, pixel (0,0) and pixel (0,1) are no more related than pixel (0,0) and pixel (200,150).</p><p><strong>It has to relearn everything everywhere.</strong> A dense layer that learns to detect an edge in the top-left corner has learned nothing about edges in the bottom-right. Every position needs its own weights.</p><p>Convolution fixes all three at once by making two assumptions about images that happen to be true.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-local-connections-and-shared-weights">Local connections and shared weights</h3>
+                    <h3>Local connections and shared weights</h3>
                     <p><strong>Locality.</strong> A small filter &mdash; typically 3&times;3 &mdash; looks at a tiny patch rather than the whole image. Meaningful visual structure is local: an edge, a corner or a texture is defined by a handful of neighbouring pixels.</p><p><strong>Weight sharing.</strong> That same filter slides across the entire image. One set of nine weights is applied everywhere, so a vertical-edge detector learned in one place works in every place.</p><p>The arithmetic is startling. A 3&times;3 filter over 3 input channels is 27 weights plus a bias. Use 64 such filters and the layer has 1,792 parameters &mdash; against 150 million for the dense equivalent, and it works better.</p><p>This also gives the network <strong>translation equivariance</strong>: move the cat two pixels right and the feature map moves two pixels right. The network does not have to see cats in every position to recognise them.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-hierarchy-that-emerges">The hierarchy that emerges</h3>
+                    <h3>The hierarchy that emerges</h3>
                     <p>Stacking convolution layers builds features of increasing abstraction, and this is not a metaphor &mdash; it is visible when you inspect trained filters.</p><div class="vz-table-wrap"><table><thead><tr><th>Depth</th><th>What the filters respond to</th></tr></thead><tbody><tr><td>Layer 1</td><td>Edges at various orientations, colour blobs</td></tr><tr><td>Layer 2</td><td>Corners, curves, simple textures</td></tr><tr><td>Layers 3&ndash;4</td><td>Repeated patterns, parts &mdash; eyes, wheels, letters</td></tr><tr><td>Deep layers</td><td>Object parts and whole objects</td></tr></tbody></table></div><p>Each layer sees a wider region of the original image than the last, because each of its inputs already summarised a patch. That growing window is the <strong>receptive field</strong>, and it is why depth matters: a network needs enough layers for its deepest neurons to see the whole object.</p><p>A complete classifier is then: several convolution and pooling blocks to build features, followed by pooling or flattening, and finally one or two dense layers to turn those features into class scores.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-guided-experiments-with-this-interactive">Guided Experiments with This Interactive</h3>
+                    <h3>Guided Experiments with This Interactive</h3>
                     <ol><li><strong>Observe the Math:</strong> <p class="font-light opacity-80 mt-1">Look at the right column. For a 16x16 RGB image, you'll see the 2D matrix labeled <code>16 x 16 x 3</code>. This means there are 768 individual color values. Scroll the 1D Input Vector horizontally to see all 768 "nodes" laid out end-to-end!</p></li><li><strong>Toggle Grayscale:</strong> <p class="font-light opacity-80 mt-1">Check the <strong>Convert to Grayscale</strong> box. Notice how the node count drops by exactly a factor of 3 (e.g., from 768 to 256). Grayscale images only have 1 channel (brightness) instead of 3 (RGB), making them much easier for simple neural networks to process.</p></li><li><strong>Adjust the Resolution:</strong> <p class="font-light opacity-80 mt-1">Slide the Resolution to <strong>32x32</strong>. Even for this tiny icon-sized image, an RGB format creates <strong>3,072 nodes</strong>. This rapid growth in data is why modern deep learning requires powerful GPUs.</p></li><li><strong>Live Webcam Test:</strong> <p class="font-light opacity-80 mt-1">Switch to the <strong>Live Webcam</strong> tab. Try moving your hand. Watch how the 2D image changes and how those changes ripple through the 1D flattened array. Every movement changes hundreds of values simultaneously across the vector.</p></li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-problem-with-flattening">The Problem with Flattening</h3>
+                    <h3>The Problem with Flattening</h3>
                     <p>While flattening allows an MLP to process an image, it <strong>destroys spatial relationships</strong>. A pixel right above another pixel in 2D might be dozens of indices apart in the 1D array. Standard dense networks struggle to understand that these pixels were originally neighbors.</p><p>This exact problem led to the invention of Convolutional Neural Networks (CNNs), which process images in 2D first before flattening them at the very end!</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-to-remember">What to remember</h3>
+                    <h3>What to remember</h3>
                     <ul><li>Dense neural network layers only accept 1D lists (vectors) as input.</li><li><strong>Flattening</strong> is the process of stringing rows of pixels together into a line.</li><li>The size of the input layer is $W \times H \times C$ (Channels).</li><li>High resolution images create massive input layers, making them computationally expensive.</li></ul><p>Flattening is the bridge between raw image files and the mathematical matrix operations that power Artificial Intelligence.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-each-piece-contributes">What each piece contributes</h3>
+                    <h3>What each piece contributes</h3>
                     <p><strong>Convolution</strong> detects patterns and produces feature maps &mdash; one per filter, each highlighting where its pattern was found.</p><p><strong>ReLU</strong> zeroes negative responses. Without a non-linearity, stacked convolutions collapse into a single convolution, and depth buys nothing.</p><p><strong>Pooling</strong> (or a strided convolution) shrinks the spatial dimensions, which reduces computation, widens the receptive field, and adds a little tolerance to small shifts.</p><p><strong>Batch normalisation</strong> keeps activations in a stable range, making deeper networks trainable and allowing higher learning rates.</p><p><strong>Global average pooling</strong> collapses each feature map to a single number, replacing the huge flatten-then-dense step used by older architectures and removing most of their parameters.</p><p><strong>The classifier head</strong> maps the final features to class scores, which a softmax turns into probabilities.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-the-assumptions-break">Where the assumptions break</h3>
+                    <h3>Where the assumptions break</h3>
                     <p>Convolution works because of assumptions about images, and it is worth knowing when they do not hold.</p><p><strong>Rotation and scale are not free.</strong> Convolution is equivariant to translation, not to rotation or resizing. A network trained on upright faces will struggle with faces at 90&deg;, which is exactly why rotation and scaling are standard data augmentations.</p><p><strong>Global relationships need depth or attention.</strong> A 3&times;3 filter sees three pixels; relating opposite corners of an image requires many layers of accumulated receptive field. Vision transformers take the other route, comparing all patches directly with attention from the first layer &mdash; which is why they need more data but capture long-range structure more easily.</p><p><strong>Not all grids are images.</strong> Convolution assumes neighbouring positions are related. Applied to a table of unrelated columns, that assumption is false and the inductive bias is wasted.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Why 3&times;3 filters almost everywhere?</strong> Two stacked 3&times;3 layers see the same region as one 5&times;5 but use fewer parameters and include an extra non-linearity. VGG established this and it stuck.</p><p><strong>Does the input have to be a fixed size?</strong> Convolutions do not care, but a flatten-then-dense head does. Global average pooling removes the constraint, which is why modern architectures accept varying sizes.</p><p><strong>Why normalise pixel values?</strong> Because 0&ndash;255 inputs produce large activations and awkward gradients. Scaling to 0&ndash;1 or standardising per channel is standard.</p><p><strong>How many filters should a layer have?</strong> Typically doubling with depth &mdash; 32, 64, 128, 256 &mdash; as spatial size shrinks and the number of distinct patterns to represent grows.</p><p><strong>Do CNNs see like humans?</strong> Not really. They are far more sensitive to texture than to shape, and small adversarial changes invisible to a person can flip a prediction entirely.</p><p><strong>Are CNNs obsolete now that transformers exist?</strong> No. They remain more data-efficient, faster on small images, and the standard choice on limited hardware. Hybrid designs are common.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>An image is a grid of numbers; colour adds three channels.</li><li>A dense layer on raw pixels needs hundreds of millions of weights and ignores spatial structure.</li><li>Convolution assumes locality and shares one small filter across the whole image, cutting parameters by orders of magnitude.</li><li>Stacked layers build a hierarchy: edges, then textures, then parts, then objects.</li><li>Translation is handled naturally; rotation and scale must come from augmentation.</li></ul>
                 </div>
             </div>

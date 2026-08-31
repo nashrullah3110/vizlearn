@@ -231,21 +231,24 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Why a column measured in pounds drowns out a column measured in years, and which models care.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-what-the-scalers-do">What the scalers do</h3>
+                    <h3>The problem is the units</h3>
+                    <p>The data here has two columns: age, spanning roughly 25 to 55, and income, spanning roughly 20,000 to 70,000. They describe a person about equally well.</p><p>Set the scaler to None and look at the readout. The income range is around a thousand times the age range. Now consider what k-NN does &mdash; it finds the nearest points by Euclidean distance:</p><pre><code>distance^2 = (age1 - age2)^2 + (income1 - income2)^2</code></pre><p>A ten-year age difference contributes 100 to that sum. A ten-pound income difference contributes 100 as well. A five-thousand-pound difference contributes twenty-five million.</p><p>The age term is not merely less important. It is numerically irrelevant: any plausible age difference is lost in the rounding of the income term. The model is effectively one-dimensional, and nobody asked for that.</p>
+                </div>
+                <div>
+                    <h3>What the scalers do</h3>
                     <p>Switch to <strong>StandardScaler</strong>. Each column has its mean subtracted and is divided by its standard deviation, so both end up centred on 0 with a spread of about 1. The scatter becomes roughly circular, both columns contribute comparably, and the accuracy in the readout moves.</p><pre><code>z = (x - mean) / std</code></pre><p>Switch to <strong>MinMaxScaler</strong>. Each column is mapped onto [0, 1] using its minimum and maximum:</p><pre><code>x&#x27; = (x - min) / (max - min)</code></pre><p>Both fix the units problem. They differ in how they handle extremes, and that is the basis for choosing.</p><div class="vz-table-wrap"><table><thead><tr><th></th><th>StandardScaler</th><th>MinMaxScaler</th></tr></thead><tbody><tr><td>Output range</td><td>unbounded, roughly &minus;3 to 3</td><td>exactly [0, 1]</td></tr><tr><td>Uses</td><td>mean, standard deviation</td><td>minimum, maximum</td></tr><tr><td>One extreme value</td><td>shifts the mean a little</td><td>compresses everything else</td></tr><tr><td>Good for</td><td>most things, especially with outliers</td><td>bounded inputs, image pixels, neural nets</td></tr></tbody></table></div><p>MinMax's weakness is worth stating plainly. Both statistics it uses are the most outlier-sensitive numbers available. One salary of ten million maps to 1.0 and crushes every real salary into the bottom half of a per cent of the range.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-which-models-care">Which models care</h3>
+                    <h3>Which models care</h3>
                     <p><strong>Sensitive</strong>, because they measure distance or magnitude:</p><ul><li>k-NN and k-means &mdash; distance is the entire algorithm</li><li>SVM with an RBF or polynomial kernel &mdash; the kernel is a distance</li><li>PCA &mdash; it finds directions of maximum variance, and unscaled variance is dominated by whichever column has the biggest units</li><li>Neural networks &mdash; not for correctness, but gradients on wildly different scales make optimisation slow and unstable</li><li>Ridge and Lasso &mdash; the penalty is on coefficient size, and coefficient size depends on the units of its column</li></ul><p><strong>Not sensitive:</strong></p><ul><li>Decision trees, random forests, gradient boosting</li></ul><p>That last group surprises people, and the reason is worth having. A tree split asks <code>is income &gt; 45000</code>. Rescale the column and the question becomes <code>is income' &gt; 0.53</code>, which partitions the rows into exactly the same two groups. Any monotonic transformation leaves every possible split unchanged, so the tree is identical. Scaling before a random forest is not wrong; it is simply a no-op.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-rule-that-matters-more-than-the-choice">The rule that matters more than the choice</h3>
+                    <h3>The rule that matters more than the choice</h3>
                     <p>Fit the scaler on the <strong>training data only</strong>, then apply it to the test data without refitting.</p><p>The mean and standard deviation are learned parameters. Computing them from the whole dataset lets information about the test set reach the model before it is evaluated, and the reported score stops being an estimate of anything. That is [data leakage](data_leakage.html), it is the most common serious mistake in applied machine learning, and it is why scalers belong inside a [pipeline](ml_pipelines.html) rather than being applied by hand.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Fitting the scaler on everything.</strong> The number you report goes up and the model does not get better.</p><p><strong>Scaling the target variable and forgetting to invert it.</strong> Predictions come back in scaled units and the error metric is meaningless.</p><p><strong>MinMax on data with outliers.</strong> The real data ends up in a sliver of the range.</p><p><strong>Scaling one-hot columns.</strong> They are already 0 and 1. StandardScaler turns them into two arbitrary values and makes the model harder to read for no gain.</p>
                 </div>
             </div>

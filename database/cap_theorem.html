@@ -232,25 +232,28 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The most quoted and most misquoted result in distributed data, and what it actually constrains.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-theorem-stated-properly">The theorem, stated properly</h3>
+                    <h3>What the three letters mean</h3>
+                    <p><strong>Consistency</strong> here means *linearisability*: every read sees the most recent write, as if there were one copy. It is not the C in ACID, which is about constraints being satisfied. Two different ideas, one letter, endless confusion.</p><p><strong>Availability</strong> means every request to a non-failed node gets a non-error response. Not "mostly up" &mdash; every request, every working node.</p><p><strong>Partition tolerance</strong> means the system keeps operating when the network drops or delays messages between nodes.</p>
+                </div>
+                <div>
+                    <h3>The theorem, stated properly</h3>
                     <p>The popular phrasing &mdash; "pick two of three" &mdash; is memorable and wrong in a way that matters.</p><p>Partitions are not a design choice. Networks fail: cables are cut, switches reboot, a cloud availability zone becomes unreachable. Any system spanning more than one machine will be partitioned eventually, so <strong>P is not optional</strong>.</p><p>What the theorem actually says is narrower and more useful:</p><p>> When a partition occurs, you must choose between consistency and availability.</p><p>That is it. When the network is healthy, a system can be both consistent and available, and most are. The theorem constrains behaviour during a specific, temporary failure.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-choice-concretely">The choice, concretely</h3>
+                    <h3>The choice, concretely</h3>
                     <p>Two nodes can no longer talk. A write arrives at one of them.</p><p><strong>CP &mdash; refuse.</strong> Return an error, because acknowledging a write the other side cannot see risks two different answers to the same question. Correct, and temporarily unavailable to whoever cannot reach a quorum.</p><p>Choose this when a wrong answer is worse than no answer: account balances, inventory that must not oversell, anything involving money or safety.</p><p><strong>AP &mdash; accept.</strong> Take the write locally, serve reads from local state, and reconcile when the partition heals. Always answering, and during the partition two clients can see different values.</p><p>Choose this when an answer now is worth more than a perfectly current one: a shopping cart, a social feed, a view counter, a DNS record. Amazon's original Dynamo paper made this argument for carts explicitly &mdash; a cart that occasionally resurrects a deleted item is better business than a cart that is sometimes unavailable.</p><p>Step the timeline above through both settings and the difference is one decision made at one moment.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-reconciling-afterwards">Reconciling afterwards</h3>
+                    <h3>Reconciling afterwards</h3>
                     <p>An AP system must resolve conflicting versions once the network returns. <strong>Last-write-wins</strong> is simple and silently discards data when clocks disagree. <strong>Vector clocks</strong> detect concurrent writes and hand the conflict to the application. <strong>CRDTs</strong> are data types designed so concurrent updates merge deterministically &mdash; which is why counters, sets and collaborative text editors are the AP success stories.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-pacelc-which-is-the-more-useful-version">PACELC, which is the more useful version</h3>
+                    <h3>PACELC, which is the more useful version</h3>
                     <p>CAP only describes partitions, and partitions are rare. Daniel Abadi's extension covers the rest of the time:</p><p>> <strong>if P</strong>artition then <strong>A</strong>vailability or <strong>C</strong>onsistency, <strong>E</strong>lse > <strong>L</strong>atency or <strong>C</strong>onsistency.</p><p>The second half is the one engineers meet daily. With the network healthy, a system can still choose to confirm every write with remote replicas &mdash; consistent and slower &mdash; or acknowledge locally and replicate afterwards &mdash; faster and briefly stale.</p><p>That is exactly the [synchronous versus asynchronous replication choice](replication_and_lag.html), and unlike CAP's trade it is live on every request.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>"We chose AP, so we gave up consistency."</strong> You gave up linearisability during partitions. Most of the time the system is consistent.</p><p><strong>Confusing CAP's C with ACID's C.</strong> Different properties.</p><p><strong>Calling a single-node database CP.</strong> With one node there is no partition and the theorem does not apply.</p><p><strong>Treating the labels as fixed.</strong> Many systems are tunable per query &mdash; Cassandra's consistency levels, DynamoDB's strongly consistent reads &mdash; so the choice belongs to the operation, not the product.</p>
                 </div>
             </div>

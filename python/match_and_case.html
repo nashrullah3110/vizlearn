@@ -351,33 +351,42 @@ for n in (-5, 0, 42, 1000):
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">match tests a value against patterns rather than conditions. For plain literals it is a tidier if-chain; for structured data it is something an if-chain cannot do at all, because the pattern takes the value apart while matching it.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-what-it-actually-adds">What it actually adds</h3>
+                    <h3>The tidy version of an if-chain</h3>
+                    <pre><code class="language-python">match status:
+    case 200:
+        return &quot;ok&quot;
+    case 500 | 502 | 503:
+        return &quot;server error&quot;
+    case _:
+        return &quot;unhandled&quot;</code></pre><p><code>|</code> groups alternatives, <code>_</code> is the default. The first matching case wins and the rest are skipped &mdash; there is no fall-through and no <code>break</code>.</p><p>If this were all <code>match</code> did it would be barely worth the keyword, and the page prints an if-chain beside it that agrees on every input.</p>
+                </div>
+                <div>
+                    <h3>What it actually adds</h3>
                     <p>case {"type": "click", "x": x, "y": y}:</p><p>This matches a dictionary that has a <code>type</code> of <code>"click"</code>, and in the same breath binds <code>x</code> and <code>y</code> to the values it found. One line replaces a type check, two key checks and two lookups &mdash; and it cannot go out of step with itself the way that sequence can.</p><p>The same applies to sequences:</p><p>case [first, *rest]:</p><p>matches any list and splits it into head and tail as it goes.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-guards">Guards</h3>
+                    <h3>Guards</h3>
                     <p>A pattern can carry a condition:</p><p>case int() if n &lt; 0:</p><p>The pattern narrows the shape, the guard narrows the value. Together they express "an integer, and a negative one" in the place where you are already looking.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-it-was-added">Why it was added</h3>
+                    <h3>Why it was added</h3>
                     <p>Python resisted a switch statement for decades on the grounds that a chain of <code>if</code>/<code>elif</code> already did the job, and for comparing a value against a few constants that argument still holds. <code>match</code> was not added to replace those.</p><p>It was added for structural pattern matching: inspecting the *shape* of data and pulling it apart in the same step. The code it replaces is a stack of <code>isinstance</code> checks, key lookups and length tests, written in a specific order, where getting the order wrong or forgetting a check produces a bug that only appears on unusual input. That pattern shows up constantly in anything that handles parsed JSON, events, commands or syntax trees.</p><p>Once you see it as "destructure and dispatch" rather than "switch", the design choices stop looking strange.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-patterns-you-will-use">Patterns you will use</h3>
+                    <h3>Patterns you will use</h3>
                     <p>Literal patterns match constants. Sequence patterns like <code>[a, b]</code> or <code>[first, *rest]</code> match lists and tuples of the right shape and bind the parts. Mapping patterns like <code>{"type": "click", "x": x}</code> match dictionaries that *contain* those keys - extra keys are allowed, which is what makes them useful against real payloads that carry more than you care about.</p><p>Class patterns match an instance and can pull attributes out of it: <code>case Point(x=0, y=y)</code> matches a Point on the y-axis and binds <code>y</code>. Combined with a guard, that covers a surprising amount of dispatch logic in one readable block.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-two-rules-to-remember">The two rules to remember</h3>
+                    <h3>The two rules to remember</h3>
                     <p>A bare name captures rather than compares, and it matches everything. If you want to compare against a constant you have stored somewhere, it must be a dotted name - <code>case Status.OK</code> - or a literal. This is the single most common <code>match</code> bug, and the failure mode is silent: the first such case swallows every value and the ones below it never run.</p><p>And <code>match</code> is not exhaustive. If nothing matches and there is no <code>case _</code>, the statement simply does nothing and execution continues. Coming from languages where the compiler insists on exhaustiveness, that is worth remembering, because a missing case here is a quiet no-op rather than an error.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-version-and-whether-to-use-it">Version, and whether to use it</h3>
+                    <h3>Version, and whether to use it</h3>
                     <p><code>match</code> requires Python 3.10. If your code has to run on anything older, the <code>if</code>/<code>elif</code> version is the only option, and for two or three literal comparisons it is the better one regardless: shorter, universally understood, and with none of the capture-pattern sharp edges.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-destructuring-in-one-step">Destructuring in one step</h3>
+                    <h3>Destructuring in one step</h3>
                     <p>The argument for <code>match</code> is not tidiness, it is that the pattern checks the shape and pulls the pieces out in the same breath:</p><pre><code class="language-python">events = [
     {&quot;type&quot;: &quot;click&quot;, &quot;x&quot;: 10, &quot;y&quot;: 20},
     {&quot;type&quot;: &quot;key&quot;, &quot;key&quot;: &quot;a&quot;},
@@ -400,7 +409,7 @@ other event: scroll
 unrecognised: not a dict</code></pre><p>Three things are worth noticing. The <code>scroll</code> event carries an <code>extra</code> key that no pattern mentions, and it still matches &mdash; mapping patterns check that the named keys are *present*, not that they are the only ones, which is what makes them usable against real payloads.</p><p>The string falls through to <code>case _</code>, because a mapping pattern does not match a non-mapping. Written with <code>if</code>, that safety would have been an explicit <code>isinstance(e, dict)</code> that somebody has to remember.</p><p>And <code>x</code>, <code>y</code>, <code>k</code> and <code>t</code> are bound by the match itself. The equivalent <code>if</code>-chain needs a key check and a lookup for each, in the right order, with the lookups repeating what the checks just established.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-bare-name-that-swallows-everything">The bare name that swallows everything</h3>
+                    <h3>The bare name that swallows everything</h3>
                     <p>A bare name in a pattern does not compare against that name. It is a <strong>capture pattern</strong>: it matches anything at all and binds the name to whatever it caught.</p><p>Python protects you from the obvious form of the mistake. Writing a capture before other cases is a compile-time error, and the message is unusually direct:</p><pre><code>SyntaxError: name capture &#x27;OK&#x27; makes remaining patterns unreachable</code></pre><p>What it cannot protect you from is the same mistake in the last position, where there are no unreachable patterns to complain about:</p><pre><code class="language-python">OK = 200
 
 for status in [200, 404, 500]:
@@ -428,16 +437,16 @@ for status in [200, 404, 500]:
 500 unhandled</code></pre><p>This is why enums pair so naturally with <code>match</code>: <code>case Colour.RED</code> is unambiguous, and an enum gives you the dotted form for nothing. Literals work too. It is only bare names that capture.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-not-exhaustive-and-what-that-means">Not exhaustive, and what that means</h3>
+                    <h3>Not exhaustive, and what that means</h3>
                     <p>Languages that popularised pattern matching usually check that every possible case is handled, and refuse to compile if one is missing. Python does not.</p><p>If no case matches and there is no <code>case _</code>, the <code>match</code> statement simply does nothing and execution continues on the next line. No exception, no warning. A value that falls through leaves no trace, and the symptom appears later as a result that was never computed.</p><p>That makes <code>case _</code> more important than a default clause usually is. Ending with one that raises &mdash; or at minimum logs the unhandled value &mdash; converts a silent no-op into something you can find:</p><pre><code class="language-python">        case _:
             raise ValueError(f&quot;unhandled event: {event!r}&quot;)</code></pre><p>The same applies inside a function returning a value: a <code>match</code> where every case returns will return <code>None</code> for an unmatched value, which then travels somewhere else before failing. Making the fallthrough explicit is the habit worth forming from the first <code>match</code> you write.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-guards-classes-and-the-shapes-worth-knowing">Guards, classes and the shapes worth knowing</h3>
+                    <h3>Guards, classes and the shapes worth knowing</h3>
                     <p>Beyond literals and mappings, three pattern kinds cover most real use.</p><p><strong>Sequence patterns</strong> match lists and tuples structurally. <code>case [x]</code> matches a one-item sequence, <code>case [first, *rest]</code> matches any non-empty one and splits it, <code>case []</code> matches empty. They do not match strings, which is deliberate &mdash; a string is a sequence of characters and matching it as one is almost never what anybody means.</p><p><strong>Class patterns</strong> match an instance and can read attributes: <code>case Point(x=0, y=y)</code> matches a <code>Point</code> whose <code>x</code> is zero and binds its <code>y</code>. Dataclasses and named tuples support the positional form, <code>case Point(0, y)</code>, via <code>__match_args__</code>.</p><p><strong>Guards</strong> attach a condition to a pattern with <code>if</code>: <code>case [x, y] if x == y</code> matches a two-item sequence whose items are equal. The pattern narrows the shape, the guard narrows the values, and a guard that fails lets the next case try &mdash; it does not abandon the whole <code>match</code>.</p><p>The combination is what makes the feature earn its keyword. "A two-element list of integers where the first is negative" is one line, and the <code>if</code>-chain equivalent is a length check, two <code>isinstance</code> calls and a comparison in a specific order.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-worked-example-a-small-command-parser">A worked example: a small command parser</h3>
+                    <h3>A worked example: a small command parser</h3>
                     <p>Every pattern kind in one function, doing the job <code>match</code> was added for:</p><pre><code class="language-python">def run(command):
     match command.split():
         case [&quot;quit&quot;] | [&quot;exit&quot;]:
@@ -461,15 +470,15 @@ for line in [&quot;quit&quot;, &quot;add pen pad&quot;, &quot;get colour&quot;, 
 &#x27;&#x27;               -&gt; say something</code></pre><p>Read the cases in order. The first uses <code>|</code> for alternatives, both of which are one-word sequences. The second matches <code>add</code> followed by any number of items and binds them, with a guard rejecting the case where there are none &mdash; which is why bare <code>"add"</code> falls through to the catch-all verb case rather than reporting "adding 0". The third requires exactly two words, so <code>get</code> with two arguments would not match it.</p><p>The fourth is the interesting one: <code>[verb, *_]</code> matches any non-empty list, binds the first word and discards the rest with <code>_</code>. The last handles the empty string, whose <code>split()</code> gives <code>[]</code>, which no sequence pattern with a required element can match.</p><p>Written as an <code>if</code>-chain, each of those becomes a length check plus an index plus a comparison, in an order that has to be right. Here the shape and the extraction are the same expression, and a case that does not fit simply does not match.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-enums-the-natural-partner">Enums, the natural partner</h3>
+                    <h3>Enums, the natural partner</h3>
                     <p>The capture-pattern trap has a structural fix rather than a discipline one: use an enum, and the problem cannot arise.</p><p>An enum member is always reached through a dotted name &mdash; <code>Colour.RED</code>, <code>Status.NOT_FOUND</code> &mdash; which makes every reference a value pattern by construction. There is no way to accidentally write the bare form, because the bare form does not name anything.</p><p>Two further benefits follow. The set of valid values is written down in one place, so a reader can see what the <code>match</code> is dispatching over without gathering the cases. And because the members are objects rather than integers, a typo is an <code>AttributeError</code> at the point of the mistake rather than a case that silently never fires.</p><p>This is the shape most <code>match</code> statements in well-organised code take: an enum or a set of classes defining the alternatives, and a <code>match</code> that handles each one and ends with a <code>case _</code> that raises. Between them, the two make the set of cases explicit and the missing case loud &mdash; recovering most of what the exhaustiveness checking of other languages provides, without the language doing it for you.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Is there fall-through like C's switch?</strong> No. The first matching case runs and the statement ends. No <code>break</code> is needed or allowed.</p><p><strong>Can I match on types?</strong> Yes, with a class pattern: <code>case int():</code> matches any integer. Note the brackets &mdash; <code>case int:</code> without them is a value pattern comparing against the type object.</p><p><strong>Does a mapping pattern require exact keys?</strong> No, extra keys are allowed. Use <code>**rest</code> to capture them.</p><p><strong>Can I bind the whole value as well as its parts?</strong> Yes, with <code>as</code>: <code>case {"type": "click"} as event</code>.</p><p><strong>Why does <code>case [x]</code> not match a string?</strong> Sequence patterns deliberately exclude <code>str</code>, <code>bytes</code> and <code>bytearray</code>.</p><p><strong>Is <code>match</code> a keyword now?</strong> It is a soft keyword, so existing code using <code>match</code> as a variable name still works.</p><p><strong>Should I convert my <code>if</code>-chains?</strong> Only where they are inspecting shape. For comparing one value against a few constants, the chain is fine and runs on older Python.</p><p><strong>Can a guard reference names bound by the pattern?</strong> Yes, and that is the usual reason to write one &mdash; the pattern binds, then the guard tests what it bound.</p><p><strong>Is <code>match</code> faster than an <code>if</code>-chain?</strong> For literals they are comparable. For structural patterns it is usually faster than the equivalent checks, and speed is not the reason to choose it.</p><p><strong>Can I match against a set of allowed values?</strong> Use <code>|</code> between literals in one case, or a guard with <code>in</code> when the collection is built elsewhere.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li><code>match</code> tests patterns, not conditions; the pattern checks shape and binds parts in one step.</li><li>A bare name captures and matches everything &mdash; use a literal or a dotted name to compare against a constant.</li><li>Mapping patterns allow extra keys; sequence patterns never match strings.</li><li>Nothing is exhaustive: an unmatched value falls through silently, so end with <code>case _</code> that raises or logs.</li><li>Reach for it when inspecting the shape of data, and keep <code>if</code>/<code>elif</code> for a few literal comparisons. Requires Python 3.10.</li></ul>
                 </div>
             </div>

@@ -326,42 +326,45 @@ print("same object  :", id(None) == id(None))</script>
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Any value can be used in a condition. Knowing which ones count as false, and when that is the wrong question to ask, prevents a class of bug that produces no error at all.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>The falsy values</h3>
+                    <p>There are not many, and the list is worth memorising:</p><p>None&nbsp;&nbsp;False&nbsp;&nbsp;0&nbsp;&nbsp;0.0&nbsp;&nbsp;""&nbsp;&nbsp;[]&nbsp;&nbsp;{}&nbsp;&nbsp;set()</p><p>Everything else is truthy. That includes <code>"0"</code>, <code>"False"</code>, <code>[0]</code> and <code>-1</code>, all of which catch people out because they look empty or negative in some sense and are not.</p>
+                </div>
+                <div>
+                    <h3>Where it goes wrong</h3>
                     <p>The trouble starts when a value can legitimately be <code>0</code> or <code>""</code>:</p><pre><code class="language-python">result = find(items, &quot;a&quot;)  # returns index 0
 if not result:
     print(&quot;not found&quot;)  # WRONG</code></pre><p>Index 0 is falsy, so "found at the first position" and "not found at all" take the same branch. Nothing raises. The program is simply wrong for one input, and that input is the first element, which many test cases skip.</p><p>The page runs exactly this, printing the wrong answer and then the fix.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-is-none-asks-a-different-question"><code>is None</code> asks a different question</h3>
+                    <h3><code>is None</code> asks a different question</h3>
                     <p>if result is None:</p><p>This tests for one specific object, not for emptiness. It is true for <code>None</code> and nothing else &mdash; not for <code>0</code>, not for <code>""</code>. When a function returns "the thing, or None if there isn't one", this is the only correct test.</p><p>The rule that follows: use truthiness when you mean "empty or zero or missing, and I treat them the same". Use <code>is None</code> when <code>None</code> means something distinct from a legitimate empty value.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-absent-is-not-the-same-as-empty">Absent is not the same as empty</h3>
+                    <h3>Absent is not the same as empty</h3>
                     <p><code>None</code> means "there is no value here". An empty string, an empty list and zero are all values - they just happen to be falsy. Treating the two as interchangeable is the source of a whole family of quiet bugs.</p><pre><code class="language-python">if not name:          # true for None AND for &quot;&quot;
 if name is None:      # true only for None</code></pre><p>The first is right when you mean "nothing useful to show". The second is right when you mean "this was never set", and the difference matters the moment an empty value is legitimate: a comment field left blank, a quantity of zero, a list with nothing in it yet.</p><p>The clearest example is a count. <code>if not count:</code> treats zero as missing, so a genuine result of zero takes the "no data" branch. <code>if count is None:</code> does not.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-is-and-not">Why <code>is</code> and not <code>==</code></h3>
+                    <h3>Why <code>is</code> and not <code>==</code></h3>
                     <p><code>None</code> is a singleton: there is exactly one of it in a running program, so identity and equality give the same answer for it, and identity is both faster and impossible to override. A class can define <code>__eq__</code> to make <code>x == None</code> return anything it likes; nothing can make <code>x is None</code> lie.</p><p>That is the whole reason the convention exists, and the same reasoning applies to <code>True</code> and <code>False</code>, although comparing to those at all is usually redundant - <code>if flag:</code> says it better than <code>if flag is True:</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-functions-that-return-none">Functions that return None</h3>
+                    <h3>Functions that return None</h3>
                     <p>A function with no <code>return</code> returns <code>None</code>, and so does one whose <code>return</code> has no value. This is why forgetting to return a result produces <code>NoneType</code> errors somewhere further along rather than at the function itself.</p><p>The in-place methods do it deliberately - <code>sort</code>, <code>reverse</code>, <code>append</code>, <code>update</code> all return <code>None</code> to signal that they mutated the object rather than producing a new one. <code>x = x.sort()</code> is the classic result, and the <code>None</code> is the library telling you it did the work already.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-defaults-that-respect-zero">Defaults that respect zero</h3>
+                    <h3>Defaults that respect zero</h3>
                     <p>The <code>or</code> shortcut for defaults is common and slightly wrong:</p><pre><code class="language-python">timeout = given or 30          # 0 becomes 30
 timeout = 30 if given is None else given</code></pre><p>The first discards any falsy value, including a deliberate zero or an empty string. The second only fills in when the value is genuinely absent. When the domain includes zero, empty text or an empty list as real values - and it usually does - the second form is the one that behaves.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-checking-emptiness">Checking emptiness</h3>
+                    <h3>Checking emptiness</h3>
                     <p>For containers, the truthiness test is idiomatic and preferred:</p><pre><code class="language-python">if not items:            # yes
 if len(items) == 0:      # works, but noisier</code></pre><p>The exception is when <code>items</code> might be <code>None</code>, because <code>not None</code> is also true. Then you need to say which case you mean.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-find-trap-run">The find() trap, run</h3>
+                    <h3>The find() trap, run</h3>
                     <p>The classic case, with all three answers printed side by side:</p><pre><code class="language-python">def find(items, target):
     for i, item in enumerate(items):
         if item == target:
@@ -379,7 +382,7 @@ b 1 found | found
 z None not found | not found</code></pre><p>The middle column is the bug. <code>find</code> returned 0 &mdash; the item *was* found, at the first position &mdash; and <code>not result</code> reported it as missing. The right-hand column, testing <code>is None</code>, is correct for all three.</p><p>Notice which case fails: the first element. A test suite that searches for something in the middle of a list passes, and the bug waits for real data where the match happens to be first. That is the characteristic shape of truthiness bugs &mdash; they are correct for most inputs, which is why they survive review.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-giving-your-own-objects-a-truth-value">Giving your own objects a truth value</h3>
+                    <h3>Giving your own objects a truth value</h3>
                     <p>Truthiness is not a fixed list. Python asks the object, and any class can answer.</p><p>When you write <code>if obj:</code>, Python calls <code>__bool__</code> if the class defines one. If it does not, it falls back to <code>__len__</code> and treats zero as false. If neither exists, the object is always truthy &mdash; which is why an instance of a plain class you wrote is true even when it holds nothing.</p><pre><code class="language-python">class Basket:
     def __init__(self, items):
         self.items = items
@@ -391,7 +394,7 @@ z None not found | not found</code></pre><p>The middle column is the bug. <code>
 print(bool(Basket([])), len(Basket([])), bool(Basket([1])))</code></pre><pre><code>False 0 True</code></pre><p>Defining <code>__len__</code> gave the class a sensible truth value for free, which is why it is the usual choice for anything container-like. <code>__bool__</code> is for objects that have a notion of empty without a length &mdash; a connection that is open or closed, a result that succeeded or failed.</p><p>The caution is that this is exactly the mechanism that makes truthiness ambiguous. An object that is falsy when empty cannot be distinguished from <code>None</code> by <code>if obj:</code>, so any code that treats "absent" and "empty" differently still has to use <code>is None</code>. Some libraries make this sharp: a pandas DataFrame raises rather than guessing when you put it in a condition, on the grounds that "empty" and "all values false" are both plausible readings.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-when-none-itself-is-a-valid-value">When None itself is a valid value</h3>
+                    <h3>When None itself is a valid value</h3>
                     <p>Occasionally <code>None</code> is a legitimate value in the data, and then it cannot also mean "absent". The standard answer is a sentinel: a unique object that means nothing else.</p><pre><code class="language-python">MISSING = object()
 
 def get(mapping, key, default=MISSING):
@@ -402,20 +405,20 @@ def get(mapping, key, default=MISSING):
     return default</code></pre><p><code>object()</code> creates something that is equal only to itself, so <code>default is MISSING</code> is true exactly when the caller did not pass a default. Now <code>get(d, "k", None)</code> and <code>get(d, "k")</code> mean different things &mdash; the first supplies <code>None</code> as the default, the second asks for an error &mdash; which is impossible if <code>None</code> is itself the sentinel.</p><p>This is not a common need, and it is worth recognising because the standard library uses it. <code>dict.pop</code> distinguishes "no default given" from "default of <code>None</code>" in exactly this way, and several libraries expose their sentinel by name so callers can test against it.</p><p>The plainer version of the same idea is a module-level constant with a name that says what it means, which reads better in a traceback than <code>&lt;object object at 0x...&gt;</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-none-comes-from">Where None comes from</h3>
+                    <h3>Where None comes from</h3>
                     <p><code>None</code> rarely gets written into your data deliberately. It arrives, and knowing the sources makes it predictable rather than mysterious.</p><p><strong>A function that did not return.</strong> Any function reaching its end without a <code>return</code> returns <code>None</code>, and so does a bare <code>return</code>. This is the biggest source: a function with a <code>return</code> inside an <code>if</code> and nothing after it returns <code>None</code> for every input that misses the branch, silently.</p><p><strong>An in-place method.</strong> <code>sort</code>, <code>reverse</code>, <code>append</code>, <code>update</code> and their relatives all return <code>None</code> on purpose, so <code>x = x.sort()</code> replaces a list with nothing.</p><p><strong>A lookup with a default.</strong> <code>d.get(k)</code> returns <code>None</code> when the key is absent, as do <code>os.environ.get</code>, <code>re.match</code> when the pattern does not match, and a great many library functions that mean "nothing here".</p><p><strong>A database or JSON null.</strong> <code>null</code> in JSON becomes <code>None</code>, and a nullable column comes back the same way. This is the one where <code>None</code> is genuinely part of the data rather than a signal, and where the "absent versus empty" distinction matters most.</p><p><strong>An uninitialised attribute.</strong> A class that sets <code>self.result = None</code> in <code>__init__</code> and fills it in later hands out <code>None</code> to anything that asks too early.</p><p>The pattern across all five is that <code>None</code> marks the absence of a value rather than being one. When it turns up somewhere unexpected, the productive question is which of these produced it &mdash; and the answer is usually the first.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-saying-might-be-none-out-loud">Saying "might be None" out loud</h3>
+                    <h3>Saying "might be None" out loud</h3>
                     <p>The failure mode of <code>None</code> is that it travels. A function returns it, the caller passes it on, and the <code>AttributeError: 'NoneType' object has no attribute ...</code> appears three functions away from the one that produced it.</p><p>Type hints are the cheapest defence, because they make the possibility part of the signature:</p><pre><code class="language-python">def find_user(name: str) -&gt; User | None:
     ...</code></pre><p>That says, to a reader and to a type checker, that every caller has to handle the <code>None</code> case. A checker will flag <code>find_user(x).email</code> as an error before it runs. On Python before 3.10 the spelling is <code>Optional[User]</code> from <code>typing</code>, which means exactly the same thing.</p><p>The hint changes nothing at runtime, and that is fine &mdash; the value is in making the contract explicit. A function whose return type is <code>User</code> and which sometimes returns <code>None</code> is lying, and the fix is either to make the hint honest or to raise instead of returning nothing.</p><p>Raising is often the better answer. If a caller has no sensible response to "not found", returning <code>None</code> just moves the crash somewhere less informative. Returning <code>None</code> is right when absence is ordinary and the caller will branch on it; raising is right when absence means something has gone wrong.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Is <code>if x:</code> faster than <code>if len(x) &gt; 0:</code>?</strong> Marginally, and that is not the reason to prefer it. It reads better and works on anything.</p><p><strong>Why is <code>"False"</code> true?</strong> Because it is a non-empty string. Truthiness asks about emptiness, not about meaning.</p><p><strong>Should I write <code>if x == None</code>?</strong> No. <code>is None</code> is the convention, is faster, and cannot be overridden by a class.</p><p><strong>What is falsy that people forget?</strong> <code>0.0</code>, <code>Decimal(0)</code>, <code>range(0)</code>, and <code>datetime.time(0, 0)</code> in older Python &mdash; midnight was falsy until 3.5, which caused real bugs.</p><p><strong>How do I test "not None and not empty"?</strong> <code>if x:</code> covers both when <code>None</code> and empty should be treated alike. When they should not, say both: <code>if x is not None and len(x):</code>.</p><p><strong>Does <code>if not x</code> work on a generator?</strong> Not usefully. A generator is always truthy, even if it will produce nothing.</p><p><strong>Why does <code>numpy</code> raise on <code>if array:</code>?</strong> Because an array with several elements has no single truth value, and guessing would be wrong half the time.</p><p><strong>Is <code>None</code> the same as <code>null</code> in other languages?</strong> It plays the same role. The difference is that Python's is a real object with a type, so <code>type(None)</code> works and <code>None.__class__</code> is <code>NoneType</code>.</p><p><strong>Can I subclass <code>NoneType</code> or make another <code>None</code>?</strong> No. <code>NoneType</code> cannot be instantiated, which is what guarantees <code>is None</code> is reliable.</p><p><strong>Why does <code>print(f())</code> show <code>None</code> for my function?</strong> Because the function returned nothing. Usually a <code>return</code> is missing on one branch.</p><p><strong>How should a function signal "no result"?</strong> Return <code>None</code> when absence is ordinary and the caller will branch on it. Raise when absence means something has gone wrong and the caller has no sensible alternative.</p><p><strong>Is there a way to make <code>None</code> falsy checks safe?</strong> Not by changing <code>None</code>. The fix is always to say which question you are asking &mdash; emptiness or absence.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>The falsy values are <code>None</code>, <code>False</code>, <code>0</code>, <code>0.0</code>, <code>""</code>, <code>[]</code>, <code>{}</code> and <code>set()</code>; everything else is truthy, including <code>"0"</code> and <code>"False"</code>.</li><li><code>if not x:</code> means "empty, zero or missing, and I treat them the same".</li><li><code>x is None</code> means "this was never set", and is the only correct test when zero or empty is a legitimate value.</li><li>Use <code>is</code> for <code>None</code> because there is exactly one of it and <code>__eq__</code> cannot interfere.</li><li>Your own classes get truthiness from <code>__bool__</code>, then <code>__len__</code>, and are otherwise always true.</li></ul>
                 </div>
             </div>

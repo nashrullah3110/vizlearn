@@ -285,9 +285,12 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Implement a hash map with put, get and remove, without using a dict.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-run-it">Run it</h3>
+                    <h3>The requirement</h3>
+                    <p>Implement <code>put</code>, <code>get</code> and <code>remove</code> with O(1) average time, without using the language's built-in dictionary.</p><p>The design has three parts, and stating them upfront is the expected opening:</p><p><strong>An array of buckets</strong> &mdash; the storage. <strong>A hash function</strong> mapping keys to bucket indices. <strong>A collision strategy</strong> for when two keys land in the same bucket.</p>
+                </div>
+                <div>
+                    <h3>Run it</h3>
                     <p>A working hash map with chaining, its bucket distribution printed before and after a resize, and the tombstone problem demonstrated on a small open-addressing version.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src">class HashMap:
     def __init__(self, buckets=8):
         self.buckets = [[] for _ in range(buckets)]
@@ -379,7 +382,7 @@ d = {a: 1, b: 2}
 print("colliding keys:", d, "- equality separates them, not the hash")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>3</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-chaining-the-straightforward-answer">Chaining: the straightforward answer</h3>
+                    <h3>Chaining: the straightforward answer</h3>
                     <p>Each bucket holds a list of key-value pairs. On collision, append.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src">class MyHashMap:
     def __init__(self, capacity=16):
         self.cap = capacity
@@ -433,27 +436,27 @@ print("get missing:", m.get("nope"))
 print("remove    :", m.remove("norms"), "| now:", m.get("norms"))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>4</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><p>O(1) average for all three operations, O(n) worst case when every key collides.</p><p>Two details are load-bearing:</p><p><strong><code>put</code> must check for an existing key</strong> before appending, or updating a value inserts a duplicate and <code>get</code> returns the stale one.</p><p><strong>Resizing rehashes every entry,</strong> because the bucket index depends on the capacity. Copying buckets across without rehashing puts keys in the wrong places, and they become unreachable.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-the-load-factor-matters">Why the load factor matters</h3>
+                    <h3>Why the load factor matters</h3>
                     <p>The <strong>load factor</strong> is entries divided by buckets. As it rises, buckets hold longer chains and lookups degrade from O(1) towards O(n).</p><div class="vz-table-wrap"><table><thead><tr><th>Load factor</th><th>Average chain length</th><th>Behaviour</th></tr></thead><tbody><tr><td>0.25</td><td>~1.1</td><td>Fast, memory-wasteful</td></tr><tr><td>0.75</td><td>~1.4</td><td>The usual threshold</td></tr><tr><td>2.0</td><td>~2.4</td><td>Noticeably slower</td></tr><tr><td>10</td><td>~10</td><td>Effectively a linked list</td></tr></tbody></table></div><p>Resizing at 0.75 is the common choice (Java's <code>HashMap</code> uses exactly this; CPython uses about 2/3). Doubling the capacity is O(n), and amortised across the insertions that fit in the new space it is O(1) per operation &mdash; the same argument as list <code>append</code>.</p><p>Choosing a <strong>power-of-two capacity</strong> allows <code>hash & (cap - 1)</code> instead of a modulo, which is faster. It also means only the low bits of the hash are used, so a hash function that varies mainly in its high bits clusters badly &mdash; which is why Java's <code>HashMap</code> mixes the high bits down before masking.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-chaining-versus-open-addressing">Chaining versus open addressing</h3>
+                    <h3>Chaining versus open addressing</h3>
                     <p><strong>Separate chaining</strong> puts colliding entries in a list per bucket. Simple, deletion is trivial, and it tolerates a high load factor. This is what to implement under time pressure.</p><p><strong>Open addressing</strong> stores everything in the array itself and probes for the next free slot on a collision. Better cache behaviour and less pointer chasing &mdash; it is what CPython actually uses &mdash; but deletion is genuinely hard.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-deletion-is-hard-in-open-addressing">Why deletion is hard in open addressing</h3>
+                    <h3>Why deletion is hard in open addressing</h3>
                     <p>Removing an entry leaves a hole, and a probe sequence that ran <em>through</em> that slot to reach a later entry now stops at the hole and reports the later entry missing.</p><p>The fix is a <strong>tombstone</strong>: mark the slot deleted rather than empty, so probes continue past it but inserts may reuse it. Tombstones accumulate and eventually force a rehash even without growth. Being able to say that is usually what the question is really checking.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-load-factor-and-the-resize">The load factor and the resize</h3>
+                    <h3>The load factor and the resize</h3>
                     <p>Lookup is O(1) only while buckets stay short. Once entries divided by buckets passes roughly 0.75, chains lengthen and every operation drifts towards O(n).</p><p>So the table doubles and <em>every key is rehashed</em>, because the index is <code>hash(key) % size</code> and the size just changed. That single resize is O(n), and amortised over the insertions that caused it each insert is still O(1) &mdash; but any individual insert can be the expensive one.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-open-addressing-the-alternative">Open addressing, the alternative</h3>
+                    <h3>Open addressing, the alternative</h3>
                     <p>Instead of a list per bucket, store entries directly in the array and probe for another slot on collision.</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>Chaining</th><th>Open addressing</th></tr></thead><tbody><tr><td>Storage</td><td>List per bucket</td><td>One flat array</td></tr><tr><td>Extra memory</td><td>Pointers per entry</td><td>None</td></tr><tr><td>Cache behaviour</td><td>Poorer &mdash; pointer chasing</td><td>Better &mdash; contiguous</td></tr><tr><td>Deletion</td><td>Straightforward</td><td>Needs tombstones</td></tr><tr><td>Load factor tolerance</td><td>Above 1 is workable</td><td>Must stay well below 1</td></tr></tbody></table></div><p><strong>Deletion is the awkward part.</strong> Removing an entry outright breaks probe sequences that passed through that slot &mdash; a later lookup would stop at the gap and report the key missing. So deleted slots hold a <strong>tombstone</strong> marker meaning "empty, but keep probing".</p><p>Tombstones accumulate and degrade performance until a resize clears them, which is why open-addressed tables need periodic rehashing even without growth.</p><p>CPython uses open addressing with a scattering probe sequence; Java uses chaining, converting long chains into trees above a threshold to bound the worst case.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-hash-function">The hash function</h3>
+                    <h3>The hash function</h3>
                     <p>For an interview, <code>hash(key) % capacity</code> is acceptable. If asked to write one:</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src">def string_hash(s, cap):
     h = 0
     for ch in s:
@@ -464,15 +467,15 @@ for word in ["basis", "rank", "trace"]:
     print("%-6s -> %d" % (word, string_hash(word, 16)))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>5</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><p>Three properties a hash function needs:</p><p><strong>Deterministic.</strong> The same key must always give the same value, or entries become unreachable.</p><p><strong>Uniform.</strong> Keys should spread across buckets. A hash returning a constant is valid and turns the table into a linked list.</p><p><strong>Fast.</strong> It runs on every operation.</p><p>It does <em>not</em> need to be cryptographic &mdash; that is a different requirement, and orders of magnitude slower.</p><p>Worth mentioning: Python randomises string hashes per process to prevent deliberate-collision denial-of-service attacks, which is why <code>hash("abc")</code> differs between runs.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-follow-up-questions">Follow-up questions</h3>
+                    <h3>Follow-up questions</h3>
                     <p><strong>"What if keys are integers 0 to 1,000,000?"</strong> Use direct addressing &mdash; an array indexed by the key. No hashing, no collisions, O(1) guaranteed. Only viable when the key space is small and dense.</p><p><strong>"How would you make it thread-safe?"</strong> A single lock serialises everything; striped locking &mdash; one lock per group of buckets &mdash; allows concurrency. Java's <code>ConcurrentHashMap</code> does this.</p><p><strong>"What is the worst case?"</strong> O(n) when all keys collide. Java mitigates it by treeifying long chains, giving O(log n).</p><p><strong>"How do you iterate in insertion order?"</strong> Maintain a doubly linked list of entries alongside the table &mdash; which is exactly <code>OrderedDict</code> and CPython's compact dict layout.</p><p><strong>"What about memory?"</strong> Chaining costs a pointer per entry plus list overhead; open addressing wastes empty slots. Both trade memory for speed.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-it-is-testing">What it is testing</h3>
+                    <h3>What it is testing</h3>
                     <p><strong>Do you name the three components?</strong> Buckets, hash function, collision strategy.</p><p><strong>Do you handle collisions explicitly?</strong> A design without a collision answer is incomplete.</p><p><strong>Do you resize?</strong> Without it, performance degrades to O(n) as the table fills.</p><p><strong>Do you rehash on resize?</strong> Copying buckets without recomputing indices is the classic bug.</p><p><strong>Do you check for an existing key in <code>put</code>?</strong> Otherwise updates create duplicates.</p><p><strong>Do you know the real implementations?</strong> CPython open-addresses, Java chains and treeifies &mdash; knowing that grounds the answer in reality.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Three components: an array of buckets, a hash function, and a collision strategy.</li><li>Chaining stores a list per bucket; open addressing probes for another slot and needs tombstones for deletion.</li><li>Resize when the load factor exceeds about 0.75, and <strong>rehash every entry</strong> because indices depend on the capacity.</li><li><code>put</code> must update an existing key rather than appending a duplicate.</li><li>O(1) average, O(n) worst case; Java bounds the worst case by treeifying long chains.</li></ul>
                 </div>
             </div>

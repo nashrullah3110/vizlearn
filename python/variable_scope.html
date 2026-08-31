@@ -342,21 +342,24 @@ print("len is a builtin:", len)</script>
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">When Python meets a name, it looks in four places in a fixed order &mdash; local, enclosing, global, builtin &mdash; and stops at the first one that has it. Almost every scope surprise comes from one rule about assignment.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-reading-is-easy-assigning-is-the-trap">Reading is easy, assigning is the trap</h3>
+                    <h3>The four places</h3>
+                    <p>LEGB is the order:</p><ul><li><strong>Local</strong> &mdash; names assigned in the current function</li><li><strong>Enclosing</strong> &mdash; names in a function that wraps this one</li><li><strong>Global</strong> &mdash; names at module level</li><li><strong>Builtin</strong> &mdash; <code>len</code>, <code>print</code>, <code>range</code> and friends</li></ul><p>The first match wins, which is why naming a variable <code>list</code> or <code>sum</code> shadows the builtin for the rest of that scope. It is legal and it will confuse you later.</p>
+                </div>
+                <div>
+                    <h3>Reading is easy, assigning is the trap</h3>
                     <p>A function can read an outer name without ceremony:</p><pre><code class="language-python">x = &quot;global&quot;
 def show():
     print(x)  # fine</code></pre><p>But assigning to that name inside the function does not change the outer one. It creates a new local name that happens to be spelled the same, and it disappears when the function returns.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-rule-that-catches-everyone">The rule that catches everyone</h3>
+                    <h3>The rule that catches everyone</h3>
                     <p><strong>If a name is assigned anywhere in a function, it is local for the entire function</strong> &mdash; including lines that run before the assignment.</p><pre><code class="language-python">def broken():
     print(x)      # UnboundLocalError
     x = &quot;too late&quot;</code></pre><p>That <code>print</code> looks like it should read the global, and it would have, if the line below it did not exist. Python decides local-or-not when it compiles the function, not while running it. The error message &mdash; "local variable referenced before assignment" &mdash; is precise once you know this, and baffling before.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-global-and-nonlocal">global and nonlocal</h3>
+                    <h3>global and nonlocal</h3>
                     <p>To rebind rather than shadow, say so:</p><pre><code class="language-python">def bump():
     global count
     count += 1</code></pre><p><code>global</code> reaches module level. <code>nonlocal</code> reaches the nearest enclosing function, which is what makes closures able to keep state:</p><pre><code class="language-python">def counter():
@@ -366,27 +369,27 @@ def show():
         n += 1</code></pre><p>Both are worth knowing and neither is worth reaching for often. A function that rebinds globals is a function whose behaviour depends on when you call it, which is exactly the kind of thing that makes bugs hard to find. Returning a value is nearly always better.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-mutating-is-not-assigning">Mutating is not assigning</h3>
+                    <h3>Mutating is not assigning</h3>
                     <p>One clarification that resolves a lot of confusion: <code>items.append(1)</code> is not an assignment. It mutates the object the name already points at, so it affects the outer list without needing <code>global</code>. <code>items = [1]</code> is an assignment, and creates a local. The distinction is the object versus the name.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-the-rule-exists">Why the rule exists</h3>
+                    <h3>Why the rule exists</h3>
                     <p>Deciding local-or-not at compile time looks like an odd choice until you consider the alternative. If Python worked out scope while running, then whether a name was local could depend on which branch had executed, and the same line could mean two different things on two different runs. Instead the compiler scans the whole function body once: if a name is assigned anywhere in it, that name is local everywhere in it.</p><p>That single rule explains the <code>UnboundLocalError</code> that catches everyone. The read on line one is a read of a local variable, because line five assigns to it, and the local has no value yet. The error message is precise; it just describes a decision made before the function ran.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-closures-and-why-they-are-useful">Closures, and why they are useful</h3>
+                    <h3>Closures, and why they are useful</h3>
                     <p>A function defined inside another function can see the enclosing function's variables, and it keeps seeing them after the outer function has returned. That combination - an inner function plus the variables it captured - is a closure, and it is how a function can carry state without a class or a global.</p><p>The counter on this page is the small version. The pattern scales to configuration: a function that builds and returns another function with some settings already baked in. <code>make_formatter(currency="GBP")</code> returns something you can call many times without repeating the currency.</p><p><code>nonlocal</code> exists because assigning inside the inner function would otherwise create a new local there, exactly as it would at module level. It says "this name belongs to the function that wraps me", and it is the only way to update captured state rather than merely read it.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-globals-and-when-they-stop-being-harmless">Globals, and when they stop being harmless</h3>
+                    <h3>Globals, and when they stop being harmless</h3>
                     <p>Reading a module-level constant from inside a function is ordinary and fine - that is what constants are for. Writing to a module-level name from inside a function is where trouble starts, because the function's behaviour now depends on what ran before it, and testing it in isolation stops being possible.</p><p>The practical test is whether calling the function twice with the same arguments gives the same answer. If a <code>global</code> statement means it does not, the state probably wants to be a parameter, a return value, or an attribute on an object - all three of which make the dependency visible in the signature rather than buried in the body.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-shadowing-builtins">Shadowing builtins</h3>
+                    <h3>Shadowing builtins</h3>
                     <p><code>list</code>, <code>dict</code>, <code>set</code>, <code>id</code>, <code>type</code>, <code>sum</code>, <code>input</code> and <code>max</code> are all ordinary names that happen to be defined in the builtin scope, and assigning to any of them inside your code hides the original for the rest of that scope. It is legal and it produces confusing failures later, usually when something calls <code>list(x)</code> and gets a <code>TypeError</code> about your list not being callable.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-watching-the-four-scopes-resolve">Watching the four scopes resolve</h3>
+                    <h3>Watching the four scopes resolve</h3>
                     <p>LEGB is easier to trust once you have seen it choose:</p><pre><code class="language-python">x = &quot;global&quot;
 
 def outer():
@@ -407,23 +410,23 @@ broken()</code></pre><pre><code>UnboundLocalError: cannot access local variable 
 with a value</code></pre><p>There is a perfectly good global <code>x</code>, and the <code>print</code> does not reach it. The assignment on the line *below* made <code>x</code> local for the whole function, so the <code>print</code> is reading a local that has not been given a value yet.</p><p>The wording of that error changed in Python 3.11; older versions say "local variable 'x' referenced before assignment". Both describe the same thing, and the newer one is clearer about it.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-comprehensions-have-their-own-scope-loops-do-not">Comprehensions have their own scope, loops do not</h3>
+                    <h3>Comprehensions have their own scope, loops do not</h3>
                     <p>Two things that look similar and differ, which explains a family of small surprises.</p><p>A <code>for</code> loop does <strong>not</strong> create a scope. The loop variable is an ordinary local, it survives after the loop ends, and it overwrites anything of the same name. This is why <code>for i in range(3)</code> leaves <code>i</code> set to 2 afterwards, and why reusing a name in nested loops silently shadows.</p><p>A comprehension <strong>does</strong> create one. Its loop variable lives only inside it, does not leak, and does not clobber a name of the same spelling outside. This changed in Python 3 specifically because the leaking was a common source of bugs.</p><p>The consequence worth remembering is that a comprehension can read enclosing names but cannot see a class body's names. A comprehension written directly in a class body that refers to another class attribute raises <code>NameError</code>, because the class body is not a function scope and the comprehension's scope skips straight past it to the module. It is the one genuinely strange corner of Python's scoping, and the fix is to compute the value outside the class or pass it in through the iterable.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-scope-shows-up-in-practice">Where scope shows up in practice</h3>
+                    <h3>Where scope shows up in practice</h3>
                     <p>The rules are short; the situations where they bite are worth naming.</p><p><strong>A function that "does not update" a counter.</strong> Assigning to a module-level name inside a function creates a local instead. The function appears to run and the value never changes. <code>global</code> fixes it and is usually the wrong fix &mdash; returning the new value and assigning at the call site keeps the dependency visible.</p><p><strong>A callback that captured the wrong value.</strong> Functions built in a loop capture the *variable*, not its value, so they all see the final one. Binding it as a default argument &mdash; <code>lambda i=i: ...</code> &mdash; captures at definition time. This is the same late-binding behaviour that makes closures useful, seen from the wrong side.</p><p><strong>A shadowed builtin.</strong> Naming a variable <code>list</code>, <code>dict</code>, <code>sum</code>, <code>id</code> or <code>input</code> hides the builtin for the rest of that scope. The failure comes later, usually as <code>TypeError: 'list' object is not callable</code>, at a line that looks correct.</p><p><strong>A name that only exists sometimes.</strong> Assigning inside an <code>if</code> and reading after it works when the branch ran and raises <code>UnboundLocalError</code> when it did not. Initialise before the branch.</p><p>All four are the same rule seen from different angles: assignment decides where a name lives, and it decides it for the whole function.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-there-is-no-block-scope">Why there is no block scope</h3>
+                    <h3>Why there is no block scope</h3>
                     <p>Coming from C, Java or JavaScript, the most surprising rule is that an <code>if</code> or a <code>for</code> does not create a scope. A name assigned inside one is visible after it, and the loop variable outlives the loop.</p><p>This is deliberate, and the reasoning is the same as everywhere else in the language: functions are the unit of encapsulation, and adding a second, finer kind of scope would mean two sets of rules for readers to hold. A function body is one namespace, and where in that body a name was first assigned does not change what it refers to.</p><p>It has practical consequences worth using rather than fighting. A value computed inside an <code>if</code> is available afterwards, so the common pattern of declaring a variable before a branch purely so it exists later is unnecessary &mdash; assign it in both branches instead. A loop can leave its last value behind on purpose, which is occasionally the neat way to say "the last item that matched".</p><p>It also has one real hazard: a name assigned only inside a branch that did not run does not exist, and reading it raises <code>UnboundLocalError</code>. The compiler knows the name is local, so it does not fall back to a global of the same spelling. Initialising before the branch, or assigning on every path, is the fix &mdash; and the error is at least loud rather than silently reading something from an outer scope.</p><p>The one exception, comprehensions, exists precisely because the leaking there was a genuine problem rather than a convenience.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Does an <code>if</code> or a <code>for</code> block create a scope?</strong> No. Only functions, classes, modules and comprehensions do.</p><p><strong>Can I read a global without declaring it?</strong> Yes. <code>global</code> is only needed to *assign* to one.</p><p><strong>What is the difference between <code>global</code> and <code>nonlocal</code>?</strong> <code>global</code> reaches module level; <code>nonlocal</code> reaches the nearest enclosing function. <code>nonlocal</code> fails if there is no such name.</p><p><strong>Why does <code>items.append(1)</code> work without <code>global</code>?</strong> Because it mutates the object rather than rebinding the name. Only assignment is affected.</p><p><strong>Does a class body count as an enclosing scope?</strong> No, and this is the exception that surprises people &mdash; methods do not see class-level names without <code>self</code> or the class name.</p><p><strong>Can I list what is in scope?</strong> <code>locals()</code> and <code>globals()</code> return dictionaries of the current names, which is occasionally useful for debugging.</p><p><strong>Is shadowing a builtin ever fine?</strong> In a two-line function where it is obvious, it does no harm. As a habit it costs more than the shorter name saves.</p><p><strong>Does <code>del x</code> remove a name from scope?</strong> It unbinds it, so a later read raises <code>NameError</code> or <code>UnboundLocalError</code>. It does not reach into an outer scope.</p><p><strong>Why can a method not see class attributes directly?</strong> Because a class body is not an enclosing scope for its methods. Reach them through <code>self.</code> or the class name.</p><p><strong>What scope does a lambda have?</strong> The same as any function: its own local scope, with the enclosing one visible. That is why the loop-capture trap applies to lambdas exactly as it does to <code>def</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Names resolve local, enclosing, global, builtin &mdash; first match wins.</li><li>If a name is assigned anywhere in a function it is local everywhere in that function, including lines above the assignment.</li><li><code>global</code> and <code>nonlocal</code> rebind rather than shadow, and both are usually a sign that a return value would be better.</li><li>Mutating is not assigning: <code>items.append(x)</code> needs no declaration, <code>items = [x]</code> creates a local.</li><li>A <code>for</code> loop shares the enclosing scope; a comprehension has its own.</li></ul>
                 </div>
             </div>

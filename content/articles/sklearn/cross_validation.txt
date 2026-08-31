@@ -1,0 +1,249 @@
+title: Cross-Validation: A Practical Guide
+intro: A single train/test split gives you one number drawn from a distribution you never see. Cross-validation shows you the distribution.
+
+## The problem with one split
+
+A held-out test set answers the question honestly, and it answers it once, on one particular random selection of rows.
+
+Run the split again with a different seed and the score moves. The editors on this page show six splits of the same data giving scores from 0.9737 to 0.9912 &mdash; a spread of nearly two points, on an easy dataset with several hundred rows. On a smaller or harder dataset the spread is much wider.
+
+That variation is not noise you can ignore. If you compare two models on one split each and they differ by a point, you have learned nothing: the difference is well inside the range a single split produces by chance. Reporting the winner would be reporting which model got the friendlier rows.
+
+Cross-validation fixes this by not choosing. It splits the data into `k` parts, holds each one out in turn, fits on the rest, and returns `k` scores &mdash; so every row is tested on exactly once and trained on `k-1` times.
+
+
+## Five splits instead of one
+
+The same model fitted five times, each time holding a different fifth back.
+
+```python-run
+from sklearn.datasets import load_breast_cancer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+X, y = load_breast_cancer(return_X_y=True)
+model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+
+scores = cross_val_score(model, X, y, cv=5)
+
+print("one score per fold:", np.round(scores, 4))
+print("mean              :", round(scores.mean(), 4))
+print("std               :", round(scores.std(), 4))
+```
+
+## Why one number was never enough
+
+Six different single splits of the same data, and the score you would have reported depends on which one you happened to run.
+
+```python-run
+from sklearn.datasets import load_breast_cancer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+X, y = load_breast_cancer(return_X_y=True)
+model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+
+scores = []
+for seed in range(6):
+    X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2,
+                                              random_state=seed, stratify=y)
+    scores.append(model.fit(X_tr, y_tr).score(X_te, y_te))
+
+print("six single splits:", np.round(scores, 4))
+print("lowest %.4f, highest %.4f - a spread of %.4f"
+      % (min(scores), max(scores), max(scores) - min(scores)))
+print()
+print("any one of those could have been 'the' test score.")
+```
+
+## Stratified folds, and what plain folds do instead
+
+Watch the third plain fold: it contains none of the minority class at all.
+
+```python-run
+from sklearn.model_selection import KFold, StratifiedKFold
+import numpy as np
+
+y = np.array([0] * 15 + [1] * 5)          # 75/25, five in the minority
+
+print("KFold (splits by position, ignoring the classes):")
+for _, te in KFold(n_splits=5, shuffle=True, random_state=0).split(y, y):
+    print("   test labels:", y[te], " ones:", int(y[te].sum()))
+
+print()
+print("StratifiedKFold (each fold mirrors the whole):")
+for _, te in StratifiedKFold(n_splits=5, shuffle=True, random_state=0).split(y, y):
+    print("   test labels:", y[te], " ones:", int(y[te].sum()))
+```
+
+## Several metrics, and the training score too
+
+cross_validate is the fuller version, and the train column is how you see overfitting.
+
+```python-run
+from sklearn.datasets import load_breast_cancer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import cross_validate
+import numpy as np
+
+X, y = load_breast_cancer(return_X_y=True)
+model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+
+out = cross_validate(model, X, y, cv=5,
+                     scoring=["accuracy", "precision", "recall"],
+                     return_train_score=True)
+
+for key in sorted(out):
+    print("%-22s %s" % (key, np.round(out[key], 3)))
+```
+
+## Preprocessing outside the loop invents skill
+
+Pure noise, nothing to learn, and one of these two numbers says the model found something.
+
+```python-run
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+# Pure noise: there is nothing to learn, so honest accuracy is about 0.5.
+rng = np.random.RandomState(0)
+X = rng.normal(size=(120, 2000))
+y = rng.randint(0, 2, size=120)
+
+# WRONG: choose the best features using every row, then cross-validate.
+picked = SelectKBest(f_classif, k=20).fit_transform(X, y)
+wrong = cross_val_score(LogisticRegression(max_iter=1000), picked, y, cv=5)
+
+# RIGHT: the selection happens inside each fold, on the training part only.
+right = cross_val_score(
+    make_pipeline(SelectKBest(f_classif, k=20),
+                  LogisticRegression(max_iter=1000)), X, y, cv=5)
+
+print("selected before splitting :", round(wrong.mean(), 3))
+print("selected inside the folds :", round(right.mean(), 3))
+print()
+print("the data is random. one of those numbers is a hallucination.")
+```
+
+## The other splitters
+
+cv= takes a number or a splitter object, and the object is how you handle time and groups.
+
+```python-run
+from sklearn.model_selection import LeaveOneOut, KFold, TimeSeriesSplit
+import numpy as np
+
+X = np.arange(6).reshape(-1, 1)
+
+print("KFold(3)      :", [list(te) for _, te in KFold(3).split(X)])
+print("LeaveOneOut   :", [list(te) for _, te in LeaveOneOut().split(X)])
+print()
+print("TimeSeriesSplit(3) - train always precedes test:")
+for tr, te in TimeSeriesSplit(n_splits=3).split(X):
+    print("   train", list(tr), "-> test", list(te))
+```
+## What the k numbers tell you
+
+The mean is the headline, and the standard deviation is the part people skip.
+
+A mean of 0.98 with a standard deviation of 0.006 is a stable, believable result. A mean of 0.98 with a standard deviation of 0.09 says the model works well on some subsets and badly on others, which is a completely different situation and usually means either very little data or a subgroup the model handles poorly.
+
+Two models whose ranges overlap heavily are not distinguishable by this evidence, whatever their means. That single habit &mdash; looking at the spread before believing a difference &mdash; prevents a large share of the wasted effort in applied machine learning.
+
+`cross_val_score` returns the array. Printing it rather than only its mean costs nothing and is where the information is.
+
+## How many folds
+
+`cv=5` is the usual default and `cv=10` the other common choice, and the trade between them is straightforward.
+
+More folds mean each model trains on more data, so each is closer to the model you would build on the whole dataset, and the estimate is less pessimistic. More folds also mean more fits &mdash; ten-fold takes twice as long as five-fold &mdash; and the training sets overlap more, which makes the scores more correlated and the standard deviation an underestimate of the true variability.
+
+The extreme is `LeaveOneOut`, where `k` equals the number of samples. Every model trains on everything but one row, which is as close to the full-data model as possible, and it costs `n` fits. It is worth it only on very small datasets, and its variance estimate is poor for the same correlation reason.
+
+Five is a reasonable default for most work. Ten when the dataset is small enough that the extra fits are cheap and you want the training sets larger. `RepeatedStratifiedKFold` runs the whole thing several times with different shuffles when you need a more reliable estimate of the spread.
+
+## Stratification happens by default, and only for classifiers
+
+Pass an integer as `cv` and scikit-learn chooses the splitter for you: `StratifiedKFold` when the estimator is a classifier, plain `KFold` otherwise.
+
+That default is a good one and worth understanding rather than relying on blindly. The editor above shows what plain folds do to an imbalanced target: with five minority samples across five folds, the counts come out 2, 1, 0, 1, 1 &mdash; one fold contains none of the class at all, so the recall computed on it is undefined and the score for that fold is meaningless. Stratified folds give exactly one to each.
+
+Note that stratification is on the **target**. When the thing that must stay balanced is something else &mdash; a site, a batch, a demographic group &mdash; you need to pass a splitter object rather than an integer.
+
+## The rule that makes it honest
+
+Cross-validation is only honest if everything learned from data is learned inside the loop.
+
+That includes the model, obviously. It also includes the scaler's mean and standard deviation, the imputer's median, the encoder's list of categories, the vectoriser's vocabulary, and &mdash; most damagingly &mdash; any feature selection.
+
+The fifth editor makes the cost concrete. The data is pure random noise with no relationship between features and target, so the honest accuracy is 0.5. Selecting the twenty "best" features using the whole dataset and then cross-validating gives **0.825**. The selection looked at the held-out rows, found the columns that happened to correlate with the target in those rows too, and handed the model a shortcut. Doing the selection inside the folds gives 0.45, which is the truth.
+
+That is not a small distortion, and it is the single most common way published results turn out to be wrong. With 2000 candidate features and 120 samples, some columns correlate with the target by chance; choosing them using all the data is choosing them partly on the test rows.
+
+`Pipeline` is the mechanism that prevents this. A pipeline is a single estimator as far as `cross_val_score` is concerned, so its `fit` &mdash; including every transformer inside it &mdash; runs on the training part of each fold only. Using one is not a style preference; it is what makes the number mean what it says.
+
+## What cross-validation does not give you
+
+It does not give you a model. The `k` models fitted during the process are scored and thrown away.
+
+What it gives you is an estimate of how well **the procedure** performs &mdash; this preprocessing, this estimator, these hyperparameters, on data like this. Once you have decided the procedure is good enough, you fit it once more on all the data, and that is the model you keep. `cross_val_predict` returns the out-of-fold predictions if you want them for inspection, and it is explicitly not a way of producing a model either.
+
+It also does not replace a final held-out test set when you have been using cross-validation to make choices. Comparing twenty hyperparameter settings by cross-validation and reporting the best one's score is optimistic for the same reason as picking the best of twenty test scores: the winner was selected for doing well on those particular folds. Nested cross-validation is the rigorous answer, and a separate untouched test set is the practical one.
+
+## The splitters worth knowing
+
+`cv` accepts an integer or a splitter object, and the objects are how you say something the integer cannot.
+
+`StratifiedKFold` and `KFold` are the defaults, and passing them explicitly lets you set `shuffle=True` and a `random_state`, which the integer form does not. Note that `KFold` does **not** shuffle by default, so data arriving in a sorted order produces folds that are each a contiguous block &mdash; occasionally a disaster nobody notices.
+
+`TimeSeriesSplit` trains on the past and tests on what follows, never the reverse, with a training set that grows each time. It is the only correct choice for ordered data.
+
+`GroupKFold` and `StratifiedGroupKFold` take a `groups` array and keep every row of a group on one side. Use them whenever several rows describe the same patient, customer, document or device &mdash; otherwise the model recognises the entity rather than learning the pattern, and the score is inflated by an amount nothing reveals.
+
+`ShuffleSplit` draws random train/test pairs without the every-row-tested-once guarantee, which is useful when you want many estimates from a large dataset cheaply.
+
+## What it costs, and when that matters
+
+Cross-validation fits the model `k` times, so it costs roughly `k` times a single fit. For a logistic regression on a few thousand rows that is imperceptible. For a large ensemble on a large dataset it can turn a two-minute experiment into twenty.
+
+Three ways to keep it affordable. `n_jobs=-1` runs the folds in parallel across cores, and since the folds are independent this is close to free speed on any machine with more than one. Fewer folds &mdash; three rather than ten &mdash; when you are exploring rather than reporting. And a subsample of the data while you are iterating, with the full run reserved for the result you intend to quote.
+
+The mistake worth avoiding is skipping cross-validation because it is slow and going back to a single split. A single split is not faster in any way that matters; it is the same fit once, and it buys a number you cannot calibrate. If the budget is genuinely tight, three folds on the full data beats one split every time.
+
+Note also that `cross_validate` reports `fit_time` and `score_time` per fold, which is the cheapest way to find out where the time is actually going before optimising anything.
+
+## Reading the training scores
+
+`return_train_score=True` adds a column that is worth the extra computation, because the gap between train and test is the clearest diagnostic in the whole library.
+
+**Train high, test high, small gap.** The model has learned something that generalises. Nothing to fix.
+
+**Train very high, test much lower.** Overfitting. The model has memorised patterns specific to the training rows. The response is more regularisation, a simpler model, or more data.
+
+**Train low, test low, small gap.** Underfitting. The model cannot capture the structure even on data it has seen. The response is the opposite: a more flexible model, better features, less regularisation.
+
+**Train lower than test.** Unusual and worth investigating rather than celebrating. It happens legitimately when regularisation or dropout is active during training but not scoring, and illegitimately when the folds are not comparable.
+
+The two failure modes need opposite treatments, which is why guessing between them wastes so much time. One extra argument tells you which one you have.
+
+## Things to try
+
+1. <strong>Run the second editor.</strong> Six seeds, six answers. That spread is the reason the rest of the page exists.
+2. <strong>Look at the spread.</strong> In the first editor, print `scores.max() - scores.min()` and compare it against the difference between two models you are considering.
+3. <strong>Run the leakage demo.</strong> The data is random. Sit with the fact that the wrong version reports 0.825.
+4. <strong>Watch overfitting appear.</strong> In the fourth editor, swap the pipeline for `DecisionTreeClassifier()` and compare the train and test columns.
+
+## Where this leaves you
+
+`cross_val_score` for a quick estimate with its spread, `cross_validate` when you want several metrics or the training scores, a `Pipeline` around everything that learns, and a splitter object whenever the data has time or groups in it. The mean is the headline; the spread is what tells you whether to believe it.
