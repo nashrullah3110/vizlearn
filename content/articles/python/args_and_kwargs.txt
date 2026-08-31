@@ -110,3 +110,234 @@ by keyword, whether or not it has a default. That is the mechanism behind
 keyword-only parameters, and it is why library authors sometimes write a bare
 `*` in a signature: it turns everything after it into a name you have to say
 out loud at the call site.
+
+## Keyword-only and positional-only, and why they exist
+
+The stars do a second job besides collecting: they mark boundaries in a
+signature. Two markers control how callers are allowed to pass arguments.
+
+A bare `*` makes everything after it keyword-only:
+
+```python
+def connect(host, *, timeout=30, retries=3):
+    return host, timeout, retries
+
+
+print(connect("db", timeout=5))
+try:
+    connect("db", 5)
+except TypeError as e:
+    print("TypeError:", e)
+```
+
+```
+('db', 5, 3)
+TypeError: connect() takes 1 positional argument but 2 were given
+```
+
+The reason to want this is readability at the call site. `connect("db", 5, 2)`
+tells a reader nothing about what 5 and 2 mean, and it silently changes meaning
+if the parameter order is ever edited. Forcing the names makes the call
+self-documenting and makes reordering the parameters a safe change.
+
+A `/` does the opposite, marking everything before it positional-only:
+
+```python
+def distance(x, y, /):
+    return abs(x - y)
+```
+
+Now `distance(3, 5)` works and `distance(x=3, y=5)` does not. This is rarer,
+and the reason is the mirror image: it keeps the parameter *names* out of the
+API, so they can be renamed later without breaking callers. Most builtins are
+positional-only for exactly that reason, which is why `len(obj=x)` fails.
+
+The rule of thumb: make a parameter keyword-only when its meaning is not
+obvious from the call site, which in practice means flags, options and
+anything numeric that is not the main subject.
+
+## What the stars cost you
+
+`*args, **kwargs` accepts everything, and the price is paid by every reader and
+every tool afterwards.
+
+The signature stops documenting anything. `def process(*args, **kwargs)` tells
+the next person nothing about what to pass, and the only way to find out is to
+read the body &mdash; and then the body of whatever it forwards to.
+
+Editors and type checkers lose their grip. Autocompletion has nothing to
+suggest, and a type checker cannot verify a call it cannot see the shape of.
+For a codebase using type hints, a star signature is a hole in the coverage
+that propagates to every caller.
+
+Errors move. A misspelled keyword argument would normally raise
+`TypeError: unexpected keyword argument 'timeuot'` at the call, naming the
+mistake. Absorbed into `**kwargs` it becomes a missing key later, or &mdash;
+worse &mdash; a default silently used instead of the value you passed, which
+produces wrong output and no error at all.
+
+None of that is an argument against the feature; it is an argument about where
+to use it. Wrappers and subclass forwarding need it and pay none of the cost,
+because there is no meaningful signature to state. A function people call
+directly should name its parameters.
+
+## Unpacking in the other direction
+
+The two stars appear in three places and mean the same thing in all of them,
+which is easier to hold on to than three separate rules.
+
+In a **definition** they collect: `def f(*args)` gathers loose positional
+arguments into a tuple.
+
+At a **call site** they spread: `f(*items)` hands each item over as a separate
+argument.
+
+In a **literal** they merge: `[*a, *b]` builds one list from two, and
+`{**a, **b}` builds one dictionary from two, with later keys winning.
+
+The last is worth dwelling on because it has quietly become the standard way to
+combine collections:
+
+```python
+defaults = {"colour": "red", "size": 1}
+overrides = {"size": 3}
+
+print({**defaults, **overrides})
+print([*"ab", *"cd"])
+```
+
+```
+{'colour': 'red', 'size': 3}
+['a', 'b', 'c', 'd']
+```
+
+Both build a new object and leave the originals alone, which is the difference
+from `update` and `extend`. And in assignment the star runs backwards again:
+`first, *rest = items` collects rather than spreads, because the star is on the
+receiving side.
+
+## A decorator, concretely
+
+The pass-through pattern exists mainly so that decorators can be written, and
+seeing one whole makes the pieces click:
+
+```python
+import functools
+
+def announce(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        print("calling", func.__name__, "with", args, kwargs)
+        result = func(*args, **kwargs)
+        print("->", result)
+        return result
+    return wrapper
+
+
+@announce
+def add(a, b=0):
+    return a + b
+
+
+print(add(2, b=3))
+print(add.__name__)
+```
+
+```
+calling add with (2,) {'b': 3}
+-> 5
+5
+add
+```
+
+Four things are happening. `announce` takes a function and returns a
+replacement. `wrapper` accepts anything with `*args, **kwargs`, so it can stand
+in front of any function at all. The forwarding call `func(*args, **kwargs)`
+spreads them back out, so `add` receives exactly what the caller wrote. And
+`@announce` above `def add` is shorthand for `add = announce(add)`.
+
+`functools.wraps` is the part people leave out and then miss. Without it,
+`add.__name__` prints `wrapper`, the docstring is gone, and every traceback
+through the decorated function names the wrapper instead of the function. It
+copies the identifying attributes across, and it is one line.
+
+Note how the arguments arrive: `2` in `args` and `b=3` in `kwargs`, exactly as
+the caller passed them. The wrapper does not know or need to know that `add`
+has a parameter called `b`.
+
+## Asking a function what it accepts
+
+When you do need to know the signature &mdash; validating a plugin, building a
+command-line interface, writing a framework &mdash; `inspect` answers it rather
+than parsing the source:
+
+`inspect.signature(func)` returns an object listing the parameters, their
+defaults, their kinds (positional, keyword-only, `*args`, `**kwargs`) and any
+annotations. `sig.bind(*args, **kwargs)` matches a proposed call against it and
+raises the same `TypeError` the real call would, which is how you check
+arguments before doing expensive work.
+
+This is also how a decorator can be smarter than pure forwarding. A caching
+decorator that wants a stable key needs to know that `f(1)` and `f(a=1)` are
+the same call; `sig.bind` plus `apply_defaults` normalises both to the same
+thing, which no amount of inspecting `args` and `kwargs` directly will do.
+
+## The star in assignment
+
+The same star appears in assignment, and it is worth connecting to the rest
+rather than learning separately.
+
+`first, *rest = items` binds the first item and collects everything else into a
+list. `*most, last = items` does the mirror image. `a, *middle, b = items` takes
+both ends and collects what is between them. In each case the starred name gets
+a list &mdash; always a list, even when the right-hand side was a tuple or a
+string.
+
+This is the collecting sense of the star, the same as in a definition: the
+star marks the name that absorbs however many items are left over. The
+spreading sense is what you get on the other side of the equals sign, in a call
+or a literal.
+
+Only one star is allowed per assignment, for the obvious reason that two would
+make the split ambiguous. And the non-starred names are still required: unpacking
+`a, *rest = []` raises, because there is nothing for `a`, while `*rest, = []`
+succeeds and gives an empty list.
+
+## Questions people ask
+
+<strong>Do the names `args` and `kwargs` matter?</strong> No, the stars carry
+the meaning. The names are a strong convention in general-purpose wrappers and
+worth replacing with something descriptive elsewhere.
+
+<strong>Can I have `*args` without `**kwargs`?</strong> Yes, and the reverse.
+They are independent.
+
+<strong>What order do they go in?</strong> Named parameters, then `*args`, then
+keyword-only parameters, then `**kwargs`.
+
+<strong>Is `**kwargs` ordered?</strong> Yes, it is a normal dictionary and
+keeps the order the caller used.
+
+<strong>Can I pass a list where `*args` is expected?</strong> Only with a star:
+`f(*items)`. Without it you pass the list as a single argument.
+
+<strong>Why does `f(**d)` fail with "keywords must be strings"?</strong>
+Because a dictionary with non-string keys cannot be turned into keyword
+arguments.
+
+<strong>How do I forward everything including the function's own new
+option?</strong> Take it as keyword-only, and forward `*args, **kwargs`
+unchanged: the new option is bound by name and never reaches the wrapped call.
+
+## Recap in one screen
+
+- One star collects positional arguments into a tuple; two collect keyword
+  arguments into a dictionary.
+- The same stars at a call site spread a collection back into arguments, and in
+  a literal they merge collections.
+- A bare `*` in a signature makes what follows keyword-only; a `/` makes what
+  precedes it positional-only.
+- The pass-through `f(*args, **kwargs)` is what makes decorators and wrappers
+  possible without knowing any signature.
+- A star signature costs documentation, tooling and clear errors &mdash; use it
+  where there is no meaningful signature to state, not to avoid writing one.

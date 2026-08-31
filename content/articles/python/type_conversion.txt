@@ -15,50 +15,11 @@ int(text) + int(text)
 
 This is the single most common source of confusion for beginners, and it is not really about conversion &mdash; it is about noticing that input is always a string.
 
-## int() is strict about strings and loose about floats
-
-
-```python
-int("3.9")  # ValueError
-int(3.9)    # 3
-```
-
-
-From a string, `int` refuses anything that is not a whole number, because guessing which way to go would be a decision it has no business making. From a float, it truncates toward zero &mdash; `int(-3.9)` is `-3`, not `-4`. If you want nearest, say `round`.
-
-It does tolerate surrounding whitespace, which is convenient when parsing scruffy input.
-
-## round() does not round half up
-
-
-```python
-round(2.5)  # 2
-round(3.5)  # 4
-```
-
-
-On an exact tie, Python rounds to the nearest <em>even</em> number. This is deliberate: always rounding halves up biases a long run of numbers upward. It surprises people once, and it is correct.
-
 ## Floats are not decimals
 
 0.1 + 0.2 == 0.3&nbsp;&nbsp;# False
 
 Binary floating point cannot represent 0.1 exactly, so the sum is a hair off. This is not a Python quirk; it is how floats work everywhere. Compare with a tolerance, round before comparing, or use `decimal.Decimal` for money.
-
-## Converting safely
-
-Do not check first &mdash; try, and handle the failure:
-
-
-```python
-try:
-    return int(text)
-except (ValueError, TypeError):
-    return default
-```
-
-
-`ValueError` covers bad text and `TypeError` covers `None`. Testing `text.isdigit()` first looks tidier and gets negative numbers and whitespace wrong.
 
 ## bool() is broader than it looks
 
@@ -121,3 +82,200 @@ That refusal is a feature. Languages that do guess produce a class of bug where
 a number arrives as a string from a form or a file and everything continues to
 work until the arithmetic silently becomes concatenation. In Python that fails
 at once, at the line responsible.
+
+## What each constructor actually accepts
+
+The type names double as conversions, and each has its own idea of what it will
+take. Seeing them side by side removes most of the surprises:
+
+```python
+print(int("  42  "), int("1_000"), int("ff", 16))
+print(float("1e3"), float("  .5 "))
+print(list("abc"), list({"a": 1}), tuple([1, 2]))
+print(str([1, 2]), str(None))
+```
+
+```
+42 1000 255
+1000.0 0.5
+['a', 'b', 'c'] ['a'] (1, 2)
+[1, 2] None
+```
+
+`int` tolerates surrounding whitespace and the underscores Python allows in
+numeric literals, and takes a base as a second argument &mdash; which is how
+you read hexadecimal, binary and octal from text without writing a parser.
+
+`list` on a dictionary gives its **keys**, not its items, which catches people
+who expected pairs. `list` on a string gives characters, which is occasionally
+what you want and more often a sign that `split` was meant.
+
+`str` never fails. Every object has a string form, so `str(x)` always returns
+something &mdash; which is convenient and means a bug can travel a long way
+disguised as text. `str(None)` is the string `"None"`, and a `"None"` written
+into a CSV column is a classic way to lose the distinction between missing and
+present.
+
+## Parsing a boolean from text
+
+There is no conversion for this, and reaching for `bool` is the mistake
+everyone makes once:
+
+```python
+print(bool("False"), bool("0"), bool(""))
+```
+
+```
+True True False
+```
+
+`bool` on a string asks only whether the string is empty. `"False"` and `"0"`
+are both non-empty, so both are `True`, which is precisely backwards from what
+the text says.
+
+Reading a boolean out of a config file, an environment variable or a form means
+deciding what counts, and then saying so:
+
+```python
+TRUE = {"1", "true", "yes", "on"}
+
+def as_bool(text):
+    return str(text).strip().lower() in TRUE
+```
+
+That is a policy rather than a conversion, which is why the language does not
+provide one &mdash; different formats disagree about whether `"y"`, `"on"` or
+`"enabled"` should count, and about what an unrecognised value means. Deciding
+explicitly is the point.
+
+## Where conversion loses information
+
+Some conversions are exact and some throw information away, and knowing which
+is which prevents a family of quiet bugs.
+
+`int(3.9)` discards the fractional part. `int` from a large float loses
+precision before it even starts, because the float never held the exact value.
+`float(some_big_int)` is worse: integers in Python are unbounded, floats are
+not, so a sufficiently large integer converts to a float that is merely nearby,
+and converting back does not return the original.
+
+`str` of a float is lossy in the other direction historically, though modern
+Python prints the shortest string that round-trips exactly, so
+`float(str(x)) == x` holds.
+
+`set(items)` discards duplicates and order. `dict(pairs)` discards all but the
+last value for each repeated key. Neither reports what it dropped, and both are
+sometimes used deliberately for exactly that effect &mdash; which is why the
+loss has to be intentional rather than discovered.
+
+The habit worth forming: when a conversion narrows &mdash; float to int, list
+to set, anything to `str` &mdash; ask what happens to what does not fit. When
+it widens, as int to float or str to list, there is usually nothing to worry
+about.
+
+## The numeric types beyond int and float
+
+`int` and `float` cover most work, and two more exist for cases where floats
+give the wrong answer.
+
+`decimal.Decimal` represents numbers in base ten, so `Decimal("0.1") * 3` is
+exactly `Decimal("0.3")` rather than a hair off. It is the right type for
+money, invoices, tax and anything where a result will be compared against a
+figure a person calculated. Build it from a **string**, not a float:
+`Decimal(0.1)` faithfully captures the float's error, which defeats the point.
+
+`fractions.Fraction` holds an exact ratio, so `Fraction(1, 3) * 3` is exactly
+1. It is the right type for exact rational arithmetic, and it is slower and
+grows in memory as denominators multiply, so it belongs in calculations rather
+than in stored data.
+
+Both convert to and from the ordinary types, and both interoperate with `int`
+&mdash; but mixing either with `float` in one expression converts back to
+`float` and reintroduces the error you were avoiding, which is the trap. If a
+calculation is meant to be exact, every value in it has to be the exact type.
+
+`complex` also exists, written `3+4j`, and is genuinely used in signal
+processing and geometry. It is worth knowing mainly so that `j` in a numeric
+literal is not a mystery.
+
+## Convert once, at the edge
+
+The thread running through this page is that conversion is a decision, and the
+useful discipline is to make each decision exactly once, where the data enters
+the program.
+
+A value read from a file, a form, an environment variable or an API is text. If
+it is converted at the point of use, every use site repeats the conversion,
+every use site has to handle the failure, and the sites will eventually
+disagree &mdash; one treats an empty string as zero, another as an error, a
+third crashes. The type of the value becomes something a reader has to infer
+from context.
+
+Converting at the boundary means one place decides what a bad value means, and
+everything after that point works with a real `int`, `date` or `Decimal`. The
+error, when it comes, names the input and the field rather than surfacing as a
+`TypeError` deep in a calculation.
+
+This is the same argument as validating nested data at the boundary, and the
+same argument for keyword-only parameters: push the ambiguity to one place, as
+early as possible, and let everything downstream rely on what it was given.
+
+## The one conversion Python does silently
+
+Everything on this page says Python refuses to convert without being asked,
+which is true with one systematic exception: numeric promotion.
+
+Mixing an `int` and a `float` in an expression converts the `int` to a `float`
+first, so `1 + 2.0` gives `3.0` and `1 / 2` gives `0.5` rather than `0`. Mixing
+a `bool` with a number treats `True` as 1 and `False` as 0, which is why
+`sum([True, False, True])` is 2 &mdash; occasionally useful for counting how
+many conditions held, and occasionally a surprise.
+
+The rule is that Python converts within the numeric tower only, and only in the
+widening direction, where nothing is lost. `int` to `float` is allowed; `str`
+to anything is not. That is why `True + 1` works and `"1" + 1` does not, which
+looks inconsistent until you see the boundary it is drawing.
+
+The one place the widening does lose something is very large integers, where
+converting to `float` loses precision even though the conversion is nominally
+widening. It is the exception to the exception, and it only bites at magnitudes
+most programs never reach.
+
+## Questions people ask
+
+<strong>Why does `int("3.9")` fail when `int(3.9)` works?</strong> The string is
+not an integer literal, so it refuses rather than choosing a rounding
+direction. Use `int(float("3.9"))` when you mean truncation.
+
+<strong>How do I convert a list of strings to numbers?</strong>
+`[int(x) for x in items]`, or `list(map(int, items))`.
+
+<strong>What is the difference between `str` and `repr`?</strong> `str` is for
+people, `repr` is for programmers and aims to be unambiguous. `print` uses
+`str`; the interactive prompt and containers use `repr`.
+
+<strong>Why is `0.1 + 0.2` not `0.3`?</strong> Binary floating point cannot
+represent those decimals exactly. Use `math.isclose` to compare, or
+`decimal.Decimal` for money.
+
+<strong>Does `int()` round or truncate?</strong> Truncates toward zero, so
+`int(-3.9)` is `-3`. `round` is the one that rounds.
+
+<strong>How do I convert between a string and bytes?</strong>
+`text.encode("utf-8")` and `data.decode("utf-8")`. Both need an encoding, and
+guessing is where mojibake comes from.
+
+<strong>Can I convert a dictionary to a list of pairs?</strong>
+`list(d.items())`. Plain `list(d)` gives the keys.
+
+## Recap in one screen
+
+- Each type's name is its conversion; there is nothing extra to memorise.
+- Input is always text, and Python will never convert it for you &mdash; that
+  refusal is what makes `"3" + 4` an error rather than a silent bug.
+- `int` from a string is strict, `int` from a float truncates toward zero, and
+  `round` rounds halves to even.
+- `bool` on a string only asks whether it is empty, so parsing a boolean from
+  text needs an explicit mapping.
+- Narrowing conversions lose information silently &mdash; duplicates, order,
+  precision, the difference between missing and `"None"`.

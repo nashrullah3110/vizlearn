@@ -17,20 +17,6 @@ if age &gt;= 18 and member:
 
 Same behaviour, one level of indentation, and the condition reads as one thought instead of two.
 
-## When it genuinely nests
-
-Nesting earns its place when the branches diverge &mdash; when the inner decision only makes sense inside the outer one, and each has its own alternative:
-
-
-```python
-if age < 18:
-    return 0 if member else 5
-return 8 if member else 12
-```
-
-
-Here "member" means something different in each branch. That is a real tree, not an accidental one.
-
 ## Guard clauses flatten the rest
 
 The most common nested shape is a series of refusals, each with an `else`:
@@ -69,32 +55,6 @@ An `elif` chain is one decision with several outcomes, all at the same indentati
 
 Two levels is normal. Three is worth a second look. Four almost always means either a set of guard clauses waiting to be inverted, or a block that wants to be its own function.
 
-## Guard clauses, and why they read better
-
-A nested conditional builds a staircase: each condition indents the next, and by
-the third level the code that actually does something is a long way from the
-left margin. The alternative is to handle the exceptional cases first and leave
-early, so the main path stays at the top level.
-
-```python
-def borrow(user, book):
-    if not user.active:
-        return "membership inactive"
-    if user.fines > 0:
-        return "clear your fines first"
-    if not book.available:
-        return "already on loan"
-    return "enjoy the book"
-```
-
-Every line reads as one rule. Adding a rule is one line in the middle; removing
-one is deleting a line. The nested version needs re-indenting for either.
-
-The reason this works is that it separates "reasons you cannot" from "what
-happens when you can". Those are different kinds of statement, and the staircase
-version tangles them together, which is why it gets harder to read exactly as
-the number of rules grows.
-
 ## When nesting is genuinely right
 
 Guard clauses suit functions, because `return` is what makes them possible.
@@ -131,3 +91,216 @@ Three levels of nested conditions inside a loop inside a function is usually not
 a formatting problem, it is a sign that the function is making several different
 decisions and would be clearer as two or three named functions. The indentation
 is doing you a favour by making that visible.
+
+## The same logic, four ways
+
+One rule set written four ways, so the difference is shape rather than
+behaviour:
+
+```python
+def price(age, member):
+    if age < 18:
+        if member:
+            return 0
+        else:
+            return 5
+    else:
+        if member:
+            return 8
+        else:
+            return 12
+
+
+def price_flat(age, member):
+    if age < 18 and member:
+        return 0
+    if age < 18:
+        return 5
+    if member:
+        return 8
+    return 12
+
+
+for age, member in [(10, True), (10, False), (30, True), (30, False)]:
+    print(age, member, price(age, member), price_flat(age, member))
+```
+
+```
+10 True 0 0
+10 False 5 5
+30 True 8 8
+30 False 12 12
+```
+
+Both are correct, and which reads better is genuinely arguable here. The nested
+version makes the two-by-two structure visible: two ages, two membership
+states, four outcomes. The flat version reads as a list of rules in priority
+order, which is how a price list is usually written down.
+
+The point of running both is that flattening is not automatically an
+improvement. It is an improvement when the nesting was accidental &mdash; when
+the inner `if` was the whole body of the outer one, or when the branches were
+refusals. When the nesting reflects a genuine grid of cases, keeping it can be
+the honest thing to do.
+
+## Conditions that depend on each other
+
+There is one case where flattening with `and` is not merely a style choice but
+actually required, and it comes from short-circuiting.
+
+```python
+user = None
+if user is not None and user.active:
+    print("never reached, and never raises")
+print("fine")
+```
+
+```
+fine
+```
+
+`and` stops as soon as the left side is false, so `user.active` is never
+evaluated. Reverse the two halves and the same line raises `AttributeError`
+&mdash; the check that was supposed to protect the access happens after it.
+
+This is why nesting `if user is not None:` around `if user.active:` and
+flattening it to a single `and` are equivalent: both express "only ask the
+second question if the first was true". What is *not* equivalent is writing
+them in the other order, or joining them with `&`, which evaluates both sides
+unconditionally.
+
+The general shape is worth recognising. Any time one condition establishes that
+the next one is safe to ask &mdash; not `None`, non-empty, key present, index
+in range &mdash; the order is load-bearing and cannot be rearranged for
+readability.
+
+## Where the nesting actually came from
+
+Deep conditionals are rarely written that way. They accumulate, and the history
+is usually visible in the code.
+
+A function starts with one check. A bug report arrives and someone adds a
+second condition inside the first, because that is the smallest possible
+change and it does not disturb what is already there. Six months and four
+reports later there are five levels, each added by someone being careful.
+
+That is worth knowing because it tells you what the fix is. The problem is not
+that a particular developer wrote bad code; it is that adding a nested `if` is
+always the locally cheapest change, and nothing pushes back. The remedy is to
+treat depth as a review signal &mdash; when a change would add a fourth level,
+that is the moment to restructure, not later.
+
+The restructuring is nearly always one of three moves. Invert the refusals into
+guard clauses. Combine conditions that were only ever both-required. Or extract
+the inner block into a function with a name, which resets the indentation and
+gives the logic a label at the same time.
+
+## Writing the condition so it reads
+
+Flattening helps only if the resulting condition is readable, and a flattened
+condition can easily be worse than the nesting it replaced. Three habits keep
+it honest.
+
+**Avoid stacked negatives.** `if not (not active or banned)` is correct and
+nobody can evaluate it at a glance. De Morgan's rules let you push the negation
+inwards &mdash; `not (A or B)` is `not A and not B`, and `not (A and B)` is
+`not A or not B` &mdash; and the version with fewer negations is almost always
+the one to keep. Better still, name the positive: `if is_eligible:`.
+
+**Name the compound.** When a condition needs three clauses, assigning it to a
+well-named variable on the line before turns the `if` into a sentence.
+`can_borrow = user.active and not user.fines and book.available` followed by
+`if can_borrow:` reads as intent, and the name explains what the combination
+*means* rather than only what it checks.
+
+**Keep comparisons in a natural order.** `if 0 <= n < 100` reads as a range and
+chains correctly in Python, where most languages would need two comparisons and
+an `and`. Writing `if n >= 0 and n < 100` says the same thing with more to
+parse.
+
+The underlying test is whether a reader can say what the condition means
+without evaluating it. A staircase of simple conditions is sometimes easier to
+read than one flat condition that requires bookkeeping, and when that is true,
+the staircase is the right answer.
+
+## Every branch is a case to test
+
+Nesting has a cost that is invisible while writing and obvious while testing:
+the number of paths multiplies.
+
+Two nested conditions give four combinations. Three give eight. A function with
+four levels has sixteen paths through it, and the tests either cover all of
+them or leave some untried &mdash; and the ones left untried are, by
+construction, the unusual combinations where the bugs are.
+
+Guard clauses do not remove the combinations, but they change what a test has
+to do. Each guard is a single condition with a single outcome, testable on its
+own by passing one bad value and checking one message. The final line is the
+case where everything passed. The tests read as a list matching the guards, and
+a new rule adds one test rather than doubling the table.
+
+This is the practical argument for flattening, and it is stronger than the
+aesthetic one. A shape that makes each rule independently testable is a shape
+where a change to one rule cannot silently affect another &mdash; which is
+exactly the property a staircase does not have, because every inner branch sits
+inside the assumptions of every outer one.
+
+## Extracting the inner block
+
+The third remedy, after combining and inverting, is to give the inner block a
+name. It is the one people reach for last and it is often the best.
+
+When a conditional is deep because the innermost part is doing real work, the
+depth is telling you that two jobs are in one function: deciding, and doing.
+Moving the inner block into its own function leaves an outer function that
+reads as a sequence of decisions ending in a call, and an inner one that starts
+at the left margin with its own name explaining what it is for.
+
+The mechanical benefit is the indentation reset. The real benefit is the name.
+A block that was three levels deep and unlabelled becomes something with a
+title, which forces you to say what it does &mdash; and occasionally reveals
+that you cannot, because it was doing two things.
+
+This is also the move that makes the guard-clause style available where it was
+not. Guards need `return`, and a block buried in a loop inside a function has
+nowhere to return to; extract it, and the guards become possible inside the new
+function.
+
+## Questions people ask
+
+<strong>Is there a limit to how deep nesting can go?</strong> Python allows
+about twenty levels before the parser complains, which is far past the point
+where anyone can read it.
+
+<strong>Does flattening change performance?</strong> Not meaningfully. Both
+forms evaluate the same conditions in the same order.
+
+<strong>Should I use `elif` or a nested `if`?</strong> `elif` when the
+conditions are alternatives to each other, nesting when the second question
+only makes sense given the first.
+
+<strong>What about `match`?</strong> When the branching is on the shape or
+value of one object, `match` often expresses it more directly than either
+nesting or an `elif` chain.
+
+<strong>Can guard clauses be used outside a function?</strong> `continue` plays
+the same role inside a loop, and it is under-used for exactly this.
+
+<strong>Is an early `return` bad practice?</strong> The single-exit rule comes
+from languages with manual cleanup. In Python, early returns make guard clauses
+possible and are standard style.
+
+<strong>How do I handle "at least one of these must be true"?</strong> `or`, or
+`any()` over a list of conditions when there are more than two or three.
+
+## Recap in one screen
+
+- If the inner `if` is the entire body of the outer one, the two conditions are
+  an `and`.
+- Refusals belong at the top as guard clauses, so the main path stays at the
+  left margin and each rule sits beside its own message.
+- Genuine nesting is when the second question only makes sense given the first
+  &mdash; and short-circuiting makes the order load-bearing.
+- `elif` is one decision with several outcomes; reaching for nesting there
+  turns a flat choice into a staircase.
+- Three levels is a review signal: combine, invert, or extract a function.

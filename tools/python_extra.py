@@ -1015,32 +1015,6 @@ sequence, where the else still runs.
 
 
 add("nested_conditionals", """
-## Guard clauses, and why they read better
-
-A nested conditional builds a staircase: each condition indents the next, and by
-the third level the code that actually does something is a long way from the
-left margin. The alternative is to handle the exceptional cases first and leave
-early, so the main path stays at the top level.
-
-```python
-def borrow(user, book):
-    if not user.active:
-        return "membership inactive"
-    if user.fines > 0:
-        return "clear your fines first"
-    if not book.available:
-        return "already on loan"
-    return "enjoy the book"
-```
-
-Every line reads as one rule. Adding a rule is one line in the middle; removing
-one is deleting a line. The nested version needs re-indenting for either.
-
-The reason this works is that it separates "reasons you cannot" from "what
-happens when you can". Those are different kinds of statement, and the staircase
-version tangles them together, which is why it gets harder to read exactly as
-the number of rules grows.
-
 ## When nesting is genuinely right
 
 Guard clauses suit functions, because `return` is what makes them possible.
@@ -6110,4 +6084,654 @@ already handles.
 - Slicing clamps rather than raising, which is convenient and occasionally
   hides a wrong index.
 - A slice copies; assigning into a slice mutates, and can change the length.
+""")
+
+
+extend("nested_conditionals", """
+## The same logic, four ways
+
+One rule set written four ways, so the difference is shape rather than
+behaviour:
+
+```python
+def price(age, member):
+    if age < 18:
+        if member:
+            return 0
+        else:
+            return 5
+    else:
+        if member:
+            return 8
+        else:
+            return 12
+
+
+def price_flat(age, member):
+    if age < 18 and member:
+        return 0
+    if age < 18:
+        return 5
+    if member:
+        return 8
+    return 12
+
+
+for age, member in [(10, True), (10, False), (30, True), (30, False)]:
+    print(age, member, price(age, member), price_flat(age, member))
+```
+
+```
+10 True 0 0
+10 False 5 5
+30 True 8 8
+30 False 12 12
+```
+
+Both are correct, and which reads better is genuinely arguable here. The nested
+version makes the two-by-two structure visible: two ages, two membership
+states, four outcomes. The flat version reads as a list of rules in priority
+order, which is how a price list is usually written down.
+
+The point of running both is that flattening is not automatically an
+improvement. It is an improvement when the nesting was accidental &mdash; when
+the inner `if` was the whole body of the outer one, or when the branches were
+refusals. When the nesting reflects a genuine grid of cases, keeping it can be
+the honest thing to do.
+
+## Conditions that depend on each other
+
+There is one case where flattening with `and` is not merely a style choice but
+actually required, and it comes from short-circuiting.
+
+```python
+user = None
+if user is not None and user.active:
+    print("never reached, and never raises")
+print("fine")
+```
+
+```
+fine
+```
+
+`and` stops as soon as the left side is false, so `user.active` is never
+evaluated. Reverse the two halves and the same line raises `AttributeError`
+&mdash; the check that was supposed to protect the access happens after it.
+
+This is why nesting `if user is not None:` around `if user.active:` and
+flattening it to a single `and` are equivalent: both express "only ask the
+second question if the first was true". What is *not* equivalent is writing
+them in the other order, or joining them with `&`, which evaluates both sides
+unconditionally.
+
+The general shape is worth recognising. Any time one condition establishes that
+the next one is safe to ask &mdash; not `None`, non-empty, key present, index
+in range &mdash; the order is load-bearing and cannot be rearranged for
+readability.
+
+## Where the nesting actually came from
+
+Deep conditionals are rarely written that way. They accumulate, and the history
+is usually visible in the code.
+
+A function starts with one check. A bug report arrives and someone adds a
+second condition inside the first, because that is the smallest possible
+change and it does not disturb what is already there. Six months and four
+reports later there are five levels, each added by someone being careful.
+
+That is worth knowing because it tells you what the fix is. The problem is not
+that a particular developer wrote bad code; it is that adding a nested `if` is
+always the locally cheapest change, and nothing pushes back. The remedy is to
+treat depth as a review signal &mdash; when a change would add a fourth level,
+that is the moment to restructure, not later.
+
+The restructuring is nearly always one of three moves. Invert the refusals into
+guard clauses. Combine conditions that were only ever both-required. Or extract
+the inner block into a function with a name, which resets the indentation and
+gives the logic a label at the same time.
+
+## Writing the condition so it reads
+
+Flattening helps only if the resulting condition is readable, and a flattened
+condition can easily be worse than the nesting it replaced. Three habits keep
+it honest.
+
+**Avoid stacked negatives.** `if not (not active or banned)` is correct and
+nobody can evaluate it at a glance. De Morgan's rules let you push the negation
+inwards &mdash; `not (A or B)` is `not A and not B`, and `not (A and B)` is
+`not A or not B` &mdash; and the version with fewer negations is almost always
+the one to keep. Better still, name the positive: `if is_eligible:`.
+
+**Name the compound.** When a condition needs three clauses, assigning it to a
+well-named variable on the line before turns the `if` into a sentence.
+`can_borrow = user.active and not user.fines and book.available` followed by
+`if can_borrow:` reads as intent, and the name explains what the combination
+*means* rather than only what it checks.
+
+**Keep comparisons in a natural order.** `if 0 <= n < 100` reads as a range and
+chains correctly in Python, where most languages would need two comparisons and
+an `and`. Writing `if n >= 0 and n < 100` says the same thing with more to
+parse.
+
+The underlying test is whether a reader can say what the condition means
+without evaluating it. A staircase of simple conditions is sometimes easier to
+read than one flat condition that requires bookkeeping, and when that is true,
+the staircase is the right answer.
+
+## Every branch is a case to test
+
+Nesting has a cost that is invisible while writing and obvious while testing:
+the number of paths multiplies.
+
+Two nested conditions give four combinations. Three give eight. A function with
+four levels has sixteen paths through it, and the tests either cover all of
+them or leave some untried &mdash; and the ones left untried are, by
+construction, the unusual combinations where the bugs are.
+
+Guard clauses do not remove the combinations, but they change what a test has
+to do. Each guard is a single condition with a single outcome, testable on its
+own by passing one bad value and checking one message. The final line is the
+case where everything passed. The tests read as a list matching the guards, and
+a new rule adds one test rather than doubling the table.
+
+This is the practical argument for flattening, and it is stronger than the
+aesthetic one. A shape that makes each rule independently testable is a shape
+where a change to one rule cannot silently affect another &mdash; which is
+exactly the property a staircase does not have, because every inner branch sits
+inside the assumptions of every outer one.
+
+## Extracting the inner block
+
+The third remedy, after combining and inverting, is to give the inner block a
+name. It is the one people reach for last and it is often the best.
+
+When a conditional is deep because the innermost part is doing real work, the
+depth is telling you that two jobs are in one function: deciding, and doing.
+Moving the inner block into its own function leaves an outer function that
+reads as a sequence of decisions ending in a call, and an inner one that starts
+at the left margin with its own name explaining what it is for.
+
+The mechanical benefit is the indentation reset. The real benefit is the name.
+A block that was three levels deep and unlabelled becomes something with a
+title, which forces you to say what it does &mdash; and occasionally reveals
+that you cannot, because it was doing two things.
+
+This is also the move that makes the guard-clause style available where it was
+not. Guards need `return`, and a block buried in a loop inside a function has
+nowhere to return to; extract it, and the guards become possible inside the new
+function.
+
+## Questions people ask
+
+<strong>Is there a limit to how deep nesting can go?</strong> Python allows
+about twenty levels before the parser complains, which is far past the point
+where anyone can read it.
+
+<strong>Does flattening change performance?</strong> Not meaningfully. Both
+forms evaluate the same conditions in the same order.
+
+<strong>Should I use `elif` or a nested `if`?</strong> `elif` when the
+conditions are alternatives to each other, nesting when the second question
+only makes sense given the first.
+
+<strong>What about `match`?</strong> When the branching is on the shape or
+value of one object, `match` often expresses it more directly than either
+nesting or an `elif` chain.
+
+<strong>Can guard clauses be used outside a function?</strong> `continue` plays
+the same role inside a loop, and it is under-used for exactly this.
+
+<strong>Is an early `return` bad practice?</strong> The single-exit rule comes
+from languages with manual cleanup. In Python, early returns make guard clauses
+possible and are standard style.
+
+<strong>How do I handle "at least one of these must be true"?</strong> `or`, or
+`any()` over a list of conditions when there are more than two or three.
+
+## Recap in one screen
+
+- If the inner `if` is the entire body of the outer one, the two conditions are
+  an `and`.
+- Refusals belong at the top as guard clauses, so the main path stays at the
+  left margin and each rule sits beside its own message.
+- Genuine nesting is when the second question only makes sense given the first
+  &mdash; and short-circuiting makes the order load-bearing.
+- `elif` is one decision with several outcomes; reaching for nesting there
+  turns a flat choice into a staircase.
+- Three levels is a review signal: combine, invert, or extract a function.
+""")
+
+
+extend("args_and_kwargs", """
+## Keyword-only and positional-only, and why they exist
+
+The stars do a second job besides collecting: they mark boundaries in a
+signature. Two markers control how callers are allowed to pass arguments.
+
+A bare `*` makes everything after it keyword-only:
+
+```python
+def connect(host, *, timeout=30, retries=3):
+    return host, timeout, retries
+
+
+print(connect("db", timeout=5))
+try:
+    connect("db", 5)
+except TypeError as e:
+    print("TypeError:", e)
+```
+
+```
+('db', 5, 3)
+TypeError: connect() takes 1 positional argument but 2 were given
+```
+
+The reason to want this is readability at the call site. `connect("db", 5, 2)`
+tells a reader nothing about what 5 and 2 mean, and it silently changes meaning
+if the parameter order is ever edited. Forcing the names makes the call
+self-documenting and makes reordering the parameters a safe change.
+
+A `/` does the opposite, marking everything before it positional-only:
+
+```python
+def distance(x, y, /):
+    return abs(x - y)
+```
+
+Now `distance(3, 5)` works and `distance(x=3, y=5)` does not. This is rarer,
+and the reason is the mirror image: it keeps the parameter *names* out of the
+API, so they can be renamed later without breaking callers. Most builtins are
+positional-only for exactly that reason, which is why `len(obj=x)` fails.
+
+The rule of thumb: make a parameter keyword-only when its meaning is not
+obvious from the call site, which in practice means flags, options and
+anything numeric that is not the main subject.
+
+## What the stars cost you
+
+`*args, **kwargs` accepts everything, and the price is paid by every reader and
+every tool afterwards.
+
+The signature stops documenting anything. `def process(*args, **kwargs)` tells
+the next person nothing about what to pass, and the only way to find out is to
+read the body &mdash; and then the body of whatever it forwards to.
+
+Editors and type checkers lose their grip. Autocompletion has nothing to
+suggest, and a type checker cannot verify a call it cannot see the shape of.
+For a codebase using type hints, a star signature is a hole in the coverage
+that propagates to every caller.
+
+Errors move. A misspelled keyword argument would normally raise
+`TypeError: unexpected keyword argument 'timeuot'` at the call, naming the
+mistake. Absorbed into `**kwargs` it becomes a missing key later, or &mdash;
+worse &mdash; a default silently used instead of the value you passed, which
+produces wrong output and no error at all.
+
+None of that is an argument against the feature; it is an argument about where
+to use it. Wrappers and subclass forwarding need it and pay none of the cost,
+because there is no meaningful signature to state. A function people call
+directly should name its parameters.
+
+## Unpacking in the other direction
+
+The two stars appear in three places and mean the same thing in all of them,
+which is easier to hold on to than three separate rules.
+
+In a **definition** they collect: `def f(*args)` gathers loose positional
+arguments into a tuple.
+
+At a **call site** they spread: `f(*items)` hands each item over as a separate
+argument.
+
+In a **literal** they merge: `[*a, *b]` builds one list from two, and
+`{**a, **b}` builds one dictionary from two, with later keys winning.
+
+The last is worth dwelling on because it has quietly become the standard way to
+combine collections:
+
+```python
+defaults = {"colour": "red", "size": 1}
+overrides = {"size": 3}
+
+print({**defaults, **overrides})
+print([*"ab", *"cd"])
+```
+
+```
+{'colour': 'red', 'size': 3}
+['a', 'b', 'c', 'd']
+```
+
+Both build a new object and leave the originals alone, which is the difference
+from `update` and `extend`. And in assignment the star runs backwards again:
+`first, *rest = items` collects rather than spreads, because the star is on the
+receiving side.
+
+## A decorator, concretely
+
+The pass-through pattern exists mainly so that decorators can be written, and
+seeing one whole makes the pieces click:
+
+```python
+import functools
+
+def announce(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        print("calling", func.__name__, "with", args, kwargs)
+        result = func(*args, **kwargs)
+        print("->", result)
+        return result
+    return wrapper
+
+
+@announce
+def add(a, b=0):
+    return a + b
+
+
+print(add(2, b=3))
+print(add.__name__)
+```
+
+```
+calling add with (2,) {'b': 3}
+-> 5
+5
+add
+```
+
+Four things are happening. `announce` takes a function and returns a
+replacement. `wrapper` accepts anything with `*args, **kwargs`, so it can stand
+in front of any function at all. The forwarding call `func(*args, **kwargs)`
+spreads them back out, so `add` receives exactly what the caller wrote. And
+`@announce` above `def add` is shorthand for `add = announce(add)`.
+
+`functools.wraps` is the part people leave out and then miss. Without it,
+`add.__name__` prints `wrapper`, the docstring is gone, and every traceback
+through the decorated function names the wrapper instead of the function. It
+copies the identifying attributes across, and it is one line.
+
+Note how the arguments arrive: `2` in `args` and `b=3` in `kwargs`, exactly as
+the caller passed them. The wrapper does not know or need to know that `add`
+has a parameter called `b`.
+
+## Asking a function what it accepts
+
+When you do need to know the signature &mdash; validating a plugin, building a
+command-line interface, writing a framework &mdash; `inspect` answers it rather
+than parsing the source:
+
+`inspect.signature(func)` returns an object listing the parameters, their
+defaults, their kinds (positional, keyword-only, `*args`, `**kwargs`) and any
+annotations. `sig.bind(*args, **kwargs)` matches a proposed call against it and
+raises the same `TypeError` the real call would, which is how you check
+arguments before doing expensive work.
+
+This is also how a decorator can be smarter than pure forwarding. A caching
+decorator that wants a stable key needs to know that `f(1)` and `f(a=1)` are
+the same call; `sig.bind` plus `apply_defaults` normalises both to the same
+thing, which no amount of inspecting `args` and `kwargs` directly will do.
+
+## The star in assignment
+
+The same star appears in assignment, and it is worth connecting to the rest
+rather than learning separately.
+
+`first, *rest = items` binds the first item and collects everything else into a
+list. `*most, last = items` does the mirror image. `a, *middle, b = items` takes
+both ends and collects what is between them. In each case the starred name gets
+a list &mdash; always a list, even when the right-hand side was a tuple or a
+string.
+
+This is the collecting sense of the star, the same as in a definition: the
+star marks the name that absorbs however many items are left over. The
+spreading sense is what you get on the other side of the equals sign, in a call
+or a literal.
+
+Only one star is allowed per assignment, for the obvious reason that two would
+make the split ambiguous. And the non-starred names are still required: unpacking
+`a, *rest = []` raises, because there is nothing for `a`, while `*rest, = []`
+succeeds and gives an empty list.
+
+## Questions people ask
+
+<strong>Do the names `args` and `kwargs` matter?</strong> No, the stars carry
+the meaning. The names are a strong convention in general-purpose wrappers and
+worth replacing with something descriptive elsewhere.
+
+<strong>Can I have `*args` without `**kwargs`?</strong> Yes, and the reverse.
+They are independent.
+
+<strong>What order do they go in?</strong> Named parameters, then `*args`, then
+keyword-only parameters, then `**kwargs`.
+
+<strong>Is `**kwargs` ordered?</strong> Yes, it is a normal dictionary and
+keeps the order the caller used.
+
+<strong>Can I pass a list where `*args` is expected?</strong> Only with a star:
+`f(*items)`. Without it you pass the list as a single argument.
+
+<strong>Why does `f(**d)` fail with "keywords must be strings"?</strong>
+Because a dictionary with non-string keys cannot be turned into keyword
+arguments.
+
+<strong>How do I forward everything including the function's own new
+option?</strong> Take it as keyword-only, and forward `*args, **kwargs`
+unchanged: the new option is bound by name and never reaches the wrapped call.
+
+## Recap in one screen
+
+- One star collects positional arguments into a tuple; two collect keyword
+  arguments into a dictionary.
+- The same stars at a call site spread a collection back into arguments, and in
+  a literal they merge collections.
+- A bare `*` in a signature makes what follows keyword-only; a `/` makes what
+  precedes it positional-only.
+- The pass-through `f(*args, **kwargs)` is what makes decorators and wrappers
+  possible without knowing any signature.
+- A star signature costs documentation, tooling and clear errors &mdash; use it
+  where there is no meaningful signature to state, not to avoid writing one.
+""")
+
+
+extend("type_conversion", """
+## What each constructor actually accepts
+
+The type names double as conversions, and each has its own idea of what it will
+take. Seeing them side by side removes most of the surprises:
+
+```python
+print(int("  42  "), int("1_000"), int("ff", 16))
+print(float("1e3"), float("  .5 "))
+print(list("abc"), list({"a": 1}), tuple([1, 2]))
+print(str([1, 2]), str(None))
+```
+
+```
+42 1000 255
+1000.0 0.5
+['a', 'b', 'c'] ['a'] (1, 2)
+[1, 2] None
+```
+
+`int` tolerates surrounding whitespace and the underscores Python allows in
+numeric literals, and takes a base as a second argument &mdash; which is how
+you read hexadecimal, binary and octal from text without writing a parser.
+
+`list` on a dictionary gives its **keys**, not its items, which catches people
+who expected pairs. `list` on a string gives characters, which is occasionally
+what you want and more often a sign that `split` was meant.
+
+`str` never fails. Every object has a string form, so `str(x)` always returns
+something &mdash; which is convenient and means a bug can travel a long way
+disguised as text. `str(None)` is the string `"None"`, and a `"None"` written
+into a CSV column is a classic way to lose the distinction between missing and
+present.
+
+## Parsing a boolean from text
+
+There is no conversion for this, and reaching for `bool` is the mistake
+everyone makes once:
+
+```python
+print(bool("False"), bool("0"), bool(""))
+```
+
+```
+True True False
+```
+
+`bool` on a string asks only whether the string is empty. `"False"` and `"0"`
+are both non-empty, so both are `True`, which is precisely backwards from what
+the text says.
+
+Reading a boolean out of a config file, an environment variable or a form means
+deciding what counts, and then saying so:
+
+```python
+TRUE = {"1", "true", "yes", "on"}
+
+def as_bool(text):
+    return str(text).strip().lower() in TRUE
+```
+
+That is a policy rather than a conversion, which is why the language does not
+provide one &mdash; different formats disagree about whether `"y"`, `"on"` or
+`"enabled"` should count, and about what an unrecognised value means. Deciding
+explicitly is the point.
+
+## Where conversion loses information
+
+Some conversions are exact and some throw information away, and knowing which
+is which prevents a family of quiet bugs.
+
+`int(3.9)` discards the fractional part. `int` from a large float loses
+precision before it even starts, because the float never held the exact value.
+`float(some_big_int)` is worse: integers in Python are unbounded, floats are
+not, so a sufficiently large integer converts to a float that is merely nearby,
+and converting back does not return the original.
+
+`str` of a float is lossy in the other direction historically, though modern
+Python prints the shortest string that round-trips exactly, so
+`float(str(x)) == x` holds.
+
+`set(items)` discards duplicates and order. `dict(pairs)` discards all but the
+last value for each repeated key. Neither reports what it dropped, and both are
+sometimes used deliberately for exactly that effect &mdash; which is why the
+loss has to be intentional rather than discovered.
+
+The habit worth forming: when a conversion narrows &mdash; float to int, list
+to set, anything to `str` &mdash; ask what happens to what does not fit. When
+it widens, as int to float or str to list, there is usually nothing to worry
+about.
+
+## The numeric types beyond int and float
+
+`int` and `float` cover most work, and two more exist for cases where floats
+give the wrong answer.
+
+`decimal.Decimal` represents numbers in base ten, so `Decimal("0.1") * 3` is
+exactly `Decimal("0.3")` rather than a hair off. It is the right type for
+money, invoices, tax and anything where a result will be compared against a
+figure a person calculated. Build it from a **string**, not a float:
+`Decimal(0.1)` faithfully captures the float's error, which defeats the point.
+
+`fractions.Fraction` holds an exact ratio, so `Fraction(1, 3) * 3` is exactly
+1. It is the right type for exact rational arithmetic, and it is slower and
+grows in memory as denominators multiply, so it belongs in calculations rather
+than in stored data.
+
+Both convert to and from the ordinary types, and both interoperate with `int`
+&mdash; but mixing either with `float` in one expression converts back to
+`float` and reintroduces the error you were avoiding, which is the trap. If a
+calculation is meant to be exact, every value in it has to be the exact type.
+
+`complex` also exists, written `3+4j`, and is genuinely used in signal
+processing and geometry. It is worth knowing mainly so that `j` in a numeric
+literal is not a mystery.
+
+## Convert once, at the edge
+
+The thread running through this page is that conversion is a decision, and the
+useful discipline is to make each decision exactly once, where the data enters
+the program.
+
+A value read from a file, a form, an environment variable or an API is text. If
+it is converted at the point of use, every use site repeats the conversion,
+every use site has to handle the failure, and the sites will eventually
+disagree &mdash; one treats an empty string as zero, another as an error, a
+third crashes. The type of the value becomes something a reader has to infer
+from context.
+
+Converting at the boundary means one place decides what a bad value means, and
+everything after that point works with a real `int`, `date` or `Decimal`. The
+error, when it comes, names the input and the field rather than surfacing as a
+`TypeError` deep in a calculation.
+
+This is the same argument as validating nested data at the boundary, and the
+same argument for keyword-only parameters: push the ambiguity to one place, as
+early as possible, and let everything downstream rely on what it was given.
+
+## The one conversion Python does silently
+
+Everything on this page says Python refuses to convert without being asked,
+which is true with one systematic exception: numeric promotion.
+
+Mixing an `int` and a `float` in an expression converts the `int` to a `float`
+first, so `1 + 2.0` gives `3.0` and `1 / 2` gives `0.5` rather than `0`. Mixing
+a `bool` with a number treats `True` as 1 and `False` as 0, which is why
+`sum([True, False, True])` is 2 &mdash; occasionally useful for counting how
+many conditions held, and occasionally a surprise.
+
+The rule is that Python converts within the numeric tower only, and only in the
+widening direction, where nothing is lost. `int` to `float` is allowed; `str`
+to anything is not. That is why `True + 1` works and `"1" + 1` does not, which
+looks inconsistent until you see the boundary it is drawing.
+
+The one place the widening does lose something is very large integers, where
+converting to `float` loses precision even though the conversion is nominally
+widening. It is the exception to the exception, and it only bites at magnitudes
+most programs never reach.
+
+## Questions people ask
+
+<strong>Why does `int("3.9")` fail when `int(3.9)` works?</strong> The string is
+not an integer literal, so it refuses rather than choosing a rounding
+direction. Use `int(float("3.9"))` when you mean truncation.
+
+<strong>How do I convert a list of strings to numbers?</strong>
+`[int(x) for x in items]`, or `list(map(int, items))`.
+
+<strong>What is the difference between `str` and `repr`?</strong> `str` is for
+people, `repr` is for programmers and aims to be unambiguous. `print` uses
+`str`; the interactive prompt and containers use `repr`.
+
+<strong>Why is `0.1 + 0.2` not `0.3`?</strong> Binary floating point cannot
+represent those decimals exactly. Use `math.isclose` to compare, or
+`decimal.Decimal` for money.
+
+<strong>Does `int()` round or truncate?</strong> Truncates toward zero, so
+`int(-3.9)` is `-3`. `round` is the one that rounds.
+
+<strong>How do I convert between a string and bytes?</strong>
+`text.encode("utf-8")` and `data.decode("utf-8")`. Both need an encoding, and
+guessing is where mojibake comes from.
+
+<strong>Can I convert a dictionary to a list of pairs?</strong>
+`list(d.items())`. Plain `list(d)` gives the keys.
+
+## Recap in one screen
+
+- Each type's name is its conversion; there is nothing extra to memorise.
+- Input is always text, and Python will never convert it for you &mdash; that
+  refusal is what makes `"3" + 4` an error rather than a silent bug.
+- `int` from a string is strict, `int` from a float truncates toward zero, and
+  `round` rounds halves to even.
+- `bool` on a string only asks whether it is empty, so parsing a boolean from
+  text needs an explicit mapping.
+- Narrowing conversions lose information silently &mdash; duplicates, order,
+  precision, the difference between missing and `"None"`.
 """)

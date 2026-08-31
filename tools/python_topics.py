@@ -2126,20 +2126,6 @@ if age &gt;= 18 and member:
 
 Same behaviour, one level of indentation, and the condition reads as one thought instead of two.
 
-## When it genuinely nests
-
-Nesting earns its place when the branches diverge &mdash; when the inner decision only makes sense inside the outer one, and each has its own alternative:
-
-
-```python
-if age < 18:
-    return 0 if member else 5
-return 8 if member else 12
-```
-
-
-Here "member" means something different in each branch. That is a real tree, not an accidental one.
-
 ## Guard clauses flatten the rest
 
 The most common nested shape is a series of refusals, each with an `else`:
@@ -3053,50 +3039,11 @@ int(text) + int(text)
 
 This is the single most common source of confusion for beginners, and it is not really about conversion &mdash; it is about noticing that input is always a string.
 
-## int() is strict about strings and loose about floats
-
-
-```python
-int("3.9")  # ValueError
-int(3.9)    # 3
-```
-
-
-From a string, `int` refuses anything that is not a whole number, because guessing which way to go would be a decision it has no business making. From a float, it truncates toward zero &mdash; `int(-3.9)` is `-3`, not `-4`. If you want nearest, say `round`.
-
-It does tolerate surrounding whitespace, which is convenient when parsing scruffy input.
-
-## round() does not round half up
-
-
-```python
-round(2.5)  # 2
-round(3.5)  # 4
-```
-
-
-On an exact tie, Python rounds to the nearest <em>even</em> number. This is deliberate: always rounding halves up biases a long run of numbers upward. It surprises people once, and it is correct.
-
 ## Floats are not decimals
 
 0.1 + 0.2 == 0.3&nbsp;&nbsp;# False
 
 Binary floating point cannot represent 0.1 exactly, so the sum is a hair off. This is not a Python quirk; it is how floats work everywhere. Compare with a tolerance, round before comparing, or use `decimal.Decimal` for money.
-
-## Converting safely
-
-Do not check first &mdash; try, and handle the failure:
-
-
-```python
-try:
-    return int(text)
-except (ValueError, TypeError):
-    return default
-```
-
-
-`ValueError` covers bad text and `TypeError` covers `None`. Testing `text.isdigit()` first looks tidier and gets negative numbers and whitespace wrong.
 
 ## bool() is broader than it looks
 
