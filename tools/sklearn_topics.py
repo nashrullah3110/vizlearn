@@ -4569,6 +4569,10 @@ A column transformer that misbehaves is harder to inspect than a plain pipeline,
 
 The general lesson is that the object is introspectable at every level; the difficulty is only that the useful attributes have to be asked for by name.
 
+<strong>Does it work with NumPy arrays?</strong> Yes, selecting by integer position rather than by name. Names are worth the DataFrame, since positions shift whenever a column is added.
+
+<strong>Can a branch return a sparse matrix?</strong> Yes, and the result is sparse if enough of it is. `sparse_threshold=0` forces a dense output when the next step needs one.
+
 ## Things to try
 
 1. <strong>Watch the shape change.</strong> The first editor turns three columns into five. Read the names to see which came from where.
