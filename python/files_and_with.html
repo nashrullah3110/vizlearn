@@ -342,16 +342,8 @@ f.readlines()  # a list of lines
 for line in f: # one line at a time</code></pre><p>The third is the one to reach for by default. It holds a single line in memory regardless of file size, so it works on a file larger than your RAM, and it reads no worse than the others.</p><p>Lines keep their trailing <code>\n</code>, which is why <code>line.rstrip()</code> appears in almost every loop over a file.</p>
                 </div>
                 <div>
-                    <h3>The modes</h3>
-                    <p>"r"&nbsp;&nbsp;read, the default &mdash; raises if the file is missing<br>"w"&nbsp;&nbsp;write &mdash; <strong>truncates immediately</strong><br>"a"&nbsp;&nbsp;append &mdash; writes to the end<br>"x"&nbsp;&nbsp;create &mdash; raises if it already exists</p><p><code>"w"</code> is the dangerous one. It empties the file the moment it is opened, before you write anything, so an <code>open(path, "w")</code> that then raises leaves you with nothing. When you mean "add to this", <code>"a"</code> is the mode.</p><p><code>"x"</code> is worth remembering when overwriting would be a bug: it refuses rather than destroying.</p>
-                </div>
-                <div>
                     <h3>Missing files raise</h3>
                     <p><code>open("nope.txt")</code> raises <code>FileNotFoundError</code>, it does not return an empty file. Handle it, or let it propagate &mdash; both are reasonable, but do not check with <code>os.path.exists</code> first: the file can disappear between the check and the open, and the <code>try</code> handles that correctly anyway.</p>
-                </div>
-                <div>
-                    <h3>Text and encoding</h3>
-                    <p>Files open in text mode and decode using your platform's default encoding, which differs between machines. For anything portable, say what you mean: <code>open(path, encoding="utf-8")</code>.</p>
                 </div>
                 <div>
                     <h3>Paths, and why pathlib is worth the switch</h3>
@@ -363,12 +355,6 @@ text = data.read_text(encoding=&quot;utf-8&quot;)</code></pre><p><code>read_text
                 <div>
                     <h3>Encoding is not optional in practice</h3>
                     <p>Text mode decodes bytes into a string using an encoding, and if you do not name one, Python uses the platform default. That default differs between machines, which is how a script that works on one computer produces <code>UnicodeDecodeError</code> on another, with data that has not changed.</p><p>Naming it removes the whole class of problem:</p><pre><code class="language-python">open(path, encoding=&quot;utf-8&quot;)</code></pre><p>If you are handling files you did not create and cannot assume, <code>errors="replace"</code> lets you read something rather than crashing, at the cost of substituting the bytes it could not decode.</p>
-                </div>
-                <div>
-                    <h3>Writing safely</h3>
-                    <p>Writing directly over the only copy of a file has an obvious failure mode: if the program dies halfway, the original is gone and the replacement is incomplete. The standard remedy is to write beside it and rename:</p><pre><code class="language-python">tmp = path.with_suffix(&quot;.tmp&quot;)
-tmp.write_text(new_content, encoding=&quot;utf-8&quot;)
-tmp.replace(path)</code></pre><p><code>replace</code> is atomic on the same filesystem, so a reader sees either the old file or the new one and never a half-written one.</p>
                 </div>
                 <div>
                     <h3>Binary mode</h3>
@@ -388,7 +374,9 @@ tmp.replace(path)</code></pre><p><code>replace</code> is atomic on the same file
                 </div>
                 <div>
                     <h3>Writing safely</h3>
-                    <p>The pattern for not losing data when writing goes wrong is to write to a temporary file and rename it into place once it is complete.</p><p>Renaming within a filesystem is atomic, so any reader sees either the old file or the new one, never a half-written one. Without it, a crash partway through leaves a truncated file that looks valid.</p><p>That matters for anything another process reads, anything run on a schedule, and anything whose loss would be noticed. For a scratch file it is over-engineering.</p><p><code>f.write()</code> does not add newlines. <code>print(..., file=f)</code> does, which is often the more convenient way to write text line by line.</p>
+                    <p>The pattern for not losing data when writing goes wrong is to write to a temporary file and rename it into place once it is complete.</p><p>Renaming within a filesystem is atomic, so any reader sees either the old file or the new one, never a half-written one. Without it, a crash partway through leaves a truncated file that looks valid.</p><p>That matters for anything another process reads, anything run on a schedule, and anything whose loss would be noticed. For a scratch file it is over-engineering.</p><p><code>f.write()</code> does not add newlines. <code>print(..., file=f)</code> does, which is often the more convenient way to write text line by line.</p><pre><code class="language-python">tmp = path.with_suffix(&quot;.tmp&quot;)
+tmp.write_text(new_content, encoding=&quot;utf-8&quot;)
+tmp.replace(path)</code></pre>
                 </div>
                 <div>
                     <h3>Encoding</h3>

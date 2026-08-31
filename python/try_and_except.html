@@ -349,21 +349,13 @@ except ValueError:
                 </div>
                 <div>
                     <h3>Catch what you expect, nothing more</h3>
-                    <p>except:&nbsp;&nbsp;&nbsp;&nbsp;# catches everything</p><p>This is almost always a mistake. It catches the error you were thinking of, and also your typos, your <code>NameError</code>s, your <code>AttributeError</code>s from a refactor you half-finished. The program stops crashing and starts producing wrong answers quietly, which is strictly worse: a crash tells you where to look.</p><p>The second program on this page has a deliberate typo inside a bare <code>except</code>. It returns 0, cheerfully, and nothing anywhere says a name was misspelled.</p><p>Name the exception:</p><p>except ValueError:<br>except (KeyError, IndexError):<br>except Exception as e:&nbsp;&nbsp;# broad, but at least not BaseException</p>
+                    <p>except:&nbsp;&nbsp;&nbsp;&nbsp;# catches everything</p><p>This is almost always a mistake. It catches the error you were thinking of, and also your typos, your <code>NameError</code>s, your <code>AttributeError</code>s from a refactor you half-finished. The program stops crashing and starts producing wrong answers quietly, which is strictly worse: a crash tells you where to look.</p><p>The second program on this page has a deliberate typo inside a bare <code>except</code>. It returns 0, cheerfully, and nothing anywhere says a name was misspelled.</p><p>Name the exception:</p><p>except ValueError:<br>except (KeyError, IndexError):<br>except Exception as e:&nbsp;&nbsp;# broad, but at least not BaseException</p><pre><code class="language-python">if age &lt; 0:
+    raise ValueError(f&quot;age cannot be negative, got {age}&quot;)</code></pre>
                 </div>
                 <div>
                     <h3>as e, and why you want it</h3>
                     <pre><code class="language-python">except ValueError as e:
     print(&quot;could not convert:&quot;, e)</code></pre><p>The exception object carries the detail &mdash; which key was missing, which value would not parse. Discarding it and printing "something went wrong" throws away the only part that would have helped.</p>
-                </div>
-                <div>
-                    <h3>else and finally</h3>
-                    <ul><li><code>else</code> runs when the <code>try</code> block raised nothing. It keeps the risky line alone in the <code>try</code>, so the handler cannot accidentally catch an error from the follow-up code.</li><li><code>finally</code> runs either way, raised or not. It is where cleanup goes.</li></ul><p>For files and locks, prefer <code>with</code>, which does the same job with less ceremony.</p>
-                </div>
-                <div>
-                    <h3>Raising your own</h3>
-                    <p>Handling is half of it. When a caller hands you something impossible, say so:</p><pre><code class="language-python">if age &lt; 0:
-    raise ValueError(f&quot;age cannot be negative, got {age}&quot;)</code></pre><p>Include the offending value in the message. "Invalid input" costs the next person a debugging session; "got -1" ends it immediately.</p>
                 </div>
                 <div>
                     <h3>Ask forgiveness, not permission</h3>
@@ -387,7 +379,11 @@ except ValueError:
                 </div>
                 <div>
                     <h3>Catch what you can handle</h3>
-                    <p>The instinct when something raises is to wrap it in <code>try</code> and move on. The question worth asking first is what the <code>except</code> block will actually do about it.</p><p>If the answer is "log it and continue with a sensible default", catching is right. If the answer is "print something and carry on with data that is now wrong", the exception was doing its job by stopping the program, and catching it has converted a loud failure into a quiet one.</p><p>A caught exception should leave the program in a state you could defend. When it cannot, letting it propagate is the better choice &mdash; a traceback that reaches the user is more useful than a program that continues incorrectly.</p>
+                    <p>The instinct when something raises is to wrap it in <code>try</code> and move on. The question worth asking first is what the <code>except</code> block will actually do about it.</p><p>If the answer is "log it and continue with a sensible default", catching is right. If the answer is "print something and carry on with data that is now wrong", the exception was doing its job by stopping the program, and catching it has converted a loud failure into a quiet one.</p><p>A caught exception should leave the program in a state you could defend. When it cannot, letting it propagate is the better choice &mdash; a traceback that reaches the user is more useful than a program that continues incorrectly.</p><pre><code class="language-python">try:
+    row = parse(line)
+    total += row.amount      # a typo here is caught as a parse failure
+except ValueError:
+    skipped += 1</code></pre>
                 </div>
                 <div>
                     <h3>Name the exception</h3>
@@ -395,14 +391,6 @@ except ValueError:
     value = int(raw)
 except ValueError:
     value = None</code></pre><p>Several can be named together with a tuple, <code>except (ValueError, TypeError):</code>, which is the right form when the handling is the same.</p><p>Bare <code>except:</code> is worse still, because it also catches <code>KeyboardInterrupt</code> and <code>SystemExit</code>, so a script becomes impossible to stop with Ctrl-C.</p>
-                </div>
-                <div>
-                    <h3>Keep the try small</h3>
-                    <p>Everything inside the <code>try</code> is protected, including the lines you did not mean to protect:</p><pre><code class="language-python">try:
-    row = parse(line)
-    total += row.amount      # a typo here is caught as a parse failure
-except ValueError:
-    skipped += 1</code></pre><p>If <code>row.amount</code> raises, the handler records a skipped row and the real bug is invisible.</p><p>The narrow version puts only the risky call inside and everything else after, which keeps the handler honest about what it is handling.</p>
                 </div>
                 <div>
                     <h3>else and finally</h3>

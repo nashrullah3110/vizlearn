@@ -26,6 +26,10 @@ Name the exception:
 
 except ValueError:<br>except (KeyError, IndexError):<br>except Exception as e:&nbsp;&nbsp;# broad, but at least not BaseException
 
+```python
+if age < 0:
+    raise ValueError(f"age cannot be negative, got {age}")
+```
 ## as e, and why you want it
 
 
@@ -36,26 +40,6 @@ except ValueError as e:
 
 
 The exception object carries the detail &mdash; which key was missing, which value would not parse. Discarding it and printing "something went wrong" throws away the only part that would have helped.
-
-## else and finally
-
-- `else` runs when the `try` block raised nothing. It keeps the risky line alone in the `try`, so the handler cannot accidentally catch an error from the follow-up code.
-- `finally` runs either way, raised or not. It is where cleanup goes.
-
-For files and locks, prefer `with`, which does the same job with less ceremony.
-
-## Raising your own
-
-Handling is half of it. When a caller hands you something impossible, say so:
-
-
-```python
-if age < 0:
-    raise ValueError(f"age cannot be negative, got {age}")
-```
-
-
-Include the offending value in the message. "Invalid input" costs the next person a debugging session; "got -1" ends it immediately.
 
 ## Ask forgiveness, not permission
 
@@ -126,6 +110,13 @@ A caught exception should leave the program in a state you could defend. When
 it cannot, letting it propagate is the better choice &mdash; a traceback that
 reaches the user is more useful than a program that continues incorrectly.
 
+```python
+try:
+    row = parse(line)
+    total += row.amount      # a typo here is caught as a parse failure
+except ValueError:
+    skipped += 1
+```
 ## Name the exception
 
 `except Exception:` catches everything, including the ones you did not think
@@ -150,25 +141,6 @@ which is the right form when the handling is the same.
 
 Bare `except:` is worse still, because it also catches `KeyboardInterrupt` and
 `SystemExit`, so a script becomes impossible to stop with Ctrl-C.
-
-## Keep the try small
-
-Everything inside the `try` is protected, including the lines you did not mean
-to protect:
-
-```python
-try:
-    row = parse(line)
-    total += row.amount      # a typo here is caught as a parse failure
-except ValueError:
-    skipped += 1
-```
-
-If `row.amount` raises, the handler records a skipped row and the real bug is
-invisible.
-
-The narrow version puts only the risky call inside and everything else after,
-which keeps the handler honest about what it is handling.
 
 ## else and finally
 
