@@ -3618,3 +3618,309 @@ One object, fitted once, holding every step that learns anything. It makes cross
          "why": "A model fitted on scaled features and served raw ones produces confident nonsense, and nothing raises to tell you."},
     ],
 )
+
+
+# ---------------------------------------------------------------------------
+# 13. Data leakage
+# ---------------------------------------------------------------------------
+topic(
+    "data_leakage",
+    "Data Leakage",
+    "Preparing Data",
+    "The failure that produces excellent scores and useless models, and the "
+    "five shapes it comes in.",
+    _svg(_box(14, 22, 60, 24, S, B) + _txt(44, 37, "train", M, 8) +
+         _box(86, 22, 60, 24, S, B) + _txt(116, 37, "test", M, 8) +
+         '<path d="M70 46 C70 62, 90 62, 90 46" stroke="var(--accent-primary)" '
+         'stroke-width="2" fill="none"/>' +
+         _txt(80, 76, "something crossed over", A, 8)),
+    [
+        ("A column that was computed from the answer",
+         "The purest form: a feature that would not exist at prediction time.",
+         '''from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+rng = np.random.RandomState(0)
+n = 400
+X = rng.normal(size=(n, 4))
+y = (X[:, 0] + rng.normal(scale=2.0, size=n) > 0).astype(int)
+
+honest = cross_val_score(LogisticRegression(), X, y, cv=5).mean()
+
+# A column built from the answer - a risk score filled in after the outcome
+# was known, say, or a status field the database updates on closure.
+leaked = np.column_stack([X, y + rng.normal(scale=0.01, size=n)])
+cheating = cross_val_score(LogisticRegression(), leaked, y, cv=5).mean()
+
+print("features that were available beforehand:", round(honest, 3))
+print("with one column derived from the answer:", round(cheating, 3))
+print()
+print("cross-validation cannot catch this: the leak is inside every fold.")
+'''),
+
+        ("The same row on both sides",
+         "Random data, nothing to learn, and a perfect score - because every "
+         "test row has a twin in the training set.",
+         '''from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+rng = np.random.RandomState(0)
+X = rng.normal(size=(200, 6))
+y = rng.randint(0, 2, size=200)          # nothing to learn
+
+clean = cross_val_score(KNeighborsClassifier(1), X, y, cv=5).mean()
+
+# The same rows, twice - as happens after a bad join or a re-import.
+Xd = np.vstack([X, X])
+yd = np.concatenate([y, y])
+duped = cross_val_score(KNeighborsClassifier(1), Xd, yd, cv=5).mean()
+
+print("random data, no duplicates :", round(clean, 3))
+print("every row duplicated       :", round(duped, 3))
+print()
+print("the nearest neighbour of a test row is its own twin in the")
+print("training set, so the model looks up the answer.")
+'''),
+
+        ("One entity, several rows, both sides of the split",
+         "The label is random per person. Anything above chance is the model "
+         "recognising people rather than learning anything.",
+         '''from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_val_score, GroupKFold, KFold
+import numpy as np
+
+rng = np.random.RandomState(0)
+n_people, per_person = 40, 5
+groups = np.repeat(np.arange(n_people), per_person)
+
+# Each person has a measurable fingerprint, and a label that has nothing
+# to do with it. Nothing here generalises to a new person.
+fingerprint = rng.normal(size=n_people)
+label = rng.randint(0, 2, size=n_people)
+
+X = fingerprint[groups][:, None] + rng.normal(scale=0.01,
+                                              size=(n_people * per_person, 1))
+y = label[groups]
+model = RandomForestClassifier(random_state=0)
+
+shuffled = cross_val_score(model, X, y,
+                           cv=KFold(5, shuffle=True, random_state=0)).mean()
+grouped = cross_val_score(model, X, y, cv=GroupKFold(5), groups=groups).mean()
+
+print("shuffled folds - a person appears on both sides:", round(shuffled, 3))
+print("GroupKFold     - each person is kept whole     :", round(grouped, 3))
+'''),
+
+        ("Shuffling a series that has an order",
+         "Interpolating between known points is a much easier job than the one "
+         "the model will actually be given.",
+         '''from sklearn.neighbors import KNeighborsRegressor
+from sklearn.model_selection import cross_val_score, KFold, TimeSeriesSplit
+import numpy as np
+
+rng = np.random.RandomState(0)
+n = 300
+t = np.arange(n).reshape(-1, 1)
+y = np.cumsum(rng.normal(size=n))        # a random walk over time
+
+model = KNeighborsRegressor(3)
+
+shuffled = cross_val_score(model, t, y,
+                           cv=KFold(5, shuffle=True, random_state=0)).mean()
+forward = cross_val_score(model, t, y, cv=TimeSeriesSplit(5)).mean()
+
+print("shuffled folds (R2)   :", round(shuffled, 3))
+print("TimeSeriesSplit (R2)  :", round(forward, 3))
+print()
+print("shuffling lets the model interpolate between points it has seen")
+print("on both sides. Predicting forward is the job it will actually have.")
+'''),
+
+        ("An encoding that used the target",
+         "Target encoding is powerful and leaks by default, because each row "
+         "helps compute the number that describes it.",
+         '''from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+rng = np.random.RandomState(0)
+n, n_cats = 300, 50
+cat = rng.randint(0, n_cats, size=n)
+y = rng.randint(0, 2, size=n)            # random - unrelated to the category
+
+# Target encoding computed over the whole dataset: each row's own label
+# has contributed to the number that describes it.
+means = np.array([y[cat == c].mean() if (cat == c).any() else 0.5
+                  for c in range(n_cats)])
+X_leaky = means[cat].reshape(-1, 1)
+
+print("target-encoded on all rows:",
+      round(cross_val_score(LogisticRegression(), X_leaky, y, cv=5).mean(), 3))
+print("the truth (labels are random):  0.5")
+print()
+print("with six rows per category, a row is a sixth of its own encoding.")
+'''),
+
+        ("Noticing it",
+         "There is no detector. There is a baseline, a suspicion, and two "
+         "questions.",
+         '''from sklearn.dummy import DummyClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+rng = np.random.RandomState(0)
+X = rng.normal(size=(300, 5))
+y = (X[:, 0] > 0).astype(int)
+X = np.column_stack([X, y])              # the answer, as a column
+
+base = cross_val_score(DummyClassifier(strategy="most_frequent"), X, y, cv=5).mean()
+real = cross_val_score(LogisticRegression(), X, y, cv=5).mean()
+
+print("dummy baseline :", round(base, 3))
+print("the model      :", round(real, 3))
+print()
+print("a perfect score is not a triumph, it is a symptom.")
+print("the checks: is any feature unavailable at prediction time?")
+print("            was any column computed after the outcome was known?")
+'''),
+    ],
+    [
+        "Leakage is any information reaching the model that it would not have "
+        "when actually used - and it always makes the score <em>better</em>.",
+        "Cross-validation does not detect it. A leak in the data is inside "
+        "every fold.",
+        "<strong>Target leakage</strong>: a feature computed from, or after, "
+        "the outcome. The most damaging and the least visible.",
+        "<strong>Train-test contamination</strong>: preprocessing fitted before "
+        "the split, duplicate rows, or one entity's rows on both sides.",
+        "<strong>Temporal leakage</strong>: shuffling data that has an order, "
+        "so the model trains on the future.",
+        "The signals are a suspiciously high score, a dominant feature nobody "
+        "expected, and a model that collapses in production.",
+    ],
+    """title: Data Leakage: A Practical Guide
+intro: Every other failure in machine learning makes the score worse. This one makes it better, which is why it survives review and reaches production.
+
+## What it is
+
+Leakage is information reaching the model during training that it will not have when it is actually used.
+
+The defining property is the direction of the error. Overfitting, a bad metric, an unlucky split &mdash; these produce results that look worse than the model is, or at least ambiguous. Leakage produces results that look *better*. So it does not trigger the instinct that something is wrong; it triggers satisfaction.
+
+That asymmetry is why it is the most expensive mistake in the field. A model with a leak passes every check, gets deployed, and fails on the first real batch &mdash; at which point the evaluation that approved it is worthless and nobody knows why.
+
+## Cross-validation will not save you
+
+Worth stating plainly, because cross-validation is otherwise the answer to almost everything on this track.
+
+Cross-validation protects against one specific thing: a score that depends on which rows happened to be held out. If the leak is in the *data* &mdash; a column derived from the answer &mdash; then every fold contains it, every fold is inflated, and the mean of five inflated numbers is an inflated number with a reassuring standard deviation.
+
+The first editor shows it: an honest 0.643 becomes 1.000, across all five folds, with no warning of any kind.
+
+## The five shapes
+
+**Target leakage.** A feature that encodes the answer, usually because it was recorded after the outcome. A `case_closed_date` predicting whether a case closed. A `discount_given` predicting churn, when the discount was offered *because* the customer was leaving. A diagnosis code entered at the same time as the diagnosis. These are the hardest to spot because the column is legitimately in the database and nothing about its name says when it was written.
+
+**Preprocessing before the split.** A scaler, imputer, encoder or feature selector fitted on all the data has seen the test rows. The cross-validation module measured this: feature selection outside the folds reported 0.825 on pure noise.
+
+**Duplicate rows.** After a bad join, a re-import, or genuinely repeated records. A duplicate split across train and test means the model has the answer memorised. The second editor scores 1.000 on random data for exactly this reason.
+
+**Group leakage.** Several rows describing one entity &mdash; a patient, a customer, a device, a document &mdash; landing on both sides. The model learns to recognise the entity rather than the pattern. The third editor scores 0.87 where the honest answer is chance.
+
+**Temporal leakage.** Shuffling data that has an order, so the training set contains the future. The fourth editor goes from R&sup2; of 0.977 to −2.526 when the split respects time, and the second number is the one describing the job the model would actually have.
+
+## Target encoding deserves its own warning
+
+It is the most useful high-cardinality encoding and the most reliable way to leak.
+
+Replacing a category with the mean target for that category is compact, powerful, and computed from `y`. Do it over the whole dataset and every row has contributed to the number that describes it. With a hundred rows per category the contribution is small; with six, as in the fifth editor, it is a sixth &mdash; and a feature built from random labels predicts those labels at 0.71.
+
+The fix is to compute the encoding inside the folds, with the row's own contribution excluded &mdash; which is what scikit-learn's `TargetEncoder` does, using an internal cross-fitting scheme. Hand-rolled target encoding is almost always leaky, and the leak is proportional to how rare the categories are, which is exactly when the encoding is most tempting.
+
+## How to notice
+
+There is no detector. There is a set of habits.
+
+**Be suspicious of a good score.** Not sceptical of a good model &mdash; suspicious of a *surprisingly* good one. If the problem is hard and the number is excellent, the first hypothesis should be a leak, not a breakthrough. Comparing against a dummy makes the size of the claim visible.
+
+**Look at feature importances.** A single feature dominating, especially one nobody expected to matter, is the classic signature. Ask what it is, when it is written, and by what process.
+
+**Ask the timing question for every column.** *Would this value be known, in this form, at the moment the prediction has to be made?* This is the single most effective check available, and it requires domain knowledge rather than code. A column that is only populated after the event is a leak regardless of how innocent it looks.
+
+**Ask who produced the row.** If several rows can come from one entity, group the split. If rows can be duplicated, check. If the data has a timestamp, respect it.
+
+**Test on genuinely later data** where possible. A model that scores well in cross-validation and badly on the next month is telling you something a random split could not.
+
+## The habits that prevent it
+
+Split first, before anything that learns. Put every transformer in a pipeline so it is refitted inside each fold. Use `GroupKFold` when rows share an entity and `TimeSeriesSplit` when they are ordered. Check for duplicates before splitting. Hold out a final test set and touch it once.
+
+None of these is expensive, and together they close every mechanical route. What they cannot close is target leakage, because that is a fact about the meaning of a column rather than about the code &mdash; which is why the timing question has to be asked of every feature, by someone who knows what the columns mean.
+
+## The famous cases
+
+Leakage is not a beginner's mistake. It has invalidated published research, competition results and deployed systems, and the examples are worth knowing because they are all plausible.
+
+A widely cited early result on detecting a disease from chest scans turned out to be partly detecting *which hospital* the scan came from &mdash; sicker patients were concentrated at one site, and the scanner left a signature in the image. The model was excellent at the task it was actually solving and useless at the one it was believed to be solving.
+
+Competition datasets have repeatedly leaked through row ordering, where the file happened to be sorted by the target, and through id columns that correlated with when a record was created. Both give a model something real to learn that has nothing to do with the problem.
+
+A recurring one in industry: a churn model trained on a table where the "customer contacted support" flag was updated during the cancellation call. The feature was genuinely predictive and genuinely unavailable at the moment a prediction was needed.
+
+The common thread is that none of these look like errors in the code. Every one is a fact about how the data came to exist, which is why reading the code more carefully never finds them and asking where a column comes from usually does.
+
+## The cost of being too careful
+
+The opposite failure exists and is worth naming, because leakage anxiety can become its own problem.
+
+Excluding every feature that has any relationship with the target removes the signal along with the leak. A feature that is predictive because it is genuinely causally upstream is exactly what you want, and dropping it because it is "too predictive" makes the model worse for no reason.
+
+Grouping a split when the rows are genuinely independent throws away resolution and gives an unnecessarily pessimistic estimate. Refusing to use any aggregate feature because target encoding can leak rules out a whole class of useful ones that are computed correctly.
+
+The distinction is not how predictive a feature is. It is whether the value would exist, in that form, at the moment the prediction has to be made. A feature that passes that test is allowed to be as predictive as it likes.
+
+## Things to try
+
+1. <strong>Run the first editor.</strong> 0.643 becomes 1.000 from one extra column, and every fold agrees.
+2. <strong>Vary the duplication.</strong> In the second editor, duplicate only a quarter of the rows and see how much of the inflation survives.
+3. <strong>Change the group size.</strong> In the third editor, set `per_person=2` and watch the gap narrow &mdash; the more rows per entity, the worse the leak.
+4. <strong>Make the categories rarer.</strong> In the fifth editor, raise `n_cats` to 150 and watch the leaked score climb.
+
+## Where this leaves you
+
+The failure that improves your metrics. Cross-validation cannot see it, a good score is evidence for it rather than against it, and the only reliable defence is asking, of every column, whether it would exist at the moment the prediction is needed.
+""",
+    [
+        {"q": "What makes leakage harder to catch than other failures?",
+         "options": ["It raises no error",
+                     "It makes the score better, so it does not feel like a problem",
+                     "It only appears in production",
+                     "It requires special tooling"],
+         "answer": 1,
+         "why": "Every other failure makes results look worse or ambiguous. Leakage makes them look excellent, so it passes review."},
+        {"q": "Does cross-validation protect against a leaked column?",
+         "options": ["Yes, that is what it is for",
+                     "No - the leak is in the data, so it is inside every fold",
+                     "Only with enough folds",
+                     "Only with stratification"],
+         "answer": 1,
+         "why": "Cross-validation guards against a score depending on which rows were held out. A column derived from the target inflates all of them equally."},
+        {"q": "Rows from one patient appear in both train and test. What is the effect?",
+         "options": ["None, if the rows differ",
+                     "The model can recognise the patient rather than learn the pattern, inflating the score",
+                     "The model underfits",
+                     "It only matters for time series"],
+         "answer": 1,
+         "why": "With a label that is random per person, shuffled folds scored 0.87 and GroupKFold 0.335. The first number was recognition, not learning."},
+        {"q": "What is the single most effective check for target leakage?",
+         "options": ["Cross-validate with more folds",
+                     "Ask whether each feature would be known at prediction time",
+                     "Scale the features",
+                     "Use a simpler model"],
+         "answer": 1,
+         "why": "Target leakage is a fact about what a column means and when it is written, so it needs domain knowledge rather than code."},
+    ],
+)

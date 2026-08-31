@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Data Leakage | VizLearn</title>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-ZT6JM33V5J');
+    </script>
+    <!-- The font stylesheet is render-blocking and lives on another origin, so
+         the browser cannot paint until it has done DNS, TCP and TLS for two
+         hosts it has not met. Warming both connections while the HTML is still
+         parsing takes that off the critical path. gstatic serves the font
+         files themselves and is fetched anonymously, hence crossorigin. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'light';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+                .py-note {
+            border-left: 2px solid var(--border-subtle);
+            padding-left: 0.9rem;
+            line-height: 1.7;
+        }
+        .py-note code { color: var(--accent-primary); }
+        .vz-pt-lead { margin-top: 0.5rem; max-width: 60ch; color: var(--text-muted); }
+
+        /* A step is numbered so the sequence reads as a sequence rather than
+           as six unrelated demos. */
+        .vz-step-head { display: flex; align-items: baseline; gap: 0.6rem; }
+        .vz-step-n {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+            font-weight: 700; color: var(--accent-primary);
+            border: 1px solid var(--border-subtle); border-radius: 5px;
+            padding: 0.1rem 0.4rem; flex: none;
+        }
+        .vz-step-blurb {
+            margin: 0.55rem 0 0.9rem; line-height: 1.7;
+            color: var(--text-muted); max-width: 68ch;
+        }
+        .vz-step-blurb code {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.85em;
+            color: var(--accent-primary);
+        }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen light-mode">
+<!-- Light is the default, so it ships on the tag: the theme script runs at the
+     bottom of the body, and waiting for it would flash dark on every load.
+     This removes the class before any content is parsed for readers who chose
+     dark, so neither theme flashes the other. -->
+<script>if(localStorage.getItem("theme")==="dark")document.body.classList.remove("light-mode");</script>
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-3 md:gap-4">
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <svg class="vz-icon text-sm" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/></svg>
+                    <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)" aria-label="Back to Home">
+                        <svg class="vz-icon text-xs" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.2 288 416 288c17.7 0 32-14.3 32-32s-14.3-32-32-32l-306.7 0L214.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <svg class="vz-icon hidden dark-icon" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M361.5 1.2c5 2.1 8.6 6.6 9.6 11.9L391 121l107.9 19.8c5.3 1 9.8 4.6 11.9 9.6s1.5 10.7-1.6 15.2L446.9 256l62.3 90.3c3.1 4.5 3.7 10.2 1.6 15.2s-6.6 8.6-11.9 9.6L391 391 371.1 498.9c-1 5.3-4.6 9.8-9.6 11.9s-10.7 1.5-15.2-1.6L256 446.9l-90.3 62.3c-4.5 3.1-10.2 3.7-15.2 1.6s-8.6-6.6-9.6-11.9L121 391 13.1 371.1c-5.3-1-9.8-4.6-11.9-9.6s-1.5-10.7 1.6-15.2L65.1 256 2.8 165.7c-3.1-4.5-3.7-10.2-1.6-15.2s6.6-8.6 11.9-9.6L121 121 140.9 13.1c1-5.3 4.6-9.8 9.6-11.9s10.7-1.5 15.2 1.6L256 65.1 346.3 2.8c4.5-3.1 10.2-3.7 15.2-1.6zM160 256a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zm224 0a128 128 0 1 0 -256 0 128 128 0 1 0 256 0z"/></svg>
+                        <svg class="vz-icon hidden light-icon" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M223.5 32C100 32 0 132.3 0 256S100 480 223.5 480c60.6 0 115.5-24.2 155.8-63.4c5-4.9 6.3-12.5 3.1-18.7s-10.1-9.7-17-8.5c-9.8 1.7-19.8 2.6-30.1 2.6c-96.9 0-175.5-78.8-175.5-176c0-65.8 36-123.1 89.3-153.3c6.1-3.5 9.2-10.5 7.7-17.3s-7.3-11.9-14.3-12.5c-6.3-.5-12.6-.8-19-.8z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+        <div class="mb-8 animate-fade-in">
+            <nav class="flex flex-wrap items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)" aria-label="Breadcrumb"><a href="../index.html" class="hover:text-green-400 transition-colors">Home</a><span aria-hidden="true">/</span><a href="../sklearn/" class="hover:text-green-400 transition-colors">scikit-learn</a><span aria-hidden="true">/</span><span aria-current="page">Preparing Data</span></nav>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Data Leakage</h1>
+            <p class="vz-pt-lead">The failure that produces excellent scores and useless models, and the five shapes it comes in.</p>
+        </div>
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
+                <div class="card-container">
+                    <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
+                    <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
+                        <div class="py-note">Leakage is any information reaching the model that it would not have when actually used - and it always makes the score <em>better</em>.</div>
+                        <div class="py-note">Cross-validation does not detect it. A leak in the data is inside every fold.</div>
+                        <div class="py-note"><strong>Target leakage</strong>: a feature computed from, or after, the outcome. The most damaging and the least visible.</div>
+                        <div class="py-note"><strong>Train-test contamination</strong>: preprocessing fitted before the split, duplicate rows, or one entity's rows on both sides.</div>
+                        <div class="py-note"><strong>Temporal leakage</strong>: shuffling data that has an order, so the model trains on the future.</div>
+                        <div class="py-note">The signals are a suspiciously high score, a dominant feature nobody expected, and a model that collapses in production.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <!-- auto-article-vizlearn -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full" data-vz-prose>
+        <div class="card-container animate-fade-in">
+<!-- VIZLEARN:ARTICLE:BEGIN (generated by tools/build_articles.py) -->
+            <div class="card-header">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Data Leakage: A Practical Guide</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">Every other failure in machine learning makes the score worse. This one makes it better, which is why it survives review and reaches production.</p>
+            </div>
+            <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <div>
+                    <h3>What it is</h3>
+                    <p>Leakage is information reaching the model during training that it will not have when it is actually used.</p><p>The defining property is the direction of the error. Overfitting, a bad metric, an unlucky split &mdash; these produce results that look worse than the model is, or at least ambiguous. Leakage produces results that look *better*. So it does not trigger the instinct that something is wrong; it triggers satisfaction.</p><p>That asymmetry is why it is the most expensive mistake in the field. A model with a leak passes every check, gets deployed, and fails on the first real batch &mdash; at which point the evaluation that approved it is worthless and nobody knows why.</p>
+                </div>
+                <div>
+                    <h3>A column that was computed from the answer</h3>
+                    <p>The purest form: a feature that would not exist at prediction time.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+rng = np.random.RandomState(0)
+n = 400
+X = rng.normal(size=(n, 4))
+y = (X[:, 0] + rng.normal(scale=2.0, size=n) > 0).astype(int)
+
+honest = cross_val_score(LogisticRegression(), X, y, cv=5).mean()
+
+# A column built from the answer - a risk score filled in after the outcome
+# was known, say, or a status field the database updates on closure.
+leaked = np.column_stack([X, y + rng.normal(scale=0.01, size=n)])
+cheating = cross_val_score(LogisticRegression(), leaked, y, cv=5).mean()
+
+print("features that were available beforehand:", round(honest, 3))
+print("with one column derived from the answer:", round(cheating, 3))
+print()
+print("cross-validation cannot catch this: the leak is inside every fold.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>The same row on both sides</h3>
+                    <p>Random data, nothing to learn, and a perfect score - because every test row has a twin in the training set.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+rng = np.random.RandomState(0)
+X = rng.normal(size=(200, 6))
+y = rng.randint(0, 2, size=200)          # nothing to learn
+
+clean = cross_val_score(KNeighborsClassifier(1), X, y, cv=5).mean()
+
+# The same rows, twice - as happens after a bad join or a re-import.
+Xd = np.vstack([X, X])
+yd = np.concatenate([y, y])
+duped = cross_val_score(KNeighborsClassifier(1), Xd, yd, cv=5).mean()
+
+print("random data, no duplicates :", round(clean, 3))
+print("every row duplicated       :", round(duped, 3))
+print()
+print("the nearest neighbour of a test row is its own twin in the")
+print("training set, so the model looks up the answer.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>One entity, several rows, both sides of the split</h3>
+                    <p>The label is random per person. Anything above chance is the model recognising people rather than learning anything.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_val_score, GroupKFold, KFold
+import numpy as np
+
+rng = np.random.RandomState(0)
+n_people, per_person = 40, 5
+groups = np.repeat(np.arange(n_people), per_person)
+
+# Each person has a measurable fingerprint, and a label that has nothing
+# to do with it. Nothing here generalises to a new person.
+fingerprint = rng.normal(size=n_people)
+label = rng.randint(0, 2, size=n_people)
+
+X = fingerprint[groups][:, None] + rng.normal(scale=0.01,
+                                              size=(n_people * per_person, 1))
+y = label[groups]
+model = RandomForestClassifier(random_state=0)
+
+shuffled = cross_val_score(model, X, y,
+                           cv=KFold(5, shuffle=True, random_state=0)).mean()
+grouped = cross_val_score(model, X, y, cv=GroupKFold(5), groups=groups).mean()
+
+print("shuffled folds - a person appears on both sides:", round(shuffled, 3))
+print("GroupKFold     - each person is kept whole     :", round(grouped, 3))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Shuffling a series that has an order</h3>
+                    <p>Interpolating between known points is a much easier job than the one the model will actually be given.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.neighbors import KNeighborsRegressor
+from sklearn.model_selection import cross_val_score, KFold, TimeSeriesSplit
+import numpy as np
+
+rng = np.random.RandomState(0)
+n = 300
+t = np.arange(n).reshape(-1, 1)
+y = np.cumsum(rng.normal(size=n))        # a random walk over time
+
+model = KNeighborsRegressor(3)
+
+shuffled = cross_val_score(model, t, y,
+                           cv=KFold(5, shuffle=True, random_state=0)).mean()
+forward = cross_val_score(model, t, y, cv=TimeSeriesSplit(5)).mean()
+
+print("shuffled folds (R2)   :", round(shuffled, 3))
+print("TimeSeriesSplit (R2)  :", round(forward, 3))
+print()
+print("shuffling lets the model interpolate between points it has seen")
+print("on both sides. Predicting forward is the job it will actually have.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>An encoding that used the target</h3>
+                    <p>Target encoding is powerful and leaks by default, because each row helps compute the number that describes it.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+rng = np.random.RandomState(0)
+n, n_cats = 300, 50
+cat = rng.randint(0, n_cats, size=n)
+y = rng.randint(0, 2, size=n)            # random - unrelated to the category
+
+# Target encoding computed over the whole dataset: each row's own label
+# has contributed to the number that describes it.
+means = np.array([y[cat == c].mean() if (cat == c).any() else 0.5
+                  for c in range(n_cats)])
+X_leaky = means[cat].reshape(-1, 1)
+
+print("target-encoded on all rows:",
+      round(cross_val_score(LogisticRegression(), X_leaky, y, cv=5).mean(), 3))
+print("the truth (labels are random):  0.5")
+print()
+print("with six rows per category, a row is a sixth of its own encoding.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Noticing it</h3>
+                    <p>There is no detector. There is a baseline, a suspicion, and two questions.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.dummy import DummyClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+rng = np.random.RandomState(0)
+X = rng.normal(size=(300, 5))
+y = (X[:, 0] > 0).astype(int)
+X = np.column_stack([X, y])              # the answer, as a column
+
+base = cross_val_score(DummyClassifier(strategy="most_frequent"), X, y, cv=5).mean()
+real = cross_val_score(LogisticRegression(), X, y, cv=5).mean()
+
+print("dummy baseline :", round(base, 3))
+print("the model      :", round(real, 3))
+print()
+print("a perfect score is not a triumph, it is a symptom.")
+print("the checks: is any feature unavailable at prediction time?")
+print("            was any column computed after the outcome was known?")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Cross-validation will not save you</h3>
+                    <p>Worth stating plainly, because cross-validation is otherwise the answer to almost everything on this track.</p><p>Cross-validation protects against one specific thing: a score that depends on which rows happened to be held out. If the leak is in the *data* &mdash; a column derived from the answer &mdash; then every fold contains it, every fold is inflated, and the mean of five inflated numbers is an inflated number with a reassuring standard deviation.</p><p>The first editor shows it: an honest 0.643 becomes 1.000, across all five folds, with no warning of any kind.</p>
+                </div>
+                <div>
+                    <h3>The five shapes</h3>
+                    <p><strong>Target leakage.</strong> A feature that encodes the answer, usually because it was recorded after the outcome. A <code>case_closed_date</code> predicting whether a case closed. A <code>discount_given</code> predicting churn, when the discount was offered *because* the customer was leaving. A diagnosis code entered at the same time as the diagnosis. These are the hardest to spot because the column is legitimately in the database and nothing about its name says when it was written.</p><p><strong>Preprocessing before the split.</strong> A scaler, imputer, encoder or feature selector fitted on all the data has seen the test rows. The cross-validation module measured this: feature selection outside the folds reported 0.825 on pure noise.</p><p><strong>Duplicate rows.</strong> After a bad join, a re-import, or genuinely repeated records. A duplicate split across train and test means the model has the answer memorised. The second editor scores 1.000 on random data for exactly this reason.</p><p><strong>Group leakage.</strong> Several rows describing one entity &mdash; a patient, a customer, a device, a document &mdash; landing on both sides. The model learns to recognise the entity rather than the pattern. The third editor scores 0.87 where the honest answer is chance.</p><p><strong>Temporal leakage.</strong> Shuffling data that has an order, so the training set contains the future. The fourth editor goes from R&sup2; of 0.977 to −2.526 when the split respects time, and the second number is the one describing the job the model would actually have.</p>
+                </div>
+                <div>
+                    <h3>Target encoding deserves its own warning</h3>
+                    <p>It is the most useful high-cardinality encoding and the most reliable way to leak.</p><p>Replacing a category with the mean target for that category is compact, powerful, and computed from <code>y</code>. Do it over the whole dataset and every row has contributed to the number that describes it. With a hundred rows per category the contribution is small; with six, as in the fifth editor, it is a sixth &mdash; and a feature built from random labels predicts those labels at 0.71.</p><p>The fix is to compute the encoding inside the folds, with the row's own contribution excluded &mdash; which is what scikit-learn's <code>TargetEncoder</code> does, using an internal cross-fitting scheme. Hand-rolled target encoding is almost always leaky, and the leak is proportional to how rare the categories are, which is exactly when the encoding is most tempting.</p>
+                </div>
+                <div>
+                    <h3>How to notice</h3>
+                    <p>There is no detector. There is a set of habits.</p><p><strong>Be suspicious of a good score.</strong> Not sceptical of a good model &mdash; suspicious of a *surprisingly* good one. If the problem is hard and the number is excellent, the first hypothesis should be a leak, not a breakthrough. Comparing against a dummy makes the size of the claim visible.</p><p><strong>Look at feature importances.</strong> A single feature dominating, especially one nobody expected to matter, is the classic signature. Ask what it is, when it is written, and by what process.</p><p><strong>Ask the timing question for every column.</strong> *Would this value be known, in this form, at the moment the prediction has to be made?* This is the single most effective check available, and it requires domain knowledge rather than code. A column that is only populated after the event is a leak regardless of how innocent it looks.</p><p><strong>Ask who produced the row.</strong> If several rows can come from one entity, group the split. If rows can be duplicated, check. If the data has a timestamp, respect it.</p><p><strong>Test on genuinely later data</strong> where possible. A model that scores well in cross-validation and badly on the next month is telling you something a random split could not.</p>
+                </div>
+                <div>
+                    <h3>The habits that prevent it</h3>
+                    <p>Split first, before anything that learns. Put every transformer in a pipeline so it is refitted inside each fold. Use <code>GroupKFold</code> when rows share an entity and <code>TimeSeriesSplit</code> when they are ordered. Check for duplicates before splitting. Hold out a final test set and touch it once.</p><p>None of these is expensive, and together they close every mechanical route. What they cannot close is target leakage, because that is a fact about the meaning of a column rather than about the code &mdash; which is why the timing question has to be asked of every feature, by someone who knows what the columns mean.</p>
+                </div>
+                <div>
+                    <h3>The famous cases</h3>
+                    <p>Leakage is not a beginner's mistake. It has invalidated published research, competition results and deployed systems, and the examples are worth knowing because they are all plausible.</p><p>A widely cited early result on detecting a disease from chest scans turned out to be partly detecting *which hospital* the scan came from &mdash; sicker patients were concentrated at one site, and the scanner left a signature in the image. The model was excellent at the task it was actually solving and useless at the one it was believed to be solving.</p><p>Competition datasets have repeatedly leaked through row ordering, where the file happened to be sorted by the target, and through id columns that correlated with when a record was created. Both give a model something real to learn that has nothing to do with the problem.</p><p>A recurring one in industry: a churn model trained on a table where the "customer contacted support" flag was updated during the cancellation call. The feature was genuinely predictive and genuinely unavailable at the moment a prediction was needed.</p><p>The common thread is that none of these look like errors in the code. Every one is a fact about how the data came to exist, which is why reading the code more carefully never finds them and asking where a column comes from usually does.</p>
+                </div>
+                <div>
+                    <h3>The cost of being too careful</h3>
+                    <p>The opposite failure exists and is worth naming, because leakage anxiety can become its own problem.</p><p>Excluding every feature that has any relationship with the target removes the signal along with the leak. A feature that is predictive because it is genuinely causally upstream is exactly what you want, and dropping it because it is "too predictive" makes the model worse for no reason.</p><p>Grouping a split when the rows are genuinely independent throws away resolution and gives an unnecessarily pessimistic estimate. Refusing to use any aggregate feature because target encoding can leak rules out a whole class of useful ones that are computed correctly.</p><p>The distinction is not how predictive a feature is. It is whether the value would exist, in that form, at the moment the prediction has to be made. A feature that passes that test is allowed to be as predictive as it likes.</p>
+                </div>
+                <div>
+                    <h3>Things to try</h3>
+                    <ol><li><strong>Run the first editor.</strong> 0.643 becomes 1.000 from one extra column, and every fold agrees.</li><li><strong>Vary the duplication.</strong> In the second editor, duplicate only a quarter of the rows and see how much of the inflation survives.</li><li><strong>Change the group size.</strong> In the third editor, set <code>per_person=2</code> and watch the gap narrow &mdash; the more rows per entity, the worse the leak.</li><li><strong>Make the categories rarer.</strong> In the fifth editor, raise <code>n_cats</code> to 150 and watch the leaked score climb.</li></ol>
+                </div>
+                <div>
+                    <h3>Where this leaves you</h3>
+                    <p>The failure that improves your metrics. Cross-validation cannot see it, a good score is evidence for it rather than against it, and the only reliable defence is asking, of every column, whether it would exist at the moment the prediction is needed.</p>
+                </div>
+            </div>
+<!-- VIZLEARN:ARTICLE:END -->
+        </div>
+    </section>
+
+    <script>
+        (function () {
+            var btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            var sun = btn.querySelector('.dark-icon');
+            var moon = btn.querySelector('.light-icon');
+
+            function paint(theme) {
+                if (theme === 'light') {
+                    document.body.classList.add('light-mode');
+                    moon.classList.remove('hidden');
+                    sun.classList.add('hidden');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    sun.classList.remove('hidden');
+                    moon.classList.add('hidden');
+                }
+            }
+
+            paint(localStorage.getItem('theme') || 'light');
+
+            btn.addEventListener('click', function () {
+                var next = document.body.classList.contains('light-mode') ? 'dark' : 'light';
+                localStorage.setItem('theme', next);
+                paint(next);
+            });
+        })();
+    </script>
+
+</body>
+</html>
