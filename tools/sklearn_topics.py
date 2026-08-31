@@ -4195,6 +4195,14 @@ A quick rule for triage, applied per column rather than to the dataset as a whol
 
 These are rules of thumb rather than thresholds, and the honest way to settle any of them is to try both inside a pipeline and compare cross-validated scores. That takes two lines, which is less effort than arguing about it.
 
+<strong>Why does IterativeImputer need a special import?</strong> It is still marked experimental, so `from sklearn.experimental import enable_iterative_imputer` has to run first. The import looks unused and is not.
+
+<strong>Should I impute the target?</strong> No. Rows with a missing target carry no information for supervised learning - drop them, and check why they are missing before you do.
+
+<strong>Does KNNImputer need scaling?</strong> Yes. It measures distance between rows, so a column in thousands dominates the neighbour search exactly as it would for k-NN itself.
+
+<strong>Can I impute before splitting if I only use the median?</strong> No. The median is learned from data, so it carries information from the test rows into training. The effect is small and the habit is what matters.
+
 ## Things to try
 
 1. <strong>Compare the strategies.</strong> In the second editor, note that mean fills 34.33 into a column whose other values are 1, 2 and 100.
