@@ -1,0 +1,222 @@
+title: Regression Metrics: A Practical Guide
+intro: R-squared is the default and rarely the right answer. Choosing the metric is choosing which mistakes you care about.
+
+## The metric is a statement about what matters
+
+Every regression metric summarises the same thing &mdash; the gaps between predictions and actuals &mdash; and they differ in how they weigh those gaps. That weighting is not a technical detail. It is a claim about which errors are worse, and the claim should come from the problem rather than from habit.
+
+If being wrong by 10 twice is exactly as bad as being wrong by 20 once, you want MAE. If one large miss is disproportionately damaging, you want RMSE. If a 10% error on a small value matters as much as a 10% error on a large one, you want a percentage metric. These are different situations and they genuinely occur, which is why the library ships several dozen metrics rather than one.
+
+
+## The four, on the same predictions
+
+Same errors, four summaries of them - and they do not rank models identically.
+
+```python-run
+from sklearn.metrics import (mean_absolute_error, mean_squared_error,
+                             r2_score)
+import numpy as np
+
+y_true = np.array([100, 120, 140, 160, 180])
+y_pred = np.array([110, 115, 145, 150, 185])
+
+mse = mean_squared_error(y_true, y_pred)
+print("MAE :", round(mean_absolute_error(y_true, y_pred), 2))
+print("MSE :", round(mse, 2))
+print("RMSE:", round(np.sqrt(mse), 2))
+print("R2  :", round(r2_score(y_true, y_pred), 4))
+```
+
+## MAE and RMSE disagree about big mistakes
+
+Two sets of predictions wrong by the same total amount, and only one metric notices the difference.
+
+```python-run
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+import numpy as np
+
+y_true = np.array([100, 120, 140, 160, 180])
+
+# Both predictions are wrong by 75 in total, spread differently.
+spread  = np.array([115, 135, 155, 175, 195])     # 15 out, five times
+one_bad = np.array([100, 120, 140, 160, 105])     # 75 out, once
+
+for label, pred in [("15 out, five times", spread), ("75 out, once", one_bad)]:
+    err = np.abs(y_true - pred)
+    mae = mean_absolute_error(y_true, pred)
+    rmse = np.sqrt(mean_squared_error(y_true, pred))
+    print("%-20s total error %3d   MAE %5.2f   RMSE %5.2f"
+          % (label, err.sum(), mae, rmse))
+```
+
+## MAE is in the units of the target
+
+Which is what makes it the number to put in front of somebody who has to decide whether the model is good enough.
+
+```python-run
+from sklearn.metrics import mean_absolute_error, r2_score
+import numpy as np
+
+y_true = np.array([100000, 120000, 140000])
+y_pred = np.array([104000, 117000, 149000])
+
+mae = mean_absolute_error(y_true, y_pred)
+print("R2 :", round(r2_score(y_true, y_pred), 3), "- unitless")
+print("MAE:", round(mae, 1), "- pounds, the same units as the target")
+print()
+print("only one of those answers 'is being wrong by this much acceptable?'")
+```
+
+## MAPE, and the division it cannot survive
+
+A percentage error is easy to explain and undefined the moment a true value is zero.
+
+```python-run
+from sklearn.metrics import mean_absolute_percentage_error
+import numpy as np
+
+y_true = np.array([100.0, 200.0, 400.0])
+y_pred = np.array([110.0, 210.0, 410.0])
+print("all 10 out, MAPE =", round(mean_absolute_percentage_error(y_true, y_pred), 4))
+print("  the same absolute error is a bigger share of a small number")
+print()
+with_zero = np.array([0.0, 200.0, 400.0])
+print("with a zero in y_true, MAPE =",
+      mean_absolute_percentage_error(with_zero, y_pred))
+print("  not an error, just a meaningless number - check for zeros yourself")
+```
+
+## Compare against the laziest possible model
+
+A score means nothing until you know what doing nothing would have scored.
+
+```python-run
+from sklearn.dummy import DummyRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.datasets import make_regression
+from sklearn.model_selection import train_test_split
+
+X, y = make_regression(n_samples=200, n_features=4, noise=25.0, random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3, random_state=0)
+
+dummy = DummyRegressor(strategy="mean").fit(X_tr, y_tr)
+model = LinearRegression().fit(X_tr, y_tr)
+
+print("always predict the mean, R2 :", round(dummy.score(X_te, y_te), 4))
+print("linear regression, R2       :", round(model.score(X_te, y_te), 4))
+print()
+print("the baseline is what 'good' has to beat.")
+```
+
+## Naming a metric for the cross-validation helpers
+
+And the reason half of them are spelled with a neg_ prefix.
+
+```python-run
+from sklearn.model_selection import cross_val_score
+from sklearn.linear_model import LinearRegression
+from sklearn.datasets import make_regression
+import numpy as np
+
+X, y = make_regression(n_samples=200, n_features=4, noise=25.0, random_state=0)
+model = LinearRegression()
+
+r2 = cross_val_score(model, X, y, cv=5, scoring="r2")
+mae = cross_val_score(model, X, y, cv=5, scoring="neg_mean_absolute_error")
+
+print("r2                     :", np.round(r2, 3))
+print("neg_mean_absolute_error:", np.round(mae, 1))
+print()
+print("the 'neg_' prefix exists because these helpers always maximise,")
+print("so an error metric is negated to make bigger mean better.")
+```
+## MAE: the average size of the mistake
+
+Mean absolute error is the average of the absolute differences. Nothing is squared, so every error contributes in proportion to its size.
+
+Its great virtue is that it is expressed in the units of the target. If you are predicting house prices in pounds, an MAE of 5,333 means the typical prediction is out by about five thousand pounds. That sentence can be said to somebody who has never heard of a regression, and they can tell you whether it is acceptable.
+
+That is a genuinely important property. Most of the value of a model is decided by a person who has to judge whether the errors are tolerable, and they cannot judge that from a unitless number. MAE is the default worth reaching for when the answer will be reported to anyone.
+
+It is also robust: a single wild outlier moves it by its own size and no more.
+
+## RMSE: the same idea, with big errors amplified
+
+Root mean squared error squares each error, averages, and takes the square root. The squaring is the whole difference.
+
+Squaring makes a large error count for much more than several small ones adding to the same total. The editors on this page show it exactly: two sets of predictions wrong by 75 in total have the same MAE of 15, and RMSE of 15.00 and 33.54 respectively. The second concentrated its error in one place, and RMSE says so.
+
+Whether that is desirable depends entirely on the application. For predicting delivery times, being an hour late once may be far worse than being twelve minutes late five times &mdash; the customer notices the hour. For predicting daily sales, the total is what matters and the distribution of errors is not especially important.
+
+The square root at the end puts the number back into the units of the target, so RMSE is comparable to MAE in magnitude. RMSE is always at least as large as MAE, and the gap between them tells you how unevenly the errors are distributed &mdash; equal means uniform, a wide gap means a few large misses.
+
+MSE without the square root is the same ranking in squared units, which are uninterpretable. It appears because it is what the fitting minimises and what differentiates cleanly, not because anyone should report it.
+
+## R-squared: a comparison, not a measurement
+
+R&sup2; asks how much of the variation in the target the model accounts for, compared against a model that always predicts the mean.
+
+1.0 is perfect, 0.0 is no better than the mean, and negative means worse than the mean &mdash; which is common on a test set and always a signal rather than a curiosity.
+
+Two things make it popular. It is unitless, so it can be compared across problems with different targets. And it has a built-in baseline, so a value tells you something without a separate comparison run.
+
+Two things make it dangerous. It says nothing about the size of the errors, so an R&sup2; of 0.87 is compatible with being wrong by five pounds or five thousand. And it depends on the variance of the target in the test set, which means the same model scores differently on two test sets drawn from the same data &mdash; a narrow test set makes the model look worse simply because the mean baseline is harder to beat.
+
+Use it for comparing models on the same data. Do not use it to decide whether a model is good enough for a purpose, and do not compare it across datasets.
+
+## MAPE, and why it is both loved and distrusted
+
+Mean absolute percentage error expresses each error as a fraction of the true value and averages those.
+
+Its appeal is obvious: "we are typically 6% out" is a sentence anyone understands, and it is comparable across products, regions or scales in a way an absolute number is not.
+
+Its problems are equally real. It is undefined when any true value is zero, and rather than raising, scikit-learn returns an enormous number &mdash; the editor above shows 1.65e+17 &mdash; which will propagate through an averaging step and produce nonsense nobody notices. It is asymmetric: over-predicting is penalised differently from under-predicting, which biases model selection towards forecasting low. And it explodes for true values that are merely small rather than zero, so a few near-zero rows can dominate the average entirely.
+
+If percentages are what the audience wants, MAPE is usable on strictly positive data with no small values. Otherwise, quote MAE alongside the mean of the target and let the reader do the division.
+
+## Always compare against doing nothing
+
+`DummyRegressor` predicts the mean, or the median, or a constant you choose, ignoring the features entirely. Fitting one takes a line and it is the most valuable line in an evaluation.
+
+The reason is that no metric is interpretable in isolation. An R&sup2; of 0.4 could be an excellent result on a genuinely noisy problem or a terrible one on an easy problem. An MAE of 5,000 is meaningless without knowing that the mean baseline scores 12,000 &mdash; or 5,200, in which case the model has bought almost nothing for its complexity.
+
+That last case is more common than people expect, and it never shows up unless the baseline is run. A model that beats the mean by 4% is not necessarily worth deploying, maintaining and explaining, and the number that tells you so takes two lines to produce.
+
+## The neg_ prefix
+
+`cross_val_score` and every search helper are written to maximise: they assume bigger is better, so that the same code can rank any metric without knowing which one it is.
+
+Error metrics are the wrong way round for that, since smaller is better. Rather than special-case them, scikit-learn negates them: `neg_mean_absolute_error` returns -15 where MAE would return 15, and maximising -15 towards zero is the same as minimising 15.
+
+So the values come back negative and you flip the sign to read them. It is startling the first time, and it is the reason `scoring="mean_absolute_error"` raises an error naming the valid options. `sorted(sklearn.metrics.get_scorer_names())` lists all of them, which is faster than guessing the spelling.
+
+## Errors that are not symmetric
+
+All four metrics on this page treat over- and under-prediction as equally bad. Often they are not.
+
+Under-predicting demand means empty shelves and lost sales; over-predicting means stock that has to be written off. Under-estimating a journey time annoys a customer; over-estimating loses the booking. Under-forecasting a load causes an outage; over-forecasting costs money. In every one of those the two directions have different prices, and a symmetric metric will happily choose a model that is wrong in the expensive direction.
+
+Two ways to handle it. Write a custom scorer with `make_scorer`, which takes a function of `(y_true, y_pred)` and a `greater_is_better` flag, and put the real cost in that function &mdash; if a unit of over-prediction costs three times a unit of under-prediction, say so arithmetically. Or use **quantile regression**, where the model is fitted to predict a chosen percentile rather than the mean: fitting the 80th percentile gives predictions that are deliberately high most of the time, which is what you want when running out is worse than having spare.
+
+`GradientBoostingRegressor(loss="quantile", alpha=0.8)` does the second directly, and the asymmetry then lives in the model rather than only in the report.
+
+## Reading errors as a distribution
+
+A single averaged number hides everything about the shape of the errors, and the shape is usually where the information is.
+
+Two habits repay the minute they cost. **Plot residuals against predictions.** A shapeless cloud means the model has extracted what it can. An arc means a missing non-linearity. A fan that widens to the right means the errors grow with the size of the target, which often argues for predicting the logarithm instead.
+
+**Look at the worst cases.** Sorting by absolute error and reading the ten worst rows tells you more about a model than any summary statistic. Usually they have something in common &mdash; a category the training data barely covered, a period with an unusual event, rows with a missing field imputed to the median &mdash; and that commonality is a feature waiting to be added or a subset the model should not be trusted on.
+
+Neither of these appears in a metric, and both change what you do next.
+
+## Things to try
+
+1. <strong>Run the second editor.</strong> Same total error, same MAE, RMSE more than twice as large. That single comparison is the whole argument for choosing between them.
+2. <strong>Add an outlier.</strong> In the first editor, change one prediction to 400 and watch which metrics move most.
+3. <strong>Beat the baseline by less.</strong> In the fifth editor, raise `noise` to 200 and see how much of the model's advantage survives.
+4. <strong>Get the spelling wrong.</strong> Ask for `scoring="mae"` and read the error - it lists every valid name.
+
+## Where this leaves you
+
+MAE for reporting to a person, RMSE when large errors are disproportionately costly, R&sup2; for comparing models on identical data, and a dummy baseline underneath all three. Which one you lead with is a decision about the problem, not about the model.
