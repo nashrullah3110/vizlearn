@@ -2032,6 +2032,12 @@ Note also that `cross_validate` reports `fit_time` and `score_time` per fold, wh
 
 The two failure modes need opposite treatments, which is why guessing between them wastes so much time. One extra argument tells you which one you have.
 
+<strong>Does KFold shuffle by default?</strong> No. Data arriving sorted produces folds that are each a contiguous block, which can be a silent disaster. Pass a splitter object with `shuffle=True` when the order might mean something.
+
+<strong>Can I cross-validate a pipeline?</strong> Yes, and you should. A pipeline is a single estimator to `cross_val_score`, which is exactly what keeps its transformers inside the folds.
+
+<strong>Why is my cross-validated score lower than my test score?</strong> Usually because each fold trains on less data than a single 80/20 split does, so the estimate is slightly pessimistic. A large gap suggests the split was lucky.
+
 ## Things to try
 
 1. <strong>Run the second editor.</strong> Six seeds, six answers. That spread is the reason the rest of the page exists.
