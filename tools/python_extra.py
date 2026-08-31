@@ -5473,6 +5473,15 @@ produces one, and it is slower and fails on anything unpicklable. Use
 works whenever nothing reaches past the top level afterwards. The copy was
 always shallow; the code simply had not yet touched the shared part.
 
+<strong>Should a function copy the arguments it is given?</strong> Only if it
+stores them or mutates them. A function that reads a list and returns a result
+has no reason to copy anything, and copying defensively everywhere costs more
+than the bugs it prevents.
+
+<strong>What is the fastest way to copy a flat list?</strong> `x.copy()` and
+`x[:]` are equivalent and both are fast. `list(x)` is the one that also accepts
+any iterable, which is occasionally why it is chosen.
+
 ## Recap in one screen
 
 - A shallow copy duplicates the outer container and shares everything inside
