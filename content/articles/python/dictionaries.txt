@@ -151,6 +151,119 @@ email = data.get("user", {}).get("email")     # None rather than an exception
 
 For genuinely deep structures, a small helper or a library such as `glom` beats a chain of five `.get({})` calls.
 
+## A worked example: the index, built once
+
+The transformation described above, small enough to run in your head:
+
+```python
+customers = [{"id": 1, "name": "ana"}, {"id": 2, "name": "bo"}]
+orders = [{"customer_id": 2, "total": 30}, {"customer_id": 1, "total": 12}]
+
+by_id = {c["id"]: c for c in customers}
+
+for order in orders:
+    print(by_id[order["customer_id"]]["name"], order["total"])
+```
+
+```
+bo 30
+ana 12
+```
+
+The dict comprehension on the middle line is the whole optimisation. It walks
+the customers once, producing a mapping from id to record, and every lookup
+afterwards is immediate. The nested-scan version would walk the customers again
+for every order.
+
+Two details are worth copying. The index is built **outside** the loop &mdash;
+rebuilding it inside would do more work than the scan it replaced. And the key
+is chosen to match what the other collection carries: `c["id"]` because orders
+hold `customer_id`. Picking the wrong key gives you a working dictionary and a
+`KeyError` on the first lookup, which is at least immediate.
+
+If a missing customer is expected rather than a bug, `by_id.get(...)` and a
+check is the right shape. If it is a bug, the `KeyError` is doing you a favour.
+
+## How the lookup actually works
+
+"Constant time" is worth unpacking, because it explains the rules about keys
+rather than leaving them as arbitrary restrictions.
+
+When you write `d[key]`, Python calls `hash(key)` to get an integer, and uses
+part of that integer to pick a slot in an internal table. It goes straight to
+that slot rather than searching. That is why the cost does not grow with the
+size of the dictionary: finding one entry among ten million takes the same
+arithmetic as finding one among ten.
+
+Two keys can hash to the same slot &mdash; a collision &mdash; and Python
+handles it by probing nearby slots and comparing keys with `==` until it finds
+the right one or an empty space. Collisions are rare enough with a good hash
+that the average stays constant, and this is why keys need both `__hash__` and
+`__eq__` to agree: the hash finds the neighbourhood, equality confirms the
+match.
+
+Now the rules follow. A key must be hashable because the hash decides where it
+lives. It must be immutable because a changed key would hash to a different
+slot than the one holding it, and the lookup would search the wrong place for
+something the dictionary definitely contains. `1`, `1.0` and `True` are one key
+because they hash the same and compare equal.
+
+The table also keeps spare capacity and grows when it fills, which is why a
+dictionary uses more memory than a list of the same values. The speed is what
+you are buying with it.
+
+## When a dictionary is the wrong choice
+
+It is the default answer often enough that the exceptions are worth naming.
+
+**When the keys are fixed and known.** A record with `name`, `email` and `age`
+is better as a dataclass. A dictionary lets a typo create a new key silently;
+an attribute raises. The dataclass also documents the shape, which a dictionary
+built in five places does not.
+
+**When you need order by value.** Dictionaries keep insertion order, not sorted
+order. If the question is always "the top ten", something else &mdash; a sorted
+list, a heap &mdash; may fit better than sorting the dictionary each time.
+
+**When there are no values.** A dictionary whose values are all `True` is a set
+wearing a costume, and `set` says what it means.
+
+**When the data is a sequence.** Keying a dictionary by 0, 1, 2 to store
+positional data is a list written the long way, and it loses slicing, ordering
+and every list method.
+
+The signal is whether the key genuinely identifies something. `by_id`,
+`prices_by_product`, `handlers_by_type` are dictionaries because the key is a
+name for the value. A dictionary whose keys are an afterthought usually wanted
+to be something else.
+
+## Choosing a good key
+
+The key is the design decision; everything else about a dictionary follows from
+it. Three properties make a key work.
+
+**It identifies the value.** A key should be the thing you will actually have
+in hand when you need the value. Indexing customers by name is convenient until
+two customers share one, and then the dictionary has quietly lost a record. An
+id exists precisely because it identifies.
+
+**It is stable.** Keying by something that can change &mdash; an email address,
+a status, a position &mdash; means the entry is filed under a value that no
+longer describes it. Python enforces this for the object's hash and cannot
+enforce it for your data model.
+
+**It has the right granularity.** When one value is not enough, a tuple is the
+standard multi-part key: `rates[(currency, date)]` rather than a dictionary of
+dictionaries. The tuple version is flatter, easier to iterate, and does not
+need a missing-level check on every lookup. Nest only when you genuinely want
+to work with a whole inner group at once.
+
+The failure worth watching for is a key that is derived rather than given. If
+building the key requires normalising, lowercasing or stripping, then every
+lookup must apply exactly the same transformation, and eventually one of them
+will not. Normalise once, when the dictionary is built and where the key
+arrives, and keep the transformation in a single function that both sides call.
+
 ## Questions people ask
 
 <strong>Are dictionaries ordered?</strong> Yes, by insertion, guaranteed since Python 3.7.
@@ -164,6 +277,40 @@ For genuinely deep structures, a small helper or a library such as `glom` beats 
 <strong>How much memory does a dict use?</strong> More than a list of the same values, because it stores hashes and keeps spare capacity. The lookup speed is what you are buying.
 
 <strong>When should I use a dataclass instead?</strong> When the keys are fixed and known &mdash; a record with `name`, `email` and `age` is better as a dataclass, which gives you attribute access, type hints and validation.
+
+## Dictionaries are how Python is built
+
+The structure turns up throughout the language itself, and noticing that
+explains several features that otherwise look unrelated.
+
+An object's attributes live in a dictionary: `obj.__dict__` is a real
+dictionary, and `obj.x = 1` is an entry in it. That is why you can add
+attributes to most objects at runtime, and why `__slots__` &mdash; which
+replaces the dictionary with a fixed array &mdash; saves memory and takes that
+ability away.
+
+Module-level names live in one too. `globals()` returns the module's namespace
+as a dictionary, and so does `locals()` for the current scope. A module is,
+roughly, a dictionary with a name.
+
+Keyword arguments arrive as one: `**kwargs` is a dictionary, built from the
+names at the call site. Class bodies are executed into a dictionary that then
+becomes the class's namespace. Even the method lookup described in the
+inheritance module is a walk through a chain of dictionaries.
+
+The practical value of knowing this is twofold. It explains why attribute
+access and dictionary lookup have such similar performance &mdash; they are the
+same operation underneath. And it explains why the rules about keys apply in
+places you would not expect: keyword argument names must be strings because
+they become dictionary keys, and attribute names follow the same constraint.
+
+<strong>Can I use a dictionary as a switch statement?</strong> Yes, mapping
+values to functions, and it is the idiomatic replacement for a long
+`elif` chain that compares one value against constants.
+
+<strong>What happens if I use a float as a key?</strong> It works, and it
+inherits every floating-point comparison problem &mdash; `0.1 + 0.2` will not
+find the entry stored under `0.3`.
 
 ## Recap in one screen
 

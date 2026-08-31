@@ -147,6 +147,117 @@ The rule of thumb: if you find yourself managing an index by hand inside a `whil
 - <strong>No maximum on a retry loop</strong>, so a failing dependency turns into a hang rather than an error.
 - <strong>Modifying the collection being scanned</strong> inside the loop, so the condition never settles.
 
+## Loops that stop when they are close enough
+
+A whole family of `while` loops has no counter at all: they repeat until a
+value settles.
+
+```python
+target, guess, steps = 2.0, 1.0, 0
+
+while abs(guess * guess - target) > 1e-12:
+    guess = (guess + target / guess) / 2
+    steps += 1
+
+print(steps, round(guess, 10))
+```
+
+```
+5 1.4142135624
+```
+
+That is Newton's method for a square root, and five passes get it to twelve
+decimal places. A `for` loop cannot express this well, because the number of
+repeats is a property of the answer rather than something known in advance.
+
+The important detail is the comparison. It tests whether the result is *close
+enough*, not whether it is exact, and with floating point that distinction is
+not optional &mdash; `while guess * guess != target` may never become false,
+because the exact value is not representable and the loop would spin for ever
+on a difference of one bit.
+
+Any convergence loop wants two things beyond the condition: a tolerance chosen
+deliberately rather than copied, and a maximum number of passes. Data that does
+not converge is not a hypothetical; a bad input, a sign error or an
+ill-conditioned problem all produce a loop that never settles, and without a
+cap that is a hung program rather than an error.
+
+## The condition is tested at the top
+
+`while` checks before each pass, including the first, and two consequences
+follow that catch people out.
+
+**A loop can run zero times.** If the condition starts false, the body never
+executes at all. That is usually what you want &mdash; a queue that is already
+empty needs no processing &mdash; but it means any variable the body was
+supposed to set must be given a value before the loop, or the code after it
+reads something that does not exist.
+
+**There is no do-while.** Python has no form that runs the body first and tests
+afterwards. When you need one &mdash; prompting for input, where the first
+attempt must always happen &mdash; the idiom is to invert it:
+
+```python
+while True:
+    answer = input("continue? ")
+    if answer in ("y", "n"):
+        break
+```
+
+The test moves to the bottom as an `if` with a `break`, which is exactly what a
+do-while does and is more explicit about where the exit is. Trying to avoid it
+by initialising a variable to a fake value so that the condition passes the
+first time works and reads worse, because a reader has to work out that the
+initial value is a placeholder rather than data.
+
+## Where while loops genuinely belong
+
+The situations are narrower than they first appear, because `for` covers more
+than beginners expect &mdash; files, generators, ranges and every collection.
+What is left is worth naming.
+
+**Consuming something that shrinks.** Processing a work queue where handling
+one item can add more: `while queue:` with `pop()` inside. A `for` over the
+queue cannot cope with it growing during iteration.
+
+**Waiting on the outside world.** Polling a job, retrying a request, reading
+until a connection closes. The number of passes depends on something you do not
+control, which is the definition of the case `while` exists for.
+
+**Driving a state machine.** A loop whose body decides what the next state is
+and whose condition is "not finished yet" &mdash; parsers, games, menus,
+simulations. The state changes, the condition consults it, and neither is a
+count.
+
+**Consuming input by hand.** Reading tokens one at a time where how many you
+take depends on what you just read.
+
+The common thread is that the stopping point is discovered rather than known.
+When you can name the collection in advance, `for` is both shorter and safer,
+because it cannot fail to terminate.
+
+## Reading one someone else wrote
+
+An unfamiliar `while` loop is worth three specific questions, in order, and
+they resolve most confusion faster than reading the body straight through.
+
+**What makes the condition false?** Find the variable in the `while` line, then
+find every place the body assigns to it. If there is no such place, the loop
+depends on a `break` and the condition is decoration. If there are several, the
+loop has several ways to end and each is a separate path.
+
+**What has to be true before the first pass?** The condition is tested
+immediately, so anything it reads must already exist and hold a sensible value.
+A loop that reads a variable initialised far above it is where an accidental
+zero-pass or infinite loop usually hides.
+
+**What is true after it ends?** This is the question people skip, and it is the
+one that matters to the code below. A loop that ended because its condition
+turned false leaves different state than one that ended with `break`, and the
+lines afterwards frequently assume only one of the two. If the difference
+matters, `while ... else` distinguishes them explicitly instead of leaving the
+next reader to work it out.
+
 ## Questions people ask
 
 <strong>How do I stop an infinite loop?</strong> Ctrl+C in the terminal. In a notebook, interrupt the kernel.
@@ -160,6 +271,37 @@ The rule of thumb: if you find yourself managing an index by hand inside a `whil
 <strong>Why does my loop run one time too many?</strong> Usually `<=` where `<` was meant, or the counter being incremented after the check rather than before.
 
 <strong>Is `while` slower than `for`?</strong> Slightly, because the condition is evaluated in Python each pass. It rarely matters; clarity should decide.
+
+## Making the exit obvious
+
+A `while` loop has one job a `for` loop does not: it has to end, and a reader
+has to be able to see how. Three habits make that visible.
+
+**Put the exit condition where it is easiest to find.** Either in the `while`
+line, or as a single early `break` near the top of the body. A loop with four
+`break` statements scattered through it has four exits, and working out which
+one fired is a debugging session rather than a reading.
+
+**Change the condition variable in one place.** If the counter is incremented
+in three branches, one of them will eventually be missed, and the resulting
+infinite loop happens only on the path nobody tested. Updating it once at the
+top or bottom of the body is worth some duplication elsewhere.
+
+**Bound anything that waits.** A loop that polls, retries, or reads from a
+network needs a maximum, and the maximum should be a named constant rather
+than a literal buried in the condition. Without it, a dependency that never
+responds turns into a program that never returns &mdash; which presents as a
+hang, with no error, no traceback and nothing in the logs.
+
+The underlying point is that a `for` loop is guaranteed to terminate because
+the collection is finite, and a `while` loop carries no such guarantee. That
+guarantee is the thing you gave up, and these habits are how you replace it.
+
+<strong>Can I loop while a file has more lines?</strong> You can, and
+`for line in file` already does exactly that without a condition to maintain.
+
+<strong>Does `break` work inside a `try`?</strong> Yes, and any `finally` block
+runs before the loop is left.
 
 ## Recap in one screen
 
