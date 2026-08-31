@@ -9274,6 +9274,18 @@ changed shape.
 immutable record, though a frozen dataclass is often clearer for anything with
 behaviour attached.
 
+<strong>Can I unpack into an existing list element?</strong> Yes &mdash;
+`a[0], a[1] = a[1], a[0]` is legal, and is how you swap two positions of a
+list in one statement.
+
+<strong>Does unpacking work on a generator?</strong> Yes, and it consumes it.
+The count still has to match, so it will run the generator to the end to find
+out.
+
+<strong>Why is `*args` a tuple rather than a list?</strong> Because the
+arguments are a fixed group by the time the function starts, and making it
+immutable stops a function from accidentally altering what it was called with.
+
 ## Recap in one screen
 
 - A tuple is a fixed, ordered group whose positions carry meaning; that is what
@@ -9410,6 +9422,18 @@ expression slot: `[[f(x) for x in row] for row in grid]`.
 
 <strong>When should I definitely not use one?</strong> When the body needs a
 `try`, a `break`, an assignment, or exists for a side effect.
+
+<strong>Can a comprehension be spread over several lines?</strong> Yes, and it
+often should be &mdash; one clause per line, with the expression on the first,
+reads far better than a long single line.
+
+<strong>Is there a limit to how many `for` clauses I can use?</strong> No limit
+in the language, and a practical one of about two before it stops being
+readable.
+
+<strong>Why does a generator expression inside a function call need no extra
+brackets?</strong> Because it is the only argument. With more than one
+argument, the brackets are required to say where it ends.
 
 ## Recap in one screen
 
