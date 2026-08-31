@@ -28,6 +28,7 @@ DIR_META = {
     "fastapi": ("FastAPI", "code"),
     "numpy": ("NumPy", "sigma"),
     "pandas": ("pandas", "table"),
+    "matplotlib": ("matplotlib", "chart"),
     "interview": ("Interview", "interview"),
 }
 

@@ -21,6 +21,25 @@ def _fastapi_prelude():
     return PRELUDE + "\n\ndrive = _drive\n"
 
 
+def _matplotlib_prelude():
+    """Pick a backend that works in a worker, and pay the import up front.
+
+    Pyodide ships a matplotlib backend that draws into the page, which cannot
+    work here: the runner executes in a Web Worker with no DOM. AGG renders to
+    an in-memory buffer instead, which is what the runner then encodes as a
+    PNG.
+
+    Importing pyplot here rather than in the reader's code moves its cost -
+    seconds, the first time - into the load budget rather than the run one,
+    which is the same reason the FastAPI track imports its app in a prelude.
+    """
+    return (
+        "import matplotlib\n\n"
+        "matplotlib.use(\"AGG\")\n\n"
+        "import matplotlib.pyplot as plt\n"
+    )
+
+
 def _pandas_prelude():
     """Silence the pyarrow DeprecationWarning pandas raises on import.
 
@@ -46,6 +65,20 @@ def _pandas_prelude():
 
 
 SPECS = {
+    "matplotlib": {
+        # matplotlib ships with Pyodide, so this is a CDN fetch rather than a
+        # wheel. numpy comes with it and is used throughout the track.
+        #
+        # pandas is here for one module - df.plot and where it stops being
+        # enough. That is a whole extra package on every page of the track,
+        # which I refused for the numpy track's pandas tangent; the
+        # difference is that df.plot is how most people actually reach
+        # matplotlib, so the module is core rather than an aside.
+        "packages": "matplotlib,numpy,pandas",
+        "label": "matplotlib",
+        "filename": "example_%02d.py",
+        "prelude": _matplotlib_prelude,
+    },
     "pandas": {
         # pandas ships with Pyodide, so this is a CDN fetch rather than a wheel.
         "packages": "pandas",

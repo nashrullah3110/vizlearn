@@ -282,6 +282,24 @@ TOPICS = {
             "arrives as a small program you can run and change on the page.",
         ],
     },
+    "matplotlib": {
+        "dir": "matplotlib",
+        "title": "matplotlib",
+        "h1": "matplotlib, by Drawing It",
+        "lead": "Figures and axes, the two APIs, and the styling that turns a "
+                "default plot into one worth showing - every example drawn on the page.",
+        "keywords": "matplotlib tutorial, matplotlib subplots, matplotlib legend, "
+                    "pyplot vs axes, matplotlib colormap, python plotting",
+        "intro": [
+            "matplotlib is two libraries sharing a name: a stateful pyplot "
+            "interface that draws into whatever figure is current, and an "
+            "object-oriented one where you hold the figure and the axes and ask "
+            "them to draw. Most confusing examples online mix the two.",
+            "This track uses the object-oriented form throughout and explains the "
+            "other where you will meet it. Every editor draws a real figure and "
+            "shows it under the output, so a change to a line is a change you see.",
+        ],
+    },
     "interview": {
         "dir": "interview",
         "title": "Interview Questions",
@@ -308,7 +326,7 @@ TOPICS = {
 
 # Display order on the hub and in the footer.
 TOPIC_ORDER = ["maths", "ml", "dl", "dsa", "nlp", "computer-vision", "db",
-               "gen-ai", "python", "pydantic", "fastapi", "numpy", "pandas", "interview"]
+               "gen-ai", "python", "pydantic", "fastapi", "numpy", "pandas", "matplotlib", "interview"]
 
 DIR_TO_TOPIC = {t["dir"]: k for k, t in TOPICS.items()}
 

@@ -83,6 +83,27 @@
   // make a later one appear to work.
   var RUNNER_SRC = [
     'import ast, sys, traceback',
+    // A program that draws does not print, so without this the editor
+    // reports success and shows nothing. Figures are collected after the
+    // run, encoded, and handed back for the page to display.
+    //
+    // pyplot is looked up in sys.modules rather than imported: importing
+    // it here would pull matplotlib into every editor on the site.
+    'def _viz_figs():',
+    '    plt = sys.modules.get("matplotlib.pyplot")',
+    '    if plt is None:',
+    '        return []',
+    '    out = []',
+    '    try:',
+    '        import io as _io, base64 as _b64',
+    '        for num in plt.get_fignums():',
+    '            buf = _io.BytesIO()',
+    '            plt.figure(num).savefig(buf, format="png", bbox_inches="tight")',
+    '            out.append(_b64.b64encode(buf.getvalue()).decode())',
+    '        plt.close("all")',
+    '    except BaseException:',
+    '        pass',
+    '    return out',
     // The prelude is executed once and its namespace reused, rather than
     // re-run on every Run. /fastapi/ pages import fastapi and starlette in
     // theirs, and that first import is slow enough that paying it inside the
@@ -111,7 +132,7 @@
     '        except BaseException:',
     '            sys.stderr.write("The page setup for this editor failed:\\n")',
     '            sys.stderr.write(traceback.format_exc())',
-    '            return',
+    '            return []',
     '    try:',
     '        tree = ast.parse(code, "<user>", "exec")',
     '        if len(tree.body) == 1 and isinstance(tree.body[0], ast.Expr):',
@@ -128,6 +149,8 @@
     '        while tb is not None and tb.tb_frame.f_code.co_filename != "<user>":',
     '            tb = tb.tb_next',
     '        sys.stderr.write("".join(traceback.format_exception(type(e), e, tb)))',
+    // A figure drawn before the error is still worth showing.
+    '    return _viz_figs()',
   ].join('\n');
 
   var worker = null;
@@ -194,7 +217,16 @@
       '      }\n' +
       '      catch (err) { postMessage({ type: "err", text: String(err) }); }\n' +
       '      return py.runPythonAsync("_viz_run(__code__, __prelude__)");\n' +
-      '    }).then(function () {\n' +
+      '    }).then(function (figs) {\n' +
+      '      try {\n' +
+      '        var arr = (figs && figs.toJs) ? figs.toJs() : figs;\n' +
+      '        if (arr) {\n' +
+      '          for (var f = 0; f < arr.length; f++) {\n' +
+      '            postMessage({ type: "img", data: arr[f] });\n' +
+      '          }\n' +
+      '        }\n' +
+      '        if (figs && figs.destroy) figs.destroy();\n' +
+      '      } catch (e) {}\n' +
       '      postMessage({ type: "done" });\n' +
       '    }, function (err) {\n' +
       '      var msg = (err && (err.message || err.toString())) || String(err);\n' +
@@ -252,6 +284,24 @@
   function setStatus(block, text) {
     var s = els(block).status;
     if (s) s.textContent = text || '';
+  }
+
+  // A drawn figure arrives as base64 PNG and is appended to the same console
+  // the prints go to, so output and plot stay in the order they were produced.
+  function appendImg(block, b64) {
+    var out = els(block).output;
+    if (!out) return;
+    var img = document.createElement('img');
+    img.src = 'data:image/png;base64,' + b64;
+    img.alt = 'Figure drawn by this program';
+    img.className = 'py-figure';
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+    img.style.display = 'block';
+    img.style.margin = '8px 0';
+    img.style.background = '#fff';
+    img.style.borderRadius = '4px';
+    out.appendChild(img);
   }
 
   function appendOut(block, text, cls) {
@@ -336,6 +386,7 @@
       worker.onmessage = function (e) {
         if (timedOut) return;
         if (e.data.type === 'out') appendOut(block, e.data.text);
+        else if (e.data.type === 'img') appendImg(block, e.data.data);
         else if (e.data.type === 'err') appendOut(block, e.data.text, 'py-out-err');
         else if (e.data.type === 'loading') {
           setStatus(block, 'Loading ' + e.data.names.join(', ') + '\u2026');

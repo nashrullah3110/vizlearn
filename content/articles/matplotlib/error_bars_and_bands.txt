@@ -1,0 +1,418 @@
+title: Error Bars and Bands
+intro: Showing uncertainty, and saying which kind you are showing.
+
+## errorbar
+
+`ax.errorbar(x, y, yerr=err)` plots points with vertical intervals.
+
+A single array or scalar gives **symmetric** bars &mdash; the same distance above and below. A `(2, n)` array or a list of two arrays gives **asymmetric** ones, with the first row the distance **below** and the second the distance **above**.
+
+Both are given as positive offsets from the point, not as absolute positions. Passing absolute upper and lower bounds is a common mistake and produces enormous bars.
+
+`xerr` does the same horizontally, and both can be used at once.
+
+`capsize` adds the end caps; without it the bars are bare lines, which is harder to read against a busy background. `fmt="o"` sets the marker, and `fmt="none"` draws the bars with no marker at all.
+
+
+## errorbar draws the interval
+
+Symmetric with one array, asymmetric with two rows.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.arange(1, 6)
+y = np.array([10, 14, 12, 17, 15], dtype=float)
+err = np.array([1.0, 2.0, 1.5, 0.8, 2.5])
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+
+a.errorbar(x, y, yerr=err, marker="o", capsize=4)
+a.set_title("symmetric")
+
+lo = np.array([0.5, 1.0, 0.8, 0.4, 1.2])
+hi = np.array([2.0, 3.0, 1.6, 1.5, 3.0])
+b.errorbar(x, y, yerr=[lo, hi], marker="o", capsize=4, color="crimson")
+b.set_title("asymmetric: yerr=[lower, upper]")
+
+print("yerr as one array  -> the same distance above and below")
+print("yerr as [lo, hi]   -> different distances, given as POSITIVE")
+print("                      offsets from the point")
+print()
+print("capsize adds the end caps; without it the bars are bare lines.")
+```
+
+## Bands for continuous data
+
+<code>fill_between</code>, because a bar per point is unreadable on a curve.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 200)
+y = np.sin(x)
+sd = 0.1 + 0.15 * np.abs(np.cos(x))
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+
+a.errorbar(x, y, yerr=sd, alpha=0.4)
+a.set_title("200 error bars: a smear")
+
+b.plot(x, y, color="crimson")
+b.fill_between(x, y - sd, y + sd, alpha=0.25, color="crimson")
+b.set_title("a band")
+
+print("Error bars suit a handful of discrete measurements.")
+print("For a curve, fill_between shows the same information and stays")
+print("readable at any number of points.")
+print()
+print("alpha around 0.2-0.3 keeps the central line clearly on top.")
+```
+
+## Say which interval it is
+
+Standard deviation, standard error and a confidence interval differ by a lot.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 40
+sample = rng.normal(100, 15, n)
+
+sd = sample.std(ddof=1)
+se = sd / np.sqrt(n)
+ci = 1.96 * se
+
+fig, ax = plt.subplots(figsize=(6, 3))
+for i, (label, half) in enumerate([("sd", sd), ("se", se), ("95% ci", ci)]):
+    ax.errorbar([i], [sample.mean()], yerr=[[half], [half]],
+                marker="o", capsize=6)
+    ax.text(i, sample.mean() + half + 1, "%s: +/-%.1f" % (label, half),
+            ha="center", fontsize=9)
+ax.set_xticks(range(3))
+ax.set_xticklabels(["sd", "se", "95% ci"])
+ax.set_title("same data, three intervals")
+
+print("sd     = %.2f  spread of the DATA" % sd)
+print("se     = %.2f  uncertainty of the MEAN" % se)
+print("95%% ci = %.2f  about 1.96 standard errors" % ci)
+print()
+print("They differ by a factor of six here. An unlabelled error bar is")
+print("uninterpretable, which is why the caption has to say which it is.")
+```
+
+## Bars with error bars
+
+The same <code>yerr</code> argument, and the same zero-baseline rule.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+groups = ["a", "b", "c", "d"]
+means = np.array([23, 31, 27, 35], dtype=float)
+errs = np.array([3, 5, 2, 4], dtype=float)
+
+fig, ax = plt.subplots(figsize=(6, 3))
+ax.bar(groups, means, yerr=errs, capsize=5,
+       color="steelblue", edgecolor="black", linewidth=0.5)
+ax.set_ylabel("mean (95% ci)")
+
+print("bar takes yerr directly.")
+print()
+print("error_kw passes styling through to the error bars:")
+print("   error_kw=dict(ecolor='0.3', lw=1, capthick=1)")
+print()
+print("The overlap rule people remember - 'if the bars overlap it is not")
+print("significant' - is wrong for confidence intervals of two means.")
+print("Non-overlapping implies significance; overlapping does not imply")
+print("its absence.")
+```
+
+## Showing the data instead
+
+With few points, the observations beat any summary of them.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(1)
+groups = {"a": rng.normal(20, 3, 12),
+          "b": rng.normal(24, 3, 12),
+          "c": rng.normal(22, 9, 12)}
+
+fig, (p, q) = plt.subplots(1, 2, figsize=(9, 3.2), sharey=True)
+
+names = list(groups)
+means = [groups[k].mean() for k in names]
+sds = [groups[k].std(ddof=1) for k in names]
+p.bar(names, means, yerr=sds, capsize=5, color="0.7")
+p.set_title("bar + error bar")
+
+for i, k in enumerate(names):
+    vals = groups[k]
+    p_x = np.full(len(vals), i) + rng.uniform(-0.12, 0.12, len(vals))
+    q.scatter(p_x, vals, alpha=0.7, s=25)
+    q.hlines(vals.mean(), i - 0.25, i + 0.25, color="crimson", linewidth=2)
+q.set_xticks(range(3)); q.set_xticklabels(names)
+q.set_title("the points themselves")
+
+print("Group c has three times the spread of the others, and one clear")
+print("outlier. The bar chart shows a taller error bar; the strip plot")
+print("shows what is actually going on.")
+print()
+print("Jitter - a small random x offset - stops points overlapping.")
+```
+
+## Bands from a model
+
+The prediction and its interval, drawn together.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(2)
+x = np.sort(rng.uniform(0, 10, 40))
+y = 2.0 * x + 5 + rng.normal(0, 3, 40)
+
+coef = np.polyfit(x, y, 1)
+xs = np.linspace(0, 10, 100)
+fit = np.polyval(coef, xs)
+
+resid = y - np.polyval(coef, x)
+s = resid.std(ddof=2)
+
+fig, ax = plt.subplots(figsize=(6.5, 3.5))
+ax.scatter(x, y, alpha=0.7, s=30, label="observations")
+ax.plot(xs, fit, color="crimson", linewidth=2, label="fit")
+ax.fill_between(xs, fit - 1.96 * s, fit + 1.96 * s,
+                color="crimson", alpha=0.15, label="+/-1.96 s")
+ax.legend()
+
+print("fit: y = %.2fx + %.2f" % (coef[0], coef[1]))
+print("residual sd: %.2f" % s)
+print()
+print("This band is a rough PREDICTION interval - where new points")
+print("should fall. A confidence interval for the LINE is narrower and")
+print("bow-shaped, widest at the ends. They are different claims and")
+print("get confused constantly.")
+```
+## Bands
+
+Error bars work for a handful of discrete measurements. On a curve with two hundred points they overlap into a grey smear that conveys nothing.
+
+`fill_between(x, low, high)` is the continuous version:
+
+```python
+ax.plot(x, y)
+ax.fill_between(x, y - sd, y + sd, alpha=0.25)
+```
+
+`alpha` around 0.2 to 0.3 keeps the central line clearly on top. Using the same colour for line and band ties them together; using a different one implies they are different series.
+
+`fill_between` also takes `where=` to shade only part of the range, and `step="pre"` for step-like data where a smooth fill would be wrong.
+
+## Say which interval it is
+
+This is the part that matters and is most often skipped.
+
+**Standard deviation** describes the spread of the **data**. It does not shrink as you collect more.
+
+**Standard error** describes the uncertainty of the **mean**. It is the standard deviation divided by the square root of n, so it does shrink.
+
+**A confidence interval** is roughly 1.96 standard errors for a 95% interval on a mean, under assumptions.
+
+**A prediction interval** is where a new observation should fall, and is wider than a confidence interval for the fitted line.
+
+On a sample of forty with a standard deviation of fifteen, these differ by a factor of six. An error bar without a caption saying which one it is cannot be interpreted, and readers reliably assume whichever supports their prior.
+
+Put it in the axis label or the legend: `"mean (95% CI)"` costs nothing.
+
+## Bars with error bars
+
+`ax.bar(x, heights, yerr=errs, capsize=5)` works directly, and `error_kw` passes styling through to the whiskers.
+
+Two cautions specific to bars.
+
+The **zero baseline** rule still applies, and error bars make it more tempting to break, because a truncated axis makes the intervals look more separated.
+
+And the **overlap heuristic** &mdash; "the error bars overlap, so the difference is not significant" &mdash; is wrong for confidence intervals of two means. Non-overlapping intervals do imply a significant difference; overlapping ones do **not** imply the absence of one, because the relevant quantity is the interval around the *difference*, which is narrower than either individual interval suggests. Two 95% intervals can overlap by a fair margin while the difference is still significant.
+
+## Show the data when you can
+
+With a dozen observations per group, a bar and an error bar throw away almost everything: the shape, the outliers, the sample size.
+
+A strip plot &mdash; the individual points with a small random x offset, or "jitter", to stop them overlapping &mdash; shows all of it in the same space. Adding a horizontal line for the mean keeps the summary.
+
+The fifth editor shows a case where two groups have the same mean and very different spreads, one with a clear outlier. The bar chart reports a taller error bar; the points report what happened.
+
+The rule of thumb: under about fifty points per group, show the points. Above that, a box plot or a violin summarises without hiding as much as a bar does.
+
+## Model intervals
+
+Drawing a fit with a band is the standard way to show a model and its uncertainty, and it requires being explicit about which band.
+
+A **confidence band** for the fitted line is narrow in the middle and bow-shaped, widening at the ends where the fit is less constrained.
+
+A **prediction band** for new observations is much wider and roughly parallel to the line, because it includes the residual scatter as well as the uncertainty in the line.
+
+The sixth editor draws the second, approximately. For anything that will be used to make a decision, statsmodels or SciPy compute these properly, and the arithmetic is worth doing rather than approximating.
+
+## Styling error bars
+
+`errorbar` takes separate styling for the line, the markers and the bars:
+
+```python
+ax.errorbar(x, y, yerr=e,
+            fmt="o", markersize=5,
+            ecolor="0.4", elinewidth=1, capsize=4, capthick=1)
+```
+
+`fmt="o"` draws markers with no connecting line, which is right when the x values are discrete categories rather than a sequence. `fmt="none"` draws bars only.
+
+`ecolor` lighter than the marker keeps the point as the subject and the interval as context, which is usually the correct emphasis.
+
+`errorevery=5` draws bars on every fifth point, for a dense series where every bar would be a smear but some indication of uncertainty is wanted.
+
+## Asymmetric intervals from quantiles
+
+Real uncertainty is often asymmetric, and quantiles give it directly:
+
+```python
+lo = np.percentile(samples, 5, axis=0)
+hi = np.percentile(samples, 95, axis=0)
+ax.fill_between(x, lo, hi, alpha=0.2)
+```
+
+For `errorbar` the same quantiles must be converted to **offsets** from the central value:
+
+```python
+yerr = np.vstack([median - lo, hi - median])
+```
+
+Forgetting that conversion &mdash; passing the quantiles themselves &mdash; is the most common error here, and produces intervals that are wrong by the magnitude of the data rather than subtly off.
+
+## Several series with intervals
+
+Two series each with a band overlap into something unreadable if both bands are the same weight.
+
+Three things help: low alpha on the bands (0.15 rather than 0.3), matching each band to its line's colour, and drawing all the bands before all the lines so no line is buried.
+
+```python
+for name, (y, lo, hi) in series.items():
+    ax.fill_between(x, lo, hi, alpha=0.15)
+for name, (y, lo, hi) in series.items():
+    ax.plot(x, y, label=name)
+```
+
+Beyond three series with bands, the bands stop being separable and small multiples are the answer.
+
+## Error bars on log axes
+
+An interval that is symmetric on a linear scale is asymmetric on a log one, and vice versa.
+
+Passing symmetric `yerr` to a log-scaled axis produces a lower bar that is visually much longer than the upper one, which is correct arithmetic and usually not what was intended &mdash; multiplicative uncertainty is normally what you have on a log scale.
+
+The fix is to compute the interval in the space you are plotting: bounds as multiplicative factors, converted to offsets at each point.
+
+A bar reaching below zero on a log axis simply does not draw, which is the visible symptom.
+
+## What the interval is for
+
+An error bar is a claim about repeatability, and it is worth being clear which claim.
+
+"If I did this again, the mean would land in here" is a confidence interval.
+
+"A new observation would land in here" is a prediction interval, and is much wider.
+
+"The data spread this much" is a standard deviation, and does not shrink with more data.
+
+Charts routinely show one and are read as another. The caption is the only thing that resolves it, which is why every editor here labels the interval rather than leaving it to the reader.
+
+## Uncertainty that is not statistical
+
+Not every band is a confidence interval, and saying which kind it is matters as much as the arithmetic.
+
+**A measurement tolerance** &mdash; the instrument's stated accuracy, fixed and known.
+
+**A range across scenarios** &mdash; best and worst case, which is not a probability statement at all.
+
+**A forecast interval** &mdash; widening with horizon, and conditional on the model.
+
+**Observed min and max** &mdash; the actual extremes, which say nothing about what a new observation would do.
+
+Each is a different claim, and drawn identically. The caption is the only thing distinguishing them, which is why an unlabelled band is the most common way a chart overstates what is known.
+
+## Choosing what to show
+
+The decision is what the reader should conclude.
+
+If the question is **"is this difference real?"**, show a confidence interval on the difference, not two intervals on the means &mdash; the eye cannot combine them correctly.
+
+If the question is **"how variable is this?"**, show the spread: a standard deviation, a percentile band, or the points.
+
+If the question is **"what will happen next?"**, show a prediction interval, which is wider than either.
+
+If the sample is small, showing the observations answers all three better than any interval.
+
+The failure to avoid is showing a standard error because it is narrowest and letting it be read as spread, which understates variability by a factor of the square root of n.
+
+## Intervals in a report
+
+An interval on a chart is a claim, and the surrounding text is part of it.
+
+Three things belong in the caption or the axis label, and are almost always omitted:
+
+**Which interval it is** &mdash; standard deviation, standard error, a confidence interval and at what level, or a prediction interval.
+
+**What it assumes** &mdash; normality, independence, a model.
+
+**The sample size**, because an interval from eight observations and one from eight hundred are different kinds of claim even when they are the same width.
+
+"Mean &plusmn; 95% CI, n = 42" in the y label costs nine words and makes the chart interpretable. Without it the reader either assumes the most favourable reading or discounts the interval entirely, and both are worse than being told.
+
+## In summary
+
+`errorbar` for discrete measurements, `fill_between` for a curve &mdash; hundreds of bars become a smear.
+
+`yerr=[lo, hi]` takes positive offsets, not absolute bounds, and getting that wrong produces intervals wrong by the scale of the data.
+
+Standard deviation, standard error and a confidence interval differ by large factors on the same data, and an unlabelled bar cannot be interpreted.
+
+Overlapping confidence intervals do not imply the absence of a significant difference, though non-overlapping ones do imply its presence.
+
+On a log axis, symmetric offsets are asymmetric on screen, and the interval should be computed in the space being plotted.
+
+And with few observations, showing the points beats any summary of them.
+
+## Bands on a forecast
+
+A forecast chart has a specific convention worth following.
+
+The **historical** series is drawn solid; the **forecast** is drawn dashed or in a different shade, so the boundary between observed and predicted is visible without reading the caption.
+
+A **vertical line** at the forecast origin makes it unmissable.
+
+The **band widens** with horizon, because uncertainty grows &mdash; a constant-width band on a forecast is almost always wrong, and it understates the far end.
+
+**Two bands** at different levels &mdash; 50% and 90%, with the inner one darker &mdash; communicate the shape of the uncertainty better than one, and are standard in published forecasts.
+
+And the caption states the model and the interval, because a forecast band is entirely conditional on a model the chart does not show.
+
+Without the vertical line and the style change, a reader takes the whole line as data, which is the most consequential misreading available on this kind of chart.
+
+## The short version
+
+An interval is a claim, and the caption is part of the claim.
+
+Standard deviation, standard error, confidence and prediction intervals differ by large factors on the same data, and drawing them identically without saying which is the most common way a chart overstates what is known.
+
+## Reading the code back
+
+Drawing an interval is one argument. Deciding which interval, computing it correctly as offsets, and saying in the chart which one it is are three separate pieces of work, and only the first is about matplotlib. A band drawn without the other two is a decoration that readers will interpret as a claim.

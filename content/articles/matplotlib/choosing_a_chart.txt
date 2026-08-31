@@ -1,0 +1,413 @@
+title: Choosing a Chart
+intro: Matching the display to the question, and the two chart types worth avoiding.
+
+## Start from the question
+
+Most charts answer one of four questions, and each has a standard display:
+
+**How did this change over time?** A line chart. Time on the x axis, left to right.
+
+**How do these categories compare?** A bar chart &mdash; horizontal, so the labels read, and sorted, so the ranking is immediate.
+
+**Is there a relationship between these two things?** A scatter plot.
+
+**How is this distributed?** A histogram for one group, box plots or the points themselves for several.
+
+That covers the large majority of real charts. When none of them fits, it is usually because the question has not been stated precisely, and stating it identifies the chart.
+
+The corollary: decide the question first. A chart made by plotting the data and then deciding what it shows is usually a chart of several things at once.
+
+
+## The question decides the chart
+
+Four common questions, four displays.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(0)
+fig, axes = plt.subplots(2, 2, figsize=(9, 5))
+
+t = np.arange(40)
+axes[0, 0].plot(t, rng.normal(0, 1, 40).cumsum())
+axes[0, 0].set_title("change over time -> line")
+
+axes[0, 1].barh(list("abcd"), sorted(rng.integers(5, 40, 4)))
+axes[0, 1].set_title("compare categories -> bar")
+
+x = rng.normal(size=200)
+axes[1, 0].scatter(x, x * 0.6 + rng.normal(size=200), s=12, alpha=0.5)
+axes[1, 0].set_title("relationship -> scatter")
+
+axes[1, 1].hist(rng.normal(size=500), bins=25)
+axes[1, 1].set_title("distribution -> histogram")
+fig.tight_layout()
+
+print("time      -> line")
+print("categories-> bar, horizontal, sorted")
+print("relation  -> scatter")
+print("spread    -> histogram, box or the points themselves")
+print()
+print("Most charts are one of these four. Reaching for something more")
+print("exotic usually means the question has not been stated yet.")
+```
+
+## Pie charts, and why not
+
+Angle is the hardest visual encoding to compare.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+vals = np.array([23, 21, 19, 20, 17])
+names = ["a", "b", "c", "d", "e"]
+
+fig, (p, q) = plt.subplots(1, 2, figsize=(9, 3.4))
+
+p.pie(vals, labels=names, autopct="%.0f%%")
+p.set_title("which is largest?")
+
+order = np.argsort(vals)
+q.barh([names[i] for i in order], vals[order])
+q.set_title("obvious")
+
+print("values:", dict(zip(names, vals)))
+print()
+print("Five similar slices are genuinely hard to rank by eye, because")
+print("people compare angles badly and areas only slightly better.")
+print("The same numbers as a sorted bar chart are trivial.")
+print()
+print("A pie is defensible for two or three parts of an obvious whole.")
+print("Beyond that a bar chart is better in every way.")
+```
+
+## Dual axes, restated
+
+Included here because it is the other one worth avoiding.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.arange(20)
+a_vals = np.linspace(10, 90, 20)
+b_vals = np.linspace(80, 20, 20)
+
+fig, (p, q) = plt.subplots(1, 2, figsize=(9, 3.2))
+
+p.plot(x, a_vals, color="#264653")
+p2 = p.twinx()
+p2.plot(x, b_vals, color="#e76f51")
+p2.set_ylim(0, 300)
+p.set_title("crossing point is arbitrary")
+
+q.plot(x, a_vals / a_vals[0] * 100, color="#264653", label="A")
+q.plot(x, b_vals / b_vals[0] * 100, color="#e76f51", label="B")
+q.set_ylabel("indexed to start = 100")
+q.legend()
+q.set_title("one honest axis")
+
+print("Changing the right-hand limits moves where the lines cross,")
+print("and readers treat the crossing as a finding.")
+print()
+print("Indexing both to a common base gives one axis and a crossing")
+print("that means something: relative growth diverged.")
+```
+
+## Small multiples beat one busy chart
+
+Seven series on one axes is a hairball; seven panels is a comparison.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(1)
+series = {name: rng.normal(0, 1, 60).cumsum() + 20
+          for name in ["a", "b", "c", "d", "e", "f"]}
+
+fig, ax = plt.subplots(figsize=(6.5, 3))
+for name, y in series.items():
+    ax.plot(y, label=name)
+ax.legend(ncol=3, fontsize=8)
+ax.set_title("six series, one axes")
+
+fig2, axes = plt.subplots(2, 3, figsize=(8, 3.6), sharex=True, sharey=True)
+for ax2, (name, y) in zip(axes.flat, series.items()):
+    ax2.plot(y, color="#264653")
+    ax2.set_title(name, fontsize=9)
+fig2.suptitle("the same data as small multiples")
+fig2.tight_layout()
+
+print("The first chart makes you trace six colours through a legend.")
+print("The second lets you see each shape and compare across panels,")
+print("because sharey means the heights mean the same thing.")
+```
+
+## Highlight rather than colour everything
+
+One series in colour, the rest in grey, says what the chart is about.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(2)
+names = ["a", "b", "c", "d", "e", "f", "g"]
+series = {n: rng.normal(0, 1, 50).cumsum() + 20 for n in names}
+focus = "d"
+
+fig, (p, q) = plt.subplots(1, 2, figsize=(10, 3.2), sharey=True)
+
+for n, y in series.items():
+    p.plot(y, label=n)
+p.legend(ncol=4, fontsize=7)
+p.set_title("all seven equally loud")
+
+for n, y in series.items():
+    if n == focus:
+        continue
+    q.plot(y, color="0.8", linewidth=1)
+y = series[focus]
+q.plot(y, color="crimson", linewidth=2.5)
+q.text(len(y) - 1, y[-1], "  " + focus, color="crimson", va="center")
+q.set_title("one highlighted, the rest as context")
+
+print("The grey lines still provide the range for comparison.")
+print("The coloured one is the subject. Nobody has to read a legend.")
+```
+
+## The checklist
+
+What to look at before a chart leaves your screen.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(3)
+months = np.arange(1, 13)
+y = np.array([12, 15, 14, 18, 22, 25, 24, 27, 23, 20, 18, 21])
+
+fig, ax = plt.subplots(figsize=(7, 3.5))
+ax.plot(months, y, marker="o", color="#264653", linewidth=2)
+i = y.argmax()
+ax.plot(months[i], y[i], marker="o", color="crimson", markersize=10)
+ax.set_title("Sales peaked in August, then fell 22%",
+             loc="left", fontsize=12, fontweight="bold")
+ax.set_xlabel("Month of 2024")
+ax.set_ylabel("Sales (thousands)")
+ax.set_ylim(0, 30)
+ax.grid(True, axis="y", alpha=0.3)
+ax.set_axisbelow(True)
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+for line in [
+    "1. does the title say the finding, not the variables?",
+    "2. do the axis labels carry units?",
+    "3. is the baseline right - zero for bars?",
+    "4. is anything hidden by overplotting?",
+    "5. is the ink that is not data doing any work?",
+    "6. would it survive greyscale?",
+    "7. is there one message, or several fighting?",
+]:
+    print(line)
+```
+## Why encodings matter
+
+Some visual channels are read more accurately than others. Roughly, in order:
+
+**Position** along a common scale &mdash; the most accurate. This is what a line, a scatter and a dot plot use.
+
+**Length** from a common baseline &mdash; nearly as good. Bars.
+
+**Angle and area** &mdash; noticeably worse. Pies, bubbles.
+
+**Colour intensity** &mdash; worse again, and good only for ordering, not for reading values.
+
+That ordering is why a bar chart beats a pie chart, why bubble size should never carry the main message, and why a heatmap needs its numbers written in when the values matter.
+
+## Pie charts
+
+A pie asks the reader to compare angles. With two or three slices of an obvious whole, that is fine, and the shape communicates "parts of a total" immediately.
+
+With five similar slices it fails: ranking them by eye is genuinely difficult, which is why almost every pie chart in the wild has its percentages printed on it &mdash; an admission that the picture is not doing the work.
+
+The same numbers as a sorted horizontal bar chart are trivially readable, and the bar chart also shows the magnitudes rather than only the proportions.
+
+Donut charts are pies with the middle removed, which makes them slightly worse, because the angle is now inferred from an arc.
+
+## Dual axes
+
+The other display worth avoiding, covered fully in its own module.
+
+The short version: two series on independent scales have no defined relationship, so where they cross is determined by the limits you chose. Readers see the crossing as a finding.
+
+Stacked panels sharing an x axis, or indexing both series to a common base, say the same thing without inventing a fact.
+
+## Small multiples
+
+Six series on one axes is a hairball with a legend. The reader traces each colour, loses it in a crossing, and consults the legend repeatedly.
+
+Six small panels, sharing axes, let them see each shape directly and compare across panels. The shared scale is what makes the comparison valid, and the panel title replaces the legend.
+
+This is one of the most reliable improvements available, and matplotlib makes it one call: `plt.subplots(2, 3, sharex=True, sharey=True)`.
+
+The trade-off is that comparing two specific series is harder when they are in different panels. If the chart is about one comparison, put those two on one axes; if it is about the set, use multiples.
+
+## Highlighting
+
+When one series is the subject and the others are context, say so with colour: the subject in a strong colour and heavier line, the rest in light grey.
+
+The grey lines still give the range and the shape of the group, so nothing is lost. The reader's eye goes to the subject immediately, and no legend is needed if the highlighted line is labelled at its end.
+
+This is more effective than an annotation, because it directs attention by contrast rather than by adding another thing to read.
+
+## The checklist
+
+Before a chart leaves your screen:
+
+Does the **title state the finding**, rather than naming the variables?
+
+Do the **axis labels carry units**?
+
+Is the **baseline** right &mdash; zero for bars, and does a truncated line axis need saying?
+
+Is anything **hidden** &mdash; overplotted points, a series behind another, a category off the edge?
+
+Is the **non-data ink** doing work &mdash; the grid, the frame, the legend, the tick marks?
+
+Would it **survive greyscale**, and colour-vision deficiency?
+
+Is there **one message**, or several competing? Two charts each saying one thing beat one saying both.
+
+None of these is about matplotlib, which is the point. The library will draw whatever you ask; the choices are yours, and they are what makes a chart worth looking at.
+
+## Ranking, not just comparing
+
+"Compare categories" splits into two questions that want different charts.
+
+**Which is biggest?** A sorted horizontal bar chart, and nothing else comes close.
+
+**How does each compare with a reference?** A dot plot against a line, or a bar of the difference from the reference, which puts the comparison on the axis instead of asking the reader to subtract.
+
+The second is under-used. A chart of "actual minus target" answers the question directly, where two bars per category makes the reader do the arithmetic.
+
+## Part-to-whole
+
+Four displays, in decreasing order of how well they work.
+
+**Stacked bar normalised to 100%** &mdash; comparable across groups, and readable for four or five parts.
+
+**A single stacked bar** &mdash; fine for one composition with few parts.
+
+**Small multiples of the parts** &mdash; better when the individual trends matter more than the composition.
+
+**A pie** &mdash; two or three parts, and only when "these are shares of one thing" is the message rather than the values.
+
+Treemaps handle many parts and are hard to compare precisely; they suit hierarchy more than proportion.
+
+## Distribution over time
+
+A frequent question with no single good answer.
+
+**A line of the median with a shaded interquartile band** works well and shows the middle and the spread.
+
+**A box plot per period** works when the periods are few.
+
+**A heatmap of time against value bins** shows the full distribution and takes practice to read.
+
+**Individual lines, greyed** &mdash; a spaghetti plot with a highlighted median &mdash; works when the number of entities is modest and their individual paths matter.
+
+The wrong answer is a line of the mean alone, which hides everything that changed about the spread.
+
+## Two variables plus a third
+
+A scatter with colour is the first choice; a scatter with size is second and much weaker.
+
+If the third variable is categorical with few levels, **small multiples** &mdash; one scatter per level, shared axes &mdash; beat colour, because comparing panels is easier than separating overlapping colours.
+
+If it is continuous, colour with a sequential map and a colorbar.
+
+Encoding four variables on one chart is usually a mistake; the fourth becomes decoration, and the chart takes longer to read than two charts would.
+
+## The general rule
+
+Every chart makes the reader do some work, and the choice of chart decides how much.
+
+A sorted bar chart asks them to read a ranking that is already visible. An unsorted one asks them to sort. A pie asks them to compare angles. A dual-axis chart asks them to hold two scales at once. A twelve-line chart asks them to trace colours through a legend.
+
+The best chart is usually the one that has already done the work &mdash; sorted, filtered, highlighted, labelled &mdash; leaving the reader only the conclusion.
+
+## Charts for a specific audience
+
+The same data justifies different charts depending on who is reading.
+
+**For yourself, exploring** &mdash; density, defaults, many panels. Nothing needs labelling because you know what it is, and speed matters more than polish.
+
+**For a colleague** &mdash; labelled, titled, one message per chart, and the caveats visible.
+
+**For a presentation** &mdash; one chart, one message, large text, minimal reference material, and the conclusion in the title. The reader has seconds and cannot zoom.
+
+**For a document** &mdash; sized for the column, with a caption carrying the detail that would clutter the chart.
+
+The mistake is showing an exploratory chart to an audience, which is how a chart with eleven series and no title ends up in a meeting.
+
+## The one-message rule
+
+The most useful constraint in charting is that a chart should say one thing.
+
+It forces the choices: which variable is on which axis, what to highlight, what to leave out, what the title claims.
+
+A chart trying to say three things usually says none, because the reader cannot tell which of the three to look at, and the elements supporting each compete with the others.
+
+Two charts each saying one thing take the same space and communicate more. Splitting is nearly always the right answer when a chart feels crowded, and "what is this chart for?" is the question that resolves most design arguments about it.
+
+## Redesigning a chart
+
+A practical exercise: take a chart that is not working and improve it without changing the data.
+
+The sequence that usually helps, in order:
+
+**State the message in a sentence.** If that is hard, the chart is trying to do more than one thing.
+
+**Remove everything the sentence does not need.** Series, gridlines, the legend if direct labels would do, tick marks, the box around the plot.
+
+**Sort, if the order is arbitrary.**
+
+**Highlight the subject** and grey the rest.
+
+**Put the sentence in the title.**
+
+**Label the thing the sentence refers to.**
+
+Six steps, none of which requires new data, and together they turn a chart that shows the numbers into one that makes the point. Most charts improve substantially and the code gets shorter, because most of the steps remove something.
+
+## In summary
+
+Time is a line, categories are a sorted horizontal bar, relationships are a scatter, distributions are a histogram or a box.
+
+Position is read most accurately, then length; angle and area much less well. That ordering is why bars beat pies and why bubble size should never carry the main message.
+
+Dual axes put the crossing point under your control rather than the data's.
+
+Small multiples beat many series on one chart when the question is about the set; highlighting beats a legend when it is about one.
+
+And the best chart is the one that has already done the reader's work: sorted, filtered, labelled, with the conclusion in the title and nothing else competing for attention.
+
+## A closing note
+
+Everything else in this track is mechanism; this module is the part that decides whether the mechanism was worth using.
+
+The recurring theme is that a chart is a piece of communication, and the reader's effort is the cost. Sorting, filtering, highlighting and labelling all move work from the reader to the author, and the best charts have had the most work moved.
+
+The chart types worth avoiding &mdash; pies with many slices, dual axes, truncated bars &mdash; are all cases where the display asks the reader to do something people do badly, or invites a conclusion the data does not support.
+
+And the most useful single constraint remains the simplest: one chart, one message. Almost every design question resolves once that is decided.
+
+## Reading the code back
+
+Choosing is done before any code: what question, what encoding, what to leave out, what the title will claim. A chart written from those four answers is usually short, because most of the length in plotting code comes from adjusting a display that was not the right one to begin with.

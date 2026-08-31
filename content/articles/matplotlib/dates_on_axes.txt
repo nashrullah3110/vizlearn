@@ -1,0 +1,409 @@
+title: Dates on an Axis
+intro: Time series plotting, and the locators and formatters that stop labels colliding.
+
+## The axis type follows the data
+
+Pass a list of `datetime.date` or `datetime.datetime` objects &mdash; or a pandas `DatetimeIndex`, or NumPy `datetime64` &mdash; and matplotlib recognises them and builds a date axis. Tick positions and labels are then chosen in date units rather than arbitrary numbers.
+
+Pass **strings** and you get something quite different: matplotlib treats them as categories. Each distinct string gets a position, evenly spaced, in the order supplied.
+
+That difference matters more than it sounds. With categories, two readings a day apart and two readings two months apart are drawn the same distance apart. The gap in the data disappears, and the line implies a continuity that is not there.
+
+Since dates from a CSV arrive as strings, this is a common and quiet failure. `pd.to_datetime` before plotting is the fix, and checking the dtype is how you notice.
+
+
+## Real dates plot as dates
+
+Pass datetimes and matplotlib gives you a date axis for free.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+import datetime as dt
+
+start = dt.date(2024, 1, 1)
+days = [start + dt.timedelta(days=i) for i in range(120)]
+y = np.random.default_rng(0).normal(0, 1, 120).cumsum() + 20
+
+fig, (a, b) = plt.subplots(2, 1, figsize=(7, 4))
+
+a.plot(range(120), y)
+a.set_title("plotted against 0..119 - the axis says nothing")
+
+b.plot(days, y)
+b.set_title("plotted against dates")
+
+print("The x axis type is decided by what you pass in.")
+print("Strings are treated as CATEGORIES - one tick per value, in the")
+print("order given, which is why a string date axis looks crowded and")
+print("ignores gaps between days.")
+```
+
+## Strings are not dates
+
+They plot in the order given, evenly spaced, whatever the gaps.
+
+```python-run
+import matplotlib.pyplot as plt
+import datetime as dt
+
+labels = ["2024-01-01", "2024-01-02", "2024-03-01", "2024-03-02"]
+real = [dt.date.fromisoformat(s) for s in labels]
+y = [1, 2, 3, 4]
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+
+a.plot(labels, y, marker="o")
+a.set_title("strings: evenly spaced")
+a.tick_params(axis="x", rotation=45, labelsize=8)
+
+b.plot(real, y, marker="o")
+b.set_title("dates: the two-month gap is visible")
+b.tick_params(axis="x", rotation=45, labelsize=8)
+
+print("Two pairs of days, two months apart.")
+print("As strings, all four points are equally spaced - the gap vanishes.")
+print("As dates, the gap is drawn, which is the whole reason to use a")
+print("date axis rather than category labels.")
+```
+
+## Locators decide where the ticks go
+
+By month, by week, by day - rather than at arbitrary numbers.
+
+```python-run
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import numpy as np
+import datetime as dt
+
+start = dt.date(2024, 1, 1)
+days = [start + dt.timedelta(days=i) for i in range(240)]
+y = np.random.default_rng(1).normal(0, 1, 240).cumsum()
+
+fig, (a, b) = plt.subplots(2, 1, figsize=(7.5, 4.5))
+
+a.plot(days, y)
+a.set_title("automatic ticks")
+
+b.plot(days, y)
+b.xaxis.set_major_locator(mdates.MonthLocator())
+b.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
+b.xaxis.set_minor_locator(mdates.WeekdayLocator(byweekday=mdates.MO))
+b.set_title("one major tick per month, minor ticks on Mondays")
+
+print("Locators: YearLocator, MonthLocator, WeekdayLocator, DayLocator,")
+print("HourLocator, AutoDateLocator.")
+print()
+print("MonthLocator(interval=3) gives quarters. DayLocator(bymonthday=1)")
+print("gives the first of each month.")
+```
+
+## Formatters decide how they read
+
+strftime codes, and a concise formatter that avoids repetition.
+
+```python-run
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import numpy as np
+import datetime as dt
+
+start = dt.datetime(2024, 3, 1)
+stamps = [start + dt.timedelta(hours=6 * i) for i in range(80)]
+y = np.random.default_rng(2).normal(0, 1, 80).cumsum()
+
+fig, (a, b) = plt.subplots(2, 1, figsize=(7.5, 4.5))
+
+a.plot(stamps, y)
+a.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d %H:%M"))
+a.tick_params(axis="x", rotation=30, labelsize=8)
+a.set_title("full timestamps - repetitive and crowded")
+
+b.plot(stamps, y)
+loc = mdates.AutoDateLocator()
+b.xaxis.set_major_locator(loc)
+b.xaxis.set_major_formatter(mdates.ConciseDateFormatter(loc))
+b.set_title("ConciseDateFormatter")
+
+print("%Y year, %m month number, %b month name, %d day,")
+print("%H hour, %M minute")
+print()
+print("ConciseDateFormatter drops what is repeated - it prints the year")
+print("once at the start rather than on every label, which is usually")
+print("what you would have written by hand.")
+```
+
+## Rotating and thinning labels
+
+When the labels still collide.
+
+```python-run
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import numpy as np
+import datetime as dt
+
+start = dt.date(2024, 1, 1)
+days = [start + dt.timedelta(days=i) for i in range(60)]
+y = np.random.default_rng(3).normal(0, 1, 60).cumsum()
+
+fig, (a, b) = plt.subplots(2, 1, figsize=(7.5, 4.5))
+
+a.plot(days, y)
+a.xaxis.set_major_locator(mdates.DayLocator(interval=2))
+a.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+a.set_title("every 2 days - collides")
+
+b.plot(days, y)
+b.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=mdates.MO))
+b.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+b.set_title("weekly ticks - readable")
+
+print("Three fixes, in order of preference:")
+print("  1. fewer ticks - a coarser locator")
+print("  2. shorter labels - '%d %b' rather than '%Y-%m-%d'")
+print("  3. rotation - fig.autofmt_xdate() rotates and right-aligns")
+print()
+print("Rotation is the last resort, because slanted text is harder to")
+print("read than horizontal text.")
+```
+
+## Marking a period
+
+A date axis takes the same spans and lines as any other.
+
+```python-run
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import numpy as np
+import datetime as dt
+
+start = dt.date(2024, 1, 1)
+days = [start + dt.timedelta(days=i) for i in range(150)]
+y = np.random.default_rng(4).normal(0, 1, 150).cumsum() + 30
+
+fig, ax = plt.subplots(figsize=(7.5, 3.2))
+ax.plot(days, y, color="0.35")
+
+ax.axvspan(dt.date(2024, 3, 1), dt.date(2024, 4, 1),
+           color="crimson", alpha=0.12)
+ax.axvline(dt.date(2024, 3, 15), color="crimson", linestyle="--", linewidth=1)
+ax.text(dt.date(2024, 3, 15), ax.get_ylim()[1], " launch",
+        va="top", fontsize=9, color="crimson")
+
+loc = mdates.AutoDateLocator()
+ax.xaxis.set_major_locator(loc)
+ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(loc))
+
+print("axvspan and axvline take dates directly, because internally the")
+print("axis is numeric - matplotlib stores dates as days since an epoch.")
+print()
+print("That is also why you can mix: ax.set_xlim takes dates or numbers.")
+```
+## Locators
+
+A **locator** decides where ticks go. The date locators think in calendar units:
+
+`YearLocator()`, `MonthLocator()`, `WeekdayLocator(byweekday=MO)`, `DayLocator()`, `HourLocator()`, `MinuteLocator()`.
+
+Each takes an `interval`, so `MonthLocator(interval=3)` gives quarterly ticks, and several take a `by...` argument &mdash; `DayLocator(bymonthday=1)` for the first of each month.
+
+`AutoDateLocator()` chooses based on the visible range, and adapts if the axis is zoomed.
+
+Minor ticks add structure without labels: monthly majors with weekly minors gives a sense of scale without crowding.
+
+## Formatters
+
+A **formatter** decides how a tick reads.
+
+`DateFormatter("%d %b")` uses `strftime` codes: `%Y` four-digit year, `%y` two-digit, `%m` month number, `%b` abbreviated month name, `%d` day, `%H:%M` time.
+
+`ConciseDateFormatter(locator)` is usually the better choice. It drops what is repeated &mdash; printing the year once at the left rather than on every label, and showing only the day number when the month is unchanged. That is what a person would do by hand, and it saves a great deal of horizontal space.
+
+It needs the locator passed to it, because it decides what to omit based on the tick spacing.
+
+## Crowded labels
+
+Date labels collide more than any other kind, because they are long and there are many of them.
+
+Three fixes, in order of preference:
+
+**Fewer ticks.** A coarser locator. Fifteen readable ticks beat forty overlapping ones, and the reader was never going to use all forty.
+
+**Shorter labels.** `"%d %b"` instead of `"%Y-%m-%d"`, or `ConciseDateFormatter`.
+
+**Rotation.** `fig.autofmt_xdate()` rotates the labels and right-aligns them, and also makes room. It works, and slanted text is genuinely harder to read than horizontal text, so it belongs after the other two rather than instead of them.
+
+A wider figure is the fourth option and often the honest one: a year of daily data does not fit legibly in four inches.
+
+## Marking events
+
+`axvline(date)` and `axvspan(start, end)` take dates directly.
+
+That works because the date axis is numeric underneath &mdash; matplotlib converts dates to floating-point days since an epoch, plots the numbers, and formats the labels back into dates. `mdates.date2num` and `num2date` do the conversion explicitly when you need it.
+
+The same fact explains why `set_xlim` accepts either dates or raw numbers, and why arithmetic on the limits works.
+
+## With pandas
+
+A pandas Series with a `DatetimeIndex` plots directly:
+
+```python
+ax.plot(series.index, series.values)
+```
+
+or `series.plot(ax=ax)`, which uses pandas' own date formatting. The two produce slightly different tick choices, and pandas' version is often good enough that no locator work is needed.
+
+For a DataFrame, `df.plot(ax=ax)` draws every column against the index, which is the fastest route from a time-indexed frame to a chart &mdash; and the subject of a later module.
+
+## Time zones and the axis
+
+matplotlib converts datetimes to numbers using a fixed epoch, and time-zone-aware timestamps are converted to the axis's timezone before plotting.
+
+`rcParams["timezone"]` sets it. If it does not match the data's, the labels are correct times in a different zone, and the shift is a whole number of hours &mdash; large enough to matter and small enough to overlook.
+
+The reliable approach is the one from the pandas track: normalise to a single zone before plotting, and label the axis with which one.
+
+## Gaps and non-trading days
+
+A date axis draws real elapsed time, so a weekend appears as a gap.
+
+For financial data that is usually unwanted: five trading days a week become a line with regular breaks, and a month of data has eight or nine of them.
+
+Two options. Plot against an integer index and label the ticks with the dates, which removes the gaps at the cost of a slightly dishonest axis. Or accept the gaps, which is more truthful about elapsed time.
+
+Which is right depends on whether the chart is about the market's behaviour over trading sessions or about calendar time. Both are defensible; picking without noticing is not.
+
+## Resampling before plotting
+
+A year of per-minute data is half a million points, and a chart seven inches wide has seven hundred pixel columns.
+
+Resampling to a sensible frequency before plotting is usually better than drawing everything:
+
+```python
+daily = series.resample("D").mean()
+ax.plot(daily.index, daily.values)
+```
+
+That is fewer artists, a smaller file, and a chart that looks identical &mdash; because the extra points were never distinguishable.
+
+Where extremes matter, resampling to min and max per period and shading between them keeps the envelope, which is the technique from the performance module.
+
+## Multiple time series with different ranges
+
+Two series covering different date ranges plot happily on one axis, and the shorter one simply occupies part of the width.
+
+That is correct and can mislead, because a series that starts later looks like it began at zero rather than being unobserved. Making the difference explicit &mdash; a note, or a shaded region marking where data exists &mdash; prevents the reading that something changed at that date.
+
+The same applies to a series with a gap in the middle, where the broken line is the honest display and a joined one is not.
+
+## Annotating dates
+
+Every annotation method takes dates directly, because the axis is numeric underneath.
+
+The pattern for marking an event:
+
+```python
+ax.axvline(event_date, color="crimson", linestyle="--", linewidth=1)
+ax.text(event_date, 1.01, " launch", transform=ax.get_xaxis_transform(),
+        rotation=0, fontsize=9, color="crimson")
+```
+
+`get_xaxis_transform()` puts x in data units and y in axes fractions, so the label sits just above the plot regardless of the data's range &mdash; which is what you want for an event marker that should stay at the top.
+
+## Reading a time axis
+
+Three things a reader needs from a dated axis, and which are frequently missing.
+
+**The period covered**, which the first and last tick imply and a title states.
+
+**The granularity** &mdash; whether a point is a day, a week or a month &mdash; which markers make explicit and a smooth line hides.
+
+**Whether gaps are real.** A break in a line means missing data; a gap on the axis with the line continuing means the axis is categorical and the elapsed time is not being shown.
+
+Stating the frequency in the title or the axis label &mdash; "Daily", "Monthly average" &mdash; costs a word and answers all three.
+
+## Common date problems
+
+**Labels overlapping** &mdash; too many ticks; use a coarser locator before rotating.
+
+**Dates as categories** &mdash; strings not converted; gaps disappear and the spacing is wrong.
+
+**A shifted axis** &mdash; a time-zone mismatch between the data and `rcParams["timezone"]`.
+
+**Ticks in odd places** &mdash; an automatic locator on an unusual range; name the locator.
+
+**A frequency string that no longer works** &mdash; pandas 2.2 renamed several of them.
+
+**The line breaking at weekends** &mdash; real elapsed time, which is either correct or a reason to plot against an index.
+
+The first two account for most of it, and both are visible immediately.
+
+## Aggregating before plotting
+
+Most time-series charts are better after aggregation than before it.
+
+Per-minute data over a year is half a million points and roughly seven hundred pixel columns. Resampling to daily gives 365 points, a chart that draws instantly, and a picture that is visually identical because the extra points were never separable.
+
+The choice of aggregation is a decision about what the chart is for:
+
+**Mean** for a level &mdash; the typical value in each period.
+
+**Sum** for a quantity &mdash; total sales per week.
+
+**Min and max** shaded as a band, when the extremes are what matter and a mean would hide them.
+
+**Last** for a state or a price, where the value at the end of the period is the meaningful one.
+
+Plotting raw high-frequency data and letting the renderer overplot it is not more honest; it is the same information rendered less legibly, with whatever the overlapping happens to leave visible standing in for a summary you did not choose.
+
+## In summary
+
+Pass real datetimes and matplotlib builds a date axis; pass strings and it builds a categorical one where gaps disappear.
+
+`pd.to_datetime` with an explicit `format` is faster and removes the day-first ambiguity.
+
+Locators place the ticks in calendar units and formatters decide how they read, with `ConciseDateFormatter` dropping the repetition.
+
+For crowded labels, fewer ticks first, shorter labels second, rotation last.
+
+`axvline` and `axvspan` take dates directly, because the axis is numeric underneath.
+
+And pandas 2.2 renamed the frequency aliases &mdash; `ME`, `h`, `min` &mdash; which is the usual reason a copied example stops working.
+
+## Periods rather than instants
+
+Much time-series data is about **periods** rather than points: monthly totals, weekly averages, daily counts.
+
+Plotting a period as a point at its start implies the value occurred at that instant, and a line between two such points implies a smooth transition through the month.
+
+Two displays are more honest for period data.
+
+**Bars**, one per period, which say "this is the total for this interval" and have no between-values.
+
+**A step line**, `ax.step(..., where="post")`, which holds the value across the period and changes at the boundary.
+
+A line is still reasonable when the periods are short relative to the trend and the shape is the point &mdash; but it is a choice, and for something like monthly revenue a bar chart is frequently the better display and rarely the one reached for.
+
+Labelling the axis with the period &mdash; "Month starting" &mdash; removes the remaining ambiguity about which end a point represents.
+
+## A closing note
+
+Time axes carry more conventions than any other kind, and most of the work is in the setup rather than the drawing.
+
+Parse the dates properly, check the dtype, decide on a time zone, sort, and choose a frequency that matches the question. After that, the plotting is the same as any other line chart.
+
+The two failures that matter are plotting strings instead of dates, which silently removes the gaps and misrepresents elapsed time, and letting the locator produce more labels than can be read, which is fixed by asking for fewer rather than by rotating them.
+
+And frequency aliases changed in pandas 2.2, which accounts for a large share of examples that no longer run.
+
+## The short version
+
+A date axis is the difference between a chart of a time series and a chart of some values in order.
+
+Parse properly, sort, choose a frequency that matches the question, and use fewer ticks than the default. The rest follows from the line-chart material.
+
+## Reading the code back
+
+A time-series chart is a line chart with three extra decisions: how the dates were parsed, which locator places the ticks, and which formatter writes them. All three are made before any styling, and getting the first wrong makes the other two irrelevant because the axis is not a timeline at all.

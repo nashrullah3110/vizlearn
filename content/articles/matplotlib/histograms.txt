@@ -1,0 +1,361 @@
+title: Histograms and Distributions
+intro: hist() and the bin count that changes what the data appears to say.
+
+## What it returns
+
+`ax.hist(data, bins=20)` returns `counts, edges, patches`.
+
+`counts` has one entry per bin. `edges` has **one more**, because n bins are defined by n+1 boundaries. That off-by-one is the usual confusion when using the return values, and it is the same convention `np.histogram` follows.
+
+`patches` is the collection of rectangles, kept if you want to recolour particular bars &mdash; highlighting a threshold, for instance.
+
+`edgecolor="white"` is worth adding almost always: without it, adjacent bars merge into a single shape and the bin structure disappears.
+
+
+## hist counts values into bins
+
+And returns the counts and edges, which are often worth keeping.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(0)
+data = rng.normal(loc=50, scale=12, size=800)
+
+fig, ax = plt.subplots(figsize=(6, 3))
+counts, edges, patches = ax.hist(data, bins=20, edgecolor="white")
+
+print("bins requested :", 20)
+print("counts         :", len(counts), "values")
+print("edges          :", len(edges), "<- one more than the counts")
+print()
+print("first three bins: %s to %s -> %d" % (round(edges[0], 1), round(edges[1], 1), counts[0]))
+print("                  %s to %s -> %d" % (round(edges[1], 1), round(edges[2], 1), counts[1]))
+print()
+print("Edges outnumber counts by one, because n bins have n+1 boundaries.")
+```
+
+## The bin count changes the story
+
+Too few hides structure; too many turns it into noise.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(1)
+data = np.concatenate([rng.normal(30, 5, 400), rng.normal(60, 5, 400)])
+
+fig, axes = plt.subplots(1, 4, figsize=(10, 2.6), sharey=True)
+for ax, b in zip(axes, [3, 12, 50, 300]):
+    ax.hist(data, bins=b, edgecolor="white", linewidth=0.3)
+    ax.set_title("bins=%d" % b)
+
+print("The data is genuinely two peaks at 30 and 60.")
+print("   3 bins  : one lump - the structure is gone")
+print("  12 bins  : both peaks visible")
+print("  50 bins  : still clear, more ragged")
+print(" 300 bins  : noise; most bins hold 0-5 points")
+print()
+print("There is no correct answer, which is why looking at two or three")
+print("is more honest than trusting one.")
+```
+
+## Letting numpy choose
+
+<code>bins="auto"</code> applies a rule of thumb rather than a guess.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(2)
+data = rng.normal(size=2000)
+
+fig, ax = plt.subplots(figsize=(6, 3))
+counts, edges, _ = ax.hist(data, bins="auto", edgecolor="white")
+
+for rule in ["auto", "sturges", "fd", "scott", "sqrt"]:
+    n = len(np.histogram_bin_edges(data, bins=rule)) - 1
+    print("%-8s -> %3d bins" % (rule, n))
+print()
+print("'auto' takes the larger of the Freedman-Diaconis and Sturges")
+print("rules. They disagree, which is the honest summary of the problem.")
+```
+
+## density instead of counts
+
+Needed to compare groups of different sizes, or to overlay a curve.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(3)
+small = rng.normal(0, 1, 200)
+large = rng.normal(0, 1, 5000)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(8, 3))
+
+a.hist(small, bins=25, alpha=0.6, label="n=200")
+a.hist(large, bins=25, alpha=0.6, label="n=5000")
+a.set_title("counts - incomparable")
+a.legend()
+
+b.hist(small, bins=25, density=True, alpha=0.6, label="n=200")
+b.hist(large, bins=25, density=True, alpha=0.6, label="n=5000")
+b.set_title("density - comparable")
+b.legend()
+
+print("Same distribution, different sample sizes.")
+print("Counts say the big sample is 25x more likely everywhere.")
+print("density=True makes the total area 1, so the shapes overlay.")
+```
+
+## Comparing groups
+
+Overlaid with transparency, or side by side - both have costs.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(4)
+a_data = rng.normal(45, 8, 600)
+b_data = rng.normal(55, 8, 600)
+
+fig, (p, q) = plt.subplots(1, 2, figsize=(9, 3))
+
+p.hist([a_data, b_data], bins=20, label=["a", "b"])
+p.set_title("side by side")
+p.legend()
+
+q.hist(a_data, bins=20, alpha=0.55, label="a")
+q.hist(b_data, bins=20, alpha=0.55, label="b")
+q.set_title("overlaid, alpha")
+q.legend()
+
+print("A list of arrays draws them side by side within each bin.")
+print("Separate calls with alpha overlays them.")
+print()
+print("Side by side keeps both readable and halves the bin width.")
+print("Overlaid keeps the bins but muddles the overlap colour.")
+print("For more than three groups, neither works - use small multiples.")
+```
+
+## The cumulative view answers different questions
+
+'How many are below x' is easier to read from a step than from bars.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(5)
+data = rng.normal(100, 15, 2000)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(8, 3))
+
+a.hist(data, bins=30, edgecolor="white")
+a.set_title("distribution")
+
+b.hist(data, bins=200, density=True, cumulative=True,
+       histtype="step", linewidth=2)
+b.set_title("cumulative")
+b.axhline(0.5, color="crimson", linestyle="--", linewidth=1)
+
+print("median of the data: %.1f" % np.median(data))
+print()
+print("The cumulative plot reads off quantiles directly: where the")
+print("curve crosses 0.5 is the median, 0.9 the 90th percentile.")
+print("It also does not depend much on the bin count, which is why")
+print("many bins is fine here and misleading on the left.")
+```
+## Bins decide the story
+
+This is the thing to understand about histograms, and it is not a detail.
+
+The same data with three bins and with three hundred looks like two different datasets. Too few bins smooths away real structure &mdash; a bimodal distribution becomes one lump. Too many turns sampling noise into apparent spikes.
+
+There is no correct number. It depends on the sample size, the underlying shape, and what you are trying to see.
+
+The honest practice is to **look at more than one**. If a feature survives at several bin counts, it is probably real; if it appears only at one, it is probably not.
+
+## The automatic rules
+
+`bins="auto"` uses the larger of two rules:
+
+**Sturges** assumes roughly normal data and scales with `log2(n)`.
+
+**Freedman&ndash;Diaconis** uses the interquartile range and scales with `n^(1/3)`, which handles skew and outliers better.
+
+`"scott"`, `"sqrt"` and `"rice"` are also available. They disagree with each other, sometimes by a factor of several, which is a fair summary of how well-defined the problem is.
+
+`"auto"` is a reasonable default and a starting point rather than an answer.
+
+You can also pass explicit edges: `bins=np.arange(0, 101, 5)` gives fixed 5-unit bins, which is what you want when the boundaries have meaning or when two charts must be comparable.
+
+## density
+
+`density=True` scales the bars so the **total area** is 1 rather than showing raw counts.
+
+Two situations need it.
+
+**Comparing samples of different sizes.** With counts, a sample ten times larger has bars ten times taller everywhere, and the shapes cannot be compared. With density they overlay.
+
+**Overlaying a theoretical curve.** A normal PDF is a density, and it only lines up with a histogram that is also a density.
+
+Note the y axis then reads as density, not proportion, and the values can exceed 1 when the bins are narrow. The area is 1; the height is not a probability.
+
+## Comparing groups
+
+`ax.hist([a, b], bins=20)` &mdash; a list of arrays &mdash; draws them side by side within each bin. Both stay readable, at the cost of halving the effective bin width.
+
+Separate `hist` calls with `alpha` around 0.5 overlay them. The bins keep their width, and the overlap region becomes a blended colour that belongs to neither series.
+
+`histtype="step"` draws outlines only, which overlays cleanly for three or four groups where filled bars would not.
+
+Beyond three groups, none of these work well, and the answer is small multiples: one histogram per group, sharing axes, side by side.
+
+## The cumulative view
+
+`cumulative=True` with `histtype="step"` draws an empirical cumulative distribution.
+
+It answers "what fraction is below x" directly, which is often the actual question &mdash; and quantiles read straight off it, where they must be estimated by eye from a histogram.
+
+It has a further practical advantage: it barely depends on the bin count. Using two hundred bins gives a smooth curve rather than noise, because each bin adds to a running total rather than standing alone. That makes it the more honest display when the bin choice is doing too much work.
+
+## Related displays
+
+`ax.boxplot` summarises a distribution as five numbers, which compares many groups compactly and hides the shape entirely &mdash; a bimodal distribution and a uniform one can produce the same box.
+
+`ax.violinplot` shows an estimated density, which restores the shape at the cost of a smoothing parameter that has the same arbitrariness as the bin count.
+
+`ax.hexbin` and `ax.hist2d` are the two-dimensional versions, for when the question is about the joint distribution rather than a single variable.
+
+## Bin edges you choose
+
+Passing a count lets matplotlib pick the edges, which land on unmemorable numbers like 3.17 to 7.42.
+
+Passing an array puts them where you want:
+
+```python
+ax.hist(ages, bins=np.arange(0, 101, 10))
+```
+
+Ten-year bands, starting at zero, with boundaries a reader can name. That is almost always better for communication, and it has a second benefit: two histograms drawn with the same explicit edges are directly comparable, where two drawn with `bins=20` are not.
+
+`range=(lo, hi)` limits the extent without fixing the count, which is how you exclude a long tail without dropping the data.
+
+Values exactly on a boundary go into the **right-hand** bin, except at the last edge where the final bin includes both ends.
+
+## Weights
+
+`weights=` gives each observation a multiplier, which covers two common needs.
+
+**Frequency data** &mdash; when the input is already counts per value rather than raw observations.
+
+**Percentages** &mdash; `weights=np.ones(n) / n * 100` makes the y axis read as a percentage of the sample, which is often more useful than either counts or density and is easier to explain than density.
+
+Density has the awkward property that its values depend on the bin width and can exceed 1; a percentage does not.
+
+## Two-dimensional histograms
+
+`ax.hist2d(x, y, bins=50)` bins in both directions and colours the cells by count. `ax.hexbin` does the same with hexagonal bins, which tile more evenly and avoid the visual artefacts of a square grid.
+
+Both replace an overplotted scatter with something that measures density instead of implying it, and both need a colorbar to be readable.
+
+`bins="log"` on hexbin, or `norm=LogNorm()`, handles the usual situation where a few cells hold most of the points and everything else is faint.
+
+## Step histograms for comparison
+
+`histtype="step"` draws the outline only. `histtype="stepfilled"` fills it with transparency.
+
+For comparing three or four distributions, outlines overlay far more cleanly than filled bars: nothing is hidden, and the colours do not blend into a fourth colour that belongs to no series.
+
+Combined with `density=True` it is the standard way to compare distributions of different sizes on one axes.
+
+Beyond four, small multiples remain the answer.
+
+## What a histogram cannot show
+
+A histogram shows a marginal distribution and nothing else.
+
+It cannot show a relationship between two variables, a change over time, or an ordering within the data. Two datasets with identical histograms can be completely different, in the same way that two datasets with identical means can be.
+
+The specific thing it hides is **sequence**: a series that drifts upward over time and one that is stationary produce the same histogram. If the data has an order, a line chart of the values and a histogram of them answer different questions, and the histogram alone can conceal a trend entirely.
+
+## Choosing the bins in practice
+
+A workable procedure, rather than a rule.
+
+Start with `bins="auto"` and look at it. Then try roughly half and roughly double that number and look at those.
+
+If the three agree about the shape, the shape is real and any of them will do; pick round-numbered edges for the final version.
+
+If they disagree, the disagreement is the finding &mdash; there is structure at one scale and not another &mdash; and the chart should show the bin count that corresponds to the question being asked.
+
+For a chart that will be compared with another, fix the edges explicitly with an array. Two histograms with automatically chosen bins are not comparable even when they look it, because the bin widths differ.
+
+And for anything above a few thousand points, a cumulative plot or a density estimate sidesteps the choice entirely, which is often the honest move.
+
+## Related displays, and when to switch
+
+A histogram is one of a family, and it is not always the strongest member.
+
+**Cumulative** &mdash; when the question is about quantiles or thresholds, and to escape the bin-count problem.
+
+**Box plots** &mdash; when comparing more than three groups.
+
+**Violin or KDE** &mdash; when the shape matters and the sample is large.
+
+**Strip plot** &mdash; when the sample is small enough that the observations are the honest display.
+
+**Rug plot** &mdash; tick marks along the axis, added under any of the above, which shows exactly where the data is without a binning choice.
+
+`ax.plot(x, np.zeros_like(x), "|", markersize=12, alpha=0.3)` draws a rug in one line, and combining it with a histogram gives both the shape and the raw positions.
+
+## In summary
+
+The bin count is the whole story: it decides what shape the data appears to have, there is no correct value, and looking at two or three is the only honest approach.
+
+`bins="auto"` is a reasonable start and an argument between two rules rather than an answer.
+
+Explicit edges make two histograms comparable, which automatically chosen bins never are.
+
+`density=True` is what lets samples of different sizes be compared, and its y axis is a density rather than a proportion.
+
+For several groups, side-by-side or step outlines up to three or four, and small multiples beyond that.
+
+And the cumulative view answers quantile questions directly while barely depending on the binning &mdash; often the more honest display when the bin choice is doing too much work.
+
+## What to check on a histogram
+
+Four things, none of which the chart tells you.
+
+**How many observations?** A histogram of thirty looks much like one of thirty thousand, and means far less. Putting `n` in the title or a corner is a one-line fix.
+
+**How many bins, and does the shape survive changing it?** The single most important check.
+
+**Is anything outside the range?** If `range=` was set, or the axis limits were, the excluded values are simply gone.
+
+**Are the bins equal width?** With explicit edges they may not be, and unequal bins with a count axis are misleading &mdash; the area should represent the count, which is what `density=True` handles correctly and a raw count does not.
+
+The last is a genuine trap: a histogram with wide bins at the tail and narrow ones in the middle, plotted as counts, exaggerates the tail. If the bins are unequal, density is the only honest y axis.
+
+## One more thing
+
+`np.histogram` computes the counts without drawing anything, which is useful when the numbers are wanted alongside the chart or when the binning needs checking before it is plotted.
+
+It takes the same `bins` argument and returns counts and edges, so the values behind a histogram can be printed, tested, or written to a file without a second pass over the data.
+
+## The short version
+
+The bin count is a parameter that changes the answer, and it is chosen by default when nobody chooses it deliberately.
+
+Looking at more than one binning, and stating which one the chart uses, is the whole of good practice here &mdash; along with knowing that a cumulative view sidesteps the problem when the question is about quantiles.
+
+## Reading the code back
+
+A histogram is one call whose most important argument is the one people leave out. Passing explicit edges rather than a count makes the chart comparable with another, gives boundaries the reader can name, and forces the binning to be a decision rather than a default. Adding the sample size to the title and an edge colour to the bars costs two more arguments and answers most of what a reader would ask.

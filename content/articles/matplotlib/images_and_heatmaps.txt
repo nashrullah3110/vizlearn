@@ -1,0 +1,394 @@
+title: Images and Heatmaps
+intro: imshow and pcolormesh, and the origin that catches everyone.
+
+## imshow
+
+`ax.imshow(z)` draws a 2-D array as a grid of coloured cells.
+
+Its defaults are chosen for **images**, and three of them are wrong for data.
+
+**Origin.** `z[0, 0]` is drawn at the top-left, because that is where the first pixel of an image goes. For a matrix whose rows are a quantity &mdash; a y axis &mdash; that puts the smallest value at the top, upside down. `origin="lower"` fixes it.
+
+**Aspect.** The default `"equal"` makes every cell square, so a 6&times;30 array is drawn five times wider than tall no matter what figure size you asked for. `aspect="auto"` stretches it to fill the axes.
+
+**Interpolation.** The default smooths between cells. On a photograph that is desirable; on a matrix of values it draws colours that correspond to no data point, which is a small lie. `interpolation="nearest"` gives hard cell edges.
+
+For data, `imshow(z, origin="lower", aspect="auto", interpolation="nearest")` is the honest starting point.
+
+
+## imshow draws an array as a grid
+
+Row 0 is at the TOP, because it is drawing an image.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+z = np.arange(12).reshape(3, 4)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(8, 3))
+
+im = a.imshow(z, cmap="viridis")
+a.set_title('origin="upper" (default)')
+fig.colorbar(im, ax=a)
+
+im2 = b.imshow(z, cmap="viridis", origin="lower")
+b.set_title('origin="lower"')
+fig.colorbar(im2, ax=b)
+
+print("the array:"); print(z)
+print()
+print("By default z[0, 0] is drawn TOP-LEFT, matching how an image is")
+print("stored. For data where the y axis is a quantity, that puts the")
+print("smallest y at the top, which is upside down.")
+print()
+print("origin='lower' is what you want for a matrix of values.")
+```
+
+## Aspect and interpolation
+
+Two defaults that suit photographs and not data.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(0)
+z = rng.random((6, 30))
+
+fig, (a, b) = plt.subplots(2, 1, figsize=(7, 4))
+
+a.imshow(z, cmap="magma")
+a.set_title('default: aspect="equal" - cells are square, plot is thin')
+
+b.imshow(z, cmap="magma", aspect="auto", interpolation="nearest")
+b.set_title('aspect="auto" fills the axes')
+
+print("aspect='equal' makes each cell square, so a 6x30 array is drawn")
+print("five times wider than tall regardless of the figure.")
+print("aspect='auto' stretches it to fill the axes.")
+print()
+print("interpolation blurs between cells. For a photograph that is")
+print("desirable; for a matrix of values it invents intermediate")
+print("values that do not exist. Use 'nearest' for data.")
+```
+
+## Labelling the cells
+
+A heatmap of a small matrix is a table, and should read like one.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rows = ["mon", "tue", "wed"]
+cols = ["north", "south", "east", "west"]
+z = np.array([[12, 7, 3, 9], [5, 14, 8, 2], [9, 4, 11, 6]])
+
+fig, ax = plt.subplots(figsize=(6, 3))
+im = ax.imshow(z, cmap="Blues")
+
+ax.set_xticks(range(len(cols)))
+ax.set_xticklabels(cols)
+ax.set_yticks(range(len(rows)))
+ax.set_yticklabels(rows)
+
+for i in range(z.shape[0]):
+    for j in range(z.shape[1]):
+        ax.text(j, i, z[i, j], ha="center", va="center",
+                color="white" if z[i, j] > z.max() / 2 else "black")
+fig.colorbar(im, ax=ax)
+
+print("Note the text index order: ax.text(j, i, ...) - x is the COLUMN.")
+print()
+print("Choosing the text colour by threshold keeps it readable on both")
+print("the light and dark ends of the colormap.")
+```
+
+## pcolormesh for uneven grids
+
+When the cells are not all the same size.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x_edges = np.array([0, 1, 2, 4, 8, 16], dtype=float)
+y_edges = np.array([0, 1, 3, 6], dtype=float)
+z = np.arange(15).reshape(3, 5).astype(float)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+
+a.imshow(z, cmap="viridis", origin="lower", aspect="auto")
+a.set_title("imshow: cells forced equal")
+
+m = b.pcolormesh(x_edges, y_edges, z, cmap="viridis")
+b.set_title("pcolormesh: real coordinates")
+fig.colorbar(m, ax=b)
+
+print("imshow assumes a regular grid and ignores the coordinates.")
+print("pcolormesh takes the EDGES, so cells can have different widths.")
+print()
+print("edges outnumber cells by one in each direction:")
+print("   x edges:", len(x_edges), "-> columns:", z.shape[1])
+print("   y edges:", len(y_edges), "-> rows:", z.shape[0])
+```
+
+## Setting the colour range
+
+<code>vmin</code> and <code>vmax</code>, and why two heatmaps otherwise lie.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(1)
+a_data = rng.normal(0, 1, (8, 8))
+b_data = rng.normal(0, 1, (8, 8)) * 3
+
+fig, axes = plt.subplots(2, 2, figsize=(8, 5))
+
+for ax, d, t in zip(axes[0], [a_data, b_data], ["sd 1", "sd 3"]):
+    im = ax.imshow(d, cmap="coolwarm")
+    ax.set_title("%s, own scale" % t, fontsize=9)
+    fig.colorbar(im, ax=ax)
+
+for ax, d, t in zip(axes[1], [a_data, b_data], ["sd 1", "sd 3"]):
+    im = ax.imshow(d, cmap="coolwarm", vmin=-9, vmax=9)
+    ax.set_title("%s, shared scale" % t, fontsize=9)
+    fig.colorbar(im, ax=ax)
+fig.tight_layout()
+
+print("The top pair look equally variable. They are not - the right")
+print("one has three times the spread, and its colorbar says so in")
+print("numbers nobody reads.")
+print()
+print("vmin/vmax force a common scale, which is what makes two")
+print("heatmaps comparable. Same rule as sharey for subplots.")
+```
+
+## Diverging data needs a centred scale
+
+Or zero ends up somewhere arbitrary in the colormap.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(2)
+z = rng.normal(2, 3, (8, 8))          # mostly positive, some negative
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3.2))
+
+im1 = a.imshow(z, cmap="coolwarm")
+a.set_title("uncentred: white is not zero")
+fig.colorbar(im1, ax=a)
+
+lim = np.abs(z).max()
+im2 = b.imshow(z, cmap="coolwarm", vmin=-lim, vmax=lim)
+b.set_title("centred: white IS zero")
+fig.colorbar(im2, ax=b)
+
+print("data range: %.2f to %.2f" % (z.min(), z.max()))
+print()
+print("With automatic limits the midpoint of the colormap falls at the")
+print("midpoint of the DATA, so white sits at %.2f, not 0." % ((z.min()+z.max())/2))
+print("A diverging colormap only means anything when its centre is the")
+print("value that matters.")
+```
+## Labelling cells
+
+A heatmap of a small matrix is a table that has been coloured. It should read like one.
+
+Set the ticks to the row and column names, and write the values into the cells:
+
+```python
+for i in range(rows):
+    for j in range(cols):
+        ax.text(j, i, z[i, j], ha="center", va="center")
+```
+
+Note the index order: `ax.text(j, i, ...)`. The first argument is x, which is the **column**. Getting this backwards is the usual bug, and on a square matrix it produces a transposed result that looks plausible.
+
+Choosing the text colour by threshold &mdash; white on dark cells, black on light &mdash; keeps every label readable. Without it, half the numbers vanish into the background at one end of the colormap.
+
+## pcolormesh
+
+`imshow` assumes a regular grid and ignores any coordinates you have.
+
+`pcolormesh(x_edges, y_edges, z)` takes the **edges** of the cells, so they can be unevenly spaced &mdash; logarithmic bins, irregular time intervals, a non-uniform mesh.
+
+The edges outnumber the cells by one in each direction, the same convention as histogram bins. Passing centres instead of edges is the common mistake; matplotlib will accept same-sized arrays and shift everything by half a cell.
+
+`pcolormesh` is slower than `imshow` and much more flexible. For a regular grid, `imshow` is the right tool.
+
+`contourf` is the third option, drawing filled contour bands rather than cells &mdash; appropriate when the underlying field is genuinely continuous and misleading when it is not.
+
+## Shared colour scales
+
+`vmin` and `vmax` set the values at the ends of the colormap.
+
+Without them, each heatmap scales to its own data, exactly like unshared subplot axes. Two heatmaps drawn side by side then use the same colours for different values, and the comparison the layout invites is invalid.
+
+The colorbar does say so, in numbers, and readers do not read them &mdash; they read the colours.
+
+So: whenever two colour-mapped plots will be compared, fix `vmin` and `vmax` across both, or use one shared colorbar.
+
+`norm=` gives finer control &mdash; `LogNorm` for data spanning orders of magnitude, `BoundaryNorm` for discrete bands.
+
+## Centring a diverging map
+
+A diverging colormap has a neutral colour in the middle and two directions away from it. It only means anything if that neutral point sits at the value that matters, usually zero.
+
+With automatic limits, the midpoint of the colormap lands at the midpoint of the **data**. On data ranging from &minus;4 to +10, white sits at +3, and every cell below +3 is coloured as though it were negative.
+
+The fix is symmetric limits:
+
+```python
+lim = np.abs(z).max()
+ax.imshow(z, cmap="coolwarm", vmin=-lim, vmax=lim)
+```
+
+or `TwoSlopeNorm(vcenter=0)` when the two sides genuinely need different ranges.
+
+This is one of the most common quiet errors in heatmaps, because the result looks like a normal chart and asserts something false about the sign of half the data.
+
+## extent for real coordinates
+
+`imshow` numbers the cells from zero by default. `extent=(x0, x1, y0, y1)` maps the array onto real coordinates:
+
+```python
+ax.imshow(z, extent=(0, 100, 0, 50), origin="lower", aspect="auto")
+```
+
+The four values are the outer edges of the image, not cell centres, which is the usual off-by-half confusion. With `origin="lower"`, `y0` is the bottom.
+
+This is what lets a heatmap be overlaid with a line or a scatter in the same units, and without it any overlay is a half-cell out.
+
+## Masked and missing values
+
+`np.nan` in the array is drawn as the colormap's "bad" colour, which defaults to fully transparent &mdash; so missing cells show whatever is behind them, usually the axes background.
+
+`cmap.set_bad("0.9")` makes them an explicit grey, which is better than transparent because a missing cell then reads as missing rather than as background.
+
+A masked array behaves the same way, and is the more explicit form when the mask is computed separately from the data.
+
+## Aspect and reading order
+
+For a correlation matrix or any square array, `aspect="equal"` is right and is the default.
+
+For a wide array &mdash; time along one axis, a handful of categories along the other &mdash; `aspect="auto"` is necessary, or the figure is drawn at the array's proportions and ignores the size you asked for.
+
+Row order deserves thought. An unordered heatmap makes the reader scan for structure; sorting rows by their mean, or by a clustering, often reveals the pattern the chart is meant to show. That is a data decision made in the plotting code, and it should be stated in the caption if the order is not alphabetical.
+
+## Contours
+
+`ax.contour(z)` draws lines of constant value; `ax.contourf(z)` fills between them.
+
+They suit genuinely continuous fields &mdash; elevation, temperature, a fitted surface &mdash; and imply smoothness, so they are wrong for a matrix of independent measurements where `pcolormesh` is honest.
+
+`levels=` sets the number or the exact values, and `ax.clabel(cs, inline=True)` writes the values on the lines, which often removes the need for a colorbar.
+
+Combining a filled contour with thin contour lines on top is a standard treatment for a field where both the bands and the exact levels matter.
+
+## Annotating a heatmap
+
+For a small matrix, writing values into the cells makes it a table with colour as a visual aid rather than the only encoding.
+
+The threshold trick for text colour is worth restating because it is the difference between a readable and an unreadable heatmap:
+
+```python
+color = "white" if z[i, j] > z.max() / 2 else "black"
+```
+
+For a diverging map centred on zero, the threshold should be based on distance from the centre rather than from the maximum, or the labels invert on the wrong half.
+
+## Reading a heatmap
+
+Heatmaps are read less accurately than people assume, because colour intensity is a weak encoding.
+
+They are good at showing **patterns**: blocks, gradients, an outlier cell, structure along a diagonal.
+
+They are poor at **values**: nobody reads 0.62 off a colour.
+
+So the rule is that a heatmap should either be about the pattern, or it should have the numbers written in the cells &mdash; at which point it is a table with colour as a guide, which is a genuinely good display for a small matrix.
+
+For a large matrix, the pattern is the only thing available, and ordering the rows and columns &mdash; by cluster, by total, by a meaningful sequence &mdash; is what makes a pattern visible at all.
+
+## Common heatmap mistakes
+
+**Wrong origin** &mdash; row 0 at the top for data whose y axis is a quantity.
+
+**Interpolation on** &mdash; smoothing between cells that are independent measurements.
+
+**Unshared scales** across panels that will be compared.
+
+**An uncentred diverging map**, putting the neutral colour at an arbitrary value.
+
+**No colorbar**, leaving the colours meaningless.
+
+**Text the same colour everywhere**, so half the labels disappear into the background.
+
+**Unordered rows**, hiding whatever structure exists.
+
+All seven are defaults or omissions rather than errors of arithmetic, which is why a heatmap can look professional and communicate nothing.
+
+## Correlation matrices
+
+The most common heatmap in practice, and it has its own conventions.
+
+**Centre the colormap on zero** with symmetric limits, because a correlation of &minus;0.4 and +0.4 should be equally strong in opposite directions. Without it, a matrix of mostly positive correlations puts the neutral colour somewhere arbitrary and the few negatives look far more extreme than they are.
+
+**Use a diverging map** for the same reason.
+
+**Set `vmin=-1, vmax=1`**, so two matrices are comparable and so the colour scale means the same thing in every such chart.
+
+**Mask the upper triangle**, since the matrix is symmetric and half of it is repetition. `np.triu` with `np.nan` and a `set_bad` colour does it.
+
+**Write the numbers in**, if the matrix is small enough, because the exact values are usually what the reader wants.
+
+Those five turn the default output into something readable, and the first three are the ones that affect whether it is accurate.
+
+## In summary
+
+`imshow` has image defaults: row 0 at the top, square cells, and interpolation between them. For data, `origin="lower"`, `aspect="auto"` and `interpolation="nearest"` are the honest settings.
+
+`pcolormesh` takes cell edges and handles uneven grids; edges outnumber cells by one per axis.
+
+`vmin`/`vmax` are what make two heatmaps comparable, and their absence is the same error as unshared subplot axes.
+
+A diverging colormap needs symmetric limits or its neutral point lands at the midpoint of the data rather than at zero.
+
+A colorbar is not optional, and a small matrix is better as a table with the numbers written in.
+
+And row order is a choice: sorting by a meaningful quantity is frequently what makes a pattern visible at all.
+
+## Overlaying on an image
+
+A heatmap or image often needs something drawn on top &mdash; contours, a scatter, a boundary.
+
+The key is that `imshow` sets up a coordinate system, and everything overlaid must use the same one.
+
+With default settings the cells are numbered from zero and a scatter must be in those units. With `extent=`, both use real coordinates and the overlay is straightforward.
+
+Two details catch people. `extent` gives the outer **edges**, so a cell centre is half a cell in from the boundary &mdash; a scatter of cell centres plotted against edge coordinates is offset by half a cell, which looks like a small registration error.
+
+And `origin="lower"` must be consistent between the image and any y coordinates computed for the overlay, or the overlay is flipped relative to the image while both look individually correct.
+
+Drawing a few known points on top is the quickest way to confirm the coordinate system is what you think.
+
+## One more thing
+
+`ax.matshow` is `imshow` with the defaults already set for a matrix: origin at the top with the tick labels along the top edge, which is the convention for displaying a matrix in mathematical notation.
+
+It is convenient for a correlation matrix and confusing for anything with a quantitative y axis, where `imshow(origin="lower")` remains the right call.
+
+## The short version
+
+A heatmap is read for its pattern, not its values, which is why ordering the rows and columns matters as much as the colormap.
+
+The defaults are built for photographs, and three of them &mdash; origin, aspect and interpolation &mdash; are wrong for data. Setting all three explicitly is the honest starting point.
+
+## Reading the code back
+
+A heatmap is one call and four corrections to its defaults: origin, aspect, interpolation and the colour limits. Add a colorbar with a label and, for a small matrix, the values in the cells. That is six lines, and it is the difference between a picture of colours and a readable display of a matrix.

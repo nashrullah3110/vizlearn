@@ -1,0 +1,363 @@
+title: Line Plots
+intro: plot() and the arguments that do most of the work.
+
+## The signature
+
+`ax.plot(y)` draws `y` against its index. `ax.plot(x, y)` draws one against the other.
+
+That one-argument form is convenient and occasionally misleading &mdash; a plot whose x axis reads 0 to 99 when the data is dated is usually a forgotten x argument rather than a deliberate choice.
+
+`plot` accepts lists, NumPy arrays and pandas Series. With a Series it uses the index as x, which is why plotting a time-indexed Series gives a dated axis for free.
+
+
+## x and y, or just y
+
+With one argument matplotlib supplies the index as x.
+
+```python-run
+import matplotlib.pyplot as plt
+
+y = [3, 7, 5, 9, 6]
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(7, 2.5))
+
+a.plot(y)
+a.set_title("plot(y) - x is 0,1,2,...")
+
+a2 = [10, 20, 30, 40, 50]
+b.plot(a2, y)
+b.set_title("plot(x, y)")
+
+print("one argument means y; the x values are range(len(y))")
+print("x used on the left :", list(range(len(y))))
+print("x used on the right:", a2)
+```
+
+## Several lines, and where the colours come from
+
+Each call takes the next colour from the axes' cycle.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 100)
+
+fig, ax = plt.subplots(figsize=(6, 3))
+for k in range(4):
+    ax.plot(x, np.sin(x + k), label="shift %d" % k)
+ax.legend()
+
+cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+print("the default colour cycle:")
+for c in cycle[:6]:
+    print("   ", c)
+print()
+print("Four calls took the first four. A fifth would take the fifth,")
+print("and the eleventh would wrap around to the first.")
+```
+
+## Style, width and colour
+
+The three arguments that turn a default line into a deliberate one.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 6, 40)
+
+fig, ax = plt.subplots(figsize=(6, 3))
+ax.plot(x, np.sin(x), color="crimson", linewidth=2.5, label="solid, thick")
+ax.plot(x, np.cos(x), color="steelblue", linestyle="--", label="dashed")
+ax.plot(x, np.sin(x) * 0.5, color="0.4", linestyle=":", linewidth=2, label="dotted grey")
+ax.legend()
+
+print("linestyle: '-' solid, '--' dashed, '-.' dashdot, ':' dotted")
+print("color    : a name, a hex string, or '0.4' for a grey level")
+print("linewidth: points, default", plt.rcParams["lines.linewidth"])
+```
+
+## The format-string shorthand
+
+Compact, common in examples, and worth being able to read.
+
+```python-run
+import matplotlib.pyplot as plt
+
+x = [1, 2, 3, 4]
+
+fig, ax = plt.subplots(figsize=(6, 3))
+ax.plot(x, [1, 4, 2, 5], "r--o", label="'r--o'")
+ax.plot(x, [2, 5, 3, 6], "g:s", label="'g:s'")
+ax.plot(x, [3, 6, 4, 7], "b-^", label="'b-^'")
+ax.legend()
+
+print("A format string packs colour, linestyle and marker into one word:")
+print("   r = red, g = green, b = blue, k = black")
+print("   -- dashed, : dotted, - solid")
+print("   o circle, s square, ^ triangle")
+print()
+print("It is terse and limited - only eight colours, and no way to set")
+print("width. Keyword arguments are clearer for anything real.")
+```
+
+## Missing values break the line
+
+NaN leaves a gap rather than drawing through it, which is usually right.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.arange(12)
+y = np.array([1, 2, 3, np.nan, np.nan, 6, 7, 8, 9, np.nan, 11, 12], dtype=float)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(7, 2.5), sharey=True)
+
+a.plot(x, y, marker="o")
+a.set_title("with NaN: gaps")
+
+ok = ~np.isnan(y)
+b.plot(x[ok], y[ok], marker="o")
+b.set_title("dropped: joined through")
+
+print("NaN is not plotted and the line is broken there.")
+print("Dropping the points instead draws a line through the gap, which")
+print("implies data you do not have. The gap is usually more honest.")
+```
+
+## Order matters, and so does zorder
+
+Later calls draw on top, unless you say otherwise.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 200)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(7, 2.5))
+
+a.fill_between(x, 0, np.sin(x) + 1, color="lightsteelblue")
+a.plot(x, np.sin(x) + 1, color="crimson", linewidth=2)
+a.set_title("line drawn second")
+
+b.plot(x, np.sin(x) + 1, color="crimson", linewidth=2)
+b.fill_between(x, 0, np.sin(x) + 1, color="lightsteelblue")
+b.set_title("fill drawn second - line hidden")
+
+print("Same two calls, swapped. The right-hand line is under the fill.")
+print()
+print("zorder overrides the order: higher draws later.")
+print("   line zorder default:", 2.0, " patch default:", 1.0)
+print("   so a line normally sits above a fill anyway - unless the fill")
+print("   is drawn after it, as on the right.")
+```
+## The colour cycle
+
+Each call to `plot` on the same axes takes the next colour from the **property cycle**, a list of ten colours defined by the current style.
+
+This is why several lines drawn in a loop come out in different colours with no work, and why the eleventh line repeats the first.
+
+`plt.rcParams["axes.prop_cycle"]` holds it. `ax.set_prop_cycle(...)` replaces it for one axes, which is how you enforce a house palette.
+
+Passing an explicit `color` bypasses the cycle without advancing it.
+
+## Styling
+
+Three keywords cover nearly everything:
+
+`color` &mdash; a name (`"crimson"`), a hex string (`"#4c72b0"`), a single letter (`"r"`), a grey level as a string (`"0.4"`), or an RGBA tuple.
+
+`linestyle` &mdash; `"-"` solid, `"--"` dashed, `"-."` dashdot, `":"` dotted, or a dash pattern as a tuple.
+
+`linewidth` &mdash; in points.
+
+Add `alpha` for transparency, which is how you keep many overlapping lines readable, and `marker` to show where the actual data points are.
+
+That last one matters more than it looks: a smooth line through four points implies a lot of data that does not exist. Markers say where the measurements are and let the line be what it is &mdash; a visual aid rather than a claim.
+
+## The format string
+
+`ax.plot(x, y, "r--o")` sets colour, linestyle and marker in one string.
+
+It is worth learning to read because it appears constantly in examples and documentation. It is not worth preferring: it supports only eight colours, cannot set width or alpha, and is opaque to anyone who has not memorised it.
+
+The order within the string does not matter, and any part can be omitted &mdash; `"o"` alone draws markers with no connecting line, which is a scatter plot by another route.
+
+## Missing data
+
+`NaN` values are skipped, and the line is broken where they occur.
+
+This is the right default. A line drawn straight through a gap asserts that the value moved smoothly across it, which is exactly the thing you do not know.
+
+If you want the line joined, dropping the missing points is explicit about it:
+
+```python
+ok = ~np.isnan(y)
+ax.plot(x[ok], y[ok])
+```
+
+Note that `None` behaves like `NaN` here, and a masked array's masked values are also skipped.
+
+For a long series with occasional gaps, the broken line can look noisy; drawing markers as well makes the pattern of missingness visible rather than merely untidy.
+
+## Drawing order
+
+Artists are drawn in the order the calls are made, so later calls sit on top.
+
+`zorder` overrides it. Higher values draw later. The defaults are set so that the usual expectations hold &mdash; patches at 1, lines at 2, text at 3 &mdash; which is why a line normally appears above a filled region even when the fill was drawn second.
+
+Where it matters most is grid lines. `ax.grid()` draws below the data by default, and `ax.set_axisbelow(False)` puts it on top, which is almost never what you want but is occasionally what you get from a style sheet.
+
+## Markers
+
+`marker="o"` draws a symbol at each data point. The common ones are `o` circle, `s` square, `^` triangle, `D` diamond, `.` point, `+` and `x`.
+
+Markers matter more than they look. A smooth line through five points implies a continuous relationship measured densely; markers say where the measurements actually are and let the line be the visual aid it is.
+
+`markevery=10` draws one marker in ten, which keeps the "here are the observations" signal on a dense series without a solid band of symbols.
+
+`markersize`, `markerfacecolor` and `markeredgecolor` style them separately from the line, so a hollow marker is `markerfacecolor="none"`.
+
+## Steps and stems
+
+Not every sequence is a line.
+
+`ax.step(x, y, where="post")` draws a step function, which is correct for anything that holds a value until it changes: a price, a setting, a state. A straight line between the points would claim a gradual transition that did not happen.
+
+`where` takes `"pre"`, `"post"` or `"mid"`, deciding whether the step happens at the start or the end of each interval. Getting it wrong shifts every value by one position, and the chart looks plausible either way.
+
+`ax.stem` draws a vertical line to each point, which suits sparse discrete data.
+
+`ax.fill_between` under a line turns it into an area chart, appropriate when the quantity accumulates to something meaningful and misleading when it does not.
+
+## Multiple lines and readability
+
+Four or five lines on one axes is usually the limit before the chart becomes a tracing exercise.
+
+Beyond that, the options in order of preference are: highlight one and grey the rest, split into small multiples, or reduce to the two lines the chart is actually about.
+
+Where several lines must stay, three things help.
+
+**Direct labels** at the line ends, instead of a legend.
+
+**Ordering the legend** to match the vertical order of the lines at their right-hand end, so the eye can map them without hunting. `ax.legend(handles=...)` in the order you want.
+
+**Varying linestyle** as well as colour, so the chart survives greyscale.
+
+## Interpolation is a claim
+
+A line between two points asserts that the quantity passed through the values in between.
+
+For a temperature sampled hourly, that is reasonable. For monthly sales, the line between January and February is decorative &mdash; nothing happened at "January the 15th" in the data.
+
+That does not make the line wrong; connecting points is how the eye reads a trend, and a scatter of twelve unconnected points is harder to follow. But it is worth knowing that the line is an aid rather than data, which is another argument for markers.
+
+Where the gaps are genuinely large, breaking the line is more honest than spanning them, and that is what leaving the NaN in does for you automatically.
+
+## Performance note
+
+One `plot` call with a large array is fast. Many `plot` calls are slow, because the cost is per artist rather than per point.
+
+Drawing fifty lines in a loop creates fifty artists; where they can be combined, `LineCollection` draws them as one.
+
+That matters at hundreds of lines rather than dozens, and it is covered properly in the performance module.
+
+## A worked example
+
+Turning a default line chart into a finished one is a short, fixed sequence.
+
+```python
+fig, ax = plt.subplots(figsize=(7.5, 3.5))
+
+ax.plot(x, y, color="#264653", linewidth=2, marker="o", markersize=4)
+
+ax.set_title("What the chart shows", loc="left", fontsize=12, fontweight="bold")
+ax.set_xlabel("Month of 2024")
+ax.set_ylabel("Sales (thousands)")
+
+ax.margins(x=0.02)
+ax.grid(True, axis="y", alpha=0.3)
+ax.set_axisbelow(True)
+for side in ("top", "right"):
+    ax.spines[side].set_visible(False)
+```
+
+Aspect, colour, weight, markers, a title that says something, labelled units, a faint grid on one axis, two spines removed.
+
+Ten lines, none of them clever, and the result looks deliberate. Every one is covered somewhere in this track, and together they are most of what separates a default matplotlib chart from a published one.
+
+## Reading a line chart critically
+
+Three questions worth asking of any line chart, including your own.
+
+**Does the y axis start at zero, and should it?** A line encodes position, so truncation is legitimate &mdash; and it changes the apparent size of every change. If a 2% movement fills the chart, the reader should be able to tell.
+
+**Are the x values evenly spaced?** If the axis is categorical or the points are irregular in time, the slope between points is not a rate, and the eye reads it as one.
+
+**What is between the points?** Twelve monthly observations joined by lines look like a continuous series. The line is an aid; the data is twelve points.
+
+None of these makes a line chart wrong. They are the things a careful reader checks, and knowing them is what lets you draw one that survives the checking.
+
+## In summary
+
+`ax.plot(x, y)` with `color`, `linewidth`, `linestyle` and `marker` covers the great majority of line charts.
+
+The colour cycle supplies distinct colours automatically and wraps after ten, which is well past the point where a line chart has stopped being readable.
+
+NaN breaks the line, which is the honest treatment of a gap.
+
+Markers say where the data actually is, and matter most when the points are few &mdash; a smooth line through five observations claims a lot.
+
+Later calls draw on top, and `zorder` overrides it.
+
+And the finishing sequence is the same every time: an aspect ratio suited to the data, a title that says something, labelled units, a faint grid on one axis, and the top and right spines removed.
+
+## Smoothing
+
+A noisy series is often plotted with a smoothed version over it, and the pairing is more honest than either alone.
+
+The raw series in a pale colour and the rolling mean in a strong one shows both the variation and the trend, and makes clear that the smooth line is derived rather than measured.
+
+Two cautions worth stating on the chart.
+
+**The window is a choice**, and a longer one produces a smoother, more convincing line that is further from the data. Naming it &mdash; "7-day mean" &mdash; is the minimum.
+
+**A centred window uses future values**, which is fine for describing history and wrong for anything presented as a signal available at the time. A trailing window is the honest choice for that case, at the cost of lagging the turns.
+
+Plotting only the smoothed line, without the raw data, is where this becomes misleading, because the reader has no way to judge how much was smoothed away.
+
+## Highlighting within a line chart
+
+A line chart with one important series and several for context is the most common real case, and the treatment is consistent:
+
+```python
+for name, y in others.items():
+    ax.plot(x, y, color="0.85", linewidth=1, zorder=1)
+ax.plot(x, focus_y, color="#264653", linewidth=2.5, zorder=2)
+ax.text(x[-1], focus_y[-1], "  " + focus_name, va="center", color="#264653")
+```
+
+The grey lines give the range and the shape of the group, so nothing is lost. The dark line is unmistakably the subject. The label at the end removes the legend.
+
+`zorder` ensures the highlighted line is on top regardless of drawing order, which matters when the context lines are drawn in a loop after it.
+
+This pattern is worth having to hand, because it converts the hardest kind of line chart &mdash; many series, one message &mdash; into one of the easiest to read.
+
+## One more thing
+
+`ax.plot` accepts several x/y pairs in one call &mdash; `ax.plot(x, y1, x, y2)` &mdash; which draws both with separate colours from the cycle.
+
+It is compact and gives no way to label the lines individually, so a loop with `label=` is usually better. Worth recognising in existing code, where it appears often.
+
+## The short version
+
+A line chart is the most common chart there is, and the finishing sequence is the same every time: aspect, colour, weight, title, units, a faint grid, two spines removed.
+
+The line itself is an aid rather than data, which is worth remembering when the points are few and the line is doing a lot of implying.
+
+## Reading the code back
+
+A finished line chart is about a dozen calls, and it is worth being able to name what each one is for: the figure size sets the aspect, the plot call sets colour and weight, the title carries the message, the labels carry the units, the margins control the breathing space, the grid supports value reading, and the spine removal takes away what carries nothing. Nothing in that list is optional in the sense of being decorative; each answers a question a reader would otherwise have to ask. Writing them in the same order every time makes the chart quick to produce and quick to review, which is most of why a house function is worth having.

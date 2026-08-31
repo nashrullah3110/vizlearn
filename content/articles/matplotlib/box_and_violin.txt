@@ -1,0 +1,379 @@
+title: Box and Violin Plots
+intro: Comparing many distributions at once, and what each summary throws away.
+
+## What a box plot is
+
+Five numbers, drawn:
+
+The **box** spans the first to the third quartile, so it contains the middle half of the data. Its height is the interquartile range.
+
+The **line** inside is the median &mdash; not the mean.
+
+The **whiskers** reach the furthest data point within 1.5&times;IQR of the box. They are not a fixed multiple of anything; they stop at real observations.
+
+Points beyond that are drawn **individually** as outliers.
+
+That 1.5 is a convention, chosen so that roughly 0.7% of normally distributed data falls outside. It has no deeper justification, and matplotlib lets you change it with `whis=`.
+
+
+## What the box contains
+
+Five numbers, and everything beyond the whiskers drawn individually.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(0)
+data = np.concatenate([rng.normal(50, 10, 200), [95, 98, 5]])
+
+fig, ax = plt.subplots(figsize=(5, 3.5))
+ax.boxplot([data], vert=True, widths=0.5)
+ax.set_xticklabels(["sample"])
+
+q1, med, q3 = np.percentile(data, [25, 50, 75])
+iqr = q3 - q1
+print("Q1     %.1f" % q1)
+print("median %.1f  <- the line in the box" % med)
+print("Q3     %.1f" % q3)
+print("IQR    %.1f  <- the height of the box" % iqr)
+print()
+print("whiskers reach the furthest point within 1.5 x IQR:")
+print("   lower fence %.1f   upper fence %.1f" % (q1 - 1.5*iqr, q3 + 1.5*iqr))
+print("points beyond are drawn individually:", int(((data < q1-1.5*iqr) |
+                                                    (data > q3+1.5*iqr)).sum()))
+```
+
+## Comparing groups is what it is for
+
+Many distributions in the space one histogram would take.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(1)
+groups = [rng.normal(m, s, 150) for m, s in
+          [(20, 4), (24, 4), (22, 9), (28, 3), (21, 6)]]
+names = list("abcde")
+
+fig, ax = plt.subplots(figsize=(7, 3.2))
+bp = ax.boxplot(groups, labels=names, patch_artist=True, widths=0.6)
+for patch in bp["boxes"]:
+    patch.set_facecolor("#a8dadc")
+ax.set_ylabel("value")
+
+print("Five distributions, one glance. A grid of five histograms would")
+print("take five times the space and be harder to compare.")
+print()
+print("patch_artist=True makes the boxes fillable; without it they are")
+print("outlines and set_facecolor does nothing.")
+```
+
+## What the box hides
+
+Two very different distributions can produce the same box.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(2)
+unimodal = rng.normal(50, 12, 600)
+bimodal = np.concatenate([rng.normal(32, 5, 300), rng.normal(68, 5, 300)])
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3.2))
+
+a.boxplot([unimodal, bimodal], labels=["unimodal", "bimodal"])
+a.set_title("boxes: nearly identical")
+
+b.hist(unimodal, bins=30, alpha=0.6, label="unimodal")
+b.hist(bimodal, bins=30, alpha=0.6, label="bimodal")
+b.legend()
+b.set_title("histograms: not remotely alike")
+
+for name, d in [("unimodal", unimodal), ("bimodal", bimodal)]:
+    q1, med, q3 = np.percentile(d, [25, 50, 75])
+    print("%-9s Q1 %.1f  med %.1f  Q3 %.1f" % (name, q1, med, q3))
+print()
+print("A box plot is five numbers. Any distribution with those five")
+print("numbers draws the same box, including one with a hole in the")
+print("middle.")
+```
+
+## Violins show the shape
+
+At the cost of a smoothing parameter you did not choose.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(3)
+unimodal = rng.normal(50, 12, 600)
+bimodal = np.concatenate([rng.normal(32, 5, 300), rng.normal(68, 5, 300)])
+
+fig, ax = plt.subplots(figsize=(6.5, 3.2))
+parts = ax.violinplot([unimodal, bimodal], showmedians=True)
+ax.set_xticks([1, 2])
+ax.set_xticklabels(["unimodal", "bimodal"])
+
+print("The violin shows the two peaks the box hid.")
+print()
+print("It is a kernel density estimate, so it has a bandwidth - a")
+print("smoothing choice, exactly like a histogram's bin count. The")
+print("default is chosen for you and can invent or erase structure.")
+print()
+print("It also extends past the data at both ends, implying values")
+print("that were never observed.")
+```
+
+## Showing the points as well
+
+The best of both, when the sample is small enough.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(4)
+groups = [rng.normal(m, s, 30) for m, s in [(20, 4), (24, 4), (22, 9)]]
+names = ["a", "b", "c"]
+
+fig, ax = plt.subplots(figsize=(6.5, 3.5))
+bp = ax.boxplot(groups, labels=names, widths=0.5, showfliers=False,
+                medianprops=dict(color="crimson", linewidth=2))
+for i, vals in enumerate(groups, start=1):
+    x = np.full(len(vals), i) + rng.uniform(-0.09, 0.09, len(vals))
+    ax.scatter(x, vals, s=14, alpha=0.6, color="#264653", zorder=3)
+
+print("showfliers=False stops the outliers being drawn twice - once by")
+print("the box and once by the scatter.")
+print()
+print("The box gives the summary, the points give the sample size and")
+print("the shape. Under about 50 points per group this is strictly")
+print("better than either alone.")
+```
+
+## Horizontal, and ordered
+
+The same readability arguments as bar charts apply.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(5)
+names = ["north region", "south region", "eastern zone", "west", "central"]
+groups = [rng.normal(m, 5, 120) for m in [22, 30, 18, 26, 24]]
+
+order = np.argsort([np.median(g) for g in groups])
+ordered = [groups[i] for i in order]
+ordered_names = [names[i] for i in order]
+
+fig, ax = plt.subplots(figsize=(6.5, 3.2))
+ax.boxplot(ordered, labels=ordered_names, vert=False, widths=0.6)
+ax.set_xlabel("value")
+
+print("vert=False turns them horizontal, so long category names read")
+print("normally - the same argument as barh.")
+print()
+print("Sorting by median makes the comparison immediate. Unsorted")
+print("boxes ask the reader to do the ranking themselves.")
+```
+## What they are for
+
+Comparing many groups.
+
+Five histograms take five panels and require the reader to move between them. Five boxes sit side by side on one axis, sharing a scale, and the comparison is immediate.
+
+That is the whole argument, and it is a strong one. For one distribution, a histogram is better. For eight, a box plot is much better. Somewhere around three the answer changes.
+
+`patch_artist=True` makes the boxes filled rather than outlines, which is needed before `set_facecolor` does anything &mdash; a common small frustration.
+
+## What they hide
+
+A box plot is a summary, and every summary discards.
+
+Any distribution sharing those five numbers produces an identical box. That includes a **bimodal** distribution &mdash; two clusters with a gap in the middle &mdash; whose median sits in the empty space where no data is.
+
+The third editor draws exactly that: two distributions with nearly identical boxes and completely different shapes.
+
+This is not a hypothetical failure. Bimodality usually means two populations have been mixed, which is often the most important thing in the data, and the box plot conceals it perfectly.
+
+The practical rule: look at a histogram of each group **once** before settling on box plots for the comparison.
+
+## Violin plots
+
+A violin shows an estimated density, mirrored, so the width at any height is how much data is around that value. It shows the bimodality a box hides.
+
+Two honest caveats.
+
+It is a **kernel density estimate**, with a bandwidth that smooths the data. That parameter has exactly the arbitrariness of a histogram's bin count, and matplotlib picks it for you. Too much smoothing merges peaks; too little invents them.
+
+It **extends past the observed data** at both ends, because the kernel has tails. A violin of a strictly positive quantity will happily show density below zero, which is a claim the data does not support.
+
+`showmedians=True` adds the median line; the defaults draw the extrema.
+
+## Showing the points
+
+For small samples, the best display is usually both: a box or violin for the summary, and the individual points with jitter on top.
+
+`showfliers=False` prevents the outliers being drawn twice, once by the box and once by the scatter.
+
+`zorder=3` on the scatter puts the points above the box.
+
+Below roughly fifty points per group this is strictly more informative than either element alone: you get the quartiles and the actual sample. Above a few hundred, the points overplot and the summary is doing the work.
+
+## Layout
+
+`vert=False` draws them horizontally, which lets long category names read normally &mdash; the same argument that makes `barh` preferable to `bar`.
+
+Sorting the groups by median makes the ranking immediate rather than something the reader assembles.
+
+And as with any grouped comparison, the y axis must be shared, which it is by construction here &mdash; that is part of why the display works.
+
+## Notches and confidence
+
+`notch=True` draws a waist around the median whose width approximates a 95% confidence interval for it.
+
+The heuristic it enables is that if two notches do not overlap, the medians differ significantly. That is roughly true and depends on assumptions the plot does not state.
+
+Two practical problems. On small samples the notch can extend beyond the box, producing a folded shape that looks like a rendering error. And the heuristic is exactly the overlap reasoning that is unreliable for error bars, applied to a different statistic.
+
+Useful when comparing many groups quickly; not a substitute for a test.
+
+## Ordering and orientation
+
+The same arguments as bar charts apply.
+
+Sort by median unless the category order means something &mdash; time, size, an experimental sequence.
+
+Use `vert=False` when the labels are words.
+
+And keep the y axis shared, which happens automatically here because all groups share one axes, and is exactly why the display works for comparison.
+
+## Styling the parts
+
+`boxplot` returns a dict of the artists, keyed by `"boxes"`, `"whiskers"`, `"caps"`, `"medians"`, `"fliers"`:
+
+```python
+bp = ax.boxplot(data, patch_artist=True)
+for b in bp["boxes"]:
+    b.set(facecolor="#a8dadc", edgecolor="0.3")
+for m in bp["medians"]:
+    m.set(color="crimson", linewidth=2)
+```
+
+`patch_artist=True` is required before boxes can be filled &mdash; without it they are unfillable outlines and `set_facecolor` does nothing, silently.
+
+The property dicts &mdash; `medianprops`, `boxprops`, `whiskerprops`, `flierprops` &mdash; do the same at call time and are usually tidier.
+
+## Violin internals
+
+`violinplot` returns a dict too, with `"bodies"` and optional `"cmedians"`, `"cmeans"`, `"cbars"`.
+
+By default it draws the extrema and no median, which is an odd choice; `showmedians=True` is nearly always wanted.
+
+`widths` controls the maximum thickness, and `bw_method` the smoothing &mdash; a number, or `"scott"` / `"silverman"`. Halving the bandwidth roughly doubles the visible detail and the visible noise.
+
+Because the two halves are mirror images, one half is redundant. A **half violin** paired with the raw points on the other side uses the space better, and is built by clipping the body path &mdash; more work than it sounds, and worth it for a figure that will be published.
+
+## Choosing between them
+
+**Box** &mdash; many groups, when the quartiles are the summary you want and shape is not expected to be interesting.
+
+**Violin** &mdash; when shape matters and the samples are large enough for a density estimate to mean something, roughly a hundred per group.
+
+**Strip or swarm** &mdash; small samples, where the individual values are the honest display.
+
+**Box plus points** &mdash; the general-purpose answer under about fifty per group.
+
+**Histogram grid** &mdash; when the shapes are the subject and there are few enough groups to give each a panel.
+
+The mistake is treating the box plot as the default for all distribution comparison, which is how bimodality goes unnoticed.
+
+## Outliers
+
+The points beyond the whiskers are labelled outliers, and the label is doing more work than the statistics support.
+
+They are simply points more than 1.5&times;IQR from the box. On normally distributed data about 0.7% of observations qualify, so a sample of a thousand produces seven "outliers" that are nothing of the kind.
+
+On skewed data the rule flags far more, all on one side, which is a property of the distribution rather than of the points.
+
+So: a point beyond a whisker is worth looking at and is not evidence of an error. `showfliers=False` hides them when they are distracting, and `whis=(5, 95)` changes the rule to percentiles, which is often more interpretable.
+
+## Sample size
+
+A box plot looks the same for twelve observations and twelve thousand, which is a real weakness when groups differ in size.
+
+Three ways to show it:
+
+**Width proportional to n** &mdash; `widths=` accepts a list, and scaling by the square root of the count is conventional.
+
+**The count in the tick label** &mdash; `"group a
+(n=12)"`.
+
+**The points overlaid**, which shows the sample size directly.
+
+Without one of these, a group of eight and a group of eight hundred are presented as equally reliable, and the reader has no way to know.
+
+## Ordering and grouping
+
+With more than a handful of groups, the arrangement is most of the chart.
+
+**Sort by median** unless the categories have a natural order. It turns a search into a reading.
+
+**Group related categories together** and separate the groups with space, which `positions=` allows: passing `[1, 2, 3, 5, 6, 7]` leaves a gap between two clusters.
+
+**Use colour for the grouping**, not for the individual boxes, so the colour carries the structure rather than repeating the labels.
+
+**Consider a reference line** &mdash; the overall median, a target &mdash; drawn across the whole axes, which turns each box from an isolated summary into a comparison.
+
+With those, twenty boxes on one chart remains readable. Without them, six is already hard.
+
+## In summary
+
+A box is five numbers, and whiskers reach the furthest point within 1.5&times;IQR rather than a fixed multiple.
+
+The display exists to compare many groups at once, which is what it does better than anything else.
+
+It hides shape, and specifically hides bimodality &mdash; two populations mixed together produce a box that looks unremarkable.
+
+A violin restores the shape and introduces a bandwidth you did not choose, plus tails extending past the observed data.
+
+Under about fifty points per group, showing the points with jitter is more informative than either.
+
+And `patch_artist=True`, `showfliers=False` and `vert=False` are the three arguments that come up most: fillable boxes, no double-drawn outliers, and horizontal layout for wordy labels.
+
+## Beeswarm and the alternatives
+
+A strip plot with random jitter shows every point and lets some of them overlap by chance.
+
+A **beeswarm** places the points deterministically so none overlap, which reads better and is not built into matplotlib &mdash; seaborn's `swarmplot` is the usual route, and it refuses to plot when there are too many points to place, which is a reasonable failure.
+
+A **rain cloud** combines three: a half violin for the shape, a box for the summary, and the points below. It is the most complete display of a distribution comparison and takes the most space, which is the trade.
+
+For most work the ordering is: points if the sample is small, box if there are many groups, box plus points in between, and a violin when the shape is genuinely the question and the samples are large enough to estimate it.
+
+What matters more than the choice is knowing what each one hides, which is the theme of this whole module.
+
+## A closing note
+
+Every distribution display is a compromise between completeness and comparability.
+
+The points show everything and compare badly past a few groups. The box compares many groups and hides the shape. The violin restores the shape and adds a smoothing choice. The histogram shows one distribution well and several badly.
+
+There is no display that does all of it, which is why the useful skill is knowing what each one discards rather than having a favourite.
+
+The specific thing worth remembering: a box plot cannot show bimodality, and bimodality usually means two populations have been mixed &mdash; which is frequently the most important fact about the data. Looking at a histogram of each group once, before settling on boxes for the comparison, costs a minute and prevents the failure this module is mostly about.
+
+## The short version
+
+Both displays trade completeness for comparability, and both hide something specific: the box hides shape, the violin hides its own smoothing choice.
+
+Knowing what each discards is more useful than preferring one, and looking at a histogram of each group once before choosing is what prevents the bimodality failure this module exists to describe.
+
+## Reading the code back
+
+A box plot is one call with three arguments worth passing: patch_artist to make the boxes fillable, showfliers to control the outliers, and vert to choose the orientation. The decisions before it are which groups, in what order, and whether the points should be shown as well - and those are what determine whether the chart works.

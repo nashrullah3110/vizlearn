@@ -1,0 +1,372 @@
+title: Layout and Spacing
+intro: Figure size, margins and the space between panels.
+
+## figsize is an aspect decision
+
+`figsize=(w, h)` in inches does two things: it sets how large the figure is, and it sets the **shape**.
+
+The shape matters more than the size, because the size is usually adjusted at display time anyway.
+
+**Time series want width.** A hundred and fifty points in three inches is 50 per inch, and the shape of the series is compressed into noise. The same data in nine inches is readable. Wide-and-short &mdash; something like 4:1 &mdash; is a good default for a single time series.
+
+**Two-variable scatters want to be square**, so neither axis is visually privileged and a correlation is not exaggerated by the aspect ratio.
+
+**Ranked bar charts want height proportional to the number of bars.** Twenty categories in three inches gives bars a few pixels apart; the figure should grow with the data.
+
+`figsize` interacts with font size: text is a fixed physical size, so a small figure has proportionally larger text. That is why shrinking a figure to fit a slide makes the labels look enormous, and why the fix is to set both together.
+
+
+## figsize is the aspect ratio decision
+
+A wide figure spreads time; a square one compares two variables.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(0)
+t = np.arange(150)
+y = rng.normal(0, 1, 150).cumsum()
+
+fig, ax = plt.subplots(figsize=(3.5, 3))
+ax.plot(t, y)
+ax.set_title("square: crowded")
+
+fig2, ax2 = plt.subplots(figsize=(9, 2.6))
+ax2.plot(t, y)
+ax2.set_title("wide: the shape is readable")
+
+print("150 points in 3.5 inches is 43 per inch; in 9 inches it is 17.")
+print()
+print("Time series want width. A scatter comparing two variables wants")
+print("to be square, so neither axis is visually privileged.")
+print("A ranked bar chart wants height proportional to the number of")
+print("bars, not a fixed size.")
+```
+
+## Margins around the data
+
+The padding matplotlib adds, and when to remove it.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 50)
+y = np.sin(x)
+
+fig, (a, b, c) = plt.subplots(1, 3, figsize=(10, 2.6))
+
+a.plot(x, y); a.set_title("default margins")
+b.plot(x, y); b.margins(0); b.set_title("margins(0)")
+c.plot(x, y); c.margins(x=0, y=0.3); c.set_title("margins(x=0, y=0.3)")
+
+print("default x margin:", plt.rcParams["axes.xmargin"])
+print("default y margin:", plt.rcParams["axes.ymargin"])
+print()
+print("5% each side. It stops points sitting on the frame, and it")
+print("means a line that should reach the edge - a filled area, a")
+print("time series ending today - stops short of it.")
+print()
+print("margins(x=0) is the usual fix for a time series.")
+```
+
+## Space between panels
+
+<code>hspace</code> and <code>wspace</code>, in units of the panel size.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(1)
+
+for hs, ws, title in [(0.05, 0.05, "cramped"), (0.5, 0.4, "roomy")]:
+    fig, axes = plt.subplots(2, 2, figsize=(6, 3.4))
+    for ax in axes.flat:
+        ax.plot(rng.random(20))
+        ax.set_xlabel("x"); ax.set_ylabel("y")
+    fig.subplots_adjust(hspace=hs, wspace=ws)
+    fig.suptitle(title)
+
+print("hspace and wspace are fractions of the average panel size, so")
+print("0.4 means 40% of a panel's height as a gap.")
+print()
+print("They are what tight_layout and constrained_layout set for you.")
+print("Setting them by hand is for when you want a specific look, or")
+print("when automatic layout fights an annotation you placed.")
+```
+
+## Making room for something outside
+
+A legend or a colorbar beside the axes needs space reserved.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 60)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(10, 3))
+
+for k in range(3):
+    a.plot(x, np.sin(x + k), label="series %d" % k)
+a.legend(loc="upper left", bbox_to_anchor=(1.02, 1))
+a.set_title("legend outside, no room made")
+
+for k in range(3):
+    b.plot(x, np.sin(x + k), label="series %d" % k)
+b.legend(loc="upper left", bbox_to_anchor=(1.02, 1))
+b.set_title("room made")
+fig.subplots_adjust(right=0.78)
+
+print("A legend placed outside the axes is drawn outside the FIGURE")
+print("too, unless room is made for it.")
+print()
+print("Three ways: subplots_adjust(right=...), constrained_layout=True,")
+print("or bbox_inches='tight' when saving - which expands the file")
+print("rather than shrinking the axes.")
+```
+
+## Aspect ratio of the data
+
+When one unit of x must equal one unit of y.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+theta = np.linspace(0, 2 * np.pi, 200)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+
+a.plot(np.cos(theta), np.sin(theta))
+a.set_title("a circle, drawn as an ellipse")
+
+b.plot(np.cos(theta), np.sin(theta))
+b.set_aspect("equal")
+b.set_title('set_aspect("equal")')
+
+print("The same unit circle. The left one is an ellipse because the")
+print("axes box is wider than it is tall and the limits are the same.")
+print()
+print("set_aspect('equal') ties the two scales together, which matters")
+print("for maps, geometry, and anything where a shape means something.")
+print("It is wrong for most other charts - it wastes space.")
+```
+
+## A finished figure
+
+Every layout decision in one place.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(2)
+months = np.arange(1, 13)
+series = {"north": rng.normal(0, 1, 12).cumsum() + 20,
+          "south": rng.normal(0, 1, 12).cumsum() + 24}
+
+fig, ax = plt.subplots(figsize=(7.5, 3.6), constrained_layout=True)
+
+for name, y in series.items():
+    ax.plot(months, y, marker="o", linewidth=2, label=name)
+    ax.text(months[-1] + 0.15, y[-1], name, va="center", fontsize=9)
+
+ax.set_xlim(0.6, 13.2)
+ax.margins(y=0.15)
+ax.set_title("Both regions grew, north faster after June",
+             loc="left", fontsize=12, fontweight="bold")
+ax.set_xlabel("Month of 2024")
+ax.set_ylabel("Index (Jan = 20)")
+ax.set_xticks(months)
+ax.grid(True, axis="y", alpha=0.3)
+ax.set_axisbelow(True)
+for side in ("top", "right"):
+    ax.spines[side].set_visible(False)
+
+print("figsize for the aspect, xlim to leave room for the end labels,")
+print("margins for breathing space, constrained_layout for the rest.")
+print("No legend, because the lines are labelled where they end.")
+```
+## Margins
+
+matplotlib leaves a 5% margin beyond the data at each end, controlled by `axes.xmargin` and `axes.ymargin`.
+
+It exists so points do not sit exactly on the frame, and it is usually right.
+
+It is wrong when the data should reach the edge: a filled area, a time series ending at today's date, an image. `ax.margins(x=0)` removes it on one axis, and `ax.margins(0)` on both.
+
+`ax.margins(y=0.15)` increases it, which is how you leave room for labels above the highest point without hard-coding limits that break when the data changes.
+
+## Space between panels
+
+`fig.subplots_adjust(hspace=..., wspace=...)` sets the gaps as **fractions of the average panel size**, so `0.4` means a gap of 40% of a panel's height.
+
+It also takes `left`, `right`, `top` and `bottom` as figure fractions, which is how you reserve space at an edge.
+
+These are what `tight_layout` and `constrained_layout` compute for you. Setting them by hand is for when you want a specific look, or when the automatic layout is fighting something you placed manually.
+
+The two automatic options differ: `tight_layout()` runs once after drawing; `constrained_layout=True` is set at creation and keeps adjusting as artists are added, handling colorbars and suptitles better.
+
+## Things outside the axes
+
+A legend positioned with `bbox_to_anchor` outside the axes is drawn outside the **figure** as well, and is simply cut off.
+
+Three fixes:
+
+`fig.subplots_adjust(right=0.78)` shrinks the axes to leave room. Predictable, and you choose the number.
+
+`constrained_layout=True` works it out, including for colorbars.
+
+`bbox_inches="tight"` at save time expands the saved image to include everything. Note this makes the file larger than `figsize` implies, rather than shrinking the axes &mdash; a different result from the other two.
+
+The same applies to long tick labels and axis labels, which is why a rotated date axis so often looks cut off.
+
+## Data aspect ratio
+
+`ax.set_aspect("equal")` makes one unit of x occupy the same distance as one unit of y.
+
+Without it, a circle plotted as `cos`/`sin` comes out an ellipse, because the axes box is wider than it is tall while the limits are the same.
+
+It is required for anything where shape carries meaning: maps, geometry, images, physical layouts. It is wrong for most statistical charts, where the two axes have unrelated units and forcing them equal wastes space.
+
+`ax.set_aspect(2)` sets a specific ratio, and `adjustable="datalim"` changes the limits rather than the box to achieve it.
+
+## Putting it together
+
+The last editor is a finished chart, and every line in it is one of the decisions from this track: an aspect ratio suited to the data, limits that leave room for end labels, margins for breathing space, ticks at meaningful positions, a faint grid below the data, two spines removed, direct labels instead of a legend, and a title that states the finding.
+
+None of it is complicated. It is a dozen lines, applied deliberately, and it is the difference between a default chart and one that looks like someone made it.
+
+## Figure versus axes coordinates
+
+Two coordinate systems place things on a figure, and mixing them up is a common source of misplaced elements.
+
+**Figure coordinates** run 0 to 1 across the whole figure. `fig.text`, `fig.add_axes`, `fig.legend` use them.
+
+**Axes coordinates** run 0 to 1 across one axes. `ax.text(..., transform=ax.transAxes)` uses them.
+
+A note that belongs to the whole figure &mdash; a source line, a caption &mdash; goes in figure coordinates and stays put when panels change. A note about one panel goes in that panel's axes coordinates.
+
+`fig.subplots_adjust` also takes figure coordinates for `left`, `right`, `top` and `bottom`, which is how you reserve a strip at an edge.
+
+## Adding an axes anywhere
+
+`fig.add_axes([left, bottom, width, height])` places an axes at an exact position in figure coordinates, outside the grid entirely.
+
+Two uses come up: an inset showing a zoomed region, and a colorbar positioned precisely rather than stolen from a panel.
+
+`ax.inset_axes([x, y, w, h])` does the same in the parent's coordinates, which is easier for an inset because the position is relative to the panel it belongs to.
+
+`ax.indicate_inset_zoom(inset_ax)` draws the connecting lines between the region and the inset, which is what makes the relationship readable.
+
+## Spacing that reads
+
+A few conventions produce figures that look considered rather than default.
+
+Leave more space **between** groups than within them &mdash; a grid of panels with a `wspace` smaller than the margin around the grid reads as a unit.
+
+Keep the **left margin** wide enough for the y label at its final font size, which is what `constrained_layout` does and hand-tuning frequently gets wrong when the font changes.
+
+Give a **suptitle** room, or it collides with the top row's titles. `fig.suptitle(..., y=1.02)` with `tight_layout` is a common fix and is fragile; `constrained_layout` handles it properly.
+
+Do not centre a title over a grid that has a colorbar on one side, because the visual centre and the geometric centre differ.
+
+## Sizing for a destination
+
+The figure should be sized for where it will be seen.
+
+**A slide** is wide and viewed from a distance: fewer elements, larger text, `figsize` around 10&times;5.6 for 16:9.
+
+**A document column** is narrow: around 3.5 inches wide for a two-column paper, and text sized so that the figure needs no scaling &mdash; scaling a figure in a document is what makes its labels the wrong size relative to the body text.
+
+**A web page** is variable, so a raster at 2&times; the display size and a `max-width` in CSS is the usual approach.
+
+The mistake is drawing at a default size and scaling afterwards, which changes the text size relative to everything else. Sizing at the destination's dimensions and choosing the font accordingly is the fix.
+
+## The last pass
+
+Before a figure is finished, three checks that are all layout:
+
+Is anything cut off at the edges? Save it and look at the file, not the screen.
+
+Is the text a sensible size relative to the figure at its final display size?
+
+Is there enough space that nothing touches anything else &mdash; labels to spines, title to panels, legend to data?
+
+None of these change what the chart says, and all of them change whether it looks like someone finished it.
+
+## Insets
+
+An inset shows a zoomed region or a small companion chart inside the main axes.
+
+```python
+inset = ax.inset_axes([0.6, 0.55, 0.35, 0.35])
+inset.plot(x, y)
+inset.set_xlim(a, b)
+ax.indicate_inset_zoom(inset, edgecolor="0.5")
+```
+
+The position is in the parent's axes coordinates, so it moves with the panel.
+
+`indicate_inset_zoom` draws the rectangle on the main axes and the connecting lines, which is what makes the relationship legible &mdash; an inset without it is a floating chart the reader has to interpret.
+
+Insets suit a long series with an interesting short window, and a scatter with a dense cluster worth magnifying. They do not suit anything the reader needs to compare precisely with the main axes, because the scales differ.
+
+## Layout that survives regeneration
+
+Hand-tuned spacing breaks when the data changes: a longer label, an extra category, a bigger number needing more room.
+
+Three habits keep a layout robust.
+
+**Prefer `constrained_layout`** over hand-set `subplots_adjust`, because it recomputes rather than remembering.
+
+**Size the figure from the data** &mdash; `figsize=(7, 0.35 * len(categories) + 1)` for a horizontal bar chart grows with the number of bars.
+
+**Use `bbox_inches="tight"` when saving**, so anything that grew is still included.
+
+A figure generated weekly will meet all three problems eventually, and the alternative is adjusting the numbers each time something changes.
+
+## Text size and the destination
+
+The most common layout error is a figure drawn at one size and displayed at another.
+
+Text in matplotlib is specified in **points**, a physical unit. A 10-point label on a 4-inch figure is a quarter of an inch, which is a substantial fraction of the width. The same label on a 10-inch figure is the same quarter inch, and now looks small.
+
+So scaling a figure after the fact changes the relationship between the text and everything else &mdash; which is why a chart shrunk to fit a document column has labels that are suddenly too large, and one enlarged for a slide has labels that are too small.
+
+The fix is to draw at the final size. For a two-column paper, that means a figure about 3.4 inches wide with fonts chosen to be readable at that size. For a slide, something like 10 by 5.6 with fonts around 14 points.
+
+`figsize` and `font.size` are one decision, not two.
+
+## In summary
+
+`figsize` is an aspect-ratio decision: width for time series, square for scatters, height proportional to the number of bars.
+
+Margins default to 5% each side and should be removed when the data is meant to reach the edge.
+
+`hspace`/`wspace` are fractions of panel size, and are what the layout managers compute for you.
+
+Anything outside the axes &mdash; a legend, long labels &mdash; needs room reserved, or it is cut off in the saved file.
+
+`set_aspect("equal")` is required where shape carries meaning and wasteful elsewhere.
+
+And a figure should be drawn at the size it will be displayed, because text is a physical size and scaling afterwards changes everything about the balance.
+
+## A closing note
+
+Layout is the part of charting that gets the least attention and is most visible in the result.
+
+A chart with the right data, the right type and the wrong spacing looks unfinished, and readers register that before they read anything. Labels touching the frame, a title colliding with a panel, a legend crowding the data, text at the wrong size for the display &mdash; all are cheap to fix and all cost credibility.
+
+The mechanisms are few: pick a figure size for the destination, let `constrained_layout` handle the spacing, reserve room for anything outside the axes, and check the saved file rather than the screen.
+
+Doing that consistently is most of the difference between charts that look produced and charts that look exported.
+
+## The short version
+
+Layout gets the least attention and is the most visible in the result.
+
+Size for the destination, let a layout manager handle the spacing, reserve room for anything outside the axes, and look at the saved file. That is most of the difference between charts that look produced and charts that look exported.

@@ -1,0 +1,383 @@
+title: Colour and Colormaps
+intro: Naming colours, the cycle, and picking a colormap that does not invent structure.
+
+## Naming a colour
+
+matplotlib accepts several notations wherever a colour is wanted:
+
+A **CSS name**: `"crimson"`, `"steelblue"`, `"rebeccapurple"`.
+
+**Hex**: `"#4c72b0"`, with an optional alpha suffix.
+
+A **cycle reference**: `"C0"` through `"C9"`, meaning the nth colour of the current property cycle. Using these keeps a figure consistent when the style changes.
+
+A **grey level as a string**: `"0.55"`. The quotes matter &mdash; the bare number `0.55` is not a colour.
+
+An **RGB or RGBA tuple** of floats from 0 to 1.
+
+Single letters `"r"`, `"g"`, `"b"`, `"k"` also work, and are the ones the format-string shorthand uses.
+
+
+## Ways to name a colour
+
+Five notations, all accepted anywhere a colour is wanted.
+
+```python-run
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(7, 2.5))
+options = [
+    ("crimson", "a CSS name"),
+    ("#4c72b0", "hex"),
+    ("C2", "the 3rd colour of the cycle"),
+    ("0.55", "a grey level, as a STRING"),
+    ((0.2, 0.6, 0.4), "an RGB tuple 0-1"),
+]
+for i, (c, why) in enumerate(options):
+    ax.barh([i], [1], color=c)
+    ax.text(1.05, i, "%-14s %s" % (repr(c), why), va="center", fontsize=9)
+ax.set_xlim(0, 3.2)
+ax.set_yticks([])
+
+print("'0.55' in quotes is a grey level; 0.55 without quotes is a number")
+print("and will not work as a colour.")
+print()
+print("C0-C9 refer to the current cycle, so a chart stays consistent")
+print("when the style changes.")
+```
+
+## The property cycle
+
+Replace it and every later plot on that axes follows.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+from cycler import cycler
+
+x = np.linspace(0, 10, 60)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+
+for k in range(4):
+    a.plot(x, np.sin(x + k))
+a.set_title("default cycle")
+
+b.set_prop_cycle(cycler(color=["#264653", "#2a9d8f", "#e9c46a", "#e76f51"]))
+for k in range(4):
+    b.plot(x, np.sin(x + k))
+b.set_title("house palette")
+
+print("set_prop_cycle applies to one axes.")
+print("plt.rcParams['axes.prop_cycle'] changes it for everything after.")
+print()
+print("A cycler can vary more than colour:")
+print("   cycler(color=[...]) + cycler(linestyle=['-', '--'])")
+print("which pairs them, so the chart survives being printed in grey.")
+```
+
+## Three kinds of colormap
+
+Picking the wrong kind invents structure that is not in the data.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+grad = np.linspace(0, 1, 256).reshape(1, -1)
+maps = [("viridis", "sequential - low to high"),
+        ("coolwarm", "diverging - around a midpoint"),
+        ("tab10", "qualitative - unordered categories"),
+        ("jet", "avoid: false bands, bad in grey")]
+
+fig, axes = plt.subplots(4, 1, figsize=(7, 3))
+for ax, (name, why) in zip(axes, maps):
+    ax.imshow(grad, aspect="auto", cmap=name)
+    ax.set_yticks([]); ax.set_xticks([])
+    ax.set_ylabel(name, rotation=0, ha="right", va="center", fontsize=9)
+    ax.text(262, 0, why, va="center", fontsize=8, transform=ax.transData)
+fig.tight_layout()
+
+print("sequential  : one direction. Use for magnitudes.")
+print("diverging   : two directions from a meaningful centre, like zero.")
+print("qualitative : distinct hues, no order. Use for categories.")
+print()
+print("Using a diverging map for data with no midpoint invents one.")
+```
+
+## Why not jet
+
+It is not perceptually uniform, so equal steps in value look unequal.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 1, 256)
+grad = x.reshape(1, -1)
+
+fig, axes = plt.subplots(2, 2, figsize=(8, 3))
+for ax, cmap in zip(axes.flat[:2], ["jet", "viridis"]):
+    ax.imshow(grad, aspect="auto", cmap=cmap)
+    ax.set_title(cmap); ax.set_xticks([]); ax.set_yticks([])
+
+for ax, cmap in zip(axes.flat[2:], ["jet", "viridis"]):
+    rgb = plt.get_cmap(cmap)(x)[:, :3]
+    lum = rgb @ np.array([0.2126, 0.7152, 0.0722])
+    ax.plot(x, lum)
+    ax.set_title("%s: brightness" % cmap, fontsize=9)
+    ax.set_ylim(0, 1)
+fig.tight_layout()
+
+print("The lower plots are how bright each colormap is along its range.")
+print("viridis rises steadily; jet goes up, down and up again.")
+print()
+print("That means jet shows features where the data has none - the eye")
+print("reads a brightness change as a boundary - and it collapses to")
+print("mush when printed in greyscale.")
+```
+
+## Colorbars
+
+A colormap without a scale is decoration.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(0)
+z = rng.normal(size=(20, 30))
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+
+a.imshow(z, cmap="viridis")
+a.set_title("no colorbar - the colours mean nothing")
+
+im = b.imshow(z, cmap="viridis")
+fig.colorbar(im, ax=b, label="value")
+b.set_title("with a scale")
+
+print("fig.colorbar needs the mappable that imshow/scatter/pcolormesh")
+print("returned - which is why those return values get captured.")
+print()
+print("ax= says which axes to steal space from; shrink and pad adjust")
+print("the size, and orientation='horizontal' puts it underneath.")
+```
+
+## Colour is not the only channel
+
+About one man in twelve cannot distinguish red from green.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 60)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+
+a.plot(x, np.sin(x), color="red", label="red")
+a.plot(x, np.cos(x), color="green", label="green")
+a.legend(); a.set_title("colour only")
+
+b.plot(x, np.sin(x), color="#0072B2", linestyle="-", marker="o",
+       markevery=8, label="solid, circles")
+b.plot(x, np.cos(x), color="#E69F00", linestyle="--", marker="s",
+       markevery=8, label="dashed, squares")
+b.legend(); b.set_title("colour + style + marker")
+
+print("Red against green is the pairing to avoid.")
+print("Blue/orange stays distinguishable for nearly everyone, and")
+print("varying linestyle as well means the chart still works in")
+print("greyscale, in a photocopy, and on a projector.")
+```
+## The property cycle
+
+Each axes has a **property cycle** that supplies the colour for successive plots. The default has ten colours and then repeats.
+
+`ax.set_prop_cycle(cycler(color=[...]))` replaces it for one axes. `plt.rcParams["axes.prop_cycle"]` replaces it globally, which is how you apply a house palette to a whole script.
+
+A `cycler` can carry more than colour:
+
+```python
+cycler(color=palette) + cycler(linestyle=["-", "--", ":", "-."])
+```
+
+`+` pairs them elementwise, so the first series is the first colour and the first linestyle. That single change makes every chart in a script survive being printed in greyscale, which is worth more than it costs.
+
+`*` gives the outer product instead, cycling every combination.
+
+## Three kinds of colormap
+
+The choice of colormap is a statement about the data, and the wrong one asserts something false.
+
+**Sequential** &mdash; `viridis`, `plasma`, `Blues` &mdash; runs from low to high in one direction. Use for magnitudes: counts, temperatures, concentrations.
+
+**Diverging** &mdash; `coolwarm`, `RdBu`, `BrBG` &mdash; has two directions from a neutral centre. Use when there is a **meaningful midpoint**: zero, an average, a baseline. Applying one to data with no natural centre invents a boundary in the middle of the range.
+
+**Qualitative** &mdash; `tab10`, `Set2` &mdash; is a set of distinct hues with no ordering. Use for categories. Using a sequential map for categories implies an order that does not exist.
+
+**Cyclic** &mdash; `twilight`, `hsv` &mdash; wraps around, for angles and phases.
+
+## Why jet is a problem
+
+`jet` was the default in older tools and still appears everywhere. It is a bad choice, for a reason that is measurable rather than aesthetic.
+
+A good colormap is **perceptually uniform**: equal steps in the data look like equal steps in colour. `viridis` was designed for this, and its brightness increases steadily from one end to the other.
+
+`jet` does not. Its brightness rises, falls and rises again, with a bright band in the middle. The eye reads a sharp brightness change as a boundary, so `jet` shows edges and structure where the data is perfectly smooth &mdash; and hides real gradients in the flat regions.
+
+It also collapses when converted to greyscale, because different values map to the same brightness.
+
+The fourth editor plots the brightness of both, which makes the difference visible rather than assertable.
+
+## Colorbars
+
+A colour-mapped plot without a colorbar is decoration: the reader can see that values differ and not by how much.
+
+`fig.colorbar(mappable, ax=ax)` needs the object returned by the drawing call &mdash; `imshow`, `scatter`, `pcolormesh`, `contourf`. That is why those return values are captured here.
+
+`label=` names the quantity, which is as important as it is on an axis. `shrink` and `pad` adjust size and spacing; `orientation="horizontal"` puts it below.
+
+For a grid of subplots, `fig.colorbar(im, ax=axes.ravel().tolist())` makes one bar serve all panels, which is right when they share a scale &mdash; and they should, or the panels are not comparable.
+
+## Accessibility
+
+Around 8% of men and 0.5% of women have some form of colour vision deficiency, most commonly difficulty separating red from green.
+
+Three habits cover most of it:
+
+**Avoid red against green** as the primary distinction. Blue against orange is distinguishable for almost everyone.
+
+**Vary a second channel** &mdash; linestyle, marker, or position &mdash; so colour is reinforcing rather than carrying the meaning alone.
+
+**Use `viridis` and friends** for continuous data. They were designed to remain monotonic in brightness under common deficiencies, which is why they work in greyscale too.
+
+The greyscale test is a good proxy for all of it: print the chart in black and white, and if it is still readable, it will survive most viewing conditions.
+
+## Transparency
+
+`alpha` runs from 0 to 1 and can be set per artist or baked into a colour as a fourth channel.
+
+Three places it earns its keep: showing density in an overplotted scatter, letting a shaded band sit under a line without hiding it, and de-emphasising context series without changing their colour.
+
+Two cautions. Alpha compounds &mdash; ten overlapping shapes at 0.1 are opaque where they all coincide, which is exactly the density signal you want in a scatter and an unwanted colour shift elsewhere. And transparency is lost when a figure is flattened onto a background, so a chart designed with alpha over white looks different over grey.
+
+## Named palettes
+
+matplotlib ships the `tab10` and `tab20` qualitative sets, and `plt.get_cmap("tab10").colors` gives the list for use in a cycler.
+
+For categorical work, palettes designed for colour-vision deficiency are worth preferring &mdash; the Okabe&ndash;Ito set is eight colours chosen to remain distinguishable under the common deficiencies, and it is a plain list of hex codes you can paste into a cycler.
+
+For sequential data, the perceptually uniform family is `viridis`, `plasma`, `inferno`, `magma` and `cividis`. `cividis` is designed specifically to look the same to viewers with and without colour-vision deficiency.
+
+Appending `_r` to any colormap name reverses it: `viridis_r`.
+
+## Discrete colour from a continuous map
+
+Sampling a continuous colormap gives a graded set for ordered categories:
+
+```python
+cmap = plt.get_cmap("viridis")
+colors = [cmap(i / (n - 1)) for i in range(n)]
+```
+
+That is right when the categories have an **order** &mdash; age bands, quartiles, years &mdash; because the colour then carries the ordering.
+
+It is wrong for unordered categories, where a qualitative palette should be used instead, and it is a common way to imply a sequence that does not exist.
+
+`BoundaryNorm` does the same thing for a mapped plot, banding a continuous scale into discrete steps with a colorbar that shows the boundaries.
+
+## Colorbar placement
+
+The default steals space from the axes it is attached to, which shrinks that panel and misaligns it with its neighbours.
+
+`fig.colorbar(im, ax=axes.ravel().tolist())` spans several panels with one bar, which is right when they share a scale.
+
+`shrink=0.8` and `aspect=30` adjust its proportions; `pad` sets the gap; `location="bottom"` moves it.
+
+For precise control, `fig.add_axes([left, bottom, width, height])` creates a dedicated axes for it in figure coordinates, which is how you get a colorbar that lines up exactly with a grid.
+
+## Backgrounds
+
+`fig.patch` is the figure background and `ax.patch` the axes background, and they are separate.
+
+`ax.set_facecolor("#f7f7f7")` gives the plotting area a light tint, which some styles use to make a white grid readable.
+
+For a dark theme, both need setting along with the text, tick and spine colours &mdash; which is exactly what the `dark_background` style does, and a reason to use a style rather than setting six things by hand.
+
+## Building a palette
+
+A palette for a project needs fewer colours than people expect.
+
+**One** colour, for charts with a single series. Most charts.
+
+**Two**, for a comparison or a before-and-after.
+
+**A greyscale plus one accent**, for highlighting one series among many. This covers more cases than any multi-colour palette.
+
+**Five or six**, for genuinely categorical work, drawn from a set designed for the purpose.
+
+Beyond about six, colour stops distinguishing reliably, and the answer is small multiples rather than more hues.
+
+Add a grey for context elements, a light grey for gridlines, and a dark grey rather than black for text, and that is a complete house palette.
+
+## Testing a colour scheme
+
+Three checks, none of which needs a tool.
+
+**Greyscale.** Convert the figure to greyscale and see whether the series are still distinguishable. If they are not, luminance is not varying and the chart depends entirely on hue.
+
+**Small size.** View the figure at the size it will actually be seen. Colours that separate at full screen frequently do not at thumbnail size.
+
+**Print.** A projector and a printer both compress the range, and colours that differ on a monitor often do not survive either.
+
+Passing all three usually means the encoding is robust, and failing any of them is fixed the same way: vary luminance, and vary a second channel.
+
+## Colour with meaning
+
+The strongest use of colour is when it encodes something the reader already understands.
+
+**Semantic colours** &mdash; red for loss, green for gain, a brand colour for one product &mdash; are read without a legend because the meaning arrives with the hue. They are also culturally specific, and the red/green pairing is the worst possible choice for colour-blind readers, so the convention has to be weighed against accessibility.
+
+**Sequential colour for an ordered variable** &mdash; darker for more &mdash; is read correctly with almost no instruction.
+
+**One accent against grey** is the most reliable of all, because it says "this one" and nothing else.
+
+The weakest use is colour as decoration: seven categories in seven hues because the palette had seven. That asks the reader to learn an arbitrary mapping and consult it repeatedly, and it is usually a sign the chart should be small multiples.
+
+The test is whether removing the colour destroys the chart's meaning or only its appearance. If the former, the colour is doing work and should be chosen carefully. If the latter, it can be simplified away.
+
+## In summary
+
+Colours accept names, hex, `C0`-style cycle references, greys as strings, and RGB tuples.
+
+The property cycle supplies distinct colours automatically, and a cycler can vary linestyle alongside colour so the chart survives greyscale.
+
+Colormaps come in three kinds, and using the wrong kind asserts something false: sequential for magnitude, diverging around a real centre, qualitative for unordered categories.
+
+`jet` fails measurably rather than aesthetically &mdash; its brightness is not monotonic, so it shows edges the data does not have.
+
+A colour-mapped plot needs a colorbar, with a label, and two such plots need a shared scale.
+
+And roughly one man in twelve cannot separate red from green, which is why a second channel is worth varying and why greyscale is a good proxy test for the whole question.
+
+## A closing note
+
+Colour is the most over-used channel in charting and the most rewarding to use sparingly.
+
+The strongest charts usually have one colour, or one colour against grey. Colour that encodes a variable earns its place; colour that distinguishes seven categories nobody needs to distinguish does not.
+
+The technical points matter too &mdash; perceptual uniformity, the right kind of colormap, a centred diverging scale, a colorbar that says what the colours mean &mdash; and they are all in service of the same thing: the reader should be able to work out what a colour means without being told twice.
+
+The greyscale test remains the quickest check on all of it.
+
+## The short version
+
+Colour is the most over-used channel in charting and the most rewarding to use sparingly.
+
+One accent against grey outperforms a seven-hue palette in almost every case, and the greyscale test is the quickest check on whether the encoding survives contact with the real world.
+
+## Reading the code back
+
+Colour decisions are made once for a project and applied through a cycler, not chosen per chart. A palette of five or six for categories, a sequential map for magnitudes, a diverging one for data with a real centre, and a grey for context is a complete set. Anything beyond that is usually a chart that should have been small multiples.

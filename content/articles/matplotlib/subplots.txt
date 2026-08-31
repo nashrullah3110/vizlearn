@@ -1,0 +1,433 @@
+title: Subplots
+intro: Several axes on one figure.
+
+## The grid
+
+`fig, axes = plt.subplots(2, 3)` creates a figure with six axes and returns them as a NumPy array.
+
+`axes[0, 2]` is the top-right panel. `axes.flat` iterates in reading order, which is what you want when the panels correspond to a flat list of categories:
+
+```python
+for ax, name in zip(axes.flat, names):
+    ...
+```
+
+`zip` stops at the shorter of the two, so a grid with more cells than data leaves the extras blank &mdash; visible, and usually worth removing with `ax.remove()` or hiding with `ax.axis("off")`.
+
+
+## A grid of axes
+
+<code>subplots(rows, cols)</code> returns an array you index or iterate.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+fig, axes = plt.subplots(2, 3, figsize=(9, 4))
+print("axes is a", type(axes).__name__, "of shape", axes.shape)
+
+for i, ax in enumerate(axes.flat):
+    ax.plot(rng.random(20).cumsum())
+    ax.set_title("panel %d" % i, fontsize=9)
+
+fig.tight_layout()
+
+print()
+print("axes[0, 2] is the top-right panel.")
+print("axes.flat iterates them in reading order, which is what you want")
+print("when the panels correspond to a flat list of things.")
+print()
+print("With one row or one column it is 1-D; with 1x1 it is a single")
+print("Axes, not an array - which is why fig, ax = plt.subplots() works.")
+```
+
+## squeeze, and the shape surprise
+
+A 1xN grid gives a 1-D array, which breaks code written for 2-D.
+
+```python-run
+import matplotlib.pyplot as plt
+
+for r, c in [(1, 1), (1, 3), (3, 1), (2, 2)]:
+    fig, axes = plt.subplots(r, c, figsize=(2, 1))
+    shape = getattr(axes, "shape", "single Axes")
+    print("subplots(%d, %d) -> %s" % (r, c, shape))
+    plt.close(fig)
+
+print()
+fig, axes = plt.subplots(1, 3, figsize=(6, 1.6), squeeze=False)
+print("squeeze=False always gives 2-D:", axes.shape)
+print()
+print("Code that does axes[0, 1] breaks on a 1-D result. squeeze=False")
+print("makes the shape predictable, which matters in a function that")
+print("takes the grid size as an argument.")
+
+fig2, ax = plt.subplots(figsize=(4, 2))
+ax.plot([0, 1], [1, 0])
+ax.set_title("and one figure left open to show")
+```
+
+## Sharing axes
+
+So panels can be compared, and the labels stop repeating.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(1)
+data = [rng.normal(loc, 1, 200) for loc in (0, 1, 2)]
+
+fig, axes = plt.subplots(1, 3, figsize=(9, 2.6))
+for ax, d in zip(axes, data):
+    ax.hist(d, bins=20)
+fig.suptitle("independent axes - the panels are NOT comparable")
+
+fig2, axes2 = plt.subplots(1, 3, figsize=(9, 2.6), sharex=True, sharey=True)
+for ax, d in zip(axes2, data):
+    ax.hist(d, bins=20)
+fig2.suptitle("sharex/sharey - now they are")
+
+print("Without sharing, each panel scales to its own data, so a taller")
+print("bar in one panel can represent a smaller number than a shorter")
+print("bar in another. Sharing is what makes a grid a comparison.")
+print()
+print("It also hides the inner tick labels, which removes clutter.")
+```
+
+## Panels of different sizes
+
+<code>gridspec</code> when the grid is not uniform.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(2)
+
+fig = plt.figure(figsize=(8, 4))
+gs = fig.add_gridspec(2, 3, height_ratios=[2, 1], width_ratios=[2, 1, 1])
+
+big = fig.add_subplot(gs[0, :])
+big.plot(rng.random(80).cumsum())
+big.set_title("spans the whole top row")
+
+for i in range(3):
+    ax = fig.add_subplot(gs[1, i])
+    ax.bar(["a", "b"], rng.random(2))
+    ax.set_title("small %d" % i, fontsize=9)
+
+fig.tight_layout()
+
+print("gs[0, :]   - row 0, every column")
+print("gs[1, 0]   - row 1, first column")
+print("height_ratios makes the top row twice the height of the bottom.")
+```
+
+## subplot_mosaic reads better
+
+A picture of the layout, in a string.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(3)
+
+fig, axd = plt.subplot_mosaic(
+    """
+    AAB
+    CCB
+    """,
+    figsize=(8, 4))
+
+axd["A"].plot(rng.random(50).cumsum())
+axd["A"].set_title("A")
+axd["B"].barh(["x", "y", "z"], rng.random(3))
+axd["B"].set_title("B")
+axd["C"].hist(rng.normal(size=300), bins=20)
+axd["C"].set_title("C")
+fig.tight_layout()
+
+print("The string IS the layout. Repeated letters span cells.")
+print("axd is a dict keyed by the letters, so panels have names")
+print("rather than indices - which reads far better than gs[0, :2].")
+```
+
+## Making room
+
+<code>tight_layout</code> and <code>constrained_layout</code> both stop labels colliding.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(4)
+
+fig, axes = plt.subplots(2, 2, figsize=(6, 4))
+for ax in axes.flat:
+    ax.plot(rng.random(10))
+    ax.set_xlabel("a long x label")
+    ax.set_ylabel("a long y label")
+fig.suptitle("no layout management - labels collide")
+
+fig2, axes2 = plt.subplots(2, 2, figsize=(6, 4), constrained_layout=True)
+for ax in axes2.flat:
+    ax.plot(rng.random(10))
+    ax.set_xlabel("a long x label")
+    ax.set_ylabel("a long y label")
+fig2.suptitle("constrained_layout=True")
+
+print("tight_layout() is called after drawing and adjusts once.")
+print("constrained_layout=True is set at creation and keeps adjusting,")
+print("which handles colorbars and suptitles better.")
+print()
+print("Neither is the default, and a figure that looks fine on screen")
+print("and cropped when saved is almost always missing one of them.")
+```
+## The shape surprise
+
+The returned array's shape is not always what code expects.
+
+`subplots(2, 3)` gives a `(2, 3)` array. `subplots(1, 3)` gives a **1-D** array of three. `subplots(1, 1)` gives a single `Axes`, not an array at all &mdash; which is what makes `fig, ax = plt.subplots()` work.
+
+That is convenient interactively and awkward in a function that takes the grid size as a parameter, because `axes[0, 1]` fails on the 1-D case.
+
+`squeeze=False` forces a 2-D array always. In reusable code it is the right default, and it costs one argument.
+
+## Sharing
+
+`sharex=True` and `sharey=True` make the panels use the same limits.
+
+This is not a cosmetic setting. Without it, every panel autoscales to its own data, so a bar that reaches the top of one panel may represent a smaller number than a shorter bar in the panel beside it. The grid looks like a comparison and is not one.
+
+Sharing also hides the inner tick labels, which removes a great deal of repetition from a grid.
+
+`sharex="col"` and `sharey="row"` share within columns or rows, which suits a matrix where each row is a different quantity.
+
+The trade-off: with shared axes, a panel whose data occupies a small part of the shared range is compressed. When the panels genuinely have different scales, small multiples with independent axes and clearly labelled ranges are more honest &mdash; but then the reader must be told not to compare heights directly.
+
+## Uneven grids
+
+`fig.add_gridspec(rows, cols)` creates a grid you then slice:
+
+```python
+gs = fig.add_gridspec(2, 3, height_ratios=[2, 1])
+big = fig.add_subplot(gs[0, :])     # whole top row
+small = fig.add_subplot(gs[1, 0])   # bottom left
+```
+
+`height_ratios` and `width_ratios` make rows and columns different sizes, which is how you give a main chart more space than the supporting ones.
+
+## subplot_mosaic
+
+`plt.subplot_mosaic` takes a **picture** of the layout:
+
+```python
+fig, axd = plt.subplot_mosaic("""
+    AAB
+    CCB
+""")
+```
+
+Repeated letters span cells, and the result is a dict keyed by the letters. `axd["A"]` is far easier to follow than `gs[0, :2]`, and the layout is visible in the source rather than encoded in slice arithmetic.
+
+A `.` in the string leaves a cell empty.
+
+It is the most readable way to build an uneven layout, and worth preferring wherever it fits.
+
+## Layout
+
+Labels, titles and tick text are drawn outside the axes, and matplotlib does not account for them when placing panels. The result is overlapping labels, or a title running off the top.
+
+Two mechanisms fix it.
+
+`fig.tight_layout()` is called after everything is drawn and adjusts spacing once. It is simple and works for most cases; it can be confused by artists added afterwards, and it does not handle colorbars especially well.
+
+`constrained_layout=True` is set when the figure is created and keeps adjusting as things are added. It handles colorbars, suptitles and legends outside the axes better, and it is the one to reach for on a complex figure.
+
+Neither is on by default. `fig.subplots_adjust(hspace=..., wspace=...)` sets spacing manually when you want precise control.
+
+The symptom of missing layout management is a figure that looks acceptable on screen and comes out cropped when saved &mdash; because `savefig` uses the figure's declared size, not whatever the screen happened to show. `bbox_inches="tight"` on `savefig` is the other half of that fix.
+
+## Removing unused panels
+
+A 3&times;4 grid holding ten charts leaves two empty boxes with ticks and spines, which look like a mistake.
+
+`ax.remove()` deletes the axes entirely. `ax.axis("off")` keeps it but hides everything, which preserves the spacing &mdash; useful when the grid should stay rectangular.
+
+```python
+for ax in axes.flat[len(items):]:
+    ax.remove()
+```
+
+The empty cell is also a reasonable place for a legend or a note, using `ax.axis("off")` and `ax.legend(...)` with handles gathered from the other panels.
+
+## Titles and labels across a grid
+
+With shared axes, per-panel axis labels are repetition. `fig.supxlabel` and `fig.supylabel` label the grid once.
+
+Panel titles remain useful and should be small &mdash; they are identifying the panel, not heading a chart. `fontsize=9` and `loc="left"` reads well.
+
+For a formal figure, lettering the panels is conventional:
+
+```python
+for letter, ax in zip("abcdef", axes.flat):
+    ax.text(0.02, 0.95, letter, transform=ax.transAxes,
+            fontweight="bold", va="top")
+```
+
+Axes coordinates, so the letter stays in the corner regardless of the data.
+
+## Iterating in the right order
+
+`axes.flat` iterates row by row, which matches how the panels will be read.
+
+`zip(axes.flat, items)` pairs them and stops at the shorter, which is convenient and silently drops items if the grid is too small. Asserting the sizes match is one line and prevents a chart quietly missing a category:
+
+```python
+assert len(items) <= axes.size
+```
+
+For a grid indexed by two variables, `axes[i, j]` with explicit loops is clearer than flattening, because the position then carries meaning.
+
+## When not to use subplots
+
+Small multiples are excellent for comparing the **same** measurement across groups.
+
+They are poor when the panels show different quantities on different scales, because the shared layout implies a comparability that the axes do not support. Four panels showing revenue, headcount, latency and satisfaction are four charts that happen to be adjacent, and separating them &mdash; or at least not sharing axes and labelling each scale clearly &mdash; is more honest.
+
+They are also poor past about twelve panels, where each becomes too small to read. At that point the answer is usually to reduce what is being shown, not to shrink the panels further.
+
+## Figure size for a grid
+
+The figure size should scale with the grid. A 2&times;3 grid in the same six inches as a single chart gives panels a third the size, and text that was comfortable becomes proportionally huge.
+
+A reasonable rule is to keep the per-panel size roughly constant:
+
+```python
+fig, axes = plt.subplots(nrows, ncols, figsize=(3.2 * ncols, 2.4 * nrows))
+```
+
+Then adding a row makes the figure taller rather than making everything smaller.
+
+## Shared axes in detail
+
+`sharex=True` links the axes objects, so changing the limits on one changes all of them &mdash; which is convenient interactively and occasionally surprising in a script, where an autoscale on one panel silently rescales the rest.
+
+`ax.label_outer()` hides the tick labels on inner panels, which `sharex`/`sharey` do automatically but which is needed when you build the grid by hand.
+
+`sharex="col"` links within columns only, which suits a grid where columns are different quantities and rows are groups.
+
+To share afterwards rather than at creation, `ax2.sharex(ax1)` exists, and the older `ax2.get_shared_x_axes().join(ax1, ax2)` appears in existing code.
+
+## A grid that reads
+
+The details that make a grid of panels look considered:
+
+**Consistent panel titles**, small and left-aligned.
+
+**One axis label per grid**, via `supxlabel`/`supylabel`.
+
+**Shared limits**, so the comparison is valid.
+
+**A consistent colour** across panels for the same series, or a single colour if each panel is one thing.
+
+**Empty cells removed**, not left as empty boxes.
+
+**A common annotation style** &mdash; if one panel has a reference line, they all should.
+
+Individually trivial; together they are the difference between a grid that reads as one figure and one that reads as several charts stuck together.
+
+## Building a grid programmatically
+
+Most real grids are generated from data rather than written out, and a few patterns make that robust.
+
+Compute the grid size from the number of items:
+
+```python
+n = len(items)
+ncols = 3
+nrows = math.ceil(n / ncols)
+fig, axes = plt.subplots(nrows, ncols, figsize=(3.2 * ncols, 2.4 * nrows),
+                         sharex=True, sharey=True, squeeze=False)
+```
+
+`squeeze=False` guarantees a 2-D array whatever the numbers work out to, so `axes.flat` always behaves.
+
+Then pair, draw, and clean up the remainder:
+
+```python
+for ax, item in zip(axes.flat, items):
+    draw(ax, item)
+for ax in axes.flat[n:]:
+    ax.remove()
+```
+
+The figure size scaling with the grid is what keeps the text a constant size relative to each panel, rather than shrinking as rows are added.
+
+And because `zip` stops at the shorter argument, asserting `n <= axes.size` is worth the line &mdash; otherwise a grid that is too small silently drops categories.
+
+## In summary
+
+`subplots(r, c)` returns an array; `axes.flat` iterates in reading order; `squeeze=False` makes the shape predictable.
+
+`sharex` and `sharey` are what turn a grid into a comparison, and without them each panel scales to its own data and the heights mean different things.
+
+`gridspec` and `subplot_mosaic` handle uneven layouts, and the mosaic string is far easier to read than slice arithmetic.
+
+`tight_layout` or `constrained_layout` stop labels colliding, and a figure that saves cropped is usually missing one.
+
+Label the grid once with `supxlabel` rather than every panel, remove unused cells, and scale the figure size with the number of panels.
+
+And small multiples are the right answer far more often than one crowded chart &mdash; they are the display that makes many comparisons possible at once.
+
+## Grids in practice
+
+Three layouts cover nearly all real grids.
+
+**A row of two or three**, for a before-and-after or a small set of related views. Wide, shared y, one shared axis label.
+
+**A square-ish grid**, for small multiples over a categorical variable. Shared both ways, panel titles small, figure size scaled by the grid.
+
+**A main chart plus supporting ones**, built with `subplot_mosaic` or `gridspec` and unequal ratios. The main panel gets two-thirds of the height and the supporting row the rest.
+
+The fourth layout &mdash; a grid of unrelated charts &mdash; is common and usually a mistake. Panels in a grid are read as comparable, and four charts of different quantities on different scales are four figures that happen to be adjacent. Either give them separate figures, or make the difference explicit with clearly labelled independent scales and no shared axes.
+
+The question that decides it: would a reader be right to compare the panels to each other? If yes, share the axes. If no, they probably should not be in a grid.
+
+## Sharing a legend
+
+A grid where every panel repeats the same legend wastes space and attention.
+
+One figure-level legend is the fix:
+
+```python
+handles, labels = axes.flat[0].get_legend_handles_labels()
+fig.legend(handles, labels, loc="lower center", ncol=len(labels))
+fig.subplots_adjust(bottom=0.15)
+```
+
+Handles are taken from any one panel, because they are all the same series, and `fig.legend` places it relative to the figure rather than an axes.
+
+Room has to be made for it, which `constrained_layout` does automatically and `subplots_adjust` does explicitly.
+
+The same applies to a colorbar: one bar serving the whole grid, which also enforces the shared scale the panels need to be comparable.
+
+## One more thing
+
+`fig.align_ylabels()` lines up the y-axis labels across a column of panels, which otherwise sit at different distances from the axes depending on how wide each panel's tick labels are.
+
+It is a small alignment that is very visible once noticed, and `align_xlabels` does the same horizontally. On a grid where the panels have different value ranges, it is the difference between a column of labels that reads as one and one that looks ragged.
+
+## The short version
+
+A grid is a claim that the panels belong together. Sharing the axes is what makes the claim true, and labelling the grid once rather than every panel is what makes it read as one figure.
+
+The three things that most often go wrong are an unshared y axis making incomparable panels look comparable, a figure size that did not grow with the grid so everything is cramped, and empty cells left as bare boxes. All three are one line each.
+
+## Reading the code back
+
+A grid is created in one call and finished in three: share the axes, label the grid once, and remove what is unused. The figure size should be computed from the grid rather than fixed, so adding a row makes the figure taller instead of making every panel smaller. Those four decisions are what separate a grid that reads as one figure from several charts that happen to be adjacent.

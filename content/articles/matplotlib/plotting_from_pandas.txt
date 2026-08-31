@@ -1,0 +1,399 @@
+title: Plotting from pandas
+intro: df.plot as a shortcut, and when to drop back to matplotlib.
+
+## What it does for you
+
+`df.plot()` draws every column as a line against the index, adds a legend labelled with the column names, and formats the x axis appropriately for the index type.
+
+For a time-indexed frame that is a dated axis, sensible tick spacing, one line per column and a legend &mdash; from one call. Doing the same in raw matplotlib is five or six lines.
+
+That is the case for using it: for exploration, and for the common chart types, it is simply faster.
+
+
+## df.plot draws every column against the index
+
+One call, and pandas supplies the labels and the legend.
+
+```python-run
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+
+idx = pd.date_range("2024-01-01", periods=60, freq="D")
+rng = np.random.default_rng(0)
+df = pd.DataFrame({"north": rng.normal(0, 1, 60).cumsum() + 20,
+                   "south": rng.normal(0, 1, 60).cumsum() + 25},
+                  index=idx)
+
+ax = df.plot(figsize=(7, 3.2))
+ax.set_ylabel("value")
+
+print("df.plot() gave, for free:")
+print("   the dates on the x axis (from the index)")
+print("   a line per column")
+print("   a legend, labelled with the column names")
+print()
+print("It returns an Axes, so everything you know still applies:")
+print("   type:", type(ax).__name__)
+```
+
+## It returns an Axes, and takes one
+
+Which is how pandas plots fit into a matplotlib layout.
+
+```python-run
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+
+rng = np.random.default_rng(1)
+df = pd.DataFrame({"a": rng.normal(0, 1, 200), "b": rng.normal(1, 2, 200)})
+
+fig, axes = plt.subplots(1, 2, figsize=(9, 3))
+
+df.plot(kind="hist", bins=30, alpha=0.6, ax=axes[0], legend=True)
+axes[0].set_title("pandas hist into a subplot")
+
+df.plot(kind="scatter", x="a", y="b", ax=axes[1], alpha=0.4, s=12)
+axes[1].set_title("pandas scatter")
+
+fig.tight_layout()
+
+print("ax= sends the plot to an axes you made.")
+print("Without it, pandas creates its own figure - which is why a")
+print("df.plot inside a subplot loop draws in the wrong place.")
+```
+
+## The kinds
+
+One argument covers most of the chart types.
+
+```python-run
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+
+rng = np.random.default_rng(2)
+df = pd.DataFrame({"a": rng.normal(10, 2, 60), "b": rng.normal(12, 3, 60)})
+cat = pd.DataFrame({"value": [23, 45, 12, 38]},
+                   index=["alpha", "beta", "gamma", "delta"])
+
+fig, axes = plt.subplots(2, 2, figsize=(9, 5))
+cat.plot(kind="bar", ax=axes[0, 0], legend=False, title="bar")
+cat.plot(kind="barh", ax=axes[0, 1], legend=False, title="barh")
+df.plot(kind="box", ax=axes[1, 0], title="box")
+df.plot(kind="area", ax=axes[1, 1], stacked=False, alpha=0.4, title="area")
+fig.tight_layout()
+
+print("kind = line bar barh hist box kde area pie scatter hexbin")
+print()
+print("df.plot.bar() is the same thing with nicer syntax, and gives")
+print("autocompletion in an editor.")
+print()
+try:
+    df.plot(kind="kde")
+except Exception as e:
+    print("kde needs scipy, which is not loaded here:")
+    print("   ", type(e).__name__, "-", str(e)[:44])
+    print("   Several pandas plot kinds have optional dependencies.")
+```
+
+## Grouped and stacked, from a frame
+
+A wide frame is already a grouped bar chart.
+
+```python-run
+import matplotlib.pyplot as plt
+import pandas as pd
+
+df = pd.DataFrame({"product a": [10, 15, 12],
+                   "product b": [8, 18, 14],
+                   "product c": [5, 4, 9]},
+                  index=["q1", "q2", "q3"])
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+df.plot(kind="bar", ax=a, rot=0, title="grouped")
+df.plot(kind="bar", stacked=True, ax=b, rot=0, title="stacked")
+
+print("Each COLUMN becomes a series; each ROW becomes a group.")
+print()
+print("So the shape of the frame decides the chart. If the bars come")
+print("out grouped the wrong way, the frame needs transposing or")
+print("pivoting - not the plot call changing.")
+print()
+print("df.T.plot(kind='bar') swaps them.")
+```
+
+## subplots=True for small multiples
+
+One panel per column, sharing the x axis.
+
+```python-run
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+
+idx = pd.date_range("2024-01-01", periods=80, freq="D")
+rng = np.random.default_rng(3)
+df = pd.DataFrame({c: rng.normal(0, 1, 80).cumsum() + base
+                   for c, base in [("north", 20), ("south", 40), ("east", 5)]},
+                  index=idx)
+
+axes = df.plot(subplots=True, figsize=(7, 4.5), sharex=True, legend=False)
+for ax, name in zip(axes, df.columns):
+    ax.set_ylabel(name)
+
+print("subplots=True gives one panel per column and returns an ARRAY")
+print("of axes rather than a single one.")
+print()
+print("Note the y axes are independent by default, so the panels are")
+print("not comparable - pass sharey=True when they should be.")
+```
+
+## When to drop back to matplotlib
+
+pandas is a shortcut; anything unusual is easier underneath.
+
+```python-run
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+
+idx = pd.date_range("2024-01-01", periods=60, freq="D")
+rng = np.random.default_rng(4)
+df = pd.DataFrame({"actual": rng.normal(0, 1, 60).cumsum() + 50}, index=idx)
+df["target"] = 52
+
+fig, ax = plt.subplots(figsize=(7.5, 3.5))
+
+df["actual"].plot(ax=ax, color="#264653", linewidth=2, label="actual")
+ax.axhline(52, color="crimson", linestyle="--", linewidth=1, label="target")
+above = df["actual"] > 52
+ax.fill_between(df.index, 52, df["actual"], where=above,
+                alpha=0.2, color="#2a9d8f")
+i = df["actual"].idxmax()
+ax.annotate("peak %.1f" % df["actual"].max(), xy=(i, df["actual"].max()),
+            xytext=(10, -20), textcoords="offset points",
+            arrowprops=dict(arrowstyle="->"))
+ax.legend()
+
+print("pandas drew the line. matplotlib did the threshold, the shading")
+print("and the annotation - none of which df.plot exposes.")
+print()
+print("The two mix freely, because df.plot is a thin wrapper that")
+print("returns the same Axes object.")
+```
+## It is a thin wrapper
+
+The important thing to know is that `df.plot` **returns a matplotlib Axes**, and accepts one through `ax=`.
+
+That means it is not a separate system. Everything in this track applies to the result:
+
+```python
+fig, ax = plt.subplots()
+df.plot(ax=ax)
+ax.set_title(...)
+ax.axhline(...)
+```
+
+`ax=` also matters for a different reason: without it, pandas creates its **own** figure. A `df.plot` call inside a loop over subplots draws each chart in a new figure rather than the panel you intended, which is a common and confusing result.
+
+## kinds
+
+`kind=` selects the chart: `"line"` (the default), `"bar"`, `"barh"`, `"hist"`, `"box"`, `"kde"`, `"area"`, `"pie"`, `"scatter"`, `"hexbin"`.
+
+`df.plot.bar()` is equivalent and reads better, with the advantage that an editor can autocomplete the method names and their arguments.
+
+`scatter` and `hexbin` need `x=` and `y=` naming columns, since they take two variables rather than plotting everything against the index.
+
+Most keyword arguments are passed through to matplotlib, so `alpha`, `color`, `linewidth` and the rest work as expected.
+
+## The frame's shape is the chart
+
+This is the part that determines whether the output is what you wanted.
+
+Each **column** becomes a series. Each **row** becomes a position on the x axis.
+
+So a frame with quarters as rows and products as columns gives grouped bars with one cluster per quarter. If you wanted one cluster per product, the frame needs transposing &mdash; `df.T.plot(kind="bar")` &mdash; not a different plotting argument.
+
+When a chart comes out grouped the wrong way, the fix is nearly always a `pivot`, a `groupby().unstack()`, or a transpose. That is the reshaping module doing its job: **getting the frame into the right shape is the plotting work**, and the plot call is then trivial.
+
+`stacked=True` stacks bars or areas.
+
+## subplots=True
+
+`df.plot(subplots=True)` gives one panel per column and returns an **array** of axes rather than one.
+
+It is the fastest route to small multiples, and it has a default worth knowing: the y axes are **independent**, so the panels are not comparable. `sharey=True` fixes it, and without it a panel showing a range of 0&ndash;2 sits beside one showing 0&ndash;2000 at the same visual height.
+
+`layout=(2, 3)` arranges them in a grid rather than a column.
+
+## When to drop back
+
+pandas covers the common cases and exposes nothing beyond them.
+
+Reach for matplotlib when you need:
+
+annotations, arrows or text;
+
+reference lines and shaded regions;
+
+a second y axis, or a secondary unit;
+
+fine control of ticks, formatters or scales;
+
+anything drawn conditionally &mdash; highlighting one series, greying the rest.
+
+The good news is that this is not a switch. `df.plot(ax=ax)` for the data and `ax.` methods for everything else is the normal way to work, and it is why the wrapper is worth having.
+
+## And when to leave both
+
+For statistical charts &mdash; faceted grids, regression plots with confidence bands, categorical scatter with built-in jitter &mdash; seaborn sits on top of matplotlib and produces them in one call, returning matplotlib objects you can adjust afterwards.
+
+For interactive charts in a browser, Plotly or Altair. matplotlib's interactivity is limited and not its purpose.
+
+Knowing where matplotlib stops is part of using it well; it is a drawing library that happens to have statistical conveniences, not a statistical graphics system.
+
+## What pandas adds
+
+Beyond convenience, three things are genuinely easier through pandas.
+
+**The index becomes the x axis**, with date formatting handled. That alone removes several lines for any time series.
+
+**Column names become labels**, so the legend is built from the data rather than from a list you maintain separately.
+
+**Groupby output plots directly**: `df.groupby("k")["v"].sum().plot(kind="barh")` goes from raw rows to a chart in one line, because the aggregation produces exactly the index-and-values shape the plot wants.
+
+That last point is the real workflow: reshape until the frame *is* the chart, then plot it.
+
+## Common frame shapes
+
+**A time-indexed frame, one column per series** &rarr; `df.plot()` gives a multi-line chart.
+
+**A frame indexed by category, one column per group** &rarr; `df.plot(kind="bar")` gives grouped bars.
+
+**A long frame** &mdash; one row per observation with a category column &mdash; needs pivoting first: `df.pivot(index=..., columns=..., values=...)`.
+
+**A group-by result with two keys** &rarr; `.unstack()` puts one key into columns, giving the wide shape the plot needs.
+
+Recognising which of these you have, and which the chart needs, is most of the work. The plot call is one line either way.
+
+## Where pandas gets in the way
+
+`df.plot` has its own opinions that occasionally conflict with matplotlib's.
+
+It sets its own tick locators for date axes, which are usually good and are awkward to override afterwards &mdash; setting a matplotlib locator on an axes pandas has already formatted sometimes has no effect, and plotting with `ax.plot(df.index, df[col])` instead gives back full control.
+
+It creates a figure if not given one, which is the `ax=` issue.
+
+And `secondary_y=True` exists and produces a twin axis with all the problems from that module, plus a legend that is harder to assemble.
+
+For anything beyond the standard cases, dropping to `ax.plot(df.index, df["col"])` costs one line and removes the ambiguity about who owns the axes.
+
+## Categorical bar charts
+
+`df.plot(kind="bar")` uses the index as the categories and draws them at integer positions, with the labels rotated 90 degrees by default.
+
+`rot=0` stops the rotation. `kind="barh"` is usually better still, for the reasons in the bar module.
+
+Sorting is a pandas operation, not a plotting one: `df.sort_values("v").plot(kind="barh")`. That is a small example of the general pattern &mdash; the data manipulation belongs in pandas, and the plot call should be trivial.
+
+## Beyond pandas
+
+`df.plot` covers the standard charts. seaborn covers the statistical ones &mdash; faceted grids, regression with bands, categorical scatter with jitter built in &mdash; and returns matplotlib objects, so the same adjustment methods apply afterwards.
+
+The three layers work together: pandas for the data, seaborn for the statistical display, matplotlib for the final control. Knowing which layer a problem belongs to is most of using them well, and the answer for "make this specific thing look right" is almost always the bottom one.
+
+## A complete example
+
+The typical shape of real plotting code, where the data work dominates:
+
+```python
+summary = (df
+           .query("year == 2024")
+           .groupby(["region", "month"], as_index=False)["sales"].sum()
+           .pivot(index="month", columns="region", values="sales"))
+
+fig, ax = plt.subplots(figsize=(7.5, 3.5))
+summary.plot(ax=ax, linewidth=2)
+ax.set_title("Sales by region, 2024", loc="left", fontweight="bold")
+ax.set_ylabel("Sales (thousands)")
+for side in ("top", "right"):
+    ax.spines[side].set_visible(False)
+```
+
+Four lines of pandas to get the frame into the shape of the chart, one to draw it, and four to finish it.
+
+That ratio is normal, and it is why reshaping is a plotting skill.
+
+## Pitfalls
+
+**Forgetting `ax=`**, so the plot lands in its own figure.
+
+**The wrong frame shape**, giving bars grouped by the wrong variable.
+
+**Rotated labels by default** on `kind="bar"`, fixed with `rot=0` or by using `barh`.
+
+**`secondary_y=True`**, which is a twin axis with all its problems.
+
+**Assuming shared axes** with `subplots=True`, where the default is independent.
+
+**A datetime index that is really strings**, giving a categorical axis with no gaps.
+
+The last is worth checking with `df.index.dtype` before wondering why the spacing looks wrong.
+
+## The three layers
+
+Real plotting code sits across three libraries, and knowing which one owns a problem saves a lot of searching.
+
+**pandas** owns the data: filtering, grouping, pivoting, resampling. If the chart is grouped by the wrong thing, or the bars are clustered incorrectly, or a date axis is behaving like a category, the fix is here &mdash; in the shape or the dtypes, not in the plot call.
+
+**seaborn** owns statistical display: faceting, regression with bands, categorical scatter with jitter, distribution comparisons. If you are writing twenty lines to build a grid of conditioned plots, this layer already has it.
+
+**matplotlib** owns the drawing: annotations, reference lines, exact ticks, colour control, layout, saving. Everything the other two produce is a matplotlib object, so this layer is always available underneath.
+
+The common mistake is trying to solve a data problem in the plotting call &mdash; adding arguments to `df.plot` to fix a grouping that should have been a `pivot`.
+
+## In summary
+
+`df.plot()` draws every column against the index and builds the legend from the column names.
+
+It returns an Axes and takes one, which is what makes it a shortcut rather than a separate system &mdash; and `ax=` is required, or a plot inside a subplot loop creates its own figure.
+
+The frame's shape is the chart: columns are series, rows are groups, and a chart grouped the wrong way needs a transpose or a pivot.
+
+`subplots=True` gives small multiples and independent y axes unless you say otherwise.
+
+Reach for matplotlib for annotations, thresholds, shading and exact control &mdash; and mix freely, because it is the same Axes object either way.
+
+## Reshaping is the plotting work
+
+The recurring lesson of this module is worth stating on its own.
+
+The plot call is usually one line. The work is getting the frame into a shape where that one line is correct.
+
+**A wide frame** &mdash; one column per series, index as x &mdash; is what a multi-line chart or a grouped bar chart wants.
+
+**A long frame** &mdash; one row per observation &mdash; is what seaborn and most statistical tools want.
+
+**An aggregated frame** &mdash; one row per group &mdash; is what a bar chart of totals wants.
+
+Moving between them is `pivot`, `melt`, `groupby().agg()` and `unstack`, all covered in the pandas track.
+
+When a chart comes out grouped by the wrong variable, or with the series and categories swapped, or with one line where there should be five, the fix is almost never an argument to `plot` &mdash; it is the shape of the frame. Recognising that immediately saves a lot of time reading plotting documentation for something the data work should have solved.
+
+## A closing note
+
+`df.plot` is a shortcut, and its value is proportional to how standard the chart is.
+
+For a quick line chart of a time-indexed frame it is unbeatable: one call, correct axis, legend included. For anything with an annotation, a threshold, a highlighted series or a specific tick format, it stops helping and matplotlib underneath does the work.
+
+The two together are the normal way to write plotting code, and the boundary is not a decision you make once &mdash; `df.plot(ax=ax)` followed by half a dozen `ax.` calls is a perfectly ordinary chart.
+
+What is worth internalising is that most plotting problems are data problems. When the chart is grouped wrongly, or has too many lines, or shows a category as a number, the fix is in the frame.
+
+## The short version
+
+`df.plot` is a shortcut that returns a matplotlib Axes, which is what makes it a convenience rather than a separate system.
+
+Its limits arrive quickly, and the boundary is not a decision made once: `df.plot(ax=ax)` followed by half a dozen `ax.` calls is ordinary code. And most plotting problems are data problems.

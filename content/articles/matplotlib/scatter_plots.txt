@@ -1,0 +1,375 @@
+title: Scatter Plots
+intro: scatter() versus plot(), and the two extra dimensions you get for free.
+
+## Two ways to draw dots
+
+`ax.plot(x, y, "o")` draws markers with no connecting line. `ax.scatter(x, y)` draws a collection of points.
+
+They look identical for a simple case, and they differ in what can vary.
+
+`plot` draws one line object: every marker is the same size and the same colour. That uniformity makes it **faster**, sometimes substantially, for large numbers of identical points.
+
+`scatter` draws a `PathCollection` where size and colour can be arrays, one value per point. That is what makes it a four-dimensional display: x, y, size and colour.
+
+The rule of thumb: `plot` when the points are all alike, `scatter` when they are not.
+
+
+## scatter and plot draw the same dots differently
+
+One makes a collection, the other makes a line with markers and no line.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(0)
+x, y = rng.random(30), rng.random(30)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(7, 3))
+
+a.scatter(x, y)
+a.set_title("ax.scatter")
+
+b.plot(x, y, "o")
+b.set_title('ax.plot(x, y, "o")')
+
+print("plot with a marker and no linestyle looks identical here.")
+print("The difference is what you can vary:")
+print("   plot   - every marker the same size and colour")
+print("   scatter- size and colour can vary per point")
+print()
+print("plot is faster for many identical points; scatter is the one")
+print("that can encode more than two variables.")
+```
+
+## Size as a third variable
+
+<code>s</code> is in points squared, so it scales with area rather than radius.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(1)
+x, y = rng.random(40), rng.random(40)
+weight = rng.random(40) * 300
+
+fig, ax = plt.subplots(figsize=(6, 3.5))
+ax.scatter(x, y, s=weight, alpha=0.6, edgecolor="black", linewidth=0.5)
+ax.set_title("size encodes a third variable")
+
+print("s is area in points**2, not diameter.")
+print("So a point with s=400 is twice as WIDE as one with s=100,")
+print("and four times the area - which is the point: area is what")
+print("the eye compares.")
+```
+
+## Colour as a fourth
+
+<code>c</code> takes an array, and then a colorbar explains it.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(2)
+x, y = rng.random(60), rng.random(60)
+value = x + y
+
+fig, ax = plt.subplots(figsize=(6, 3.5))
+sc = ax.scatter(x, y, c=value, cmap="viridis", s=60)
+fig.colorbar(sc, ax=ax, label="x + y")
+ax.set_title("colour encodes a fourth variable")
+
+print("c= an array   -> mapped through a colormap")
+print("color= a name -> one fixed colour for every point")
+print()
+print("Those two arguments look alike and mean different things, which")
+print("is a common source of 'why is my whole plot one colour'.")
+```
+
+## Overplotting hides the data
+
+With enough points, a scatter becomes a silhouette.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(3)
+n = 5000
+x = rng.normal(size=n)
+y = x * 0.6 + rng.normal(size=n) * 0.8
+
+fig, (a, b, c) = plt.subplots(1, 3, figsize=(9, 3))
+
+a.scatter(x, y, s=10)
+a.set_title("opaque: a blob")
+
+b.scatter(x, y, s=10, alpha=0.05)
+b.set_title("alpha=0.05")
+
+c.hexbin(x, y, gridsize=30, cmap="Blues")
+c.set_title("hexbin: counts")
+
+print("5000 points. The first tells you the range and nothing else.")
+print("alpha shows density; hexbin measures it.")
+print("For very large n, hexbin or a 2-D histogram is the honest choice.")
+```
+
+## Marker shape, edges and transparency
+
+The arguments that make a dense scatter readable.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(4)
+
+fig, ax = plt.subplots(figsize=(6, 3.5))
+for marker, name in [("o", "circle"), ("s", "square"), ("^", "triangle")]:
+    ax.scatter(rng.random(15), rng.random(15), marker=marker, s=80,
+               alpha=0.7, edgecolor="black", linewidth=0.6, label=name)
+ax.legend()
+
+print("marker    : o s ^ v D * + x, and more")
+print("edgecolor : an outline separates overlapping points")
+print("alpha     : below 1 makes density visible")
+print()
+print("Shape is a weak encoding - people read three shapes reliably and")
+print("not six. Colour and position are much stronger.")
+```
+
+## Adding a trend line
+
+Two lines of numpy, and the result is drawn like any other line.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(5)
+x = rng.random(50) * 10
+y = 2.5 * x + rng.normal(scale=4, size=50) + 3
+
+slope, intercept = np.polyfit(x, y, 1)
+xs = np.array([x.min(), x.max()])
+
+fig, ax = plt.subplots(figsize=(6, 3.5))
+ax.scatter(x, y, alpha=0.7)
+ax.plot(xs, slope * xs + intercept, color="crimson", linewidth=2,
+        label="fit: y = %.2fx + %.2f" % (slope, intercept))
+ax.legend()
+
+print("slope     : %.3f" % slope)
+print("intercept : %.3f" % intercept)
+print()
+print("polyfit(x, y, 1) is a straight line; 2 is a parabola, and so on.")
+print("Drawing the fit over only the observed x range avoids implying")
+print("it holds outside the data.")
+```
+## Size
+
+`s` is the marker area in **points squared**.
+
+That trips people, because doubling `s` does not double the visual width &mdash; it takes four times `s` to double the width. The default is around 36, meaning six points across.
+
+Area is the right thing to scale, because the eye compares areas rather than radii. A common mistake is passing a raw value as `s` and getting circles that differ far more than the underlying numbers do; scaling into a sensible range first is usually needed.
+
+Very small values disappear and very large ones overlap into a mass, so the useful range is narrow &mdash; roughly 10 to 400 for most plots.
+
+## Colour
+
+`c=` takes an **array** of values, which are mapped through a colormap and can be explained with a colorbar.
+
+`color=` takes a **single** colour applied to every point.
+
+The names are one letter apart and the failure is silent: passing an array to `color` either errors or produces something unintended, and passing a single colour to `c` works but wastes the mechanism. "Why is my whole plot one colour" is nearly always this.
+
+`fig.colorbar(sc, ax=ax)` needs the object `scatter` returned, which is why the return value is captured here where it is ignored elsewhere.
+
+## Overplotting
+
+A scatter with a few hundred points shows the data. With a few thousand it shows the outline of the data, and every point in the middle is hidden behind another.
+
+Three responses, in order of how much they preserve:
+
+`alpha` below 1 makes density visible as darkness. It is the cheapest fix and works up to tens of thousands of points.
+
+Smaller markers help, and combine with alpha.
+
+`hexbin` or `hist2d` bins the points and shows counts, which turns density from something implied into something measured. Past roughly fifty thousand points this is the only honest option, and it is also far faster to draw.
+
+Sampling is a fourth option, and a reasonable one when the shape matters more than the completeness.
+
+## Making it readable
+
+`edgecolor="black"` with a thin `linewidth` outlines each marker, which separates points that overlap. It is the single most effective small improvement to a moderately dense scatter.
+
+Marker shape distinguishes categories, and does so weakly &mdash; readers reliably tell apart about three shapes, not six. Colour and position are much stronger encodings; if you need six categories, small multiples usually beat six shapes on one plot.
+
+## Trend lines
+
+`np.polyfit(x, y, 1)` returns slope and intercept, and the fit is then drawn with an ordinary `plot`.
+
+Two details worth getting right. Draw the line only over the range of the observed x values, so it does not imply the relationship holds beyond the data. And put the coefficients in the legend label, so the chart carries the number rather than requiring the reader to estimate it.
+
+For anything beyond a straight line, `numpy.polynomial` is the modern interface and SciPy or statsmodels give confidence intervals &mdash; at which point the fit is a statistical claim and deserves the surrounding machinery.
+
+## Colour by category
+
+For a categorical variable, plotting one scatter per group is clearer than mapping colours by hand:
+
+```python
+for name, sub in groups.items():
+    ax.scatter(sub.x, sub.y, label=name, alpha=0.7)
+ax.legend()
+```
+
+Each call takes the next colour from the cycle and the legend is built from the labels, so nothing has to be assembled manually.
+
+Passing a list of category codes to `c=` works and gives you a continuous colormap applied to arbitrary integers, which implies an ordering the categories do not have &mdash; the same mistake as using a sequential colormap for categories.
+
+## Bubble charts
+
+Encoding a third variable in the marker area produces a bubble chart, and it has a specific weakness: area is read poorly, so the third variable is the least accurately perceived thing on the chart.
+
+Two rules make them work when they are used.
+
+Scale by **area**, not by radius. Passing the raw value as `s` scales by area already, since `s` is area &mdash; but computing a radius and squaring it is a common way to exaggerate differences fourfold.
+
+Provide a **size legend**, since nobody can read an area off a chart without a reference. `ax.legend` can be built from proxy artists at a few representative sizes.
+
+If the third variable is the point of the chart, position or colour will carry it better than size.
+
+## Jitter for discrete values
+
+When one axis is discrete &mdash; a rating from one to five, a day of the week &mdash; points land exactly on top of each other and the density is invisible.
+
+Adding a small random offset separates them:
+
+```python
+xj = x + rng.uniform(-0.15, 0.15, len(x))
+```
+
+The jitter must be small enough not to blur the categories, and it should be mentioned if the chart is published, because it is a deliberate distortion of position.
+
+`alpha` and marker size do part of the same job and do not move anything.
+
+## Connecting scatter points
+
+`ax.plot(x, y, "-o")` connects points in the order they appear in the array, which for a scatter is usually meaningless and occasionally exactly right.
+
+The case where it is right is a **connected scatter**: two variables measured over time, with the line showing the path through the space. Unemployment against inflation year by year, for instance. Adding an arrow or labelling the first and last point makes the direction readable.
+
+For anything without a natural order, sorting by x before connecting is what turns it into a line chart, and doing it accidentally &mdash; because the data happened to arrive sorted &mdash; produces a chart that implies a sequence that does not exist.
+
+## Density alternatives, in order
+
+As n grows, the sequence of reasonable displays is fairly fixed:
+
+**Under 1,000** &mdash; a plain scatter, with `edgecolor` for separation.
+
+**1,000 to 20,000** &mdash; `alpha` around 0.1&ndash;0.3, smaller markers.
+
+**20,000 to 500,000** &mdash; `hexbin` or `hist2d`, which measure density rather than implying it.
+
+**Above that** &mdash; datashader, or aggregate before plotting.
+
+At every stage the question is the same: can the reader see the middle of the distribution, or only its outline? If only the outline, the display has stopped working regardless of how many points are technically drawn.
+
+## Correlation and what a scatter shows
+
+A scatter is the display for a relationship, and it shows more than a correlation coefficient does.
+
+It shows the **shape** &mdash; linear, curved, stepped &mdash; where a coefficient assumes linearity.
+
+It shows **outliers**, which can create or destroy a correlation on their own.
+
+It shows **clusters**, which a single coefficient averages away, and which usually mean an unmodelled group variable.
+
+It shows **heteroscedasticity** &mdash; spread that changes with x &mdash; which invalidates several standard tests.
+
+Anscombe's quartet is the canonical demonstration: four datasets with identical means, variances and correlation, and four completely different scatters. Plotting first is not a formality.
+
+## Practical defaults
+
+A scatter that works most of the time:
+
+```python
+ax.scatter(x, y, s=25, alpha=0.6, edgecolor="white", linewidth=0.4)
+```
+
+Moderate size, some transparency, and a thin light edge that separates overlapping points without adding visual weight.
+
+From there the adjustments follow the data: lower alpha and smaller markers as n grows, `hexbin` when the middle stops being visible, colour when there is a third variable worth showing.
+
+For a relationship that will be discussed, adding the fit and putting its slope in the legend saves the reader estimating it &mdash; and forces you to look at whether a straight line is the right model, which the scatter will have already told you.
+
+## In summary
+
+`scatter` when size or colour varies per point, `plot` with a marker when they do not &mdash; the second is faster and there is nothing to gain from the machinery you are not using.
+
+`s` is area, so it scales as the square of the visual width.
+
+`c=` takes an array through a colormap; `color=` takes one colour. The distinction is one letter and produces very different charts.
+
+Overplotting is the recurring problem, and the sequence of answers is alpha, then smaller markers, then hexbin, then aggregation before plotting.
+
+`edgecolor` separates overlapping points and is the cheapest readability fix available.
+
+And a scatter shows things a correlation coefficient cannot: shape, clusters, outliers and changing spread. That is the reason to draw one before computing anything.
+
+## Adding a third dimension well
+
+When a scatter needs to carry a third variable, the options are not equally good.
+
+**Colour, sequential** &mdash; for a continuous third variable. Read reasonably well, and needs a colorbar.
+
+**Colour, categorical** &mdash; for a few discrete levels. Works up to about five before the colours stop separating.
+
+**Small multiples** &mdash; one panel per level of a categorical variable. Better than colour for anything above three levels, because comparing panels is easier than separating overlapping colours.
+
+**Size** &mdash; read poorly, and best reserved for a variable that is context rather than the subject.
+
+**Shape** &mdash; read poorly beyond about three levels.
+
+The pattern is that the two strong channels &mdash; position and panel &mdash; are already used or available, and the weak ones should carry the least important variable. Encoding the most important third variable as size is a common inversion of that.
+
+## Labelling points
+
+A scatter of named entities &mdash; countries, products, customers &mdash; frequently wants some of the points labelled.
+
+Labelling all of them produces an unreadable mass. The useful approaches:
+
+**Label the extremes**, which are what the reader will ask about: the highest, the lowest, the furthest from the fit.
+
+**Label a chosen few** that the accompanying text discusses.
+
+**Label on hover**, which matplotlib does not do well and is a reason to use an interactive library when it matters.
+
+For the first two, offsetting the text so it does not sit on the marker is necessary:
+
+```python
+ax.annotate(name, (x[i], y[i]), textcoords="offset points",
+            xytext=(5, 4), fontsize=9)
+```
+
+With more than about eight labels, overlaps become the problem, and `adjustText` is the usual third-party answer &mdash; or, more simply, labelling fewer points.
+
+## One more thing
+
+`ax.scatter` returns a `PathCollection`, and `set_offsets` updates the point positions without redrawing everything.
+
+That is what makes an animated or interactive scatter efficient, and it is the same reuse principle as `set_ydata` on a line: create the artist once, change its data.
+
+## The short version
+
+A scatter is the display that shows what a summary statistic cannot: shape, clusters, outliers and changing spread.
+
+Its failure mode is density, and the sequence of fixes is fixed &mdash; alpha, smaller markers, hexbin, aggregation. The question at every stage is whether the middle of the distribution is still visible.
+
+## Reading the code back
+
+A working scatter is usually four decisions: marker size, transparency, whether an edge is needed, and whether a third variable is being encoded. Everything else follows from the data. The size and alpha are chosen from the number of points rather than from taste, which is why the same two lines that work for two hundred points fail for twenty thousand, and why the sequence of density fixes in this module is worth having in mind before drawing rather than after.

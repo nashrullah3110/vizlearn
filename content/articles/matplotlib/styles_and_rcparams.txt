@@ -1,0 +1,432 @@
+title: Styles and rcParams
+intro: Changing every chart at once, instead of styling each one by hand.
+
+## rcParams
+
+`plt.rcParams` is a dictionary of every default matplotlib uses &mdash; several hundred settings covering figure size, fonts, colours, line widths, spines, grids, ticks and saving.
+
+Changing one changes every figure created afterwards:
+
+```python
+plt.rcParams["axes.spines.top"] = False
+```
+
+The keys are dotted paths mirroring the object structure: `lines.linewidth`, `axes.titlesize`, `xtick.direction`, `savefig.dpi`.
+
+`plt.rcdefaults()` restores everything, which is worth knowing in a notebook where settings accumulate across cells.
+
+The important property is that these are **defaults**, applied when an artist is created. Changing a setting does not affect figures already drawn.
+
+
+## rcParams is the settings dictionary
+
+Every default lives in it, and changing one changes every later figure.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+print("some current defaults:")
+for k in ["figure.figsize", "lines.linewidth", "axes.grid",
+          "font.size", "axes.spines.top"]:
+    print("   %-20s %s" % (k, plt.rcParams[k]))
+print()
+print("total settings:", len(plt.rcParams))
+
+plt.rcParams["lines.linewidth"] = 3
+plt.rcParams["axes.spines.top"] = False
+plt.rcParams["axes.spines.right"] = False
+
+fig, ax = plt.subplots(figsize=(6, 2.5))
+ax.plot(np.linspace(0, 10, 50), np.sin(np.linspace(0, 10, 50)))
+ax.set_title("thick line, no top/right spines - set globally")
+
+plt.rcdefaults()
+print()
+print("plt.rcdefaults() puts everything back.")
+```
+
+## Style sheets are named bundles of settings
+
+One line instead of twenty.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+print("a few available styles:")
+for s in sorted(plt.style.available)[:12]:
+    print("   ", s)
+print("   ... %d in total" % len(plt.style.available))
+
+x = np.linspace(0, 10, 60)
+
+for name in ["default", "ggplot", "seaborn-v0_8-darkgrid"]:
+    if name not in plt.style.available and name != "default":
+        continue
+    with plt.style.context(name):
+        fig, ax = plt.subplots(figsize=(4.5, 2))
+        for k in range(3):
+            ax.plot(x, np.sin(x + k))
+        ax.set_title(name, fontsize=10)
+
+print()
+print("plt.style.use(name) applies it from then on.")
+print("plt.style.context(name) is a context manager, so it applies to")
+print("one block and leaves everything else alone - which is what you")
+print("want in a script that also draws other charts.")
+```
+
+## Combining styles
+
+A list applies them in order, so later ones override.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 60)
+
+with plt.style.context(["ggplot", {"lines.linewidth": 3,
+                                   "axes.facecolor": "white",
+                                   "figure.figsize": (6, 2.5)}]):
+    fig, ax = plt.subplots()
+    for k in range(3):
+        ax.plot(x, np.sin(x + k))
+    ax.set_title("ggplot, with three settings overridden")
+
+print("A list is applied left to right.")
+print("A dict in the list is treated as a set of rcParams, so you can")
+print("take a style and change a few things without copying the file.")
+print()
+print("This is the practical form: a published style for the look, a")
+print("dict for the two things it gets wrong for your use.")
+```
+
+## A house style, in one place
+
+Define it once and every chart in the project matches.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+from cycler import cycler
+
+HOUSE = {
+    "figure.figsize": (6.5, 3.5),
+    "figure.dpi": 110,
+    "font.size": 10,
+    "axes.titlesize": 12,
+    "axes.titleweight": "bold",
+    "axes.titlelocation": "left",
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "axes.grid": True,
+    "grid.alpha": 0.3,
+    "axes.axisbelow": True,
+    "lines.linewidth": 2,
+    "legend.frameon": False,
+    "axes.prop_cycle": cycler(color=["#264653", "#e76f51", "#2a9d8f",
+                                     "#e9c46a", "#8ab17d"]),
+}
+
+with plt.rc_context(HOUSE):
+    x = np.linspace(0, 10, 80)
+    fig, ax = plt.subplots()
+    for k, name in enumerate(["north", "south", "east"]):
+        ax.plot(x, np.sin(x + k) + k * 0.3, label=name)
+    ax.set_title("Every chart in the project looks like this")
+    ax.set_xlabel("x")
+    ax.set_ylabel("value")
+    ax.legend()
+
+print("rc_context takes a dict directly, and restores the old settings")
+print("on exit. A module-level HOUSE dict plus rc_context is the whole")
+print("mechanism for a consistent set of charts.")
+```
+
+## What a style cannot fix
+
+Settings control defaults, not the decisions.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(0)
+x = rng.normal(size=3000)
+y = x * 0.6 + rng.normal(size=3000)
+
+with plt.style.context("ggplot"):
+    fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+    a.scatter(x, y)
+    a.set_title("styled, and still unreadable")
+
+    b.scatter(x, y, s=6, alpha=0.15)
+    b.set_title("alpha and marker size fixed by hand")
+
+print("Both panels use the same style sheet.")
+print("The left one is 3000 opaque markers; no style setting rescues it.")
+print()
+print("Styles handle fonts, colours, spines and grids. They cannot")
+print("choose a chart type, set an alpha appropriate to your n, or")
+print("decide what the title should say.")
+```
+
+## Fonts
+
+Setting a family, and what happens when it is missing.
+
+```python-run
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+
+available = sorted({f.name for f in fm.fontManager.ttflist})
+print("fonts matplotlib can see here:", len(available))
+for name in available[:8]:
+    print("   ", name)
+
+print()
+print("current family:", plt.rcParams["font.family"],
+      "->", plt.rcParams["font.sans-serif"][:3])
+print()
+print("font.family takes a generic name; font.sans-serif is the list")
+print("tried in order. A missing font produces a warning and a")
+print("fallback, not an error - so a figure can silently render in a")
+print("different typeface on another machine.")
+
+fig, ax = plt.subplots(figsize=(6, 2))
+ax.text(0.5, 0.5, "whatever font is available here",
+        ha="center", va="center", fontsize=14)
+ax.set_xticks([]); ax.set_yticks([])
+```
+## Style sheets
+
+A style sheet is a named bundle of rcParams.
+
+`plt.style.available` lists them &mdash; `ggplot`, `bmh`, `fivethirtyeight`, `grayscale`, the `seaborn-v0_8-*` family, and several others.
+
+`plt.style.use("ggplot")` applies one from that point on. `with plt.style.context("ggplot"):` applies it to a block and restores the previous settings afterwards, which is what you want in a script that also produces charts in a different style.
+
+Writing your own is a plain text file of `key: value` lines with a `.mplstyle` extension, placed where matplotlib looks for it. For a project, a dict in a module is usually simpler.
+
+## Combining
+
+`plt.style.use(["ggplot", {"lines.linewidth": 3}])` applies items left to right, so later ones win.
+
+A dict in the list is treated as rcParams. That is the practical form for real work: take a published style for its typography and colours, then override the two or three things it gets wrong for your case, without copying and maintaining a whole style file.
+
+## A house style
+
+The pattern that scales to a project:
+
+```python
+HOUSE = {
+    "figure.figsize": (6.5, 3.5),
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "axes.titlelocation": "left",
+    "axes.grid": True,
+    "grid.alpha": 0.3,
+    "legend.frameon": False,
+    "axes.prop_cycle": cycler(color=PALETTE),
+}
+
+with plt.rc_context(HOUSE):
+    ...
+```
+
+`rc_context` takes a dict directly and restores the previous settings on exit.
+
+The settings worth putting in almost any house style are the ones that fix matplotlib's weakest defaults: the top and right spines, a left-aligned bold title, a faint grid drawn below the data, a legend without a frame, and a colour cycle you chose.
+
+That is six lines, and it is the difference between charts that look like matplotlib defaults and charts that look designed.
+
+## What styles cannot do
+
+A style sets defaults. It cannot make decisions.
+
+It will not choose between a bar chart and a line chart. It will not set an `alpha` appropriate to your number of points &mdash; the right value for 100 points is wrong for 100,000. It will not decide the axis should start at zero, or that the title should state a finding, or that three of the seven series should be greyed out.
+
+The fifth editor shows a styled scatter that is still unreadable, because the problem was overplotting and no setting addresses that.
+
+Styling is the last 20% of a chart. The decisions are the rest, and they are the subject of most of this track.
+
+## Fonts
+
+`font.family` takes a generic name &mdash; `sans-serif`, `serif`, `monospace` &mdash; and `font.sans-serif` is the ordered list of actual fonts tried for it.
+
+A font that is not installed produces a **warning and a fallback**, not an error. The figure renders in whatever was available next, which means the same script can produce different-looking output on a different machine, and the only sign is a warning that is easy to miss in a log.
+
+For output that must look identical everywhere, either restrict yourself to fonts you know are present, or embed the font by saving as PDF or SVG with `pdf.fonttype = 42`, which stores the glyphs in the file.
+
+`mathtext` handles LaTeX-style maths in labels without needing LaTeX installed: `r"$\sigma^2$"` in any text argument.
+
+## Where settings come from
+
+matplotlib reads its defaults in a fixed order, each overriding the last:
+
+The built-in defaults.
+
+A `matplotlibrc` file, found in the current directory, the user's config directory, or the installation.
+
+`plt.style.use(...)`.
+
+Direct assignment to `plt.rcParams`.
+
+Arguments passed to the plotting call itself.
+
+That ordering explains a common confusion: a setting applied in a style sheet is overridden by anything passed explicitly, and a `matplotlibrc` in the working directory silently changes every chart in that project. When a figure looks different on another machine, a `matplotlibrc` is a candidate.
+
+## Settings worth knowing
+
+Beyond the obvious ones, a handful appear in most house styles:
+
+`figure.autolayout: True` &mdash; applies `tight_layout` to every figure automatically.
+
+`axes.titlelocation: left` &mdash; headline-style titles.
+
+`axes.axisbelow: True` &mdash; grid behind the data.
+
+`legend.frameon: False`.
+
+`savefig.bbox: tight` &mdash; makes every save behave as if `bbox_inches="tight"` had been passed, which removes a whole class of cropping bug.
+
+`figure.constrained_layout.use: True` &mdash; the newer alternative to `autolayout`.
+
+`errorbar.capsize: 3` &mdash; caps by default, since the bare-line default is rarely what anyone wants.
+
+## Writing a style file
+
+A `.mplstyle` file is plain text, one `key: value` per line, with `#` comments and no quotes:
+
+```
+figure.figsize: 6.5, 3.5
+axes.spines.top: False
+axes.prop_cycle: cycler('color', ['264653', 'e76f51', '2a9d8f'])
+```
+
+Note the colours have no `#` prefix, because `#` starts a comment in this format &mdash; a small trap that produces a confusing parse error.
+
+Placed in `~/.config/matplotlib/stylelib/`, it can be used by name from anywhere.
+
+## Per-project versus per-figure
+
+A project-wide style is right for consistency and wrong when one figure needs to differ.
+
+`plt.rc_context(...)` as a context manager is the middle ground: a project default applied broadly, and a block that overrides it for one figure without leaking.
+
+The failure mode of global settings in a notebook is that they accumulate invisibly across cells, so a figure depends on which cells have been run. `plt.rcdefaults()` at the top of a notebook, followed by the project style, makes it deterministic.
+
+## Style is not design
+
+A style sheet gets the typography, spacing and palette consistent, which is genuinely valuable and is roughly the last fifth of making a chart good.
+
+The other four fifths &mdash; which chart, what to compare, what to leave out, what the title claims, whether the axis starts at zero &mdash; are decisions no setting can make.
+
+That is worth saying explicitly because a good style sheet makes a bad chart look professional, which is not an improvement.
+
+## A minimal house style
+
+The settings that fix matplotlib's weakest defaults, in about ten lines:
+
+```python
+HOUSE = {
+    "figure.figsize": (7, 4),
+    "figure.dpi": 110,
+    "savefig.bbox": "tight",
+    "font.size": 10,
+    "axes.titlesize": 12,
+    "axes.titleweight": "bold",
+    "axes.titlelocation": "left",
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "axes.grid": True,
+    "axes.axisbelow": True,
+    "grid.alpha": 0.3,
+    "legend.frameon": False,
+    "lines.linewidth": 2,
+}
+```
+
+Nothing exotic, and every chart in a project drawn under it looks intentional. `savefig.bbox` alone removes the most common cropping complaint.
+
+## Styles and reproducibility
+
+A figure's appearance depends on settings that are not in the plotting code, which is a reproducibility problem.
+
+Three sources of drift: a `matplotlibrc` in the working directory, accumulated `rcParams` changes in a long notebook session, and a style sheet that differs between machines.
+
+Two habits address it.
+
+**Reset explicitly** at the start: `plt.rcdefaults()` followed by the project style. The figure then does not depend on what ran before.
+
+**Apply the style in a context manager** rather than globally, so a figure carries its own appearance rather than inheriting whatever is current.
+
+For a figure that will be regenerated months later, the style belongs in the repository alongside the code, not in a user config directory.
+
+## Style as a decision record
+
+A style sheet is a place to write down decisions once, and that is worth more than the consistency it produces.
+
+Every setting in it encodes a judgement: that titles are left-aligned headlines, that grids are faint and behind the data, that legends have no frame, that this is the palette. Written in a style file, those decisions are visible, reviewable and changeable in one place.
+
+Written into each chart, they are re-decided every time, inconsistently, by whoever is writing that chart.
+
+The practical benefit shows up when something has to change &mdash; a new brand colour, a journal's font requirement, a switch to dark backgrounds for a presentation. With a style, that is one edit. Without it, it is a search through every plotting call in the project.
+
+That is the same argument as any other configuration, and it applies here more than people expect, because chart styling is exactly the kind of thing that gets copy-pasted.
+
+## In summary
+
+`rcParams` holds every default, and changes affect figures created afterwards.
+
+Style sheets bundle them; `plt.style.context` applies one to a block without leaking.
+
+A list applies styles in order, and a dict in the list overrides individual settings &mdash; the practical way to take a published style and fix the two things it gets wrong.
+
+`rc_context` with a module-level dict is the whole mechanism for a project style.
+
+A missing font warns and falls back silently, so figures can look different elsewhere.
+
+And a style is the last fifth of a good chart. It cannot choose the chart type, set an alpha suited to your sample size, or decide what the title should claim &mdash; and it will make a bad chart look professional, which is not the same as making it better.
+
+## Dark backgrounds
+
+A dark theme is not a colour inversion, and doing it by hand usually misses something.
+
+The elements that need changing: the figure background, the axes background, the text colour, the tick colours, the tick label colours, the spine colours, the grid colour, and the property cycle &mdash; because a palette tuned for white is usually too dark on black.
+
+`plt.style.use("dark_background")` does all of it, which is the argument for using a style rather than setting six things.
+
+Two further points. Saturated colours that look right on white are often too intense on black, and desaturating them slightly helps. And `savefig` still writes a white background unless told otherwise, so a dark figure saved with default settings comes out with a white border around a dark plot &mdash; `facecolor=fig.get_facecolor()` fixes it, or setting `savefig.facecolor` in the style.
+
+## Where to keep a style
+
+A project style needs to live somewhere both the code and the people can find.
+
+**A module in the repository** &mdash; `style.py` exporting a dict &mdash; is version-controlled, reviewable, and importable. It is the option that behaves like the rest of the code.
+
+**A `.mplstyle` file in the repository**, applied with a relative path, is equivalent and uses matplotlib's own format.
+
+**A file in the user's config directory** is convenient and invisible to everyone else, which makes figures irreproducible on another machine. It is the wrong place for anything shared.
+
+The repository options also mean the style is part of the diff when it changes, so a figure that suddenly looks different has a commit explaining why.
+
+For a single analysis, a dict at the top of the notebook applied with `rc_context` is enough, and still better than settings scattered through the plotting calls.
+
+## One more thing
+
+`plt.style.use` accepts a URL or a file path as well as a name, so a style can be shared without installing it.
+
+For a team, a style file in a shared repository referenced by relative path gives everyone the same figures without anyone configuring their environment &mdash; and it appears in code review when it changes.
+
+## The short version
+
+A style is a set of decisions written down once, which is worth more than the consistency it produces.
+
+It handles typography, spacing and palette &mdash; roughly the last fifth of a good chart. The other four fifths are choices no setting can make, and a good style applied to a bad chart produces a professional-looking bad chart.
+
+## Reading the code back
+
+A style is a dict applied in a context manager, and its contents are decisions rather than settings. The ones that matter most are the ones fixing matplotlib's weakest defaults: spines, title alignment, grid weight, legend frame and the colour cycle. Six entries covers it, and every chart in the project then starts from a better place.

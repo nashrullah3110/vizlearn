@@ -1,0 +1,403 @@
+title: Saving Figures
+intro: savefig, dpi, and the arguments that decide whether the file looks like the screen.
+
+## Size and resolution
+
+A figure has a size in **inches** (`figsize`) and a resolution in **dots per inch** (`dpi`). The saved image is their product in pixels.
+
+`figsize=(6, 3)` at `dpi=100` gives 600&times;300. At `dpi=200` it gives 1200&times;600.
+
+That much is arithmetic. The part that catches people is that **these two are not interchangeable**:
+
+`figsize=(4, 2), dpi=200` &rarr; 800&times;400
+`figsize=(8, 4), dpi=100` &rarr; 800&times;400
+
+Same pixels, different-looking charts. Text is sized in **points**, a physical unit, so 10-point text occupies a tenth of an inch either way. On the 4-inch figure that is a large fraction of the width; on the 8-inch one it is half as much.
+
+The rule that follows: choose `figsize` for the **layout** &mdash; how big the text should look relative to the plot &mdash; and `dpi` for the **resolution**. Then scaling up for a high-resolution export changes only sharpness, not proportions.
+
+A common mistake is making a figure bigger to get more detail and finding the text has shrunk relative to everything else.
+
+
+## savefig writes what the figure declares
+
+Not what the screen shows, which is why sizes surprise people.
+
+```python-run
+import matplotlib.pyplot as plt
+import io, os
+
+fig, ax = plt.subplots(figsize=(6, 3), dpi=100)
+ax.plot([1, 2, 3], [2, 1, 3])
+ax.set_title("6 x 3 inches at 100 dpi")
+
+buf = io.BytesIO()
+fig.savefig(buf, format="png")
+size = len(buf.getvalue())
+
+print("figsize    :", fig.get_size_inches(), "inches")
+print("dpi        :", fig.dpi)
+print("pixels     : %d x %d" % (6 * 100, 3 * 100))
+print("file bytes :", size)
+print()
+print("figsize is in INCHES and dpi is dots per inch, so the pixel")
+print("dimensions are their product. To get a 1200px wide image, use")
+print("figsize=(6, 3) with dpi=200, or figsize=(12, 6) with dpi=100 -")
+print("and those two are not the same: the second has smaller text.")
+```
+
+## dpi changes apparent text size
+
+Because the text is sized in points, which are physical units.
+
+```python-run
+import matplotlib.pyplot as plt
+import io
+
+for figsize, dpi in [((4, 2), 200), ((8, 4), 100)]:
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    ax.plot([1, 2, 3], [2, 1, 3])
+    ax.set_title("figsize=%s dpi=%d" % (figsize, dpi))
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    print("figsize %-8s dpi %3d -> %d x %d px, %5d bytes"
+          % (str(figsize), dpi, figsize[0]*dpi, figsize[1]*dpi, len(buf.getvalue())))
+
+print()
+print("Both are 800x400. The first has text twice as large relative to")
+print("the plot, because 10-point text is 10 points on a 4-inch figure")
+print("and 10 points on an 8-inch one.")
+print()
+print("So: choose figsize for the layout, dpi for the resolution.")
+```
+
+## bbox_inches='tight'
+
+The fix for labels cut off at the edge.
+
+```python-run
+import matplotlib.pyplot as plt
+import io
+
+fig, ax = plt.subplots(figsize=(4, 2.5))
+ax.plot([1, 2, 3], [2, 1, 3])
+ax.set_ylabel("a rather long y axis label")
+ax.set_title("title")
+
+plain = io.BytesIO(); fig.savefig(plain, format="png")
+tight = io.BytesIO(); fig.savefig(tight, format="png", bbox_inches="tight")
+
+print("default          : %d bytes" % len(plain.getvalue()))
+print("bbox_inches tight: %d bytes" % len(tight.getvalue()))
+print()
+print("'tight' recomputes the bounding box to include everything drawn,")
+print("so labels outside the axes are not cropped. It also changes the")
+print("output size, which matters if you need an exact pixel count.")
+print()
+print("pad_inches=0.1 controls the border it leaves.")
+```
+
+## Vector or raster
+
+PNG for the web, PDF or SVG for print and for anything to be resized.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+import io
+
+rng = np.random.default_rng(0)
+fig, ax = plt.subplots(figsize=(5, 3))
+ax.plot(rng.random(200).cumsum())
+ax.set_title("200 points")
+
+for fmt in ["png", "pdf", "svg"]:
+    buf = io.BytesIO()
+    fig.savefig(buf, format=fmt)
+    print("%-4s %7d bytes" % (fmt, len(buf.getvalue())))
+
+print()
+print("png : pixels. Fixed resolution, small for simple charts.")
+print("pdf : vector. Scales to any size, embeds fonts, right for print.")
+print("svg : vector, and editable afterwards in Inkscape or a browser.")
+print()
+print("Vector formats grow with the NUMBER OF ELEMENTS, so a scatter of")
+print("100,000 points makes an enormous PDF. Rasterise those layers.")
+```
+
+## Transparency and the background
+
+The default is a white background, which is wrong on a dark page.
+
+```python-run
+import matplotlib.pyplot as plt
+import io
+
+fig, ax = plt.subplots(figsize=(5, 2.5))
+ax.plot([1, 2, 3], [2, 1, 3], color="crimson", linewidth=2)
+ax.set_title("saved three ways")
+
+opts = [
+    dict(),
+    dict(transparent=True),
+    dict(facecolor="#222222"),
+]
+for o in opts:
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", **o)
+    print("%-28s %6d bytes" % (str(o) if o else "default (white)", len(buf.getvalue())))
+
+print()
+print("transparent=True drops both the figure and axes background, so")
+print("the chart sits on whatever is behind it.")
+print()
+print("Note the TEXT stays dark either way - a transparent figure on a")
+print("dark background still needs its text and spines recoloured.")
+```
+
+## Saving in a loop
+
+The pattern that works, and the one that exhausts memory.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+import io
+
+rng = np.random.default_rng(1)
+
+sizes = []
+for i in range(5):
+    fig, ax = plt.subplots(figsize=(3, 1.6))
+    ax.plot(rng.random(30).cumsum())
+    ax.set_title("chart %d" % i, fontsize=9)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight")
+    sizes.append(len(buf.getvalue()))
+    plt.close(fig)                      # <- the important line
+
+print("saved %d charts, sizes: %s" % (len(sizes), sizes))
+print("figures still open:", len(plt.get_fignums()))
+print()
+print("Without plt.close(fig) they all stay open, matplotlib warns")
+print("after 20, and a long loop runs out of memory.")
+
+fig, ax = plt.subplots(figsize=(4, 2))
+ax.bar(range(5), sizes)
+ax.set_title("file sizes")
+```
+## bbox_inches
+
+By default `savefig` writes exactly the declared figure area. Labels, titles and legends drawn outside the axes may fall outside it and be cropped.
+
+`bbox_inches="tight"` recomputes the bounding box to include everything drawn. It is the fix for the very common "my y-axis label is missing from the saved file".
+
+Two consequences: the output dimensions are no longer exactly `figsize &times; dpi`, and `pad_inches` controls the margin it leaves. If you need an exact pixel size, use layout management instead and leave the bbox alone.
+
+## Formats
+
+**PNG** is raster: a grid of pixels. Right for the web, for slides, and anywhere the display size is known. Small for simple charts.
+
+**PDF** is vector: shapes and text. Scales to any size without blurring, embeds fonts, and is what a journal or a print process wants.
+
+**SVG** is vector and text-based, so it can be edited afterwards in Inkscape or styled with CSS in a browser.
+
+**JPEG** should be avoided for charts: it is lossy in a way that puts artefacts around sharp edges and text, which is exactly what a chart is made of.
+
+The trade-off with vector formats is that file size grows with the **number of elements**, not the image dimensions. A line chart is tiny; a scatter plot of 100,000 points is an enormous PDF that may take a viewer minutes to render.
+
+`rasterized=True` on a specific artist stores just that layer as pixels while keeping text and axes as vectors, which gives a small file with sharp labels.
+
+## Background
+
+The default background is white for both the figure and the axes.
+
+`transparent=True` makes both transparent, so the chart sits on whatever is behind it. `facecolor="#222"` sets a specific colour.
+
+The catch: transparency changes the background and **not the foreground**. Text, spines and tick labels stay their original dark colour, so a transparent figure dropped onto a dark slide has invisible labels. Making a chart for a dark background means changing the text and line colours too, which is what a dark style sheet does.
+
+## Saving in a loop
+
+The pattern for generating many charts:
+
+```python
+for group, data in groups:
+    fig, ax = plt.subplots()
+    ...
+    fig.savefig(f"{group}.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+```
+
+`plt.close(fig)` is the line people omit. Without it every figure stays open, matplotlib warns after twenty, and a loop over a few thousand groups exhausts memory.
+
+For output that goes into a document, saving as PDF and letting the document scale it usually beats guessing a dpi.
+
+And `savefig` accepts a file-like object as well as a path, which is how you write straight into a buffer for a web response or a test &mdash; as every editor on this page does, since there is no filesystem to write to.
+
+## dpi in three places
+
+`dpi` appears in the figure, in `savefig`, and in rcParams, and they interact.
+
+`plt.subplots(dpi=100)` sets the figure's own dpi, which affects on-screen size.
+
+`fig.savefig(path, dpi=200)` overrides it for that file.
+
+`rcParams["savefig.dpi"]` sets the default for saving, and defaults to `"figure"`, meaning "use the figure's".
+
+The practical consequence is that a figure looking right on screen can save at a different resolution than expected, and passing `dpi` explicitly at save time removes the question.
+
+Common values: 100 for a quick look, 150&ndash;200 for slides and web, 300 for print, 600 for a journal that asks for it.
+
+## Metadata and reproducibility
+
+`savefig` accepts a `metadata` dict, which for PNG and PDF is written into the file.
+
+Recording the script, the data version and the timestamp there means a chart found later can be traced back:
+
+```python
+fig.savefig(path, metadata={"Software": "analysis.py", "Creation Date": stamp})
+```
+
+A more visible version is a small caption in figure coordinates giving the source and date, which survives the chart being copied into a document where the file metadata does not follow.
+
+## Vector text and fonts
+
+By default, PDF and SVG output stores text as **text**, which keeps it selectable and searchable, and requires the reader to have the font.
+
+`rcParams["pdf.fonttype"] = 42` embeds the font as TrueType, making the file self-contained at the cost of size. Journals frequently require this, and it is the fix when a submitted figure renders in the wrong typeface.
+
+`rcParams["svg.fonttype"] = "none"` does the opposite for SVG, leaving text as text so it can be styled with CSS in a browser &mdash; useful for the web, wrong for a document.
+
+## Saving several formats
+
+A common pattern is one call per format from the same figure:
+
+```python
+for ext in ("png", "pdf"):
+    fig.savefig(f"{name}.{ext}", dpi=200, bbox_inches="tight")
+```
+
+The figure can be saved any number of times; nothing is consumed. A PNG for the draft and a PDF for the final document, from one drawing pass.
+
+## Buffers rather than files
+
+`savefig` accepts any file-like object:
+
+```python
+buf = io.BytesIO()
+fig.savefig(buf, format="png")
+```
+
+That is how a chart becomes a web response, an email attachment, or a test assertion &mdash; and how these pages work, since the browser has no filesystem to write into.
+
+`format` is required when there is no filename to infer it from, which is the usual first error with this.
+
+## A saving function
+
+For a project producing many figures, a small wrapper enforces consistency:
+
+```python
+def save(fig, name, formats=("png", "pdf")):
+    for ext in formats:
+        fig.savefig(f"figures/{name}.{ext}", dpi=200,
+                    bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+```
+
+One place to change the dpi, the formats, the background and the padding, and the `close` is not forgotten.
+
+Adding the source script and a timestamp to the metadata, or as a small caption, makes a figure traceable months later &mdash; which is the difference between a chart that can be updated and one that has to be remade.
+
+## Common saving problems
+
+**Labels cut off** &mdash; missing `bbox_inches="tight"` or layout management.
+
+**Blurry in a document** &mdash; a raster format at too low a dpi; use PDF, or 200&ndash;300 dpi.
+
+**Enormous PDF** &mdash; a dense scatter stored as vector; rasterise that layer.
+
+**Wrong font on another machine** &mdash; the font was not embedded; `pdf.fonttype = 42`.
+
+**Invisible text on a dark background** &mdash; `transparent=True` changed the background and not the foreground.
+
+**Different from the screen** &mdash; the screen was a different size; the file is authoritative.
+
+Each has a one-line fix, and all of them are easier to prevent in a saving function than to diagnose per figure.
+
+## Figures in a pipeline
+
+When charts are generated automatically &mdash; a weekly report, a dashboard build, a model evaluation &mdash; a few properties matter more than they do for a one-off.
+
+**Determinism.** The same input should produce the same file. That means seeding any randomness, sorting anything whose order is not guaranteed, and pinning the style rather than inheriting whatever is configured.
+
+**Self-description.** The chart should carry its own date range and source, because it will be found later without its context.
+
+**Failure behaviour.** A chart generated from empty data should produce something explicit rather than an empty axes; a check and a clear message beats a blank rectangle in a report.
+
+**Size predictability.** Labels grow with the data, so `bbox_inches="tight"` and a figure size derived from the number of categories prevent a layout that worked in testing from cropping in production.
+
+None of these is about matplotlib specifically. They are the difference between a chart that runs unattended and one that has to be looked at every week.
+
+## In summary
+
+Pixel size is `figsize &times; dpi`, and `figsize` decides how large the text looks relative to the plot &mdash; so the two are not interchangeable ways of getting the same resolution.
+
+`bbox_inches="tight"` is the fix for cropped labels, and changes the output dimensions as a side effect.
+
+PNG for the web, PDF or SVG for print and anything resized, and never JPEG for a chart.
+
+Vector file size grows with the number of elements, so a dense scatter wants `rasterized=True` on that artist.
+
+`transparent=True` changes the background and not the text, so a chart for a dark page needs its foreground recoloured too.
+
+And in any loop that saves, `plt.close(fig)` &mdash; the figures do not clean themselves up, and the warning arrives long after the memory has started growing.
+
+## Choosing dpi and size together
+
+The two are usually chosen backwards: a default size, then a dpi high enough to look sharp.
+
+The order that works is destination first.
+
+**Print at 300 dpi, one column wide** &rarr; `figsize=(3.4, 2.4)`, `dpi=300`, fonts around 8 points.
+
+**A slide** &rarr; `figsize=(10, 5.6)`, `dpi=150`, fonts 14 or larger.
+
+**A web page at 700 px wide** &rarr; `figsize=(7, 4)`, `dpi=200` for retina displays, then let CSS scale it down.
+
+**A quick look** &rarr; whatever the default is.
+
+Setting the size to the destination means the fonts can be chosen once and are right, and no scaling happens afterwards to disturb the proportions.
+
+The test is whether the figure needs resizing when it arrives where it is going. If it does, it was drawn at the wrong size.
+
+## Checking the output
+
+The saved file is what other people see, and it differs from the screen in ways worth checking once per project rather than per figure.
+
+**Open it at 100%.** Labels that are comfortable in a scaled preview may be too small.
+
+**Check the edges.** Anything drawn outside the axes is the first thing to be cropped.
+
+**Check the background.** A transparent figure over an unexpected background, or a white border around a dark chart.
+
+**Check the file size.** A surprisingly large PDF means a dense artist that should be rasterised.
+
+**Open it in the destination** &mdash; the document, the slide, the page &mdash; because that is where the size and the background are decided.
+
+Doing this once when the saving function is written catches problems that would otherwise recur in every figure the project produces.
+
+## One more thing
+
+`fig.savefig` accepts `pad_inches=0` alongside `bbox_inches="tight"`, which removes the border entirely.
+
+That is what you want for a figure being embedded in a layout that provides its own spacing, and what you do not want for one being viewed on its own, where the border is what stops the labels touching the edge.
+
+## The short version
+
+The saved file is the artefact; the screen is a preview.
+
+Size and dpi are one decision made for the destination, `bbox_inches="tight"` prevents the most common cropping, vector formats need rasterised layers for dense data, and every loop that saves needs to close.
+
+## Reading the code back
+
+A save is one call with four arguments that matter: the format, the dpi, the bounding box and the background. Wrapping them in a project function means they are decided once, applied everywhere, and the close is not forgotten. The check that the output is right is to open the file at full size in the place it will be used.

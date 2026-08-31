@@ -1,0 +1,357 @@
+title: Bar Charts
+intro: Vertical, horizontal, grouped and stacked, and why the baseline has to be zero.
+
+## bar and barh
+
+`ax.bar(categories, values)` draws vertical bars; `ax.barh` draws horizontal ones.
+
+For categorical data, **horizontal is usually better**, and the reason is typography: category labels are words, words are wide, and a vertical chart has only a bar's width in which to put each one. The usual workarounds &mdash; rotating labels 45 degrees, truncating them, shrinking the font &mdash; all make the chart harder to read.
+
+`barh` gives every label a full line of horizontal space, reading left to right like text.
+
+Vertical bars remain right when the x axis is ordered and quantitative-ish: months, years, bins of a distribution. There the order carries meaning and the labels are short.
+
+
+## bar and barh
+
+Horizontal is usually the better choice when the labels are words.
+
+```python-run
+import matplotlib.pyplot as plt
+
+names = ["alpha", "beta", "gamma with a long name", "delta"]
+vals = [23, 45, 12, 38]
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+
+a.bar(names, vals)
+a.set_title("bar - labels collide")
+
+b.barh(names, vals)
+b.set_title("barh - labels read normally")
+
+print("Category labels are words, and words are wide.")
+print("barh gives each one a whole line to sit on, so nothing has to be")
+print("rotated or truncated. It is the default worth reaching for.")
+```
+
+## Sorting is part of the chart
+
+An unsorted bar chart makes the reader do the comparing.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+names = np.array(["delhi", "pune", "goa", "mumbai", "jaipur"])
+vals = np.array([38, 23, 12, 45, 29])
+
+order = np.argsort(vals)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+a.barh(names, vals)
+a.set_title("as given")
+b.barh(names[order], vals[order])
+b.set_title("sorted")
+
+print("Same numbers. The right-hand chart answers 'which is biggest'")
+print("at a glance; the left one requires reading every bar.")
+print()
+print("barh draws from the bottom up, so sorting ascending puts the")
+print("largest at the top, which is where the eye starts.")
+```
+
+## Labelling the bars
+
+<code>bar_label</code> puts the value on the bar, which often replaces the axis entirely.
+
+```python-run
+import matplotlib.pyplot as plt
+
+names = ["alpha", "beta", "gamma"]
+vals = [23, 45, 12]
+
+fig, ax = plt.subplots(figsize=(6, 3))
+bars = ax.barh(names, vals, color="steelblue")
+ax.bar_label(bars, padding=3)
+ax.set_xlim(0, 52)
+
+print("bar_label takes the container that bar/barh returned.")
+print("fmt='%.1f' formats them; labels=[...] replaces them entirely.")
+print()
+print("With values on the bars, the x axis is usually redundant -")
+print("ax.set_xticks([]) removes it and the chart gets quieter.")
+```
+
+## Grouped bars
+
+You position them yourself, which is the part that surprises people.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+groups = ["q1", "q2", "q3"]
+a_vals = [10, 15, 12]
+b_vals = [8, 18, 14]
+
+x = np.arange(len(groups))
+w = 0.38
+
+fig, ax = plt.subplots(figsize=(6, 3))
+ax.bar(x - w/2, a_vals, w, label="product a")
+ax.bar(x + w/2, b_vals, w, label="product b")
+ax.set_xticks(x)
+ax.set_xticklabels(groups)
+ax.legend()
+
+print("There is no 'grouped bar' function. You compute the offsets:")
+print("   x        =", list(x))
+print("   left  at =", [round(v - w/2, 2) for v in x])
+print("   right at =", [round(v + w/2, 2) for v in x])
+print()
+print("set_xticks(x) then puts the tick in the middle of each pair.")
+```
+
+## Stacked bars, and what they hide
+
+<code>bottom</code> is the running total; only the first segment is easy to compare.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+groups = ["q1", "q2", "q3"]
+a = np.array([10, 15, 12])
+b = np.array([8, 18, 14])
+c = np.array([5, 4, 9])
+
+fig, ax = plt.subplots(figsize=(6, 3))
+ax.bar(groups, a, label="a")
+ax.bar(groups, b, bottom=a, label="b")
+ax.bar(groups, c, bottom=a + b, label="c")
+ax.legend()
+
+print("bottom= is where each segment starts: a, then a+b.")
+print()
+print("Stacking shows the TOTAL well and the components badly - only")
+print("the bottom segment shares a baseline, so only it can be compared")
+print("across bars by eye. If the components are the point, group them.")
+```
+
+## The baseline must be zero
+
+A truncated bar axis misrepresents the data, and it is easy to do by accident.
+
+```python-run
+import matplotlib.pyplot as plt
+
+names = ["a", "b", "c"]
+vals = [98, 100, 102]
+
+fig, (p, q) = plt.subplots(1, 2, figsize=(8, 3))
+
+p.bar(names, vals)
+p.set_ylim(97, 103)
+p.set_title("truncated: b looks half of c")
+
+q.bar(names, vals)
+q.set_title("from zero: nearly equal")
+
+print("The numbers are 98, 100 and 102 - a 4% spread.")
+print("The left chart makes them look like 1x, 2x and 3x.")
+print()
+print("A bar encodes value as LENGTH, and length from a non-zero base")
+print("is not proportional to the value. Lines may be truncated; bars")
+print("may not. If the differences are small, use a line or a dot plot.")
+```
+## Sorting
+
+Bar charts are read by comparing lengths, and comparison is much easier when the bars are ordered.
+
+Unless the category order means something &mdash; months, sizes, a fixed scale &mdash; sort by value. It costs one line with `np.argsort` and changes the chart from something to be studied into something to be glanced at.
+
+With `barh`, note that bars are drawn from the bottom up, so sorting **ascending** puts the largest bar at the top, which is where the eye starts.
+
+## Labelling
+
+`ax.bar_label(bars)` writes each bar's value at its end. It takes the container returned by `bar` or `barh`, which is why that return value is worth keeping here.
+
+`fmt="%.1f"` controls the format; `labels=[...]` replaces the text entirely, which is how you show percentages or add units.
+
+Once the values are on the bars, the value axis is usually redundant. Removing it &mdash; `ax.set_xticks([])` and hiding the spines &mdash; leaves a chart that is quieter and easier to read. This is one of the few cases where deleting a standard chart element is almost always an improvement.
+
+## Grouped bars
+
+There is no grouped-bar function. You compute the positions.
+
+The pattern is: take `x = np.arange(n_groups)`, choose a bar width `w`, and offset each series by a fraction of it. For two series, `x - w/2` and `x + w/2`. For three, `x - w`, `x`, `x + w`.
+
+Then `ax.set_xticks(x)` and `ax.set_xticklabels(groups)` put one label in the middle of each cluster, because the default ticks would otherwise fall on the individual bars.
+
+Keep the total width of a group below 1 so there is a gap between clusters &mdash; a group of three bars of width 0.25 leaves 0.25 of space, which reads well.
+
+Beyond three or four series per group, the chart stops working, and small multiples are the better answer.
+
+## Stacked bars
+
+`bottom=` gives the starting height of each segment, so each call passes the cumulative sum of everything below it.
+
+Stacking answers one question well &mdash; what is the total &mdash; and another badly. Only the **bottom** segment sits on a common baseline, so only it can be compared across bars by eye. Segments higher up float at different heights, and comparing them is genuinely hard.
+
+So: stack when the total is the message and the breakdown is context. Group when the components are the message. And if the question is really about proportions, a 100% stacked bar &mdash; each column normalised to 1 &mdash; answers it better than either.
+
+## The zero baseline
+
+This is the one rule about bar charts that is not a matter of taste.
+
+A bar represents its value by **length**. If the axis starts at 97, a bar of value 98 has one unit of length and a bar of value 102 has five, so the chart shows a five-fold difference where the data has a 4% one.
+
+Line charts do not have this problem, because a line encodes value by **position**, and position is read against the axis labels. That is why truncating a line chart's y axis is acceptable and truncating a bar chart's is not.
+
+matplotlib will happily let you do it, and it happens by accident whenever `set_ylim` is applied to a bar chart to "zoom in".
+
+If the differences are genuinely small and genuinely interesting, the answer is a different chart &mdash; a line, a dot plot, or a chart of the differences themselves &mdash; not a truncated bar.
+
+## Width and spacing
+
+`width` is in data units, and the default of 0.8 leaves a fifth of the spacing as a gap.
+
+Setting it to 1.0 removes the gaps entirely, which turns a bar chart into something that reads like a histogram &mdash; and that is exactly the distinction the gap communicates. Bars with gaps say "these are separate categories"; bars without say "these are adjacent intervals of a continuous variable".
+
+That is why a histogram has no gaps and a category chart does, and why removing the gap from a category chart is a small lie.
+
+For grouped bars, the arithmetic is: total group width below 1, divided by the number of series. Three series of width 0.27 occupy 0.81 and leave a fifth of a unit between clusters.
+
+## Colour on bars
+
+A bar chart usually needs **one** colour. The categories are already distinguished by position and label, so colouring each bar differently adds nothing and implies a grouping that is not there.
+
+The exception is highlighting: one bar in a strong colour and the rest in grey says which category the chart is about, and is far more effective than an annotation.
+
+```python
+colors = ["0.75"] * len(names)
+colors[focus] = "crimson"
+ax.barh(names, values, color=colors)
+```
+
+Colour becomes meaningful again when it encodes a second variable &mdash; above or below target, positive or negative &mdash; and then two colours, not seven.
+
+## Negative values
+
+Bars extending below zero are drawn automatically, and the baseline should be made visible:
+
+```python
+ax.axhline(0, color="black", linewidth=0.8)
+```
+
+Without it, the zero line is implied by the axis and easy to lose.
+
+Colouring by sign is the standard treatment, and it is one of the few cases where two colours on one series is right:
+
+```python
+colors = ["#2a9d8f" if v >= 0 else "#e76f51" for v in values]
+```
+
+For a diverging bar chart &mdash; change from a baseline &mdash; sorting by value puts the largest increases and decreases at the two ends, which is usually the most readable arrangement.
+
+## Bars for parts of a whole
+
+A stacked bar normalised so each column sums to 100% answers "what is the composition" better than either a pie or an ordinary stack.
+
+```python
+shares = counts / counts.sum(axis=0)
+```
+
+Each segment is then a proportion, the columns are directly comparable, and the total &mdash; which is no longer shown &mdash; can go in the axis label or an annotation if it matters.
+
+The remaining weakness is the same as any stack: only the bottom and top segments have a fixed baseline, so middle categories are hard to compare across columns. Ordering the categories so the ones being compared are at the bottom mitigates it.
+
+## Bars are not always right
+
+Two cases where the default choice is wrong.
+
+**Small differences.** A bar's message is its length, and length must be read from zero. If the interesting differences are 2% of the value, a bar chart cannot show them honestly &mdash; a dot plot, or a chart of the differences, can.
+
+**Many categories.** Forty bars is a wall. Sorting helps, and beyond about twenty a dot plot or a lollipop chart uses far less ink per category and stays readable.
+
+`ax.hlines` plus `ax.scatter` builds a lollipop in two lines, and it is often the better display for a long ranked list.
+
+## Labels on and around bars
+
+`ax.bar_label` handles the common case, and its arguments cover most of the rest.
+
+`padding=3` sets the gap in points. `fmt="%.1f%%"` formats. `label_type="center"` puts the value inside the bar rather than beyond its end, which suits stacked segments where there is no free space at the tip.
+
+For stacked bars, calling it once per container labels each segment:
+
+```python
+for container in ax.containers:
+    ax.bar_label(container, label_type="center", fmt="%.0f")
+```
+
+Small segments produce overlapping labels, so filtering to the ones with room is usually necessary &mdash; `labels=[v if v > threshold else "" for v in values]`.
+
+Once values are on the bars, removing the value axis entirely makes the chart quieter and loses nothing.
+
+## The bar chart checklist
+
+Before a bar chart is finished:
+
+**Is it sorted?** Unless the order means something.
+
+**Is it horizontal?** Unless the labels are short or the axis is ordered.
+
+**Does it start at zero?** Always, for bars.
+
+**Is there one colour?** Unless colour encodes something, or one bar is highlighted.
+
+**Are the values labelled?** If so, is the axis now redundant?
+
+**Are there too many bars?** Past about twenty, a dot plot reads better.
+
+**Is the gap between bars visible?** It is what says these are categories rather than intervals.
+
+Seven questions, and a chart that answers all of them well is close to as good as a bar chart gets.
+
+## In summary
+
+Horizontal, sorted, one colour, from zero.
+
+That covers most bar charts, and each part has a reason: horizontal because category labels are words, sorted because the reader should not have to rank them, one colour because position already distinguishes the categories, and from zero because a bar encodes value as length.
+
+`bar_label` puts the numbers on the bars, which often makes the value axis redundant.
+
+Grouped bars need the offsets computed by hand; stacked bars need `bottom` and hide everything above the first segment.
+
+And past about twenty categories, a dot plot or lollipop chart uses far less ink and stays readable, which is worth reaching for rather than shrinking the bars further.
+
+## Bars over time
+
+Bars and lines both show a quantity over time, and the choice says something.
+
+A **line** implies continuity: the quantity existed between the observations and moved smoothly. Right for a measurement sampled repeatedly &mdash; a temperature, a price, a running total.
+
+**Bars** imply discreteness: each period is a separate quantity, and there is nothing between them. Right for a total per period &mdash; monthly revenue, daily counts, quarterly headcount.
+
+Most business time series are period totals and are drawn as lines out of habit. The bar version is frequently more honest and reads no worse.
+
+Two practical points. Bars need the zero baseline, which limits how much detail can be shown when the variation is small relative to the level. And with many periods bars become too thin to read, at which point a line or a step is the practical choice regardless of the semantics.
+
+A step plot is the compromise: discrete like bars, compact like a line.
+
+## One more thing
+
+`ax.barh` draws from the bottom up, so a list passed in ascending order appears with the largest at the top.
+
+That is usually what you want and is the opposite of the intuition from `bar`, where ascending order puts the largest on the right. Sorting ascending and letting `barh` reverse it visually is the idiom.
+
+## The short version
+
+Horizontal, sorted, one colour, from zero &mdash; four defaults that fix most bar charts before anything else is considered.
+
+The zero baseline is the only rule here that is not a matter of taste, because a bar encodes value as length and a truncated axis misstates every ratio on the chart.
+
+## Reading the code back
+
+A bar chart is one call and a handful of decisions made before it: which orientation, what order, one colour or two, whether the values go on the bars, and whether the axis is then needed at all. Those decisions are all made in the data preparation and the argument list rather than in anything clever, which is why bar charts are quick to produce well once the defaults are settled and quick to produce badly when they are not.

@@ -1,0 +1,412 @@
+title: Labels, Titles and Legends
+intro: The text that turns a plot into something someone else can read.
+
+## The minimum
+
+Every chart that leaves your screen needs a title, an x label and a y label, and a legend if there is more than one series.
+
+The axis labels carry the part people most often omit: **units**. "Sales" could be rupees, units, thousands or a percentage change, and a reader who has to guess cannot act on the chart. "Sales (&#8377; thousands)" takes four extra characters and removes the question.
+
+`ax.set(title=..., xlabel=..., ylabel=...)` does all three in one call, which is convenient in a chain.
+
+
+## The four pieces of text
+
+Title, both axis labels, and a legend when there is more than one series.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.arange(1, 13)
+sales = [12, 15, 14, 18, 22, 25, 24, 27, 23, 20, 18, 21]
+
+fig, ax = plt.subplots(figsize=(6.5, 3.5))
+ax.plot(x, sales, marker="o", label="2024")
+ax.set_title("Monthly sales")
+ax.set_xlabel("Month")
+ax.set_ylabel("Sales (thousands)")
+ax.legend()
+
+print("A chart without units is a chart nobody can act on.")
+print("'Sales' could be rupees, units or thousands - the label says.")
+print()
+print("ax.set() does all of them in one call:")
+print('   ax.set(title=..., xlabel=..., ylabel=...)')
+```
+
+## legend needs labels to work with
+
+It reads them from the artists; without them it has nothing to show.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 50)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(8, 3))
+
+a.plot(x, np.sin(x))
+a.plot(x, np.cos(x))
+a.legend()                      # nothing is labelled
+a.set_title("no labels")
+
+b.plot(x, np.sin(x), label="sin")
+b.plot(x, np.cos(x), label="cos")
+b.legend()
+b.set_title("labelled")
+
+print("The left legend drew nothing, and matplotlib said so - look for")
+print("the warning above this output, in red.")
+print()
+print("A label starting with an underscore is skipped deliberately -")
+print("that is how you exclude a helper line from the legend:")
+c = a.plot(x, np.sin(x) * 0.2, label="_helper")
+print("   labels on the left axes:", [l.get_label() for l in a.lines])
+```
+
+## Placing it
+
+<code>loc</code> for inside, <code>bbox_to_anchor</code> for outside.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 50)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+
+for k in range(3):
+    a.plot(x, np.sin(x + k), label="series %d" % k)
+a.legend(loc="upper right")
+a.set_title("loc='upper right'")
+
+for k in range(3):
+    b.plot(x, np.sin(x + k), label="series %d" % k)
+b.legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0)
+b.set_title("outside")
+
+print("loc takes 'best' (the default), 'upper right', 'lower left',")
+print("'center', and the rest of the compass.")
+print()
+print("'best' searches for the emptiest corner, which costs time on a")
+print("busy plot and can move between runs. Naming a corner is stabler.")
+```
+
+## Legends cost the reader work
+
+Labelling the lines directly is often better.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 100)
+series = {"alpha": np.sin(x), "beta": np.sin(x) + 1.2, "gamma": np.sin(x) - 1.2}
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3.2))
+
+for name, y in series.items():
+    a.plot(x, y, label=name)
+a.legend()
+a.set_title("legend: eye moves back and forth")
+
+for name, y in series.items():
+    b.plot(x, y)
+    b.text(x[-1] + 0.2, y[-1], name, va="center")
+b.set_xlim(0, 12.5)
+b.set_title("labelled at the end")
+
+print("A legend makes the reader match a colour to a name and carry it")
+print("back to the line. Direct labels remove that step entirely.")
+print("It works when the lines end apart; it fails when they converge.")
+```
+
+## Titles that say the finding
+
+A descriptive title labels the chart; an assertive one states what it shows.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+months = np.arange(1, 13)
+y = np.array([12, 15, 14, 18, 22, 25, 24, 27, 23, 20, 18, 21])
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3.2))
+
+a.plot(months, y, marker="o")
+a.set_title("Sales by month")
+
+b.plot(months, y, marker="o")
+b.set_title("Sales peaked in August, then fell 22%", loc="left", fontsize=11)
+b.axvline(8, color="crimson", linestyle="--", linewidth=1)
+
+print("The left title names the axes again. The right one tells the")
+print("reader what to look at, and the annotation shows where.")
+print()
+print("loc='left' is worth knowing: a left-aligned title reads like a")
+print("headline rather than a caption.")
+```
+
+## Figure-level text
+
+For a grid, the labels usually belong to the figure rather than each axes.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+fig, axes = plt.subplots(2, 2, figsize=(7, 4), sharex=True, sharey=True)
+for i, ax in enumerate(axes.flat):
+    ax.plot(rng.random(20).cumsum())
+    ax.set_title("panel %d" % (i + 1), fontsize=9)
+
+fig.suptitle("One title for the whole figure", fontsize=13)
+fig.supxlabel("shared x label")
+fig.supylabel("shared y label")
+fig.tight_layout()
+
+print("suptitle / supxlabel / supylabel belong to the FIGURE.")
+print("With sharex and sharey, repeating the axis label on every panel")
+print("is noise - one label for the grid says the same thing.")
+```
+## legend
+
+`ax.legend()` collects the artists on the axes that have a `label` and draws a key.
+
+Artists without a label are skipped, and if nothing has one, matplotlib warns and draws nothing. That warning &mdash; "No artists with labels found" &mdash; is one of the most common in matplotlib and always means the same thing.
+
+A label beginning with an underscore is **deliberately excluded**. That is the mechanism for keeping a helper artist &mdash; a threshold line, a shaded band &mdash; out of the key without giving up labelling it in code.
+
+You can also pass the handles and labels explicitly, `ax.legend(handles, labels)`, which is how you control the order or combine artists from different axes.
+
+## Placement
+
+`loc` names a position: `"upper right"`, `"lower left"`, `"center"`, and the rest.
+
+The default is `"best"`, which searches for the position overlapping the least data. That is convenient and has two costs: it is slow on a plot with many points, and it can put the legend somewhere different when the data changes, which is unwelcome in a figure you are iterating on.
+
+For a legend outside the axes:
+
+```python
+ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0)
+```
+
+`bbox_to_anchor` gives a point in axes coordinates &mdash; `(1.02, 1)` is just past the right edge, at the top &mdash; and `loc` says which corner of the legend goes there. Remember to leave room, with `fig.tight_layout()` or a smaller axes, or the legend will be cut off when saved.
+
+`ncol=3` spreads a legend horizontally, which suits one placed above or below the axes.
+
+`frameon=False` removes the box, which usually looks cleaner over a plot with white space.
+
+## Direct labelling
+
+A legend asks the reader to match a colour to a name, hold it in memory, and find the corresponding line. That is real cognitive work, repeated for every series.
+
+Labelling each line at its end removes the step:
+
+```python
+ax.text(x[-1] + 0.2, y[-1], name, va="center")
+```
+
+It works well when the lines end at different heights, which is common in time series. It fails when they converge, and then a legend is the honest choice.
+
+This is one of the highest-value small improvements available to a line chart, and matplotlib has no built-in for it &mdash; two lines of `text` is the whole implementation.
+
+## Titles that say something
+
+The default habit is a title that names the variables: "Sales by month". The chart already shows that; the axis labels already say it.
+
+A more useful title states the **finding**: "Sales peaked in August, then fell 22%". The reader then knows what they are looking for, and the chart supports the claim rather than posing a question.
+
+`loc="left"` left-aligns the title, which makes it read like a headline rather than a caption. Combined with a slightly larger font and a subtitle in smaller grey text, it is the layout most publications use, and it is a few lines of matplotlib.
+
+Annotating the thing the title mentions &mdash; a vertical line at the peak, a highlighted point &mdash; closes the loop between the words and the picture.
+
+## Figure-level text
+
+With a grid of subplots sharing axes, repeating the same axis label on every panel is noise.
+
+`fig.supxlabel`, `fig.supylabel` and `fig.suptitle` attach text to the figure instead, so one label serves the whole grid.
+
+`fig.tight_layout()` afterwards makes room for them; without it, a suptitle frequently overlaps the top row of panels.
+
+## Text properties
+
+Every text-producing method takes the same styling arguments: `fontsize`, `fontweight`, `color`, `family`, `style`, `alpha`, `rotation`.
+
+A small set of conventions covers most charts:
+
+**Title** &mdash; larger, bold, left-aligned. It is a headline.
+
+**Axis labels** &mdash; default size, sentence case, with units.
+
+**Tick labels** &mdash; smaller and lighter than the data, because they are reference rather than content.
+
+**Annotations** &mdash; the colour of the thing they annotate, which ties them together without an arrow.
+
+`plt.rcParams` holds defaults for all of these &mdash; `axes.titlesize`, `axes.labelsize`, `xtick.labelsize` &mdash; so a house style sets them once rather than per chart.
+
+## Legend contents
+
+`ax.legend()` takes arguments that solve most legend problems.
+
+`ncol=3` spreads it horizontally, which suits a legend above or below the axes and wastes far less vertical space than a single column.
+
+`title="Region"` labels the legend itself, which removes the need to explain the categories elsewhere.
+
+`frameon=False` drops the box. `framealpha=0.8` keeps it but lets the data show through.
+
+`fontsize="small"` shrinks it, appropriate because a legend is reference material rather than content.
+
+`handles` and `labels` given explicitly control both the order and the contents &mdash; how you put the series in the same vertical order they appear on the chart, which makes the mapping obvious.
+
+## Mathematical text
+
+Any text argument accepts mathtext between dollar signs:
+
+```python
+ax.set_ylabel(r"Energy ($\mathrm{J\,m^{-2}}$)")
+```
+
+The `r` prefix matters, because backslashes are otherwise interpreted by Python before matplotlib sees them.
+
+This is a built-in subset of LaTeX and needs no LaTeX installation. `rcParams["text.usetex"] = True` switches to a real LaTeX renderer for full support, at the cost of requiring LaTeX to be present and slowing rendering considerably.
+
+For units, superscripts and Greek letters &mdash; which is most scientific labelling &mdash; mathtext is enough.
+
+## Multi-line and wrapped text
+
+A long title can be broken with a newline, and the alignment applies to the block:
+
+```python
+ax.set_title("A longer headline that
+runs to two lines", loc="left")
+```
+
+`linespacing=` adjusts the gap.
+
+A common publication pattern is a bold headline and a lighter subtitle:
+
+```python
+ax.set_title("Sales peaked in August", loc="left", fontsize=13, fontweight="bold")
+ax.text(0, 1.02, "Monthly, 2024, thousands", transform=ax.transAxes,
+        fontsize=9, color="0.4")
+```
+
+Two lines, and the chart reads like something published rather than something exported.
+
+## Labels that fix themselves
+
+The most robust label is one computed from the data rather than typed:
+
+```python
+ax.set_title("Peak %s: %.0f" % (months[i], y[i]))
+ax.legend(title="n = %d" % len(df))
+```
+
+A hard-coded number in a title is wrong the first time the data changes, and nothing will tell you. Deriving it means the chart cannot disagree with itself &mdash; which matters most for exactly the charts that get regenerated regularly.
+
+## Where the reader looks
+
+Text placement is not only about fitting; it is about the order things are read.
+
+The **title** is read first, so it should carry the message.
+
+The **direct labels** on the data are read next, if they exist, which is why they beat a legend.
+
+The **axis labels** are consulted when a value needs interpreting.
+
+The **legend** is consulted repeatedly, which is the cost that direct labels remove.
+
+A **caption or source note** is read last, if at all, and belongs in small grey text at the bottom.
+
+Designing in that order &mdash; message, then data labels, then reference material &mdash; produces a chart that can be understood at a glance and interrogated afterwards, which is what a good chart does.
+
+## Common labelling errors
+
+**No units.** The single most common omission, and the one that makes a chart unusable.
+
+**A title that repeats the axes.** "Sales by month" over a chart with "Month" and "Sales" on the axes says nothing new.
+
+**A legend with no title**, where the categories need explaining.
+
+**Labels rotated 45 degrees** when `barh` would have avoided rotation entirely.
+
+**Text that overlaps the data**, with no background box.
+
+**A hard-coded number in the title** that no longer matches the data.
+
+**A legend in `loc="best"`** that moves between runs, making two versions of a figure hard to compare.
+
+All are cheap to fix and all survive into published charts regularly.
+
+## In summary
+
+Title, both axis labels with units, and a legend when there is more than one series &mdash; that is the minimum, and units are the part most often missing.
+
+`legend()` reads labels from the artists, warns when there are none, and skips anything whose label starts with an underscore.
+
+Direct labels on the lines remove the colour-matching a legend imposes, and are worth the two lines of `text` they cost.
+
+A title that states the finding is more useful than one naming the variables, and `loc="left"` makes it read as a headline.
+
+For a grid, `fig.suptitle` and `supxlabel` replace repeating the same label on every panel.
+
+And any number in a label should be computed from the data, because a hard-coded one is wrong the first time the data changes and nothing will say so.
+
+## Writing the title
+
+The title is the most valuable text on a chart and the most often wasted.
+
+Three levels, in increasing usefulness:
+
+**Descriptive** &mdash; "Sales by month". Names the variables the axes already name. Adds nothing.
+
+**Specific** &mdash; "Monthly sales, 2024, all regions". Adds scope, which the reader needs, and belongs in a subtitle rather than the headline.
+
+**Assertive** &mdash; "Sales peaked in August, then fell 22%". States what the chart shows, so the reader knows what to look for and can check the claim against the picture.
+
+The assertive form has a discipline attached: having written it, you have to make sure the chart supports it. That is a useful constraint, and it frequently changes the chart &mdash; highlighting August, annotating the fall, removing series that are not part of the claim.
+
+Where a chart genuinely has no single finding &mdash; an exploratory panel, a reference figure &mdash; the specific form is right, and the absence of a claim is itself informative.
+
+## Subtitles and source notes
+
+Two pieces of text that most charts want and matplotlib has no method for.
+
+A **subtitle** carries the scope that the headline title leaves out &mdash; the period, the units, the population. Placed just under the title in axes coordinates, smaller and grey:
+
+```python
+ax.text(0, 1.02, "Monthly, 2024, all regions", transform=ax.transAxes,
+        fontsize=9, color="0.4", va="bottom")
+```
+
+A **source note** goes at the bottom of the figure, smaller still:
+
+```python
+fig.text(0, 0, "Source: internal sales data, extracted 2024-09-01",
+         fontsize=8, color="0.5", va="bottom")
+```
+
+Both are two lines and both are what makes a chart usable by someone who did not make it. The source note in particular is the difference between a chart that can be checked and one that has to be taken on trust.
+
+## One more thing
+
+`ax.legend(labelcolor="linecolor")` colours each legend label to match its line, which removes the need for the swatch entirely and reads well with `handlelength=0`.
+
+It is a compact treatment that sits between a full legend and direct labelling, and works when the lines converge so that end labels would overlap.
+
+## The short version
+
+Text is what turns a picture of numbers into something someone else can act on, and units are the part most often left out.
+
+A legend is reference material that the reader consults repeatedly; a direct label is read once. Where the lines end apart, the direct label wins, and it costs two lines of `text`.
+
+## Reading the code back
+
+The text on a chart is written in a fixed order: the title says what was found, the axis labels say what the numbers are, and the legend or the direct labels say which series is which. Written in that order, the chart is complete; written in any other, something is usually missing. The most common omission is units, and the most common redundancy is a title that repeats the axis names.

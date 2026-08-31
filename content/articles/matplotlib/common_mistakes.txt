@@ -1,0 +1,430 @@
+title: Common Mistakes
+intro: The errors that produce a chart which looks fine and is not.
+
+## Nothing appears
+
+Three causes, distinguishable in a few seconds.
+
+**No data.** `len(x)` and `len(y)`. An empty array plots without complaint.
+
+**All missing.** `np.isnan(y).all()`. NaN is skipped, so an all-NaN series draws an empty line object.
+
+**The view is elsewhere.** `ax.get_xlim()` and `get_ylim()`. Limits set before the data was added, or set to the wrong range, put the data outside the visible box.
+
+`len(ax.lines)` distinguishes "the draw call never ran" from "it ran and there is nothing to see", which is usually the fastest thing to check.
+
+A fourth possibility in a script: you never showed or saved the figure. In a notebook figures display automatically; in a script they do not, and `plt.show()` or `savefig` is required.
+
+
+## Nothing appears
+
+Three causes, and how to tell which one you have.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+fig, axes = plt.subplots(1, 3, figsize=(10, 2.6))
+
+axes[0].plot([], [])
+axes[0].set_title("empty data")
+
+x = np.array([1, 2, 3])
+y = np.array([np.nan, np.nan, np.nan])
+axes[1].plot(x, y, marker="o")
+axes[1].set_title("all NaN")
+
+axes[2].plot([1, 2, 3], [1, 2, 3])
+axes[2].set_xlim(100, 200)
+axes[2].set_title("limits exclude the data")
+
+print("To diagnose an empty plot:")
+print("   len(x), len(y)        - is there data at all?")
+print("   np.isnan(y).all()     - is it all missing?")
+print("   ax.get_xlim()         - is the view somewhere else?")
+print("   len(ax.lines)         - did the draw call even happen?")
+print()
+print("lines on each axes:", [len(a.lines) for a in axes])
+print("   all three DREW something; only the data or the view is wrong.")
+```
+
+## The plot goes to the wrong axes
+
+Because plt.* uses the current figure, whatever that now is.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 5, 30)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(8, 2.6))
+a.set_title("meant for here")
+b.set_title("landed here")
+
+plt.plot(x, np.sin(x))          # goes to the CURRENT axes, which is b
+
+print("lines on the left  :", len(a.lines))
+print("lines on the right :", len(b.lines), "<- plt.plot landed here")
+print()
+print("subplots() makes each axes current in turn, so the last one")
+print("created wins. Use a.plot(...) and the question never arises.")
+```
+
+## Overlapping labels in a saved file
+
+It looked fine on screen because the screen was a different size.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+import io
+
+rng = np.random.default_rng(0)
+names = ["category number %d" % i for i in range(8)]
+vals = rng.integers(5, 40, 8)
+
+fig, ax = plt.subplots(figsize=(4, 2.5))
+ax.bar(names, vals)
+ax.tick_params(axis="x", rotation=90, labelsize=8)
+ax.set_title("cramped")
+
+fig2, ax2 = plt.subplots(figsize=(5, 3.5))
+ax2.barh(names, vals)
+ax2.set_title("barh, no rotation needed")
+fig2.tight_layout()
+
+print("A figure is saved at its declared size, not the size of the")
+print("window you were looking at, so a layout that fits on screen")
+print("can be cut off in the file.")
+print()
+print("Fixes: tight_layout, bbox_inches='tight', a bigger figsize, or")
+print("a chart type that does not need rotated labels.")
+```
+
+## Colours that do not survive
+
+Greyscale is the quickest test of whether the encoding works.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 60)
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+
+for c, lbl in [("red", "A"), ("green", "B"), ("#8b0000", "C")]:
+    a.plot(x, np.sin(x) + hash(lbl) % 3 * 0.4, color=c, label=lbl)
+a.legend(); a.set_title("three similar luminances")
+
+styles = [("-", "o"), ("--", "s"), (":", "^")]
+for (ls, mk), lbl in zip(styles, "ABC"):
+    b.plot(x, np.sin(x) + ord(lbl) % 3 * 0.4, linestyle=ls, marker=mk,
+           markevery=10, color="0.25", label=lbl)
+b.legend(); b.set_title("style and marker, one colour")
+
+print("Red, green and dark red have similar brightness, so in")
+print("greyscale - or to a red-green colour-blind reader - the left")
+print("chart has three identical lines.")
+print()
+print("Varying linestyle and marker means the right chart works with")
+print("no colour at all.")
+```
+
+## Silent truncation and missing categories
+
+The chart draws happily with part of the data missing.
+
+```python-run
+import matplotlib.pyplot as plt
+import numpy as np
+
+values = np.array([12, 45, 8, 200, 15, 22])
+names = list("abcdef")
+
+fig, (a, b) = plt.subplots(1, 2, figsize=(9, 3))
+
+a.bar(names, values)
+a.set_ylim(0, 50)
+a.set_title("ylim hides d entirely")
+
+b.bar(names, values)
+b.set_title("all six visible")
+
+print("Category d is 200. With ylim(0, 50) its bar runs off the top")
+print("and looks identical to any other tall bar - the reader has no")
+print("way to know it is four times the next largest.")
+print()
+print("matplotlib does not warn, because clipping is a legitimate")
+print("thing to ask for. Check that max(data) is inside get_ylim().")
+print()
+print("data max: %d   ylim: %s" % (values.max(), a.get_ylim()))
+```
+
+## Figures left open
+
+The warning that appears after twenty, and what it means.
+
+```python-run
+import matplotlib.pyplot as plt
+import warnings
+
+plt.close("all")
+
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter("always")
+    for i in range(22):
+        fig, ax = plt.subplots(figsize=(1, 1))
+    names = [str(w.category.__name__) for w in caught]
+
+print("figures open:", len(plt.get_fignums()))
+print("warnings raised:", names[:1] or "none")
+print()
+if caught:
+    print("message:", str(caught[0].message)[:96])
+print()
+plt.close("all")
+print("after close('all'):", len(plt.get_fignums()))
+print()
+print("The limit is rcParams['figure.max_open_warning'] and it is a")
+print("warning, not an error - a loop will keep going and keep using")
+print("memory until something else breaks.")
+
+fig, ax = plt.subplots(figsize=(4, 2))
+ax.plot([0, 1], [0, 1])
+ax.set_title("one deliberate figure")
+```
+## The plot lands somewhere else
+
+`plt.plot` draws on the **current** axes. After `plt.subplots(1, 2)`, the current axes is the last one created, so a stray `plt.plot` goes to the right-hand panel regardless of intent.
+
+In a notebook it is worse, because the current figure is whatever the last executed cell created &mdash; which, with out-of-order execution, is not necessarily the one above.
+
+`ax.plot(...)` removes the question. This is the practical reason the object-oriented API is worth the extra characters.
+
+## Cropped output
+
+A figure is saved at the size `figsize` declares, at `dpi` resolution. The window you were looking at has nothing to do with it.
+
+So a chart whose labels fit on screen can be cropped in the file, and the first time this happens it looks like matplotlib lost the label.
+
+`tight_layout()` or `constrained_layout=True` reserve the space. `bbox_inches="tight"` at save time expands the output to include everything.
+
+Rotated tick labels and long y-axis labels are the usual casualties, and a chart type that does not need rotation &mdash; `barh` rather than `bar` &mdash; avoids the problem entirely.
+
+## Colour that does not survive
+
+Colours chosen to be visually distinct are often not distinct in **luminance**, and luminance is what remains in greyscale and what colour-blind readers rely on most.
+
+Red, green and dark red are three obviously different colours with nearly the same brightness. Printed in black and white, they are one colour.
+
+Two habits fix it: use a palette designed for the purpose &mdash; the viridis family, or Okabe&ndash;Ito for categories &mdash; and vary a second channel so colour is reinforcing rather than carrying the meaning.
+
+The greyscale test is quick and catches most of it.
+
+## Silent clipping
+
+Setting limits that exclude data does not warn. The excluded points are simply not drawn, and a bar taller than the axis runs off the top looking like any other tall bar.
+
+That is a serious failure: the reader sees a chart where one category is four times the next largest, and has no way to know.
+
+matplotlib cannot warn about it, because clipping is often exactly what you want &mdash; zooming into a region is a legitimate operation.
+
+The check is one line: compare `max(data)` against `ax.get_ylim()[1]`. Where a value is genuinely off-scale and the chart must stay zoomed, say so with an annotation giving the real number.
+
+The related version is a category filtered out earlier in the pipeline and never noticed, which is why comparing the number of bars against the number of groups is worth doing.
+
+## Figures left open
+
+matplotlib keeps a reference to every figure created through pyplot, so they are never collected while it holds them.
+
+After twenty, it warns: "More than 20 figures have been opened." That is a warning, not an error &mdash; the loop continues, and memory keeps growing until something else fails.
+
+`plt.close(fig)` in the loop. `plt.close("all")` between sections of a notebook.
+
+The threshold is `rcParams["figure.max_open_warning"]`, and raising it to silence the message is the wrong response to a real problem.
+
+## A short list
+
+Use `ax.` methods, not `plt.`.
+
+Check the data before blaming the chart: length, NaN, limits.
+
+Save with layout management, and look at the saved file rather than the screen.
+
+Test in greyscale.
+
+Compare the data's range against the axis limits.
+
+Close figures in loops.
+
+And the one from the design module that outranks all of them: know what the chart is for before drawing it, because none of these checks help a chart that is answering the wrong question.
+
+## Mistakes of interpretation
+
+Beyond the mechanical errors, a set of chart-level mistakes produce output that is technically correct and misleading.
+
+**A truncated bar axis.** Length must be read from zero.
+
+**Dual axes.** The crossing point is a choice, not a finding.
+
+**Unshared axes across panels.** The layout invites a comparison the scales do not support.
+
+**An uncentred diverging colormap.** Half the data is coloured as though it had the opposite sign.
+
+**A line through sparse points.** It asserts values between the observations.
+
+**A pie with many slices.** The reader cannot rank them.
+
+**A mean without a spread.** Two very different distributions look identical.
+
+Each of these is a default that matplotlib will happily produce, which is why they are worth knowing as a list.
+
+## Mistakes of omission
+
+Things whose absence is the error:
+
+No units on the axis labels.
+
+No indication of sample size, when it varies between groups.
+
+No note that an axis is logarithmic, which changes how every distance on it should be read.
+
+No statement of what an error bar represents.
+
+No caption saying when the data is from and what it covers.
+
+These cost a line each and are the difference between a chart that can be acted on and one that has to be asked about.
+
+## Debugging a figure
+
+A routine that resolves most problems quickly:
+
+**Print the data.** Shape, range, count of NaN. Most "the chart is wrong" is "the data is not what I thought".
+
+**Check the artists.** `len(ax.lines)`, `len(ax.patches)`, `len(ax.collections)` &mdash; did the draw call happen?
+
+**Check the view.** `ax.get_xlim()`, `get_ylim()` against the data's range.
+
+**Save it and look at the file**, which is what other people will see.
+
+**Look at it in greyscale**, which catches encoding problems that colour hides.
+
+In that order, because each is cheaper than the next.
+
+## A pre-flight checklist
+
+Before a chart is shared:
+
+Does the title state the finding?
+
+Do the axes have units?
+
+Is the baseline appropriate?
+
+Are the panels comparable, if the layout implies they should be?
+
+Is anything clipped, hidden or overplotted?
+
+Does it work without colour?
+
+Is there one message?
+
+Is the source and date on it?
+
+Eight questions, most answered in seconds, and between them they catch nearly everything in this module.
+
+## The general lesson
+
+matplotlib will draw whatever it is asked. It has no opinion about whether the chart is honest, readable or answering a question anyone asked.
+
+That is the right design for a library and it means the responsibility sits with the person writing the call. The mechanical parts of this track &mdash; the arguments, the objects, the defaults &mdash; are the easy half. The decisions are the half that determines whether the chart was worth drawing.
+
+## Mistakes that look like matplotlib bugs
+
+A few behaviours get reported as bugs and are working as designed.
+
+**A figure appears blank in a script** &mdash; nothing called `show` or `savefig`.
+
+**Colours ignored** &mdash; passing `c=` where `color=` was meant, or a colour list to a function taking a single colour.
+
+**`set_facecolor` doing nothing on a box plot** &mdash; `patch_artist=True` was not passed.
+
+**Ticks reappearing** after being set &mdash; a later autoscale replaced the locator.
+
+**A legend showing one entry for many lines** &mdash; one `label` on a call that drew several.
+
+**Text invisible after `transparent=True`** &mdash; the foreground was never changed.
+
+Each has a one-line fix and none of them raises, which is what makes them frustrating rather than difficult.
+
+## Building the habit
+
+The checks in this module are worth turning into a routine rather than remembering individually.
+
+A short function that draws and then asserts is one way:
+
+```python
+def finish(ax, title, xlabel, ylabel):
+    ax.set_title(title, loc="left", fontweight="bold")
+    ax.set_xlabel(xlabel); ax.set_ylabel(ylabel)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    assert ax.get_title(), "no title"
+    return ax
+```
+
+It enforces the labels, applies the house treatment, and fails if something was skipped.
+
+More generally, the mistakes in this track fall into two groups: things matplotlib will not tell you (clipping, wrong axes, cropped output) and things nobody will tell you (a misleading baseline, an uninterpretable interval, a chart answering the wrong question). The first group is caught by checking; the second only by asking what the chart is for.
+
+## The two kinds of error
+
+It is worth separating them, because they are found in different ways.
+
+**Errors matplotlib could tell you about but does not.** A plot on the wrong axes, a clipped bar, a cropped label, an empty series, a figure never closed. These are mechanical, they have definite answers, and the checks in this module find them in seconds. They are also the ones that produce a chart which is obviously odd once looked at.
+
+**Errors nobody can tell you about.** A truncated baseline, an uncentred diverging scale, a dual axis, a mean without a spread, a chart answering a question nobody asked. These produce output that is technically correct and misleading, and no check catches them because nothing is wrong with the code.
+
+The first kind is fixed by looking at the chart. The second is fixed by asking what the chart claims and whether the data supports it &mdash; which is a different activity, and the one that matters more.
+
+## In summary
+
+An empty plot is empty data, all-NaN data, or limits pointing elsewhere; `len(ax.lines)` says whether the draw happened.
+
+`plt.plot` lands on the current axes, which is rarely the one you meant.
+
+A figure saves at its declared size, so look at the file rather than the screen.
+
+Limits that exclude data clip it silently, and a too-tall bar looks like any other tall bar.
+
+Colours of similar luminance vanish in greyscale.
+
+Figures left open warn after twenty and keep consuming memory.
+
+And the checklist that catches most of it &mdash; title states the finding, units on the labels, correct baseline, nothing hidden, works without colour, one message, source and date &mdash; takes under a minute and is the difference between a chart that is finished and one that is merely drawn.
+
+## A worked debug
+
+A concrete example of the routine, on the most common complaint: "the chart is wrong".
+
+**Look at the data going in.** `df.shape`, `df.head()`, `df.dtypes`, `df.isna().sum()`. About half of all wrong charts are correct renderings of wrong data, and this finds them before any plotting is examined.
+
+**Check the artists.** Did the draw call happen, and how many things did it create? A legend with one entry where five were expected means one call drew five lines with one label.
+
+**Check the view.** Limits against the data's range.
+
+**Check the axes.** Is the plot on the axes you think? `len(ax.lines)` on each.
+
+**Look at the saved file**, not the screen.
+
+**Look at it in greyscale.**
+
+The order matters because each step is cheaper than the next, and the first one resolves the majority. The instinct to start by reading matplotlib documentation is usually the slowest available route.
+
+## The short version
+
+Two kinds of error: the ones matplotlib could report and does not, and the ones nobody can report because nothing is wrong with the code.
+
+The first are found by looking &mdash; at the data, the artists, the limits, the saved file. The second are found by asking what the chart claims and whether the data supports it, which is the harder and more valuable habit.

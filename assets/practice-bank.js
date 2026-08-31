@@ -17525,6 +17525,1128 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "matplotlib/annotations.html",
+  "title": "Annotating a Plot",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "What do `ha` and `va` control in `ax.text`?",
+    "o": [
+     "The font",
+     "Which part of the text sits at the given point",
+     "The colour",
+     "The rotation"
+    ],
+    "a": 1,
+    "w": "Without them, text starts at the point and runs right - rarely where you want it."
+   },
+   {
+    "t": "What are `xy` and `xytext` in `annotate`?",
+    "o": [
+     "Two labels",
+     "The point being annotated, and where the text sits",
+     "x and y data",
+     "Offsets"
+    ],
+    "a": 1,
+    "w": "arrowprops joins them; omit it for text with an offset and no arrow."
+   },
+   {
+    "t": "Why use `axhline` rather than plotting the line yourself?",
+    "o": [
+     "It is faster",
+     "It spans the axes regardless of limits, and stays correct when the data changes",
+     "It is coloured differently",
+     "It adds a legend"
+    ],
+    "a": 1,
+    "w": "ax.plot([0, 40], [mean, mean]) hard-codes the x range and stops spanning as soon as the data grows."
+   },
+   {
+    "t": "Where should a corner note like a sample size be placed?",
+    "o": [
+     "Data coordinates",
+     "Axes coordinates via transform=ax.transAxes",
+     "Figure coordinates always",
+     "In the title"
+    ],
+    "a": 1,
+    "w": "A corner label in data coordinates looks right until the data changes, then drifts into the plot or off the edge."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/bar_charts.html",
+  "title": "Bar Charts",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "Why is `barh` usually better for categorical data?",
+    "o": [
+     "It is faster",
+     "Category labels are words, and horizontal bars give each label a full line to sit on",
+     "It uses less ink",
+     "Vertical bars are deprecated"
+    ],
+    "a": 1,
+    "w": "The alternatives - rotating, truncating, shrinking - all make the chart harder to read."
+   },
+   {
+    "t": "How do you draw grouped bars?",
+    "o": [
+     "ax.bar(grouped=True)",
+     "Offset the positions yourself and set_xticks to centre the labels",
+     "Use barh",
+     "Stack them"
+    ],
+    "a": 1,
+    "w": "There is no grouped-bar function. Keep a group's total width below 1 so clusters stay separated."
+   },
+   {
+    "t": "What does stacking show badly?",
+    "o": [
+     "The total",
+     "The components - only the bottom segment shares a baseline across bars",
+     "The categories",
+     "The colours"
+    ],
+    "a": 1,
+    "w": "Stack when the total is the message; group when the components are. For proportions, normalise each column to 1."
+   },
+   {
+    "t": "Why must a bar chart's axis start at zero, when a line chart's need not?",
+    "o": [
+     "Convention",
+     "A bar encodes value as length, and length from a non-zero base is not proportional to the value",
+     "matplotlib requires it",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "A line encodes value as position, read against the axis labels, so truncating it is acceptable."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/box_and_violin.html",
+  "title": "Box and Violin Plots",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "What do the whiskers on a matplotlib box plot reach?",
+    "o": [
+     "The minimum and maximum",
+     "The furthest data point within 1.5x IQR of the box",
+     "Two standard deviations",
+     "The 5th and 95th percentiles"
+    ],
+    "a": 1,
+    "w": "They stop at real observations, and points beyond are drawn individually. The 1.5 is a convention, changeable with whis=."
+   },
+   {
+    "t": "What can a box plot completely hide?",
+    "o": [
+     "Outliers",
+     "Bimodality - two clusters with a gap where the median sits",
+     "The median",
+     "The sample size"
+    ],
+    "a": 1,
+    "w": "Bimodality usually means two populations have been mixed, which is often the most important thing in the data."
+   },
+   {
+    "t": "What is the cost of a violin plot?",
+    "o": [
+     "It is slow",
+     "It is a kernel density estimate with a bandwidth you did not choose, and it extends past the observed data",
+     "It hides the median",
+     "It needs many groups"
+    ],
+    "a": 1,
+    "w": "A violin of a strictly positive quantity will show density below zero - a claim the data does not support."
+   },
+   {
+    "t": "Why pass `showfliers=False` when overlaying the raw points?",
+    "o": [
+     "To hide outliers",
+     "So outliers are not drawn twice, once by the box and once by the scatter",
+     "It is faster",
+     "To fix the colours"
+    ],
+    "a": 1,
+    "w": "Below about fifty points per group, box plus points is strictly more informative than either alone."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/choosing_a_chart.html",
+  "title": "Choosing a Chart",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "Which visual encoding do people read most accurately?",
+    "o": [
+     "Angle",
+     "Position along a common scale",
+     "Area",
+     "Colour intensity"
+    ],
+    "a": 1,
+    "w": "Length from a common baseline is close behind. Angle and area are noticeably worse, which is why bars beat pies."
+   },
+   {
+    "t": "Why do almost all pie charts print their percentages?",
+    "o": [
+     "Convention",
+     "Because the picture is not doing the work - angles are hard to compare",
+     "To save space",
+     "For accessibility"
+    ],
+    "a": 1,
+    "w": "A sorted horizontal bar chart shows the same data readably, and shows magnitudes rather than only proportions."
+   },
+   {
+    "t": "When are small multiples better than one chart with six series?",
+    "o": [
+     "Never",
+     "When the question is about the set - shared axes make the panels comparable",
+     "Only for time series",
+     "When there is no legend"
+    ],
+    "a": 1,
+    "w": "If the chart is about one specific comparison, put those two series on one axes instead."
+   },
+   {
+    "t": "What is the advantage of greying out all but one series?",
+    "o": [
+     "It saves ink",
+     "It directs attention by contrast, and the grey lines still provide the range",
+     "It is faster to draw",
+     "It avoids colormaps"
+    ],
+    "a": 1,
+    "w": "More effective than an annotation, because it does not add another thing to read."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/colours_and_colormaps.html",
+  "title": "Colour and Colormaps",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "What does the string `'0.55'` mean as a colour?",
+    "o": [
+     "55% opacity",
+     "A grey level",
+     "An error",
+     "The 55th colour"
+    ],
+    "a": 1,
+    "w": "The quotes matter - the bare number 0.55 is not a colour. C0-C9 refer to the current cycle instead."
+   },
+   {
+    "t": "When is a diverging colormap the wrong choice?",
+    "o": [
+     "Always",
+     "When the data has no meaningful midpoint - it invents a boundary mid-range",
+     "For temperatures",
+     "For negative values"
+    ],
+    "a": 1,
+    "w": "Sequential for magnitudes, diverging around a real centre like zero, qualitative for unordered categories."
+   },
+   {
+    "t": "What is measurably wrong with `jet`?",
+    "o": [
+     "Too colourful",
+     "Its brightness rises and falls, so the eye reads boundaries where the data is smooth",
+     "It is slow",
+     "It has too few colours"
+    ],
+    "a": 1,
+    "w": "It also collapses in greyscale, because different values map to the same brightness. viridis is monotonic in brightness."
+   },
+   {
+    "t": "What does `fig.colorbar` need as its first argument?",
+    "o": [
+     "The axes",
+     "The mappable returned by imshow, scatter or pcolormesh",
+     "The colormap name",
+     "The data"
+    ],
+    "a": 1,
+    "w": "Which is why those return values get captured. label= names the quantity, as important as it is on an axis."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/common_mistakes.html",
+  "title": "Common Mistakes",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "Your plot is empty. What distinguishes 'the draw never ran' from 'there is nothing to see'?",
+    "o": [
+     "The title",
+     "len(ax.lines)",
+     "The figure size",
+     "The dpi"
+    ],
+    "a": 1,
+    "w": "Then check len(x), np.isnan(y).all(), and ax.get_xlim() - empty data, all-NaN data, and limits pointing elsewhere all draw nothing."
+   },
+   {
+    "t": "After `plt.subplots(1, 2)`, where does a stray `plt.plot` land?",
+    "o": [
+     "The left panel",
+     "The last axes created - the right panel",
+     "Both",
+     "A new figure"
+    ],
+    "a": 1,
+    "w": "In a notebook it is worse, because the current figure is whatever the last executed cell made. ax.plot removes the question."
+   },
+   {
+    "t": "Why can a chart look fine on screen and be cropped when saved?",
+    "o": [
+     "A bug in savefig",
+     "It saves at the declared figsize and dpi, not the window size",
+     "The dpi is too low",
+     "The format is wrong"
+    ],
+    "a": 1,
+    "w": "Rotated tick labels and long axis labels are the usual casualties. tight_layout or bbox_inches='tight' fix it."
+   },
+   {
+    "t": "What happens when axis limits exclude some of the data?",
+    "o": [
+     "matplotlib warns",
+     "The data is silently clipped, and a too-tall bar looks like any other tall bar",
+     "The limits expand",
+     "It raises"
+    ],
+    "a": 1,
+    "w": "matplotlib cannot warn, because zooming is legitimate. Compare max(data) against ax.get_ylim()[1]."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/dates_on_axes.html",
+  "title": "Dates on an Axis",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "What happens if you plot date strings rather than date objects?",
+    "o": [
+     "Nothing different",
+     "They are treated as categories - evenly spaced in the order given, so gaps disappear",
+     "It raises",
+     "They are parsed automatically"
+    ],
+    "a": 1,
+    "w": "Dates from a CSV arrive as strings, so this is a common quiet failure. The line implies a continuity that is not there."
+   },
+   {
+    "t": "What does a locator do?",
+    "o": [
+     "Formats the label text",
+     "Decides where the ticks go",
+     "Sets the limits",
+     "Finds the data"
+    ],
+    "a": 1,
+    "w": "Formatters decide how ticks read; locators decide where they are. Date locators think in calendar units."
+   },
+   {
+    "t": "Why is `ConciseDateFormatter` usually better than `DateFormatter`?",
+    "o": [
+     "It is faster",
+     "It drops repeated parts - the year appears once rather than on every label",
+     "It rotates labels",
+     "It adds minor ticks"
+    ],
+    "a": 1,
+    "w": "It needs the locator passed to it, because what it omits depends on the tick spacing."
+   },
+   {
+    "t": "Date labels are colliding. What should you try first?",
+    "o": [
+     "Rotate them",
+     "Use fewer ticks with a coarser locator",
+     "Shrink the font",
+     "Remove the axis"
+    ],
+    "a": 1,
+    "w": "Then shorter labels, and rotation last - slanted text is genuinely harder to read than horizontal text."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/error_bars_and_bands.html",
+  "title": "Error Bars and Bands",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "How is `yerr=[lo, hi]` interpreted?",
+    "o": [
+     "Absolute lower and upper bounds",
+     "Positive offsets below and above each point",
+     "Two separate series",
+     "Percentages"
+    ],
+    "a": 1,
+    "w": "Passing absolute bounds is a common mistake and produces enormous bars."
+   },
+   {
+    "t": "Why use `fill_between` rather than error bars on a curve?",
+    "o": [
+     "It is faster",
+     "Hundreds of overlapping bars become an unreadable smear",
+     "Error bars need discrete x",
+     "It is more accurate"
+    ],
+    "a": 1,
+    "w": "alpha around 0.2-0.3 keeps the central line clearly on top, and the same colour ties the band to the line."
+   },
+   {
+    "t": "Two 95% confidence intervals for means overlap slightly. What follows?",
+    "o": [
+     "The difference is not significant",
+     "Nothing - overlapping does not imply the absence of a significant difference",
+     "They are equal",
+     "The test is invalid"
+    ],
+    "a": 1,
+    "w": "Non-overlapping does imply significance, but the relevant interval is the one around the difference, which is narrower than either alone."
+   },
+   {
+    "t": "You have 12 observations per group. What shows the most?",
+    "o": [
+     "A bar with an error bar",
+     "The individual points with jitter, plus a mean line",
+     "A pie chart",
+     "A single number"
+    ],
+    "a": 1,
+    "w": "A bar and error bar throw away the shape, the outliers and the sample size. Under about fifty points per group, show the points."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/what_is_matplotlib.html",
+  "title": "Figure and Axes",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "What does 'Axes' refer to in matplotlib?",
+    "o": [
+     "The x and y axis objects",
+     "One plotting area inside a figure",
+     "The figure itself",
+     "The tick marks"
+    ],
+    "a": 1,
+    "w": "The name is unfortunate - it is singular, and the x/y axis objects live on it as ax.xaxis and ax.yaxis."
+   },
+   {
+    "t": "Why prefer `ax.plot()` over `plt.plot()`?",
+    "o": [
+     "It is faster",
+     "plt draws into a hidden 'current figure', which is a global and goes wrong with several figures or in a notebook",
+     "plt is deprecated",
+     "ax supports more plot types"
+    ],
+    "a": 1,
+    "w": "In a notebook where cells run out of order, the current figure is whatever ran last - which is why plots sometimes land on the wrong chart."
+   },
+   {
+    "t": "Why is there a comma in `line, = ax.plot(x, y)`?",
+    "o": [
+     "A typo",
+     "plot returns a list, because one call can draw several lines; the comma unpacks the single element",
+     "It creates a tuple",
+     "It is optional syntax"
+    ],
+    "a": 1,
+    "w": "Without it, `line` is a list and `line.set_color` fails."
+   },
+   {
+    "t": "Why must figures be closed?",
+    "o": [
+     "To save the file",
+     "matplotlib keeps a reference to each one, so they are never garbage collected",
+     "To reset the style",
+     "They close themselves"
+    ],
+    "a": 1,
+    "w": "A loop that draws without closing leaks memory, and matplotlib warns once more than 20 are open."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/histograms.html",
+  "title": "Histograms and Distributions",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "Why does `hist` return one more edge than count?",
+    "o": [
+     "A bug",
+     "n bins are defined by n+1 boundaries",
+     "It includes a total",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "The same convention np.histogram follows, and the usual off-by-one when using the return values."
+   },
+   {
+    "t": "What is the main risk of choosing a bin count?",
+    "o": [
+     "Slow rendering",
+     "Too few hides real structure and too many turns noise into apparent spikes",
+     "Wrong colours",
+     "Missing data"
+    ],
+    "a": 1,
+    "w": "There is no correct number. Looking at two or three tells you which features are real - a feature that survives several bin counts probably is."
+   },
+   {
+    "t": "Why is `density=True` needed to compare two samples of different sizes?",
+    "o": [
+     "It is faster",
+     "With counts the larger sample has taller bars everywhere, so the shapes cannot be compared",
+     "It fixes the bins",
+     "It is not needed"
+    ],
+    "a": 1,
+    "w": "Density makes the total area 1 so the shapes overlay. The y axis then reads as density, and can exceed 1."
+   },
+   {
+    "t": "Why does a cumulative histogram tolerate many more bins?",
+    "o": [
+     "It is smoothed",
+     "Each bin adds to a running total rather than standing alone, so noise does not show",
+     "It uses fewer points",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "It also reads off quantiles directly - where the curve crosses 0.5 is the median."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/images_and_heatmaps.html",
+  "title": "Images and Heatmaps",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "Why does `imshow` put row 0 at the top?",
+    "o": [
+     "A bug",
+     "Its defaults are for images, where the first pixel is top-left",
+     "Matrices are stored that way",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "For a matrix whose rows are a quantity, that is upside down. origin='lower' fixes it."
+   },
+   {
+    "t": "Why use `interpolation='nearest'` for data?",
+    "o": [
+     "It is faster",
+     "The default smooths between cells, drawing colours that correspond to no data point",
+     "It is sharper",
+     "It handles NaN"
+    ],
+    "a": 1,
+    "w": "Desirable on a photograph, a small lie on a matrix of values."
+   },
+   {
+    "t": "What does `pcolormesh` take that `imshow` does not?",
+    "o": [
+     "A colormap",
+     "Cell edges, so the grid can be uneven",
+     "A colorbar",
+     "Labels"
+    ],
+    "a": 1,
+    "w": "Edges outnumber cells by one per axis. Passing centres instead shifts everything by half a cell."
+   },
+   {
+    "t": "Data ranges from -4 to +10 with a diverging colormap and automatic limits. Where is the neutral colour?",
+    "o": [
+     "At 0",
+     "At +3, the midpoint of the data",
+     "At -4",
+     "At +10"
+    ],
+    "a": 1,
+    "w": "Every cell below +3 is then coloured as though negative. Use symmetric vmin/vmax, or TwoSlopeNorm(vcenter=0)."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/labels_and_legends.html",
+  "title": "Labels, Titles and Legends",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "What does `ax.legend()` do when no artist has a label?",
+    "o": [
+     "Shows all series",
+     "Warns and draws nothing",
+     "Raises",
+     "Numbers them"
+    ],
+    "a": 1,
+    "w": "'No artists with labels found' is one of the most common matplotlib warnings and always means this."
+   },
+   {
+    "t": "How do you keep a helper line out of the legend?",
+    "o": [
+     "Draw it last",
+     "Give its label a leading underscore",
+     "Use alpha",
+     "You cannot"
+    ],
+    "a": 1,
+    "w": "A deliberate mechanism, so a threshold line can be labelled in code without appearing in the key."
+   },
+   {
+    "t": "What is the drawback of `loc='best'`?",
+    "o": [
+     "It is ugly",
+     "It is slow on busy plots and can move when the data changes",
+     "It only works on lines",
+     "It is deprecated"
+    ],
+    "a": 1,
+    "w": "Naming a corner is more stable, which matters in a figure you are iterating on."
+   },
+   {
+    "t": "Why is 'Sales peaked in August, then fell 22%' a better title than 'Sales by month'?",
+    "o": [
+     "It is longer",
+     "It states the finding, so the reader knows what to look for",
+     "It includes a number",
+     "It is not better"
+    ],
+    "a": 1,
+    "w": "The axis labels already say what the variables are. loc='left' makes such a title read as a headline."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/layout_and_spacing.html",
+  "title": "Layout and Spacing",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "What shape suits a single time series?",
+    "o": [
+     "Square",
+     "Wide and short",
+     "Tall and narrow",
+     "It does not matter"
+    ],
+    "a": 1,
+    "w": "Compressing 150 points into three inches turns the shape into noise. Two-variable scatters want to be square instead."
+   },
+   {
+    "t": "Why does a filled area chart often need `ax.margins(x=0)`?",
+    "o": [
+     "To fix the colours",
+     "matplotlib's default 5% margin stops the fill reaching the edge of the axes",
+     "To share axes",
+     "For the legend"
+    ],
+    "a": 1,
+    "w": "The margin exists so points do not sit on the frame, which is usually right and wrong for anything meant to reach the edge."
+   },
+   {
+    "t": "What happens to a legend placed outside the axes with no other change?",
+    "o": [
+     "It moves inside",
+     "It is drawn outside the figure and cut off",
+     "It shrinks",
+     "It raises"
+    ],
+    "a": 1,
+    "w": "Fix with subplots_adjust, constrained_layout, or bbox_inches='tight' at save time - which expands the file rather than shrinking the axes."
+   },
+   {
+    "t": "When do you need `set_aspect('equal')`?",
+    "o": [
+     "Always",
+     "When shape carries meaning - maps, geometry, images",
+     "For time series",
+     "For bar charts"
+    ],
+    "a": 1,
+    "w": "Without it a circle comes out an ellipse. For statistical charts with unrelated units it just wastes space."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/axis_limits_and_ticks.html",
+  "title": "Limits, Ticks and Scales",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "Why do automatic limits extend beyond the data?",
+    "o": [
+     "A bug",
+     "matplotlib adds a margin so points do not sit on the frame",
+     "To include zero",
+     "For the legend"
+    ],
+    "a": 1,
+    "w": "ax.margins(0) removes it, and passing limits in reverse order reverses the axis."
+   },
+   {
+    "t": "What goes wrong when you call `set_xticklabels` without `set_xticks`?",
+    "o": [
+     "Nothing",
+     "matplotlib keeps its own tick positions and renames them, so labels attach to the wrong values",
+     "It raises",
+     "Labels are ignored"
+    ],
+    "a": 1,
+    "w": "The symptom is a chart whose labels are subtly wrong with no error - set positions first, or pass both together."
+   },
+   {
+    "t": "What happens to zero values on a log axis?",
+    "o": [
+     "Plotted at the bottom",
+     "Silently dropped",
+     "Raise an error",
+     "Treated as 1"
+    ],
+    "a": 1,
+    "w": "Log requires positive values. A series that touches zero loses those points without any warning."
+   },
+   {
+    "t": "What is the cheapest visual improvement to a default matplotlib chart?",
+    "o": [
+     "A different colormap",
+     "Hiding the top and right spines",
+     "A bigger font",
+     "A grid"
+    ],
+    "a": 1,
+    "w": "Those two lines enclose the plot and carry no information. Nearly every published-looking style removes them."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/line_plots.html",
+  "title": "Line Plots",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "What does `ax.plot(y)` use for the x values?",
+    "o": [
+     "Zeros",
+     "range(len(y))",
+     "It raises",
+     "The y values"
+    ],
+    "a": 1,
+    "w": "An axis reading 0 to 99 when the data is dated is usually a forgotten x argument rather than a choice."
+   },
+   {
+    "t": "Why do four lines drawn in a loop come out in different colours?",
+    "o": [
+     "Random assignment",
+     "Each call takes the next colour from the axes' property cycle",
+     "matplotlib detects overlap",
+     "They do not"
+    ],
+    "a": 1,
+    "w": "The cycle holds ten colours, so the eleventh line repeats the first. Passing an explicit color bypasses it without advancing it."
+   },
+   {
+    "t": "What does matplotlib do with a NaN in the middle of a line?",
+    "o": [
+     "Interpolates across it",
+     "Breaks the line, leaving a gap",
+     "Raises",
+     "Treats it as zero"
+    ],
+    "a": 1,
+    "w": "The right default - a line drawn through the gap would assert the value moved smoothly across it, which is the thing you do not know."
+   },
+   {
+    "t": "Two calls draw a fill and a line over the same region. What decides which is visible?",
+    "o": [
+     "Colour",
+     "Call order, unless zorder overrides it",
+     "Alpha",
+     "Line width"
+    ],
+    "a": 1,
+    "w": "Later calls draw on top. Defaults put patches at 1 and lines at 2, so a line usually sits above a fill drawn before it."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/performance.html",
+  "title": "Performance and Large Data",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "What dominates matplotlib's drawing cost?",
+    "o": [
+     "The number of data points",
+     "The number of artists",
+     "The figure size",
+     "The colormap"
+    ],
+    "a": 1,
+    "w": "One plot call with a million points makes one Line2D; two thousand calls make two thousand artists, each drawn separately."
+   },
+   {
+    "t": "When is `plot(x, y, 'o')` faster than `scatter`?",
+    "o": [
+     "Never",
+     "When size and colour do not vary per point",
+     "For fewer than 100 points",
+     "On log axes"
+    ],
+    "a": 1,
+    "w": "scatter carries per-point size and colour machinery that is paid for even when unused."
+   },
+   {
+    "t": "Why is subsampling risky for a dense series?",
+    "o": [
+     "It is slow",
+     "It drops whatever it does not land on, including genuine single-sample spikes",
+     "It changes the colours",
+     "It breaks the axis"
+    ],
+    "a": 1,
+    "w": "Binning to a min/max envelope keeps the extremes, and the chart looks nearly the same because the envelope is what the eye reads."
+   },
+   {
+    "t": "What does `rasterized=True` do to a PDF?",
+    "o": [
+     "Rasterises the whole figure",
+     "Stores that artist as pixels while axes and text stay vector",
+     "Compresses the file",
+     "Lowers the dpi"
+    ],
+    "a": 1,
+    "w": "The right trade for a dense scatter in a document - small file, sharp labels, pixel-based data layer."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/plotting_from_pandas.html",
+  "title": "Plotting from pandas",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "What does `df.plot()` use for the x axis?",
+    "o": [
+     "The first column",
+     "The index",
+     "Row numbers always",
+     "You must specify it"
+    ],
+    "a": 1,
+    "w": "Which is why a time-indexed frame gives a dated axis for free, with one line per column and a legend."
+   },
+   {
+    "t": "Why pass `ax=` to `df.plot`?",
+    "o": [
+     "For speed",
+     "Without it pandas creates its own figure, so a plot inside a subplot loop lands in the wrong place",
+     "It is required",
+     "To set the title"
+    ],
+    "a": 1,
+    "w": "df.plot returns and accepts a matplotlib Axes, which is what makes the two mix freely."
+   },
+   {
+    "t": "Your grouped bars are clustered by the wrong variable. What do you change?",
+    "o": [
+     "The kind argument",
+     "The shape of the frame - transpose or pivot it",
+     "The colours",
+     "The legend"
+    ],
+    "a": 1,
+    "w": "Each column is a series and each row a group, so getting the frame into the right shape is the plotting work."
+   },
+   {
+    "t": "What is the default for the y axes with `subplots=True`?",
+    "o": [
+     "Shared",
+     "Independent, so the panels are not comparable",
+     "Log scale",
+     "Hidden"
+    ],
+    "a": 1,
+    "w": "Pass sharey=True, or a panel ranging 0-2 sits beside one ranging 0-2000 at the same visual height."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/saving_figures.html",
+  "title": "Saving Figures",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "`figsize=(4,2) dpi=200` and `figsize=(8,4) dpi=100` both give 800x400. How do they differ?",
+    "o": [
+     "Not at all",
+     "Text is sized in points, so it looks twice as large relative to the smaller figure",
+     "The second is sharper",
+     "The first is smaller on disk"
+    ],
+    "a": 1,
+    "w": "Choose figsize for layout and dpi for resolution - then a high-resolution export changes sharpness, not proportions."
+   },
+   {
+    "t": "Your saved figure is missing its y-axis label. What fixes it?",
+    "o": [
+     "A higher dpi",
+     "bbox_inches='tight'",
+     "A larger dpi",
+     "transparent=True"
+    ],
+    "a": 1,
+    "w": "savefig writes the declared figure area, and labels drawn outside it get cropped. It also changes the output dimensions."
+   },
+   {
+    "t": "Why can a scatter of 100,000 points make a huge PDF?",
+    "o": [
+     "PDFs are inefficient",
+     "Vector file size grows with the number of elements, not the image size",
+     "The dpi is too high",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "rasterized=True on that artist stores it as pixels while keeping text and axes as vectors."
+   },
+   {
+    "t": "What does `transparent=True` NOT change?",
+    "o": [
+     "The figure background",
+     "The axes background",
+     "The text and spine colours",
+     "The file format"
+    ],
+    "a": 2,
+    "w": "A transparent figure dropped on a dark slide has invisible labels - a dark background needs the foreground recoloured too."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/scatter_plots.html",
+  "title": "Scatter Plots",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "When does `scatter` do something `plot(x, y, 'o')` cannot?",
+    "o": [
+     "Never",
+     "When size or colour needs to vary per point",
+     "When there are many points",
+     "When x is a date"
+    ],
+    "a": 1,
+    "w": "plot draws one line object with uniform markers, which makes it faster for large numbers of identical points."
+   },
+   {
+    "t": "What does `s=400` mean compared with `s=100`?",
+    "o": [
+     "Four times as wide",
+     "Twice as wide, four times the area",
+     "Four times the radius",
+     "Four points wide"
+    ],
+    "a": 1,
+    "w": "s is area in points squared. Scaling area is right, because that is what the eye compares."
+   },
+   {
+    "t": "What is the difference between `c=` and `color=` in scatter?",
+    "o": [
+     "None",
+     "c takes an array mapped through a colormap; color takes one fixed colour",
+     "color is deprecated",
+     "c is for categories"
+    ],
+    "a": 1,
+    "w": "One letter apart, and 'why is my whole plot one colour' is nearly always this confusion."
+   },
+   {
+    "t": "5000 points produce a solid blob. What is the most honest fix?",
+    "o": [
+     "Bigger markers",
+     "alpha for density, or hexbin to actually measure it",
+     "A different colour",
+     "Remove the axes"
+    ],
+    "a": 1,
+    "w": "Past roughly fifty thousand points, binning is the only honest option - and it is far faster to draw."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/styles_and_rcparams.html",
+  "title": "Styles and rcParams",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "What does changing `plt.rcParams` affect?",
+    "o": [
+     "Every figure, including ones already drawn",
+     "Figures created after the change",
+     "Only the current figure",
+     "Nothing until you call apply()"
+    ],
+    "a": 1,
+    "w": "They are defaults, applied when an artist is created. plt.rcdefaults() restores them."
+   },
+   {
+    "t": "What is the difference between `plt.style.use` and `plt.style.context`?",
+    "o": [
+     "None",
+     "context is a context manager that restores the previous settings afterwards",
+     "use is deprecated",
+     "context is faster"
+    ],
+    "a": 1,
+    "w": "Which is what you want in a script that also produces charts in another style."
+   },
+   {
+    "t": "How do you take a style but change two of its settings?",
+    "o": [
+     "Copy the style file",
+     "Pass a list: [name, {\"key\": value}] - applied left to right",
+     "You cannot",
+     "Edit rcParams afterwards only"
+    ],
+    "a": 1,
+    "w": "A dict in the list is treated as rcParams, so you avoid maintaining a whole style file for two overrides."
+   },
+   {
+    "t": "What happens when a font named in rcParams is not installed?",
+    "o": [
+     "An error",
+     "A warning and a silent fallback to another font",
+     "matplotlib downloads it",
+     "The text is blank"
+    ],
+    "a": 1,
+    "w": "The same script can produce different-looking output on a different machine, with only an easily-missed warning."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/subplots.html",
+  "title": "Subplots",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "What does `plt.subplots(1, 3)` return for the axes?",
+    "o": [
+     "A 2-D array",
+     "A 1-D array of three",
+     "A single Axes",
+     "A dict"
+    ],
+    "a": 1,
+    "w": "1x1 gives a bare Axes, which is what makes `fig, ax = plt.subplots()` work. squeeze=False forces 2-D always."
+   },
+   {
+    "t": "Why does `sharey=True` matter for a grid of histograms?",
+    "o": [
+     "It is faster",
+     "Without it each panel autoscales, so bar heights are not comparable between panels",
+     "It fixes the bins",
+     "It adds a legend"
+    ],
+    "a": 1,
+    "w": "The grid looks like a comparison and is not one. Sharing also hides the inner tick labels."
+   },
+   {
+    "t": "What does the string in `subplot_mosaic` represent?",
+    "o": [
+     "Panel titles",
+     "A picture of the layout, where repeated letters span cells",
+     "Colour codes",
+     "The data"
+    ],
+    "a": 1,
+    "w": "It returns a dict keyed by the letters, so axd['A'] beats gs[0, :2] for readability."
+   },
+   {
+    "t": "A figure looks fine on screen but is cropped when saved. What is missing?",
+    "o": [
+     "A higher dpi",
+     "Layout management - tight_layout or constrained_layout, and bbox_inches='tight'",
+     "A larger figsize",
+     "A different format"
+    ],
+    "a": 1,
+    "w": "savefig uses the figure's declared size, not what the screen showed, and labels are drawn outside the axes."
+   }
+  ]
+ },
+ {
+  "path": "matplotlib/twin_axes.html",
+  "title": "Twin and Secondary Axes",
+  "cat": "matplotlib",
+  "q": [
+   {
+    "t": "Why must you colour-code the two y axes on a twin plot?",
+    "o": [
+     "It looks nicer",
+     "Otherwise the reader has two scales and no way to tell which belongs to which series",
+     "matplotlib requires it",
+     "To pass accessibility checks"
+    ],
+    "a": 1,
+    "w": "Set both the label colour and tick_params labelcolor. Without it the chart is simply unreadable."
+   },
+   {
+    "t": "What determines where two twinned series cross?",
+    "o": [
+     "The data",
+     "The axis limits you chose for the second axis",
+     "The colours",
+     "The order drawn"
+    ],
+    "a": 1,
+    "w": "Readers see a crossing as an event in the data. It is an artefact of a choice usually made automatically."
+   },
+   {
+    "t": "What is the honest alternative to a twin axis?",
+    "o": [
+     "A bigger figure",
+     "Stacked panels sharing x, or indexing both series to a common base",
+     "A log scale",
+     "More colours"
+    ],
+    "a": 1,
+    "w": "Indexing puts them on one axis honestly, and then a crossing means something real - relative growth diverged."
+   },
+   {
+    "t": "How does `secondary_yaxis` differ from `twinx`?",
+    "o": [
+     "It is newer",
+     "It relabels the same data in another unit via a function pair, so there is no arbitrary scale",
+     "It is on the left",
+     "It shares the y axis"
+    ],
+    "a": 1,
+    "w": "Celsius/Fahrenheit or mm/inches - the two scales are related by a function, so nothing can mislead."
+   }
+  ]
+ },
+ {
   "path": "pandas/adding_and_dropping.html",
   "title": "Adding and Removing Columns",
   "cat": "pandas",

@@ -4076,6 +4076,182 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Annotating a Plot",
+  "path": "matplotlib/annotations.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Bar Charts",
+  "path": "matplotlib/bar_charts.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Box and Violin Plots",
+  "path": "matplotlib/box_and_violin.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Choosing a Chart",
+  "path": "matplotlib/choosing_a_chart.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Colour and Colormaps",
+  "path": "matplotlib/colours_and_colormaps.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Common Mistakes",
+  "path": "matplotlib/common_mistakes.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Dates on an Axis",
+  "path": "matplotlib/dates_on_axes.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Error Bars and Bands",
+  "path": "matplotlib/error_bars_and_bands.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Figure and Axes",
+  "path": "matplotlib/what_is_matplotlib.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Histograms and Distributions",
+  "path": "matplotlib/histograms.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Images and Heatmaps",
+  "path": "matplotlib/images_and_heatmaps.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Labels, Titles and Legends",
+  "path": "matplotlib/labels_and_legends.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Layout and Spacing",
+  "path": "matplotlib/layout_and_spacing.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Limits, Ticks and Scales",
+  "path": "matplotlib/axis_limits_and_ticks.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Line Plots",
+  "path": "matplotlib/line_plots.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Performance and Large Data",
+  "path": "matplotlib/performance.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Plotting from pandas",
+  "path": "matplotlib/plotting_from_pandas.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Saving Figures",
+  "path": "matplotlib/saving_figures.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Scatter Plots",
+  "path": "matplotlib/scatter_plots.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Styles and rcParams",
+  "path": "matplotlib/styles_and_rcparams.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Subplots",
+  "path": "matplotlib/subplots.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
+  "title": "Twin and Secondary Axes",
+  "path": "matplotlib/twin_axes.html",
+  "category": "matplotlib",
+  "topic": "matplotlib",
+  "icon": "chart",
+  "desc": ""
+ },
+ {
   "title": "Adding and Removing Columns",
   "path": "pandas/adding_and_dropping.html",
   "category": "pandas",

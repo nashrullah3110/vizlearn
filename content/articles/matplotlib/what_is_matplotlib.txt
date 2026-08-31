@@ -1,0 +1,321 @@
+title: Figure and Axes
+intro: The two objects everything hangs off, and the two APIs that confuse every example.
+
+## Two objects
+
+A **Figure** is the whole image: the canvas, its size, its background, and the file it is eventually saved to.
+
+An **Axes** is one plotting area inside it &mdash; the box with the ticks, the data, and the labels.
+
+The name is unfortunate. "Axes" is singular here, and it does not mean "the x and y axes". Those are `ax.xaxis` and `ax.yaxis`, which are objects on the Axes. One figure can hold many Axes, which is what a grid of subplots is.
+
+Nearly everything you want to do belongs to the Axes. Plotting, labelling, limits, ticks, legends and annotation are all `ax.` methods. The Figure handles size, the overall title, layout between subplots, and saving.
+
+`fig, ax = plt.subplots()` creates one of each and returns both. It is the standard first line of almost every matplotlib program, and it is worth using even for a single plot, because it puts you in the API that keeps working when the plot grows.
+
+
+## A figure holds axes; axes hold the plot
+
+Two objects, and almost every method you will use belongs to the second.
+
+```python-run
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(5, 3))
+
+ax.plot([1, 2, 3, 4], [10, 25, 18, 30], marker="o")
+ax.set_title("one figure, one axes")
+
+print("figure :", type(fig).__name__)
+print("axes   :", type(ax).__name__)
+print("axes on this figure:", len(fig.axes))
+print()
+print("'Axes' is singular here - it is one plotting area, not two axis")
+print("objects. The x and y axis objects live on it, as ax.xaxis / ax.yaxis.")
+```
+
+## The same plot, two ways to write it
+
+The stateful API draws into whatever figure is current; the object-oriented one asks a specific axes.
+
+```python-run
+import matplotlib.pyplot as plt
+
+# stateful: plt.* acts on "the current figure"
+plt.figure(figsize=(4, 2))
+plt.plot([1, 2, 3], [2, 1, 3])
+plt.title("stateful")
+
+# object-oriented: you hold the objects
+fig, ax = plt.subplots(figsize=(4, 2))
+ax.plot([1, 2, 3], [2, 1, 3])
+ax.set_title("object-oriented")
+
+print("two figures were created:", len(plt.get_fignums()))
+print()
+print("Both draw. The second says which axes it is drawing on, which is")
+print("why it keeps working once there is more than one.")
+```
+
+## Why the stateful API causes trouble
+
+It has a hidden current figure, and that is a global.
+
+```python-run
+import matplotlib.pyplot as plt
+
+fig1, ax1 = plt.subplots(figsize=(3.5, 2))
+ax1.set_title("first")
+
+fig2, ax2 = plt.subplots(figsize=(3.5, 2))
+ax2.set_title("second")
+
+# plt.plot goes to the CURRENT figure, which is now fig2
+plt.plot([1, 2, 3], [1, 2, 1])
+
+print("current figure number:", plt.gcf().number)
+print("fig1 has lines:", len(ax1.lines))
+print("fig2 has lines:", len(ax2.lines), "<- the plt.plot landed here")
+print()
+print("In a script this is merely surprising. In a notebook, where cells")
+print("run in any order, 'the current figure' is whatever ran last.")
+```
+
+## set_ methods, and the plt equivalents
+
+The object-oriented names are the plt names with <code>set_</code> in front, mostly.
+
+```python-run
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(5, 3))
+ax.plot([1, 2, 3], [4, 5, 6])
+
+ax.set_title("title")
+ax.set_xlabel("x label")
+ax.set_ylabel("y label")
+ax.set_xlim(0, 4)
+
+print("plt.title()  -> ax.set_title()")
+print("plt.xlabel() -> ax.set_xlabel()")
+print("plt.xlim()   -> ax.set_xlim()")
+print("plt.plot()   -> ax.plot()      <- no set_ prefix; it draws")
+print()
+print("ax.set() takes several at once:")
+ax.set(title="set several at once", xlabel="x", ylabel="y")
+print("   ", ax.get_title())
+```
+
+## Every draw call returns something
+
+Usually a list of the artists it created, which you keep when you want to change them later.
+
+```python-run
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(5, 3))
+
+lines = ax.plot([1, 2, 3], [2, 1, 3])
+print("ax.plot returns:", type(lines).__name__, "of", len(lines), "->",
+      type(lines[0]).__name__)
+
+line = lines[0]                      # the common idiom is  line, = ax.plot(...)
+line.set_color("crimson")
+line.set_linewidth(3)
+line.set_label("renamed later")
+ax.legend()
+
+print()
+print("Because it returns a list, the comma in 'line, = ax.plot(...)' is")
+print("doing real work - it unpacks the single element.")
+```
+
+## Figures have to be closed
+
+Each one holds memory until it is, and in a loop that adds up.
+
+```python-run
+import matplotlib.pyplot as plt
+
+for i in range(3):
+    fig, ax = plt.subplots(figsize=(2.5, 1.5))
+    ax.set_title("figure %d" % i)
+
+print("open figures:", len(plt.get_fignums()), plt.get_fignums())
+print()
+plt.close("all")
+print("after plt.close('all'):", len(plt.get_fignums()))
+print()
+print("matplotlib keeps a reference to every figure it makes, so they are")
+print("not garbage collected on their own. A loop that draws and saves")
+print("without closing will eventually exhaust memory - and warn at 20.")
+
+fig, ax = plt.subplots(figsize=(4, 2))
+ax.plot([0, 1], [0, 1])
+ax.set_title("this one is left open, so the page shows it")
+```
+## Two APIs
+
+Every matplotlib example you find online is written in one of two styles, and mixing them is why so many of them are hard to follow.
+
+**Stateful (pyplot)**: `plt.plot(...)`, `plt.title(...)`, `plt.xlabel(...)`. These act on "the current figure and current axes", which matplotlib tracks internally. It is compact and reads well for a single quick plot.
+
+**Object-oriented**: `ax.plot(...)`, `ax.set_title(...)`. You hold the objects and say which one you mean.
+
+The stateful API is a convenience layer over the object-oriented one. `plt.title` finds the current axes and calls `set_title` on it.
+
+The translation is mechanical: most `plt.foo()` calls become `ax.set_foo()`. The exceptions are the drawing methods &mdash; `plot`, `scatter`, `bar` &mdash; which keep their names because they are actions rather than properties.
+
+## Why the object-oriented form
+
+The current figure is a global variable, with the problems globals always have.
+
+In a script that draws one plot, nothing goes wrong. In a script that draws several, `plt.plot` after creating a second figure lands on the second, whether or not that was the intent. In a notebook, where cells run repeatedly and out of order, "the current figure" is whatever ran last &mdash; which is why plots sometimes appear on the wrong chart or an earlier figure gains a line nobody added.
+
+The object-oriented form has no such ambiguity: `ax1.plot` draws on `ax1`.
+
+It is also the only form that works comfortably with subplots, where there are several axes and no sensible notion of a current one.
+
+This track uses `fig, ax = plt.subplots()` throughout, and mentions the `plt` equivalent where you are likely to meet it in other people's code.
+
+## Artists
+
+Everything drawn is an **Artist**: lines, text, patches, the axes themselves.
+
+Draw calls return the artists they create. `ax.plot` returns a **list** of `Line2D` objects &mdash; a list, because one call can draw several lines &mdash; which is why the idiom is:
+
+```python
+line, = ax.plot(x, y)
+```
+
+The trailing comma unpacks the single element. Without it, `line` is a list and `line.set_color` fails.
+
+Keeping the artist matters when you want to change it later: `line.set_color("crimson")`, `line.set_label("...")`. For a static plot you can ignore the return value entirely, which is what most code does.
+
+## Closing figures
+
+matplotlib keeps an internal reference to every figure created through pyplot, so they are never garbage collected while that reference exists.
+
+For one plot that does not matter. In a loop &mdash; generating a chart per group, per file, per day &mdash; the figures accumulate, and matplotlib warns after twenty that "more than 20 figures have been opened".
+
+`plt.close(fig)` closes one; `plt.close("all")` closes everything. Any loop that draws should close.
+
+On these pages the runner collects open figures after each run and closes them, which is why an editor that draws shows its plot. That is also why a `plt.close()` at the end of an editor would leave you with no image &mdash; the figure has to still be open when the program finishes.
+
+## Where matplotlib sits
+
+matplotlib is the oldest and most widely used plotting library in Python, and nearly everything else is built on it or interoperates with it. pandas' `.plot`, seaborn, and the plotting in scikit-learn and statsmodels all produce matplotlib objects you can adjust afterwards.
+
+That is the practical argument for learning it even if you mostly use something higher-level: when the convenience wrapper does not do quite what you need, the escape hatch is matplotlib, and it is always available.
+
+Its age also explains its awkward parts. The pyplot interface was designed to feel like MATLAB, the object-oriented API came later, and both are supported forever. Most confusing examples online are simply mixing the two.
+
+## The parts of a figure
+
+Worth naming, because the documentation uses these terms constantly:
+
+**Figure** &mdash; the whole canvas.
+
+**Axes** &mdash; one plotting area. A figure holds one or many.
+
+**Axis** &mdash; the x or y scale on an Axes, with its ticks and label. `ax.xaxis`.
+
+**Artist** &mdash; anything drawn: lines, text, patches, the axes themselves.
+
+**Spines** &mdash; the four lines bounding the plotting area.
+
+**Ticks** &mdash; the marks on an axis, with major and minor variants.
+
+The hierarchy is Figure &rarr; Axes &rarr; Axis &rarr; ticks and labels, and almost every method lives on the Axes.
+
+## Showing a figure
+
+In a **notebook**, figures display automatically when a cell finishes. `%matplotlib inline` is the default in Jupyter and rarely needs stating.
+
+In a **script**, nothing is displayed unless you ask. `plt.show()` opens a window and blocks; `fig.savefig(path)` writes a file. A script that draws and does neither produces nothing, which is a common first surprise.
+
+On **these pages**, the runner collects any figure still open when your program finishes, renders it to a PNG, and shows it under the printed output. That is why the editors here never call `show` or `savefig` &mdash; and why calling `plt.close()` at the end of an editor would leave you with no picture.
+
+## Backends
+
+A **backend** is what matplotlib draws with. Interactive ones open windows; non-interactive ones write files.
+
+`AGG` is the non-interactive raster backend, and it is what these pages use, because a Web Worker has no window to draw into. `matplotlib.use("AGG")` selects it, and that call must come before pyplot is imported &mdash; which is why it is in the page setup rather than in the examples.
+
+You will meet this in two places: on a server with no display, where `AGG` is required, and in a script that hangs on `plt.show()` because it picked an interactive backend it cannot actually use.
+
+## What this track covers
+
+The first modules are the drawing types: lines, scatters, bars, histograms, boxes, images.
+
+Then the parts that make a chart readable: labels, legends, limits, ticks, scales, colour, annotation.
+
+Then layout: subplots, spacing, twin axes, saving.
+
+Then judgement: choosing a chart, common mistakes, and performance when the data is large.
+
+Every module is six short programs, and each one draws. Changing a number and re-running is the fastest way to find out what an argument actually does &mdash; which is worth more here than in most libraries, because matplotlib's argument names are not always guessable.
+
+## Questions people ask first
+
+**Why are there two ways to do everything?**
+
+History. pyplot was written to feel like MATLAB, where there is one implicit figure and commands act on it. The object-oriented API came later and is what pyplot calls underneath. Both are supported permanently, so examples mix them, and that is the main reason matplotlib feels harder than it is.
+
+**Do I need `plt.show()`?**
+
+In a script, yes, unless you are saving to a file. In a notebook, no. On these pages, no &mdash; the runner collects whatever is open.
+
+**Why does my figure look different on someone else's machine?**
+
+A different style, a different `matplotlibrc`, a missing font, or a different backend. The first two are the usual causes and both are silent.
+
+**Should I use seaborn instead?**
+
+For statistical charts, often yes &mdash; it produces matplotlib objects, so nothing is lost. Knowing matplotlib is what lets you adjust what seaborn gives you.
+
+**Why is my chart slow?**
+
+Almost always too many artists, or too many points to be visible. Both have their own module.
+
+## How to read the documentation
+
+matplotlib's documentation is large and organised around the object model, which makes it hard to search until you know the vocabulary.
+
+Three habits help.
+
+Search for the **Axes method**, not the pyplot function &mdash; `Axes.set_xlabel` rather than `plt.xlabel` &mdash; because that page lists the full signature and every keyword.
+
+Read the **Artist** page for the thing you are styling. Most keyword arguments to a drawing call are properties of the artist it creates, so `Line2D` documents everything `plot` accepts beyond its own arguments.
+
+Use the **examples gallery** as a search index. Finding a picture that resembles what you want and reading its source is usually faster than working out what the operation is called.
+
+The API is wide but shallow: a few hundred methods, most of which take the same handful of styling arguments. Once the vocabulary is familiar the documentation becomes navigable.
+
+## In summary
+
+Two objects: a Figure holding one or more Axes. Almost every method you want belongs to the Axes.
+
+Two APIs: the stateful `plt.*` one that draws into a hidden current figure, and the object-oriented one that names the axes. The second is what this track uses, because the first goes wrong the moment there is more than one figure &mdash; which in a notebook is immediately.
+
+`fig, ax = plt.subplots()` is the standard opening line, and the translation from any pyplot example is mechanical: `plt.title` becomes `ax.set_title`, and the drawing methods keep their names.
+
+Draw calls return the artists they create, which you keep when something needs changing later and ignore otherwise.
+
+And figures must be closed, because matplotlib holds a reference to every one until you do.
+
+Everything after this module is either a kind of drawing or a way of making the result readable, and all of it hangs off those two objects.
+
+## A closing note
+
+matplotlib has a reputation for being hard, and most of that comes from two things this module addresses.
+
+The first is the two APIs, and examples that mix them without saying so. Once you know that `plt.title` and `ax.set_title` are the same operation reached differently, most confusing code becomes readable.
+
+The second is that it is a **drawing** library rather than a charting one. It has no opinion about what a good chart is, so it will not stop you, and everything is possible at the cost of nothing being automatic.
+
+That is the right trade for a foundation library, and it is why every higher-level tool in Python either sits on matplotlib or has to reimplement it. Learning it well means the ceiling is never the library.
+
+## Reading the code back
+
+Every chart in this track starts the same way and ends the same way: create a figure and axes, draw with ax methods, label, adjust, and let the runner show it. What changes in the middle is the drawing call and the handful of arguments it takes. Recognising that shape makes the rest of the library a matter of looking up which method and which argument, rather than learning a new pattern each time.
