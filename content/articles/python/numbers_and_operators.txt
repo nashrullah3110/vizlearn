@@ -137,6 +137,126 @@ math.inf             # infinity, useful as a starting "worst value"
 - <strong>Forgetting `input()` returns a string.</strong> `input("n: ") * 3` repeats the text; wrap it in `int()`.
 - <strong>Integer division on negatives.</strong> `-7 // 2` is `-4`, because it floors rather than truncating.
 
+## A worked example: divmod and the units it gives you
+
+`//` and `%` are almost always wanted together, and `divmod` returns both in
+one call:
+
+```python
+minutes, seconds = divmod(3725, 60)
+hours, minutes = divmod(minutes, 60)
+
+print(f"{hours}h {minutes}m {seconds}s")
+```
+
+```
+1h 2m 5s
+```
+
+Each `divmod` peels off one unit: how many whole minutes, and what is left
+over. Applying it again to the minutes gives hours. The same shape converts
+bytes to kilobytes, pence to pounds, or an item count to pages and a remainder.
+
+Doing it with two operators means writing the division twice, and the two can
+drift apart when someone edits one and not the other. `divmod` computes them
+together, so they cannot disagree.
+
+The general pattern is worth recognising: any time you have a total and a unit
+size, `//` is "how many whole units" and `%` is "what did not fit". Chunking a
+list, paginating results, laying out a grid and formatting a duration are all
+the same arithmetic.
+
+## Comparing floats without lying to yourself
+
+"Never compare floats with `==`" is easy to say and needs one more sentence to
+be useful, because `math.isclose` has two tolerances and the default only
+covers one case.
+
+```python
+import math
+
+print(math.isclose(0.1 + 0.2, 0.3))
+print(math.isclose(1e-9, 0.0))
+print(math.isclose(1e-9, 0.0, abs_tol=1e-6))
+```
+
+```
+True False True
+```
+
+By default `isclose` uses a **relative** tolerance: the two values must be
+within a small proportion of each other. That is the right test for ordinary
+magnitudes, and it is why the first line works.
+
+It fails against zero, and the second line shows it. Nothing is within a
+proportion of zero except zero itself, so a comparison to zero always needs an
+absolute tolerance, chosen from what "negligible" means in your problem. That
+is what `abs_tol` is for, and forgetting it is the most common way this
+function surprises people.
+
+The related habit is to compare rounded values only when rounding is the
+question. `round(a, 2) == round(b, 2)` is a legitimate test for "do these agree
+to the penny", and a poor substitute for a tolerance when the question is "are
+these the same number".
+
+## The operators that surprise people on negatives
+
+Three operations disagree with C, JavaScript and most people's intuition, all
+for the same underlying reason: Python floors rather than truncating.
+
+```python
+print(-7 // 2, -7 % 3, int(-2.7))
+```
+
+```
+-4 2 -2
+```
+
+`-7 // 2` is `-4`, not `-3`, because floor division rounds towards negative
+infinity rather than towards zero. `-7 % 3` is `2`, not `-1`, because the
+result takes the sign of the right-hand operand. And `int(-2.7)` is `-2`
+because `int` truncates, which is the one that does *not* floor &mdash; making
+`//` and `int()` disagree on negatives.
+
+The modulo behaviour is the useful one. Because the result always has the sign
+of the divisor, `i % len(items)` is a valid index for any `i`, positive or
+negative, which is exactly what makes the wrap-around idiom safe. In languages
+where modulo can return a negative, that idiom needs a correction term.
+
+The rule to carry: `//` and `%` are defined so that `a == (a // b) * b + a % b`
+holds for every pair, and everything else follows from keeping that identity
+true.
+
+## Choosing the right numeric type
+
+Four types cover numeric work in Python, and picking the wrong one is the cause
+of most "the arithmetic is wrong" reports.
+
+**`int`** for anything countable: quantities, indices, ids, pence. It is exact
+and unbounded, so there is no overflow to plan around and no rounding to worry
+about. When a value will only ever be whole, an `int` removes an entire class
+of problem.
+
+**`float`** for measurement and anything scientific: lengths, temperatures,
+probabilities, timings. It is fast, fixed-size and approximate, and the
+approximation is acceptable because the input was approximate too. A sensor
+reading accurate to three decimal places loses nothing to a representation
+error at the sixteenth.
+
+**`decimal.Decimal`** for money and anything a person will check by hand. It
+works in base ten, so the values you write are the values it holds, and it
+carries an explicit precision and rounding mode. The cost is speed, which
+almost never matters next to producing a total that matches the invoice.
+
+**`fractions.Fraction`** for exact ratios, where a third really must be a third
+rather than 0.333…. Rare, and the right answer when it applies.
+
+The decision is easier than it looks: if the number counts something, `int`. If
+it measures something, `float`. If somebody will audit it, `Decimal`. Mixing a
+`Decimal` with a `float` in one expression converts back to `float` and
+discards the exactness you paid for, so the choice has to hold across the whole
+calculation rather than at the end of it.
+
 ## Questions people ask
 
 <strong>Is there a maximum integer?</strong> No. Python integers grow to whatever memory allows.

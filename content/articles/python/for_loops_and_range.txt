@@ -20,6 +20,16 @@ When you genuinely need the position as well, <span class="mono-font">enumerate<
 for i, name in enumerate(items):
 ```
 
+And to walk two sequences together, `zip` pairs them by position:
+
+```python
+for name, score in zip(names, scores):
+    print(name, score)
+```
+
+`zip` stops at the shorter sequence, silently. If that would hide a bug,
+`zip(a, b, strict=True)` in Python 3.10+ raises instead.
+
 ## What range actually produces
 
 `range` does not build a list. It produces numbers one at a time as the loop asks for them, so `range(10_000_000)` uses a few dozen bytes rather than 400MB.
@@ -35,41 +45,6 @@ list(range(3))    # [0, 1, 2]            - materialise it if you must
 The stop value is always excluded, exactly as in slicing, and for the same reason: `range(len(items))` then covers every valid index precisely once.
 
 `for _ in range(3):` is the idiom for "do this three times" &mdash; the underscore signals that the value is deliberately unused.
-
-## Looping over things, not over numbers
-
-Many languages loop by counting: start an index at 0, compare it against a length, increment it. Python loops over the items directly.
-
-```python
-names = ["Ada", "Grace", "Alan"]
-
-for name in names:            # idiomatic Python
-    print(name)
-
-for i in range(len(names)):   # what people write coming from other languages
-    print(names[i])
-```
-
-The first version is shorter, cannot go out of bounds, and works unchanged on lists, strings, dictionaries, sets, files and generators &mdash; anything that can be iterated.
-
-When you genuinely need the position as well, `enumerate` gives both:
-
-```python
-for index, name in enumerate(names):
-    print(index, name)
-
-for number, name in enumerate(names, start=1):   # 1, 2, 3 for display
-    print(f"{number}. {name}")
-```
-
-And to walk two sequences together, `zip`:
-
-```python
-for name, score in zip(names, scores):
-    print(name, score)
-```
-
-`zip` stops at the shorter sequence, silently. If that would hide a bug, `zip(a, b, strict=True)` in Python 3.10+ raises instead.
 
 ## break, continue, and the else nobody expects
 
@@ -169,6 +144,122 @@ total = sum(order.amount for order in orders)   # no intermediate list
 ```
 
 Use a comprehension when the logic fits on one readable line. When it needs two conditions, a nested loop and a conditional expression, the plain loop is the clearer code.
+
+## What makes something iterable
+
+A `for` loop is not a list feature. It works on anything that implements one
+small protocol, which is why the same syntax walks strings, files,
+dictionaries, sets, generators and objects from libraries you have never seen.
+
+The loop calls `iter()` on whatever it was given to obtain an iterator, then
+calls `next()` on that repeatedly, and stops when `StopIteration` is raised.
+That is the whole mechanism. A class becomes iterable by defining `__iter__`,
+and there is no interface to declare or base class to inherit.
+
+Two consequences follow that explain a lot of behaviour.
+
+**Some iterables can be walked repeatedly and some cannot.** A list gives a
+fresh iterator each time, so two loops over it both see everything. A generator
+or a file object *is* its own iterator, holding a position, so a second loop
+sees nothing. The syntax is identical; the behaviour is not, and this is the
+single most common surprise when a loop over something that worked once
+produces nothing the second time.
+
+**Anything iterable works with more than `for`.** `list()`, `sum()`, `max()`,
+`sorted()`, `zip()`, `enumerate()`, unpacking and comprehensions all consume
+the same protocol. Learning it once means a new iterable type needs no new
+knowledge to use.
+
+## Modifying a list while looping over it
+
+This is the one `for` loop mistake that produces wrong output rather than an
+error:
+
+```python
+items = [1, 2, 2, 3]
+
+for x in items:
+    if x == 2:
+        items.remove(x)
+
+print(items)
+```
+
+```
+[1, 2, 3]
+```
+
+One of the twos survived. The iterator walks by position: after removing the
+first `2` at index 1, everything shifts left, so the next position the iterator
+visits is index 2 &mdash; which is now `3`, and the second `2` was stepped
+over.
+
+Nothing raises, and the result is plausible, which is what makes it dangerous.
+Removing every other item is a bug that looks like a subtle logic error rather
+than what it is.
+
+Three fixes, in order of preference. Build a new list, usually with a
+comprehension: `items = [x for x in items if x != 2]`, which is clearer as well
+as correct. Loop over a copy, `for x in items[:]`, when the removal genuinely
+has to happen in place. Or walk backwards by index, so that shifting affects
+only positions already visited.
+
+Dictionaries and sets are stricter about the same problem: changing their size
+during iteration raises `RuntimeError` rather than silently skipping. Lists get
+no such protection, because their iteration is positional.
+
+## The loop variable outlives the loop
+
+A `for` loop does not create a scope, so its variable is still there afterwards
+holding the last value it took.
+
+That is occasionally useful &mdash; after a search loop that ends with `break`,
+the variable holds the item that matched, which saves assigning it to something
+else. It is more often a quiet hazard.
+
+Two ways it bites. A name reused for two loops in one function carries a value
+from the first into the second if the second never runs, which happens when its
+collection is empty. And reading the variable after a loop that iterated
+nothing raises `NameError`, because it was never assigned at all &mdash; the
+loop body simply did not execute.
+
+Both mean the same thing in practice: do not depend on the loop variable after
+the loop unless you know the loop ran and you meant to. If the value matters,
+assign it to a clearly named variable inside the loop, where the intent is
+visible.
+
+A comprehension does not have this behaviour. Its variable has its own scope
+and is gone the moment it finishes, which is one of the reasons the Python 3
+change was worth making.
+
+## Reading a loop for cost
+
+The most common performance problem in everyday Python is a loop, and the cost
+can be read off the page without measuring anything.
+
+Count what runs per pass, and multiply by the passes. A loop over `n` items
+containing a dictionary lookup is `n` cheap operations. The same loop
+containing `if x in some_list` is `n` scans of that list, which is `n` times
+the list's length &mdash; the same code shape, an entirely different curve.
+
+Three specific things to look for inside a loop body.
+
+**A membership test against a list.** Converting that list to a set once,
+before the loop, is often the whole fix.
+
+**A search over another collection.** Building a dictionary index once, outside
+the loop, replaces a scan per pass with a lookup per pass. This is the single
+most valuable transformation in ordinary Python code.
+
+**Work that does not depend on the loop variable.** Anything computed the same
+way on every pass &mdash; opening a file, compiling a regular expression,
+building a constant list &mdash; belongs above the loop. The interpreter will
+not hoist it for you.
+
+None of this matters at small sizes, and that is the trap: every one of these
+is invisible on ten items and decisive on ten thousand. The habit worth forming
+is to notice the shape while writing, because the fix is trivial then and an
+investigation later.
 
 ## Questions people ask
 
