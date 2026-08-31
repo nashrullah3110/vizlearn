@@ -4555,6 +4555,20 @@ It also means a transformer that returns a different number of rows than it rece
 
 <strong>What if a column is numeric but categorical in meaning?</strong> Convert it to a string or a pandas `category` dtype before the pipeline, or dtype-based selection will scale it as a number.
 
+## Debugging one that is not working
+
+A column transformer that misbehaves is harder to inspect than a plain pipeline, because the branches run in parallel and the output is a single anonymous array. Four things to check, in order.
+
+**The output shape.** `pre.fit_transform(df).shape` against what you expected. Too few columns usually means a branch selected nothing; too many usually means a high-cardinality column reached the one-hot encoder.
+
+**What each branch actually selected.** After fitting, `pre.transformers_` holds the resolved triples, with the callable selectors already turned into concrete column lists. Printing the third element of each entry says exactly which columns went where, which is the fastest way to find a column that fell through to `remainder`.
+
+**The names.** `pre.get_feature_names_out()` lists every output column with its branch prefix. If a name you expected is absent, the column was dropped; if there are hundreds of `cat__` names, an identifier reached the encoder.
+
+**One branch at a time.** `pre.named_transformers_["num"]` gives the fitted branch, which can be inspected on its own &mdash; its imputer's `statistics_`, its scaler's `mean_`. When the whole thing produces something odd, narrowing to one branch usually localises it in a minute.
+
+The general lesson is that the object is introspectable at every level; the difficulty is only that the useful attributes have to be asked for by name.
+
 ## Things to try
 
 1. <strong>Watch the shape change.</strong> The first editor turns three columns into five. Read the names to see which came from where.
