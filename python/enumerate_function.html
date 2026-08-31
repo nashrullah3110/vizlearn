@@ -193,8 +193,9 @@
 for name in names:
     print(i, name)
     i += 1</code></pre><p>and the index:</p><pre><code class="language-python">for i in range(len(names)):
-    print(i, names[i])</code></pre><p>Both work. The first has a variable to initialise and remember to increment; forget the increment and the loop runs forever printing zero. The second reads the list twice per pass &mdash; once for the length, once per lookup &mdash; and puts <code>names[i]</code> where you wanted <code>name</code>.</p><p>for i, name in enumerate(names):</p><p>says the same thing with neither problem.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-what-it-actually-produces">What it actually produces</a></li><li><a href="#vz-s-start-renumbers-the-label">start= renumbers the label</a></li><li><a href="#vz-s-it-is-lazy-and-it-takes-any-iterable">It is lazy, and it takes any iterable</a></li><li><a href="#vz-s-when-you-do-not-need-it">When you do not need it</a></li><li><a href="#vz-s-what-it-replaces-and-why-that-matters">What it replaces, and why that matters</a></li><li><a href="#vz-s-the-start-argument">The start argument</a></li><li><a href="#vz-s-it-works-on-anything-iterable">It works on anything iterable</a></li><li><a href="#vz-s-unpacking-is-doing-the-work">Unpacking is doing the work</a></li><li><a href="#vz-s-when-you-do-not-need-it">When you do not need it</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+    print(i, names[i])</code></pre><p>Both work, and both have a specific failure.</p><p>The manual counter breaks the moment the body gains an early <code>continue</code> above the increment. The loop still runs, the numbers are just wrong, and nothing raises &mdash; which makes it the kind of bug that survives a code review.</p><p>The <code>range(len(...))</code> version puts an index between you and the value, so every use reads <code>names[i]</code> rather than <code>name</code>. It is noisier, and it offers an off-by-one error where none needs to exist.</p><pre><code class="language-python">for i, name in enumerate(names):
+    print(i, name)</code></pre><p>says the same thing with neither problem. There is no counter to forget and no index to get wrong.</p>
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-what-it-actually-produces">What it actually produces</a></li><li><a href="#vz-s-start-renumbers-the-label">start= renumbers the label</a></li><li><a href="#vz-s-it-works-on-anything-iterable">It works on anything iterable</a></li><li><a href="#vz-s-combining-it-with-zip">Combining it with zip</a></li><li><a href="#vz-s-unused-variables">Unused variables</a></li><li><a href="#vz-s-common-mistakes">Common mistakes</a></li><li><a href="#vz-s-the-short-version">The short version</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -337,41 +338,41 @@ for n, name in enumerate(["ana", "bo"], start=1):
                 <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
                     <h3 id="vz-s-what-it-actually-produces">What it actually produces</h3>
-                    <p><code>enumerate</code> yields tuples: <code>(0, "ana")</code>, <code>(1, "bo")</code>. The <code>for i, name</code> on the left is ordinary tuple unpacking, which is why the tuples are invisible in normal use. Loop without unpacking and you see them:</p><p>for pair in enumerate(names):&nbsp;&nbsp;# (0, 'ana')</p><p><code>list(enumerate(x))</code> is the quickest way to see the whole thing at once.</p>
+                    <p><code>enumerate</code> yields tuples: <code>(0, "ana")</code>, <code>(1, "bo")</code>. The <code>for i, name</code> on the left is ordinary tuple unpacking, which is why the tuples are invisible in normal use.</p><p>Loop without unpacking and they appear:</p><pre><code class="language-python">for pair in enumerate(names):
+    print(pair)          # (0, &#x27;ana&#x27;)</code></pre><p>which is legal and rarely what you want. The unpacked form is the point: it gives both halves a name at the top of the loop, so the body never says <code>pair[0]</code>.</p><p><code>list(enumerate(x))</code> is the quickest way to see the whole thing at once, which is worth knowing when a loop is not doing what you expect.</p>
                 </div>
                 <div>
                     <h3 id="vz-s-start-renumbers-the-label">start= renumbers the label</h3>
-                    <p>for n, name in enumerate(names, start=1):</p><p>This is for output humans read &mdash; line numbers, ranked lists, steps. It changes the number reported, not the position read: with <code>start=1</code>, the item labelled 1 is still <code>names[0]</code>. If you use <code>n</code> to index back into the list you will be off by one, which is a bug that only shows up on the first and last element.</p>
-                </div>
-                <div>
-                    <h3 id="vz-s-it-is-lazy-and-it-takes-any-iterable">It is lazy, and it takes any iterable</h3>
-                    <p><code>enumerate</code> does not build a list of pairs. It produces them one at a time as the loop asks, so it works on a file, a generator, or a sequence too large to hold in memory. It also works on strings, giving character positions.</p>
-                </div>
-                <div>
-                    <h3 id="vz-s-when-you-do-not-need-it">When you do not need it</h3>
-                    <p>If you never use the index, do not ask for it. <code>for name in names</code> is the shorter, clearer loop, and reaching for <code>enumerate</code> out of habit adds a variable nothing reads.</p>
-                </div>
-                <div>
-                    <h3 id="vz-s-what-it-replaces-and-why-that-matters">What it replaces, and why that matters</h3>
-                    <p>Before <code>enumerate</code>, keeping a counter alongside a loop meant one of two things: initialising <code>i = 0</code> and remembering to increment it at the bottom of the body, or looping over <code>range(len(items))</code> and indexing back into the list.</p><p>Both work. Both have a specific failure. The manual counter breaks the moment the body has an early <code>continue</code> above the increment, and the bug is invisible - the loop still runs, the numbers are just wrong. The <code>range(len(...))</code> version puts an index between you and the value, so every use is <code>items[i]</code> rather than <code>item</code>, which is noisier and offers an off-by-one error where none needs to exist.</p><p><code>enumerate</code> removes the counter entirely. There is nothing to forget to increment and nothing to index.</p>
-                </div>
-                <div>
-                    <h3 id="vz-s-the-start-argument">The start argument</h3>
-                    <pre><code class="language-python">for n, line in enumerate(lines, start=1):
-    print(f&quot;{n}: {line}&quot;)</code></pre><p>Line numbers, question numbers, ranked results and anything else a human reads usually start at one. Passing <code>start=1</code> is better than writing <code>n + 1</code> inside the body, because it states the intent once at the top rather than repeating an adjustment everywhere the number is used - and it means you cannot apply the adjustment in one place and forget it in another.</p>
+                    <pre><code class="language-python">for n, name in enumerate(names, start=1):
+    print(f&quot;{n}. {name}&quot;)</code></pre><p>Line numbers, question numbers, ranked results and anything else a human reads usually start at one.</p><p><code>start=1</code> is better than writing <code>n + 1</code> in the body, because it states the intent once at the top rather than repeating an adjustment everywhere the number is used &mdash; and it means you cannot apply the adjustment in one place and forget it in another.</p><p>The important caveat: it changes <strong>the number reported, not the position read</strong>. With <code>start=1</code>, the item labelled 1 is still <code>names[0]</code>. If you use <code>n</code> to index back into the list you are off by one, and the bug shows up only at the first and last element, which is exactly where a quick test is least likely to look.</p><p>If you find yourself indexing with the enumerate variable, that is a sign the loop wanted the default <code>start=0</code>.</p>
                 </div>
                 <div>
                     <h3 id="vz-s-it-works-on-anything-iterable">It works on anything iterable</h3>
-                    <p><code>enumerate</code> is not a list feature. It works on strings, files, generators, dictionary views and anything else you can loop over, and it does not build a list to do it - it yields pairs as the loop asks for them.</p><p>That makes <code>for n, line in enumerate(f)</code> a perfectly good way to number the lines of a file too large to hold in memory, which the <code>range(len(...))</code> form cannot do at all, because there is no length to take.</p>
+                    <p><code>enumerate</code> is not a list feature. It works on strings, files, generators, dictionary views, <code>zip</code> results and anything else you can loop over.</p><p>It also does not build a list to do it. It yields pairs as the loop asks for them, so:</p><pre><code class="language-python">with open(&quot;big.log&quot;) as f:
+    for n, line in enumerate(f, start=1):
+        if &quot;ERROR&quot; in line:
+            print(n, line.rstrip())</code></pre><p>numbers the lines of a file too large to hold in memory. The <code>range(len(...))</code> form cannot do this at all, because a file has no length to take.</p><p>On a string it gives character positions, which is occasionally what you want and more often a sign you should be using a string method.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-unpacking-is-doing-the-work">Unpacking is doing the work</h3>
-                    <p><code>enumerate</code> yields tuples. Writing <code>for n, item in ...</code> is tuple unpacking, the same feature that makes <code>for k, v in d.items()</code> work. Occasionally you will see it left packed:</p><pre><code class="language-python">for pair in enumerate(items):
-    print(pair)      # (0, &#x27;a&#x27;)</code></pre><p>which is legal and rarely what you want. The unpacked form is the point: it gives both halves a name at the top of the loop, so the body never has to say <code>pair[0]</code>.</p>
+                    <h3 id="vz-s-combining-it-with-zip">Combining it with zip</h3>
+                    <p>The two are frequently wanted together &mdash; a position and two parallel values:</p><pre><code class="language-python">for i, (name, score) in enumerate(zip(names, scores)):
+    print(i, name, score)</code></pre><p>The parentheses around <code>(name, score)</code> matter. <code>enumerate</code> yields <code>(index, item)</code>, and here the item is itself the tuple <code>zip</code> produced, so the target has to mirror that nesting. Written without them, Python tries to unpack two values into three names and raises.</p><p>Reading it outward from the loop variable is the way to keep it straight: the outer pair comes from <code>enumerate</code>, the inner pair from <code>zip</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-when-you-do-not-need-it">When you do not need it</h3>
-                    <p>If you never use the index, do not ask for one. <code>for item in items</code> is the correct loop, and <code>for i, item in enumerate(items)</code> with <code>i</code> unused is noise that a linter will flag. The convention when you need one and not the other is to name the unused variable <code>_</code>.</p>
+                    <h3 id="vz-s-unused-variables">Unused variables</h3>
+                    <p>If you never use the index, do not ask for one. <code>for item in items</code> is the correct loop, and <code>for i, item in enumerate(items)</code> with <code>i</code> unused is noise that a linter will flag.</p><p>The convention when you need one half and not the other is to name the unused variable <code>_</code>:</p><pre><code class="language-python">for _, name in enumerate(names):
+    ...          # pointless: this is just `for name in names`
+
+for i, _ in enumerate(names):
+    ...          # you wanted range(len(names)), or something else entirely</code></pre><p>Both of those are signals that <code>enumerate</code> is not the tool. The first should be a plain loop; the second wants <code>range(len(names))</code> or, more likely, a rethink, because a loop that uses only the index and never the item is usually counting something a comprehension or <code>sum</code> would count better.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-common-mistakes">Common mistakes</h3>
+                    <p><strong>Using the enumerate index to look up the item again.</strong> <code>names[i]</code> inside <code>for i, name in enumerate(names)</code> is doing the work twice, and it breaks if <code>start</code> is not zero.</p><p><strong>Assuming it returns a list.</strong> It returns an iterator, so printing it shows an object and consuming it twice gives nothing the second time. <code>list()</code> when you need to keep it.</p><p><strong>Forgetting the parentheses when combining with zip</strong>, which raises a value error that names counts rather than the cause.</p><p><strong>Enumerating when you wanted the item only</strong>, which adds a variable that nothing reads.</p><p><strong>Assuming <code>start</code> shifts the data.</strong> It shifts the label. The item at label 1 is still the first item.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-the-short-version">The short version</h3>
+                    <p><code>enumerate(iterable, start=0)</code> yields <code>(index, item)</code> pairs, lazily, for anything you can loop over.</p><p>Use it whenever a loop needs both the position and the value. Use <code>start=1</code> for numbers a person will read, and remember that the label and the index have now parted company.</p><p>Do not use it when the index is never read, and do not use the index to fetch the item you already have.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

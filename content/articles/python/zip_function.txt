@@ -3,52 +3,21 @@ intro: zip walks several sequences in step, yielding one tuple per position. It 
 
 ## The basic shape
 
+```python
 for name, score in zip(names, scores):
+    print(name, score)
+```
 
-Each pass gives you the next item from each list. The alternative is `for i in range(len(names))` followed by two lookups, which works and puts an index between you and the values.
+Each pass gives you the next item from each list. The alternative is
+`for i in range(len(names))` followed by two lookups, which works and puts an
+index between you and the values.
 
 It takes any number of iterables:
 
-for name, score, grade in zip(names, scores, grades):
-
-## Building a dict
-
-dict(zip(keys, values))
-
-This is the standard idiom for turning two parallel lists into a mapping, and it is worth recognising on sight because it appears everywhere.
-
-## It truncates, and it does not tell you
-
-This is the part that costs people an afternoon:
-
-zip(["ana", "bo", "cy", "dee"], [91, 78])
-
-gives two pairs. `cy` and `dee` are gone. No error, no warning &mdash; `zip` stops when the shortest input runs out, by design.
-
-When the lists come from the same source that is usually harmless. When one is data and the other is a lookup that quietly returned fewer rows, you get a silently shortened result, which is the worst kind of wrong.
-
-Two ways to be explicit:
-
-
 ```python
-zip(a, b, strict=True)  # raises ValueError on mismatch (3.10+)
-zip_longest(a, b, fillvalue=0)  # pads instead, from itertools
+for name, score, grade in zip(names, scores, grades):
+    ...
 ```
-
-
-If the lists are supposed to be the same length, `strict=True` turns a silent bug into an immediate error. That is nearly always the better trade.
-
-## Unzipping
-
-The same function reverses itself with a star:
-
-who, what = zip(*pairs)
-
-`zip(*pairs)` spreads the list of pairs into arguments, so `zip` receives each pair as a separate iterable and re-pairs them by position. The results come back as tuples, not lists &mdash; wrap in `list()` if that matters.
-
-## It is lazy
-
-`zip` returns an iterator, not a list. It produces pairs as they are asked for, which is what lets it work on files and generators. It also means you can only walk it once: consume it in a loop and it is exhausted. `list(zip(...))` when you need to keep the result.
 
 ## Walking two things at once
 
@@ -61,26 +30,34 @@ Without it, the loop goes through indices and reaches back into both lists,
 which reintroduces exactly the off-by-one risk that looping over items avoids.
 With it, each iteration hands you one item from each and the indices disappear.
 
-## Stopping at the shortest
+## It truncates, and it does not tell you
 
-`zip` stops when its shortest input runs out. This is a genuine design decision
-rather than an oversight, and it cuts both ways.
-
-It is convenient when you deliberately pair a finite list against an infinite
-generator, because you get exactly as many pairs as the finite side has. It is
-dangerous when the two lists were supposed to be the same length and are not,
-because the extra items are dropped in silence and the program produces a
-short, plausible, wrong answer.
-
-Since Python 3.10 you can ask for the check:
+This is the part that costs people an afternoon:
 
 ```python
-zip(a, b, strict=True)     # ValueError if the lengths differ
+zip(["ana", "bo", "cy", "dee"], [91, 78])
 ```
 
-Use it whenever equal lengths are an assumption rather than a coincidence. If
-you want the opposite - pad the short one instead of truncating - `itertools`
-has `zip_longest`, which fills with `None` or a value you choose.
+gives two pairs. `cy` and `dee` are gone. No error, no warning &mdash; `zip`
+stops when its shortest input runs out, by design.
+
+That design cuts both ways. It is convenient when you deliberately pair a
+finite list against an infinite generator, because you get exactly as many
+pairs as the finite side has. It is dangerous when the two lists were supposed
+to be the same length and are not, because the extra items vanish in silence
+and the program produces a short, plausible, wrong answer.
+
+Two ways to be explicit:
+
+```python
+zip(a, b, strict=True)             # ValueError on mismatch (Python 3.10+)
+zip_longest(a, b, fillvalue=0)     # pads instead, from itertools
+```
+
+Use `strict=True` whenever equal lengths are an assumption rather than a
+coincidence. It turns a silent bug into an immediate error, which is nearly
+always the better trade. `zip_longest` is the opposite choice: keep everything,
+and fill the gaps.
 
 ## Building a dictionary from two lists
 
@@ -92,6 +69,10 @@ This is the standard way to turn parallel lists into a mapping, and it reads
 better than any loop version. It appears constantly when handling CSV rows,
 where the header row supplies the keys and each data row supplies the values.
 
+The truncation rule applies here too, and is easier to miss: a row with fewer
+fields than the header produces a dict with fewer keys, silently, and the
+missing ones surface later as a `KeyError` a long way from the cause.
+
 ## Unzipping
 
 The same function undoes itself, which surprises people:
@@ -101,13 +82,68 @@ pairs = [("ana", 91), ("bo", 78)]
 names, scores = zip(*pairs)
 ```
 
-The star spreads the list of pairs into separate arguments, and `zip` then
-takes one item from each, which recombines them by position. The results are
-tuples rather than lists, which matters only if you intend to mutate them.
+The star spreads the list of pairs into separate arguments, so `zip` receives
+each pair as its own iterable and re-pairs them by position.
+
+Two details. The results are **tuples**, not lists, which matters only if you
+intend to mutate them &mdash; wrap in `list()` if you do. And `zip(*[])` on an
+empty list produces nothing to unpack, so the idiom raises on empty input,
+which is worth guarding when the data can be empty.
 
 ## It is lazy
 
-Like `map` and `filter`, `zip` returns an iterator rather than a list. Printing
-it shows an object, and consuming it twice gives nothing the second time. In a
-`for` loop that is invisible and ideal; the moment you want to keep the result,
-wrap it in `list()`.
+`zip` returns an iterator rather than a list. Printing it shows an object, and
+consuming it twice gives nothing the second time.
+
+In a `for` loop that is invisible and ideal &mdash; it is what lets `zip` work
+on files and generators without loading them. The moment you want to keep the
+result, or look at it twice, wrap it in `list()`.
+
+```python
+pairs = zip(a, b)
+print(len(pairs))        # TypeError: no len() on an iterator
+pairs = list(zip(a, b))  # now it has a length, and survives a second pass
+```
+
+## Where it fits among the alternatives
+
+**`zip`** &mdash; several sequences, matched by position.
+
+**`enumerate`** &mdash; one sequence, matched with its position.
+
+**`zip(*rows)`** &mdash; transposing rows into columns.
+
+**`itertools.product`** &mdash; every combination rather than matched pairs,
+which is the thing people occasionally reach for `zip` expecting.
+
+**`dict.items()`** &mdash; when the pairing already exists in a mapping, which
+is better than zipping `keys()` against `values()`.
+
+That last one is worth stating: `zip(d.keys(), d.values())` works and is a
+longer way of writing `d.items()`.
+
+## Common mistakes
+
+**Assuming equal lengths.** The commonest and quietest. `strict=True` when they
+should match.
+
+**Calling `len()` on the result**, which raises because it is an iterator.
+
+**Consuming it twice.** The second pass sees an exhausted iterator and does
+nothing, with no error.
+
+**Forgetting the star when unzipping.** `zip(pairs)` wraps each pair in another
+tuple instead of transposing; `zip(*pairs)` is the transpose.
+
+**Zipping `keys()` and `values()`** where `items()` says it directly.
+
+## The short version
+
+`zip` pairs sequences by position, lazily, stopping at the shortest.
+
+It is the right answer whenever two collections line up, and it is one argument
+away &mdash; `strict=True` &mdash; from being safe when they are supposed to.
+
+The star form transposes, `list()` makes the result reusable, and `enumerate`
+is its sibling for when the thing you need alongside the item is its position
+rather than another sequence.

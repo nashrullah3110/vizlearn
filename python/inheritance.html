@@ -193,7 +193,7 @@
     def speak(self):
         return &quot;woof&quot;</code></pre><p><code>Dog</code> gets everything <code>Animal</code> has. Where it defines a method of the same name, that version wins &mdash; that is overriding.</p><p>The payoff shows up in methods the parent already wrote:</p><pre><code class="language-python">def describe(self):
     return f&quot;{self.name} says {self.speak()}&quot;</code></pre><p><code>describe</code> was written once on <code>Animal</code> and calls whichever <code>speak</code> the actual object has. Add a tenth animal and <code>describe</code> needs no change. That is the whole argument for inheritance in one method.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-super">super()</a></li><li><a href="#vz-s-the-lookup-order">The lookup order</a></li><li><a href="#vz-s-is-a-not-has-a">is-a, not has-a</a></li><li><a href="#vz-s-composition-concretely">Composition, concretely</a></li><li><a href="#vz-s-abstract-base-classes">Abstract base classes</a></li><li><a href="#vz-s-duck-typing-means-you-often-need-neither">Duck typing means you often need neither</a></li><li><a href="#vz-s-multiple-inheritance-and-mixins">Multiple inheritance and mixins</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-super">super()</a></li><li><a href="#vz-s-the-lookup-order">The lookup order</a></li><li><a href="#vz-s-is-a-not-has-a">is-a, not has-a</a></li><li><a href="#vz-s-composition-concretely">Composition, concretely</a></li><li><a href="#vz-s-abstract-base-classes">Abstract base classes</a></li><li><a href="#vz-s-duck-typing-means-you-often-need-neither">Duck typing means you often need neither</a></li><li><a href="#vz-s-multiple-inheritance-and-mixins">Multiple inheritance and mixins</a></li><li><a href="#vz-s-overriding-and-calling-the-original">Overriding, and calling the original</a></li><li><a href="#vz-s-what-a-subclass-promises">What a subclass promises</a></li><li><a href="#vz-s-the-classic-wrong-hierarchy">The classic wrong hierarchy</a></li><li><a href="#vz-s-when-composition-is-the-answer">When composition is the answer</a></li><li><a href="#vz-s-attributes-and-init">Attributes and __init__</a></li><li><a href="#vz-s-depth">Depth</a></li><li><a href="#vz-s-common-mistakes">Common mistakes</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -390,6 +390,52 @@ class Shape(ABC):
                 <div>
                     <h3 id="vz-s-multiple-inheritance-and-mixins">Multiple inheritance and mixins</h3>
                     <p>Multiple parents are legal, and the reasonable use is a mixin: a small class providing one capability, with no state of its own and no expectation of being instantiated - <code>JSONSerialisableMixin</code>, <code>TimestampMixin</code>.</p><p>Deep diamond hierarchies are the unreasonable use. When two parents both define the same method and both call <code>super()</code>, the order of execution depends on the MRO, and reasoning about it stops being possible for anyone who did not write it. If you need <code>__mro__</code> to work out which code runs, the design has already cost more than it saved.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-overriding-and-calling-the-original">Overriding, and calling the original</h3>
+                    <p>Redefining a method in a subclass replaces it entirely. Calling <code>super()</code> runs the parent's version as part of yours:</p><pre><code class="language-python">class Account:
+    def describe(self):
+        return f&quot;{self.owner}: {self.balance}&quot;
+
+class Savings(Account):
+    def describe(self):
+        return super().describe() + f&quot; (rate {self.rate})&quot;</code></pre><p>That is the common and reasonable shape: extend the parent's behaviour rather than reproduce it.</p><p>The failure to avoid is copying the parent's body into the child and editing it. The two then drift, and a fix applied to one leaves the other wrong &mdash; which is the duplication inheritance was supposed to remove.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-what-a-subclass-promises">What a subclass promises</h3>
+                    <p>A subclass is a promise that it can be used anywhere the parent can. Code that holds an <code>Account</code> should not need to know whether it is really a <code>Savings</code>.</p><p>Breaking that promise is the usual source of inheritance bugs, and it happens in specific ways:</p><p><strong>Narrowing what a method accepts.</strong> If the parent's <code>withdraw</code> takes any positive amount and the child's rejects amounts over 100, existing code that was correct against the parent is now wrong.</p><p><strong>Raising where the parent did not.</strong> A child whose <code>save()</code> raises for some inputs breaks every caller that had no reason to catch anything.</p><p><strong>Changing what a method returns.</strong> A parent returning a list and a child returning a single item will fail somewhere far away.</p><p>The test is simple to state: could someone replace the parent with the child without reading the child's source? If not, the relationship is not inheritance, whatever the class statement says.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-the-classic-wrong-hierarchy">The classic wrong hierarchy</h3>
+                    <p>A square is a rectangle in geometry and not in code.</p><pre><code class="language-python">class Rectangle:
+    def set_width(self, w): self.w = w
+    def set_height(self, h): self.h = h
+
+class Square(Rectangle):     # tempting, and wrong
+    def set_width(self, w): self.w = self.h = w</code></pre><p>Any code that sets a width and a height and expects both to hold now breaks for squares. The class hierarchy is inherited from mathematics, where the objects are immutable; the code's objects are not.</p><p>The lesson generalises: inheritance is about <strong>substitutable behaviour</strong>, not about whether the words are in an is-a relationship in English.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-when-composition-is-the-answer">When composition is the answer</h3>
+                    <p>If the child needs only some of the parent's behaviour, or needs to disable part of it, that is composition:</p><pre><code class="language-python">class Cache:
+    def __init__(self):
+        self._data = {}          # has a dict, is not a dict
+    def get(self, k):
+        return self._data.get(k)</code></pre><p>Subclassing <code>dict</code> here would expose fifty methods you have not thought about, each of which is now part of your interface and can be called by anyone.</p><p>The rule of thumb: inherit when you want everything the parent does and mean to be usable in its place; compose when you want one capability and control over what is exposed.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-attributes-and-init">Attributes and __init__</h3>
+                    <p>A subclass that defines <code>__init__</code> and does not call <code>super().__init__()</code> gets an object the parent's methods cannot work with, because the attributes they rely on were never set.</p><pre><code class="language-python">class Savings(Account):
+    def __init__(self, owner, balance, rate):
+        super().__init__(owner, balance)     # not optional
+        self.rate = rate</code></pre><p>The failure appears later, as an <code>AttributeError</code> in a parent method, a long way from the constructor that caused it.</p><p>The same applies to <code>__eq__</code>, <code>__hash__</code> and <code>__repr__</code>: overriding one without thinking about the others produces objects that behave inconsistently in sets, dicts and debug output.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-depth">Depth</h3>
+                    <p>Two levels of inheritance is usually manageable. Four is usually a design that grew rather than one that was chosen.</p><p>The cost of depth is that behaviour is assembled from pieces spread across files, and answering "what does this method do?" means reading the whole chain. <code>Class.__mro__</code> tells you the order, and needing it regularly is the signal that the hierarchy has outgrown its usefulness.</p><p>Flattening usually means turning the middle layers into composed objects or plain functions, which is more code in the class and less code to find.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-common-mistakes">Common mistakes</h3>
+                    <p><strong>Copying the parent's method body</strong> instead of calling <code>super()</code>.</p><p><strong>Subclassing to reuse code</strong> rather than to be substitutable &mdash; the most common misuse, and what composition is for.</p><p><strong>Forgetting <code>super().__init__()</code></strong>, which produces an <code>AttributeError</code> far from its cause.</p><p><strong>Subclassing builtins</strong> like <code>dict</code> or <code>list</code> without needing their full interface.</p><p><strong>Deep hierarchies</strong>, where finding the code that runs requires the MRO.</p><p><strong>Overriding a method with a different signature</strong>, which breaks callers that were written against the parent.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->
