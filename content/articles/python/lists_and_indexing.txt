@@ -128,6 +128,132 @@ Keep them to one line of logic. A comprehension with two conditions, a nested lo
 
 For very large sequences, a generator expression `(n * n for n in range(10_000_000))` produces items lazily and uses almost no memory.
 
+## What list operations cost
+
+A list is an array of references underneath, and that single fact predicts the
+cost of everything you can do to one.
+
+**Cheap, and independent of size.** Indexing `items[i]`, assigning to a
+position, `len()`, and `append`. Appending is occasionally slower when the
+underlying array has to grow, but Python over-allocates so that averages out to
+constant.
+
+**Proportional to length.** `insert(0, x)` and `pop(0)`, because everything
+after the insertion point has to shift along. `remove(x)` and `x in items`,
+because both scan until they find a match. `del items[0]`, for the same shifting
+reason.
+
+The one that catches people is the combination: a loop over `n` items that does
+`x in some_list` inside it is doing `n` scans, which is quadratic even though
+nothing about the code looks nested. Converting that list to a set once, before
+the loop, is the standard fix and often the whole fix.
+
+The other is queue-shaped work. Repeatedly taking from the front of a list is
+proportional to length on every step. `collections.deque` is built for it:
+
+```python
+from collections import deque
+
+d = deque([1, 2, 3])
+d.appendleft(0)
+print(list(d))
+```
+
+```
+[0, 1, 2, 3]
+```
+
+`appendleft` and `popleft` are constant time, where the list equivalents are
+not. If a list is being used as a queue, a deque is the right container and the
+change is usually two lines.
+
+## Removing items safely
+
+Removing while iterating is the mistake that produces wrong output rather than
+an error, because the iterator walks by position and removal shifts everything
+after it left.
+
+The reliable answer is almost always to build a new list instead of editing the
+old one:
+
+```python
+rows = [1, 2, 2, 3]
+print([x for x in rows if x != 2])
+```
+
+```
+[1, 3]
+```
+
+A comprehension states the condition for *keeping* an item, which is easier to
+get right than a condition for removing one, and it cannot skip anything
+because nothing shifts underneath it.
+
+When the removal genuinely has to happen in place &mdash; because other code
+holds a reference to that exact list &mdash; assign back into a full slice:
+`items[:] = [x for x in items if keep(x)]`. That replaces the contents rather
+than rebinding the name, so every holder sees the change.
+
+The other two options are worth knowing and worth reaching for less. Iterating
+over a copy, `for x in items[:]`, works because the copy is not being modified.
+Walking backwards by index works because shifting only affects positions
+already visited. Both are correct and both are more to explain than the
+comprehension.
+
+## Sorting, in place and not
+
+Two spellings, one difference, and it is the source of a classic beginner bug.
+
+`items.sort()` reorders the list in place and returns `None`. `sorted(items)`
+leaves the original alone and returns a new list. So `items = items.sort()`
+replaces the list with `None`, and the `None` is deliberate &mdash; every
+in-place method in the standard library returns it, precisely so this mistake
+fails loudly rather than silently appearing to work.
+
+Both take the same two arguments. `key` is a function applied to each item to
+decide what to compare: `key=len` sorts by length, `key=str.lower` sorts
+case-insensitively, `key=lambda r: r["score"]` sorts records by a field.
+`reverse=True` flips the whole ordering.
+
+A tuple key gives tiebreaks, and it is worth having in your fingers:
+`key=lambda r: (-r["score"], r["name"])` sorts by score descending and breaks
+ties by name ascending. The minus sign reverses one field only, which
+`reverse=True` cannot do because it reverses everything.
+
+The sort is **stable**, meaning items that compare equal keep their original
+relative order. That guarantee is what makes sorting twice work for a two-level
+sort, and it is a property you can rely on rather than an accident of the
+implementation.
+
+## Building a list, and the ways that go wrong
+
+Three ways to build a list, and one that quietly does not.
+
+**Append in a loop** when each step does real work or has a condition too
+complex for one line. It is the plainest shape and it is never wrong.
+
+**A comprehension** when the loop's only job is to produce items.
+`[f(x) for x in items if keep(x)]` states the result on the first line and
+leaves nowhere for anything else to hide.
+
+**Multiplication** for a flat list of a repeated immutable value.
+`[0] * 5` gives five zeros and is perfectly safe, because integers cannot be
+mutated.
+
+The one that goes wrong is multiplication with a mutable item.
+`[[0] * 3] * 3` does not build three rows; it builds one row and stores three
+references to it, so writing into `board[0][0]` appears to write into all three.
+The inner `[0] * 3` is fine &mdash; it is the outer multiplication that
+duplicates a reference rather than the object.
+
+The comprehension version, `[[0] * 3 for _ in range(3)]`, evaluates the inner
+expression afresh on every pass, so there really are three lists. The same rule
+explains the mutable default argument: one object, created once, shared
+everywhere it appears.
+
+The general test is whether the thing being repeated can change. Repeat
+numbers, strings and tuples freely; build anything mutable with a comprehension.
+
 ## Questions people ask
 
 <strong>What is the difference between `append` and `extend`?</strong> `append` adds one item &mdash; `[1,2].append([3,4])` gives `[1, 2, [3, 4]]`. `extend` adds each item of an iterable, giving `[1, 2, 3, 4]`.
