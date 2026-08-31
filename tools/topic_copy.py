@@ -14,6 +14,163 @@ Keyed by the same topic key as TOPICS. Rendered by tools/build_topics.py.
 
 # Each entry: extra "About this track" paragraph, then the three sections.
 TOPIC_SECTIONS = {
+    "numpy": {
+        "learn": [
+            "Predict an operation's result shape from the shapes going in, rather than running it to find out.",
+            "Apply the broadcasting rules deliberately, including the cases where they raise.",
+            "Tell a view from a copy, and know which operations give you which.",
+            "Read axis= as the axis that disappears, and get the same answer in any number of dimensions.",
+            "Choose a dtype that fits the data, and recognise the silent overflow when one does not.",
+        ],
+        "order": (
+            "Arrays come first, because the dtype and the shape decide almost "
+            "everything that follows. Then indexing and slicing, which is where "
+            "views appear, and vectorised arithmetic, which is the reason to use "
+            "the library at all. Broadcasting, masking and fancy indexing build on "
+            "those three. Aggregation along an axis comes next, then the "
+            "structural operations - stacking, transposing, sorting - and finally "
+            "the linear algebra that sits under every machine learning library, "
+            "plus the performance and file-format material you need once the "
+            "arrays get large."
+        ),
+        "next": (
+            "NumPy is the layer under pandas, scikit-learn, PyTorch and matplotlib, "
+            "so the shapes and dtypes here reappear in all of them. The pandas "
+            "track adds labels and mixed types to the same arrays; the matplotlib "
+            "track draws them."
+        ),
+        "more": (
+            "Every example runs in the browser against the real library, and "
+            "several are written so the output contradicts the guess most people "
+            "would make - that a slice is a copy, or that axis=0 means along the "
+            "rows. Being wrong on the page and seeing it immediately is the point."
+        ),
+    },
+    "pandas": {
+        "learn": [
+            "Explain what the index is doing in an operation you did not ask it to take part in.",
+            "Choose between loc and iloc without guessing, and know why their slices differ.",
+            "Recognise chained assignment on sight, and write the version that works.",
+            "Reshape a frame into the form a group-by, a join or a chart actually wants.",
+            "Spot the silent failures - a dropped NaN key, a duplicated merge key, an integer column turned float.",
+        ],
+        "order": (
+            "The Series and the index come first, because nearly every pandas "
+            "surprise traces back to the index doing work you did not ask for. "
+            "Selection follows, and then the copy warning, which gets a module to "
+            "itself because nothing else in the library wastes as much of people's "
+            "time. Cleaning comes next - dtypes, missing values, duplicates, text "
+            "and dates - since that is where most real work goes. Only then the "
+            "aggregation everyone thinks of as the point: group-by, joins, "
+            "reshaping, time series, and the performance rules that decide whether "
+            "any of it finishes."
+        ),
+        "next": (
+            "pandas sits on NumPy and feeds matplotlib, scikit-learn and most data "
+            "pipelines. The NumPy track explains the array layer underneath; the "
+            "matplotlib track picks up where df.plot stops being enough."
+        ),
+        "more": (
+            "Every example runs in the browser against pandas itself, and several "
+            "demonstrate a failure rather than describing it - the assignment that "
+            "silently does nothing, the merge that multiplies rows, the group-by "
+            "whose totals no longer add up."
+        ),
+    },
+    "matplotlib": {
+        "learn": [
+            "Reach for the object-oriented API and translate any pyplot example you find into it.",
+            "Choose a chart from the question being asked rather than from habit.",
+            "Control limits, ticks, scales and colour deliberately instead of accepting the defaults.",
+            "Build a figure of several panels that is a genuine comparison rather than four adjacent charts.",
+            "Recognise the displays that mislead - a truncated bar axis, a dual axis, an uncentred diverging colormap.",
+        ],
+        "order": (
+            "The figure and the axes come first, along with the two APIs that make "
+            "most examples online confusing. Then the drawing types - lines, "
+            "scatters, bars, histograms, boxes and images - followed by everything "
+            "that makes a chart readable: labels, legends, limits, ticks, colour "
+            "and annotation. Layout and saving come next, because a figure that "
+            "looks right on screen and crops when saved is the commonest "
+            "frustration. The track ends with judgement rather than mechanism - "
+            "choosing a chart, the mistakes that produce a plausible wrong "
+            "picture, and what to do when there are more points than pixels."
+        ),
+        "next": (
+            "matplotlib is the layer under pandas' .plot and under seaborn, so "
+            "anything either of those produces can be adjusted with what is here. "
+            "The pandas track covers getting data into the shape a chart wants, "
+            "which is usually the larger half of the work."
+        ),
+        "more": (
+            "Every editor draws a real figure and shows it under the output, so "
+            "changing a number and running it again is the fastest way to find out "
+            "what an argument does - which matters here more than in most "
+            "libraries, because matplotlib's argument names are not always "
+            "guessable."
+        ),
+    },
+    "pydantic": {
+        "learn": [
+            "Describe the shape of incoming data as a model, and let the library reject what does not fit.",
+            "Read a validation error well enough to know which field failed and why.",
+            "Choose between strict and lax coercion deliberately, rather than discovering the default.",
+            "Validate and serialise nested models, custom types, dates and decimals without hand-written checks.",
+            "Recognise the v1 patterns still all over the internet, and their v2 replacements.",
+        ],
+        "order": (
+            "Models and fields come first, then validation - what happens "
+            "automatically, what you have to ask for, and how to read the error "
+            "when it fails. Types follow: nested models, optionals, enums, dates, "
+            "decimals and the custom types that the standard library does not "
+            "cover. Then the parts that shape a real application - settings, "
+            "aliases, serialisation, generics and the FastAPI integration - and "
+            "finally performance and the v1-to-v2 migration you will meet in "
+            "existing code."
+        ),
+        "next": (
+            "Pydantic is the validation layer under FastAPI, so the FastAPI track "
+            "assumes what is here. It is also the boundary layer for anything that "
+            "reads JSON, environment variables or a config file."
+        ),
+        "more": (
+            "Every model on these pages runs in the browser against Pydantic "
+            "itself, including the ones written to fail - because the error a "
+            "library gives you is part of learning it, and reading one is a skill "
+            "the documentation cannot teach."
+        ),
+    },
+    "fastapi": {
+        "learn": [
+            "Build an endpoint and know which part of the request each parameter is reading.",
+            "Use dependency injection for shared work, and override it in tests.",
+            "Choose between async and sync endpoints from what the handler actually does.",
+            "Return the right status code and shape the error responses deliberately.",
+            "Structure an application that is still navigable once it outgrows one file.",
+        ],
+        "order": (
+            "The first endpoint comes first, then the request - path parameters, "
+            "query parameters, bodies, headers, forms and files - because "
+            "everything else assumes you can read the input. Responses and status "
+            "codes follow. Dependencies get the largest share of the track, since "
+            "they are the mechanism FastAPI is built around and the thing that "
+            "makes an application testable. The track closes with structure, "
+            "security, testing and the async question, which is where most "
+            "production problems actually live."
+        ),
+        "next": (
+            "FastAPI is Pydantic applied to HTTP, so the Pydantic track explains "
+            "the validation layer these pages rely on. Beyond it lie deployment, "
+            "databases and the operational material a running service needs."
+        ),
+        "more": (
+            "Every example runs a real FastAPI application in the browser against "
+            "a test client, so a request and its response are both on the page - "
+            "including the requests that are rejected, which is where most of the "
+            "framework's behaviour is visible."
+        ),
+    },
+
 
 "maths": {
  "more": "The order matters more here than anywhere else on the site. Each page is "

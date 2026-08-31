@@ -1,6 +1,5 @@
 title: Transpose and Moving Axes
 intro: Reordering axes without moving a single byte.
-
 ## Strides again
 
 An array knows how many bytes to step for each axis. Transposing swaps those numbers along with the shape, and the underlying buffer is untouched.
@@ -8,7 +7,6 @@ An array knows how many bytes to step for each axis. Transposing swaps those num
 That is why `a.T` on a gigabyte array returns instantly. It is a view, and `np.shares_memory(a, a.T)` confirms it.
 
 Everything else in this module follows from that one fact.
-
 
 ## .T reverses the axes
 
@@ -49,6 +47,14 @@ print("This is why a 'row minus column' outer operation needs None,")
 print("not .T:")
 print(v[:, None] - v)
 ```
+
+`v.T` where `v` has shape `(3,)` gives shape `(3,)`. Nothing happens.
+
+There is no second axis to swap, so the operation is meaningless and NumPy performs it silently rather than raising. People coming from MATLAB or from linear algebra notation expect a column vector and get their input back.
+
+The fix is to add an axis: `v[:, None]` gives `(3, 1)`, and `v[None, :]` gives `(1, 3)`. `reshape(-1, 1)` does the same job.
+
+This is also why an outer-style operation is written `v[:, None] - v` rather than `v.T - v`. The first broadcasts `(3,1)` against `(3,)` to give `(3,3)`; the second subtracts an array from itself and gives zeros.
 
 ## transpose with an explicit order
 
@@ -137,16 +143,6 @@ print()
 print("rot90 twice == flipping both ways:",
       np.array_equal(np.rot90(a, 2), np.flipud(np.fliplr(a))))
 ```
-## The 1-D trap
-
-`v.T` where `v` has shape `(3,)` gives shape `(3,)`. Nothing happens.
-
-There is no second axis to swap, so the operation is meaningless and NumPy performs it silently rather than raising. People coming from MATLAB or from linear algebra notation expect a column vector and get their input back.
-
-The fix is to add an axis: `v[:, None]` gives `(3, 1)`, and `v[None, :]` gives `(1, 3)`. `reshape(-1, 1)` does the same job.
-
-This is also why an outer-style operation is written `v[:, None] - v` rather than `v.T - v`. The first broadcasts `(3,1)` against `(3,)` to give `(3,3)`; the second subtracts an array from itself and gives zeros.
-
 ## More than two axes
 
 `.T` reverses **all** axes. On shape `(2, 3, 4)` it gives `(4, 3, 2)`.
@@ -186,10 +182,6 @@ This trips people up on image data.
 Transpose reflects along the main diagonal. Rotating a quarter turn is `np.rot90`. Mirroring is `np.flipud` (up-down) and `np.fliplr` (left-right).
 
 They are related &mdash; a rotation is a transpose followed by a flip &mdash; but they are different operations, and reaching for `.T` to turn an image gives a mirrored result that looks almost right and is not.
-
-## In practice
-
-Use `.T` freely on 2-D. Use `moveaxis` or `swapaxes` on anything higher, because they say what you meant. Remember that a 1-D transpose is a no-op, and that the result of any of them is a view over the same bytes &mdash; which is the entire point, and also the reason contiguity assumptions later in the pipeline can quietly cost you a copy.
 
 ## C order and F order, stated plainly
 

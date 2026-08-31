@@ -59,6 +59,22 @@ def slug(s):
     return "vz-s-" + (s[:48] or "section")
 
 
+def unique_slugs(titles):
+    """One id per heading, de-duplicated within the page.
+
+    A generated page can carry the same heading twice: the walkthrough folds a
+    step in under its own title, and the article may discuss the same thing
+    later. Emitting slug(title) for both produced two elements with one id -
+    invalid HTML, and a contents entry whose link jumped to the wrong section.
+    """
+    seen, out = {}, []
+    for t in titles:
+        base = slug(t)
+        seen[base] = seen.get(base, 0) + 1
+        out.append(base if seen[base] == 1 else "%s-%d" % (base, seen[base]))
+    return out
+
+
 def top_level_divs(src, start, end):
     """(open_start, close_end) for each <div> directly inside [start, end)."""
     out = []
@@ -163,24 +179,39 @@ def render(moved, headings):
 
 def process(rel):
     path = os.path.join(ROOT, rel)
-    src = restore(open(path, encoding="utf-8").read())
+    original = open(path, encoding="utf-8").read()
+    src = restore(original)
+
+    def bail(reason):
+        """Give up on this page, but do not leave a stale block behind.
+
+        A page can stop qualifying - a short new opening section pushes the
+        old one below the 45-word floor, say. restore() has already lifted
+        the previous run's block out of `src`; without writing that back the
+        page keeps a contents list linking to ids this run never injects,
+        which is how four hand-written pages ended up with dead anchors.
+        """
+        if src != original:
+            open(path, "w", encoding="utf-8").write(src)
+        return reason
 
     body = article_body(src)
     if not body:
-        return "no-article"
+        return bail("no-article")
 
     preamble, blocks = segments(src, *body)
     if len(blocks) < 3:
-        return "too-few-sections"
+        return bail("too-few-sections")
 
     # Give every heading a stable id so the contents list can link to it.
     # Patch back to front so the offsets ahead of each edit stay valid.
+    slugs = unique_slugs([t for _, _, t in blocks])
     for i in range(len(blocks) - 1, -1, -1):
         a, b, title = blocks[i]
         m = H3.search(src, a, b)
         if not m or "id=" in m.group(1):
             continue
-        patched = '<h3%s id="%s">%s</h3>' % (m.group(1), slug(title), m.group(2))
+        patched = '<h3%s id="%s">%s</h3>' % (m.group(1), slugs[i], m.group(2))
         src = src[: m.start()] + patched + src[m.end():]
 
     # Every id inserted above shifted the bytes after it, so the spans measured
@@ -188,11 +219,12 @@ def process(rel):
     # the stale offsets silently truncated the section being moved.
     body = article_body(src)
     if not body:
-        return "no-article"
+        return bail("no-article")
     preamble, blocks = segments(src, *body)
     if len(blocks) < 3:
-        return "too-few-sections"
-    ids = [(slug(title), title) for _, _, title in blocks]
+        return bail("too-few-sections")
+    ids = list(zip(unique_slugs([t for _, _, t in blocks]),
+                   [t for _, _, t in blocks]))
 
     # Prefer a substantial opening paragraph; otherwise lift the first section.
     if preamble and len(text_of(src[preamble[0]:preamble[1]]).split()) >= 45:
@@ -202,20 +234,20 @@ def process(rel):
         first_start, first_end, title = blocks[0]
         first_end = blocks[0][1]
         if title.lower().rstrip(":?") in UI_HEADINGS:
-            return "not-prose"
+            return bail("not-prose")
         rest = [i for i in ids[1:] if i]
 
     first = src[first_start:first_end]
     # A list-led section is still an introduction; only length disqualifies it.
     if len(text_of(first).split()) < 45:
-        return "not-prose"
+        return bail("not-prose")
 
     src = src[:first_start] + SLOT + src[first_end:]
     block = render(first, rest)
 
     lead = LEAD.search(src)
     if not lead:
-        return "no-anchor"
+        return bail("no-anchor")
     src = src[: lead.end()] + "\n" + block + src[lead.end():]
 
     open(path, "w", encoding="utf-8").write(src)

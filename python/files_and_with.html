@@ -327,68 +327,52 @@ print("with block   :", g.closed, " <- closed automatically")</script>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <div>
-                    <h3>A note about this page</h3>
+                    <h3 id="vz-s-a-note-about-this-page">A note about this page</h3>
                     <p>These editors run Python in your browser against an in-memory filesystem. The files are real while the program runs and vanish afterwards, so everything below behaves exactly as it would on your machine &mdash; it just does not persist.</p>
                 </div>
                 <div>
-                    <h3>with, and why</h3>
+                    <h3 id="vz-s-with-and-why">with, and why</h3>
                     <pre><code class="language-python">with open(&quot;notes.txt&quot;) as f:
     content = f.read()</code></pre><p>When the block ends the file is closed, whether it ended normally or by raising. Doing it by hand means <code>f.close()</code> in a <code>finally</code>, and forgetting it leaves the handle open &mdash; which on a long-running program eventually exhausts the operating system's limit, and on a write leaves data sitting in a buffer that never reaches the disk.</p><p><code>with</code> is not a style preference here. It is the correct way to open a file.</p>
                 </div>
                 <div>
-                    <h3>Three ways to read</h3>
+                    <h3 id="vz-s-three-ways-to-read">Three ways to read</h3>
                     <pre><code class="language-python">f.read()       # the whole thing as one string
 f.readlines()  # a list of lines
 for line in f: # one line at a time</code></pre><p>The third is the one to reach for by default. It holds a single line in memory regardless of file size, so it works on a file larger than your RAM, and it reads no worse than the others.</p><p>Lines keep their trailing <code>\n</code>, which is why <code>line.rstrip()</code> appears in almost every loop over a file.</p>
                 </div>
                 <div>
-                    <h3>Missing files raise</h3>
+                    <h3 id="vz-s-the-modes">The modes</h3>
+                    <p>"r"&nbsp;&nbsp;read, the default &mdash; raises if the file is missing<br>"w"&nbsp;&nbsp;write &mdash; <strong>truncates immediately</strong><br>"a"&nbsp;&nbsp;append &mdash; writes to the end<br>"x"&nbsp;&nbsp;create &mdash; raises if it already exists</p><p><code>"w"</code> is the dangerous one. It empties the file the moment it is opened, before you write anything, so an <code>open(path, "w")</code> that then raises leaves you with nothing. When you mean "add to this", <code>"a"</code> is the mode.</p><p><code>"x"</code> is worth remembering when overwriting would be a bug: it refuses rather than destroying.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-missing-files-raise">Missing files raise</h3>
                     <p><code>open("nope.txt")</code> raises <code>FileNotFoundError</code>, it does not return an empty file. Handle it, or let it propagate &mdash; both are reasonable, but do not check with <code>os.path.exists</code> first: the file can disappear between the check and the open, and the <code>try</code> handles that correctly anyway.</p>
                 </div>
                 <div>
-                    <h3>Paths, and why pathlib is worth the switch</h3>
+                    <h3 id="vz-s-text-and-encoding">Text and encoding</h3>
+                    <p>Files open in text mode and decode using your platform's default encoding, which differs between machines. For anything portable, say what you mean: <code>open(path, encoding="utf-8")</code>.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-paths-and-why-pathlib-is-worth-the-switch">Paths, and why pathlib is worth the switch</h3>
                     <p>String concatenation for paths breaks across operating systems and on edge cases like trailing slashes. <code>pathlib</code> handles both and reads better:</p><pre><code class="language-python">from pathlib import Path
 
 data = Path(&quot;content&quot;) / &quot;articles&quot; / &quot;notes.txt&quot;
 text = data.read_text(encoding=&quot;utf-8&quot;)</code></pre><p><code>read_text</code> and <code>write_text</code> open, read or write, and close in one call, which covers the common case where you want the whole file and do not need to stream it. For anything iterative, <code>data.open()</code> gives you the same file object <code>open</code> would.</p><p><code>Path</code> also carries the questions you would otherwise ask the <code>os</code> module: <code>.exists()</code>, <code>.suffix</code>, <code>.stem</code>, <code>.parent</code>, <code>.glob("*.txt")</code>.</p>
                 </div>
                 <div>
-                    <h3>Encoding is not optional in practice</h3>
+                    <h3 id="vz-s-encoding-is-not-optional-in-practice">Encoding is not optional in practice</h3>
                     <p>Text mode decodes bytes into a string using an encoding, and if you do not name one, Python uses the platform default. That default differs between machines, which is how a script that works on one computer produces <code>UnicodeDecodeError</code> on another, with data that has not changed.</p><p>Naming it removes the whole class of problem:</p><pre><code class="language-python">open(path, encoding=&quot;utf-8&quot;)</code></pre><p>If you are handling files you did not create and cannot assume, <code>errors="replace"</code> lets you read something rather than crashing, at the cost of substituting the bytes it could not decode.</p>
                 </div>
                 <div>
-                    <h3>Binary mode</h3>
-                    <p>Adding <code>b</code> - <code>open(path, "rb")</code> - skips decoding and gives bytes. That is what you want for images, archives, and anything you are copying rather than reading. The mistake in the other direction is more common: opening a text file in binary mode and then being puzzled that comparisons against strings all fail, because <code>b"abc"</code> and <code>"abc"</code> are different types that never compare equal.</p>
-                </div>
-                <div>
-                    <h3>What <code>with</code> actually does</h3>
-                    <p><code>with</code> is not file syntax. It works with any object that defines <code>__enter__</code> and <code>__exit__</code>, and it guarantees that the exit step runs when the block ends &mdash; whether it ends normally, by <code>return</code>, or by an exception.</p><p>For a file, the exit step closes it. For a lock, it releases. For a database connection, it commits or rolls back.</p><p>That guarantee is the point. Code that opens and closes by hand is correct until something between the two raises, and then the file stays open. In a short script the interpreter cleans up on exit and nothing appears wrong; in a long-running process, file handles leak until the operating system refuses to open more.</p><p>Because the mechanism is general, <code>with</code> is worth recognising as a shape rather than a file idiom &mdash; anything that needs cleaning up afterwards is a candidate.</p>
-                </div>
-                <div>
-                    <h3>Reading: three shapes, three purposes</h3>
-                    <p><code>f.read()</code> returns the entire contents as one string. Simple, and it needs memory proportional to the file.</p><p><code>f.readlines()</code> returns a list of lines, with the newline characters still attached, and has the same memory cost.</p><p>Iterating the file object &mdash; <code>for line in f</code> &mdash; yields one line at a time and never holds more than one in memory. It is the right default, and the only one that works on a file larger than RAM.</p><p>The newline is the detail people trip over. Every line except possibly the last ends with <code>\n</code>, so comparisons fail and printed output double-spaces. <code>line.rstrip("\n")</code> removes exactly the newline; a bare <code>strip()</code> also removes leading and trailing spaces, which is usually convenient and occasionally destroys meaningful indentation.</p>
-                </div>
-                <div>
-                    <h3>Modes, and the destructive one</h3>
-                    <p><code>r</code> reads and is the default. <code>w</code> <strong>truncates the file to nothing</strong> before writing. <code>a</code> appends. <code>x</code> creates and fails if the file exists.</p><p>The one to be careful with is <code>w</code>, because it destroys the file's contents at the moment of opening, before a single byte is written. A script that opens for writing and then crashes has already emptied the file.</p><p><code>x</code> is the safe version when the intent is to create something new, since it refuses rather than overwriting. It is under-used, and it converts a silent data loss into an error.</p><p>Adding <code>+</code> to any mode allows both reading and writing, with position rules that are easy to get wrong; when a program needs both, it is usually clearer to read the file, close it, and write a new one.</p>
-                </div>
-                <div>
-                    <h3>Writing safely</h3>
-                    <p>The pattern for not losing data when writing goes wrong is to write to a temporary file and rename it into place once it is complete.</p><p>Renaming within a filesystem is atomic, so any reader sees either the old file or the new one, never a half-written one. Without it, a crash partway through leaves a truncated file that looks valid.</p><p>That matters for anything another process reads, anything run on a schedule, and anything whose loss would be noticed. For a scratch file it is over-engineering.</p><p><code>f.write()</code> does not add newlines. <code>print(..., file=f)</code> does, which is often the more convenient way to write text line by line.</p><pre><code class="language-python">tmp = path.with_suffix(&quot;.tmp&quot;)
+                    <h3 id="vz-s-writing-safely">Writing safely</h3>
+                    <p>Writing directly over the only copy of a file has an obvious failure mode: if the program dies halfway, the original is gone and the replacement is incomplete. The standard remedy is to write beside it and rename:</p><pre><code class="language-python">tmp = path.with_suffix(&quot;.tmp&quot;)
 tmp.write_text(new_content, encoding=&quot;utf-8&quot;)
-tmp.replace(path)</code></pre>
+tmp.replace(path)</code></pre><p><code>replace</code> is atomic on the same filesystem, so a reader sees either the old file or the new one and never a half-written one.</p>
                 </div>
                 <div>
-                    <h3>Encoding</h3>
-                    <p><code>open()</code> uses the platform's default encoding unless told otherwise, and that default differs between machines. The same script can read a file correctly on one computer and raise <code>UnicodeDecodeError</code> on another.</p><p>Passing <code>encoding="utf-8"</code> explicitly removes the variability, and it should be considered mandatory for anything that leaves your own machine.</p><p>When a file's encoding is genuinely unknown, <code>errors="replace"</code> substitutes a placeholder for undecodable bytes rather than raising, which is right for inspection and wrong for anything that will be written back out &mdash; the replacement is lossy and permanent.</p><p>The related symptom is mojibake: text that decodes without error into the wrong characters, usually because a Windows-encoded file was read as UTF-8 or the reverse. That produces no exception at all, which is why the encoding is worth stating rather than discovering.</p>
-                </div>
-                <div>
-                    <h3>Paths</h3>
-                    <p><code>pathlib</code> replaces most of what string manipulation used to do with filenames, and it does so more safely.</p><p><code>Path("data") / "raw" / "file.csv"</code> builds a path with the right separator for the platform. <code>p.exists()</code>, <code>p.suffix</code>, <code>p.stem</code>, <code>p.parent</code> answer the usual questions without parsing. <code>p.read_text()</code> and <code>p.write_text()</code> handle the open and close for small files in one call.</p><p>The habit worth forming is to accept and pass <code>Path</code> objects rather than strings, converting at the edges. String paths work and reintroduce the separator and joining bugs that <code>pathlib</code> exists to remove.</p>
-                </div>
-                <div>
-                    <h3>Common mistakes</h3>
-                    <p><strong>Opening without <code>with</code></strong>, so a raised exception leaves the file open.</p><p><strong>Opening with <code>w</code> when <code>a</code> or <code>x</code> was meant</strong>, which empties the file immediately.</p><p><strong>Forgetting the newline</strong> when reading, or forgetting to add one when writing.</p><p><strong>Relying on the default encoding</strong>, which differs by platform.</p><p><strong>Reading a large file with <code>read()</code></strong> when iteration would do.</p><p><strong>Writing in place</strong> without a temporary file, so a crash truncates the original.</p><p><strong>Building paths with string concatenation</strong>, which breaks across platforms.</p>
+                    <h3 id="vz-s-binary-mode">Binary mode</h3>
+                    <p>Adding <code>b</code> - <code>open(path, "rb")</code> - skips decoding and gives bytes. That is what you want for images, archives, and anything you are copying rather than reading. The mistake in the other direction is more common: opening a text file in binary mode and then being puzzled that comparisons against strings all fail, because <code>b"abc"</code> and <code>"abc"</code> are different types that never compare equal.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

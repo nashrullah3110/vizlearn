@@ -110,6 +110,25 @@ print(b)
 print("   delhi kept its 0.")
 ```
 
+The most common real instance:
+
+```python
+sub = df[df["city"] == "pune"]
+df["doubled"] = sub["sales"] * 2
+```
+
+`sub` has only the Pune rows, so the computed Series has only those labels. Alignment fills every other row with `NaN`.
+
+pandas did exactly what it promises. The author expected "compute for these rows and leave the others alone", which is a different operation:
+
+```python
+df.loc[df["city"] == "pune", "doubled"] = df["sales"] * 2
+```
+
+The difference is visible whenever the column **already exists**. Whole-column assignment replaces the entire column, so rows absent from the subset are overwritten with `NaN` &mdash; even if they held a perfectly good value a moment ago. The `.loc` form touches only the selected rows and leaves the rest alone.
+
+When the column does *not* already exist, both forms leave `NaN` in the unselected rows, because creating a column has to put something in every row. If you want a default there, create the column first and then overwrite the subset &mdash; which is exactly what the editor above does.
+
 ## Dropping columns and rows
 
 The same method, steered by axis - and it returns a new frame by default.
@@ -183,28 +202,6 @@ Assigning a **Series** aligns on the index. If the Series has the same labels in
 Assigning a **list** or a NumPy array has no index to align on, so it goes in by position, and the length must match exactly or it raises.
 
 That difference means `df["x"] = some_series` and `df["x"] = some_series.values` can produce different columns from the same data. The first is usually what you want; the second is the escape hatch when you know the order is right and the labels are not.
-
-## The filtered-assignment trap
-
-The most common real instance:
-
-```python
-sub = df[df["city"] == "pune"]
-df["doubled"] = sub["sales"] * 2
-```
-
-`sub` has only the Pune rows, so the computed Series has only those labels. Alignment fills every other row with `NaN`.
-
-pandas did exactly what it promises. The author expected "compute for these rows and leave the others alone", which is a different operation:
-
-```python
-df.loc[df["city"] == "pune", "doubled"] = df["sales"] * 2
-```
-
-The difference is visible whenever the column **already exists**. Whole-column assignment replaces the entire column, so rows absent from the subset are overwritten with `NaN` &mdash; even if they held a perfectly good value a moment ago. The `.loc` form touches only the selected rows and leaves the rest alone.
-
-When the column does *not* already exist, both forms leave `NaN` in the unselected rows, because creating a column has to put something in every row. If you want a default there, create the column first and then overwrite the subset &mdash; which is exactly what the editor above does.
-
 ## Dropping
 
 `df.drop(columns=["b"])` and `df.drop(index=[0])` both return a new frame.

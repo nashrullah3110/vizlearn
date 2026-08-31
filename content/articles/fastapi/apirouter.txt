@@ -7,7 +7,6 @@ Every FastAPI project starts as one file, and one file works for perhaps twenty 
 
 `APIRouter` is the answer, and the useful time to reach for it is *before* you need to.
 
-
 ## A router is a mini-app
 
 Register routes on it exactly as on an app, then include it. The prefix and tags apply to everything in it.
@@ -36,6 +35,20 @@ for r in app.routes:
     if getattr(r, "methods", None):
         print("  %-6s %s" % (",".join(sorted(r.methods)), r.path))
 ```
+
+```python
+router = APIRouter(prefix="/modules", tags=["modules"])
+
+@router.get("")
+def list_modules():
+    ...
+
+app.include_router(router)
+```
+
+The decorators are the same. The prefix is prepended to every path in the router, so `@router.get("")` becomes `/modules`. The tags apply to every route, which is what groups them into a section in the interactive documentation.
+
+Note `@router.get("")` rather than `@router.get("/")` for the collection itself. With a prefix, the empty string gives `/modules` and a slash gives `/modules/`, and the difference is the trailing-slash redirect from earlier. Pick one convention.
 
 ## Several routers, one app
 
@@ -93,6 +106,16 @@ print()
 print("Same handlers, two paths. Real versioning usually wants two routers,")
 print("but the mechanism is this.")
 ```
+
+A prefix can be given when including instead of when creating:
+
+```python
+app.include_router(router, prefix="/v1")
+```
+
+That lets one router be mounted at several paths, which is the mechanism behind version prefixes. Whether you *should* mount the same handlers at two versions is a different question &mdash; usually a new version exists because behaviour differs, and then you want two routers.
+
+Where this genuinely helps is keeping the version out of the router file entirely, so the routes read as `/modules` and the assembly decides they live under `/v1`.
 
 ## Dependencies for a whole router
 
@@ -188,22 +211,6 @@ right.include_router(generic)
 print("wrong order:", TestClient(wrong).get("/modules/latest").json())
 print("right order:", TestClient(right).get("/modules/latest").json())
 ```
-## A router is a mini-app
-
-```python
-router = APIRouter(prefix="/modules", tags=["modules"])
-
-@router.get("")
-def list_modules():
-    ...
-
-app.include_router(router)
-```
-
-The decorators are the same. The prefix is prepended to every path in the router, so `@router.get("")` becomes `/modules`. The tags apply to every route, which is what groups them into a section in the interactive documentation.
-
-Note `@router.get("")` rather than `@router.get("/")` for the collection itself. With a prefix, the empty string gives `/modules` and a slash gives `/modules/`, and the difference is the trailing-slash redirect from earlier. Pick one convention.
-
 ## The shape a project takes
 
 One router per resource, one file each, assembled in one place:
@@ -220,19 +227,6 @@ app/
 `main.py` becomes short and boring, which is what you want from the file that wires everything together. Each router file owns one resource and can be read on its own.
 
 The advice worth acting on: create `routers/` on day one, even with two endpoints in it. Moving three routes later is trivial; moving eighty is a weekend, and by then something will depend on the import layout.
-
-## Prefixes at include time
-
-A prefix can be given when including instead of when creating:
-
-```python
-app.include_router(router, prefix="/v1")
-```
-
-That lets one router be mounted at several paths, which is the mechanism behind version prefixes. Whether you *should* mount the same handlers at two versions is a different question &mdash; usually a new version exists because behaviour differs, and then you want two routers.
-
-Where this genuinely helps is keeping the version out of the router file entirely, so the routes read as `/modules` and the assembly decides they live under `/v1`.
-
 ## Dependencies for a section
 
 ```python

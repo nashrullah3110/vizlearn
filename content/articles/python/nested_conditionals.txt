@@ -13,9 +13,7 @@ if age >= 18:
 
 If the inner `if` is the entire body of the outer one, and there is no `else` on either, the two conditions are simply both required:
 
-```python
-if age >= 18 and member:
-```
+if age &gt;= 18 and member:
 
 Same behaviour, one level of indentation, and the condition reads as one thought instead of two.
 
@@ -60,6 +58,12 @@ return "yes"
 
 
 Now every rule sits beside its own message, the happy path is the last line at zero indentation, and adding a rule is one line rather than another level. The page runs both over the same four cases and prints them side by side, because the point is that the behaviour is identical and only the shape changed.
+
+## elif is not nesting
+
+if n &gt; 100: ... elif n &gt; 50: ... else: ...
+
+An `elif` chain is one decision with several outcomes, all at the same indentation. Reaching for a nested `if` where an `elif` would do is how a flat choice becomes a staircase.
 
 ## The rule of thumb
 
@@ -127,144 +131,3 @@ Three levels of nested conditions inside a loop inside a function is usually not
 a formatting problem, it is a sign that the function is making several different
 decisions and would be clearer as two or three named functions. The indentation
 is doing you a favour by making that visible.
-
-## Depth is a readability cost
-
-Each level of nesting adds a condition the reader has to hold in mind to
-understand the code inside it. At one level that is free. At four, understanding
-a line means remembering four things that are simultaneously true, and the
-reader is doing bookkeeping instead of following logic.
-
-The cost is not aesthetic. Deeply nested code is where edge cases hide, because
-the combination of conditions that reaches a particular branch stops being
-obvious, and a case nobody enumerated is a case nobody tested.
-
-Two structural fixes remove most depth, and both are worth reaching for before
-the third level.
-
-## Guard clauses
-
-Instead of wrapping the real work in conditions, handle the exceptional cases
-first and return early:
-
-```python
-def process(order):
-    if order is None:
-        return None
-    if not order.items:
-        return None
-    if order.total <= 0:
-        return None
-    return charge(order)
-```
-
-The nested version puts `charge(order)` three levels deep with three closing
-braces of context. The guard version puts it at the top level, where it belongs,
-because it is the point of the function.
-
-Guards also read in the order you would say them aloud: "if there is no order,
-stop; if it is empty, stop; otherwise charge it."
-
-The objection to multiple returns is worth answering: a single exit point is a
-convention from languages with manual cleanup, where an early return could skip
-freeing something. Python has `with` and `finally` for that, so the reason does
-not apply.
-
-## Combining conditions
-
-Two nested `if`s with no `else` between them are one `if` with `and`:
-
-```python
-if user:
-    if user.active:
-        ...
-```
-
-becomes `if user and user.active:` &mdash; and works, because `and`
-short-circuits, so `user.active` is never evaluated when `user` is falsy.
-
-That short-circuiting is what makes the combined form safe. It is the same
-mechanism that lets `if d and d["k"]` avoid a `KeyError`, and the reason the
-order of the operands is not arbitrary.
-
-The limit is length. Four conditions joined by `and` is a line nobody reads
-carefully, and the fix there is a named boolean:
-
-```python
-eligible = user.active and user.age >= 18 and not user.banned
-if eligible and item.in_stock:
-    ...
-```
-
-A name is documentation that cannot drift, and it makes the condition testable
-on its own.
-
-## When the nesting is the logic
-
-Some nesting is honest. A decision that genuinely depends on another decision
-&mdash; check the type, then within that, check a property specific to that
-type &mdash; is nested because the problem is.
-
-The tell is whether the inner condition makes sense without the outer one. If
-it does, they should be combined or flattened. If it does not, the nesting is
-carrying real meaning and removing it would produce a flat list of conditions
-that each silently assume the ones above.
-
-In that case, the improvement is not to flatten but to extract: give the inner
-decision a function with a name, and the outer level reads as a summary.
-
-## elif is not nesting
-
-A chain of `elif` looks nested and is flat. Each condition is tested only when
-all the previous ones failed, and exactly one branch runs.
-
-The difference from nested `if`s matters when the conditions overlap. With
-`elif`, order decides which branch wins, and a broad condition placed early
-makes everything after it unreachable. With separate `if` statements, several
-can run.
-
-That is worth checking explicitly: a chain where a later branch can never be
-reached is a bug that produces no error, and it is most likely when the
-conditions are ranges and one of them is wider than intended.
-
-## Dictionaries instead of chains
-
-A chain that maps one value to another is data pretending to be code:
-
-```python
-if code == "A": label = "Active"
-elif code == "B": label = "Blocked"
-elif code == "C": label = "Closed"
-```
-
-A dictionary says the same thing in one expression, is faster, and can be
-loaded from a file or extended without touching the logic:
-
-```python
-LABELS = {"A": "Active", "B": "Blocked", "C": "Closed"}
-label = LABELS.get(code, "Unknown")
-```
-
-The `get` default replaces the final `else`, and the mapping can be tested
-directly.
-
-This applies whenever every branch does the same *kind* of thing with a
-different constant. It does not apply when the branches do genuinely different
-work, where the chain is honest.
-
-## Common mistakes
-
-**Nesting where `and` would do**, which adds a level for nothing.
-
-**Deep nesting of the main path**, where guard clauses would surface it.
-
-**An `elif` chain whose broad case comes first**, making later branches
-unreachable.
-
-**Separate `if` statements where `elif` was meant**, so more than one branch
-runs.
-
-**A long condition with no name**, which nobody reads and nothing tests.
-
-**Encoding a lookup table as branches**, which grows with the data rather than
-staying constant.

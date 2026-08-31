@@ -1,6 +1,5 @@
 title: Sub-dependencies
 intro: Dependencies that depend on dependencies, and the tree resolved before your handler runs.
-
 ## The same syntax, one level down
 
 A dependency is a function whose parameters are request parameters &mdash; and `Depends` is a request parameter. So a dependency can depend on another:
@@ -153,6 +152,16 @@ for path in ["/public", "/account", "/admin"]:
               c.request("GET", path, headers=h).status_code))
 ```
 
+The pattern this shape is built for:
+
+`current_user` &mdash; who is this? 401 if unknown.
+`verified` &mdash; are they confirmed? 403 if not.
+`admin` &mdash; are they an admin? 403 if not.
+
+Each depends on the previous and adds exactly one rule. An endpoint then declares the level it needs, and the level is visible in its signature.
+
+The alternative &mdash; one `check_permissions(level="admin")` function with branching inside &mdash; works and hides the rules in a body rather than showing them in a chain. The layered version is easier to read and much easier to extend, because adding a level is a new function rather than a new branch.
+
 ## Parameters gather from the whole tree
 
 Every parameter any dependency declares becomes the endpoint's, and every one is documented.
@@ -224,19 +233,6 @@ If any dependency raises, everything below and after it is skipped, including th
 That is what makes layered checks safe. `admin_only` can assume `current_user` succeeded, because it only runs if it did. There is no need to check for `None` or re-verify &mdash; the tree guarantees ordering.
 
 It is also why authentication as a dependency is genuinely safer than a check in the handler. A handler can forget to check. A signature cannot: if the endpoint declares `admin_only`, the check ran.
-
-## Layering permissions
-
-The pattern this shape is built for:
-
-`current_user` &mdash; who is this? 401 if unknown.
-`verified` &mdash; are they confirmed? 403 if not.
-`admin` &mdash; are they an admin? 403 if not.
-
-Each depends on the previous and adds exactly one rule. An endpoint then declares the level it needs, and the level is visible in its signature.
-
-The alternative &mdash; one `check_permissions(level="admin")` function with branching inside &mdash; works and hides the rules in a body rather than showing them in a chain. The layered version is easier to read and much easier to extend, because adding a level is a new function rather than a new branch.
-
 ## Parameters gather upward
 
 Every parameter declared anywhere in the tree becomes a parameter of the endpoint.
@@ -306,11 +302,6 @@ Every dependency in the tree is a function call per request, and the tree is res
 For the ordinary case - a handful of small functions - the cost is nothing next to a single query. It becomes visible in two situations: a dependency doing real work, such as a lookup, that is now multiplied across every endpoint sharing it; and a very wide tree where the sheer number of calls adds up under load.
 
 Neither is a reason to avoid the feature. Both are reasons to know what is in the tree, because a slow dependency near the root is slow for everything, and its cost does not appear in any single endpoint's code.
-
-## Next
-
-Applying a dependency to a whole router or the whole application, so that a section is protected without every endpoint repeating the declaration.
-
 
 ## A worked permission chain
 

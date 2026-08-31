@@ -100,6 +100,14 @@ print("Downcast only when the range is known and bounded. An int8 column")
 print("that later receives 200 wraps or raises, depending on how it got there.")
 ```
 
+`int64` holds numbers up to about 9.2 quintillion. A column of ages does not need that.
+
+`pd.to_numeric(s, downcast="integer")` picks the narrowest signed type that fits; `downcast="unsigned"` does the same for non-negative data, and `downcast="float"` gives `float32`.
+
+The saving is up to 8x for integers and 2x for floats.
+
+The caution is the same as NumPy's: narrow integer types **wrap silently** on overflow. Downcast when the range is genuinely bounded &mdash; ages, day-of-month, a small enum &mdash; and leave counters and identifiers alone. An `int8` column that later receives 200 does not give you 200.
+
 ## Nullable dtypes hold integers AND missing
 
 The capital-I Int64 is a different type from int64.
@@ -147,6 +155,19 @@ print("   rows that would not convert:", list(s[coerced.isna()]))
 print()
 print("dtype after coercion:", coerced.dtype)
 ```
+
+`astype(int)` raises on the first value it cannot convert, and the message does not tell you which row.
+
+`pd.to_numeric(s, errors="coerce")` converts what it can and turns the rest into `NaN`. That is usually the better tool for real data, because it lets you find the offenders:
+
+```python
+converted = pd.to_numeric(s, errors="coerce")
+bad = s[converted.isna() & s.notna()]
+```
+
+Those are the rows that were present and unconvertible &mdash; the stray `"N/A"`, the number with a thousands separator, the value with a trailing space.
+
+`errors="raise"` is the default and is right when the data is supposed to be clean and you want to know immediately if it is not.
 ## object is the expensive one
 
 A column of strings has dtype `object`. That means an array of **pointers**, each leading to a separate Python string somewhere else in memory.
@@ -170,17 +191,6 @@ The savings are large, and they compound: group-by and comparison on a category 
 The condition is repetition. A column where every value is distinct &mdash; an email address, a UUID &mdash; costs **more** as a category, because you store the codes in addition to all the original values. The rule of thumb is that it pays when the number of distinct values is well under half the row count, and it pays enormously when it is a tiny fraction.
 
 Two behaviours to know. Categories carry an order if you give them one, which is what makes sorting by a grade or a size work properly. And operations that produce a value outside the category set give `NaN` rather than extending the set, which is occasionally surprising and generally the safer default.
-
-## Downcasting numbers
-
-`int64` holds numbers up to about 9.2 quintillion. A column of ages does not need that.
-
-`pd.to_numeric(s, downcast="integer")` picks the narrowest signed type that fits; `downcast="unsigned"` does the same for non-negative data, and `downcast="float"` gives `float32`.
-
-The saving is up to 8x for integers and 2x for floats.
-
-The caution is the same as NumPy's: narrow integer types **wrap silently** on overflow. Downcast when the range is genuinely bounded &mdash; ages, day-of-month, a small enum &mdash; and leave counters and identifiers alone. An `int8` column that later receives 200 does not give you 200.
-
 ## Nullable dtypes
 
 The oldest wart in pandas is that a NumPy integer array cannot represent a missing value, so an integer column with one gap becomes `float64` and identifiers start printing as `1001.0`.
@@ -192,22 +202,6 @@ The nullable extension types fix this. `Int64` with a **capital I** is a differe
 They are not the default, and there are corners where a library downstream expects NumPy types and does not handle them. But for identifiers and counts that must not become floats, they are the right answer.
 
 `pd.NA` propagates through arithmetic like NaN, and comparisons with it return `pd.NA` rather than `False` &mdash; a difference from NaN that matters if you are filtering on such a column.
-
-## Converting safely
-
-`astype(int)` raises on the first value it cannot convert, and the message does not tell you which row.
-
-`pd.to_numeric(s, errors="coerce")` converts what it can and turns the rest into `NaN`. That is usually the better tool for real data, because it lets you find the offenders:
-
-```python
-converted = pd.to_numeric(s, errors="coerce")
-bad = s[converted.isna() & s.notna()]
-```
-
-Those are the rows that were present and unconvertible &mdash; the stray `"N/A"`, the number with a thousands separator, the value with a trailing space.
-
-`errors="raise"` is the default and is right when the data is supposed to be clean and you want to know immediately if it is not.
-
 ## A practical routine
 
 After loading anything:

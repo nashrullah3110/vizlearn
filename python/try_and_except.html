@@ -341,83 +341,49 @@ except ValueError as e:
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <div>
-                    <h3>The shape</h3>
+                    <h3 id="vz-s-the-shape">The shape</h3>
                     <pre><code class="language-python">try:
     return int(text)
 except ValueError:
     return None</code></pre><p>If <code>int()</code> raises <code>ValueError</code>, control jumps to the handler. If it raises anything else, the handler is skipped and the error keeps travelling up. That selectivity is the point.</p>
                 </div>
                 <div>
-                    <h3>Catch what you expect, nothing more</h3>
-                    <p>except:&nbsp;&nbsp;&nbsp;&nbsp;# catches everything</p><p>This is almost always a mistake. It catches the error you were thinking of, and also your typos, your <code>NameError</code>s, your <code>AttributeError</code>s from a refactor you half-finished. The program stops crashing and starts producing wrong answers quietly, which is strictly worse: a crash tells you where to look.</p><p>The second program on this page has a deliberate typo inside a bare <code>except</code>. It returns 0, cheerfully, and nothing anywhere says a name was misspelled.</p><p>Name the exception:</p><p>except ValueError:<br>except (KeyError, IndexError):<br>except Exception as e:&nbsp;&nbsp;# broad, but at least not BaseException</p><pre><code class="language-python">if age &lt; 0:
-    raise ValueError(f&quot;age cannot be negative, got {age}&quot;)</code></pre>
+                    <h3 id="vz-s-catch-what-you-expect-nothing-more">Catch what you expect, nothing more</h3>
+                    <p>except:&nbsp;&nbsp;&nbsp;&nbsp;# catches everything</p><p>This is almost always a mistake. It catches the error you were thinking of, and also your typos, your <code>NameError</code>s, your <code>AttributeError</code>s from a refactor you half-finished. The program stops crashing and starts producing wrong answers quietly, which is strictly worse: a crash tells you where to look.</p><p>The second program on this page has a deliberate typo inside a bare <code>except</code>. It returns 0, cheerfully, and nothing anywhere says a name was misspelled.</p><p>Name the exception:</p><p>except ValueError:<br>except (KeyError, IndexError):<br>except Exception as e:&nbsp;&nbsp;# broad, but at least not BaseException</p>
                 </div>
                 <div>
-                    <h3>as e, and why you want it</h3>
+                    <h3 id="vz-s-as-e-and-why-you-want-it">as e, and why you want it</h3>
                     <pre><code class="language-python">except ValueError as e:
     print(&quot;could not convert:&quot;, e)</code></pre><p>The exception object carries the detail &mdash; which key was missing, which value would not parse. Discarding it and printing "something went wrong" throws away the only part that would have helped.</p>
                 </div>
                 <div>
-                    <h3>Ask forgiveness, not permission</h3>
+                    <h3 id="vz-s-else-and-finally">else and finally</h3>
+                    <ul><li><code>else</code> runs when the <code>try</code> block raised nothing. It keeps the risky line alone in the <code>try</code>, so the handler cannot accidentally catch an error from the follow-up code.</li><li><code>finally</code> runs either way, raised or not. It is where cleanup goes.</li></ul><p>For files and locks, prefer <code>with</code>, which does the same job with less ceremony.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-raising-your-own">Raising your own</h3>
+                    <p>Handling is half of it. When a caller hands you something impossible, say so:</p><pre><code class="language-python">if age &lt; 0:
+    raise ValueError(f&quot;age cannot be negative, got {age}&quot;)</code></pre><p>Include the offending value in the message. "Invalid input" costs the next person a debugging session; "got -1" ends it immediately.</p>
+                </div>
+                <div>
+                    <h3 id="vz-s-ask-forgiveness-not-permission">Ask forgiveness, not permission</h3>
                     <p>Python leans toward trying the operation and handling the failure, rather than checking first. Checking <code>if key in d</code> before <code>d[key]</code> does the lookup twice and still has a gap between the check and the use. Try it and catch <code>KeyError</code>; it is faster in the common case and correct in all of them.</p>
                 </div>
                 <div>
-                    <h3>Which exceptions to expect</h3>
+                    <h3 id="vz-s-which-exceptions-to-expect">Which exceptions to expect</h3>
                     <p>The instruction to catch specific exceptions is easy to agree with and harder to follow, because it requires knowing what a piece of code can raise. Three ways to find out, in order of reliability.</p><p>Read the documentation: the standard library is explicit about what its functions raise, and <code>int()</code>, <code>open()</code> and <code>dict</code> lookups all document theirs. Run it and see: trigger the failure deliberately once, read the traceback, and catch what actually appeared. And reason about it: an operation that parses can raise <code>ValueError</code>, one that touches the filesystem can raise <code>OSError</code>, one that indexes can raise <code>IndexError</code> or <code>KeyError</code>.</p><p>Catching <code>Exception</code> is the honest middle ground when you genuinely cannot enumerate them - a plugin boundary, a top-level handler that must not crash the program - and it is different from a bare <code>except</code>, because it still lets <code>KeyboardInterrupt</code> and <code>SystemExit</code> through. Those two are how a user stops your program, and swallowing them is how a program becomes impossible to quit.</p>
                 </div>
                 <div>
-                    <h3>Keep the try block small</h3>
+                    <h3 id="vz-s-keep-the-try-block-small">Keep the try block small</h3>
                     <p>A <code>try</code> that wraps twenty lines catches errors from all twenty, including ones you never thought about. If the handler says "could not parse the date", but the block also contains a database call, then a database failure now reports itself as a date problem, and the person debugging it starts in the wrong place.</p><p>Wrap the line that can fail, and put the follow-up work in <code>else</code>. The block stays honest about what it is handling.</p>
                 </div>
                 <div>
-                    <h3>Failing loudly is usually right</h3>
+                    <h3 id="vz-s-failing-loudly-is-usually-right">Failing loudly is usually right</h3>
                     <p>There is a reflex, especially early on, to wrap anything that has ever raised in a <code>try</code> and carry on. It feels defensive. What it actually does is convert a loud, located failure into a quiet, wrong result that surfaces somewhere else with no traceback pointing home.</p><p>An exception is not automatically a problem to suppress. It is information, and often the most useful information the program will produce. Handle the ones you have a real answer for - a missing optional file, a user typing letters into a number field, a network call worth retrying - and let the rest travel. A crash in development is a bug report that writes itself.</p>
                 </div>
                 <div>
-                    <h3>Cleanup belongs to <code>with</code></h3>
+                    <h3 id="vz-s-cleanup-belongs-to-with">Cleanup belongs to <code>with</code></h3>
                     <p><code>finally</code> guarantees that cleanup runs, and for files, locks and connections there is a better tool: a context manager. <code>with open(...)</code> closes the file whether the block succeeded or raised, without the extra indentation and without the risk of forgetting. Reach for <code>finally</code> when there is no context manager for what you are doing, and for <code>with</code> when there is.</p>
-                </div>
-                <div>
-                    <h3>Catch what you can handle</h3>
-                    <p>The instinct when something raises is to wrap it in <code>try</code> and move on. The question worth asking first is what the <code>except</code> block will actually do about it.</p><p>If the answer is "log it and continue with a sensible default", catching is right. If the answer is "print something and carry on with data that is now wrong", the exception was doing its job by stopping the program, and catching it has converted a loud failure into a quiet one.</p><p>A caught exception should leave the program in a state you could defend. When it cannot, letting it propagate is the better choice &mdash; a traceback that reaches the user is more useful than a program that continues incorrectly.</p><pre><code class="language-python">try:
-    row = parse(line)
-    total += row.amount      # a typo here is caught as a parse failure
-except ValueError:
-    skipped += 1</code></pre>
-                </div>
-                <div>
-                    <h3>Name the exception</h3>
-                    <p><code>except Exception:</code> catches everything, including the ones you did not think about: a typo raising <code>NameError</code>, an <code>AttributeError</code> from a refactor, a <code>KeyError</code> from a renamed field.</p><p>Those are bugs, and catching them means they surface as whatever your handler does &mdash; often a generic message &mdash; instead of as a traceback pointing at the line.</p><p>Naming the exception documents what you expect to go wrong:</p><pre><code class="language-python">try:
-    value = int(raw)
-except ValueError:
-    value = None</code></pre><p>Several can be named together with a tuple, <code>except (ValueError, TypeError):</code>, which is the right form when the handling is the same.</p><p>Bare <code>except:</code> is worse still, because it also catches <code>KeyboardInterrupt</code> and <code>SystemExit</code>, so a script becomes impossible to stop with Ctrl-C.</p>
-                </div>
-                <div>
-                    <h3>else and finally</h3>
-                    <p><code>else</code> runs when the <code>try</code> block did <strong>not</strong> raise. It is where the code that depends on success belongs, and it is what keeps the <code>try</code> narrow:</p><pre><code class="language-python">try:
-    value = int(raw)
-except ValueError:
-    log(&quot;bad input&quot;)
-else:
-    process(value)</code></pre><p><code>finally</code> runs either way, and is for cleanup that must happen whether or not things went well. In practice <code>with</code> handles most of what <code>finally</code> used to, which is why it appears less often in modern code.</p><p>The one thing to know about <code>finally</code> is that a <code>return</code> inside it silently discards any exception in flight, which is almost never intended.</p>
-                </div>
-                <div>
-                    <h3>The exception object carries the detail</h3>
-                    <p><code>except KeyError as e</code> gives you the exception, and <code>e</code> names the key. <code>except ValueError as e</code> gives the value that would not parse.</p><p>Discarding it and printing "something went wrong" throws away the only part that would have helped whoever reads the log. The message costs nothing to include and is the difference between a report you can act on and one you cannot.</p><p>For unexpected failures, <code>logging.exception(...)</code> inside the handler records the full traceback along with your message, which is what you want in anything that runs unattended.</p>
-                </div>
-                <div>
-                    <h3>Raising, and re-raising</h3>
-                    <p><code>raise</code> on its own inside an <code>except</code> re-raises the current exception with its original traceback, which is how you log and still fail:</p><pre><code class="language-python">except ValueError:
-    log(&quot;could not parse row %d&quot;, n)
-    raise</code></pre><p><code>raise NewError(...) from e</code> chains, so the traceback shows both what went wrong and what it was doing at the time. That is the right way to convert a low-level failure into a domain one without losing the cause.</p><p>Defining your own exception is a small class inheriting from <code>Exception</code>, and it is worth doing as soon as callers might want to catch your failure specifically rather than by message.</p>
-                </div>
-                <div>
-                    <h3>EAFP and LBYL</h3>
-                    <p>Python's convention is "easier to ask forgiveness than permission": attempt the operation and handle the failure, rather than checking first.</p><p>The reason is not style. Checking first has a race &mdash; a file that exists when you check may not when you open it &mdash; and it duplicates the check the operation performs anyway.</p><p>The exception is when the failure is expected and frequent. Exceptions are cheap to set up and expensive to raise, so a loop where most iterations fail is faster with a check. <code>d.get(k)</code> over <code>try: d[k]</code> is the everyday example, and it reads better too.</p>
-                </div>
-                <div>
-                    <h3>Common mistakes</h3>
-                    <p><strong>Catching <code>Exception</code></strong> and hiding bugs.</p><p><strong>A bare <code>except:</code></strong>, which also swallows Ctrl-C.</p><p><strong>A <code>try</code> wrapping more than the risky call.</strong></p><p><strong>Discarding the exception object</strong>, losing the only detail.</p><p><strong><code>except: pass</code></strong>, which is silence by design and almost always wrong.</p><p><strong>Catching what you cannot handle</strong>, turning a loud failure into a quiet one.</p><p><strong>Using exceptions for ordinary control flow</strong> in a hot loop, where a check is cheaper.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->

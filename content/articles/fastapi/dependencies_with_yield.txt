@@ -1,6 +1,5 @@
 title: Dependencies with yield
 intro: Setup before the handler, teardown after it, and the transaction pattern that falls out.
-
 ## The shape
 
 ```python
@@ -264,14 +263,6 @@ If cleanup can fail, catch it and log it. The request already succeeded or faile
 
 **Do not rely on the exception being visible.** In older FastAPI versions the exception was not always available to the teardown in the way people expected. The `try/except/finally` shape above works because it wraps the `yield` directly rather than trying to inspect state.
 
-## Sync or async
-
-Both work. `def get_session()` runs in the threadpool; `async def get_session()` runs on the event loop.
-
-Use `async def` when the setup and teardown are themselves async &mdash; an async database driver, an async HTTP client. Use `def` when they are ordinary blocking calls, and let the framework keep them off the loop.
-
-Mixing is fine: an async handler can depend on a sync yield dependency and vice versa.
-
 ## What belongs here
 
 Anything with a lifetime tied to the request: database sessions, transactions, file handles, temporary directories, locks, an HTTP client that should be closed.
@@ -316,16 +307,6 @@ That is why teardown ordering is reverse, why teardown runs on failure, and why 
 
 It also explains the lifetime precisely. The dependency is alive for the whole request, including while the response is being serialised - so a session yielded here is still usable by a response model reading lazy attributes, which is a common source of confusion when it is *not* the case in other frameworks.
 
-## Sync or async
-
-Both forms work, and the choice follows the resource.
-
-`def get_session()` runs in a threadpool, which is right for a blocking driver.
-
-`async def get_session()` runs on the event loop, which is right for an async one.
-
-Mixing is allowed in both directions. What matters is not making a blocking call directly on the loop, which the runtime tier covers.
-
 ## A checklist
 
 Before shipping a yield dependency, four questions.
@@ -337,11 +318,6 @@ Can the handler fail? Then anything conditional on success sits between the `yie
 Can the cleanup fail? Then it is caught and logged, not raised.
 
 Is this per-request, or per-process? A session is per request; the pool it comes from is not.
-
-## Next
-
-Dependencies that depend on dependencies, and the tree FastAPI resolves before your handler runs.
-
 
 ## One more thing to watch
 

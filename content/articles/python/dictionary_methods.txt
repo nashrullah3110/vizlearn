@@ -17,19 +17,34 @@ Do not reach for `get` reflexively. `d.get(k)` returning `None` where you expect
 
 ## items, keys, values
 
-```python
 for k, v in d.items():
-```
 
 `items()` is what you want most of the time. Plain `for k in d` iterates keys, which is easy to forget and produces a confusing error when you then treat `k` as a value.
 
 All three are views, not lists: they reflect later changes to the dict and are cheap to create. Wrap in `list()` if you need a snapshot &mdash; and you do need one if you intend to modify the dict while looping.
 
-## The grouping pattern
+## The counting pattern
+
+The block everyone writes first:
+
 
 ```python
-teams.setdefault(team, []).append(name)
+if w in counts:
+    counts[w] += 1
+else:
+    counts[w] = 1
 ```
+
+
+collapses to:
+
+counts[w] = counts.get(w, 0) + 1
+
+and, if counting is all you are doing, to `Counter(words)` from `collections`, which is faster and says what it means.
+
+## The grouping pattern
+
+teams.setdefault(team, []).append(name)
 
 `setdefault` returns the value at that key, inserting the default first if the key was absent. So this reads "get the list for this team, making an empty one if needed, and append to it" &mdash; three lines in one.
 
@@ -98,138 +113,14 @@ missing key springs into existence on access. Use it when *every* access should
 create a default. Its downside is exactly that: a typo'd key lookup silently
 creates an empty entry instead of raising, which can mask a bug.
 
-## The three views, and why they are views
-
-`keys()`, `values()` and `items()` do not return lists. They return **view
-objects**, which are windows onto the dictionary rather than copies of it.
-
-That has two consequences worth knowing.
-
-A view stays up to date. Take `d.keys()`, add a key to `d`, and the view now
-includes it, because it was never a snapshot. This is efficient &mdash; no
-copying, whatever the size of the dictionary &mdash; and occasionally
-surprising if you expected the value you captured to stay still.
-
-A view cannot be indexed. `d.keys()[0]` raises, because a view is not a
-sequence. `list(d.keys())[0]` works, and if you find yourself writing it, the
-question worth asking is whether you wanted `next(iter(d))` instead.
-
-Key views also behave like sets, which is genuinely useful: `d.keys() &
-other.keys()` gives the shared keys, and `-` gives the difference. That is the
-cleanest way to compare two dictionaries' shapes.
-
-## get, setdefault and defaultdict
-
-Three ways to handle a key that may not exist, and they are not
-interchangeable.
-
-`d.get(key, default)` reads without inserting. It is the right choice when a
-missing key is normal and you simply want a fallback value. It leaves the
-dictionary unchanged, which matters more than it sounds &mdash; a read that
-quietly writes is a surprising thing to find in a loop.
-
-`d.setdefault(key, default)` reads **and inserts** if the key was absent,
-returning whichever value is now there. It is the idiom behind building a
-dictionary of lists in one line, and the thing to remember is that it always
-constructs the default, even when the key exists.
-
-`collections.defaultdict(list)` moves the decision into the dictionary itself,
-so any missing key produces a new list on access. It reads best when every key
-is expected to follow the same pattern. Its trap is that merely *looking* at a
-missing key creates it, so a defaultdict grows when you test it.
-
-The rough guide: `get` for reads, `setdefault` for occasional accumulation,
-`defaultdict` when accumulation is the whole purpose of the dictionary.
-
-## Ordering
-
-Since Python 3.7, dictionaries preserve insertion order as a language
-guarantee, and that changed how they are used.
-
-It means a dictionary can stand in for an ordered record, that `list(d)` gives
-the keys in a predictable sequence, and that printing one is reproducible
-between runs.
-
-What it does not mean is that dictionaries are sorted. The order is the order
-things were added, and reordering requires building a new dictionary:
-
-```python
-dict(sorted(d.items(), key=lambda kv: kv[1], reverse=True))
-```
-
-That idiom &mdash; sort the items, rebuild the dict &mdash; is how "top n by
-value" is written, and it appears constantly in counting code.
-
 ## Merging
-
-There are three ways to combine dictionaries, and they differ in what they do
-to the originals.
-
-`d.update(other)` modifies `d` in place and returns `None`. Assigning its result
-is a common way to end up with `None` where a dictionary was expected.
-
-`{**a, **b}` builds a new dictionary, with `b` winning on conflicts. It works on
-every version that matters and reads well when combining defaults with
-overrides.
-
-`a | b`, from Python 3.9, does the same thing with clearer syntax, and `a |= b`
-is the in-place form.
-
-In all three, later values win. That is what makes the pattern
-`{**defaults, **user_settings}` work: the user's choices override the defaults
-because they come second, and reversing the order silently reverses the
-meaning.
 
 ```python
 merged = {**defaults, **overrides}     # 3.5+
 merged = defaults | overrides          # 3.9+
 defaults |= overrides                  # in place
 ```
-## Counting
 
-Counting is the single most common thing done with a dictionary, and the
-standard library has already done it:
-
-```python
-from collections import Counter
-counts = Counter(words)
-counts.most_common(3)
-```
-
-`Counter` is a dictionary subclass, so everything above applies to it, and it
-adds the two operations counting always needs: ranking by frequency, and
-arithmetic between counts.
-
-Writing the loop by hand is fine and is what `get(key, 0) + 1` or a
-`defaultdict(int)` is for &mdash; but reaching for `Counter` first saves the
-code and gives `most_common` for free.
-
-## Deleting
-
-`del d[key]` raises if the key is missing. `d.pop(key, None)` removes it and
-returns the value, or the default when absent, which is the version that does
-not need a guard.
-
-The rule that catches people is that a dictionary cannot be modified while it
-is being iterated. Deleting inside a `for key in d` raises
-`RuntimeError: dictionary changed size during iteration`.
-
-The fix is to iterate over a copy of the keys, `for key in list(d)`, or to
-build the dictionary you want rather than editing the one you have &mdash;
-usually a comprehension, which is clearer anyway.
-
-## Common mistakes
-
-**Assigning the result of `update`**, which is `None`.
-
-**Indexing a view**, which raises because a view is not a sequence.
-
-**Using `setdefault` for a plain read**, which inserts a key as a side effect.
-
-**Testing a key on a `defaultdict`**, which creates it.
-
-**Modifying during iteration**, which raises partway through.
-
-**Assuming sorted order** because dictionaries now keep insertion order.
-
-**Writing a counting loop** where `Counter` already exists.
+Later keys win in all three. This is the clean way to layer configuration, and
+it beats a loop of `if key not in d` conditions because the precedence is stated
+by the order of the operands rather than buried in the logic.

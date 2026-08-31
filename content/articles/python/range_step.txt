@@ -17,6 +17,40 @@ One argument is the stop. Two are start and stop. Three add the step. The step c
 
 `range(5)` gives five numbers ending at 4. This looks like an off-by-one waiting to happen and is the opposite: it is what makes `range(len(items))` produce exactly the valid indices of a list, and what makes `range(a, b)` produce `b - a` numbers.
 
+## Counting down
+
+Two things must both be true:
+
+range(5, 0, -1)&nbsp;&nbsp;&nbsp;&nbsp;# 5 4 3 2 1
+
+The step is negative <em>and</em> the stop is below the start. Get one wrong and you get an empty range, not an error &mdash; `range(5, 0)` with no step produces nothing at all, because it is counting up from 5 to 0.
+
+The classic mistake is stopping at 0 when you meant to include it:
+
+
+```python
+range(3, 0, -1)   # 3 2 1  - misses 0
+range(3, -1, -1)  # 3 2 1 0
+```
+
+
+To walk a list backwards by index you need `range(len(items) - 1, -1, -1)`, which is three fiddly numbers in a row and exactly why the alternatives exist:
+
+
+```python
+for x in reversed(items):
+for x in items[::-1]:
+```
+
+
+Both say "backwards" without arithmetic. Reach for a backwards `range` only when you genuinely need the index.
+
+## It does not build a list
+
+`range(1_000_000)` stores three integers &mdash; start, stop, step &mdash; and computes each value on demand. It is a few dozen bytes whatever the size, which the page prints beside the list version for contrast.
+
+That laziness is also why `x in range(n)` is fast: it does arithmetic rather than searching. It is the one `in` test on a sequence that does not scan.
+
 ## Only integers
 
 `range` refuses floats. For a fractional step, build the integers and divide, or use a library. `range(0, 1, 0.1)` is a TypeError, not a rounding problem.
@@ -73,108 +107,3 @@ The third argument to a slice is the same step, with the same rules, which is
 why `[::2]` takes every second item and `[::-1]` reverses. Learning the
 behaviour once covers both, and the exclusive-stop rule is what makes
 `a[:n]` and `a[n:]` fit together with no gap and no overlap.
-
-## The three arguments, and which are optional
-
-`range(stop)` counts from zero. `range(start, stop)` counts from `start`.
-`range(start, stop, step)` adds a stride.
-
-There is no way to give a step without giving a start, which is why counting
-every second number from zero is `range(0, 20, 2)` rather than
-`range(20, step=2)` &mdash; `range` takes no keyword arguments at all, being
-one of the older parts of the language.
-
-The stop is always excluded, in all three forms. That is the same convention
-slicing uses, and it is what makes `range(len(items))` cover exactly the valid
-indices and `range(a, b)` have `b - a` items.
-
-## Why exclusive stop is the right default
-
-It looks arbitrary until the consequences are listed.
-
-The count is the difference: `range(3, 8)` has five items, and you can see that
-without thinking. With an inclusive stop it would be six, and every length
-calculation would carry a `+ 1`.
-
-Ranges join cleanly: `range(0, 5)` and `range(5, 10)` cover 0 to 9 with no gap
-and no overlap, and the boundary appears once. With an inclusive stop, splitting
-a range at a point means writing the point twice, once as `5` and once as `4`.
-
-And `range(len(x))` is exactly the valid indices, because indices start at zero
-and stop one before the length.
-
-The cost is the off-by-one when you want to include the end, and
-`range(1, n + 1)` is the standard answer to that.
-
-## Counting down needs two things right
-
-A negative step alone is not enough. The start must also be above the stop, and
-if it is not, the result is empty rather than an error:
-
-```python
-range(5, 0, -1)      # 5 4 3 2 1
-range(0, 5, -1)      # empty - no error
-```
-
-That silent emptiness is the trap. A loop that never runs looks like a loop
-whose body is broken, and the actual cause is the arguments.
-
-The exclusive stop still applies when counting down, which is why including
-zero means stopping at `-1`:
-
-```python
-range(3, -1, -1)     # 3 2 1 0
-range(3, 0, -1)      # 3 2 1
-```
-
-For simply walking a sequence backwards, `reversed(items)` says the intent more
-plainly than `range(len(items) - 1, -1, -1)`, and cannot be got wrong.
-
-## It is a sequence, not a generator
-
-`range` is often described as lazy, and it is more than that. It is a full
-sequence type: it has a length, supports indexing and slicing, and can be
-iterated any number of times.
-
-```python
-r = range(10)
-len(r)        # 10
-r[3]          # 3
-r[2:5]        # range(2, 5)
-7 in r        # True, and fast
-```
-
-That last one is worth knowing. Membership testing on a range is arithmetic
-rather than a scan, so `1_000_000 in range(10_000_000)` is instant, where the
-same test on a list of ten million would walk it.
-
-A generator can do none of those things. The distinction matters when code
-expects to walk something twice, which works with a `range` and silently
-produces nothing the second time with a generator.
-
-## When not to use it
-
-The common misuse is `for i in range(len(items))` followed by `items[i]`.
-
-If the loop needs only the values, iterate the collection. If it needs the
-position too, `enumerate` gives both without an index. If it walks two
-collections, `zip` pairs them.
-
-`range(len(...))` is genuinely right when the index itself is the subject
-&mdash; comparing `items[i]` with `items[i + 1]`, or building a lookup by
-position &mdash; and those are a small minority of loops.
-
-## Common mistakes
-
-**Expecting the stop to be included**, and losing the last item.
-
-**A negative step with the start below the stop**, giving an empty range and a
-loop that never runs.
-
-**Trying to use floats**, which raises &mdash; `numpy.arange` or a
-comprehension over integers is the way to step by a fraction.
-
-**Assuming it builds a list**, and being surprised that printing shows
-`range(0, 10)`.
-
-**`range(len(x))` where `enumerate` or plain iteration would do.**

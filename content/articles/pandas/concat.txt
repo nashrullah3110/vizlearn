@@ -1,6 +1,5 @@
 title: Stacking Frames with concat
 intro: Adding rows or columns from another frame.
-
 ## Two directions
 
 `pd.concat([a, b])` stacks **rows**: the result is taller.
@@ -10,7 +9,6 @@ intro: Adding rows or columns from another frame.
 Which axis you are joining along decides which axis does the *aligning*, and that is the part worth being deliberate about.
 
 Stacking rows aligns the **columns** by name. Stacking columns aligns the **index** by label.
-
 
 ## Stacking rows
 
@@ -33,6 +31,18 @@ print()
 print("A repeated index is legal and breaks later lookups, so renumber")
 print("unless the labels mean something.")
 ```
+
+The default keeps both frames' index labels, so the result can have repeated labels &mdash; two rows both labelled 0.
+
+That is legal, and it breaks things later: `.loc[0]` returns two rows instead of one, and code expecting a scalar fails. It is also invisible until something depends on it.
+
+`ignore_index=True` renumbers from 0. Pass it unless the index labels carry meaning you need to keep.
+
+Columns are matched **by name**. A column present in one frame and not the other is filled with `NaN` for the missing rows, and the result has the union of all columns. `join="inner"` keeps only columns present in every frame.
+
+The name-matching is a feature: two frames with the same columns in different orders line up correctly. It is also a trap when a column has been misspelled in one source, because you get two columns each half-full rather than an error.
+
+Checking `result.columns` and the `isna()` counts after a concat catches that immediately.
 
 ## Columns are matched by name
 
@@ -148,20 +158,6 @@ print()
 print("This is why starting with pd.DataFrame() and concatenating into")
 print("it is worse than just collecting a list.")
 ```
-## Stacking rows
-
-The default keeps both frames' index labels, so the result can have repeated labels &mdash; two rows both labelled 0.
-
-That is legal, and it breaks things later: `.loc[0]` returns two rows instead of one, and code expecting a scalar fails. It is also invisible until something depends on it.
-
-`ignore_index=True` renumbers from 0. Pass it unless the index labels carry meaning you need to keep.
-
-Columns are matched **by name**. A column present in one frame and not the other is filled with `NaN` for the missing rows, and the result has the union of all columns. `join="inner"` keeps only columns present in every frame.
-
-The name-matching is a feature: two frames with the same columns in different orders line up correctly. It is also a trap when a column has been misspelled in one source, because you get two columns each half-full rather than an error.
-
-Checking `result.columns` and the `isna()` counts after a concat catches that immediately.
-
 ## Stacking columns
 
 `axis=1` puts frames side by side, aligning on the index.
@@ -311,24 +307,6 @@ frames = [d.assign(source=name) for name, d in items]
 ```
 
 Either way, recording where a row came from is worth doing at the moment of combining, because afterwards the information is gone and reconstructing it means remembering row counts.
-
-## A summary
-
-`concat` stacks rows by default and columns with `axis=1`.
-
-Row stacking aligns **columns by name**; column stacking aligns the **index by label**.
-
-`ignore_index=True` unless the labels mean something.
-
-`join="inner"` keeps only what is common.
-
-`keys=` records provenance.
-
-Never concat in a loop &mdash; collect and combine once.
-
-Dtypes promote when frames disagree, and an empty seed frame can widen a column to `object`.
-
-And check the row count, the dtypes and the missingness afterwards.
 
 ## A closing note
 

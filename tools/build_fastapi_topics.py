@@ -20,6 +20,7 @@ tools/labs.py.
 import html
 import json
 import os
+import re
 import sys
 
 import lib_shell as shell
@@ -177,10 +178,28 @@ def merged_article(t):
     to "the editor above", which is still true once they sit above it.
     """
     text = t["article"].strip()
+
+    # A step title sometimes matches a heading the article already uses, which
+    # would put the same "## Combining conditions" on the page twice. When that
+    # happens the prose section is lifted out and folded in under the step's
+    # heading instead, after the editor -- so there is one section, and prose
+    # that says "the editor above" is talking about the editor directly above.
+    def take_section(title):
+        m = re.search(r"(?m)^## %s[ \t]*$" % re.escape(title), text)
+        if not m:
+            return None, text
+        end = text.find("\n## ", m.end())
+        end = len(text) if end == -1 else end
+        return text[m.end():end].strip(), text[:m.start()].rstrip() + text[end:]
+
     blocks = []
     for heading, blurb, code in t["steps"]:
-        blocks.append("## %s\n\n%s\n\n```python-run\n%s\n```"
-                      % (heading, blurb.strip(), code.rstrip()))
+        body, text = take_section(heading)
+        block = ("## %s\n\n%s\n\n```python-run\n%s\n```"
+                 % (heading, blurb.strip(), code.rstrip()))
+        if body:
+            block += "\n\n" + body
+        blocks.append(block)
     steps = "\n\n".join(blocks)
 
     # Split after the first "## " section so the lede is untouched.

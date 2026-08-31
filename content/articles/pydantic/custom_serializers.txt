@@ -1,6 +1,5 @@
 title: Custom Serializers: Changing What Comes Out
 intro: Per-field and per-model output control, and the strong argument for not using it.
-
 ## What they do
 
 Pydantic's defaults are good: dates become ISO strings, decimals become strings, enums become values, nested models become nested objects. For most fields there is nothing to decide.
@@ -14,7 +13,6 @@ def show_money(self, value: Decimal) -> str:
 ```
 
 The method takes `self` and the value, and returns whatever should appear.
-
 
 ## A field serialiser
 
@@ -60,6 +58,12 @@ print("still a Decimal:", b.unit * b.quantity)
 print("comparison     :", b.unit > Decimal("4"))
 print("but dumped     :", b.model_dump())
 ```
+
+This is the important property. A serialiser does not change validation, and does not change what the field holds.
+
+`p.amount` is still a `Decimal`. Arithmetic works, comparisons work, and every rule you attached still ran. The serialiser is the last step on the way out, not a conversion applied to the model.
+
+That separation is what makes the feature safe. You are not weakening the model to satisfy a consumer's format preference.
 
 ## Different output for JSON and Python
 
@@ -166,14 +170,6 @@ print()
 print("A client can sort, filter and localise the second.")
 print("The first has to be parsed back, and only by an English reader.")
 ```
-## Only the output changes
-
-This is the important property. A serialiser does not change validation, and does not change what the field holds.
-
-`p.amount` is still a `Decimal`. Arithmetic works, comparisons work, and every rule you attached still ran. The serialiser is the last step on the way out, not a conversion applied to the model.
-
-That separation is what makes the feature safe. You are not weakening the model to satisfy a consumer's format preference.
-
 ## Two modes, two outputs
 
 `when_used` restricts a serialiser to one direction:
@@ -317,14 +313,6 @@ Most proposed serialisers fail one of those, which is the reason this module arg
 `when_used="json"` keeps Python dumps useful. `return_type` keeps the schema honest. `info.context` makes output conditional when that is genuinely needed.
 
 For secrets prefer `SecretStr` and `Field(exclude=True)`. And reach for a serialiser when an external constraint demands a shape &mdash; not when a default merely looks unfamiliar.
-
-## Summary
-
-`@field_serializer` for one field, `@model_serializer` for the whole model, `mode="wrap"` when augmenting rather than replacing. `when_used="json"` to keep Python dumps useful. `return_type` so the schema does not lie.
-
-For secrets, prefer `SecretStr` and `Field(exclude=True)`.
-
-And apply the test before writing one: is the default actually wrong for a machine, or merely unformatted for a person? Only the first is a serialiser's job.
 
 ## What to remember
 

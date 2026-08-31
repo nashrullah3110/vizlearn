@@ -2124,7 +2124,6 @@ print("   original still has", len(df), "rows")'''),
     '''
 title: Filtering Rows
 intro: Masks, isin, between and query, and the parenthesis rule that catches everyone.
-
 ## A mask is a Series
 
 `df["age"] >= 25` does not return rows. It returns a boolean Series, one value per row, carrying the same index as the frame.
@@ -2337,20 +2336,6 @@ Anything you then assign into `sub` may or may not affect `df`. This is the sing
 `df.loc[mask, "col"] = ...` if you meant to change `df`.
 
 Adding `.copy()` to a filter you intend to modify costs seven characters and removes the question entirely.
-
-## A summary
-
-Build masks with comparisons; combine with `&`, `|`, `~`; parenthesise everything.
-
-Use `isin` and `between` where they fit, and `query` when the expression is long.
-
-Pass `na=False` on `.str` predicates.
-
-Remember that missing values fail every test, so a condition and its negation do not partition the frame.
-
-Name your masks when there is more than one.
-
-And `.copy()` the result if you are going to modify it.
 
 ## A closing note
 
@@ -7330,7 +7315,6 @@ print("it is worse than just collecting a list.")'''),
     '''
 title: Stacking Frames with concat
 intro: Adding rows or columns from another frame.
-
 ## Two directions
 
 `pd.concat([a, b])` stacks **rows**: the result is taller.
@@ -7504,24 +7488,6 @@ frames = [d.assign(source=name) for name, d in items]
 ```
 
 Either way, recording where a row came from is worth doing at the moment of combining, because afterwards the information is gone and reconstructing it means remembering row counts.
-
-## A summary
-
-`concat` stacks rows by default and columns with `axis=1`.
-
-Row stacking aligns **columns by name**; column stacking aligns the **index by label**.
-
-`ignore_index=True` unless the labels mean something.
-
-`join="inner"` keeps only what is common.
-
-`keys=` records provenance.
-
-Never concat in a loop &mdash; collect and combine once.
-
-Dtypes promote when frames disagree, and an empty seed frame can widen a column to `object`.
-
-And check the row count, the dtypes and the missingness afterwards.
 
 ## A closing note
 

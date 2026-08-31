@@ -5,6 +5,7 @@ intro: enumerate walks a sequence and hands you the position along with the item
 
 The counter:
 
+
 ```python
 i = 0
 for name in names:
@@ -12,162 +13,101 @@ for name in names:
     i += 1
 ```
 
+
 and the index:
+
 
 ```python
 for i in range(len(names)):
     print(i, names[i])
 ```
 
-Both work, and both have a specific failure.
 
-The manual counter breaks the moment the body gains an early `continue` above
-the increment. The loop still runs, the numbers are just wrong, and nothing
-raises &mdash; which makes it the kind of bug that survives a code review.
+Both work. The first has a variable to initialise and remember to increment; forget the increment and the loop runs forever printing zero. The second reads the list twice per pass &mdash; once for the length, once per lookup &mdash; and puts `names[i]` where you wanted `name`.
 
-The `range(len(...))` version puts an index between you and the value, so every
-use reads `names[i]` rather than `name`. It is noisier, and it offers an
-off-by-one error where none needs to exist.
-
-```python
 for i, name in enumerate(names):
-    print(i, name)
-```
 
-says the same thing with neither problem. There is no counter to forget and no
-index to get wrong.
+says the same thing with neither problem.
 
 ## What it actually produces
 
-`enumerate` yields tuples: `(0, "ana")`, `(1, "bo")`. The `for i, name` on the
-left is ordinary tuple unpacking, which is why the tuples are invisible in
-normal use.
+`enumerate` yields tuples: `(0, "ana")`, `(1, "bo")`. The `for i, name` on the left is ordinary tuple unpacking, which is why the tuples are invisible in normal use. Loop without unpacking and you see them:
 
-Loop without unpacking and they appear:
+for pair in enumerate(names):&nbsp;&nbsp;# (0, 'ana')
 
-```python
-for pair in enumerate(names):
-    print(pair)          # (0, 'ana')
-```
-
-which is legal and rarely what you want. The unpacked form is the point: it
-gives both halves a name at the top of the loop, so the body never says
-`pair[0]`.
-
-`list(enumerate(x))` is the quickest way to see the whole thing at once, which
-is worth knowing when a loop is not doing what you expect.
+`list(enumerate(x))` is the quickest way to see the whole thing at once.
 
 ## start= renumbers the label
 
-```python
 for n, name in enumerate(names, start=1):
-    print(f"{n}. {name}")
+
+This is for output humans read &mdash; line numbers, ranked lists, steps. It changes the number reported, not the position read: with `start=1`, the item labelled 1 is still `names[0]`. If you use `n` to index back into the list you will be off by one, which is a bug that only shows up on the first and last element.
+
+## It is lazy, and it takes any iterable
+
+`enumerate` does not build a list of pairs. It produces them one at a time as the loop asks, so it works on a file, a generator, or a sequence too large to hold in memory. It also works on strings, giving character positions.
+
+## When you do not need it
+
+If you never use the index, do not ask for it. `for name in names` is the shorter, clearer loop, and reaching for `enumerate` out of habit adds a variable nothing reads.
+
+## What it replaces, and why that matters
+
+Before `enumerate`, keeping a counter alongside a loop meant one of two things:
+initialising `i = 0` and remembering to increment it at the bottom of the body,
+or looping over `range(len(items))` and indexing back into the list.
+
+Both work. Both have a specific failure. The manual counter breaks the moment
+the body has an early `continue` above the increment, and the bug is invisible -
+the loop still runs, the numbers are just wrong. The `range(len(...))` version
+puts an index between you and the value, so every use is `items[i]` rather than
+`item`, which is noisier and offers an off-by-one error where none needs to
+exist.
+
+`enumerate` removes the counter entirely. There is nothing to forget to
+increment and nothing to index.
+
+## The start argument
+
+```python
+for n, line in enumerate(lines, start=1):
+    print(f"{n}: {line}")
 ```
 
 Line numbers, question numbers, ranked results and anything else a human reads
-usually start at one.
-
-`start=1` is better than writing `n + 1` in the body, because it states the
-intent once at the top rather than repeating an adjustment everywhere the
-number is used &mdash; and it means you cannot apply the adjustment in one place
-and forget it in another.
-
-The important caveat: it changes **the number reported, not the position read**.
-With `start=1`, the item labelled 1 is still `names[0]`. If you use `n` to index
-back into the list you are off by one, and the bug shows up only at the first
-and last element, which is exactly where a quick test is least likely to look.
-
-If you find yourself indexing with the enumerate variable, that is a sign the
-loop wanted the default `start=0`.
+usually start at one. Passing `start=1` is better than writing `n + 1` inside
+the body, because it states the intent once at the top rather than repeating an
+adjustment everywhere the number is used - and it means you cannot apply the
+adjustment in one place and forget it in another.
 
 ## It works on anything iterable
 
 `enumerate` is not a list feature. It works on strings, files, generators,
-dictionary views, `zip` results and anything else you can loop over.
+dictionary views and anything else you can loop over, and it does not build a
+list to do it - it yields pairs as the loop asks for them.
 
-It also does not build a list to do it. It yields pairs as the loop asks for
-them, so:
+That makes `for n, line in enumerate(f)` a perfectly good way to number the
+lines of a file too large to hold in memory, which the `range(len(...))` form
+cannot do at all, because there is no length to take.
 
-```python
-with open("big.log") as f:
-    for n, line in enumerate(f, start=1):
-        if "ERROR" in line:
-            print(n, line.rstrip())
-```
+## Unpacking is doing the work
 
-numbers the lines of a file too large to hold in memory. The `range(len(...))`
-form cannot do this at all, because a file has no length to take.
-
-On a string it gives character positions, which is occasionally what you want
-and more often a sign you should be using a string method.
-
-## Combining it with zip
-
-The two are frequently wanted together &mdash; a position and two parallel
-values:
+`enumerate` yields tuples. Writing `for n, item in ...` is tuple unpacking, the
+same feature that makes `for k, v in d.items()` work. Occasionally you will see
+it left packed:
 
 ```python
-for i, (name, score) in enumerate(zip(names, scores)):
-    print(i, name, score)
+for pair in enumerate(items):
+    print(pair)      # (0, 'a')
 ```
 
-The parentheses around `(name, score)` matter. `enumerate` yields
-`(index, item)`, and here the item is itself the tuple `zip` produced, so the
-target has to mirror that nesting. Written without them, Python tries to unpack
-two values into three names and raises.
+which is legal and rarely what you want. The unpacked form is the point: it
+gives both halves a name at the top of the loop, so the body never has to say
+`pair[0]`.
 
-Reading it outward from the loop variable is the way to keep it straight: the
-outer pair comes from `enumerate`, the inner pair from `zip`.
-
-## Unused variables
+## When you do not need it
 
 If you never use the index, do not ask for one. `for item in items` is the
 correct loop, and `for i, item in enumerate(items)` with `i` unused is noise
-that a linter will flag.
-
-The convention when you need one half and not the other is to name the unused
-variable `_`:
-
-```python
-for _, name in enumerate(names):
-    ...          # pointless: this is just `for name in names`
-
-for i, _ in enumerate(names):
-    ...          # you wanted range(len(names)), or something else entirely
-```
-
-Both of those are signals that `enumerate` is not the tool. The first should be
-a plain loop; the second wants `range(len(names))` or, more likely, a rethink,
-because a loop that uses only the index and never the item is usually counting
-something a comprehension or `sum` would count better.
-
-## Common mistakes
-
-**Using the enumerate index to look up the item again.** `names[i]` inside
-`for i, name in enumerate(names)` is doing the work twice, and it breaks if
-`start` is not zero.
-
-**Assuming it returns a list.** It returns an iterator, so printing it shows an
-object and consuming it twice gives nothing the second time. `list()` when you
-need to keep it.
-
-**Forgetting the parentheses when combining with zip**, which raises a value
-error that names counts rather than the cause.
-
-**Enumerating when you wanted the item only**, which adds a variable that
-nothing reads.
-
-**Assuming `start` shifts the data.** It shifts the label. The item at label 1
-is still the first item.
-
-## The short version
-
-`enumerate(iterable, start=0)` yields `(index, item)` pairs, lazily, for
-anything you can loop over.
-
-Use it whenever a loop needs both the position and the value. Use `start=1` for
-numbers a person will read, and remember that the label and the index have now
-parted company.
-
-Do not use it when the index is never read, and do not use the index to fetch
-the item you already have.
+that a linter will flag. The convention when you need one and not the other is
+to name the unused variable `_`.

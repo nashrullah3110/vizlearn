@@ -1,6 +1,5 @@
 title: Filtering Rows
 intro: Masks, isin, between and query, and the parenthesis rule that catches everyone.
-
 ## A mask is a Series
 
 `df["age"] >= 25` does not return rows. It returns a boolean Series, one value per row, carrying the same index as the frame.
@@ -94,6 +93,12 @@ print("negate with ~ :")
 print(list(df.loc[~df["city"].isin(["pune"]), "city"]))
 ```
 
+`df["city"].isin(["pune", "goa"])` is clearer and faster than `(df["city"] == "pune") | (df["city"] == "goa")`, and it scales to a list of any length &mdash; including one computed at runtime.
+
+`df["age"].between(25, 31)` is inclusive of both ends by default. The `inclusive` argument takes `"both"`, `"left"`, `"right"` or `"neither"`, which is worth passing explicitly whenever the boundary matters, because the default is not what everyone assumes.
+
+`~` negates either of them.
+
 ## Missing values fail every test
 
 So a condition and its opposite can both drop the same row.
@@ -172,15 +177,6 @@ Every condition needs its own parentheses: `(df["age"] > 20) & (df["age"] < 35)`
 The related mistake is `and` instead of `&`. Python's `and` needs a single truth value and a Series has many, so it raises "The truth value of a Series is ambiguous". That message always means the same thing: use `&`, and add parentheses.
 
 The three operators are `&` (and), `|` (or), `~` (not). There is no way to make Python's precedence rules cooperate here, so parenthesising becomes a reflex.
-
-## isin and between
-
-`df["city"].isin(["pune", "goa"])` is clearer and faster than `(df["city"] == "pune") | (df["city"] == "goa")`, and it scales to a list of any length &mdash; including one computed at runtime.
-
-`df["age"].between(25, 31)` is inclusive of both ends by default. The `inclusive` argument takes `"both"`, `"left"`, `"right"` or `"neither"`, which is worth passing explicitly whenever the boundary matters, because the default is not what everyone assumes.
-
-`~` negates either of them.
-
 ## Missing values fail everything
 
 Every comparison involving `NaN` is `False`. That includes `>`, `<`, `==` and `!=`.
@@ -354,20 +350,6 @@ Anything you then assign into `sub` may or may not affect `df`. This is the sing
 `df.loc[mask, "col"] = ...` if you meant to change `df`.
 
 Adding `.copy()` to a filter you intend to modify costs seven characters and removes the question entirely.
-
-## A summary
-
-Build masks with comparisons; combine with `&`, `|`, `~`; parenthesise everything.
-
-Use `isin` and `between` where they fit, and `query` when the expression is long.
-
-Pass `na=False` on `.str` predicates.
-
-Remember that missing values fail every test, so a condition and its negation do not partition the frame.
-
-Name your masks when there is more than one.
-
-And `.copy()` the result if you are going to modify it.
 
 ## A closing note
 

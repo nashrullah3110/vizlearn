@@ -58,6 +58,18 @@ print("  pattern:", WithPattern.model_json_schema()["properties"]["track"])
 print("  literal:", WithLiteral.model_json_schema()["properties"]["track"])
 ```
 
+`Field(pattern=r"^(maths|python|dsa|ml)$")` enforces the same rule. It is worse in four distinct ways, and they are worth listing because the pattern approach is common.
+
+**The error.** A `Literal` says the input should be one of a list, and gives the list. A pattern says the string should match a regular expression, and prints the expression. One of those is usable by a person who did not write your code.
+
+**The schema.** A `Literal` becomes `enum` in JSON Schema. Documentation renders it as a set of choices, a generated client offers a type with four options, a form builder makes a dropdown. A `pattern` becomes a `pattern`, and every tool downstream shrugs.
+
+**Static checking.** Mypy knows the four values of a `Literal` and will tell you when a comparison can never be true. It has no idea what a regular expression permits.
+
+**Maintenance.** Adding a fifth track means editing a regular expression, which is a place people make mistakes, versus adding a word to a list.
+
+The only case for a pattern is a set that is genuinely open &mdash; a format rather than a list. Slugs, postcodes, identifiers. If you can enumerate the values, enumerate them.
+
 ## Enum when the values need behaviour
 
 An <code>Enum</code> gives the set a name, a home for methods, and members you can refer to in code rather than retyping the strings.
@@ -185,21 +197,6 @@ track: Literal["maths", "python", "dsa", "ml"]
 The permitted values are written where the type goes. Anything else raises, with an error that lists the options.
 
 It is the smallest thing that works, it needs no imports beyond `typing`, and mypy understands it &mdash; so your own code gets checked against the same set. A comparison against `"mathematics"` is flagged by your editor before it ever runs.
-
-## Why not a regular expression
-
-`Field(pattern=r"^(maths|python|dsa|ml)$")` enforces the same rule. It is worse in four distinct ways, and they are worth listing because the pattern approach is common.
-
-**The error.** A `Literal` says the input should be one of a list, and gives the list. A pattern says the string should match a regular expression, and prints the expression. One of those is usable by a person who did not write your code.
-
-**The schema.** A `Literal` becomes `enum` in JSON Schema. Documentation renders it as a set of choices, a generated client offers a type with four options, a form builder makes a dropdown. A `pattern` becomes a `pattern`, and every tool downstream shrugs.
-
-**Static checking.** Mypy knows the four values of a `Literal` and will tell you when a comparison can never be true. It has no idea what a regular expression permits.
-
-**Maintenance.** Adding a fifth track means editing a regular expression, which is a place people make mistakes, versus adding a word to a list.
-
-The only case for a pattern is a set that is genuinely open &mdash; a format rather than a list. Slugs, postcodes, identifiers. If you can enumerate the values, enumerate them.
-
 ## Enum
 
 An `Enum` gives the set an identity:

@@ -1,6 +1,5 @@
 title: async def or def
 intro: Where your handler runs, and the one mistake that turns a fast framework into a slow one.
-
 ## Two placements, one interface
 
 FastAPI accepts both:
@@ -104,6 +103,28 @@ print()
 print("Only one of them let the server keep serving while it worked.")
 ```
 
+```python
+@app.get("/users")
+async def users():
+    return db.query(User).all()      # a blocking driver
+```
+
+This looks modern and is the single most common performance bug in FastAPI applications.
+
+The function is `async`, so it runs on the loop. The query is synchronous, so it does not yield. For the entire duration of that query the loop is stuck: no other request progresses, no other handler runs, no keepalive is answered. One slow query has stopped the whole process.
+
+Nothing errors. The endpoint returns correctly. It is only under concurrency that the application turns out to handle one request at a time, and the symptom &mdash; everything is slow when the system is busy &mdash; points nowhere useful.
+
+The fix is one keyword:
+
+```python
+@app.get("/users")
+def users():
+    return db.query(User).all()
+```
+
+Now Starlette runs it in a threadpool and the loop keeps going.
+
 ## Awaiting inside an async handler
 
 An <code>async def</code> endpoint earns its keep when it awaits &mdash; the loop runs something else while it waits.
@@ -202,31 +223,6 @@ for p in ["/awaits", "/blocks", "/neither"]:
 An ASGI server handles many requests in one thread by never waiting. When a handler awaits a database query, the loop parks it and runs something else. Thousands of requests can be in flight with almost none of them consuming anything but memory.
 
 That works because awaiting yields control. It stops working the moment something does not.
-
-## The mistake
-
-```python
-@app.get("/users")
-async def users():
-    return db.query(User).all()      # a blocking driver
-```
-
-This looks modern and is the single most common performance bug in FastAPI applications.
-
-The function is `async`, so it runs on the loop. The query is synchronous, so it does not yield. For the entire duration of that query the loop is stuck: no other request progresses, no other handler runs, no keepalive is answered. One slow query has stopped the whole process.
-
-Nothing errors. The endpoint returns correctly. It is only under concurrency that the application turns out to handle one request at a time, and the symptom &mdash; everything is slow when the system is busy &mdash; points nowhere useful.
-
-The fix is one keyword:
-
-```python
-@app.get("/users")
-def users():
-    return db.query(User).all()
-```
-
-Now Starlette runs it in a threadpool and the loop keeps going.
-
 ## The rule
 
 **Does the body await anything?**
@@ -265,15 +261,6 @@ Two specific things to avoid.
 
 **Calling `asyncio.run()` inside a handler.** There is already a loop running; starting another raises. To call an async function from a sync handler, the honest answer is usually to make the handler async.
 
-## Being consistent
-
-An application that is mostly sync and mostly fast is a perfectly good application. So is one that is async throughout with async drivers.
-
-What causes trouble is a codebase where the choice was made per handler by whoever wrote it, without a rule &mdash; because then nobody can tell whether a given endpoint is safe to add a blocking call to, and eventually somebody adds one to the wrong sort.
-
-Pick a default, write it down, and make the exception deliberate.
-
-
 ## Mistakes people make
 
 **`async def` with a blocking call.** The one that matters. Nothing errors and the whole process serves one request at a time under load, with a symptom - everything is slow when busy - that points nowhere useful.
@@ -297,10 +284,6 @@ Two symptoms distinguish the failures.
 **The threadpool is full**: the fast endpoints stay fast while requests to slow sync ones queue. The loop is fine; the workers are all busy.
 
 The fix differs. The first needs the blocking call moved off the loop - change `async def` to `def`, or wrap it in `run_in_threadpool`. The second needs fewer slow synchronous operations, more workers, or async drivers.
-
-## Next
-
-Work that should happen after the response has been sent, which is what background tasks are for.
 
 ## Being consistent
 

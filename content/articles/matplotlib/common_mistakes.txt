@@ -1,19 +1,12 @@
 title: Common Mistakes
 intro: The errors that produce a chart which looks fine and is not.
+## The plot lands somewhere else
 
-## Nothing appears
+`plt.plot` draws on the **current** axes. After `plt.subplots(1, 2)`, the current axes is the last one created, so a stray `plt.plot` goes to the right-hand panel regardless of intent.
 
-Three causes, distinguishable in a few seconds.
+In a notebook it is worse, because the current figure is whatever the last executed cell created &mdash; which, with out-of-order execution, is not necessarily the one above.
 
-**No data.** `len(x)` and `len(y)`. An empty array plots without complaint.
-
-**All missing.** `np.isnan(y).all()`. NaN is skipped, so an all-NaN series draws an empty line object.
-
-**The view is elsewhere.** `ax.get_xlim()` and `get_ylim()`. Limits set before the data was added, or set to the wrong range, put the data outside the visible box.
-
-`len(ax.lines)` distinguishes "the draw call never ran" from "it ran and there is nothing to see", which is usually the fastest thing to check.
-
-A fourth possibility in a script: you never showed or saved the figure. In a notebook figures display automatically; in a script they do not, and `plt.show()` or `savefig` is required.
+`ax.plot(...)` removes the question. This is the practical reason the object-oriented API is worth the extra characters.
 
 
 ## Nothing appears
@@ -47,6 +40,18 @@ print()
 print("lines on each axes:", [len(a.lines) for a in axes])
 print("   all three DREW something; only the data or the view is wrong.")
 ```
+
+Three causes, distinguishable in a few seconds.
+
+**No data.** `len(x)` and `len(y)`. An empty array plots without complaint.
+
+**All missing.** `np.isnan(y).all()`. NaN is skipped, so an all-NaN series draws an empty line object.
+
+**The view is elsewhere.** `ax.get_xlim()` and `get_ylim()`. Limits set before the data was added, or set to the wrong range, put the data outside the visible box.
+
+`len(ax.lines)` distinguishes "the draw call never ran" from "it ran and there is nothing to see", which is usually the fastest thing to check.
+
+A fourth possibility in a script: you never showed or saved the figure. In a notebook figures display automatically; in a script they do not, and `plt.show()` or `savefig` is required.
 
 ## The plot goes to the wrong axes
 
@@ -195,14 +200,14 @@ fig, ax = plt.subplots(figsize=(4, 2))
 ax.plot([0, 1], [0, 1])
 ax.set_title("one deliberate figure")
 ```
-## The plot lands somewhere else
 
-`plt.plot` draws on the **current** axes. After `plt.subplots(1, 2)`, the current axes is the last one created, so a stray `plt.plot` goes to the right-hand panel regardless of intent.
+matplotlib keeps a reference to every figure created through pyplot, so they are never collected while it holds them.
 
-In a notebook it is worse, because the current figure is whatever the last executed cell created &mdash; which, with out-of-order execution, is not necessarily the one above.
+After twenty, it warns: "More than 20 figures have been opened." That is a warning, not an error &mdash; the loop continues, and memory keeps growing until something else fails.
 
-`ax.plot(...)` removes the question. This is the practical reason the object-oriented API is worth the extra characters.
+`plt.close(fig)` in the loop. `plt.close("all")` between sections of a notebook.
 
+The threshold is `rcParams["figure.max_open_warning"]`, and raising it to silence the message is the wrong response to a real problem.
 ## Cropped output
 
 A figure is saved at the size `figsize` declares, at `dpi` resolution. The window you were looking at has nothing to do with it.
@@ -234,17 +239,6 @@ matplotlib cannot warn about it, because clipping is often exactly what you want
 The check is one line: compare `max(data)` against `ax.get_ylim()[1]`. Where a value is genuinely off-scale and the chart must stay zoomed, say so with an annotation giving the real number.
 
 The related version is a category filtered out earlier in the pipeline and never noticed, which is why comparing the number of bars against the number of groups is worth doing.
-
-## Figures left open
-
-matplotlib keeps a reference to every figure created through pyplot, so they are never collected while it holds them.
-
-After twenty, it warns: "More than 20 figures have been opened." That is a warning, not an error &mdash; the loop continues, and memory keeps growing until something else fails.
-
-`plt.close(fig)` in the loop. `plt.close("all")` between sections of a notebook.
-
-The threshold is `rcParams["figure.max_open_warning"]`, and raising it to silence the message is the wrong response to a real problem.
-
 ## A short list
 
 Use `ax.` methods, not `plt.`.

@@ -11,7 +11,6 @@ Each returns a Series, so they chain: `s.str.strip().str.lower().str.replace(" "
 
 The accessor is required. `s.strip()` is not the same thing &mdash; it either does something unrelated to the Series or fails, because `strip` is not a Series method. Forgetting `.str` is the most common beginner error here, and the resulting `AttributeError` at least says so clearly.
 
-
 ## The .str accessor applies to every value
 
 The same methods you know from Python, one call for the whole column.
@@ -61,6 +60,22 @@ print("na=False is the fix:")
 print("   ", list(s[s.str.contains("a", na=False)]))
 ```
 
+`.str` methods return `NaN` for missing input rather than raising or returning an empty string.
+
+That is usually right: the uppercase of an unknown value is unknown.
+
+It becomes a problem for **predicates**. `s.str.contains("a")` returns `True`, `False` **or `NaN`**, and a mask containing `NaN` cannot be used to index a frame &mdash; pandas raises "Cannot mask with non-boolean array containing NA / NaN values".
+
+The fix is `na=False`, which decides what a missing value should count as:
+
+```python
+df[df["name"].str.contains("ana", na=False)]
+```
+
+Pass it every time you filter on a text predicate. `na=True` is occasionally what you want, when missing should be included.
+
+This is the single most common runtime error in text cleaning, and it appears only when the data has a gap &mdash; so it usually shows up in production rather than on the sample.
+
 ## Testing and finding
 
 contains, startswith and match, and which of them takes a regex.
@@ -103,6 +118,24 @@ print(out)
 print("   dtypes:", dict(out.dtypes.astype(str)))
 print("   note num is object - extract returns text, convert if you need numbers")
 ```
+
+`s.str.split("-")` gives a Series of lists. That is rarely what you want directly.
+
+`expand=True` turns it into a DataFrame with one column per piece, which is how you split a combined field into real columns. Rows with fewer pieces get `None` in the trailing columns.
+
+`s.str.split("-").str[0]` takes one piece &mdash; the second `.str` indexes into the lists.
+
+`extract` is usually better when the structure is known. It takes a regex with capture groups and returns one column per group, and named groups become column names:
+
+```python
+s.str.extract(r"(?P<kind>[a-z]+)-(?P<num>\d+)")
+```
+
+Rows that do not match give `NaN` across the row, which makes non-matching input visible rather than silently mangled.
+
+`extract` returns **text**, even for digits. Convert afterwards with `pd.to_numeric` if you need numbers.
+
+`extractall` returns every match rather than the first, with a MultiIndex.
 
 ## Replacing, with and without regex
 
@@ -155,24 +188,6 @@ print("Object columns store pointers to Python strings, so every")
 print("operation walks them one at a time. Convert to category when")
 print("the values repeat, and do text work once rather than in a loop.")
 ```
-## Missing values pass through
-
-`.str` methods return `NaN` for missing input rather than raising or returning an empty string.
-
-That is usually right: the uppercase of an unknown value is unknown.
-
-It becomes a problem for **predicates**. `s.str.contains("a")` returns `True`, `False` **or `NaN`**, and a mask containing `NaN` cannot be used to index a frame &mdash; pandas raises "Cannot mask with non-boolean array containing NA / NaN values".
-
-The fix is `na=False`, which decides what a missing value should count as:
-
-```python
-df[df["name"].str.contains("ana", na=False)]
-```
-
-Pass it every time you filter on a text predicate. `na=True` is occasionally what you want, when missing should be included.
-
-This is the single most common runtime error in text cleaning, and it appears only when the data has a gap &mdash; so it usually shows up in production rather than on the sample.
-
 ## Testing
 
 `contains` searches anywhere in the string. `startswith` and `endswith` anchor. `match` anchors at the start, `fullmatch` at both ends.
@@ -184,27 +199,6 @@ Pass `regex=False` for a literal search. It is also faster.
 `case=False` makes the test case-insensitive without a separate `.lower()` pass.
 
 `startswith` and `endswith` do **not** take a regex, which is an inconsistency worth remembering rather than deriving.
-
-## Splitting and extracting
-
-`s.str.split("-")` gives a Series of lists. That is rarely what you want directly.
-
-`expand=True` turns it into a DataFrame with one column per piece, which is how you split a combined field into real columns. Rows with fewer pieces get `None` in the trailing columns.
-
-`s.str.split("-").str[0]` takes one piece &mdash; the second `.str` indexes into the lists.
-
-`extract` is usually better when the structure is known. It takes a regex with capture groups and returns one column per group, and named groups become column names:
-
-```python
-s.str.extract(r"(?P<kind>[a-z]+)-(?P<num>\d+)")
-```
-
-Rows that do not match give `NaN` across the row, which makes non-matching input visible rather than silently mangled.
-
-`extract` returns **text**, even for digits. Convert afterwards with `pd.to_numeric` if you need numbers.
-
-`extractall` returns every match rather than the first, with a MultiIndex.
-
 ## Replacing
 
 `s.str.replace(old, new, regex=...)` requires the `regex` argument to be explicit in pandas 2. The default changed, and code written against pandas 1 that relied on the old behaviour can silently do the wrong thing.

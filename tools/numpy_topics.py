@@ -1487,7 +1487,6 @@ print("and fails; against (3,1) it compares 4 with 1 and stretches.")'''),
     '''
 title: Indexing and Slicing
 intro: Elements, rows and rectangles - and the one behaviour that differs from lists in a way that matters.
-
 ## One index per axis
 
 A comma separates axes, so `a[1, 2]` means row one, column two. That is the idiomatic form and the efficient one.
@@ -1611,14 +1610,6 @@ There is one rule that predicts the shape of any basic selection:
 `a[:, 0]` gives `(3,)`; `a[:, 0:1]` gives `(3, 1)`.
 
 That last pair is the one that matters in practice, because the `(3, 1)` form broadcasts down a column and the `(3,)` form does not. When a broadcast fails on something you expected to work, an integer index that dropped an axis is a likely cause.
-
-## Ellipsis
-
-`...` stands for as many full slices as are needed.
-
-`a[..., 0]` takes the first element along the last axis, whatever the dimensionality. On a 2-D array it is `a[:, 0]`; on a 4-D array it is `a[:, :, :, 0]`.
-
-This is how you write code that works for both a single image and a batch of them without branching on `ndim`. Anywhere you find yourself counting colons, `...` is probably the clearer expression, and it is more robust to the array gaining a dimension later.
 
 ## A note on tuples
 
@@ -2917,7 +2908,6 @@ except IndexError as e:
     '''
 title: Fancy Indexing
 intro: Selecting by a list of positions - reordering, repeating, and a result whose shape follows the index.
-
 ## Indexing with an array
 
 Give an integer array where you would normally give a number, and you get those elements back:
@@ -2985,16 +2975,6 @@ Once you have seen that the second form is just broadcasting applied to indices,
 `mode='raise'` is the default and matches `a[idx]`. `mode='clip'` pins out-of-range indices to the ends. `mode='wrap'` wraps them around.
 
 Those modes are useful for boundary handling &mdash; a filter that would read past the edge, for instance &mdash; where the alternative is padding the array or special-casing the ends.
-
-## Choosing between the three ways to select
-
-**Slicing** when the positions are a regular range. It is free and gives a view.
-
-**Boolean masking** when the selection is a condition on the values.
-
-**Fancy indexing** when you have specific positions, need a particular order, or want repeats.
-
-The first is cheap; the other two copy. On large arrays that difference is worth a thought before it is worth a benchmark.
 
 ## Mixing fancy indexing with slices
 
@@ -4341,7 +4321,6 @@ print("rot90 twice == flipping both ways:",
     '''
 title: Transpose and Moving Axes
 intro: Reordering axes without moving a single byte.
-
 ## Strides again
 
 An array knows how many bytes to step for each axis. Transposing swaps those numbers along with the shape, and the underlying buffer is untouched.
@@ -4399,10 +4378,6 @@ This trips people up on image data.
 Transpose reflects along the main diagonal. Rotating a quarter turn is `np.rot90`. Mirroring is `np.flipud` (up-down) and `np.fliplr` (left-right).
 
 They are related &mdash; a rotation is a transpose followed by a flip &mdash; but they are different operations, and reaching for `.T` to turn an image gives a mirrored result that looks almost right and is not.
-
-## In practice
-
-Use `.T` freely on 2-D. Use `moveaxis` or `swapaxes` on anything higher, because they say what you meant. Remember that a 1-D transpose is a no-op, and that the result of any of them is a view over the same bytes &mdash; which is the entire point, and also the reason contiguity assumptions later in the pipeline can quietly cost you a copy.
 
 ## C order and F order, stated plainly
 

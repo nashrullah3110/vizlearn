@@ -71,6 +71,24 @@ except ValidationError as e:
     print("AwareDatetime rejects naive input:", e.errors()[0]["msg"])
 ```
 
+This is the first of the two expensive ones.
+
+A `datetime` string without an offset produces a **naive** datetime &mdash; one with no `tzinfo`. A string with an offset produces an **aware** one. Both are valid `datetime` objects and both pass a `datetime` annotation.
+
+They cannot be compared. `naive < aware` raises `TypeError`. Subtracting one from the other raises. So a model that accepts both will work perfectly until the day a client sends the other kind, and then fail somewhere entirely unrelated to the model.
+
+The fix is to be explicit in the type:
+
+```python
+from pydantic import AwareDatetime
+
+updated_at: AwareDatetime
+```
+
+Now a naive string is rejected at the boundary, with a clear message, at the point the bad data arrived. `NaiveDatetime` exists for the opposite requirement.
+
+The general advice for anything with users in more than one place: store and transmit UTC with an explicit offset, use `AwareDatetime` in your models, and convert to local time only at the moment of display. A system that is consistently aware has no timezone bugs; a system that is inconsistently aware has nothing but.
+
 ## Money is not a float
 
 Binary floating point cannot represent most decimal fractions. <code>Decimal</code> can &mdash; but only if you keep the value as text on the way in.
@@ -100,6 +118,23 @@ print("three of each      :", a.price * 3, "|", b.price * 3)
 print()
 print("This is why prices travel as strings in JSON.")
 ```
+
+This is the second expensive trap, and it is not a Pydantic quirk &mdash; it is how binary floating point works.
+
+`0.1 + 0.2` is not `0.3` in any language using IEEE 754, because `0.1` cannot be represented exactly in binary any more than one-third can be in decimal. The error is tiny and it accumulates, and financial code that accumulates errors eventually produces a total that is a penny out and an afternoon nobody enjoys.
+
+`Decimal` represents decimal fractions exactly. But the conversion matters enormously:
+
+```python
+Decimal(0.1)     # 0.1000000000000000055511151231257827
+Decimal("0.1")   # 0.1
+```
+
+By the time a float exists, the information is already lost. Passing it to `Decimal` faithfully preserves the wrong number.
+
+So money should travel as a **string** in JSON, and be validated as `Decimal`. That is why so many payment APIs quote amounts as `"12.50"` rather than `12.50`, and it is a convention worth adopting rather than fighting.
+
+If a float is unavoidable on the way in, be aware that you have already lost exactness and any quantisation is damage control, not a fix.
 
 ## Constraining a decimal properly
 
@@ -151,6 +186,14 @@ except ValidationError as e:
     print("bad uuid :", e.errors()[0]["msg"])
 ```
 
+`UUID` accepts a `UUID` or its string form, and rejects anything that is not a valid UUID &mdash; which is a genuinely useful check, since an id from an untrusted source is a common injection vector when it is treated as an opaque string.
+
+What you get back is a real `UUID`, so `.version` and `.hex` work. Note that `model_dump()` gives you the `UUID` object and the JSON forms give the string, which matters if you pass the dump to something expecting text.
+
+`Path` accepts a string and gives you a `pathlib.Path`, with `.suffix`, `.parent` and the rest. A caution: validating something as a `Path` does not make it safe. It does not check the path exists, and it certainly does not prevent `../../etc/passwd`. Path traversal is a security check you still have to write.
+
+`EmailStr` deserves a mention because people look for it: it exists, but it lives in a separate package (`email-validator`) that must be installed. Without it, a plain `str` with a pattern is the pragmatic option &mdash; and worth remembering that no regular expression genuinely validates an email address. The only real check is sending a message to it.
+
 ## What comes out the other side
 
 None of these types exist in JSON, so serialising converts them. <code>model_dump()</code> keeps the objects; the JSON forms make text.
@@ -193,46 +236,6 @@ print("json string:", m.model_dump_json())
 `timedelta` accepts a number of seconds or an ISO 8601 duration such as `"PT1H30M"`.
 
 The pattern is the one from the coercion module: the type itself always works, and the obvious textual form works. What you get back is a real object, so `.year`, `.weekday()` and arithmetic all work without you having called `strptime` anywhere.
-
-## The timezone trap
-
-This is the first of the two expensive ones.
-
-A `datetime` string without an offset produces a **naive** datetime &mdash; one with no `tzinfo`. A string with an offset produces an **aware** one. Both are valid `datetime` objects and both pass a `datetime` annotation.
-
-They cannot be compared. `naive < aware` raises `TypeError`. Subtracting one from the other raises. So a model that accepts both will work perfectly until the day a client sends the other kind, and then fail somewhere entirely unrelated to the model.
-
-The fix is to be explicit in the type:
-
-```python
-from pydantic import AwareDatetime
-
-updated_at: AwareDatetime
-```
-
-Now a naive string is rejected at the boundary, with a clear message, at the point the bad data arrived. `NaiveDatetime` exists for the opposite requirement.
-
-The general advice for anything with users in more than one place: store and transmit UTC with an explicit offset, use `AwareDatetime` in your models, and convert to local time only at the moment of display. A system that is consistently aware has no timezone bugs; a system that is inconsistently aware has nothing but.
-
-## Money is not a float
-
-This is the second expensive trap, and it is not a Pydantic quirk &mdash; it is how binary floating point works.
-
-`0.1 + 0.2` is not `0.3` in any language using IEEE 754, because `0.1` cannot be represented exactly in binary any more than one-third can be in decimal. The error is tiny and it accumulates, and financial code that accumulates errors eventually produces a total that is a penny out and an afternoon nobody enjoys.
-
-`Decimal` represents decimal fractions exactly. But the conversion matters enormously:
-
-```python
-Decimal(0.1)     # 0.1000000000000000055511151231257827
-Decimal("0.1")   # 0.1
-```
-
-By the time a float exists, the information is already lost. Passing it to `Decimal` faithfully preserves the wrong number.
-
-So money should travel as a **string** in JSON, and be validated as `Decimal`. That is why so many payment APIs quote amounts as `"12.50"` rather than `12.50`, and it is a convention worth adopting rather than fighting.
-
-If a float is unavoidable on the way in, be aware that you have already lost exactness and any quantisation is damage control, not a fix.
-
 ## Constraining a decimal
 
 Two constraints exist for decimals specifically:
@@ -244,17 +247,6 @@ amount: Decimal = Field(gt=0, max_digits=8, decimal_places=2)
 `decimal_places=2` rejects `"12.505"`. `max_digits=8` bounds the total number of significant digits. Together they express "a currency amount" far better than any `float` annotation can, and they appear in the schema.
 
 This is also a good example of a constraint carrying domain meaning. `decimal_places=2` is a statement that this system deals in whole pence, which is a real decision that would otherwise live only in whoever's head made it.
-
-## UUIDs and paths
-
-`UUID` accepts a `UUID` or its string form, and rejects anything that is not a valid UUID &mdash; which is a genuinely useful check, since an id from an untrusted source is a common injection vector when it is treated as an opaque string.
-
-What you get back is a real `UUID`, so `.version` and `.hex` work. Note that `model_dump()` gives you the `UUID` object and the JSON forms give the string, which matters if you pass the dump to something expecting text.
-
-`Path` accepts a string and gives you a `pathlib.Path`, with `.suffix`, `.parent` and the rest. A caution: validating something as a `Path` does not make it safe. It does not check the path exists, and it certainly does not prevent `../../etc/passwd`. Path traversal is a security check you still have to write.
-
-`EmailStr` deserves a mention because people look for it: it exists, but it lives in a separate package (`email-validator`) that must be installed. Without it, a plain `str` with a pattern is the pragmatic option &mdash; and worth remembering that no regular expression genuinely validates an email address. The only real check is sending a message to it.
-
 ## What comes out
 
 Because none of these types exist in JSON, serialisation has to convert them, and the mode decides whether it does.

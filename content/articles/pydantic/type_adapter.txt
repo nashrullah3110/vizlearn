@@ -1,6 +1,5 @@
 title: TypeAdapter: Validation Without a Model
 intro: The same machinery applied to any annotation - and the fastest way to validate a large collection.
-
 ## The thing people work around
 
 A model validates a model. But plenty of data is not shaped like one.
@@ -145,6 +144,26 @@ print()
 print("Module level is where an adapter belongs.")
 ```
 
+This is the mistake worth naming loudly, because it is invisible and common.
+
+Constructing a `TypeAdapter` **compiles a schema**. That is real work &mdash; the same work that happens once when a model class is defined.
+
+```python
+for row in rows:
+    TypeAdapter(List[int]).validate_python(row)     # recompiles every iteration
+```
+
+The adapter belongs at module level, built once and reused:
+
+```python
+NUMBERS = TypeAdapter(List[int])
+
+for row in rows:
+    NUMBERS.validate_python(row)
+```
+
+The difference is large and it does not look like a performance bug in review, which is exactly why it survives.
+
 ## Validating a whole list in one call
 
 Letting the core do the looping beats a comprehension that crosses into Python for every item.
@@ -191,29 +210,6 @@ Anything you can write as an annotation.
 Scalars: `TypeAdapter(int)`. Containers: `List`, `Dict`, `Set`, `Tuple`. Optionals and unions, including discriminated ones. Models. Constrained types from `Annotated`. Any nesting of those.
 
 `TypeAdapter(Annotated[int, Field(gt=0)])` validates a bare positive integer, which is occasionally exactly what a function argument needs.
-
-## Build it once
-
-This is the mistake worth naming loudly, because it is invisible and common.
-
-Constructing a `TypeAdapter` **compiles a schema**. That is real work &mdash; the same work that happens once when a model class is defined.
-
-```python
-for row in rows:
-    TypeAdapter(List[int]).validate_python(row)     # recompiles every iteration
-```
-
-The adapter belongs at module level, built once and reused:
-
-```python
-NUMBERS = TypeAdapter(List[int])
-
-for row in rows:
-    NUMBERS.validate_python(row)
-```
-
-The difference is large and it does not look like a performance bug in review, which is exactly why it survives.
-
 ## Validating a collection in one call
 
 The second performance point is the more valuable one, and it applies to models too.
@@ -330,12 +326,6 @@ Each of those has a wrapper-model workaround, and each is cleaner without one.
 Build it once at module level. Prefer one call over a Python loop for collections. Use models where a thing deserves a name and a class body; use adapters for the shapes around them.
 
 It is the piece most people find late, and the one that removes the most awkward code when they do.
-
-## Summary
-
-`TypeAdapter` applies validation, serialisation and schema generation to any annotation, with the same methods, the same coercion and the same errors as a model.
-
-Build it once at module level, because constructing one compiles a schema. Use it to validate whole collections in a single call rather than looping in Python. And reach for it whenever the data has no natural model around it &mdash; which turns out to be far more often than the wrapper-model habit suggests.
 
 ## Why it is worth learning early
 

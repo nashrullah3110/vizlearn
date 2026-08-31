@@ -1,6 +1,5 @@
 title: Dependency Overrides
 intro: Swapping a dependency for a test, and why that makes the whole tier practical.
-
 ## The mechanism
 
 ```python
@@ -103,6 +102,12 @@ print()
 print("current_user and admin were never mentioned, and both changed.")
 ```
 
+Overriding a dependency replaces it wherever it appears, including deep inside a tree.
+
+So overriding `token` at the bottom changes `current_user` and `admin_only` above it, without either being mentioned. That is usually what you want: fake the one thing at the edge &mdash; the network call, the database, the clock &mdash; and let the real logic above it run unchanged.
+
+It is also the reason to fake as low as possible. Overriding `admin_only` skips the permission logic entirely; overriding `token` lets that logic actually be tested.
+
 ## Router-level dependencies too
 
 An override replaces the function wherever it is declared, including on a router.
@@ -198,15 +203,6 @@ This is the one thing that goes wrong, and the symptom is confusing: the overrid
 The dictionary is keyed by identity, so the object you use as the key must be the same object the endpoints depend on. If your test imports `get_db` from `app.db` and the router imported it from `.db`, and those resolve to two different module objects, you have two different functions and the override targets the wrong one.
 
 The fix is to be consistent about import paths. When an override silently does nothing, compare the two objects before looking anywhere else.
-
-## It reaches the whole tree
-
-Overriding a dependency replaces it wherever it appears, including deep inside a tree.
-
-So overriding `token` at the bottom changes `current_user` and `admin_only` above it, without either being mentioned. That is usually what you want: fake the one thing at the edge &mdash; the network call, the database, the clock &mdash; and let the real logic above it run unchanged.
-
-It is also the reason to fake as low as possible. Overriding `admin_only` skips the permission logic entirely; overriding `token` lets that logic actually be tested.
-
 ## Router and app level too
 
 An override replaces the function wherever it is declared, which includes `dependencies=[...]` on a router or the app.
@@ -286,11 +282,6 @@ Overrides replace a dependency, and that is all they do.
 They cannot change what an endpoint declares, so an endpoint depending on something unnecessary still depends on it in tests. They do not apply to code called *inside* a handler - a handler that imports and calls `get_session()` directly is untouched by any override, which is the strongest practical argument for declaring dependencies rather than reaching for them.
 
 And they are per app object. Tests that construct their own `FastAPI()` per module get isolation for free; tests that share one imported app need the discipline of clearing.
-
-## Next
-
-The runtime: what actually happens when a request arrives, why an `async def` endpoint that blocks stalls everything, and the parts of the framework that need a real event loop.
-
 
 ## Beyond the test suite
 

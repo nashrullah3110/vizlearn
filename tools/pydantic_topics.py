@@ -7324,7 +7324,6 @@ print("title:", repr(m.title))'''),
     '''
 title: Validator Modes: before, after, plain and wrap
 intro: What runs when, relative to coercion, and why the choice decides what a validator can do.
-
 ## The pipeline
 
 Validating one field is a sequence, and every mode is a slot in it:
@@ -7492,12 +7491,6 @@ If profiling points at validation on a hot path, the questions are: can this rul
 Four slots around one pipeline: before, coerce, constrain, after. `plain` replaces the pipeline; `wrap` surrounds it.
 
 Choose by asking what the value looks like when your logic needs to see it. When a validator does not run, check the mode before anything else. And remember that constraints sit between the two ordinary slots, so an after validator only ever sees values that already passed them.
-
-## Summary
-
-Four slots. `before` on raw input, for shape. `after` on the converted value, for meaning &mdash; and the default. `plain` replacing validation entirely, for custom formats. `wrap` around it, for fallbacks and context.
-
-The pipeline is before, coerce, constrain, after. Most validator confusion is a mode chosen without that sequence in mind, and most of it is fixed by moving one argument.
 
 ## The mental model
 
@@ -7709,7 +7702,6 @@ print("json round trip:", Module.model_validate_json(m.model_dump_json()) == m)'
     '''
 title: model_dump and model_dump_json: Getting Data Back Out
 intro: Two methods, several filters, and the one mistake that raises TypeError.
-
 ## Two methods, and the difference that matters
 
 `model_dump()` returns a dictionary of Python objects. A `date` field is a `date`. A `Decimal` is a `Decimal`. An enum member is the member.
@@ -7848,12 +7840,6 @@ Serialising more than you send. Building a full dump and then picking three keys
 Serialising the same object repeatedly. Inside a loop that renders one object per row, hoisting the dump out is the obvious fix and easy to miss.
 
 Neither matters at small scale. Both are visible when a response contains thousands of models.
-
-## Summary
-
-Two methods and a mode: `model_dump()` for Python objects, `model_dump_json()` for text, `model_dump(mode="json")` for a JSON-safe dict.
-
-The classic error is `json.dumps(model_dump())`, and the classic bug is `exclude_none` where `exclude_unset` was meant. Secrets want `Field(exclude=True)` and `SecretStr`, and a separate output model when you want a guarantee rather than a setting.
 
 ## Summary
 
@@ -8074,7 +8060,6 @@ print("by name:", Module(title="X", published_at="Y", reading_minutes=1).reading
     '''
 title: Aliases: When the Wire and Your Code Disagree
 intro: camelCase payloads, reserved words, legacy names, and nested shapes flattened into yours.
-
 ## Four reasons a field needs another name
 
 **The wire is camelCase.** JavaScript clients and a great many APIs use `publishedAt`. Python uses `published_at`. Renaming your attributes to match makes every Python file read badly; renaming their payload is not an option.
@@ -8232,14 +8217,6 @@ A model full of aliases is sometimes a sign that the model is describing someone
 If you consume a third-party API with thirty oddly-named fields, two models can be cleaner than thirty aliases: one matching their shape exactly, with their names, and a conversion into yours. The first model documents their API honestly; the second is your domain, unpolluted.
 
 Aliases are best when the difference is a *convention* &mdash; camelCase versus snake_case, a reserved word, a rename in progress. When the difference is a whole foreign vocabulary, a translation layer says more.
-
-## Summary
-
-`alias` for one name both ways, `validation_alias` and `serialization_alias` when the directions differ, `populate_by_name=True` so Python names still work.
-
-`by_alias=True` to emit them &mdash; the most commonly forgotten step. `AliasChoices` for renames, `AliasPath` for flattening, `alias_generator` on a base for a whole-codebase convention.
-
-And errors report the alias, because that is the name the caller used.
 
 ## Summary
 
@@ -8484,7 +8461,6 @@ except ValidationError as e:
     '''
 title: Parsing JSON: One Step Instead of Two
 intro: Why model_validate_json beats json.loads plus model_validate on speed, errors and fidelity.
-
 ## The habit worth changing
 
 Most people write this:
@@ -8620,12 +8596,6 @@ The habit is small: when you are holding JSON text or bytes, hand it to Pydantic
 It is faster, because it skips an entire intermediate representation. It produces better errors, because syntax and validation failures arrive through one channel with positions attached. It is more faithful, because decimals keep the digits as written. And it is shorter to write.
 
 Very few changes improve four things at once for one fewer line of code.
-
-## Summary
-
-`model_validate_json` for JSON text or bytes; `model_validate` for Python objects you already have. One pass in Rust instead of two with garbage in between.
-
-Malformed JSON becomes a `ValidationError` with `json_invalid` and a position, so one handler covers everything. Decimals survive. Strict mode behaves correctly, because the parser knows the input was JSON. And `TypeAdapter` gives all of it to shapes that are not models.
 
 ## Summary
 
@@ -8853,7 +8823,6 @@ print("The first has to be parsed back, and only by an English reader.")'''),
     '''
 title: Custom Serializers: Changing What Comes Out
 intro: Per-field and per-model output control, and the strong argument for not using it.
-
 ## What they do
 
 Pydantic's defaults are good: dates become ISO strings, decimals become strings, enums become values, nested models become nested objects. For most fields there is nothing to decide.
@@ -9019,14 +8988,6 @@ Most proposed serialisers fail one of those, which is the reason this module arg
 `when_used="json"` keeps Python dumps useful. `return_type` keeps the schema honest. `info.context` makes output conditional when that is genuinely needed.
 
 For secrets prefer `SecretStr` and `Field(exclude=True)`. And reach for a serialiser when an external constraint demands a shape &mdash; not when a default merely looks unfamiliar.
-
-## Summary
-
-`@field_serializer` for one field, `@model_serializer` for the whole model, `mode="wrap"` when augmenting rather than replacing. `when_used="json"` to keep Python dumps useful. `return_type` so the schema does not lie.
-
-For secrets, prefer `SecretStr` and `Field(exclude=True)`.
-
-And apply the test before writing one: is the default actually wrong for a machine, or merely unformatted for a person? Only the first is a serialiser's job.
 
 ## What to remember
 
@@ -9603,7 +9564,6 @@ print("same result:", one == many)'''),
     '''
 title: TypeAdapter: Validation Without a Model
 intro: The same machinery applied to any annotation - and the fastest way to validate a large collection.
-
 ## The thing people work around
 
 A model validates a model. But plenty of data is not shaped like one.
@@ -9782,12 +9742,6 @@ Each of those has a wrapper-model workaround, and each is cleaner without one.
 Build it once at module level. Prefer one call over a Python loop for collections. Use models where a thing deserves a name and a class body; use adapters for the shapes around them.
 
 It is the piece most people find late, and the one that removes the most awkward code when they do.
-
-## Summary
-
-`TypeAdapter` applies validation, serialisation and schema generation to any annotation, with the same methods, the same coercion and the same errors as a model.
-
-Build it once at module level, because constructing one compiles a schema. Use it to validate whole collections in a single call rather than looping in Python. And reach for it whenever the data has no natural model around it &mdash; which turns out to be far more often than the wrapper-model habit suggests.
 
 ## Why it is worth learning early
 
@@ -10041,7 +9995,6 @@ print("items :", json.dumps(schema["properties"]["items"]))'''),
     '''
 title: Generic Models: One Envelope, Many Payloads
 intro: The pattern behind every paginated response, written once instead of once per resource.
-
 ## The duplication
 
 Every API with more than one list endpoint grows the same class several times:
@@ -10164,12 +10117,6 @@ That gives you the shared envelope plus something specific to one resource. It i
 **A union would say it better.** If the payload is one of a fixed small set rather than arbitrary, a discriminated union describes that precisely and a generic does not.
 
 **The envelope has no structure.** `Generic[T]` wrapping a single field of type `T` is a box. `TypeAdapter` validates the payload directly without one.
-
-## Summary
-
-`class Page(BaseModel, Generic[T])`, parameterised as `Page[Module]`. Full validation of the parameter, a real class per parameterisation with a real name in the schema, and bounds when the generic needs to rely on what the parameter provides.
-
-Alias parameterisations at module level. Keep the parameter count low. And reach for it at the third copy, not the second.
 
 ## Generics and validation cost
 
@@ -10474,7 +10421,6 @@ print("reading it deliberately:", Safe().secret_key.get_secret_value()[:6] + "..
     '''
 title: Settings Management: Configuration That Fails Early
 intro: Typed, validated configuration from the environment - and why start-up is the right place to fail.
-
 ## Configuration is untrusted input
 
 Everything in this track has argued that data crossing into your program should be validated at the boundary. Configuration is such data, and it is usually treated as though it is not.
@@ -10582,14 +10528,6 @@ Instantiate with explicit values: `Settings(app_port=1234)` bypasses the environ
 
 And use `monkeypatch.setenv` for tests that genuinely exercise the environment reading. Do not mutate `os.environ` directly, because the change leaks into every test that follows.
 
-## Summary
-
-`BaseSettings` treats configuration as what it is: untrusted input crossing a boundary. Field names map to variables, `env_prefix` namespaces them, `validation_alias` pins the exceptions.
-
-Required fields with no default make a deployment fail at boot rather than at midnight. Constraints and `Literal` catch the typos and out-of-range values that cause most configuration incidents. `SecretStr` keeps credentials out of the logs that a settings object is uniquely likely to end up in.
-
-Build it once, at start-up, and let it refuse to start when something is wrong.
-
 ## Layering environments
 
 Most applications need the same settings with different values per environment, and the clean shape uses ordinary inheritance:
@@ -10663,14 +10601,6 @@ The best time to discover that something is misconfigured is before the process 
 A settings model turns configuration from something an application discovers gradually into something it asserts at boot. Every required variable is checked, every value is converted to the type the code expects, every constrained field is inside its range, and if any of that fails the process stops with a message naming exactly what is wrong.
 
 That is the same argument as validating a request body, applied to the other kind of input a program takes. It is just that request bodies are obviously untrusted and configuration usually is not treated that way &mdash; which is precisely why configuration errors cause so many incidents.
-
-## Summary
-
-`BaseSettings` is a model that reads the environment, which means configuration gets the same treatment as any other untrusted input.
-
-Names map implicitly, `env_prefix` namespaces a model, `validation_alias` pins the exceptions. Required fields with no default make a misconfigured deploy fail at boot rather than hours later. Constraints and `Literal` catch the typos and out-of-range values behind most configuration incidents. `SecretStr` keeps credentials out of the logs.
-
-Build it once at start-up, cache it, inject it, and let it refuse to start when something is wrong.
 
 ## One habit
 
@@ -10879,7 +10809,6 @@ for name, prop in schema["properties"].items():
     '''
 title: Pydantic with FastAPI: Where It All Arrives
 intro: Request bodies, response models and documentation, all from annotations you already wrote.
-
 ## Why this is the common entry point
 
 Most people meet Pydantic through FastAPI, and often without realising they are two libraries. That is a compliment to the integration and it leaves a gap: everything that looks like FastAPI magic is Pydantic doing what the previous tiers described.
@@ -10979,12 +10908,6 @@ There is no server here &mdash; a browser tab cannot listen on a port. `client` 
 
 The full explanation, and the one behaviour that genuinely differs, is on the [FastAPI compiler](../fastapi-lab/) page.
 
-## Summary
-
-FastAPI is Pydantic at the edges of an HTTP application. A model parameter is the body; failures become 422 carrying `errors()`; `response_model` validates and filters what goes out; the schema becomes your documentation and your consumers' clients.
-
-Use separate models per direction. Put facts about the world in the service layer and shape in the model. And write constraints rather than validators wherever you can, because only one of them reaches the people calling you.
-
 ## Where the boundary between the two libraries falls
 
 It is worth being able to say which library is doing what, because it changes where you look when something is wrong.
@@ -11070,13 +10993,6 @@ Before shipping an endpoint, three questions that take a minute each.
 
 **Would a 422 from this endpoint tell a caller what to fix?** If a field is a bare `str` where a `Literal` belongs, or a rule lives in a validator that the schema cannot show, the answer is no &mdash; and the caller finds out by being rejected rather than by reading.
 
-## Summary
-
-A model parameter is the request body, validated before your handler runs. Failures become a 422 whose `detail` is `e.errors()`, with `loc` naming which part of the request was wrong.
-
-`response_model` validates and filters the output, so undeclared fields cannot leak. Separate `Create`, `Update` and `Out` models per resource, and dump updates with `exclude_unset=True`.
-
-Keep facts about the world in the service layer and shape in the model. And prefer constraints to validators, because only one of the two reaches the documentation your callers actually read.
 ''',
     [
         {"q": "What does `response_model` do besides validating the output?",
@@ -11285,7 +11201,6 @@ print("ratio                 : %.2fx" % (two_step / one_step))'''),
     '''
 title: Performance and pydantic-core: What Validation Actually Costs
 intro: Why v2 is fast, where the time goes, and the three habits that account for most of the difference.
-
 ## Two libraries in a trench coat
 
 Installing `pydantic` installs two things.
@@ -11413,15 +11328,6 @@ If you do need to measure, three things make the result meaningful.
 **Compare under identical conditions.** Same machine, same process, same interpreter. Absolute numbers do not survive a move between any of those, which is why the timings on this page are presented as ratios.
 
 `time.perf_counter` is sufficient for A-versus-B. For finding where time goes in a real application, a profiler will point at the database long before it points at validation.
-
-## Summary
-
-Two pieces: Python builds the schema once, Rust executes it per value. Cost scales with how much conversion and how much custom Python is involved.
-
-Three habits cover nearly all avoidable cost &mdash; validate once at the boundary, validate collections in a single call, parse JSON directly. Prefer constraints to validators where either works, and build schemas at module level rather than in a loop.
-
-Then stop. Validation is rarely the bottleneck, and the remaining questions belong to a profiler.
-
 
 ## Mistakes people make
 
@@ -11664,7 +11570,6 @@ print("Match on type, never on msg - that advice exists because of this.")'''),
     '''
 title: Migrating v1 to v2: What Changed and What Bites
 intro: The renames, the behaviour changes that fail silently, and how to date a tutorial.
-
 ## Why this module exists even if you never migrate
 
 Pydantic v1 was popular for years, and a great deal of writing about it is still the top result for many searches. Reading a v1 answer as though it describes v2 is a genuine source of confusion.
@@ -11768,12 +11673,6 @@ The migration is not free, and it is worth knowing what it buys.
 Validation is substantially faster, because the core is Rust rather than Python. Strict mode exists. Discriminated unions became a first-class feature. `TypeAdapter` arrived, and with it validation without a wrapper model. Error output became structured and stable. `computed_field` exists. Serialisation gained real control.
 
 Most of this track describes features that are v2-only. If you are reading it against a v1 codebase, that is the gap.
-
-## Summary
-
-Renames are mechanical and mostly warn. `Optional[X]` losing its implicit `None` default is the change that fails silently and needs a deliberate search. Validators changed shape, not just name. Config moved into `model_config`. Error codes were renamed wholesale, which is why matching on `type` rather than `msg` is the rule.
-
-And when reading anything about Pydantic online, check which vocabulary it uses before trusting it.
 
 ## Things that were removed outright
 

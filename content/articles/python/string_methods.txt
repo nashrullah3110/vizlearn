@@ -13,9 +13,7 @@ print(name)      # still "ana"
 
 Strings are immutable, so a method that "changes" one actually returns a new one. If you do not keep the result, nothing happened. The fix is to rebind:
 
-```python
 name = name.upper()
-```
 
 This is the single most common string mistake, and it fails silently &mdash; no error, just the old value.
 
@@ -49,6 +47,10 @@ For that job:
 ## Tests that read as English
 
 `startswith`, `endswith`, `isdigit`, `isalpha` all return booleans and read naturally in a condition. `endswith` accepts a tuple, so `name.endswith((".jpg", ".png"))` is one call rather than two comparisons.
+
+## Case methods and comparison
+
+`upper`, `lower` and `title` return new strings. For case-insensitive comparison, `lower()` both sides &mdash; or `casefold()`, which handles a few non-English cases `lower` does not.
 
 ## Cleaning input, in order
 
@@ -117,125 +119,3 @@ text = "\n".join(parts)
 This is the same reason `join` exists as a method on the separator: it is
 building the whole result in one pass, which it can only do if it is given all
 the pieces at once.
-
-## Why immutability shapes everything here
-
-Every string method returns a new string, and the original is untouched. That
-single fact explains most of the surprises people meet.
-
-It is why `name.upper()` on its own line does nothing useful &mdash; the
-uppercased string is created and immediately discarded, because nothing was
-assigned. It is why methods chain so naturally, since each one hands the next a
-fresh string to work on. And it is why building a string by repeated
-concatenation in a loop is slow: each `+=` creates a whole new string and copies
-everything so far, so the work grows with the square of the length.
-
-The practical consequences are three habits. Assign the result, or chain into
-something that uses it. Chain freely, because nothing is being mutated
-underneath you. And collect pieces in a list and `join` them once, rather than
-adding to a string repeatedly.
-
-Immutability also means strings are safe to share. Passing one to a function
-carries no risk that the function will change it, which is why strings can be
-dictionary keys and set members while lists cannot.
-
-## Finding the right method
-
-The string type has around forty methods, and remembering which is which
-matters less than knowing the four groups they fall into.
-
-**Tests** return a boolean and read as questions: `startswith`, `endswith`,
-`isdigit`, `isalpha`, `isspace`, `islower`. They are the ones that make
-conditions readable, and they are almost always clearer than the slicing or
-regular expression that would do the same job.
-
-**Transformations** return a changed copy: `upper`, `lower`, `title`, `strip`,
-`replace`, `zfill`, `center`. These are the ones people chain.
-
-**Splitting and joining** move between a string and a list: `split`,
-`rsplit`, `splitlines`, `partition`, and `join` in the other direction.
-
-**Searching** reports positions: `find`, `rfind`, `index`, `count`. The
-distinction between `find` and `index` is that one returns &minus;1 for a miss
-and the other raises, which is a choice about whether absence is normal.
-
-Knowing the group tells you what to search the documentation for, which is
-faster than remembering forty names.
-
-## The methods that look similar and are not
-
-Several pairs differ in a way that only shows up on unusual input.
-
-`strip` removes any of the characters you pass, from both ends, in any order
-&mdash; it is not a prefix or suffix removal. `strip(".com")` will happily eat a
-trailing `m`, `o` or `c` in any combination. `removeprefix` and `removesuffix`,
-added in Python 3.9, are the operations people usually mean.
-
-`split()` with no argument splits on any run of whitespace and discards empty
-pieces, which is what you want for words in a sentence. `split(" ")` splits on
-single spaces and keeps empties, which is what you want for a delimited record
-where a missing field matters. Two consecutive delimiters produce an empty
-string in the second form and nothing in the first, and that difference has
-silently dropped columns from many a parsed file.
-
-`title()` capitalises after every non-letter, so `"o'brien"` becomes
-`"O'Brien"` and `"don't"` becomes `"Don'T"`. It is fine for simple labels and
-wrong for names, which is a reason to be cautious about applying it to user
-data.
-
-`isdigit` is true for characters like superscript two and false for a minus
-sign or a decimal point, so it is not a test for "is this a number". Trying
-`float()` inside a `try` is the honest check.
-
-## Case and comparison
-
-Comparing user input case-insensitively is a two-step operation, and the usual
-first attempt is `a.lower() == b.lower()`.
-
-That works for English. For text that may contain other scripts, `casefold()`
-is the stronger version &mdash; it handles cases where lowercasing is not enough,
-such as the German sharp s, which casefolds to `ss` and so compares equal to the
-spelled-out form.
-
-The wider point is that string comparison is more subtle than it looks once
-text stops being ASCII. Characters can be composed in more than one way, so two
-strings that display identically can compare unequal. `unicodedata.normalize`
-is the fix when that matters, and it matters more often than people expect with
-copied-and-pasted data.
-
-## Cleaning input, as a pipeline
-
-Text that arrives from a person or a file usually needs the same sequence
-before anything else touches it: strip the ends, normalise the case, collapse
-internal whitespace, and remove anything the field is not supposed to contain.
-
-Doing that once, at the boundary where the data enters the program, is
-considerably better than scattering `strip()` calls through the code that uses
-it. Everything downstream then works on values that are already in a known
-shape, and a bug in the cleaning is in one place.
-
-The order matters slightly: strip before checking for emptiness, because a
-field of spaces is empty in every sense that matters, and `"   ".strip()` is
-falsy while `"   "` is not.
-
-## Common mistakes
-
-**Calling a method and discarding the result**, which is the immutability
-surprise and produces no error at all.
-
-**Using `strip` to remove a suffix**, which removes characters rather than the
-string you named.
-
-**Using bare `split(" ")`** where `split()` was meant, or the reverse, and
-silently mishandling repeated delimiters.
-
-**Comparing without normalising**, so `"Yes "` fails a test against `"yes"`.
-
-**Using `isdigit` as a number check**, which passes on characters no numeric
-conversion accepts.
-
-**Building strings with `+=` in a loop**, which is quadratic; collect and
-`join`.
-
-**Applying `title()` to names**, which produces apostrophes followed by
-capitals.

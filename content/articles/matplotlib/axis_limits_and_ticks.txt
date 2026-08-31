@@ -1,17 +1,16 @@
 title: Limits, Ticks and Scales
 intro: Controlling what the axis shows and how it is written.
+## Ticks
 
-## Limits
+`ax.set_xticks(positions)` decides where the ticks go. `ax.set_xticklabels(labels)` decides what they say.
 
-`ax.set_xlim(a, b)` and `ax.set_ylim(a, b)` set the visible range.
+**Setting labels without setting positions is the classic bug.** matplotlib chooses its own positions based on the current view, and `set_xticklabels` simply renames whatever ticks happen to exist. Change the data and the labels stay put, now attached to different values. The symptom is a chart where the labels are subtly wrong and nothing errored.
 
-By default matplotlib picks limits slightly **wider** than the data, so points do not sit on the frame. `ax.margins(0)` removes that padding, and `ax.margins(x=0.1, y=0.2)` sets it per axis as a fraction.
+Always set positions first, or pass both together: `ax.set_xticks(pos, labels)`.
 
-Passing the limits in reverse order reverses the axis: `ax.set_ylim(100, 0)` puts 100 at the bottom. That is how you draw a rank chart where 1 is best, or a depth profile where zero is the surface.
+For automatic but controlled ticks, `matplotlib.ticker` has locators: `MaxNLocator(5)` for at most five ticks, `MultipleLocator(0.25)` for every quarter, `LogLocator` for log axes.
 
-Two cautions. Setting limits **hides** data rather than removing it &mdash; points outside the range are still there, still counted by anything that reads the data, just not visible. And on a bar chart, changing the y limit away from zero misstates the values, which is the subject of its own module.
-
-`ax.autoscale()` returns to automatic, and `ax.set_xlim(left=0)` sets one end and leaves the other automatic.
+`ax.tick_params(axis="x", rotation=45, labelsize=9)` handles rotation and size, which is the usual fix for crowded category labels &mdash; though `barh` is usually the better fix.
 
 
 ## Limits
@@ -43,6 +42,16 @@ print()
 print("Reversing an axis is just giving the limits backwards:")
 print("   ax.set_ylim(top, bottom)")
 ```
+
+`ax.set_xlim(a, b)` and `ax.set_ylim(a, b)` set the visible range.
+
+By default matplotlib picks limits slightly **wider** than the data, so points do not sit on the frame. `ax.margins(0)` removes that padding, and `ax.margins(x=0.1, y=0.2)` sets it per axis as a fraction.
+
+Passing the limits in reverse order reverses the axis: `ax.set_ylim(100, 0)` puts 100 at the bottom. That is how you draw a rank chart where 1 is best, or a depth profile where zero is the surface.
+
+Two cautions. Setting limits **hides** data rather than removing it &mdash; points outside the range are still there, still counted by anything that reads the data, just not visible. And on a bar chart, changing the y limit away from zero misstates the values, which is the subject of its own module.
+
+`ax.autoscale()` returns to automatic, and `ax.set_xlim(left=0)` sets one end and leaves the other automatic.
 
 ## Where the ticks go
 
@@ -192,18 +201,23 @@ print("The top and right spines enclose the plot and carry no")
 print("information. Removing them is the cheapest visual improvement")
 print("matplotlib offers.")
 ```
-## Ticks
 
-`ax.set_xticks(positions)` decides where the ticks go. `ax.set_xticklabels(labels)` decides what they say.
+A grid helps when someone will read values off the chart, and is decoration when they will not.
 
-**Setting labels without setting positions is the classic bug.** matplotlib chooses its own positions based on the current view, and `set_xticklabels` simply renames whatever ticks happen to exist. Change the data and the labels stay put, now attached to different values. The symptom is a chart where the labels are subtly wrong and nothing errored.
+When it does help, a faint grid on one axis is usually enough: `ax.grid(True, axis="y", alpha=0.4)`. A full dark grid competes with the data for attention.
 
-Always set positions first, or pass both together: `ax.set_xticks(pos, labels)`.
+`ax.set_axisbelow(True)` draws it behind the data, which is normally what you want and is not always the default in a given style.
 
-For automatic but controlled ticks, `matplotlib.ticker` has locators: `MaxNLocator(5)` for at most five ticks, `MultipleLocator(0.25)` for every quarter, `LogLocator` for log axes.
+The **spines** are the four lines around the plot. The top and right ones enclose the area and carry no information:
 
-`ax.tick_params(axis="x", rotation=45, labelsize=9)` handles rotation and size, which is the usual fix for crowded category labels &mdash; though `barh` is usually the better fix.
+```python
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+```
 
+Two lines, and the chart immediately looks less like a default. It is the highest ratio of visual improvement to effort in matplotlib, which is why nearly every published-looking style does it.
+
+`ax.spines["left"].set_position(("outward", 10))` detaches the remaining spines slightly, which is a further small refinement.
 ## Formatters
 
 A formatter changes how a tick value is **written** without changing the value.
@@ -227,26 +241,6 @@ Two things to know. Log requires **positive** values; zeros and negatives are dr
 `"symlog"` is logarithmic away from zero and linear within a band around it, set by `linthresh`. It handles data that crosses zero, at the cost of a scale that changes character partway along &mdash; which needs explaining to the reader.
 
 `"logit"` suits proportions, stretching the ends near 0 and 1.
-
-## Grids and spines
-
-A grid helps when someone will read values off the chart, and is decoration when they will not.
-
-When it does help, a faint grid on one axis is usually enough: `ax.grid(True, axis="y", alpha=0.4)`. A full dark grid competes with the data for attention.
-
-`ax.set_axisbelow(True)` draws it behind the data, which is normally what you want and is not always the default in a given style.
-
-The **spines** are the four lines around the plot. The top and right ones enclose the area and carry no information:
-
-```python
-ax.spines["top"].set_visible(False)
-ax.spines["right"].set_visible(False)
-```
-
-Two lines, and the chart immediately looks less like a default. It is the highest ratio of visual improvement to effort in matplotlib, which is why nearly every published-looking style does it.
-
-`ax.spines["left"].set_position(("outward", 10))` detaches the remaining spines slightly, which is a further small refinement.
-
 ## Minor ticks
 
 `ax.minorticks_on()` adds unlabelled ticks between the major ones, and `AutoMinorLocator(5)` sets how many.

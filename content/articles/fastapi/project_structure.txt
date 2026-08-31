@@ -1,6 +1,5 @@
 title: Project Structure
 intro: How the pieces are arranged once the application is more than one file.
-
 ## The layout
 
 Nothing here is clever, and that is the point.
@@ -191,6 +190,18 @@ def config(): return good.model_dump()
 print("served :", TestClient(app).get("/config").json())
 ```
 
+A Pydantic model, read once, validated at startup:
+
+```python
+class Settings(BaseModel):
+    page_size: int = Field(default=20, ge=1, le=100)
+    debug: bool = False
+```
+
+Two benefits over reading the environment where it is needed. A missing or invalid value fails at startup with a message naming the field, rather than at request time in a handler. And the model is a list of everything the application needs to run, in one place, which is what a deployment checklist wants to be generated from.
+
+`pydantic-settings` does the environment reading properly, including `.env` files and nested configuration.
+
 ## Dependencies shared across routers
 
 One module holding what several routers need, so the same rule is not written twice.
@@ -328,21 +339,6 @@ Keeping them beside each other makes the differences visible, which is when peop
 Several routers need the same ones &mdash; the session, the current user, pagination. A shared `dependencies.py` is where they are found.
 
 Reading that file should tell you what the application's endpoints are allowed to assume. That is a genuinely useful summary, and it is the same argument as the `types.py` from the Pydantic track.
-
-## Settings in one model
-
-A Pydantic model, read once, validated at startup:
-
-```python
-class Settings(BaseModel):
-    page_size: int = Field(default=20, ge=1, le=100)
-    debug: bool = False
-```
-
-Two benefits over reading the environment where it is needed. A missing or invalid value fails at startup with a message naming the field, rather than at request time in a handler. And the model is a list of everything the application needs to run, in one place, which is what a deployment checklist wants to be generated from.
-
-`pydantic-settings` does the environment reading properly, including `.env` files and nested configuration.
-
 ## When to split
 
 Earlier than feels necessary.
@@ -381,13 +377,6 @@ Ask somebody new to add a field to one resource and watch what they do.
 If they open `schemas/modules.py`, `services/modules.py` and `routers/modules.py`, the structure is working. If they search the codebase for a string, it is not.
 
 That test matters more than any particular arrangement. A layout is a guess about where people will look, and the only evidence is whether they find it.
-
-## Where the track leaves you
-
-Routing, every source of input, the response and its status, errors, structure, the whole dependency system, the runtime, testing, the generated documentation and the shape of authentication.
-
-That is enough to build and maintain a real API. What is left is mostly not FastAPI &mdash; databases, deployment, observability, the operational parts &mdash; and each of those is easier to learn once the application layer underneath it is arranged so that it can be reasoned about one piece at a time.
-
 
 ## Growing into it
 

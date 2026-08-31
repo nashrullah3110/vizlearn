@@ -3021,7 +3021,6 @@ print("list   :", c.get("/modules").json())'''),
     '''
 title: HTTP Methods and Routing
 intro: What each verb promises, and how the router decides which handler runs.
-
 ## A resource is one name and several operations
 
 The same path with different methods is the central idea of an HTTP API. `/modules/7` names a thing; `GET`, `PUT` and `DELETE` are what you can do to it.
@@ -3133,11 +3132,6 @@ Two things worth knowing are absent.
 **No wildcard fallback by default.** An unmatched path is a 404 from the router with a generic body. If you want a catch-all - to serve a single-page app, say - you register one, and it must come last or it shadows everything after it.
 
 That last point is the ordering rule at its most severe: a catch-all in an early router makes every route in every later router unreachable, which is a confusing morning.
-
-## Next
-
-The parts of a request that are neither path, query nor body: headers and cookies, and what they are each properly for.
-
 
 ## A closing thought
 
@@ -3673,7 +3667,6 @@ for label, spec in [
     '''
 title: Form Data and File Uploads
 intro: What a browser form actually sends, and why it is neither JSON nor a query string.
-
 ## Three body formats
 
 An HTTP request has one body, and for an API there are three ways it is commonly encoded.
@@ -3802,11 +3795,6 @@ What to avoid is a decorator that inspects a model and generates form parameters
 Two cautions with it. The size limit now applies to the total as well as each item, so a hundred small files can be as expensive as one large one - cap the count with `max_length` as well. And validating each file means doing the work per item, so a slow check multiplies.
 
 For anything where the count could be large, an endpoint that accepts one file and is called repeatedly is easier to reason about, easier to retry, and gives the client better progress reporting.
-
-## Next
-
-Status codes: which one to return when, and why returning 200 for everything throws away information the client already knows how to use.
-
 
 ## A closing thought
 
@@ -4042,7 +4030,6 @@ print("documented responses:",
     '''
 title: Status Codes
 intro: Which number to return when, and why 200-for-everything discards information the client already understands.
-
 ## The class matters more than the number
 
 Before the specific code, a client reads the class.
@@ -4121,15 +4108,6 @@ Now the schema describes the error shape, and a generated client can type it. Wi
 
 Worth doing for the failures a caller is expected to handle &mdash; 404 on a lookup, 409 on a create. Not worth doing for every conceivable code.
 
-## A short reference
-
-Created something: **201**. Deleted something: **204**. Queued something: **202**. Read something: **200**.
-
-Caller sent nonsense: **422** if validation caught it, **400** if you did. Caller is not signed in: **401**. Caller is signed in and not allowed: **403**. Thing does not exist: **404**. Thing conflicts: **409**. Caller is asking too often: **429**.
-
-Something broke that is not their fault: **500**, and do not put the traceback in it.
-
-
 ## Mistakes people make
 
 **200 with an error body.** The one that costs most. Retries, caches, monitoring and every client's error handling branch on the status class, and a 200 tells all of them the call succeeded.
@@ -4192,11 +4170,6 @@ Some codes exist and are produced by infrastructure rather than by your handlers
 **413** may be returned by a reverse proxy before a request reaches you, which is why an upload limit belongs there as well as in the handler.
 
 Knowing which layer produces which saves time when something breaks: a 500 is yours, a 502 is not.
-
-## Next
-
-The mechanics behind most of those: `HTTPException`, custom exception handlers, and how to keep HTTP concerns out of your business logic.
-
 
 ## A closing thought
 
@@ -4451,7 +4424,6 @@ print("raised    :", c.post("/modules", json={"title": "Vectors"}).json())'''),
     '''
 title: Error Handling
 intro: HTTPException, custom handlers, and keeping HTTP out of the code that does the work.
-
 ## The ordinary case
 
 ```python
@@ -4620,11 +4592,6 @@ Error paths are the least-tested part of most applications, and the easiest to t
 A test that a missing module gives 404, that a duplicate gives 409, and that a malformed body gives 422 with the right `loc` costs three short functions and covers the branches most likely to be wrong.
 
 Assert on the status and on `type` or a stable key - not on the message, for the same reason as in the Pydantic track. Prose gets reworded, and a suite that fails on wording is a suite people learn to ignore.
-
-## Next
-
-Splitting a growing app into routers, before `main.py` becomes the file nobody wants to open.
-
 
 ## Errors as part of the contract
 
@@ -5308,7 +5275,6 @@ print("but only one states the requirement once for every endpoint.")'''),
     '''
 title: Dependency Injection
 intro: Declaring what an endpoint needs and letting the framework supply it.
-
 ## The whole idea
 
 ```python
@@ -5449,11 +5415,6 @@ The payoff arrives in the test file, and it is worth previewing before the overr
 An endpoint declaring `Depends(get_db)` and `Depends(current_user)` can be tested without a database and without a token, because both can be replaced at the app level. The handler is unchanged; only what it depends on moves.
 
 That is the practical argument for pushing requirements into dependencies rather than reaching for them inside handlers. A handler that calls `get_session()` directly cannot be tested without a session. One that declares it can.
-
-## Next
-
-Dependencies that need to clean up after themselves &mdash; a database session that must be closed whether or not the handler succeeded &mdash; which is what `yield` is for.
-
 
 ## One habit worth forming
 
@@ -5726,7 +5687,6 @@ print("The response was already decided. Log the failure; do not raise it.")''')
     '''
 title: Dependencies with yield
 intro: Setup before the handler, teardown after it, and the transaction pattern that falls out.
-
 ## The shape
 
 ```python
@@ -5795,14 +5755,6 @@ If cleanup can fail, catch it and log it. The request already succeeded or faile
 
 **Do not rely on the exception being visible.** In older FastAPI versions the exception was not always available to the teardown in the way people expected. The `try/except/finally` shape above works because it wraps the `yield` directly rather than trying to inspect state.
 
-## Sync or async
-
-Both work. `def get_session()` runs in the threadpool; `async def get_session()` runs on the event loop.
-
-Use `async def` when the setup and teardown are themselves async &mdash; an async database driver, an async HTTP client. Use `def` when they are ordinary blocking calls, and let the framework keep them off the loop.
-
-Mixing is fine: an async handler can depend on a sync yield dependency and vice versa.
-
 ## What belongs here
 
 Anything with a lifetime tied to the request: database sessions, transactions, file handles, temporary directories, locks, an HTTP client that should be closed.
@@ -5847,16 +5799,6 @@ That is why teardown ordering is reverse, why teardown runs on failure, and why 
 
 It also explains the lifetime precisely. The dependency is alive for the whole request, including while the response is being serialised - so a session yielded here is still usable by a response model reading lazy attributes, which is a common source of confusion when it is *not* the case in other frameworks.
 
-## Sync or async
-
-Both forms work, and the choice follows the resource.
-
-`def get_session()` runs in a threadpool, which is right for a blocking driver.
-
-`async def get_session()` runs on the event loop, which is right for an async one.
-
-Mixing is allowed in both directions. What matters is not making a blocking call directly on the loop, which the runtime tier covers.
-
 ## A checklist
 
 Before shipping a yield dependency, four questions.
@@ -5868,11 +5810,6 @@ Can the handler fail? Then anything conditional on success sits between the `yie
 Can the cleanup fail? Then it is caught and logged, not raised.
 
 Is this per-request, or per-process? A session is per request; the pool it comes from is not.
-
-## Next
-
-Dependencies that depend on dependencies, and the tree FastAPI resolves before your handler runs.
-
 
 ## One more thing to watch
 
@@ -6148,7 +6085,6 @@ print("and nothing in its signature says so.")'''),
     '''
 title: Sub-dependencies
 intro: Dependencies that depend on dependencies, and the tree resolved before your handler runs.
-
 ## The same syntax, one level down
 
 A dependency is a function whose parameters are request parameters &mdash; and `Depends` is a request parameter. So a dependency can depend on another:
@@ -6263,11 +6199,6 @@ Every dependency in the tree is a function call per request, and the tree is res
 For the ordinary case - a handful of small functions - the cost is nothing next to a single query. It becomes visible in two situations: a dependency doing real work, such as a lookup, that is now multiplied across every endpoint sharing it; and a very wide tree where the sheer number of calls adds up under load.
 
 Neither is a reason to avoid the feature. Both are reasons to know what is in the tree, because a slow dependency near the root is slow for everything, and its cost does not appear in any single endpoint's code.
-
-## Next
-
-Applying a dependency to a whole router or the whole application, so that a section is protected without every endpoint repeating the declaration.
-
 
 ## A worked permission chain
 
@@ -6578,7 +6509,6 @@ print("Identical behaviour. Reach for the class when it holds something.")'''),
     '''
 title: Class Dependencies
 intro: Anything callable works, which is how a dependency gets configuration of its own.
-
 ## Callables, not functions
 
 `Depends` takes a callable. A function is the obvious one; a class is a callable too, because calling it constructs an instance.
@@ -6747,11 +6677,6 @@ Because `read_modules` is created at import, it is one object shared by every re
 That is what makes it cheap, and it is the constraint to respect: the instance may hold configuration, and it must not hold anything about a particular request. If you find yourself assigning to `self` inside `__call__`, the value belongs in the return instead.
 
 The same applies across workers. Each process has its own instance, so anything accumulated on `self` is per process rather than per application - which is why an instance attribute is the wrong place for a rate-limit counter, and a shared store is the right one.
-
-## Next
-
-Applying a dependency to every route in a router or an entire application, so a whole section is protected without each endpoint repeating the declaration.
-
 
 ## Where the instance lives
 
@@ -7046,7 +6971,6 @@ for p in ["/g/one", "/g/two", "/e/one", "/e/two"]:
     '''
 title: Router and Global Dependencies
 intro: Protecting a section without every endpoint repeating itself - and the endpoint that would otherwise be forgotten.
-
 ## Three places to declare one
 
 A dependency can be attached at three levels, all with the same argument:
@@ -7168,11 +7092,6 @@ Two arguments belong on the router beside the dependency.
 `tags=["admin"]` groups them, so a reader of the documentation sees the protected endpoints together rather than scattered among the public ones.
 
 Both are single arguments, and together they turn "these routes need a key" from something a caller discovers by being rejected into something the schema states.
-
-## Next
-
-Replacing a dependency for a test &mdash; the piece that makes all of this testable without a database, a token service or a network.
-
 
 ## A note on ordering and errors
 
@@ -7436,7 +7355,6 @@ print("lifecycle:", log)'''),
     '''
 title: Dependency Overrides
 intro: Swapping a dependency for a test, and why that makes the whole tier practical.
-
 ## The mechanism
 
 ```python
@@ -7550,11 +7468,6 @@ Overrides replace a dependency, and that is all they do.
 They cannot change what an endpoint declares, so an endpoint depending on something unnecessary still depends on it in tests. They do not apply to code called *inside* a handler - a handler that imports and calls `get_session()` directly is untouched by any override, which is the strongest practical argument for declaring dependencies rather than reaching for them.
 
 And they are per app object. Tests that construct their own `FastAPI()` per module get isolation for free; tests that share one imported app need the discipline of clearing.
-
-## Next
-
-The runtime: what actually happens when a request arrives, why an `async def` endpoint that blocks stalls everything, and the parts of the framework that need a real event loop.
-
 
 ## Beyond the test suite
 
@@ -7826,7 +7739,6 @@ for p in ["/awaits", "/blocks", "/neither"]:
     '''
 title: async def or def
 intro: Where your handler runs, and the one mistake that turns a fast framework into a slow one.
-
 ## Two placements, one interface
 
 FastAPI accepts both:
@@ -7913,15 +7825,6 @@ Two specific things to avoid.
 
 **Calling `asyncio.run()` inside a handler.** There is already a loop running; starting another raises. To call an async function from a sync handler, the honest answer is usually to make the handler async.
 
-## Being consistent
-
-An application that is mostly sync and mostly fast is a perfectly good application. So is one that is async throughout with async drivers.
-
-What causes trouble is a codebase where the choice was made per handler by whoever wrote it, without a rule &mdash; because then nobody can tell whether a given endpoint is safe to add a blocking call to, and eventually somebody adds one to the wrong sort.
-
-Pick a default, write it down, and make the exception deliberate.
-
-
 ## Mistakes people make
 
 **`async def` with a blocking call.** The one that matters. Nothing errors and the whole process serves one request at a time under load, with a symptom - everything is slow when busy - that points nowhere useful.
@@ -7945,10 +7848,6 @@ Two symptoms distinguish the failures.
 **The threadpool is full**: the fast endpoints stay fast while requests to slow sync ones queue. The loop is fine; the workers are all busy.
 
 The fix differs. The first needs the blocking call moved off the loop - change `async def` to `def`, or wrap it in `run_in_threadpool`. The second needs fewer slow synchronous operations, more workers, or async drivers.
-
-## Next
-
-Work that should happen after the response has been sent, which is what background tasks are for.
 
 ## Being consistent
 
@@ -8211,7 +8110,6 @@ print("trail:", trail)'''),
     '''
 title: Background Tasks
 intro: Work that should happen after the response has gone, and the point at which it needs a real queue instead.
-
 ## The mechanism
 
 ```python
@@ -8311,10 +8209,6 @@ Good: a log line, a cache warm, a non-critical notification, a temporary file cl
 Not: anything with money in it, anything a user is told happened, anything that must be retried, anything that takes more than a second or two.
 
 The upgrade path is Celery, RQ, Dramatiq or a cloud queue, and the moment to take it is when you first find yourself hoping a task did not get lost.
-
-## Next
-
-Work that happens once per process rather than once per request: startup and shutdown, and where a connection pool actually belongs.
 
 ## Where it fits
 
@@ -8632,7 +8526,6 @@ print("A test that merely imports the module paid for the first line only.")''')
     '''
 title: Lifespan Events
 intro: Work that happens once per process rather than once per request, and where a connection pool belongs.
-
 ## Two lifetimes
 
 Almost everything in this track has been per request: a body, a session, a user, a background task.
@@ -8759,11 +8652,6 @@ with TestClient(app) as client:
 Both are useful. An isolated unit test with dependencies overridden is faster and cleaner without startup; an integration test that should exercise the real wiring needs it.
 
 Knowing the difference explains the common confusion of a test failing because `app.state.pool` does not exist - the startup that would have created it never ran.
-
-## Next
-
-Testing what you have built &mdash; the client, the overrides, and what a good FastAPI test suite actually asserts.
-
 
 ## What belongs in it
 
@@ -9046,7 +8934,6 @@ print("no leak          :", "internal" not in r.json())'''),
     '''
 title: Testing
 intro: A client that calls the app directly, and what a good FastAPI test suite actually asserts.
-
 ## No server involved
 
 `TestClient` does not start anything. It builds the ASGI scope a server would build, calls your application, and turns the response messages back into an object with `.status_code` and `.json()`.
@@ -9140,11 +9027,6 @@ Per endpoint: the success case with the values you expect; one validation failur
 Across the application: one test per dependency that can reject, so the 401 and 403 paths are covered; and a handful asserting on `app.openapi()` for endpoints with real consumers, since a removed `response_model` is a breaking change no functional test notices.
 
 That is a few short functions per endpoint, and it covers the branches most likely to be wrong.
-
-## Next
-
-The document all of this generates, and how much of your API's usability is decided by it.
-
 
 ## Speed and what it buys
 
@@ -9430,7 +9312,6 @@ for p in params:
     '''
 title: OpenAPI and the Docs
 intro: The document your annotations generate, and how much of an API's usability is decided by it.
-
 ## What is generated
 
 `app.openapi()` returns one OpenAPI document describing every route: paths, methods, parameters, request bodies, response shapes, status codes, descriptions and examples.
@@ -9614,10 +9495,6 @@ The generated document is the closest thing an API has to a public interface def
 That is unusual and worth appreciating. In most stacks the specification is a separate artefact that somebody maintains, and it drifts from the implementation immediately because nothing forces them together.
 
 Here it cannot drift, because there is only one source. What varies is how much you put into that source - and the difference between a document consumers can build against and one they have to guess at is a handful of descriptions, one example per model, and a `Literal` where a `str` would have done.
-
-## Next
-
-Authentication and authorisation - as dependencies, which is where the previous tier was heading all along.
 
 ## In one line
 
@@ -9862,7 +9739,6 @@ print("internal dump   :", u.model_dump())'''),
     '''
 title: Security Basics
 intro: Authentication as a dependency, what a token actually is, and the mistakes that matter most.
-
 ## Authentication is a dependency
 
 Everything from the dependencies tier applies here, and this is the case that justifies it.
@@ -9973,11 +9849,6 @@ Each is a real subject. The point of this one is that the *shape* &mdash; authen
 Worth naming so the gaps are known: CSRF for cookie sessions, CORS, rate limiting, sanitising anything rendered as HTML, dependency scanning, and secrets management.
 
 Each is a subject. What this module gives you is the shape - authentication as a dependency, authorisation layered above it, secrets out of payloads and out of responses - and that shape is what makes the rest tractable rather than scattered.
-
-## Next
-
-How the pieces are arranged once the application is more than one file.
-
 
 ## Where to be careful
 
@@ -10340,7 +10211,6 @@ print("missing:", c.get("/modules/99").status_code)'''),
     '''
 title: Project Structure
 intro: How the pieces are arranged once the application is more than one file.
-
 ## The layout
 
 Nothing here is clever, and that is the point.
@@ -10455,13 +10325,6 @@ Ask somebody new to add a field to one resource and watch what they do.
 If they open `schemas/modules.py`, `services/modules.py` and `routers/modules.py`, the structure is working. If they search the codebase for a string, it is not.
 
 That test matters more than any particular arrangement. A layout is a guess about where people will look, and the only evidence is whether they find it.
-
-## Where the track leaves you
-
-Routing, every source of input, the response and its status, errors, structure, the whole dependency system, the runtime, testing, the generated documentation and the shape of authentication.
-
-That is enough to build and maintain a real API. What is left is mostly not FastAPI &mdash; databases, deployment, observability, the operational parts &mdash; and each of those is easier to learn once the application layer underneath it is arranged so that it can be reasoned about one piece at a time.
-
 
 ## Growing into it
 

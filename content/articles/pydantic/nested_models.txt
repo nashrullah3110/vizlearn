@@ -139,6 +139,20 @@ print("given        :", full.author)
 print("inner default:", full.author.email)
 ```
 
+The rules from the defaults module apply without modification, and one of them has a specific trap here.
+
+For a nested model that should always exist, use `default_factory`:
+
+```python
+reviewer: Author = Field(default_factory=Author)
+```
+
+Not `= Author()`. That expression is evaluated once, when the class body runs, so every parent would share one `Author` instance &mdash; and since models are mutable by default, a change through one parent would be visible through all of them. Pydantic deep-copies simple defaults, but constructing the instance at class-definition time is still the wrong shape, and a factory says what you mean.
+
+For a nested model that may genuinely be absent, `Optional[Author] = None` behaves exactly as it does for any other type, with the same distinction between omitted and explicitly null.
+
+Note that a nested model whose own fields all have defaults can be built from an empty dict, which occasionally surprises people: `Module(title="x", author={})` succeeds if every `Author` field has a default. That is correct, and it is a good reason to think about whether those inner defaults should exist.
+
 ## Dumping and reloading a nested tree
 
 <code>model_dump()</code> recurses, so the whole tree comes back as nested dicts &mdash; and that output is valid input again.
@@ -232,23 +246,6 @@ class Author(BaseModel):
 Use that as a field type and every parent gets those rules for free. This is the compounding benefit of composition: a well-specified small model is reusable, and each place it is reused inherits the entire specification rather than a copy of it that can drift.
 
 It is also the argument for making small models. `Address`, `Money`, `DateRange`, `Contact` &mdash; anything that appears in more than one place and has rules of its own is a model waiting to be extracted. The alternative is the same four fields and the same three constraints written out in five parent models, four of which get updated when the rule changes.
-
-## Optional and defaulted nested models
-
-The rules from the defaults module apply without modification, and one of them has a specific trap here.
-
-For a nested model that should always exist, use `default_factory`:
-
-```python
-reviewer: Author = Field(default_factory=Author)
-```
-
-Not `= Author()`. That expression is evaluated once, when the class body runs, so every parent would share one `Author` instance &mdash; and since models are mutable by default, a change through one parent would be visible through all of them. Pydantic deep-copies simple defaults, but constructing the instance at class-definition time is still the wrong shape, and a factory says what you mean.
-
-For a nested model that may genuinely be absent, `Optional[Author] = None` behaves exactly as it does for any other type, with the same distinction between omitted and explicitly null.
-
-Note that a nested model whose own fields all have defaults can be built from an empty dict, which occasionally surprises people: `Module(title="x", author={})` succeeds if every `Author` field has a default. That is correct, and it is a good reason to think about whether those inner defaults should exist.
-
 ## Shaping the output
 
 `model_dump` takes `include` and `exclude`, and both understand structure. A set names top-level fields; a dict reaches inside. The two spellings do not mix in one literal, so once any entry needs to reach inside, every entry becomes a key:

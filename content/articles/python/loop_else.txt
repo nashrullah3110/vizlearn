@@ -55,6 +55,10 @@ else:
 
 The same rule applies to `while`: the else runs when the condition became false, and not when a `break` ended the loop. That maps onto retry loops neatly &mdash; the else is where "we exhausted every attempt" lives.
 
+## Should you use it
+
+It is a genuine tool and it is also unfamiliar to many readers. Inside a small function whose whole point is the search, it reads well and saves a flag. Buried in a long function among other loops, a comment or a flag may serve the next person better. Knowing it matters more than using it, because you will meet it in other people's code and it must not be a mystery.
+
 ## The name is the whole problem
 
 Nothing about the word "else" suggests "if the loop was not broken out of", and
@@ -77,118 +81,15 @@ delimiter. In each case the alternative is a boolean flag that exists only to
 carry one bit of information past the end of the loop, and every flag is a
 chance to forget to set it or to check it in the wrong place.
 
-## Knowing it matters more than using it
-
-The reason to learn this feature is that you will read it. It appears in the
-standard library and in other people's code, and an unfamiliar construct in
-someone else's loop is exactly the kind of thing that makes a reader guess.
-Guessing wrong here is easy, because the plain-English reading of "else" is the
-opposite of the truth in the case people usually check first - the empty
-sequence, where the else still runs.
-
-## What it actually means
-
-The `else` on a loop runs when the loop finished **without breaking**. It has
-nothing to do with the loop body running or not.
-
-That name is the whole problem. Every other `else` in the language pairs with a
-condition and runs when it is false. This one pairs with `break` and runs when
-it did not happen, which is closer to `nobreak` than to `else` &mdash; a name
-Python's own designers have said would have been better.
-
-Once read as "else: no break happened", the behaviour stops being surprising:
-
-```python
-for item in items:
-    if matches(item):
-        found = item
-        break
-else:
-    found = None
-```
-
-The `else` runs when the loop ran to completion, which here means nothing
-matched.
-
-## The problem it solves
-
-Searching a collection has two outcomes, and only one of them has a natural
-place to put code.
-
-Without `else`, the "not found" case needs a flag:
-
-```python
-found = None
-for item in items:
-    if matches(item):
-        found = item
-        break
-```
-
-which works, and adds a variable whose only job is to remember whether
-something happened. The flag has to be initialised before the loop, set inside
-it, and tested after, and each of those is a place to get it wrong &mdash;
-particularly forgetting to reset it inside an outer loop.
-
-`for ... else` removes the flag entirely, which is a genuine simplification for
-exactly this shape.
-
-## Where a function is better
-
-Very often the loop is a search, and a search deserves a name:
-
-```python
-def find(items):
-    for item in items:
-        if matches(item):
-            return item
-    return None
-```
-
-The `return` ends the loop and the function together, so no `break`, no flag
-and no `else` is needed. The "not found" case is the final `return`, which
-reads as the fallthrough it is.
-
-That version is usually clearer, and it has the advantage of being testable on
-its own. When a loop with `else` is doing a search inside a longer function,
-extracting it is the better refactor.
-
-`next(gen, default)` compresses the same thing to one line when the search fits
-a generator expression, and is the most idiomatic form for a simple find.
-
-## The while version
-
-`while ... else` works the same way: the `else` runs if the loop ended because
-the condition became false, and not if it ended by `break`.
-
-It is rarer, and the natural use is a retry loop &mdash; try a few times, break
-on success, and the `else` handles "we never succeeded".
-
-```python
-attempts = 0
-while attempts < 3:
-    if try_once():
-        break
-    attempts += 1
-else:
-    give_up()
-```
-
-That reads reasonably, and the same caveat applies: many readers will not know
-the construct, so a comment or a differently-shaped function may serve better.
-
 ## When not to use it
 
-If the loop contains no `break`, the `else` always runs and is decoration. It
-means exactly what putting the code after the loop means, while making the
-reader stop and check. Delete it.
+If the loop has no `break`, the `else` always runs and is therefore pure
+decoration - it means exactly the same as putting the code after the loop, but
+makes a reader stop and work that out. Delete it.
 
-If the loop is inside a function that could simply `return`, the function
-version is clearer.
-
-And if the surrounding function is long, the construct's unfamiliarity works
-against it &mdash; a reader who has to look up what `else` means here has been
-slowed down more than the flag would have cost.
+If the function can simply `return` from inside the loop, that is usually
+clearer than either version, because the "not found" case becomes the last line
+of the function rather than an attached block:
 
 ```python
 def find(items, target):
@@ -197,18 +98,15 @@ def find(items, target):
             return item
     return None
 ```
-## Common mistakes
 
-**Reading it as "if the loop did not run"**, which is what it looks like and
-not what it does. An empty collection runs the `else`, because nothing broke.
+Most searches inside a function are better written this way, which is part of
+why `for/else` stays uncommon even among people who know it.
 
-**Putting an `else` on a loop with no `break`**, where it is unconditional.
+## Knowing it matters more than using it
 
-**Using it where a function and `return` would be plainer.**
-
-**Assuming `continue` skips it** &mdash; only `break` does. A loop that
-`continue`s through every item still finishes normally and still runs the
-`else`.
-
-**Forgetting it exists** and writing the flag version, which is the commonest
-outcome and is not a serious problem.
+The reason to learn this feature is that you will read it. It appears in the
+standard library and in other people's code, and an unfamiliar construct in
+someone else's loop is exactly the kind of thing that makes a reader guess.
+Guessing wrong here is easy, because the plain-English reading of "else" is the
+opposite of the truth in the case people usually check first - the empty
+sequence, where the else still runs.

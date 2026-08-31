@@ -1,6 +1,5 @@
 title: model_dump and model_dump_json: Getting Data Back Out
 intro: Two methods, several filters, and the one mistake that raises TypeError.
-
 ## Two methods, and the difference that matters
 
 `model_dump()` returns a dictionary of Python objects. A `date` field is a `date`. A `Decimal` is a `Decimal`. An enum member is the member.
@@ -162,6 +161,18 @@ except ValidationError as e:
 print()
 print("json round trip:", Module.model_validate_json(m.model_dump_json()) == m)
 ```
+
+A dump is valid input to the same model:
+
+```python
+Module.model_validate(m.model_dump()) == m
+```
+
+That is genuinely useful for copying, for caching, and for tests.
+
+It stops being true the moment you filter. `model_dump(exclude={"minutes"})` produces a dict missing a required field, and validating it raises. Worth remembering when a filtered dump is being stored and later read back &mdash; the filter that made the output tidy also made it un-reloadable.
+
+Round tripping through JSON works too, and is exact for the types Pydantic knows.
 ## The TypeError
 
 Everybody meets this once:
@@ -212,21 +223,6 @@ Two mechanisms, for two different exposures.
 They are complementary. A token that must neither be logged nor serialised wants both.
 
 The safest structure of all is a separate output model that simply does not have the field. You cannot leak what is not there, and no future refactor can accidentally remove a flag.
-
-## Round tripping
-
-A dump is valid input to the same model:
-
-```python
-Module.model_validate(m.model_dump()) == m
-```
-
-That is genuinely useful for copying, for caching, and for tests.
-
-It stops being true the moment you filter. `model_dump(exclude={"minutes"})` produces a dict missing a required field, and validating it raises. Worth remembering when a filtered dump is being stored and later read back &mdash; the filter that made the output tidy also made it un-reloadable.
-
-Round tripping through JSON works too, and is exact for the types Pydantic knows.
-
 ## Nested behaviour
 
 Everything recurses. `model_dump()` on a model containing models returns nested plain dicts, and `model_dump_json()` produces nested JSON.
@@ -288,12 +284,6 @@ Serialising more than you send. Building a full dump and then picking three keys
 Serialising the same object repeatedly. Inside a loop that renders one object per row, hoisting the dump out is the obvious fix and easy to miss.
 
 Neither matters at small scale. Both are visible when a response contains thousands of models.
-
-## Summary
-
-Two methods and a mode: `model_dump()` for Python objects, `model_dump_json()` for text, `model_dump(mode="json")` for a JSON-safe dict.
-
-The classic error is `json.dumps(model_dump())`, and the classic bug is `exclude_none` where `exclude_unset` was meant. Secrets want `Field(exclude=True)` and `SecretStr`, and a separate output model when you want a guarantee rather than a setting.
 
 ## Summary
 

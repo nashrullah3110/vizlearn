@@ -1,6 +1,5 @@
 title: Generic Models: One Envelope, Many Payloads
 intro: The pattern behind every paginated response, written once instead of once per resource.
-
 ## The duplication
 
 Every API with more than one list endpoint grows the same class several times:
@@ -168,6 +167,19 @@ print("ok  :", good)
 print("bad :", bad)
 ```
 
+More than one is allowed, and the result-or-error envelope is the common case:
+
+```python
+class Result(BaseModel, Generic[D, E]):
+    ok: bool
+    data: Optional[D] = None
+    error: Optional[E] = None
+```
+
+Written once, used as `Result[Module, Problem]` everywhere. This is a pattern many codebases reinvent per endpoint.
+
+Keep the count low. Two parameters is comfortable, three is a stretch, and beyond that the type is usually trying to be several types at once.
+
 ## What the schema does with it
 
 Each parameterisation becomes its own definition, so a generated client gets a real named type rather than an untyped envelope.
@@ -253,22 +265,6 @@ class Page(BaseModel, Generic[TResource]):
 Because the parameter must be a `Resource`, every item is guaranteed to have `id`, and the method is safe. Without the bound, mypy would object and the method would be a runtime gamble.
 
 Bounds are also documentation. `Generic[TResource]` with a bound says what kind of thing this envelope is for; a bare `T` says nothing.
-
-## Several parameters
-
-More than one is allowed, and the result-or-error envelope is the common case:
-
-```python
-class Result(BaseModel, Generic[D, E]):
-    ok: bool
-    data: Optional[D] = None
-    error: Optional[E] = None
-```
-
-Written once, used as `Result[Module, Problem]` everywhere. This is a pattern many codebases reinvent per endpoint.
-
-Keep the count low. Two parameters is comfortable, three is a stretch, and beyond that the type is usually trying to be several types at once.
-
 ## Schemas and clients
 
 Each parameterisation generates its own schema, titled with the parameterised name.
@@ -297,12 +293,6 @@ That gives you the shared envelope plus something specific to one resource. It i
 **A union would say it better.** If the payload is one of a fixed small set rather than arbitrary, a discriminated union describes that precisely and a generic does not.
 
 **The envelope has no structure.** `Generic[T]` wrapping a single field of type `T` is a box. `TypeAdapter` validates the payload directly without one.
-
-## Summary
-
-`class Page(BaseModel, Generic[T])`, parameterised as `Page[Module]`. Full validation of the parameter, a real class per parameterisation with a real name in the schema, and bounds when the generic needs to rely on what the parameter provides.
-
-Alias parameterisations at module level. Keep the parameter count low. And reach for it at the third copy, not the second.
 
 ## Generics and validation cost
 
