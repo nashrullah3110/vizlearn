@@ -5699,6 +5699,13 @@ shape of what is yielded.
 manual counter placed after the `continue`, it never runs for skipped items.
 `enumerate` has no such problem, because the counting is not in your loop body.
 
+<strong>Can I start the count from something other than a number?</strong> No.
+`start` is added to an integer counter, so it has to be an integer.
+
+<strong>Is there a version that gives the index from the end?</strong> Not
+built in. `zip(range(len(a) - 1, -1, -1), a)` does it, and is a good example of
+the arithmetic `enumerate` normally saves you.
+
 ## Recap in one screen
 
 - `enumerate` yields `(position, item)`; the `for i, x` on the left is ordinary
@@ -6084,6 +6091,13 @@ the copying slice.
 <strong>Does slicing a list of objects copy the objects?</strong> No. The new
 list holds the same objects, which is the shallow-copy behaviour from elsewhere
 in the track.
+
+<strong>Can the step be zero?</strong> No. `a[::0]` raises `ValueError`,
+because a step of zero would never advance and the slice would never end.
+
+<strong>Is `a[0:len(a)]` the same as `a[:]`?</strong> Yes, and the shorter form
+is preferred &mdash; it does not have to compute a length that the slice
+already handles.
 
 ## Recap in one screen
 
