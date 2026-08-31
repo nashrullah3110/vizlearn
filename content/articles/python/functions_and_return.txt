@@ -1,17 +1,6 @@
 title: Functions and Return Values: A Practical Guide
 intro: A function packages a piece of work behind a name. return sends a value back to the caller - and a function without one still returns something, which is the source of a great many confusing bugs.
 
-## Defining and calling
-
-
-```python
-def area(width, height):
-    return width * height
-```
-
-<span class="mono-font">width</span> and <span class="mono-font">height</span> are <strong>parameters</strong> &mdash; names the function uses internally. The values supplied at the call site are <strong>arguments</strong>. Calling <span class="mono-font">area(3, 4)</span> binds 3 to width and 4 to height, runs the body, and evaluates to 12.<p>Arguments can be passed by position or by name, and keyword arguments are worth using whenever the meaning is not obvious: <span class="mono-font">area(width=3, height=4)</span> cannot be got the wrong way round.</p>
-
-
 ## return, and the None you did not ask for
 
 `return` sends a value back and ends the function immediately.
@@ -45,24 +34,6 @@ def stats(numbers):
 
 low, high, mean = stats([1, 2, 3])
 ```
-
-## Scope and default arguments
-
-Names created inside a function are <strong>local</strong> to it and disappear when it ends. The function can read names from the enclosing scope but assigning to one creates a new local rather than modifying the outer variable, unless declared <span class="mono-font">global</span> &mdash; which is nearly always the wrong solution.
-
-Default values let a parameter be optional: <span class="mono-font">def greet(name, greeting="Hello")</span>. Defaults must come after all non-default parameters.
-
-The famous trap is a <strong>mutable default</strong>. The default is evaluated <em>once</em>, when the function is defined, not on each call:
-
-
-```python
-def add(item, target=[]):  # wrong
-    target.append(item)
-    return target
-```
-
-
-Every call that omits <span class="mono-font">target</span> shares the same list, so results accumulate across calls. Use <span class="mono-font">None</span> as the default and create the list inside the body.
 
 ## Packaging a piece of work behind a name
 
@@ -191,6 +162,125 @@ The same discipline applies to arguments. A function that modifies a list passed
 - <strong>Name it after what it does,</strong> as a verb phrase: `calculate_tax`, `load_config`, `is_valid`.
 - <strong>Docstring first.</strong> One line saying what it returns is enough for most functions.
 - <strong>Fail loudly.</strong> Raising `ValueError` on bad input is kinder than returning `None` and letting the caller discover it later.
+
+## A worked example: one job, one return shape
+
+A small function doing the thing this page recommends &mdash; taking arguments,
+returning values, handling the empty case explicitly:
+
+```python
+def summarise(scores):
+    """Return (count, mean, best) for a list of scores."""
+    if not scores:
+        return 0, 0.0, None
+    return len(scores), sum(scores) / len(scores), max(scores)
+
+
+count, mean, best = summarise([88, 92, 79])
+print(count, round(mean, 1), best)
+print(summarise([]))
+```
+
+```
+3 86.3 92
+(0, 0.0, None)
+```
+
+Four decisions are visible. The empty case is handled first as a guard clause,
+so the main path is not indented and does not have to worry about dividing by
+zero. Both `return` statements produce a tuple of the same three things, so the
+caller can unpack the result without checking which branch ran. The docstring
+says what comes back, which is the one thing a caller cannot see from the
+signature. And nothing is printed &mdash; the caller decides what to do with
+the values.
+
+That last point is the one worth dwelling on. A version that printed the
+summary instead of returning it could not be tested, could not be totalled
+across several groups, and could not be written to a file. Returning keeps
+every one of those open.
+
+The empty case returning `None` for the best score is deliberate: there is no
+best score, and `0` would be a lie that arithmetic downstream would happily
+believe.
+
+## Returning early
+
+A `return` in the middle of a function ends it immediately, and using that
+deliberately is what keeps functions flat.
+
+The pattern is to deal with the cases you cannot handle first, each with its
+own `return`, leaving the main work at the bottom at zero indentation. Every
+refusal sits next to the condition that caused it, adding a rule is one line
+rather than another level of nesting, and the reader can see the whole set of
+preconditions without scrolling.
+
+The objection is the old single-exit rule, which came from languages where
+every exit path had to free memory by hand and missing one leaked. Python has
+neither manual cleanup nor that hazard &mdash; `with` handles resources
+regardless of how the block is left &mdash; so the rule brings no benefit and
+costs the readability that guard clauses provide. Early returns are standard
+Python style.
+
+Two cautions. Every path should return the same *kind* of thing; a function
+that returns a number on one path and a tuple on another forces every caller to
+find out which. And if the function assigns to a variable that the code after
+the branches uses, make sure every path assigns it, or return from each branch
+so there is no "after".
+
+## Docstrings, and what belongs in one
+
+The string on the first line of a function is its docstring, available as
+`help(func)` and `func.__doc__`, and shown by every editor at the call site.
+
+One line is enough for most functions, and it should say what the function
+*returns* or *does*, not restate the name. `"""Return the area of a
+rectangle."""` is useful; `"""This function calculates area."""` is the name
+again with more words.
+
+When more is warranted, the conventional order is: a one-line summary, a blank
+line, then the details &mdash; what the parameters mean where it is not
+obvious, what is returned, and what exceptions it raises deliberately. Anything
+a caller has to know that the signature does not already say belongs here, and
+nothing else does.
+
+Two things not to put in one. Types, if you are using type hints &mdash; the
+hints say it in a form tools can check, and repeating it in prose means two
+places to update. And implementation detail: the docstring is for the caller,
+and describing how the function works internally makes it wrong the first time
+the implementation changes.
+
+The habit worth adopting is writing the docstring before the body. If it is
+hard to state what the function returns in one sentence, the function is
+probably doing more than one thing, and that is easier to fix before it is
+written than after.
+
+## Functions as values
+
+A `def` statement creates an object and binds it to a name, exactly as an
+assignment does. That single fact is behind several features that otherwise
+look unrelated.
+
+Because a function is an object, it can be stored in a list or a dictionary,
+passed as an argument, returned from another function, and given attributes.
+`sorted(items, key=len)` passes `len` itself, not a call to it &mdash; note the
+absence of brackets, which is the difference between the function and its
+result.
+
+That difference is worth stating plainly, because it is a common early
+mistake. `f` is the function; `f()` calls it. Writing `callback = handler()` in
+a place expecting a function stores the *result* of calling it, usually `None`,
+and the failure arrives later when something tries to call `None`.
+
+Three things follow directly. A dictionary of functions replaces a chain of
+`elif` when dispatching on a value. A function that takes a function is how
+`map`, `filter`, `sorted` and every decorator work. And a function that returns
+a function is how you build one with some arguments already fixed, which
+`functools.partial` also does.
+
+The practical habit is to notice when you are writing the same function shape
+several times with one value changed. That value can usually become a
+parameter, and if it cannot, the function itself can become the thing being
+passed around.
 
 ## Questions people ask
 
