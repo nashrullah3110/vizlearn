@@ -8800,6 +8800,14 @@ nest a field in the spec: `f"{value:>{width}}"`.
 Nothing, in practice &mdash; `str` is the default. `!r` is the one worth
 typing.
 
+<strong>How do I show a number rounded but keep full precision?</strong> Format
+only where you print. The variable is never changed by a format spec, so the
+arithmetic that follows still uses every digit it had.
+
+<strong>Can I align text and numbers in the same column?</strong> Yes, and it
+usually reads badly. Give the header the same alignment as the data if you
+want them to line up, or left-align both.
+
 ## Recap in one screen
 
 - The `f` prefix turns braces into slots holding any expression, evaluated
@@ -8953,6 +8961,14 @@ same and compare equal, so `{1, True}` has one element.
 
 <strong>Can I use a set as a dictionary value?</strong> Yes. Only keys need to
 be hashable; values can be anything.
+
+<strong>How do I find duplicates rather than remove them?</strong> Compare the
+lengths, or use `collections.Counter` and keep the entries with a count above
+one. A set alone tells you they existed, not which.
+
+<strong>Is a set faster than a dictionary for membership?</strong> They use the
+same mechanism, so effectively no. Use a dictionary when you also need a value
+attached.
 
 ## Recap in one screen
 
@@ -9116,6 +9132,13 @@ fingers at the call site. Group them into an object, or split the function.
 
 <strong>Can I make every parameter keyword-only?</strong> Yes, put the bare `*`
 first: `def f(*, a, b)`. Callers must then name both.
+
+<strong>Does the order of keyword arguments matter?</strong> Not to Python. They
+are matched by name, so any order works &mdash; though matching the signature's
+order helps a reader.
+
+<strong>Can two parameters share a default object?</strong> They can, and they
+should not if it is mutable, because then both accumulate into the same thing.
 
 ## Recap in one screen
 
