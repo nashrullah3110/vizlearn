@@ -1,0 +1,272 @@
+title: Different Columns, Different Treatment: A Practical Guide
+intro: A pipeline applies every step to every column. Real tables need scaling on some columns and encoding on others, and ColumnTransformer is how you say which is which.
+
+## The problem
+
+A `Pipeline` is a sequence applied to all of `X`. That works when the columns are homogeneous and breaks immediately on a real table.
+
+Numeric columns want imputing with a median and scaling. Categorical columns want imputing with a constant and one-hot encoding. Applying a scaler to a text column raises; applying an encoder to a continuous one produces a column per distinct value, which is nonsense.
+
+The manual workaround &mdash; split the frame, transform each part, concatenate &mdash; works and puts the transformations outside any pipeline, which puts them outside the cross-validation folds, which is the leak this track keeps returning to.
+
+`ColumnTransformer` solves it properly: it routes each subset of columns to its own transformer and concatenates the results, and because it is itself a transformer, the whole thing drops into a pipeline as a single step.
+
+
+## Two treatments, one object
+
+Each transformer gets the columns it was given, and the results are stuck side by side.
+
+```python-run
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+import pandas as pd
+
+df = pd.DataFrame({"age": [25, 40, 33, 51],
+                   "salary": [30000, 55000, 41000, 72000],
+                   "city": ["london", "paris", "london", "berlin"]})
+
+pre = ColumnTransformer([
+    ("num", StandardScaler(), ["age", "salary"]),
+    ("cat", OneHotEncoder(sparse_output=False), ["city"]),
+])
+
+out = pre.fit_transform(df)
+print("in :", df.shape, " out:", out.shape)
+print("names:", list(pre.get_feature_names_out()))
+print(out.round(2))
+```
+
+## Selecting by type instead of by hand
+
+So that adding a column to the data does not mean editing the pipeline.
+
+```python-run
+from sklearn.compose import ColumnTransformer, make_column_selector
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+import pandas as pd
+
+df = pd.DataFrame({"age": [25, 40, 33], "salary": [30000, 55000, 41000],
+                   "city": ["london", "paris", "london"],
+                   "grade": ["a", "b", "a"]})
+
+pre = ColumnTransformer([
+    ("num", StandardScaler(), make_column_selector(dtype_include="number")),
+    ("cat", OneHotEncoder(sparse_output=False),
+     make_column_selector(dtype_include=object)),
+])
+pre.fit(df)
+print("picked by dtype, not by hand:")
+print("  numeric    :", list(pre.transformers_[0][2]))
+print("  categorical:", list(pre.transformers_[1][2]))
+```
+
+## What happens to the columns you did not mention
+
+The default is to drop them, silently.
+
+```python-run
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler
+import pandas as pd
+
+df = pd.DataFrame({"age": [25, 40, 33], "salary": [30000, 55000, 41000],
+                   "id": [1, 2, 3]})
+
+drop = ColumnTransformer([("num", StandardScaler(), ["age", "salary"])])
+keep = ColumnTransformer([("num", StandardScaler(), ["age", "salary"])],
+                         remainder="passthrough")
+
+print("remainder='drop' (the default):", drop.fit_transform(df).shape)
+print("remainder='passthrough'       :", keep.fit_transform(df).shape)
+print()
+print("the default silently discards any column you did not name -")
+print("which is usually right, and is worth knowing about.")
+```
+
+## The whole preparation, inside one estimator
+
+Impute, scale, encode and fit - and every step refitted on the training part of each fold.
+
+```python-run
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline, make_pipeline
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+import pandas as pd
+import numpy as np
+
+rng = np.random.RandomState(0)
+n = 300
+df = pd.DataFrame({
+    "age": rng.normal(40, 10, n),
+    "salary": rng.normal(50000, 15000, n),
+    "city": rng.choice(["london", "paris", "berlin"], n),
+})
+df.loc[rng.rand(n) < 0.1, "age"] = np.nan
+y = (df["salary"] > 50000).astype(int)
+
+numeric = make_pipeline(SimpleImputer(strategy="median"), StandardScaler())
+categorical = OneHotEncoder(handle_unknown="ignore")
+
+pre = ColumnTransformer([("num", numeric, ["age", "salary"]),
+                         ("cat", categorical, ["city"])])
+
+model = Pipeline([("pre", pre), ("clf", LogisticRegression(max_iter=1000))])
+print("cross-validated accuracy:",
+      round(cross_val_score(model, df, y, cv=5).mean(), 4))
+print()
+print("impute, scale, encode and fit - every step refitted per fold")
+```
+
+## Tuning something four levels down
+
+The underscores compose, so a search can reach the imputation strategy inside the numeric branch.
+
+```python-run
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline, make_pipeline
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV
+import pandas as pd
+import numpy as np
+
+rng = np.random.RandomState(0)
+n = 200
+df = pd.DataFrame({"age": rng.normal(40, 10, n),
+                   "city": rng.choice(["a", "b"], n)})
+df.loc[rng.rand(n) < 0.2, "age"] = np.nan
+y = rng.randint(0, 2, n)
+
+numeric = make_pipeline(SimpleImputer(), StandardScaler())
+pre = ColumnTransformer([("num", numeric, ["age"]),
+                         ("cat", OneHotEncoder(handle_unknown="ignore"), ["city"])])
+pipe = Pipeline([("pre", pre), ("clf", LogisticRegression())])
+
+grid = {"pre__num__simpleimputer__strategy": ["mean", "median"],
+        "clf__C": [0.1, 1.0]}
+search = GridSearchCV(pipe, grid, cv=3).fit(df, y)
+print("the key reaches four levels down:")
+print("  pre__num__simpleimputer__strategy")
+print()
+print("best:", search.best_params_)
+```
+
+## A list of names, not a name
+
+The most common error here, and the message says exactly what is wrong.
+
+```python-run
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
+import pandas as pd
+
+df = pd.DataFrame({"city": ["london", "paris", "london"]})
+
+ok = ColumnTransformer([("cat", OneHotEncoder(sparse_output=False), ["city"])])
+print("a list of names ->", ok.fit_transform(df).shape)
+
+bad = ColumnTransformer([("cat", OneHotEncoder(sparse_output=False), "city")])
+try:
+    bad.fit_transform(df)
+except Exception as e:
+    print()
+    print("a bare string ->", type(e).__name__)
+    print(" ", str(e).split("\n")[0][:88])
+print()
+print("a list selects a DataFrame (2-D); a bare name selects a Series (1-D),")
+print("and the encoder wants two dimensions.")
+```
+## How it is written
+
+Each entry is a triple: a name, a transformer, and the columns it applies to.
+
+The name is yours to choose and appears in the generated feature names and in the parameter keys for tuning, so short and meaningful pays off &mdash; `num` and `cat` rather than `transformer_1`.
+
+The columns can be a list of names, a list of integer positions, a boolean mask, or a callable. Passing a **list** matters: a list of one name selects a DataFrame, which is two-dimensional; a bare string selects a Series, which is one-dimensional, and the transformer raises. The error message says "Expected a 2-dimensional container", which is precise once you know what it refers to.
+
+The outputs are concatenated left to right in the order the transformers are listed, not in the original column order. So the resulting array's columns follow your specification, which is why `get_feature_names_out()` is the reliable way to know what ended up where.
+
+## remainder, and the columns you forgot
+
+By default, any column not named in any transformer is **dropped**.
+
+That is usually right &mdash; ids, timestamps and free text usually should not reach the model &mdash; and it is silent, which is the part worth knowing. A column added to the source data will simply not appear in the model, with no warning, and the effect is a model quietly ignoring a feature somebody thought they had added.
+
+`remainder="passthrough"` keeps the unnamed columns as they are. It is convenient and slightly dangerous: it will happily pass through an id column, which is exactly the sort of thing that lets a model memorise rows.
+
+`remainder=SomeTransformer()` applies a transformer to everything left over, which is occasionally the tidiest way to say "scale everything I have not otherwise mentioned".
+
+The habit worth adopting: name every column explicitly, or use selectors that provably cover everything, and treat the default drop as a safety net rather than as the design.
+
+## Selecting by type
+
+Listing column names by hand is fine for a fixed table and a maintenance burden for anything that changes.
+
+`make_column_selector(dtype_include="number")` selects the numeric columns whatever they are called. `dtype_include=object` picks up the strings. `pattern="^date_"` selects by name. The selector runs at `fit` time against whatever frame it is given, so a new numeric column is handled without touching the pipeline.
+
+The caution is that dtypes are not always what you expect. A categorical column stored as integers &mdash; a postcode district, a department id &mdash; is selected as numeric and scaled, which is the mistake the encoding module warned about, now happening automatically. Converting such columns to a string or a pandas `category` dtype before the pipeline is what makes dtype-based selection safe.
+
+## Nesting a pipeline inside a branch
+
+A single column group usually needs more than one step: numeric columns want imputing *and* scaling.
+
+The transformer in a `ColumnTransformer` entry can be a `Pipeline`, which is how that is expressed. `make_pipeline(SimpleImputer(strategy="median"), StandardScaler())` becomes the numeric branch, and the categorical branch gets its own with an imputer and an encoder.
+
+The result is a small tree: a pipeline containing a column transformer containing pipelines containing transformers. That sounds elaborate and is the standard shape of every real scikit-learn program, because it is the minimum structure that does the right thing on a mixed table.
+
+The whole tree is one estimator. `fit` on the outer pipeline reaches every leaf, and cross-validation refits all of it on each training fold.
+
+## Reaching into it to tune
+
+The double-underscore convention composes, so parameters deep in the tree are addressable.
+
+`pre__num__simpleimputer__strategy` reads outside in: the step named `pre`, its branch named `num`, the step named `simpleimputer` in that branch, and its `strategy`. Four levels, one string, and a grid search can vary it alongside the model's own hyperparameters.
+
+This is more useful than it first appears. Whether to impute with the mean or the median, whether to scale, whether to drop the first one-hot column &mdash; these are choices usually made by guesswork, and they can be made by cross-validation instead, in the same search that tunes the model.
+
+`pipe.get_params().keys()` lists every addressable parameter, which is the fastest way to find the right spelling rather than deriving it.
+
+## Getting the names back
+
+After one-hot encoding, the array has more columns than the frame had, with names nobody wrote.
+
+`get_feature_names_out()` reconstructs them, prefixed by the transformer name: `num__age`, `cat__city_paris`. Called on the outer pipeline, it traces through every step.
+
+That matters for reading the model. Zipping the names against `coef_` or `feature_importances_` turns an anonymous array into a labelled result, and without it the mapping has to be reconstructed by counting, which is both tedious and easy to get wrong by one after any change to the preprocessing.
+
+## The shape of a real preprocessing block
+
+Almost every tabular project ends up with the same structure, and it is worth having it in mind as a template rather than deriving it each time.
+
+A numeric branch: impute with the median, then scale. A categorical branch: impute with a constant such as `"missing"`, then one-hot encode with `handle_unknown="ignore"`. A column transformer routing the two by dtype. A model on the end. The whole thing in one `Pipeline`, cross-validated, with the preprocessing choices exposed to a search.
+
+That covers a large majority of tabular problems and is about fifteen lines. What varies between projects is which extra branches appear: a text column going to a vectoriser, a date column going to a custom transformer that extracts the parts, a high-cardinality column going to a target encoder instead of one-hot.
+
+The value of the template is not the specific steps but that it puts every learned transformation in one place, inside the folds, addressable by a search. A project that starts from it rarely acquires the leaks that a project assembled step by step does.
+
+One practical note: build it up one branch at a time and check the output shape after each. A column transformer that silently drops half the frame produces a model that works and underperforms, and the shape is the fastest way to notice.
+
+## When the branches disagree about rows
+
+A limitation worth knowing, because it is not obvious from the interface.
+
+Every transformer in a `ColumnTransformer` receives the same rows and must return the same number of rows, in the same order. The results are concatenated horizontally, so anything that reordered or dropped rows would misalign the columns against each other and against `y`.
+
+That rules out row-level operations inside it: no dropping outliers, no resampling, no aggregating. Those belong before the pipeline, applied to the training data only, or in a library built for it &mdash; `imbalanced-learn` provides a pipeline that understands row changes, which is the right tool when resampling is part of the model rather than part of the data preparation.
+
+It also means a transformer that returns a different number of rows than it received will fail with a shape error rather than a helpful message, so a custom transformer that filters is a mistake worth ruling out early.
+
+## Things to try
+
+1. <strong>Watch the shape change.</strong> The first editor turns three columns into five. Read the names to see which came from where.
+2. <strong>Lose a column.</strong> In the third editor, note that `id` disappears with no warning under the default.
+3. <strong>Add a column.</strong> In the second editor, add another numeric column to the frame and confirm the selector picks it up with no edit to the transformer.
+4. <strong>Find the parameter names.</strong> In the fifth editor, print `sorted(pipe.get_params())` and look for the keys you could tune.
+
+## Where this leaves you
+
+One object that sends each group of columns to the transformer it needs, nests pipelines inside its branches, drops what you did not mention, and exposes every setting inside it to a search. Together with `Pipeline` it is the shape of essentially every real scikit-learn program on tabular data.
