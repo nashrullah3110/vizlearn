@@ -1,0 +1,249 @@
+title: Overfitting and Underfitting: A Practical Guide
+intro: Two failures that look similar in a single number and need opposite treatments. Telling them apart takes one extra column.
+
+## The two failures
+
+**Overfitting** is learning the training data rather than the pattern in it. The model captures noise, coincidences and details specific to the rows it was shown, none of which recur. Training score high, test score much lower.
+
+**Underfitting** is the opposite: the model is too simple, or too constrained, to represent the structure that is there. It does badly on the training data and equally badly on the test data.
+
+Both produce a disappointing test score, which is why a single number cannot distinguish them &mdash; and why the responses are opposite. Overfitting needs a simpler model, more regularisation, or more data. Underfitting needs a more flexible model, better features, or less regularisation. Applying the wrong remedy makes things worse, and guessing is a coin flip.
+
+
+## The gap opening up
+
+One model, six complexities. Watch the training score reach 1.0 and the test score stop improving.
+
+```python-run
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+
+X, y = make_classification(n_samples=500, n_features=20, n_informative=5,
+                           random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3, random_state=0)
+
+print(" depth   train    test     gap")
+for depth in (1, 2, 3, 5, 10, None):
+    t = DecisionTreeClassifier(max_depth=depth, random_state=0).fit(X_tr, y_tr)
+    tr, te = t.score(X_tr, y_tr), t.score(X_te, y_te)
+    print("%6s  %.3f   %.3f   %+.3f" % (depth, tr, te, tr - te))
+```
+
+## validation_curve does the sweep for you
+
+The same picture, cross-validated, in one call.
+
+```python-run
+from sklearn.model_selection import validation_curve
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import make_classification
+import numpy as np
+
+X, y = make_classification(n_samples=500, n_features=20, n_informative=5,
+                           random_state=0)
+
+depths = [1, 2, 3, 5, 8, 12, 20]
+train, test = validation_curve(
+    DecisionTreeClassifier(random_state=0), X, y,
+    param_name="max_depth", param_range=depths, cv=5)
+
+print(" depth   train    test")
+for d, tr, te in zip(depths, train.mean(axis=1), test.mean(axis=1)):
+    print("%6d  %.3f   %.3f" % (d, tr, te))
+print()
+print("best depth by cross-validation:", depths[int(np.argmax(test.mean(axis=1)))])
+```
+
+## Would more data help?
+
+learning_curve answers the question that otherwise gets guessed at.
+
+```python-run
+from sklearn.model_selection import learning_curve
+from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import make_classification
+
+X, y = make_classification(n_samples=2000, n_features=20, n_informative=5,
+                           random_state=0)
+
+sizes, train, test = learning_curve(
+    LogisticRegression(max_iter=1000), X, y,
+    train_sizes=[0.05, 0.1, 0.25, 0.5, 1.0], cv=5)
+
+print("  n_train   train    test")
+for n, tr, te in zip(sizes, train.mean(axis=1), test.mean(axis=1)):
+    print("%9d  %.3f   %.3f" % (n, tr, te))
+print()
+print("the two curves converging means more data will not help much;")
+print("a wide gap that is still closing means it would.")
+```
+
+The question people guess at, and `learning_curve` answers it directly by fitting at several training-set sizes and reporting both scores.
+
+Two shapes matter. **A large gap that is still narrowing** as the training set grows means more data would help &mdash; the model has capacity it cannot yet use reliably. **Two curves that have converged** means more data will not help; the model has extracted what it can, and improving requires a different model or better features.
+
+The third editor shows the converged case: at 80 training samples the gap is 0.900 against 0.798, and by 1600 it is 0.844 against 0.838. Collecting another thousand rows would be wasted effort, and knowing that before commissioning the collection is worth a great deal.
+
+The training score falling as the training set grows is normal and often surprises people. Fitting 80 points is easy; fitting 1600 is not.
+
+## Both failures, on one dataset
+
+The truth is a parabola. Degree 1 cannot bend, and degree 15 bends to every point it was shown.
+
+```python-run
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+rng = np.random.RandomState(0)
+x = np.sort(rng.uniform(-3, 3, 60)).reshape(-1, 1)
+y = x.ravel() ** 2 + rng.normal(scale=1.5, size=60)
+
+x_tr, x_te, y_tr, y_te = train_test_split(x, y, test_size=0.4, random_state=0)
+
+print("degree   train R2   test R2")
+for deg in (1, 2, 5, 15):
+    m = make_pipeline(PolynomialFeatures(deg), LinearRegression()).fit(x_tr, y_tr)
+    print("%6d   %8.3f   %7.3f" % (deg, m.score(x_tr, y_tr), m.score(x_te, y_te)))
+print()
+print("degree 1 underfits, degree 2 is the truth, degree 15 memorises.")
+```
+
+## Variance, measured
+
+How much the model changes when the training data changes - which is what averaging many models fixes.
+
+```python-run
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.datasets import make_regression
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+X, y = make_regression(n_samples=300, n_features=10, noise=20.0, random_state=0)
+
+preds = []
+for seed in range(5):
+    X_tr, _, y_tr, _ = train_test_split(X, y, test_size=0.5, random_state=seed)
+    preds.append(DecisionTreeRegressor(random_state=0).fit(X_tr, y_tr).predict(X[:5]))
+print("one deep tree, 5 refits - spread of the first prediction: %.1f"
+      % np.ptp([p[0] for p in preds]))
+
+preds = []
+for seed in range(5):
+    X_tr, _, y_tr, _ = train_test_split(X, y, test_size=0.5, random_state=seed)
+    preds.append(RandomForestRegressor(n_estimators=50, random_state=0)
+                 .fit(X_tr, y_tr).predict(X[:5]))
+print("a forest of 50,  same 5 refits - spread:                  %.1f"
+      % np.ptp([p[0] for p in preds]))
+```
+
+## Three constraints, two of which help
+
+Every one of them lowers the training score. That is the trade, and it does not always pay.
+
+```python-run
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import cross_validate
+
+X, y = make_classification(n_samples=500, n_features=20, n_informative=5,
+                           random_state=0)
+
+settings = [("unconstrained", {}),
+            ("max_depth=3", {"max_depth": 3}),
+            ("min_samples_leaf=20", {"min_samples_leaf": 20}),
+            ("ccp_alpha=0.01", {"ccp_alpha": 0.01})]
+
+print("%-22s %7s %7s %7s" % ("", "train", "test", "gap"))
+for label, kw in settings:
+    out = cross_validate(DecisionTreeClassifier(random_state=0, **kw), X, y,
+                         cv=5, return_train_score=True)
+    tr, te = out["train_score"].mean(), out["test_score"].mean()
+    print("%-22s %7.3f %7.3f %+7.3f" % (label, tr, te, tr - te))
+print()
+print("every constraint lowers the training score. Two of them")
+print("raise the test score, which is the trade being made.")
+```
+## The gap is the diagnostic
+
+Compare the training score with the test score.
+
+**Both high, small gap.** Working. Nothing to fix.
+
+**Train high, test much lower.** Overfitting. The size of the gap is roughly how much of the training performance was memorisation.
+
+**Both low, small gap.** Underfitting. The model is not capturing what is there.
+
+**Train lower than test.** Unusual. Legitimate when regularisation or dropout is active during training but not scoring; otherwise a sign the folds are not comparable.
+
+`cross_validate(..., return_train_score=True)` gives you both columns. It costs an extra scoring pass per fold and it is the single most informative argument in the model-selection module, because it converts "the score is disappointing" into "the score is disappointing *for this reason*".
+
+The first editor shows the gap opening as a tree is allowed to grow: +0.070 at depth 1, +0.193 unconstrained, with the test score peaking in the middle and then going nowhere while the training score climbs to a perfect 1.000.
+
+## Complexity is the dial
+
+Every model has something that controls how much structure it can represent.
+
+Tree depth, and the minimum samples in a leaf. The number of neighbours in k-NN &mdash; fewer neighbours is *more* complex, which is the one that runs backwards. The degree of a polynomial expansion. The `C` in an SVM or a logistic regression, where larger is less regularised. The number of estimators and the learning rate in a boosting model.
+
+Turn the dial up and the training score rises monotonically; the test score rises, peaks, and falls. The peak is what you are looking for, and `validation_curve` finds it by sweeping one parameter with cross-validation at each setting.
+
+The fourth editor shows both ends on the same data. The truth is a parabola. Degree 1 scores 0.008 on training &mdash; it cannot bend at all. Degree 2 is right. Degree 15 scores 0.894 on training and **−17.888** on test, which is far worse than predicting the mean, and is what memorising sixty points with sixteen coefficients produces.
+## Bias, variance, and why averaging works
+
+The two failures have formal names. **Bias** is error from a model too rigid to represent the truth &mdash; underfitting. **Variance** is error from a model so flexible that it changes substantially when the training data changes &mdash; overfitting.
+
+Variance is measurable, and the fifth editor measures it: refitting a single deep decision tree on five different halves of the data moves one prediction by 270. The same exercise with a fifty-tree random forest moves it by 48.
+
+That reduction is the entire idea behind ensembles. Each tree is high-variance; the errors are partly independent; averaging cancels them. It is why a random forest is almost always better than the tree inside it, and why bagging works on unstable models and does nothing for stable ones.
+
+The classic framing is a trade-off, and modern practice complicates it &mdash; very large models sometimes improve again past the point of interpolating the training data. For everything in this track, the trade-off framing holds: reducing one usually increases the other, and the useful setting is where their sum is smallest.
+
+## The remedies, and that they can fail
+
+For **overfitting**: constrain the model, add regularisation, reduce the number of features, get more data, or use an ensemble to average the variance away.
+
+For **underfitting**: use a more flexible model, add features or interactions, reduce regularisation, or train for longer if the fit was cut short.
+
+The last editor is worth dwelling on because it shows the trade honestly. Three constraints applied to an overfitting tree: all three lower the training score, as they must. `max_depth=3` and `ccp_alpha=0.01` raise the test score. `min_samples_leaf=20` lowers it, from 0.826 to 0.806 &mdash; it constrained the model past the useful point and turned overfitting into underfitting.
+
+So "add regularisation" is a direction rather than a fix, and the amount has to be found by cross-validation rather than chosen. That is precisely what the tuning module is for.
+
+## Overfitting the validation set
+
+There is a third failure, and it is the one that catches experienced people rather than beginners.
+
+Every time you look at a validation score and change something in response, you use that score to make a decision. Do it once and the effect is negligible. Do it two hundred times &mdash; trying models, sweeping hyperparameters, adding and removing features, each time keeping what scored better &mdash; and the winner has been selected for performing well on those particular folds, including on their noise.
+
+The result is a cross-validated score that is optimistic even though every individual fit was honest. Nothing in the procedure was wrong; the selection was the leak. It is the same mechanism as picking the best of twenty test scores, just slower and less obviously a mistake.
+
+Three defences. Keep a final test set that is touched exactly once, at the end, after every decision has been made. Prefer a small number of deliberate comparisons to a long undirected search. And when the difference between two candidates is smaller than the standard deviation across folds, treat them as tied rather than picking a winner &mdash; because at that point you are choosing noise.
+
+Nested cross-validation is the rigorous version: an inner loop tunes and an outer loop scores the whole tuning procedure. It costs a multiple of the fits and is the right answer when the number being reported matters.
+
+## Signals from the model itself
+
+Besides the gap, three things hint at overfitting before you have measured anything.
+
+**Coefficients that are enormous.** A linear model whose coefficients run to thousands is balancing large positive and negative terms that nearly cancel &mdash; a fit that is precariously tuned to the training rows. Regularisation exists to prevent exactly this, and the size of the coefficients is a reasonable proxy for how much is needed.
+
+**A tree with as many leaves as samples.** If `tree.get_n_leaves()` is close to the number of training rows, every leaf is one or two samples and the model is a lookup table.
+
+**Scores that move a lot between folds.** A high standard deviation across cross-validation folds means the model is sensitive to which rows it saw, which is variance by definition.
+
+None of these is conclusive on its own. All three are cheap to check and worth a glance before the more expensive diagnosis.
+
+## Things to try
+
+1. <strong>Watch the gap grow.</strong> The first editor's last column goes from +0.070 to +0.193 while the test score stops improving after depth 3.
+2. <strong>Find the peak.</strong> In the second editor, note that the training score keeps rising after the test score has stopped &mdash; that divergence is the definition.
+3. <strong>Ask whether data would help.</strong> In the third editor, cut `n_samples` to 300 and see whether the curves have converged by then.
+4. <strong>Over-constrain deliberately.</strong> In the last editor, try `min_samples_leaf=100` and watch both scores fall together.
+
+## Where this leaves you
+
+One extra column tells you which failure you have. `validation_curve` finds the right complexity, `learning_curve` says whether more data would help, and every constraint is a trade that has to be measured rather than assumed.

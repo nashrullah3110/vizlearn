@@ -231,25 +231,28 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">How a model that emits one token at a time chooses a whole sequence, and why the obvious method is not the best one.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-greedy-decoding-and-its-regret">Greedy decoding, and its regret</h3>
+                    <h3>The architecture</h3>
+                    <p>Encoder-decoder handles the case where input and output are both sequences and their lengths differ &mdash; translation, summarisation, speech to text.</p><p>The <strong>encoder</strong> reads the input and produces a representation. The <strong>decoder</strong> emits output tokens one at a time, each conditioned on the representation and on everything it has emitted so far.</p><p>The original version compressed the whole input into a single fixed vector, which became the bottleneck that motivated [attention](../natural_language_processing/attention_mechanism.html): let the decoder look back at every input position rather than at one summary. That is the change the field turned on, and the transformer is its conclusion.</p><p>Autoregressive decoding is not specific to that architecture. Any model that emits one token at a time faces the same question: at each step you have a probability over the vocabulary, and you have to choose.</p>
+                </div>
+                <div>
+                    <h3>Greedy decoding, and its regret</h3>
                     <p>Take the most probable token each time.</p><p>Fast, simple, and it optimises the wrong thing. You want the most probable *sequence*, and the highest-probability first token can lead into a region where everything that follows is bad.</p><p>The chart shows the cumulative log probability of the beam's paths. With the width at 1 you get greedy decoding, and the readout compares it against the best sequence a wider beam found. It is frequently worse, and the reason is always the same: it committed early to something that looked good and did not pay off.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-beam-search">Beam search</h3>
+                    <h3>Beam search</h3>
                     <p>Keep the <code>k</code> best partial sequences. At each step, expand all of them, score every continuation, keep the best <code>k</code> overall, and continue. At the end, take the best complete sequence.</p><p>Drag the width from 1 upward and watch the best score improve.</p><p>It is still a heuristic. It does <strong>not</strong> find the globally best sequence &mdash; that would require searching an exponentially large tree &mdash; and a path discarded early because it looked weak can never come back, even if it led somewhere excellent. Beam search only reduces how often that happens.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-length-problem">The length problem</h3>
+                    <h3>The length problem</h3>
                     <p>Sequence probability is a product of per-token probabilities, so every extra token multiplies by something less than 1. Longer sequences have lower probability, always, and unnormalised beam search therefore has a systematic bias toward stopping early.</p><p>The standard fix divides the log probability by the length, sometimes raised to a tunable power. It is a correction with no principled derivation, it is necessary, and every production decoder has one.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-wider-is-not-always-better">Wider is not always better</h3>
+                    <h3>Wider is not always better</h3>
                     <p>Raise the width past about 5 and translation quality often *falls*. This is called the <strong>beam search curse</strong>, and it is well documented.</p><p>The explanation is that a wider beam finds sequences the model genuinely considers more probable, and the model's notion of probable is not the same as good. Very high-probability text is bland: it is the safe, generic continuation. A wider search is a more faithful search of a flawed objective.</p><p>That is also why open-ended generation abandons beam search entirely. Sampling methods &mdash; temperature, top-k, nucleus &mdash; deliberately do not take the most probable path, because for creative text the most probable path is the boring one. Beam search survives where there is a right answer: translation, speech recognition, constrained generation.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>No length normalisation.</strong> Everything comes out truncated.</p><p><strong>A very wide beam on open-ended text.</strong> Blander, not better.</p><p><strong>Using beam search for creative generation.</strong> Use sampling.</p><p><strong>Forgetting the cost.</strong> Width <code>k</code> multiplies both computation and memory by <code>k</code>, and for a large model that is the binding constraint.</p>
                 </div>
             </div>

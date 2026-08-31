@@ -535,56 +535,59 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Having decided what to erase, the LSTM must decide what to store. The Input Gate is the valve on that write &mdash; and it works as one half of a two-part team.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-two-layers-two-different-jobs">Two Layers, Two Different Jobs</h3>
+                    <h3>What the Gate Actually Is</h3>
+                    <p>Like the Forget Gate, the Input Gate is a sigmoid layer emitting one value per memory slot:</p><p>$$i_t = \sigma(W_i \cdot [H_{t-1}, X_t] + b_i)$$</p><p>But notice what it is multiplied against. It never touches the old memory. It scales the <strong>candidate vector</strong> $\tilde{C}_t$ &mdash; the freshly proposed content &mdash; before that content is added to the cell state:</p><p>$$C_t = \underbrace{f_t \odot C_{t-1}}_{\text{what survives}} + \underbrace{i_t \odot \tilde{C}_t}_{\text{what gets written}}$$</p>
+                </div>
+                <div>
+                    <h3>Two Layers, Two Different Jobs</h3>
                     <p>Beginners often merge these two ideas, so it is worth stating plainly:</p><ul><li><strong style="color: #ef4444">The candidate $\tilde{C}_t$ ($\tanh$)</strong> answers <em>"what is the new information?"</em> It can be positive or negative, because it is real content.</li><li><strong style="color: var(--gate-color)">The input gate $i_t$ ($\sigma$)</strong> answers <em>"how much of it do we actually want?"</em> It is strictly between 0 and 1, because it is a volume knob, not content.</li></ul><p>Splitting the decision this way is what lets the cell be selective per dimension. The candidate can propose a strong update to eight memory slots while the gate admits it into only two of them.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-addition-not-replacement">Why Addition, Not Replacement</h3>
+                    <h3>Why Addition, Not Replacement</h3>
                     <p>The written term is <em>added</em> to what the Forget Gate let through. This matters enormously. Replacement would destroy old memory every time something new arrived; addition lets the cell <strong>accumulate</strong> &mdash; keeping the subject of a sentence while layering on new adjectives.</p><p>It also protects the gradient. Addition passes gradients backwards unchanged, which is precisely why the cell state acts as a highway through time rather than a lossy relay.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-forget-and-input-are-not-opposites">Forget and Input Are Not Opposites</h3>
+                    <h3>Forget and Input Are Not Opposites</h3>
                     <p>A natural assumption is that $i_t = 1 - f_t$ &mdash; that whatever you forget, you replace. In a standard LSTM this is <strong>false</strong>: the two gates are independent layers with their own weights, and all four combinations are meaningful.</p><p>The cell can keep old memory <em>and</em> write new content ($f\!\approx\!1, i\!\approx\!1$), keep memory and write nothing ($f\!\approx\!1, i\!\approx\!0$), wipe and overwrite ($f\!\approx\!0, i\!\approx\!1$), or wipe and store nothing at all ($f\!\approx\!0, i\!\approx\!0$). The GRU is the variant that <em>does</em> tie them together with a single update gate &mdash; which is exactly how it saves a set of weights.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-deciding-what-to-store">Deciding what to store</h3>
+                    <h3>Deciding what to store</h3>
                     <p>The forget gate decides what leaves memory. The input gate decides what enters it &mdash; and it works in a pair with the candidate memory.</p><p class="mono-font">i&#7511; = &sigma;(W&#7522; &middot; [h&#7511;&#8331;&#8321;, x&#7511;] + b&#7522;)&nbsp;&nbsp;&nbsp;&nbsp;the gate</p>
 <p class="mono-font">g&#7511; = tanh(W&#7509; &middot; [h&#7511;&#8331;&#8321;, x&#7511;] + b&#7509;)&nbsp;&nbsp;the candidate</p>
 <p class="mono-font">c&#7511; = f&#7511; &#8857; c&#7511;&#8331;&#8321; + i&#7511; &#8857; g&#7511;</p><p>Two separate computations from the same inputs, with different activations and different jobs:</p><ul><li>The <strong>candidate</strong> <code>g</code> uses tanh, so its values run from &minus;1 to 1. It is <em>what could be written</em> &mdash; content, which may be positive or negative.</li><li>The <strong>gate</strong> <code>i</code> uses sigmoid, so its values run from 0 to 1. It is <em>how much of that content to actually write</em>.</li></ul><p>Their elementwise product is what gets added to the cell state. A dimension with a strong candidate and a closed gate contributes nothing; a dimension with a weak candidate and an open gate contributes a little.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-the-split-is-necessary">Why the split is necessary</h3>
+                    <h3>Why the split is necessary</h3>
                     <p>The obvious question: why not have one computation produce both the content and its strength?</p><p>Because they are different decisions and depend on different things. Whether a piece of information is <em>relevant now</em> is a question about context; what that information <em>is</em> is a question about the current input. Separating them lets the cell learn "this input carries a strong signal, but it is not relevant at this point in the sequence" &mdash; which a single computation cannot express.</p><p>The practical demonstration is selectivity. Reading "The cat, which was orange, sat", the cell wants to store the subject (cat) and update its state as the clause proceeds without letting "orange" overwrite the subject. Separate gate and candidate make that possible: the candidate can carry "orange" while the gate keeps it out of the dimensions holding the subject.</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>Gate <code>i</code></th><th>Candidate <code>g</code></th></tr></thead><tbody><tr><td>Activation</td><td>Sigmoid</td><td>Tanh</td></tr><tr><td>Range</td><td>0 to 1</td><td>&minus;1 to 1</td></tr><tr><td>Meaning</td><td>How much to write</td><td>What to write</td></tr><tr><td>Analogy</td><td>The valve</td><td>The fluid</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-working-with-the-forget-gate">Working with the forget gate</h3>
+                    <h3>Working with the forget gate</h3>
                     <p>The cell update has two terms, and the two gates control one each. That independence is what distinguishes an LSTM from a GRU.</p><div class="vz-table-wrap"><table><thead><tr><th>Forget</th><th>Input</th><th>Result for that dimension</th></tr></thead><tbody><tr><td>1</td><td>0</td><td>Keep old memory unchanged</td></tr><tr><td>0</td><td>1</td><td>Replace entirely with new</td></tr><tr><td>1</td><td>1</td><td>Add new on top of old &mdash; accumulate</td></tr><tr><td>0</td><td>0</td><td>Clear the dimension</td></tr><tr><td>0.9</td><td>0.3</td><td>Decay slowly while adding a little</td></tr></tbody></table></div><p>The third row is what a GRU cannot do. Its update gate uses <code>z</code> and <code>1 − z</code>, so keeping the old state at full strength forces the new contribution to zero. An LSTM can do both, and that is the expressiveness it buys with its extra gate.</p><p>The <code>1 → 1</code> case matters in practice: it is how a cell accumulates evidence over several steps, such as building up a sentiment reading across a sentence rather than replacing it word by word.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-things-to-try">Things to try</h3>
+                    <h3>Things to try</h3>
                     <ol><li><strong>Run the simulation.</strong> The highlighted route shows $i_t$ leaving the glowing gate, meeting the candidate at the $\times$ operator, and only then rising to the $+$ on the conveyor belt.</li><li><strong>Set the gate to 0 but leave the candidate at 0.80.</strong> The written amount drops to zero. The network did all the work of computing a rich candidate and then threw it away &mdash; the cell state simply passes through untouched.</li><li><strong>Open the gate to 1.00 and sweep the candidate.</strong> Now the written amount tracks the candidate exactly, including negative values that pull the memory slot down.</li><li><strong>Try gate 1.00 with candidate 0.00.</strong> Nothing is written even though the gate is wide open &mdash; proof that the gate controls volume, not content.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-in-one-line">In one line</h3>
+                    <h3>In one line</h3>
                     <p>The Input Gate is the LSTM's write-enable line. It converts a proposal into an actual memory change, one dimension at a time, and it does so by <em>adding</em> rather than overwriting. To see where that proposal comes from, study the <strong>Candidate Memory</strong> layer next.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-goes-wrong">What goes wrong</h3>
+                    <h3>What goes wrong</h3>
                     <p><strong>The gate stays closed.</strong> If <code>i</code> is consistently near 0, nothing new ever enters memory and the cell state is frozen. The model behaves as if it had no memory at all beyond the current input. Usually a symptom of a learning rate or initialisation problem, or a task where the model has found no use for memory.</p><p><strong>The gate stays open.</strong> If <code>i</code> is consistently near 1 while the forget gate is also near 1, the cell state grows without bound as contributions accumulate. Values in the hundreds appear, tanh in the output path saturates, and gradients vanish through the output gate. Layer normalisation inside the cell is one remedy.</p><p><strong>Saturated sigmoids.</strong> A gate pinned at 0 or 1 has a derivative near zero, so it stops learning when to open and close. Keeping pre-activations in a reasonable range &mdash; scaled inputs, sensible initialisation &mdash; prevents it.</p><p>Diagnosing these means logging the mean and spread of gate activations:</p><pre><code class="language-python"># with a manual cell that returns its gates
 print(f&quot;input gate: mean {i.mean():.3f}  std {i.std():.3f}&quot;)</code></pre><p>Healthy gates have a mean somewhere in the middle of the range and genuine variation across dimensions and time steps. A mean of 0.99 with a standard deviation of 0.001 means the gate has stopped being a gate.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-parameter-cost">Parameter cost</h3>
+                    <h3>Parameter cost</h3>
                     <p>Each gate needs its own weight matrix over the concatenated previous hidden state and current input:</p><p class="mono-font">per gate: (input + hidden) &times; hidden + hidden</p><p>With 300-dimensional input and 256 hidden units that is 143,616 parameters per gate. An LSTM has four such matrices &mdash; forget, input, candidate and output &mdash; so about 574,000 per layer.</p><p>That is why LSTMs are heavier than they appear, and why a GRU with three matrices instead of four is roughly 25% smaller. In practice the four are computed as one fused matrix multiplication and then split, which is what <code>nn.LSTM</code> does internally and why it is much faster than a hand-written loop.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Why does the candidate use tanh and the gate use sigmoid?</strong> Content should be able to be negative, so tanh. A gate is a fraction, so sigmoid.</p><p><strong>Is the input gate the same as the update gate in a GRU?</strong> Related but not the same. A GRU's update gate does the work of forget and input together, with coupled coefficients.</p><p><strong>Can the input gate be negative?</strong> No &mdash; sigmoid output is strictly between 0 and 1. Negative <em>content</em> comes from the candidate.</p><p><strong>What if the input gate is always 0?</strong> The cell never stores anything new, and memory is useless. Check initialisation and learning rate.</p><p><strong>Should its bias be initialised specially?</strong> Zero is standard. It is the <em>forget</em> gate that benefits from a bias of 1.</p><p><strong>Are the four matrices computed separately?</strong> No &mdash; implementations concatenate them into one multiplication and split the result, which is considerably faster.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>The input gate decides how much new information to write; the candidate decides what that information is.</li><li>Sigmoid for the gate (a fraction), tanh for the candidate (content that may be negative).</li><li>Their elementwise product is added to the retained old state.</li><li>Separate forget and input gates let a cell keep old memory and add new at full strength &mdash; a GRU cannot.</li><li>Watch for gates saturated at 0 or 1: a gate that never varies has stopped functioning as one.</li></ul>
                 </div>
             </div>

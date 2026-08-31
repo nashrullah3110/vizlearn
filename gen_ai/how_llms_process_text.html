@@ -522,61 +522,64 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">A language model never sees text. It sees numbers &mdash; and the transformation from your sentence to those numbers, and back to a prediction, is a fixed pipeline of stages. Stepping through them is the fastest way to demystify what "the model read my prompt" actually means.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-stage-4-embeddings-give-ids-meaning">Stage 4: Embeddings Give IDs Meaning</h3>
+                    <h3>Stages 1–3: Text Becomes Integers</h3>
+                    <p>Tokenization splits the string into subword pieces, and each piece is looked up in the vocabulary to get an integer ID. That is the model's entire input: a list of integers. Nothing about the <em>meaning</em> of a word has entered yet &mdash; ID 4021 is no closer to ID 4022 than to ID 9. The IDs are arbitrary addresses, not measurements.</p>
+                </div>
+                <div>
+                    <h3>Stage 4: Embeddings Give IDs Meaning</h3>
                     <p>Each ID indexes into a giant lookup table, pulling out a learned vector of <span class="mono-font">d</span> numbers. <em>These vectors are where meaning lives.</em> Words used in similar contexts end up with similar vectors, and this table is trained along with everything else.</p><p>Notice the shape change: a list of <span class="mono-font">n</span> integers becomes an <span class="mono-font">n &times; d</span> matrix. Every stage from here on preserves that shape &mdash; the transformer transforms these vectors repeatedly without ever changing the grid size.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-stage-5-position-must-be-injected">Stage 5: Position Must Be Injected</h3>
+                    <h3>Stage 5: Position Must Be Injected</h3>
                     <p>Self-attention has no inherent sense of order &mdash; it sees a <em>set</em> of vectors, so "dog bites man" and "man bites dog" would be identical. Position is therefore added directly into the vectors, classically with sinusoids of geometrically increasing wavelength:</p><p>PE(pos, 2i) = sin(pos / 10000<sup>2i/d</sup>) &nbsp;&nbsp; PE(pos, 2i+1) = cos(pos / 10000<sup>2i/d</sup>)</p><p>The values in this lab are the genuine formula. Look along a row and you will see fast oscillation in the early dimensions and near-constant values in the later ones &mdash; that mix gives every position a unique fingerprint the model can decode.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-stage-6-attention-mixes-the-tokens">Stage 6: Attention Mixes the Tokens</h3>
+                    <h3>Stage 6: Attention Mixes the Tokens</h3>
                     <p>Now every token looks at every other token. Each position produces a query and a key; their dot product, scaled by <span class="mono-font">&radic;d</span>, scores how relevant one token is to another, and a softmax over each row turns those scores into weights that sum to 1:</p><p>Attention(Q, K, V) = softmax(QK&#7488; / &radic;d) V</p><p>The heatmap in this stage is a real computation from the vectors above it. Each row shows where one token sent its attention. This is the step where a token stops being an isolated word and becomes a <em>contextual</em> representation.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-stages-7-8-depth-then-a-single-prediction">Stages 7–8: Depth, Then a Single Prediction</h3>
+                    <h3>Stages 7–8: Depth, Then a Single Prediction</h3>
                     <p>One attention block is repeated dozens of times, each with a feed-forward network, residual connections and normalisation. Early layers capture syntax; deeper layers capture semantics and task structure.</p><p>At the very end only the <strong>last position's</strong> vector is used for the next token. It is multiplied by the vocabulary matrix to produce one logit per possible token &mdash; and we are back to a distribution over words. The chosen token is appended to the input and the entire pipeline runs again, from stage 1, for every single word generated.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-full-path-once">The full path, once</h3>
+                    <h3>The full path, once</h3>
                     <p>Text goes in, text comes out, and five stages sit between them. Knowing which stage a problem lives in resolves most confusion about model behaviour.</p><ol><li><strong>Tokenise</strong> &mdash; the string becomes integer ids via a subword vocabulary.</li><li><strong>Embed</strong> &mdash; each id indexes a learned matrix, giving a vector per token.</li><li><strong>Add position</strong> &mdash; attention is order-blind, so positional information is injected.</li><li><strong>N transformer blocks</strong> &mdash; attention moves information between positions, feed-forward layers process each position.</li><li><strong>Project and sample</strong> &mdash; one logit per vocabulary entry, softmax, pick a token.</li></ol><p class="mono-font">"The capital of France is" &rarr; [464, 3139, 286, 4881, 318] &rarr; 5&times;4096 &rarr; blocks &rarr; " Paris"</p><p>Then the chosen token is appended to the input and the whole thing runs again. That loop is generation.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-inside-one-block">Inside one block</h3>
+                    <h3>Inside one block</h3>
                     <p>Every block is the same two sublayers, each wrapped in a residual connection and a normalisation:</p><p class="mono-font">x &rarr; LayerNorm &rarr; Attention &rarr; (+x) &rarr; LayerNorm &rarr; FFN &rarr; (+x)</p><p><strong>Attention</strong> lets each token gather information from others. Each token produces a query, compares it against every token's key, and takes a weighted mixture of their values. In a decoder, future positions are masked out so generation is possible.</p><p><strong>The feed-forward network</strong> processes each position independently, expanding to roughly four times the model dimension and back. This is where <em>most of the parameters live</em> &mdash; typically two thirds of the model &mdash; which is worth knowing because attention gets all the attention.</p><p><strong>Residual connections</strong> give gradients a clean path back through dozens of blocks. Without them, deep stacks do not train.</p><p>The tensor shape through all of this is constant: (batch, sequence, model_dim). That constancy is what makes blocks stackable, and why the same architecture works at 12 layers and at 80.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-two-phases-very-different-costs">Two phases, very different costs</h3>
+                    <h3>Two phases, very different costs</h3>
                     <p>Generation splits into two workloads, and the split explains most latency and pricing behaviour.</p><p><strong>Prefill</strong> processes the prompt. Every token is known, so all positions are computed in parallel in one pass. Compute-bound, efficient, cheap per token.</p><p><strong>Decode</strong> produces the output. Each token depends on the last, so it is strictly sequential, and every step must read the entire model's weights plus the KV cache from memory. Bandwidth-bound, and expensive per token.</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>Prefill</th><th>Decode</th></tr></thead><tbody><tr><td>Parallel</td><td>Yes</td><td>No</td></tr><tr><td>Bottleneck</td><td>Compute</td><td>Memory bandwidth</td></tr><tr><td>Cost per token</td><td>Low</td><td>High</td></tr><tr><td>User-visible metric</td><td>Time to first token</td><td>Tokens per second</td></tr></tbody></table></div><p>That is why input tokens are priced below output tokens, why a long prompt delays the first word rather than slowing the stream, and why generating 500 tokens takes longer than reading 5,000.</p><p>The <strong>KV cache</strong> is what keeps decode linear: previous tokens' keys and values are stored rather than recomputed. It costs memory &mdash; several gigabytes for a long context &mdash; and it is the dominant memory consumer in serving.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-try-it-yourself">Try it yourself</h3>
+                    <h3>Try it yourself</h3>
                     <ol><li><strong>Walk from stage 1 to 8 with Next</strong> and keep an eye on the shape tag. Watch <span class="mono-font">n</span> integers become <span class="mono-font">n &times; d</span> and stay there until the final projection.</li><li><strong>At stage 5, compare the two rows of "the".</strong> Identical embeddings, different positional vectors &mdash; which is the only reason the model can tell the two occurrences apart.</li><li><strong>At stage 6, read the attention rows.</strong> Repeated words attend to each other strongly, because attention is driven by vector similarity.</li><li><strong>Change the sentence to "man bites dog", then "dog bites man".</strong> Same tokens, different attention pattern &mdash; order genuinely changes the computation once positions are added.</li><li><strong>Raise the model dimension.</strong> Every downstream matrix widens, which is the crudest possible illustration of why parameter counts explode with <span class="mono-font">d</span>.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-to-remember">What to remember</h3>
+                    <h3>What to remember</h3>
                     <p>Text in, integers, vectors, mixed vectors, logits, text out. The embeddings and attention weights in this lab are deterministic stand-ins for learned parameters, but the <em>operations</em> &mdash; sinusoidal positions, scaled dot-product attention, softmax &mdash; are the real ones. Understanding this pipeline makes context windows, tokenizer quirks and attention costs stop feeling arbitrary.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-the-model-does-and-does-not-have">What the model does and does not have</h3>
+                    <h3>What the model does and does not have</h3>
                     <p><strong>No memory between calls.</strong> A chat interface re-sends the whole conversation every time. The model reads the history; it does not remember it. That is why long conversations get slower and more expensive, and why "remember what I said earlier" only works within the window.</p><p><strong>No access to anything outside the prompt.</strong> No files, no internet, no database &mdash; unless a tool call provides it. Retrieval exists precisely to put external information into the context.</p><p><strong>No view of characters.</strong> The model sees tokens. "Strawberry" may be two or three tokens, none of which is a letter, which is why letter-counting and spelling questions are unreliable.</p><p><strong>No calculator.</strong> Numbers tokenise inconsistently, so arithmetic is pattern-matched rather than computed. Give it a tool.</p><p><strong>No calibrated confidence.</strong> It produces a distribution over tokens, not a belief about truth. A confident tone is a property of the text distribution.</p><p>Those five limitations account for a large share of the surprising failures people report, and all five are structural rather than fixable by prompting.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-the-parameters-are">Where the parameters are</h3>
+                    <h3>Where the parameters are</h3>
                     <p>For a 7B-parameter model with 32 layers and a model dimension of 4096:</p><div class="vz-table-wrap"><table><thead><tr><th>Component</th><th>Approximate share</th></tr></thead><tbody><tr><td>Feed-forward layers</td><td>~65%</td></tr><tr><td>Attention projections</td><td>~30%</td></tr><tr><td>Embedding and output</td><td>~5%</td></tr><tr><td>LayerNorm</td><td>Negligible</td></tr></tbody></table></div><p>The embedding and output matrices are frequently <strong>tied</strong> &mdash; the same weights used in both directions &mdash; which saves a substantial number of parameters (a 128,000-token vocabulary times 4,096 dimensions is 524 million) and typically helps slightly.</p><p>Memory at inference is roughly the parameter count times the bytes per parameter, plus the KV cache. That is the arithmetic behind every quantisation decision: 7 billion parameters is 14GB at 16-bit and 3.5GB at 4-bit.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-practical-implications">Practical implications</h3>
+                    <h3>Practical implications</h3>
                     <p><strong>Count tokens with the real tokeniser</strong> when budgeting a prompt. Word-count estimates are unreliable, especially for code and non-Latin scripts.</p><p><strong>Put important material at the ends of a long prompt.</strong> Models attend less reliably to the middle of a long context.</p><p><strong>Shorter prompts are cheaper and often better.</strong> Irrelevant context degrades answers as well as costing money.</p><p><strong>Temperature 0 for anything that must be determinate</strong> &mdash; extraction, classification, code. Higher only where variety is wanted.</p><p><strong>Stream the output</strong> if a user is waiting. Time to first token is what feels like latency, and it is dominated by prefill.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Does the model understand what it reads?</strong> It models statistical structure in text extremely well. Whether that constitutes understanding is a genuine open question rather than a settled one.</p><p><strong>Why is the same question answered differently each time?</strong> Sampling, unless temperature is 0 &mdash; and even then, batching and hardware non-determinism produce small variations.</p><p><strong>Can it read a file I mention?</strong> Only if something puts the contents into the context. Naming a path does nothing.</p><p><strong>Why does it fail at simple arithmetic?</strong> Tokenisation fragments numbers, and the model pattern-matches rather than calculating. Use a tool.</p><p><strong>What is the context window shared between?</strong> Prompt, system instructions, retrieved documents, conversation history and generated output &mdash; one budget for all of them.</p><p><strong>Why are output tokens more expensive?</strong> Prefill is parallel; decode is sequential and bandwidth-bound.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Tokenise, embed, add position, pass through N identical blocks, project to the vocabulary, sample &mdash; then repeat.</li><li>Attention moves information between positions; the feed-forward layers hold most of the parameters.</li><li>Prefill is parallel and cheap; decode is sequential and expensive, which explains the pricing and latency asymmetry.</li><li>The KV cache makes decode linear at a large memory cost.</li><li>No memory between calls, no view of characters, no calculator, no calibrated confidence.</li></ul>
                 </div>
             </div>

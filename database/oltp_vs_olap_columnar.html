@@ -296,31 +296,34 @@ SELECT * FROM orders WHERE id = 4;
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Why the database that runs your application is the wrong one for your dashboards.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-how-rows-are-stored">How rows are stored</h3>
+                    <h3>Two workloads</h3>
+                    <p><strong>OLTP</strong> &mdash; online transaction processing &mdash; is the application database. Many concurrent connections, each doing something small: fetch this order, insert this payment, update this status. Queries touch few rows and usually want all of a row's columns. Latency per query matters enormously.</p><p><strong>OLAP</strong> &mdash; online analytical processing &mdash; is the reporting workload. Few concurrent users, each asking something enormous: revenue by region by month for three years. Queries touch millions of rows and usually want three or four columns out of fifty. Throughput matters; a query taking two seconds instead of two hundred milliseconds is fine.</p><p>These want opposite things, and the disagreement is about physical layout.</p>
+                </div>
+                <div>
+                    <h3>How rows are stored</h3>
                     <p>A <strong>row store</strong> keeps each row's fields contiguously:</p><pre><code>[1|Ada|Leeds|2026-08-01|120.00][2|Bo|Bristol|2026-08-03|64.50]...</code></pre><p>Fetching order 2 is a single page read, and everything needed is there. Perfect for OLTP.</p><p>Now compute the average of <code>total</code> over ten million orders. Every page has to be read, because the totals are scattered one per row, separated by all the other columns. To read 8 bytes of interest you read a 200-byte row, and 96% of the I/O is waste.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-how-columns-are-stored">How columns are stored</h3>
+                    <h3>How columns are stored</h3>
                     <p>A <strong>column store</strong> keeps each column contiguously:</p><pre><code>ids:     [1][2][3][4]...
 names:   [Ada][Bo][Cy][Di]...
 totals:  [120.00][64.50][45.00][220.00]...</code></pre><p>That average now reads only the <code>totals</code> region. Reading a fiftieth of the data is roughly a fiftieth of the time, and the advantage grows with the width of the table.</p><p>Two further wins follow from the layout rather than being added to it.</p><p><strong>Compression.</strong> A column holds one type, and often few distinct values. A <code>country</code> column across ten million rows compresses to almost nothing with dictionary encoding; a sorted date column run-length encodes brilliantly. Mixed row data does none of this. Ten-times ratios are ordinary, and the speed-up is mostly the reduced I/O.</p><p><strong>Vectorised execution.</strong> Values of one type packed contiguously can be processed in batches with SIMD instructions, instead of one row at a time through a tuple interface.</p><p>The cost is the mirror image: fetching one whole row means one read per column and reassembly, and inserting a row means writing into fifty places. Columnar stores are therefore usually append-oriented and batch-loaded, not update-in-place.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-choosing">Choosing</h3>
+                    <h3>Choosing</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th></th><th>Row store</th><th>Column store</th></tr></thead><tbody><tr><td>Fetch a whole row</td><td>fast</td><td>slow</td></tr><tr><td>Aggregate one column</td><td>slow</td><td>fast</td></tr><tr><td>Insert or update one row</td><td>fast</td><td>slow</td></tr><tr><td>Bulk load</td><td>fine</td><td>ideal</td></tr><tr><td>Compression</td><td>poor</td><td>excellent</td></tr><tr><td>Examples</td><td>PostgreSQL, MySQL</td><td>ClickHouse, BigQuery, DuckDB, Snowflake</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-do-not-run-both-on-one-database">Do not run both on one database</h3>
+                    <h3>Do not run both on one database</h3>
                     <p>The usual mistake is analytics against the production OLTP database. A report scanning ten million rows evicts the working set from the buffer cache, and every application query afterwards goes to disk. The dashboard is slow *and* the checkout is slow.</p><p>The standard arrangement separates them: OLTP handles the application, data is copied into an analytical store on a schedule or a stream, and reports run there with a [star schema](star_schema.html) shaped for them. The copy is stale by minutes or hours, which is almost always acceptable for reporting and is the price of not having the two workloads fight.</p><p>The variants above make the difference concrete: the same table queried the OLTP way and the OLAP way, with a note on how much of each row each one actually needs.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-the-line-has-blurred">Where the line has blurred</h3>
+                    <h3>Where the line has blurred</h3>
                     <p><strong>DuckDB</strong> is columnar, embedded and single-file &mdash; analytical power with no cluster. <strong>Postgres</strong> has columnar extensions and can query Parquet through foreign data wrappers. <strong>Parquet</strong> itself has made columnar a file format rather than a database, so the same data can be read by many engines.</p><p>The result is that "we need a data warehouse" is a much bigger claim than it was. For datasets under a few hundred gigabytes, DuckDB over Parquet on one machine frequently outperforms a cluster.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Reporting off the primary.</strong> Cache eviction makes the application slow, and the cause is not obvious from the application's own metrics.</p><p><strong>Row-by-row inserts into a columnar store.</strong> They are built for batches; single inserts are pathologically slow.</p><p><strong><code>SELECT *</code> on a column store.</strong> It gives up the entire advantage.</p><p><strong>Assuming you need a cluster.</strong> Measure on one machine first.</p>
                 </div>
             </div>

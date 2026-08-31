@@ -308,25 +308,28 @@ ORDER  BY o.id, i.product;
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">One order, stored two ways, and an honest account of which questions each shape answers well.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-what-documents-make-easy">What documents make easy</h3>
+                    <h3>The same order, two shapes</h3>
+                    <p>Run the query above and then the variants. The identical order is stored as normalised rows and as a single JSON document, and both are queried in the same session &mdash; because modern SQL engines support both.</p><p><strong>Relational</strong>: an <code>orders</code> row, several <code>order_items</code> rows referring back to it, a <code>customers</code> row. Each fact recorded once, joined when needed.</p><p><strong>Document</strong>: one record containing the order, its items nested inside it, and the customer details copied in.</p>
+                </div>
+                <div>
+                    <h3>What documents make easy</h3>
                     <p><strong>One read for one thing.</strong> Fetching an order means retrieving one document. No joins, no round trips, and the data is contiguous on disk. For a read-this-whole-object access pattern, this is genuinely faster and the gap widens as the object gets more parts.</p><p><strong>A shape that matches the code.</strong> The document deserialises straight into an object. No object-relational mapping layer reassembling a graph from five result sets.</p><p><strong>Schema flexibility.</strong> Adding a field to some documents and not others requires no migration. For genuinely heterogeneous data &mdash; product catalogues where a book and a fridge share almost no attributes &mdash; this is a real advantage rather than laziness.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-rows-make-easy">What rows make easy</h3>
+                    <h3>What rows make easy</h3>
                     <p><strong>Querying from any direction.</strong> "Which customers bought product 902" is straightforward relationally and awkward in a document store, because the data is organised around orders, not products. Documents optimise one access path and make the others harder.</p><p><strong>Updating a shared fact once.</strong> If the customer's address is copied into every order document, changing it means finding and rewriting every one. Relationally it is a single <code>UPDATE</code>. This is the classic normalisation argument and it has not stopped being true.</p><p><strong>Integrity the database enforces.</strong> Foreign keys, uniqueness and check constraints are declared once and cannot be bypassed. In a document store these usually become application code, which means they hold until some other code path forgets.</p><p><strong>Ad-hoc analysis.</strong> Aggregating across documents means either a scan or a purpose-built index, and the queries are harder to write.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-denormalisation-is-the-actual-trade">Denormalisation is the actual trade</h3>
+                    <h3>Denormalisation is the actual trade</h3>
                     <p>Nesting the items inside the order is fine &mdash; an order item belongs to exactly one order and is never queried independently. That is not duplication, just co-location.</p><p>Copying the customer's name and address into every order is duplication, and it buys read speed at the cost of update cost and the risk of divergence. Sometimes that is right: an invoice arguably *should* record the address as it was at the time, in which case it is not duplication at all but a historical fact.</p><p>The question is always whether the copies must agree. If they must, storing them separately means keeping them in sync forever.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-distinction-has-mostly-dissolved">The distinction has mostly dissolved</h3>
+                    <h3>The distinction has mostly dissolved</h3>
                     <p>PostgreSQL's <code>jsonb</code> is indexable, queryable and transactional. MySQL and SQLite have JSON functions &mdash; the queries on this page use SQLite's, in the same session as ordinary tables.</p><p>So the modern answer is usually neither purely one nor the other: relational tables for the entities that are queried from several directions and must stay consistent, and a JSON column for the parts that are genuinely variable and only ever read alongside their parent.</p><p>What a dedicated document database still offers is horizontal scaling and operational tooling built around that model from the start. What it gives up is joins and multi-document transactions &mdash; though MongoDB has had the latter since 4.0, which narrowed the gap considerably.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Choosing documents to avoid schema design.</strong> The schema still exists; it has moved into the application, where nothing enforces it.</p><p><strong>Unbounded arrays.</strong> A document that grows without limit &mdash; every event appended to one record &mdash; eventually exceeds the size limit and rewrites the whole thing on every append.</p><p><strong>Duplicating a fact that must stay consistent.</strong> Fine for a historical snapshot, a slow disaster for live data.</p><p><strong>Using JSON columns for well-structured data.</strong> If every row has the same fields, they are columns. Putting them in JSON gives up type checking and constraints for nothing.</p>
                 </div>
             </div>
