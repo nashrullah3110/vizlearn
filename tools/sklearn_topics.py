@@ -328,6 +328,8 @@ It does not handle data loading, cleaning or plotting. Data arrives as arrays or
 
 It also does not do statistical inference. A linear model gives you coefficients and no p-values, no confidence intervals and no hypothesis tests, because the library is built around prediction rather than explanation. `statsmodels` is the library for that question, and reaching for it is the right answer rather than a workaround.
 
+<strong>Is the API stable?</strong> Remarkably so. Code written against `fit`/`predict` a decade ago still runs, which is unusual in this field and is a large part of why the library is worth learning properly.
+
 ## Things to try
 
 1. <strong>Run the first editor.</strong> `hasattr(model, "coef_")` is False before `fit` and True after. That is the whole of what fitting does, visible in one line.
@@ -337,8 +339,7 @@ It also does not do statistical inference. A linear model gives you coefficients
 
 ## Where this leaves you
 
-Three method names, one shape convention and one naming convention cover the surface of the entire library. Everything after this is which estimator to reach for and how to avoid fooling yourself about how well it worked.
-""",
+Three method names, one shape convention and one naming convention cover the surface of the entire library. Everything from here is a choice of estimator and, far more importantly, whether the number it reports can be believed. """,
     [
         {"q": "What does a trailing underscore on an attribute mean?",
          "options": ["It is private",
@@ -365,5 +366,247 @@ Three method names, one shape convention and one naming convention cover the sur
                      "It returns the score"],
          "answer": 1,
          "why": "Every fit returns self, which is what makes the constructor-and-fit one-liner work."},
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# 2. Loading and shaping data
+# ---------------------------------------------------------------------------
+topic(
+    "loading_and_shaping_data",
+    "Loading and Shaping Data",
+    "The API",
+    "Where practice data comes from, what shape the library insists on, and "
+    "the two error messages you will meet before anything else works.",
+    _svg(_grid(20, 24, 4, 4, 12, S) + _txt(44, 20, "X  (n, features)", M, 7) +
+         _grid(84, 24, 1, 4, 12, S) + _txt(90, 20, "y", M, 7) +
+         _txt(126, 44, "rows =", M, 7, "start") +
+         _txt(126, 56, "samples", A, 7, "start")),
+    [
+        ("A dataset that ships with the library",
+         "Seven small datasets come with scikit-learn, so nothing has to be "
+         "downloaded before you can try something.",
+         '''from sklearn.datasets import load_iris
+
+data = load_iris()
+
+print("X shape:", data.data.shape)
+print("y shape:", data.target.shape)
+print("features:", data.feature_names)
+print("classes :", list(data.target_names))
+print()
+print("first row:", data.data[0], "-> class", data.target[0])
+'''),
+
+        ("Three ways to take the same data out",
+         "The default gives you a Bunch, and two arguments give you the shapes "
+         "you usually want instead.",
+         '''from sklearn.datasets import load_iris
+
+X, y = load_iris(return_X_y=True)
+print("return_X_y gives arrays:", type(X).__name__, X.shape, y.shape)
+
+df = load_iris(as_frame=True).frame
+print()
+print("as_frame gives a DataFrame:", df.shape)
+print(df.head(3))
+'''),
+
+        ("Data you make up, with the properties you want",
+         "The make_* functions generate data with a known structure, which is "
+         "how you test an idea without hunting for a dataset.",
+         '''from sklearn.datasets import make_classification, make_regression
+
+Xc, yc = make_classification(n_samples=200, n_features=5, n_informative=3,
+                             n_classes=2, random_state=0)
+print("classification:", Xc.shape, "classes:", sorted(set(yc)))
+
+Xr, yr = make_regression(n_samples=200, n_features=3, noise=10.0, random_state=0)
+print("regression    :", Xr.shape, "y range: %.1f to %.1f" % (yr.min(), yr.max()))
+'''),
+
+        ("Your own data, arranged the way the library wants",
+         "One row per sample, one column per feature - and the target separate.",
+         '''import numpy as np
+
+rows = [
+    {"rooms": 2, "area": 55, "price": 180},
+    {"rooms": 3, "area": 78, "price": 260},
+    {"rooms": 4, "area": 96, "price": 310},
+]
+
+X = np.array([[r["rooms"], r["area"]] for r in rows])
+y = np.array([r["price"] for r in rows])
+
+print("X:", X.shape)
+print(X)
+print("y:", y.shape, y)
+'''),
+
+        ("X and y must agree on the number of rows",
+         "The second error message everyone meets, and it counts both for you.",
+         '''from sklearn.linear_model import LinearRegression
+import numpy as np
+
+X = np.array([[1], [2], [3]])
+y = np.array([10, 20])          # one short
+
+try:
+    LinearRegression().fit(X, y)
+except ValueError as e:
+    print("ValueError:", e)
+'''),
+
+        ("A Bunch is a dictionary with attribute access",
+         "Which is why you will see both bunch.data and bunch['data'] in "
+         "examples, meaning the same thing.",
+         '''from sklearn.datasets import load_wine
+
+bunch = load_wine()
+print("a Bunch is a dict you can also use with dots")
+print("keys:", sorted(k for k in bunch.keys() if k != "DESCR"))
+print()
+print("bunch.data is bunch['data']:", bunch.data is bunch["data"])
+print("samples per class:", [int((bunch.target == c).sum()) for c in range(3)])
+'''),
+    ],
+    [
+        "<code class='mono-font'>X</code> is 2-D - rows are samples, columns "
+        "are features. <code class='mono-font'>y</code> is 1-D, one entry per "
+        "row of X.",
+        "<code class='mono-font'>load_*</code> functions ship data with the "
+        "library; <code class='mono-font'>fetch_*</code> download it; "
+        "<code class='mono-font'>make_*</code> generate it.",
+        "<code class='mono-font'>return_X_y=True</code> skips the Bunch and "
+        "hands back the two arrays directly.",
+        "<code class='mono-font'>as_frame=True</code> gives a DataFrame with "
+        "the feature names attached, which is what keeps names alive through a "
+        "pipeline.",
+        "\"Expected 2D array, got 1D array instead\" means a single feature "
+        "needs <code class='mono-font'>reshape(-1, 1)</code>.",
+        "\"Found input variables with inconsistent numbers of samples\" means "
+        "X and y have different row counts - the message prints both.",
+    ],
+    """title: Loading and Shaping Data: A Practical Guide
+intro: Before any model can be fitted, the data has to be two objects of exactly the right shape. Almost every first error on this track is one of the two this page ends with.
+
+## The shape the library insists on
+
+scikit-learn takes two things: a two-dimensional `X` and a one-dimensional `y`.
+
+`X` has one row per sample and one column per feature. If you have 150 flowers and four measurements of each, `X.shape` is `(150, 4)`. The convention is universal across the library, and it is the reason a table of data maps onto it so directly &mdash; rows are observations, columns are variables, which is how a spreadsheet is already arranged.
+
+`y` has one entry per row of `X`. For a regression it holds numbers; for a classification it holds labels, which may be integers or strings. `y.shape` is `(150,)` &mdash; note the trailing comma, which is what a one-dimensional shape looks like in NumPy.
+
+The library will not guess when the shapes are wrong, and that refusal is worth appreciating rather than resenting. A list of six numbers could be six samples of one feature or one sample of six features, and those are entirely different problems. Rather than pick one, scikit-learn raises and tells you what it received.
+
+## Where practice data comes from
+
+Three families of function, distinguished by their prefix.
+
+`load_*` returns a small dataset that ships inside the installed package. `load_iris`, `load_wine`, `load_digits`, `load_diabetes`, `load_breast_cancer` and a couple more. They are tiny, they need no network, and they are what almost every example in the documentation uses. Their size is the point: a model fits in milliseconds, so you can try something and see the result immediately.
+
+`fetch_*` downloads a larger, more realistic dataset the first time and caches it. `fetch_california_housing`, `fetch_20newsgroups`, `fetch_openml` for anything on OpenML. These are the ones to use when the toy datasets stop being convincing &mdash; but they need a network, which is why this track stays with the bundled ones.
+
+`make_*` generates data with the structure you asked for. `make_classification`, `make_regression`, `make_blobs`, `make_moons`. These are the most underrated of the three, because they let you construct exactly the situation you want to study: a dataset with two informative features and eight useless ones, or classes that are deliberately not linearly separable, or a regression with a known amount of noise. When you are testing whether a technique does what you think, generated data with known properties beats real data whose properties you are guessing at.
+
+## The Bunch, and the two ways past it
+
+The `load_*` and `fetch_*` functions return a `Bunch`, which is a dictionary that also allows attribute access. `data.target` and `data["target"]` are the same object, which is why examples use both spellings interchangeably.
+
+A Bunch carries more than the arrays. `feature_names` gives the column names, `target_names` maps the integer labels back to something readable, and `DESCR` holds a full description of the dataset &mdash; where it came from, what each column means, and how many samples there are. Printing `DESCR` is the fastest way to understand an unfamiliar bundled dataset, and it is routinely ignored.
+
+`return_X_y=True` skips the Bunch and returns the two arrays as a tuple, which is what you want when you already know the dataset and just need the data. It makes the common line short: `X, y = load_iris(return_X_y=True)`.
+
+`as_frame=True` returns pandas objects instead of NumPy arrays: `data.frame` is a DataFrame with the target as a column, and `data.data` becomes a DataFrame with named columns. This matters more than it first appears, because a DataFrame carries its column names into the estimator, which is what lets a fitted model report `feature_names_in_` and what lets a `ColumnTransformer` select columns by name rather than by position.
+
+## Turning your own data into X and y
+
+Real data rarely arrives in the right shape, and the conversion is usually one comprehension.
+
+From a list of dictionaries, build `X` by pulling the feature keys in a fixed order and `y` by pulling the target key. The order matters and must be the same for every row, which is exactly what a list comprehension guarantees and a hand-written loop does not.
+
+From a pandas DataFrame it is shorter still: `X = df[["rooms", "area"]]` and `y = df["price"]`. Selecting with a list of column names gives a DataFrame, which is 2-D and therefore a valid `X`; selecting with a single name gives a Series, which is 1-D and therefore a valid `y`. Getting those two confused &mdash; `df["rooms"]` where `df[["rooms"]]` was meant &mdash; produces the 1-D error message, and the doubled brackets are the fix.
+
+The one rule that survives every source: decide the column order once, and keep it. A model fitted on columns in one order and given new data in another will not complain. It will produce confident nonsense, because column three is column three whatever it used to mean.
+
+## The two errors, and what they are telling you
+
+**"Expected 2D array, got 1D array instead."** You passed something with one dimension where `X` was wanted. The message goes on to suggest `reshape(-1, 1)` if the data has a single feature and `reshape(1, -1)` if it is a single sample, and choosing between those two is choosing what your data means. `-1` tells NumPy to work that dimension out from the length.
+
+**"Found input variables with inconsistent numbers of samples: [3, 2]."** `X` and `y` disagree about how many rows there are, and the numbers in brackets are the two counts in order. This one almost always means an upstream filter was applied to one and not the other &mdash; dropping rows with missing targets from `y` but not from `X`, say &mdash; and the fix belongs there rather than at the call that raised.
+
+Both messages name the shapes involved, which makes them among the more helpful errors you will meet. Reading them before changing anything is faster than guessing, and the shape they report is usually enough on its own to identify which of the two objects is wrong.
+
+## Sparse matrices, and when one appears
+
+Some transformers do not return a normal array. `OneHotEncoder` and the text vectorisers return a **sparse matrix**, which stores only the non-zero entries and their positions.
+
+The reason is size. One-hot encoding a column with ten thousand distinct values produces ten thousand columns, almost all of them zero on any given row. Stored densely that is enormous and almost entirely wasted; stored sparsely it is a list of the few positions that are not zero.
+
+You will notice it in three ways. Printing one shows a summary rather than the numbers. Indexing behaves differently from a NumPy array. And some estimators accept it happily while others raise, because not every algorithm can be written to work on that representation.
+
+`.toarray()` converts to a dense array, and is the right move only when you are certain the result fits in memory &mdash; which is exactly the case the sparse representation existed to avoid. `sparse_output=False` on the encoder is the better fix when the number of columns is genuinely small. Most of the time the correct answer is to leave it sparse, because the estimators that matter for high-dimensional data all handle it.
+
+## Looking at the data before fitting anything
+
+The step that gets skipped, and the one that catches the problems a model will silently absorb.
+
+Four questions are worth answering before any `fit`. **How many rows and columns**, from `X.shape` &mdash; a model with more features than samples behaves quite differently from one with the reverse. **What range each feature covers**, because a column measured in millions next to one measured in fractions is the situation that makes scaling necessary. **Whether anything is missing**, since `np.isnan(X).sum()` costs nothing and most estimators refuse to fit with `NaN` present. And **how the target is distributed** &mdash; for a classifier, the count per class, because that single number decides whether accuracy is a meaningful metric at all.
+
+None of these require plotting or a lengthy exploration. Four lines before the first `fit` catch the majority of problems that would otherwise appear later as an inexplicable score.
+
+The one that matters most is the class balance. A dataset that is 99% one class will let almost any classifier report 99% accuracy, and a reader who has not counted will believe it.
+
+## Feature names, and why they are worth keeping
+
+Passing NumPy arrays works, and passing DataFrames gives you something arrays cannot: the model remembers what the columns were called.
+
+A fitted estimator that was given a DataFrame gains `feature_names_in_`, and several report results against those names rather than against positions. `feature_importances_` on a tree, `coef_` on a linear model, and the output of `get_feature_names_out()` on a transformer are all far easier to read when there is a name attached to each number.
+
+It also adds a safety check. Fit on a DataFrame and then predict on one whose columns are in a different order, and scikit-learn raises rather than silently using the wrong column &mdash; which is the failure mode that arrays cannot protect you from at all.
+
+The cost is that a DataFrame is slower than an array and that some operations convert back to arrays anyway, losing the names partway through a pipeline. That is why `get_feature_names_out()` exists on transformers: it reconstructs the names on the other side of a step that dropped them, including the invented names that one-hot encoding produces.
+
+The habit worth adopting: use DataFrames at the boundary where data enters, and stop worrying about whether the middle of the pipeline is arrays or frames.
+
+## Things to try
+
+1. <strong>Print the description.</strong> Add `print(load_iris().DESCR[:800])` to the first editor. It explains the columns, the classes and where the data came from.
+2. <strong>Change the generated data.</strong> In the third editor, set `n_informative=1` and see that four of the five features are noise by construction &mdash; useful when testing whether a model can ignore them.
+3. <strong>Trigger the shape error deliberately.</strong> Pass `data.data[0]` as `X` and read what it suggests. One sample needs `reshape(1, -1)`, not `reshape(-1, 1)`.
+4. <strong>Compare the two representations.</strong> Fit anything on `as_frame=True` data, then check `model.feature_names_in_`. With plain arrays that attribute does not exist.
+
+## Where this leaves you
+
+Two objects, two shapes, and three prefixes for finding data to practise on. The next module takes that data and does the one thing that has to happen before any score means anything: splitting it.
+""",
+    [
+        {"q": "What shape must X have?",
+         "options": ["1-D, one entry per sample",
+                     "2-D, samples as rows and features as columns",
+                     "2-D, features as rows and samples as columns",
+                     "Any shape - scikit-learn infers it"],
+         "answer": 1,
+         "why": "Rows are samples and columns are features, which is why a single feature still needs reshape(-1, 1)."},
+        {"q": "What does return_X_y=True change?",
+         "options": ["It shuffles the data",
+                     "It returns the two arrays directly instead of a Bunch",
+                     "It splits into train and test",
+                     "It returns a DataFrame"],
+         "answer": 1,
+         "why": "It skips the Bunch wrapper, which is what makes `X, y = load_iris(return_X_y=True)` a one-liner."},
+        {"q": "Which prefix generates synthetic data with properties you choose?",
+         "options": ["load_", "fetch_", "make_", "build_"],
+         "answer": 2,
+         "why": "make_classification, make_regression and make_blobs construct data with a known structure, which is ideal for testing whether a technique behaves as expected."},
+        {"q": "\"Found input variables with inconsistent numbers of samples\" means what?",
+         "options": ["X is 1-D",
+                     "X and y have different numbers of rows",
+                     "There are missing values",
+                     "The features are on different scales"],
+         "answer": 1,
+         "why": "The numbers in the brackets are the two row counts. It usually means a filter was applied to one of the two and not the other."},
     ],
 )
