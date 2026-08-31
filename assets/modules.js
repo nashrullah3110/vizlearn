@@ -4460,6 +4460,22 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Classification Metrics",
+  "path": "sklearn/classification_metrics.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Cross-Validation",
+  "path": "sklearn/cross_validation.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "Linear Regression",
   "path": "sklearn/linear_regression.html",
   "category": "scikit-learn",
@@ -4494,6 +4510,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Splitting Train and Test",
   "path": "sklearn/train_test_split.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "The Confusion Matrix",
+  "path": "sklearn/confusion_matrix.html",
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",

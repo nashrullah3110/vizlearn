@@ -231,12 +231,9 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Nine numbers, one sliding window, and most of classical image processing.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>One operation, many effects</h3>
-                    <p>Convolution is a single, simple operation that produces a startling range of results depending on nine numbers. Take a small grid of weights &mdash; the <strong>kernel</strong> &mdash; centre it on a pixel, multiply each weight by the pixel underneath it, and add the products together. That sum is the output pixel. Slide the kernel one step and do it again.</p><p>That is the whole algorithm. Blurring, sharpening, edge detection and embossing are not different algorithms; they are the same algorithm with different numbers in the grid.</p>
-                </div>
-                <div>
-                    <h3>Reading a kernel</h3>
+                    <h3 id="vz-s-reading-a-kernel">Reading a kernel</h3>
                     <p>The identity kernel is the easiest to reason about:</p><pre><code>0  0  0
 0  1  0
 0  0  0</code></pre><p>Every neighbour is multiplied by zero, the centre pixel by one, so the output is the input unchanged. Now change the centre to 5 and set the four orthogonal neighbours to &minus;1:</p><pre><code> 0 -1  0
@@ -244,26 +241,26 @@
  0 -1  0</code></pre><p>The centre pixel is amplified and its neighbours are subtracted from it. Where the neighbourhood is flat, the subtraction cancels the amplification exactly and nothing happens. Where the centre differs from its surroundings &mdash; at an edge &mdash; the difference is exaggerated. That is <strong>sharpening</strong>, and it explains why sharpening amplifies noise: a noisy pixel is, by definition, a pixel that differs from its neighbours.</p>
                 </div>
                 <div>
-                    <h3>The sum tells you what kind of filter it is</h3>
+                    <h3 id="vz-s-the-sum-tells-you-what-kind-of-filter-it-is">The sum tells you what kind of filter it is</h3>
                     <p>There are two families, and you can tell them apart by adding the weights up.</p><p><strong>Weights summing to 1</strong> preserve average brightness. A box blur of nine ones divided by nine is the arithmetic mean of the neighbourhood; a Gaussian blur weights the centre more heavily than the corners. Both keep the image at the same overall exposure because the total contribution of every pixel is unchanged.</p><p><strong>Weights summing to 0</strong> produce a difference image. Flat regions become zero, because a constant multiplied by weights that cancel gives nothing. Only where the image changes does anything survive. Since a result can be negative, these filters are usually displayed with 128 added, which is why edge images have that flat grey background.</p><div class="vz-table-wrap"><table><thead><tr><th>Kernel</th><th>Sum</th><th>What survives</th></tr></thead><tbody><tr><td>Identity</td><td>1</td><td>everything, unchanged</td></tr><tr><td>Box blur</td><td>1 (after division)</td><td>low-frequency detail</td></tr><tr><td>Sharpen</td><td>1</td><td>everything, with edges exaggerated</td></tr><tr><td>Sobel</td><td>0</td><td>edges in one direction</td></tr><tr><td>Laplacian</td><td>0</td><td>edges in every direction</td></tr><tr><td>Emboss</td><td>1</td><td>a directional shadow</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3>Sobel: why there are two of them</h3>
+                    <h3 id="vz-s-sobel-why-there-are-two-of-them">Sobel: why there are two of them</h3>
                     <p>The Sobel operator comes as a pair, and the pair is one kernel rotated by ninety degrees:</p><pre><code>Sobel X          Sobel Y
 -1  0  1        -1 -2 -1
 -2  0  2         0  0  0
 -1  0  1         1  2  1</code></pre><p>Sobel X subtracts the column on the left from the column on the right. A vertical edge &mdash; where left and right differ &mdash; produces a large value. A horizontal edge produces nothing at all, because left and right are identical there. Sobel Y is the same argument with rows.</p><p>Run each on the visualisation above and the asymmetry is obvious: the vertical sides of the rectangle appear under Sobel X and vanish under Sobel Y. In practice the two are combined, usually as the square root of the sum of their squares, to get an edge strength that does not care about direction.</p><p>The middle row being &minus;2, 0, 2 rather than &minus;1, 0, 1 is a small piece of smoothing built in: the pixel in line with the centre is weighted more than the diagonals, so a single noisy pixel has less influence than it would in a pure difference.</p>
                 </div>
                 <div>
-                    <h3>What happens at the border</h3>
+                    <h3 id="vz-s-what-happens-at-the-border">What happens at the border</h3>
                     <p>A kernel centred on a corner pixel has five of its nine cells hanging over the edge of the image. Something has to be decided, and the three common answers are to leave the border out (producing a smaller output), to treat the missing pixels as zero, or to repeat the nearest real pixel outwards. The visualisation here repeats the edge pixel, which is why the frame stays clean; zero-padding would darken it. The [padding module](padding_in_cnn.html) works through what that choice costs inside a network.</p>
                 </div>
                 <div>
-                    <h3>Why this matters for CNNs</h3>
+                    <h3 id="vz-s-why-this-matters-for-cnns">Why this matters for CNNs</h3>
                     <p>Everything above is fixed: someone chose the nine numbers and wrote them down. A convolutional layer in a neural network performs the identical operation and differs in exactly one respect &mdash; the nine numbers are parameters, and gradient descent chooses them.</p><p>That is worth sitting with. When people say a CNN "learns to detect edges in the first layer", they mean that training drives some of the learned kernels towards something that looks very much like Sobel, because edges turn out to be a useful thing to measure. Nobody put Sobel there. The architecture only supplies the sliding window; the content of the window is discovered.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>Sharpening noise.</strong> Any kernel with negative weights amplifies pixel-to-pixel variation, and noise is pixel-to-pixel variation. Denoise first, sharpen second.</p><p><strong>Forgetting to normalise.</strong> A blur kernel of nine ones, applied without dividing by nine, produces an image nine times too bright &mdash; which, after clipping at 255, is a white rectangle.</p><p><strong>Assuming bigger is better.</strong> A 3&#215;3 kernel sees a 3&#215;3 region. To see further you either use a larger kernel, which costs quadratically more multiplications, or stack several small ones, which is what modern architectures do and why [receptive field](feature_map_in_cnn.html) is a concept worth having.</p>
                 </div>
             </div>

@@ -231,32 +231,29 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Getting the effect of a large batch out of a device that cannot hold one.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Why it works</h3>
-                    <p>The loss over a batch is the mean of the per-example losses, and differentiation is linear. So the gradient of the batch is the mean of the per-example gradients.</p><p>That means the sum can be built in pieces. Run a forward and backward pass on 16 examples, keep the gradients, run another 16, add to them, and after 16 rounds you have exactly the gradient of a 256-example batch. Step the optimiser once.</p><p><strong>The resulting update is identical</strong> &mdash; not similar, identical up to floating-point ordering &mdash; to what a single 256-example batch would have produced.</p>
-                </div>
-                <div>
-                    <h3>What actually consumes the memory</h3>
+                    <h3 id="vz-s-what-actually-consumes-the-memory">What actually consumes the memory</h3>
                     <p>The bars separate the two cases at the memory budget you choose.</p><p>Training memory is roughly:</p><p><strong>Fixed costs.</strong> Weights, their gradients, and the optimiser state. Adam keeps two extra tensors per parameter, so this is around four times the model size, and it does not depend on the batch at all.</p><p><strong>Activations.</strong> Every intermediate value from the forward pass has to be kept for the backward pass. This scales linearly with the batch size, and for a deep model it dominates.</p><p>Accumulation attacks only the second, which is why it works. Drag the micro-batch down and watch the second bar fall while the fixed part stays put.</p><p>The dashed line is the budget. When the full batch crosses it and the micro-batch does not, that gap is the entire reason the technique exists.</p>
                 </div>
                 <div>
-                    <h3>What it costs</h3>
+                    <h3 id="vz-s-what-it-costs">What it costs</h3>
                     <p><strong>Time.</strong> Sixteen sequential passes take about as long as sixteen passes. Accumulation does not make anything faster; it makes something possible.</p><p>There is a small efficiency loss too, since very small micro-batches use the accelerator less well. A micro-batch of 1 is usually much less than a sixteenth as efficient as a micro-batch of 16.</p>
                 </div>
                 <div>
-                    <h3>The one thing that is not identical</h3>
+                    <h3 id="vz-s-the-one-thing-that-is-not-identical">The one thing that is not identical</h3>
                     <p><strong>Batch normalisation.</strong> Its statistics are computed over whatever is in the forward pass, which is the micro-batch, not the accumulated total.</p><p>So a model with batch norm trained with a micro-batch of 4 behaves like one trained with a batch of 4, however many accumulation steps follow. The normalisation is noisier, and at very small micro-batches it degrades badly.</p><p>This is a real reason to prefer [layer normalisation](layer_normalization.html) or group normalisation, both of which normalise per example and are indifferent to the batch. It is not a coincidence that transformers use layer norm and are the architectures trained with the most aggressive accumulation.</p>
                 </div>
                 <div>
-                    <h3>Getting it right</h3>
+                    <h3 id="vz-s-getting-it-right">Getting it right</h3>
                     <p>Two details cause most of the bugs.</p><p><strong>Divide the loss by the number of accumulation steps</strong> before the backward pass, or the accumulated gradient is a sum where the optimiser expects a mean, and your effective learning rate is multiplied by the step count.</p><p><strong>Zero the gradients at the right time</strong> &mdash; after the optimiser step, not after every backward pass. Zeroing every pass defeats the whole thing, and it fails silently: training still runs, just with the small batch you were trying to avoid.</p>
                 </div>
                 <div>
-                    <h3>Alongside</h3>
+                    <h3 id="vz-s-alongside">Alongside</h3>
                     <p><strong>Activation checkpointing</strong> trades compute for memory in the other direction: discard activations during the forward pass and recompute them in the backward pass, for roughly 30% more time and a large memory saving. The two combine.</p><p><strong>Mixed precision</strong> halves activation memory outright, and combines with both.</p><p><strong>Model parallelism and ZeRO</strong> attack the fixed costs, which accumulation cannot touch. When the weights alone do not fit, accumulation is not the answer.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>Forgetting to divide the loss.</strong> Silently multiplies the learning rate.</p><p><strong>Zeroing gradients every pass.</strong> Silently defeats the technique.</p><p><strong>Using it with batch norm at a tiny micro-batch.</strong> Real quality loss.</p><p><strong>Expecting a speed-up.</strong> It buys capability, not throughput.</p>
                 </div>
             </div>

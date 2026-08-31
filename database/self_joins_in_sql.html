@@ -300,31 +300,27 @@ ORDER  BY e.name;
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">A table joined to itself, and the three questions that need one.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Nothing new, except the alias</h3>
-                    <p>A self-join is an ordinary join in which both sides are the same table. There is no special keyword and no special execution; the only thing that changes is that aliases become mandatory.</p><pre><code>FROM  employees e
-JOIN  employees m ON e.manager_id = m.id</code></pre><p><code>e</code> and <code>m</code> are two independent views of the same rows. Without them, <code>name</code> would be ambiguous &mdash; the database has two columns with that name in scope and no way to guess which was meant.</p><p>The mental move that makes this click is to stop thinking of <code>e</code> and <code>m</code> as one table used twice, and start thinking of them as two tables that happen to contain identical data. Everything else about joins then applies unchanged.</p>
-                </div>
-                <div>
-                    <h3>When you need one</h3>
+                    <h3 id="vz-s-when-you-need-one">When you need one</h3>
                     <p>Self-joins answer questions that involve <strong>comparing a row to another row of the same kind</strong>, which SQL otherwise makes awkward.</p><p><strong>Hierarchies stored in one table.</strong> An employee's manager is another employee. A category's parent is another category. A reply's target is another comment. Joining the table to itself resolves the reference into real columns.</p><p><strong>Row-to-row comparisons.</strong> "Who earns more than their manager" needs both salaries available at once. Run the third variant: Barbara earns 101,000 and reports to Grace on 98,000, and the join is what puts those two numbers in one row so a <code>WHERE</code> can compare them.</p><p><strong>Pairing rows within a group.</strong> "Which colleagues share a manager" pairs the table with itself on <code>manager_id</code>.</p>
                 </div>
                 <div>
-                    <h3>The two conditions that keep pairs sane</h3>
+                    <h3 id="vz-s-the-two-conditions-that-keep-pairs-sane">The two conditions that keep pairs sane</h3>
                     <p>The fourth variant contains a detail that looks small and is not:</p><pre><code>ON a.manager_id = b.manager_id AND a.id &lt; b.id</code></pre><p>Without <code>a.id &lt; b.id</code>, two things go wrong. Every row pairs with <strong>itself</strong>, because a row trivially shares its own manager. And every genuine pair appears <strong>twice</strong>, once as (Alan, Grace) and once as (Grace, Alan).</p><p>Writing <code>a.id &lt;&gt; b.id</code> fixes the first problem and not the second. Writing <code>a.id &lt; b.id</code> fixes both at once, because for any two distinct rows exactly one ordering satisfies it. That is the standard idiom for "each unordered pair once" and it is worth recognising on sight.</p>
                 </div>
                 <div>
-                    <h3>The top of the hierarchy disappears</h3>
+                    <h3 id="vz-s-the-top-of-the-hierarchy-disappears">The top of the hierarchy disappears</h3>
                     <p>Run the first variant and count the rows: five, not six. Ada is missing.</p><p>Ada is the root &mdash; her <code>manager_id</code> is NULL &mdash; and an inner join requires a match on both sides. NULL matches nothing, so her row is dropped without comment.</p><p>The second variant uses <code>LEFT JOIN</code> and Ada reappears with a NULL manager. This is nearly always what was intended, and the failure is quiet enough to reach production: the query works, returns plausible rows, and is missing exactly the most senior person in the organisation.</p>
                 </div>
                 <div>
-                    <h3>Depth is where it stops</h3>
+                    <h3 id="vz-s-depth-is-where-it-stops">Depth is where it stops</h3>
                     <p>A self-join resolves <strong>one</strong> level. Employee to manager is one join. Employee to manager's manager is two, written out by hand:</p><pre><code>FROM employees e
 JOIN employees m  ON e.manager_id = m.id
 JOIN employees mm ON m.manager_id = mm.id</code></pre><p>Three levels needs three, and an arbitrary depth cannot be written this way at all, because the number of joins would have to depend on the data.</p><p>That is the boundary where the technique runs out and [recursive CTEs](recursive_ctes_in_sql.html) take over. A recursive CTE walks down as many levels as exist, and it is the correct tool the moment the depth is not known in advance.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>Inner join on a nullable parent.</strong> The root vanishes. This is the single most common self-join bug.</p><p><strong>Forgetting the anti-self condition.</strong> Without <code>a.id &lt; b.id</code> every row pairs with itself, and totals come out roughly double.</p><p><strong>Using one for arbitrary depth.</strong> If the query has four copies of the same table and someone is about to add a fifth, it wants to be recursive.</p><p><strong>Leaving the join column unindexed.</strong> A self-join reads the table twice. On a large table with no index on <code>manager_id</code>, that is two full scans and a hash in between.</p>
                 </div>
             </div>

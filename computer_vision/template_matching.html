@@ -231,28 +231,25 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The most direct way to find something in an image, and a clear demonstration of why the field moved on.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The method</h3>
-                    <p>Take a patch &mdash; the <strong>template</strong> &mdash; and place it over every possible position in the image. At each position, score how well the template agrees with what is underneath. The result is a <strong>response map</strong> with one score per position, and the highest score is where the template was found.</p><p>The template here is cut from the image itself, using the position controls, so a perfect match is guaranteed to exist. The grey square marks where it came from and the orange square marks where it was found. Move the controls and they track each other, with the correlation in the readout staying at 1.000.</p>
-                </div>
-                <div>
-                    <h3>Scoring: why not just subtract?</h3>
+                    <h3 id="vz-s-scoring-why-not-just-subtract">Scoring: why not just subtract?</h3>
                     <p>The obvious score is the sum of squared differences. It works, and it breaks the moment lighting changes: brighten the image by 20 and every difference grows, even where the shapes match perfectly.</p><p><strong>Normalised cross-correlation</strong> fixes this by standardising both sides before comparing &mdash; subtract the mean, divide by the standard deviation, then take the dot product:</p><pre><code>NCC = sum( (T - mean_T) * (W - mean_W) ) / ( sd_T * sd_W )</code></pre><p>Subtracting the means removes any constant brightness offset. Dividing by the standard deviations removes any constant contrast scaling. What is left measures <strong>pattern</strong> rather than pixel values, and the result is bounded between &minus;1 and 1, which makes scores comparable across positions and images.</p><p>That is why NCC is the standard choice, and why the response map here is readable as an image: every value is on the same scale.</p>
                 </div>
                 <div>
-                    <h3>Reading the response map</h3>
+                    <h3 id="vz-s-reading-the-response-map">Reading the response map</h3>
                     <p>The bright region around the true match is not a single pixel. It is a blob, because a template shifted by one pixel still overlaps almost entirely and still scores well.</p><p>That blob is why picking the maximum is not enough in practice. Several nearby positions all score highly, and returning all of them means returning the same detection several times. The standard fix is the same one detection uses: suppress everything within a radius of a stronger response, which is exactly [non-maximum suppression](iou_and_non_max_suppression.html).</p><p>Make the template small &mdash; drag the size control down &mdash; and the map becomes noisy, with strong responses in places that merely happen to have a similar local pattern. A small template does not contain enough structure to be distinctive.</p>
                 </div>
                 <div>
-                    <h3>What it cannot do</h3>
+                    <h3 id="vz-s-what-it-cannot-do">What it cannot do</h3>
                     <p>The limitations are severe and they are the reason the field developed alternatives.</p><p><strong>Rotation.</strong> A template rotated by ten degrees no longer aligns, and the correlation falls sharply. Handling rotation means searching over angles as well as positions.</p><p><strong>Scale.</strong> The same problem in another dimension. Searching over scales too means an image pyramid and a much larger search.</p><p><strong>Deformation.</strong> A face is not a rigid patch. Any object that bends, or that varies between instances, cannot be represented by one template.</p><p><strong>Cost.</strong> Every position &#215; every scale &#215; every angle, each requiring a full patch comparison, is expensive, though correlation via the FFT helps a great deal in the translation-only case.</p>
                 </div>
                 <div>
-                    <h3>Where it is still the right tool</h3>
+                    <h3 id="vz-s-where-it-is-still-the-right-tool">Where it is still the right tool</h3>
                     <p>Template matching has not disappeared, because when its assumptions hold it is exact, needs no training data, and is trivially explainable.</p><p>Industrial inspection with a fixed camera and fixed part orientation. Finding a known icon on a screen for UI automation. Aligning scanned documents against a form. Matching a fixed logo. In all of these, position is the only unknown, which is precisely the case the method solves.</p><p>Where the assumptions fail, the successors are <strong>keypoint matching</strong> &mdash; [Harris corners](harris_corners.html), SIFT, ORB &mdash; which find distinctive points and match those, giving rotation and scale invariance for free, and learned detectors, which handle deformation and appearance variation as well.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>Sum of squared differences under changing light.</strong> Use NCC.</p><p><strong>Taking the argmax without suppression.</strong> The peak is a blob, not a point.</p><p><strong>A template that is too small.</strong> Not distinctive; the map fills with false peaks.</p><p><strong>Expecting invariance it does not have.</strong> If the object can rotate or change size, this is the wrong method, not a method that needs tuning.</p>
                 </div>
             </div>

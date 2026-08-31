@@ -19973,6 +19973,108 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "sklearn/classification_metrics.html",
+  "title": "Classification Metrics",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "A classifier scores 99% accuracy on data that is 99% one class. What has it shown?",
+    "o": [
+     "It is an excellent model",
+     "Possibly nothing - always predicting the majority scores the same",
+     "The data needs more features",
+     "That accuracy is the right metric here"
+    ],
+    "a": 1,
+    "w": "A DummyClassifier predicting the majority achieves it without learning anything. Fitting one is how you find out whether a score means anything."
+   },
+   {
+    "t": "What does recall measure?",
+    "o": [
+     "How many flagged cases were correct",
+     "How many of the real positives were found",
+     "Overall correctness",
+     "The false positive rate"
+    ],
+    "a": 1,
+    "w": "Recall divides true positives by everything that was actually positive - it is about misses. Precision divides by everything flagged, and is about false alarms."
+   },
+   {
+    "t": "Why is F1 a harmonic mean rather than an ordinary one?",
+    "o": [
+     "It is faster to compute",
+     "It stays low when either precision or recall is low",
+     "It handles more than two classes",
+     "Convention only"
+    ],
+    "a": 1,
+    "w": "Precision 1.0 with recall 0.1 gives F1 of 0.18, not 0.55. An ordinary average would let one good half disguise a bad one."
+   },
+   {
+    "t": "Which averaging makes an ignored rare class visible?",
+    "o": [
+     "micro",
+     "weighted",
+     "macro",
+     "all three equally"
+    ],
+    "a": 2,
+    "w": "Macro treats every class equally regardless of size. Weighted and micro are dominated by the large classes, and micro equals accuracy for single-label problems."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/cross_validation.html",
+  "title": "Cross-Validation",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "What does cross_val_score return?",
+    "o": [
+     "A fitted model",
+     "One score per fold",
+     "The mean score",
+     "The best model of the k"
+    ],
+    "a": 1,
+    "w": "An array with one entry per fold. The spread across them matters as much as the mean, and the fitted models are discarded."
+   },
+   {
+    "t": "Why must preprocessing go inside a Pipeline for cross-validation?",
+    "o": [
+     "It is faster",
+     "Otherwise it is fitted on the fold being held out, inflating the score",
+     "Pipelines are required by cross_val_score",
+     "It avoids a warning"
+    ],
+    "a": 1,
+    "w": "Anything fitted before the split has seen every fold. With feature selection on noise this took a true 0.45 to a reported 0.825."
+   },
+   {
+    "t": "You pass cv=5 with a classifier. Which splitter is used?",
+    "o": [
+     "KFold",
+     "StratifiedKFold",
+     "ShuffleSplit",
+     "LeaveOneOut"
+    ],
+    "a": 1,
+    "w": "scikit-learn picks StratifiedKFold for classifiers and plain KFold otherwise. Pass a splitter object when you need shuffling or a fixed seed."
+   },
+   {
+    "t": "After cross-validating, which model do you deploy?",
+    "o": [
+     "The best-scoring fold's model",
+     "A new one fitted on all the data",
+     "An average of the k models",
+     "The last fold's model"
+    ],
+    "a": 1,
+    "w": "Cross-validation estimates how a procedure performs. Once you accept the procedure, refit it once on everything - the k models are thrown away."
+   }
+  ]
+ },
+ {
   "path": "sklearn/linear_regression.html",
   "title": "Linear Regression",
   "cat": "scikit-learn",
@@ -20224,6 +20326,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Anything fitted on the whole dataset has seen the test set. Information reaches the model through the transformer's parameters, and the score comes out too high."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/confusion_matrix.html",
+  "title": "The Confusion Matrix",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "In a scikit-learn confusion matrix, what do the rows represent?",
+    "o": [
+     "The predicted classes",
+     "The actual classes",
+     "The features",
+     "It depends on the argument order"
+    ],
+    "a": 1,
+    "w": "Rows are the truth and columns the prediction. The diagonal is correct; everything off it is a mistake of a specific kind."
+   },
+   {
+    "t": "What does cm.ravel() return for a binary problem?",
+    "o": [
+     "tp, fp, fn, tn",
+     "tn, fp, fn, tp",
+     "tp, tn, fp, fn",
+     "fp, fn, tp, tn"
+    ],
+    "a": 1,
+    "w": "True negative, false positive, false negative, true positive - reading order across the 2x2 table."
+   },
+   {
+    "t": "Why pass labels= to confusion_matrix?",
+    "o": [
+     "To rename the classes",
+     "To guarantee the order and keep classes that never appear",
+     "To normalise the counts",
+     "It is required for more than two classes"
+    ],
+    "a": 1,
+    "w": "Without it the classes are inferred and sorted, so a class missing from a split silently shrinks the matrix and code indexing by position reads the wrong cell."
+   },
+   {
+    "t": "What does normalize=\"true\" give you on the diagonal?",
+    "o": [
+     "Precision per class",
+     "Recall per class",
+     "F1 per class",
+     "Accuracy"
+    ],
+    "a": 1,
+    "w": "Dividing by row totals gives the proportion of each actual class predicted correctly, which is recall. normalize=\"pred\" divides by column and gives precision."
    }
   ]
  },

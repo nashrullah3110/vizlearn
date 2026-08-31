@@ -232,30 +232,26 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Six numbers that cover every rotation, scale, shear and shift an image can take.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>One matrix for four operations</h3>
-                    <p>Rotating, scaling, shearing and translating look like four separate things. They are one thing with different numbers in it &mdash; an <strong>affine transform</strong>, written as a 2&#215;3 matrix:</p><pre><code>| a  b  e |
-| c  d  f |</code></pre><p>A point at (x, y) moves to (ax + by + e, cx + dy + f). The four numbers a, b, c and d handle everything that involves direction &mdash; rotation, scale, shear, flip &mdash; and e and f slide the result sideways and down.</p><p>The defining property is in the name: affine transforms preserve straightness and parallelism. A straight line stays straight, and two parallel lines stay parallel. Anything you can do to a photograph by moving, turning, stretching or skewing it is affine. Anything involving perspective &mdash; railway tracks converging &mdash; is not, because parallel lines stop being parallel.</p>
-                </div>
-                <div>
-                    <h3>What each number does</h3>
+                    <h3 id="vz-s-what-each-number-does">What each number does</h3>
                     <p>Set everything to the identity &mdash; a and d at 1, the rest at 0 &mdash; and the image is unchanged. Then move one at a time.</p><p><strong>a scales horizontally.</strong> At 2 the image doubles in width; at 0.5 it halves; at &minus;1 it mirrors left-to-right.</p><p><strong>d scales vertically</strong>, the same way.</p><p><strong>c shears in x.</strong> Each row slides sideways in proportion to its distance from the centre, turning a rectangle into a parallelogram. This is the italic transformation.</p><p><strong>b shears in y</strong>, tilting columns instead of rows.</p><p><strong>e and f translate</strong>, in pixels, and are the only two that do not interact with the others.</p><p>Rotation is not its own control because it does not need one. A rotation by &theta; is:</p><pre><code>a =  cos t    b = -sin t
 c =  sin t    d =  cos t</code></pre><p>Set a and d to 0.87 and c to 0.5 with b at &minus;0.5 and the image turns by thirty degrees. Rotation is a particular combination of scale and shear, which is the sort of fact the matrix makes obvious and four separate functions hide.</p>
                 </div>
                 <div>
-                    <h3>The determinant</h3>
+                    <h3 id="vz-s-the-determinant">The determinant</h3>
                     <p>The readout under the visualisation shows <strong>ad &minus; bc</strong>, the determinant. It has a direct meaning: it is the factor by which area is multiplied.</p><p>A pure rotation has determinant 1, because rotating does not change area. Doubling both scales gives 4. A negative determinant means the image has been flipped &mdash; orientation reversed.</p><p>At determinant 0 the transform is not invertible, and geometrically it has collapsed the plane onto a line. Set a and c to the same value with b and d matching and the image degenerates. Nothing can undo that, because the information about position along the lost direction is gone.</p>
                 </div>
                 <div>
-                    <h3>Why implementations work backwards</h3>
+                    <h3 id="vz-s-why-implementations-work-backwards">Why implementations work backwards</h3>
                     <p>The obvious way to apply a transform is to loop over input pixels, compute where each lands, and write it there. This produces a broken image.</p><p>When the transform enlarges, adjacent input pixels land more than one pixel apart in the output, leaving gaps that nothing ever writes to &mdash; a lattice of holes. When it shrinks, several inputs land on the same output and fight over it.</p><p>Real implementations invert the problem. Loop over every <strong>output</strong> pixel, apply the *inverse* transform to find where it came from in the input, and sample there. Every output pixel gets written exactly once, so there are no holes, and the sampling step is an ordinary interpolation problem &mdash; nearest neighbour or bilinear, with the same trade-offs as [resizing](resizing_and_interpolation.html).</p><p>This is why the code above computes the inverse rather than the forward map, and why an affine transform needs an interpolation choice at all.</p>
                 </div>
                 <div>
-                    <h3>Where it shows up</h3>
+                    <h3 id="vz-s-where-it-shows-up">Where it shows up</h3>
                     <p><strong>Data augmentation.</strong> Small random rotations, scales and shears applied to training images teach a network that a cat rotated by ten degrees is still a cat. It is the cheapest regularisation there is, and it is affine.</p><p><strong>Image registration.</strong> Aligning two photographs of the same scene means finding the affine transform that best maps one onto the other.</p><p><strong>Document scanning.</strong> Straightening a page photographed at an angle is affine if the camera was square to the page and projective if it was not, which is why scanning apps ask you to mark the corners.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>Expecting to correct perspective.</strong> Affine cannot. A photograph taken from an angle needs a projective (homography) transform, which has eight parameters and does not preserve parallelism.</p><p><strong>Composing in the wrong order.</strong> Matrix multiplication does not commute. Rotate-then-translate and translate-then-rotate give different results, and which one you meant is usually clear only after seeing the wrong one.</p><p><strong>Rotating about the origin by accident.</strong> The formulas rotate about (0, 0), which is a corner. Rotating about the centre means translating the centre to the origin, rotating, and translating back &mdash; three matrices multiplied together.</p><p><strong>Losing the corners.</strong> A rotated rectangle does not fit in the original frame. Either accept the clipping or compute the bounding box of the transformed corners and enlarge the canvas first.</p>
                 </div>
             </div>

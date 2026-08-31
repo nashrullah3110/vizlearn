@@ -546,6 +546,9 @@ SEQUENCE = {
         "sklearn/linear_regression.html",
         "sklearn/regression_metrics.html",
         "sklearn/logistic_regression.html",
+        "sklearn/classification_metrics.html",
+        "sklearn/confusion_matrix.html",
+        "sklearn/cross_validation.html",
     ],
     "pydantic": [
         "pydantic/what_is_pydantic.html",

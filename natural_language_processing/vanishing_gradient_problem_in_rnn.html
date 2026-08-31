@@ -491,57 +491,54 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">A geometric series is all it takes to erase long-term memory — and to motivate LSTMs.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The Arithmetic of Forgetting</h3>
-                    <p>BPTT multiplies the gradient by &part;h&#8348;/&part;h&#8348;&#8331;&#8321; once per timestep. Call that factor's typical size <em>w</em>. After travelling back T steps the gradient is scaled by <strong>w<sup>T</sup></strong> — a geometric series. At w = 0.7 and T = 30, that's 0.7&sup3;&#8304; &asymp; 0.00002: the beginning of the sentence receives <em>two hundred-thousandths</em> of the learning signal.</p>
-                </div>
-                <div>
-                    <h3>Vanishing and Exploding: Two Sides of One Coin</h3>
+                    <h3 id="vz-s-vanishing-and-exploding-two-sides-of-one-coin">Vanishing and Exploding: Two Sides of One Coin</h3>
                     <ul><li><strong>w &lt; 1 &rarr; vanishing:</strong> gradients decay exponentially; early timesteps stop learning; the network only captures short-range patterns.</li><li><strong>w &gt; 1 &rarr; exploding:</strong> gradients grow exponentially; updates become huge and training destabilizes into NaNs. (The blunt fix — gradient clipping — just caps the magnitude.)</li><li><strong>w = 1 exactly:</strong> stable — but nothing keeps a trained weight matrix pinned there. The knife-edge is why vanilla RNNs are fundamentally fragile on long sequences.</li></ul>
                 </div>
                 <div>
-                    <h3>The Way Out: Gates</h3>
+                    <h3 id="vz-s-the-way-out-gates">The Way Out: Gates</h3>
                     <p><strong>LSTM</strong> and <strong>GRU</strong> cells attack the product itself: they add a cell state with <em>additive</em> updates and learned gates, creating a path where the effective factor stays near 1 for as long as the gates choose. Gradients ride this "constant error carousel" across hundreds of steps — which is why LSTMs dominated sequence learning for two decades, until attention offered an even more direct shortcut.</p>
                 </div>
                 <div>
-                    <h3>Multiplication through time</h3>
+                    <h3 id="vz-s-multiplication-through-time">Multiplication through time</h3>
                     <p>Training a recurrent network means unrolling it. A 50-step sequence becomes a 50-layer network sharing one weight matrix, and backpropagation multiplies one Jacobian factor per step.</p><p>The gradient reaching step 1 from a loss at step 50 is a product of 49 factors. If they average below 1, the product collapses:</p><div class="vz-table-wrap"><table><thead><tr><th>Steps back</th><th>Factor 0.5</th><th>Factor 0.9</th><th>Factor 1.1</th></tr></thead><tbody><tr><td>10</td><td>0.001</td><td>0.35</td><td>2.6</td></tr><tr><td>25</td><td>3e-8</td><td>0.07</td><td>10.8</td></tr><tr><td>50</td><td>9e-16</td><td>0.005</td><td>117</td></tr></tbody></table></div><p>At 50 steps with a factor of 0.5 the gradient is one part in a quadrillion &mdash; indistinguishable from zero in floating point. The network cannot learn that step 1 mattered, so it cannot learn long-range dependencies at all.</p><p>Two things make factors below 1 the default. Tanh's derivative is at most 1 and usually well below it. And the recurrent weight matrix's largest singular value must be near 1 for the product to be stable, which nothing enforces.</p>
                 </div>
                 <div>
-                    <h3>What it looks like in practice</h3>
+                    <h3 id="vz-s-what-it-looks-like-in-practice">What it looks like in practice</h3>
                     <p>The symptoms are specific enough to diagnose:</p><ul><li><strong>The model learns local patterns and ignores distant ones.</strong> It predicts the next word well from the previous two and fails on agreement across a clause.</li><li><strong>Early-layer or early-timestep gradients are orders of magnitude smaller</strong> than late ones.</li><li><strong>Loss falls and then plateaus</strong> at a level that local context alone can explain.</li><li><strong>Increasing the sequence length does not improve results</strong>, because the extra context is unreachable.</li></ul><p>The diagnostic is to log gradient norms by time step or by layer:</p><pre><code class="language-python">loss.backward()
 for name, p in model.named_parameters():
     if p.grad is not None:
         print(f&quot;{name:&lt;30} {p.grad.norm().item():.3e}&quot;)</code></pre><p>A steady decay from output to input is the signature. Similar magnitudes throughout is healthy.</p>
                 </div>
                 <div>
-                    <h3>The mirror problem</h3>
+                    <h3 id="vz-s-the-mirror-problem">The mirror problem</h3>
                     <p>The same multiplication explodes when the factors exceed 1. A factor of 1.1 over 50 steps gives 117; a factor of 2 gives 10&#185;&#8309;.</p><p>The result is one enormous weight update that pushes the model far outside any sensible region, the next forward pass produces <code>inf</code>, the loss becomes <code>NaN</code>, and the run is over &mdash; nothing recovers from <code>NaN</code> weights.</p><p>Exploding gradients are, in one sense, the easier problem: they are loud and immediately visible, and gradient clipping fixes them completely. Vanishing gradients are silent &mdash; the model trains, converges, and simply fails to learn what you wanted.</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>Vanishing</th><th>Exploding</th></tr></thead><tbody><tr><td>Symptom</td><td>Slow or no learning of long range</td><td><code>NaN</code> loss</td></tr><tr><td>Visibility</td><td>Silent</td><td>Immediate</td></tr><tr><td>Fix</td><td>Gating, architecture</td><td>Gradient clipping</td></tr><tr><td>Onset</td><td>From the start</td><td>Often within a few steps</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3>Guided experiments</h3>
-                    <ol><li><strong>Start at w = 0.70, T = 20.</strong> The bars die out about a third of the way back — most of the sentence is unreachable by the learning signal.</li><li><strong>Enable log scale.</strong> The decay becomes a straight line — the visual signature of an exponential. Now drag T to 40 and read the survival value: it falls off a cliff.</li><li><strong>Push w to 1.3.</strong> The diagnosis flips to EXPLODING and the bars blow through the top of the chart. Then park w exactly at 1.0 and notice how artificial that stability feels — one nudge either way and it's gone.</li></ol>
+                    <h3 id="vz-s-guided-experiments">Guided experiments</h3>
+                    <ol><li><strong>Start at w = 0.70, T = 20.</strong> The bars die out about a third of the way back — most of the sentence is unreachable by the learning signal.</li><li><strong>Enable log scale.</strong> The decay becomes a straight line — the visual signature of an exponential. Now drag T to 40 and read the survival value: it falls off a cliff.<button class="vz-run" type="button" data-vz-run="0" aria-label="Run this experiment in the visualisation: Enable log scale"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Push w to 1.3.</strong> The diagnosis flips to EXPLODING and the bars blow through the top of the chart. Then park w exactly at 1.0 and notice how artificial that stability feels — one nudge either way and it's gone.</li></ol>
                 </div>
                 <div>
-                    <h3>What to remember</h3>
+                    <h3 id="vz-s-what-to-remember">What to remember</h3>
                     <p>The vanishing gradient problem is not a bug or a tuning issue — it is the inescapable arithmetic of multiplying T numbers that aren't exactly 1. It caps how far back a vanilla RNN can learn, and it is the direct reason LSTMs, GRUs, and ultimately attention-based Transformers exist.</p>
                 </div>
                 <div>
-                    <h3>How gating fixes it</h3>
+                    <h3 id="vz-s-how-gating-fixes-it">How gating fixes it</h3>
                     <p>The LSTM's answer is an additive path. Its cell state updates as:</p><p class="mono-font">c&#7511; = f&#7511; &#8857; c&#7511;&#8331;&#8321; + i&#7511; &#8857; g&#7511;</p><p>Differentiating with respect to <code>cₜ₋₁</code> gives the forget gate <code>fₜ</code>. If the network has learned to keep this information, <code>fₜ</code> is near 1, and the gradient passes back through that step essentially unchanged.</p><p>Contrast with a plain RNN, where the factor is the derivative of a tanh times a weight matrix &mdash; a quantity nothing keeps near 1.</p><p>The GRU achieves the same with its update gate: <code>hₜ</code> includes <code>(1 − zₜ) ⊙ hₜ₋₁</code>, so the derivative includes <code>(1 − zₜ)</code>, near 1 when the state is being preserved.</p><p>This is structurally the same trick as a <strong>residual connection</strong>: an additive path whose derivative is 1, giving gradients a route that multiplication cannot crush. The transformer's <code>x + sublayer(x)</code>, the LSTM's cell state and the GRU's interpolation are three expressions of one idea.</p><p>Gating reduces the problem rather than solving it. LSTMs handle hundreds of steps reliably and thousands unreliably, which is part of why attention &mdash; where any two positions are one step apart regardless of distance &mdash; eventually displaced them.</p>
                 </div>
                 <div>
-                    <h3>The full set of countermeasures</h3>
+                    <h3 id="vz-s-the-full-set-of-countermeasures">The full set of countermeasures</h3>
                     <p><strong>For vanishing:</strong></p><ul><li><strong>Use an LSTM or GRU</strong> rather than a plain RNN. This is the main fix, and it is free.</li><li><strong>Orthogonal initialisation</strong> of the recurrent matrix keeps its singular values at 1, so the product neither grows nor shrinks initially.</li><li><strong>Shorter sequences,</strong> or truncated backpropagation through time, which bounds how far gradients must travel.</li><li><strong>Skip connections across time steps</strong> in deeper recurrent stacks.</li><li><strong>Attention,</strong> which removes the distance dependence entirely.</li></ul><p><strong>For exploding:</strong></p><ul><li><strong>Gradient clipping by norm.</strong> Essentially mandatory for recurrent models; <code>max_norm=1.0</code> to <code>5.0</code> is typical.</li><li><strong>A lower learning rate.</strong></li><li><strong>Layer normalisation</strong> inside the recurrent cell.</li></ul><pre><code class="language-python">loss.backward()
 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
 optimizer.step()</code></pre>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>Why does tanh cause vanishing gradients?</strong> Its derivative is at most 1 and approaches 0 when saturated, so the per-step factor is usually below 1.</p><p><strong>Would ReLU fix it in an RNN?</strong> It removes the saturation problem and makes explosion far more likely, since the derivative is exactly 1 on the positive side and the same matrix is applied repeatedly. Gating is the better answer.</p><p><strong>Do LSTMs eliminate the problem?</strong> They greatly reduce it. Very long dependencies remain hard, and clipping is still needed for the exploding direction.</p><p><strong>How do transformers avoid it?</strong> Any two positions are one attention step apart, so there is no long product of factors to decay.</p><p><strong>What is truncated BPTT?</strong> Backpropagating only k steps back rather than to the beginning. It bounds memory and compute, and prevents learning dependencies longer than k.</p><p><strong>Is this the same problem as in deep feed-forward networks?</strong> Structurally identical &mdash; a product of many factors &mdash; and the fixes rhyme: ReLU and residual connections there, gating and clipping here.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>Backpropagation through time multiplies one factor per step, so anything not near 1 compounds.</li><li>Factors below 1 vanish the gradient and make long-range learning impossible &mdash; silently.</li><li>Factors above 1 explode it into <code>NaN</code> &mdash; loudly, and clipping fixes it completely.</li><li>Gating creates an additive path whose derivative is the gate, near 1 when information is preserved.</li><li>That is the same idea as a residual connection, and attention removes the distance dependence altogether.</li></ul>
                 </div>
             </div>

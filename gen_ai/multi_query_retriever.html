@@ -234,16 +234,13 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">One question can be asked many ways, and vector search only finds what is phrased like the query it was given. A multi-query retriever generates several rewordings, searches with each, and merges the results.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The vocabulary mismatch problem</h3>
-                    <p>Embedding-based retrieval finds documents whose vectors are near the query’s vector. That works well when the question and the document use similar language, and fails when they do not.</p><p>Ask “how do I speed up my model?” of a corpus that discusses “reducing inference latency”, “quantisation” and “batch throughput” and the embedding may simply not land near any of them. The information is present and the phrasing is wrong, and a single query gets a single shot at matching it.</p><p>The failure is silent. The retriever returns its nearest neighbours regardless, so you get plausible-looking, unhelpful chunks with no signal that anything was missed.</p>
-                </div>
-                <div>
-                    <h3>Generating several queries and merging</h3>
+                    <h3 id="vz-s-generating-several-queries-and-merging">Generating several queries and merging</h3>
                     <p>A multi-query retriever asks a language model to produce N alternative phrasings of the question &mdash; typically 3 to 5 &mdash; each approaching it from a different angle. The original question above might become:</p><ul><li>“What techniques reduce model inference latency?”</li><li>“How can I improve throughput at serving time?”</li><li>“What makes a neural network run faster in production?”</li></ul><p>Each is embedded and searched independently, giving N result sets which are then combined and deduplicated. Because the rewordings cover different vocabulary, their nearest neighbours differ, and the union covers substantially more of the relevant material than any one query would.</p><p>Merging is usually done with <strong>reciprocal rank fusion</strong> rather than raw scores. RRF assigns each document a score of <span class="mono-font">&Sigma; 1/(60 + rank)</span> across the lists it appears in, which rewards documents that several rewordings agree on and avoids the problem that similarity scores from different queries are not directly comparable.</p>
                 </div>
                 <div>
-                    <h3>One question, several searches</h3>
+                    <h3 id="vz-s-one-question-several-searches">One question, several searches</h3>
                     <p>A single embedding of a question is one point in the space. If the question is phrased differently from the documents that answer it, that point sits in the wrong place, and no amount of index tuning will fix it.</p><p>Multi-query retrieval hedges by generating several rewrites of the question, searching with each, and combining the results.</p><blockquote>Original: "How do I stop getting so many alerts?"</blockquote>
 <blockquote>1. "How to reduce alert volume"</blockquote>
 <blockquote>2. "Configuring notification thresholds"</blockquote>
@@ -257,43 +254,43 @@ ranked_lists = [index.search(q, k=20) for q in queries]
 results = rrf(ranked_lists)          # fuse by rank</code></pre><p>Note that the original question is included. The rewrites are additions, not replacements &mdash; a poor rewrite then dilutes the results slightly rather than destroying them.</p>
                 </div>
                 <div>
-                    <h3>Why fusion rather than concatenation</h3>
+                    <h3 id="vz-s-why-fusion-rather-than-concatenation">Why fusion rather than concatenation</h3>
                     <p>The results from several searches must be combined, and how matters.</p><p><strong>Concatenating and deduplicating</strong> loses the ranking information: a document ranked first by two rewrites is treated the same as one ranked twentieth by one.</p><p><strong>Averaging scores</strong> requires the scores to be comparable across searches, and they are not reliably so.</p><p><strong>Reciprocal rank fusion</strong> uses only ranks:</p><p class="mono-font">score(d) = &Sigma;<sub>queries</sub> 1 / (60 + rank(d))</p><p>A document retrieved highly by several rewrites accumulates from each, so <strong>agreement across rewrites becomes evidence</strong>. That is exactly the property you want: a document that only one rewrite found is plausible; one that all four found is probably right.</p><p>RRF also needs no normalisation, which is what makes it practical when combining an arbitrary number of retrievers.</p>
                 </div>
                 <div>
-                    <h3>The costs</h3>
+                    <h3 id="vz-s-the-costs">The costs</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Cost</th><th>Detail</th></tr></thead><tbody><tr><td>One model call</td><td>To generate the rewrites, 200&ndash;500ms</td></tr><tr><td>N searches</td><td>Usually parallelisable, so latency is the slowest one</td></tr><tr><td>More candidates</td><td>N&times;k documents before fusion</td></tr><tr><td>Reranking load</td><td>More candidates to rerank, if reranking</td></tr></tbody></table></div><p>The searches parallelise, so the added latency is roughly one model call plus one search &mdash; not N searches. That makes the technique considerably cheaper in practice than it looks.</p><p>Three or four rewrites is the usual range. Beyond that, the additional rewrites are paraphrases of paraphrases and the returns flatten while the reranking load grows.</p><p>Cache aggressively: at temperature 0 the rewrites are deterministic, and repeated or similar questions are common in real traffic.</p>
                 </div>
                 <div>
-                    <h3>Guided experiments</h3>
+                    <h3 id="vz-s-guided-experiments">Guided experiments</h3>
                     <ol><li><strong>Compare a single query with the set.</strong> Look at what one phrasing retrieves against the union of all of them. The union is broader, and usually includes at least one document no single query found.</li><li><strong>Find the documents only one variant retrieves.</strong> These are exactly the recall the technique is buying &mdash; material the original phrasing would have missed entirely.</li><li><strong>Look for agreement.</strong> Documents retrieved by several variants are the strongest candidates, and that consensus is what rank fusion promotes to the top.</li><li><strong>Watch the precision cost.</strong> The merged list is longer and contains more marginal results. Multi-query improves recall and dilutes precision, which is why a reranker usually follows it.</li></ol>
                 </div>
                 <div>
-                    <h3>What it costs, and what to use instead</h3>
+                    <h3 id="vz-s-what-it-costs-and-what-to-use-instead">What it costs, and what to use instead</h3>
                     <p>Multi-query is not free. Generating the variants is an extra LLM call on the critical path, adding latency and cost to every request, and it runs N searches instead of one. For an interactive application that overhead is real.</p><p>Related approaches make different trades. <strong>HyDE</strong> generates a hypothetical <em>answer</em> and embeds that, on the argument that an answer is textually closer to the passage containing it than a question is. <strong>Query decomposition</strong> splits a multi-part question into separate sub-questions, which multi-query does not do &mdash; it rephrases rather than divides. And <strong>hybrid search</strong>, combining dense retrieval with BM25 keyword matching, addresses much of the same vocabulary problem for a fraction of the cost, because exact term matching catches precisely the rare words embeddings handle worst.</p>
                 </div>
                 <div>
-                    <h3>Common mistakes</h3>
+                    <h3 id="vz-s-common-mistakes">Common mistakes</h3>
                     <ul><li><strong>Generating variants that all say the same thing.</strong> If the rewordings are near-identical, they retrieve the same documents and you have paid for nothing. The prompt must push for genuinely different angles and vocabulary.</li><li><strong>Merging by raw similarity score.</strong> Scores from different query embeddings are not comparable. Use rank-based fusion.</li><li><strong>Skipping deduplication.</strong> The same chunk retrieved by four variants will otherwise occupy four slots of context.</li><li><strong>Not reranking afterwards.</strong> The merged list is broader and noisier; a cross-encoder reranker recovers the precision.</li><li><strong>Using it where the problem is chunking.</strong> If the relevant text is split badly across chunks, no amount of query rewriting will retrieve it intact.</li></ul>
                 </div>
                 <div>
-                    <h3>What to remember</h3>
+                    <h3 id="vz-s-what-to-remember">What to remember</h3>
                     <p>A multi-query retriever compensates for the fact that a single embedding gets one attempt at matching the corpus vocabulary: it generates several rewordings, retrieves with each, and fuses the ranked lists. It buys recall at the cost of an extra LLM call, N searches, and some precision &mdash; so it pairs naturally with a reranker. Where the mismatch is about rare or exact terms, hybrid search with BM25 gets much of the same benefit far more cheaply.</p>
                 </div>
                 <div>
-                    <h3>Where it helps, and where it does not</h3>
+                    <h3 id="vz-s-where-it-helps-and-where-it-does-not">Where it helps, and where it does not</h3>
                     <p><strong>It helps with vague or short queries.</strong> "It's broken" gives an embedding with almost no signal; several specific rewrites give several usable ones.</p><p><strong>It helps when documents use different vocabulary</strong> from users &mdash; jargon, product names, formal register.</p><p><strong>It helps with multi-faceted questions,</strong> where different aspects live in different documents. Decomposition is a related and sometimes better approach: split the question into its parts explicitly and retrieve for each.</p><p><strong>It does not help much when the query already contains exact identifiers.</strong> Rewriting "error E4471" risks losing the code, which was the most retrievable part. Including the original query protects against this.</p><p><strong>It does not help when recall is already high.</strong> If recall@20 is 0.97, there is almost nothing left to find and the extra latency buys nothing. Measure before adding it.</p><p>That last point generalises: <strong>multi-query addresses a recall problem</strong>. If your failures are ordering failures &mdash; the right document is retrieved at rank 15 &mdash; a reranker is the correct tool, not more queries.</p>
                 </div>
                 <div>
-                    <h3>Related techniques, and how they combine</h3>
+                    <h3 id="vz-s-related-techniques-and-how-they-combine">Related techniques, and how they combine</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Technique</th><th>What it changes</th></tr></thead><tbody><tr><td>Multi-query</td><td>Several phrasings, fused</td></tr><tr><td>Decomposition</td><td>Splits a compound question into sub-questions</td></tr><tr><td>HyDE</td><td>Searches with a generated hypothetical answer</td></tr><tr><td>Step-back prompting</td><td>Asks a more general question first</td></tr><tr><td>Self-query</td><td>Extracts metadata filters from the question</td></tr></tbody></table></div><p><strong>Step-back prompting</strong> is worth knowing: for a specific question, first ask a broader one ("what are the general principles of X?"), retrieve for both, and fuse. It surfaces background material that a narrow query misses.</p><p><strong>Decomposition</strong> is the better choice for genuinely compound questions. "How do refunds differ from exchanges, and what are the deadlines?" is three questions; rewriting it three ways is less effective than splitting it into its actual parts.</p><p>These compose, and each adds latency. The ordering to add them in is by measured benefit on your own question set &mdash; and in most systems hybrid search and reranking come first.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>How many rewrites?</strong> Three or four including the original. More flattens out.</p><p><strong>Should I include the original query?</strong> Yes, always &mdash; it protects against a bad rewrite and preserves exact identifiers.</p><p><strong>Which model for the rewrites?</strong> A small fast one. Paraphrasing a question is not a demanding task.</p><p><strong>Does it increase hallucination?</strong> No &mdash; the rewrites are only search keys and are never shown to the user or to the answering model.</p><p><strong>How do I combine the result lists?</strong> Reciprocal rank fusion, which needs only ranks.</p><p><strong>Is it better than HyDE?</strong> They address the same gap differently and can be used together. HyDE matches the documents' register; multi-query covers several phrasings.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>One embedding of a badly-phrased question searches from the wrong point; several rewrites cover more ground.</li><li>Generate 3&ndash;4 phrasings, search with each, and fuse with reciprocal rank fusion.</li><li>Always include the original query, so a poor rewrite cannot destroy the results.</li><li>Agreement across rewrites is evidence, and RRF rewards it automatically.</li><li>It fixes recall problems; ordering problems need a reranker instead.</li></ul>
                 </div>
             </div>

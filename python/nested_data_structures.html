@@ -338,41 +338,38 @@ print(json.dumps(teams, indent=2))</script>
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Real data is rarely a flat list. It is a list of records, each with fields, some of which are themselves lists. Working with it is the same handful of moves repeated at different depths.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Reading a path</h3>
-                    <p>people[0]["langs"][1]</p><p>Left to right: index the list, look up the key, index that list. Each step returns something, and the next step operates on it. If you are unsure what a line does, evaluate it one piece at a time &mdash; <code>people[0]</code>, then <code>people[0]["langs"]</code> &mdash; which is exactly what an editor's debugger shows you.</p>
-                </div>
-                <div>
-                    <h3>Walking it</h3>
+                    <h3 id="vz-s-walking-it">Walking it</h3>
                     <pre><code class="language-python">for person in people:
     for lang in person[&quot;langs&quot;]:</code></pre><p>The outer loop takes records, the inner takes the list inside each one. That is the shape of most processing you will do, and the flatten version of it is a nested comprehension:</p><p>[lang for person in people for lang in person["langs"]]</p><p>Same clause order as the loops, and worth using only when it fits on one line.</p>
                 </div>
                 <div>
-                    <h3>The missing-key problem</h3>
+                    <h3 id="vz-s-the-missing-key-problem">The missing-key problem</h3>
                     <p>data["user"]["settings"]["theme"]</p><p>raises as soon as any level is absent, and the <code>KeyError</code> names only the key that failed, not the path you were walking. Two ways to be safe:</p><p>data.get("user", {}).get("settings", {}).get("theme", "default")</p><p>Each <code>get</code> returns <code>{}</code> rather than <code>None</code> when absent, so the next <code>get</code> still has a dictionary to call. That <code>{}</code> default is the trick that makes the chain work.</p><p>For anything deeper than two or three levels, a small helper is clearer than a long chain, and a <code>try/except KeyError</code> around the whole path is clearer still when a missing value really is exceptional.</p>
                 </div>
                 <div>
-                    <h3>Building nested shapes</h3>
+                    <h3 id="vz-s-building-nested-shapes">Building nested shapes</h3>
                     <p>Flat rows into groups is the most common transformation:</p><p>teams.setdefault(team, []).append(name)</p><p>and summing across two levels is a single generator expression:</p><p>sum(item["price"] for o in orders for item in o["items"])</p>
                 </div>
                 <div>
-                    <h3>The shape of data that arrives</h3>
+                    <h3 id="vz-s-the-shape-of-data-that-arrives">The shape of data that arrives</h3>
                     <p>Most real data is a list of records, and most records are dictionaries. API responses, parsed JSON, CSV rows read with <code>DictReader</code>, database results - all the same shape.</p><p>Recognising this makes the code predictable. The outer loop takes records; a key lookup takes a field; an inner loop takes a list-valued field. Three moves cover almost everything, and they compose to any depth.</p><p>The depth itself is the thing to keep an eye on. Two levels are easy to hold in your head. Four levels of mixed lists and dictionaries is where a small helper function - <code>def city_of(record):</code> - pays for itself immediately, because it gives the path a name and one place to fix when the shape changes.</p>
                 </div>
                 <div>
-                    <h3>Modifying nested structures</h3>
+                    <h3 id="vz-s-modifying-nested-structures">Modifying nested structures</h3>
                     <p>Reading a nested value is safe; writing one is where aliasing matters. If you copied the outer list shallowly and then edit a dictionary inside it, both copies change, because they hold the same dictionaries.</p><p>That is not a reason to deepcopy everything. It is a reason to decide deliberately: either the structure is shared and everyone knows it, or you take a deep copy at the boundary where it enters your code.</p>
                 </div>
                 <div>
-                    <h3>Flattening and grouping</h3>
+                    <h3 id="vz-s-flattening-and-grouping">Flattening and grouping</h3>
                     <p>The two transformations that come up constantly are inverses of each other.</p><p>Flattening turns a nested structure into a flat one - all languages anyone knows, all items across all orders - and a nested comprehension or <code>itertools.chain</code> does it in a line.</p><p>Grouping turns a flat list into a nested one, keyed by some field. <code>setdefault</code> or <code>defaultdict(list)</code> is the idiom, and it is worth writing out once until it feels automatic, because half of the reporting code anyone ever writes is a grouping followed by an aggregation.</p>
                 </div>
                 <div>
-                    <h3>JSON is the same shape</h3>
+                    <h3 id="vz-s-json-is-the-same-shape">JSON is the same shape</h3>
                     <p><code>json.load</code> produces exactly these structures - dictionaries, lists, strings, numbers, booleans and <code>None</code> - which is why working with parsed JSON needs no new skills beyond this page. <code>json.dumps(data, indent=2)</code> prints them back readably, and is the fastest way to understand something you have just fetched.</p><p>The one asymmetry: JSON object keys are always strings. A dictionary keyed by integers survives the round trip as string keys, which is a small surprise that shows up when a lookup that worked before saving fails after loading.</p>
                 </div>
                 <div>
-                    <h3>A worked example: from rows to a report</h3>
+                    <h3 id="vz-s-a-worked-example-from-rows-to-a-report">A worked example: from rows to a report</h3>
                     <p>Most work with nested data is the same journey &mdash; records in, grouped summary out. Here it is end to end:</p><pre><code class="language-python">orders = [
     {&quot;customer&quot;: &quot;ana&quot;, &quot;items&quot;: [{&quot;name&quot;: &quot;pen&quot;, &quot;price&quot;: 2},
                                   {&quot;name&quot;: &quot;pad&quot;, &quot;price&quot;: 5}]},
@@ -389,28 +386,28 @@ for customer, total in sorted(totals.items(), key=lambda kv: -kv[1]):
 bo       2</code></pre><p>Three moves, each from elsewhere in the track. The generator expression sums a list-valued field without building an intermediate list. <code>totals.get(key, 0)</code> accumulates without a first-time special case. And <code>sorted</code> with a negated key puts the largest first.</p><p>What makes it readable is that each level is handled at one depth. The inner sum works on one order's items and knows nothing about customers; the outer loop works on orders and knows nothing about prices. When nested-data code becomes hard to follow, it is almost always because one expression is reaching through three levels at once.</p>
                 </div>
                 <div>
-                    <h3>Naming the path</h3>
+                    <h3 id="vz-s-naming-the-path">Naming the path</h3>
                     <p>The single most useful habit with nested data is refusing to repeat a long path. <code>record["user"]["profile"]["display_name"]</code> written in four places is four places to update when the API changes, and four chances to typo a key into a <code>KeyError</code> that names only the last one.</p><p>A one-line function fixes it:</p><pre><code class="language-python">def display_name(record):
     return record[&quot;user&quot;][&quot;profile&quot;][&quot;display_name&quot;]</code></pre><p>The path now exists once. It has a name that says what it means, so the call sites read as intent rather than as navigation. It has somewhere to put a default or a <code>try</code>. And when the shape changes &mdash; and it will &mdash; there is one line to edit.</p><p>This is worth doing at two levels of nesting, not four. The instinct to wait until it gets bad is why it usually does.</p>
                 </div>
                 <div>
-                    <h3>Where the shape comes from, and what it costs</h3>
+                    <h3 id="vz-s-where-the-shape-comes-from-and-what-it-costs">Where the shape comes from, and what it costs</h3>
                     <p>Nested data almost always arrives rather than being designed: it is the shape some API returns, or the shape JSON has, or the shape a database join produced. That has a consequence worth being deliberate about.</p><p>Data in the shape it arrived in is convenient for reading once and awkward for everything else. Nothing validates it, so a missing key is discovered at the point of use rather than at the point of parsing. Nothing names it, so every function that touches it has to know the layout. And nothing stops two parts of the program disagreeing about whether a field is optional.</p><p>The alternative is to convert at the boundary: read the nested structure once, pull out what you need, and build objects &mdash; dataclasses, named tuples, or just flatter dictionaries with the names you chose. Everything downstream then works with a shape you defined, validated once, at a known place.</p><p>For a script that reads a file and prints a summary, this is overkill and the raw structure is fine. For anything long-lived, converting at the edge is the difference between a program where a shape change breaks one function and one where it breaks eleven.</p>
                 </div>
                 <div>
-                    <h3>Depth, and when to stop nesting</h3>
+                    <h3 id="vz-s-depth-and-when-to-stop-nesting">Depth, and when to stop nesting</h3>
                     <p>Reading nested data is unavoidable. *Building* deeply nested data is a choice, and usually a poor one past two levels.</p><p>A dictionary of dictionaries of lists is hard to inspect, hard to iterate without three loops, and impossible to query except by walking. The alternative is usually a flat list of records where the nesting becomes fields: instead of <code>by_region[region][city] = [names]</code>, a list of <code>{"region": ..., "city": ..., "name": ...}</code> rows.</p><p>Flat records are longer to write and enormously easier to work with. They sort by any field, filter with one comprehension, group by whichever key the current question needs rather than the one you committed to when you built the structure, and convert directly to CSV or a dataframe. The nesting you actually need can be produced on demand with a grouping, which is three lines.</p><p>The heuristic: nest when the structure reflects genuine containment that will never be queried the other way round. Flatten when you can imagine wanting a different grouping later &mdash; which, for anything resembling a report, you will.</p>
                 </div>
                 <div>
-                    <h3>Failing at the boundary rather than in the middle</h3>
+                    <h3 id="vz-s-failing-at-the-boundary-rather-than-in-the-middl">Failing at the boundary rather than in the middle</h3>
                     <p>The characteristic problem with nested data is that a shape mistake surfaces far from where it entered. A key that is missing from an API response is discovered three functions later, as a <code>KeyError</code> naming a key that looks correct, in code that has nothing to do with fetching.</p><p>The remedy is to check the shape once, where the data arrives, rather than defending against it everywhere afterwards. What that check looks like depends on how much the data matters.</p><p>At the simplest, a few lines that pull out the fields you need and raise a clear error if they are absent. The error then says "response is missing <code>user.profile.name</code>" at the point of parsing, which is a diagnosis rather than a symptom.</p><p>A step up, build the values into a dataclass or a <code>NamedTuple</code>. Construction fails immediately if a field is missing, the resulting object has known attributes rather than arbitrary keys, and every function downstream can be written against a shape that is guaranteed rather than hoped for.</p><p>Further still, a validation library &mdash; Pydantic being the common choice &mdash; declares the expected shape as types and reports every problem at once, with the path to each. That is worth it when the data comes from outside your control and the cost of processing something malformed is high.</p><p>All three are the same idea at different sizes: convert once, at the edge, and let everything inside the boundary assume the data is what it claims to be. The alternative &mdash; a <code>.get</code> chain at every use site &mdash; spreads the uncertainty through the whole program and never actually resolves it.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>How do I get a value several levels down safely?</strong> Chain <code>.get</code> with <code>{}</code> defaults, or wrap the direct path in <code>try</code>/<code>except KeyError</code> when absence is genuinely exceptional.</p><p><strong>Why does <code>.get("a", {}).get("b")</code> work but <code>.get("a").get("b")</code> not?</strong> Because the second returns <code>None</code> when the key is missing, and <code>None</code> has no <code>.get</code>. The <code>{}</code> keeps a dictionary in the chain.</p><p><strong>How do I see the shape of something I just parsed?</strong> <code>print(json.dumps(data, indent=2))</code> for JSON-compatible data, and <code>pprint.pprint</code> for anything else.</p><p><strong>Can I flatten an arbitrarily deep structure?</strong> Yes, with recursion or a stack &mdash; but if the depth is unknown, that is usually a sign the data wants to be flat records instead.</p><p><strong>Are nested comprehensions read inside-out?</strong> No. The <code>for</code> clauses read left to right in the same order as the equivalent nested loops.</p><p><strong>Why did my copy of a nested structure change?</strong> Because the copy was shallow and the inner structures are shared.</p><p><strong>Do JSON keys stay integers?</strong> No. They come back as strings, which is a common surprise after a save-and-load round trip.</p><p><strong>Should I use dotted access instead of brackets?</strong> Libraries that turn dictionaries into attribute access look convenient and hide typos, since a missing attribute and a missing key report differently. A dataclass gives you the same ergonomics with the checking.</p><p><strong>What is the fastest way to search nested data?</strong> Build an index once &mdash; a dictionary keyed by whatever you search on &mdash; rather than walking the structure on every lookup.</p><p><strong>Is there a standard way to walk a structure of unknown depth?</strong> Recursion, with a check on each value for whether it is a dictionary, a list, or a leaf. The standard library has no general walker, because what to do at each node depends entirely on the task.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>Most real data is a list of records; the moves are index, key lookup, and an inner loop, composed to whatever depth is needed.</li><li>Chain <code>.get(key, {})</code> for optional paths, and <code>try</code>/<code>except KeyError</code> when a missing value is exceptional rather than expected.</li><li>Give a repeated path a named function at two levels of nesting, not four.</li><li>Convert at the boundary into shapes you defined, unless the script is small enough that the raw structure will do.</li><li>Prefer flat records over deep nesting for anything you might want to group a different way later.</li></ul>
                 </div>
             </div>
