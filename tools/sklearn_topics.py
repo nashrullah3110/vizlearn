@@ -3882,6 +3882,14 @@ Grouping a split when the rows are genuinely independent throws away resolution 
 
 The distinction is not how predictive a feature is. It is whether the value would exist, in that form, at the moment the prediction has to be made. A feature that passes that test is allowed to be as predictive as it likes.
 
+<strong>Is a highly predictive feature always suspicious?</strong> No. It is worth one question - would this be known at prediction time - and if the answer is yes, use it.
+
+<strong>How do I check for duplicates?</strong> `df.duplicated().sum()` before splitting, and consider near-duplicates too: rows differing only in an id or a timestamp are functionally the same row.
+
+<strong>Does leakage matter if I only care about ranking?</strong> Yes. A leaked feature ranks well in evaluation and is absent in production, so the ranking you deploy is not the one you measured.
+
+<strong>Can I fix a leak by removing the column?</strong> Usually, and check what else was derived from it. Aggregates, ratios and encodings built on a leaky column carry the leak with them.
+
 ## Things to try
 
 1. <strong>Run the first editor.</strong> 0.643 becomes 1.000 from one extra column, and every fold agrees.
