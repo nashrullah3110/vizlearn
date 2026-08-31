@@ -4547,6 +4547,14 @@ That rules out row-level operations inside it: no dropping outliers, no resampli
 
 It also means a transformer that returns a different number of rows than it received will fail with a shape error rather than a helpful message, so a custom transformer that filters is a mistake worth ruling out early.
 
+<strong>Does the output keep my column order?</strong> No. Columns come out in the order the transformers are listed, then within each transformer. `get_feature_names_out()` is the reliable way to know what is where.
+
+<strong>Can I use the same column in two transformers?</strong> Yes - a column can appear in more than one entry, and both outputs are kept. That is how you would scale a column and also bin it.
+
+<strong>Is there a shorthand?</strong> `make_column_transformer((StandardScaler(), ["age"]), (OneHotEncoder(), ["city"]))` skips the names and generates them, in the same way `make_pipeline` does.
+
+<strong>What if a column is numeric but categorical in meaning?</strong> Convert it to a string or a pandas `category` dtype before the pipeline, or dtype-based selection will scale it as a number.
+
 ## Things to try
 
 1. <strong>Watch the shape change.</strong> The first editor turns three columns into five. Read the names to see which came from where.
