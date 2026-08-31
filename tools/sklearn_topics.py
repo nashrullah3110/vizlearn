@@ -1127,6 +1127,10 @@ Textbooks list four or five assumptions behind linear regression. For prediction
 
 The practical version: look at the residuals for a pattern. A pattern means a missing feature or the wrong shape of model, and no amount of regularisation fixes either.
 
+<strong>Should I use LinearRegression or Ridge by default?</strong> Ridge, for anything with more than a few features. It costs one hyperparameter and removes the instability that plain least squares has when columns are correlated.
+
+<strong>Does it need scaled features?</strong> Plain linear regression does not - the fit is identical either way. Ridge, Lasso and ElasticNet do, because their penalty is on coefficient size.
+
 ## Things to try
 
 1. <strong>Add an outlier.</strong> In the first editor, change one price to 400 and watch the slope move. Squared errors mean one bad point has a large vote.
