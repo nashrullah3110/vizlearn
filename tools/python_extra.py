@@ -8237,6 +8237,10 @@ function is often just as good.
 <strong>Why does my object print as an address?</strong> Because it has no
 `__repr__`. Two lines fix it permanently.
 
+<strong>Can a class have no methods at all?</strong> Yes, and a dataclass with
+only fields is a perfectly good way to give a group of related values a name
+and a readable `repr`.
+
 ## Recap in one screen
 
 - A class bundles data with the functions that operate on it; each instance
@@ -8627,4 +8631,502 @@ trap applies to lambdas exactly as it does to `def`.
 - Mutating is not assigning: `items.append(x)` needs no declaration,
   `items = [x]` creates a local.
 - A `for` loop shares the enclosing scope; a comprehension has its own.
+""")
+
+
+extend("f_strings_and_formatting", """
+## A worked example: a receipt
+
+Alignment, decimals and a total, using nothing but the format spec:
+
+```python
+items = [("apple", 3, 1.5), ("banana", 12, 0.25)]
+total = sum(q * p for _, q, p in items)
+
+print(f"{'item':<10}{'qty':>5}{'each':>8}{'cost':>9}")
+for name, qty, price in items:
+    print(f"{name:<10}{qty:>5}{price:>8.2f}{qty * price:>9.2f}")
+print(f"{'total':<10}{'':>5}{'':>8}{total:>9.2f}")
+```
+
+```
+item        qty    each     cost
+apple         3    1.50     4.50
+banana       12    0.25     3.00
+total                       7.50
+```
+
+The header row uses the same widths as the data rows, which is what keeps the
+labels over their columns &mdash; and it works because a string can take an
+alignment and a width just as a number can. `{'':>8}` is an empty string padded
+to eight, which is how the total line skips columns without counting spaces.
+
+Text is left-aligned and numbers right-aligned, which is not a style preference:
+right-aligning numbers puts the decimal points under each other, and that is
+what makes a column of figures readable at a glance.
+
+Note that `total` is computed from the full-precision prices, not from the
+rounded strings. Formatting is applied only where the number is printed, which
+is the habit that stops a column of rounded values from failing to add up to
+the rounded total.
+
+## The three parts of a replacement field
+
+Everything inside the braces follows one shape:
+`{expression!conversion:format_spec}`, and knowing the three slots explains
+several things that otherwise look like separate features.
+
+The **expression** is any Python expression, evaluated at that point.
+
+The **conversion** is `!r`, `!s` or `!a`, applied before formatting. `!r` calls
+`repr` instead of `str`, which is what puts quotes around a string and makes
+whitespace visible &mdash; invaluable in a debugging print, because `ana` and
+`ana ` look identical without it.
+
+The **format spec** is everything after the colon, and it is handed to the
+object itself. That is why `:.2f` means something to a float, `%d %B %Y` means
+something to a `datetime`, and neither means anything to the other.
+
+The spec can contain its own braces, which is how a width computed at runtime
+gets in:
+
+```python
+name = "ana"
+w = 8
+print(f"{name!r:>{w}}")
+print(f"{3.14159:.{2}f}")
+```
+
+```
+   'ana'
+3.14
+```
+
+Nesting one level is allowed and is the standard way to align a table whose
+column widths are calculated from the data rather than written into the source.
+
+## Numbers as people read them
+
+A handful of specs cover almost every number a person will look at.
+
+```python
+print(f"{1234567:,}")
+print(f"{0.256:.1%}")
+print(f"{5:+d}")
+```
+
+```
+1,234,567
+25.6%
++5
+```
+
+`,` inserts thousands separators, and `_` does the same with underscores.
+`%` multiplies by a hundred and appends the sign, which is the correct way to
+show a proportion &mdash; writing `f"{x * 100:.1f}%"` does the same thing with
+one more place to make a mistake. `+` forces a sign on positive numbers, which
+matters when the number is a change rather than a quantity.
+
+Two further ones are worth having. `:>10,.2f` combines alignment, separators
+and decimals, which is the full treatment for a money column. And `:g` chooses
+between fixed and scientific notation based on magnitude, which is useful when
+the range of values is unknown and awful when it is not, because the column
+stops lining up.
+
+For money specifically, remember that floats are not decimals. The formatting
+is honest about what it was given; if the arithmetic used floats, the rounding
+error was already there before the format spec saw it.
+
+## Where formatting belongs in a program
+
+An f-string is a presentation decision, and presentation decisions are worth
+keeping in one layer rather than scattered through the code that does the work.
+
+The symptom of getting this wrong is a function that returns a string where it
+should return a number. `def total(items) -> str` that hands back `"£7.50"`
+looks convenient at the call site and has thrown away everything else you might
+do with the value: adding it to another total, comparing it, storing it,
+converting the currency. The caller who needs the number now has to parse the
+string back, and the parse will eventually meet a thousands separator.
+
+Keep values as values, and format at the point of output. A reporting function
+takes numbers and produces the string; the calculation returns numbers. This is
+the same boundary argument as converting input at the edge, run in the opposite
+direction: parse on the way in, compute in real types, format on the way out.
+
+The second habit is to keep the template near the output rather than near the
+data. A dictionary of format specs per column, applied in the printing loop,
+is easy to change when the report changes. Specs scattered through the
+functions that computed each figure are not.
+
+There is one honest exception: log messages and error text, where the string
+*is* the output and there is nothing downstream to preserve precision for. Even
+there, prefer `logging.info("total %s", total)` over an f-string, because the
+logger can then skip the formatting entirely when the message is filtered out.
+
+## Questions people ask
+
+<strong>Can I use an f-string for a template stored elsewhere?</strong> No, it
+is evaluated where it is written. `str.format` on a stored template is the tool
+for that.
+
+<strong>Is an f-string faster than concatenation?</strong> Yes, usually
+noticeably, because it does not build intermediate strings.
+
+<strong>How do I put a quote inside?</strong> Use the other quote character, or
+&mdash; from Python 3.12 &mdash; the same one.
+
+<strong>Can I have a backslash inside the braces?</strong> Not before Python
+3.12. Compute the value on the line above instead.
+
+<strong>What does `f"{x=}"` do?</strong> Prints the expression text, an equals
+sign, and the value's `repr`. It is the fastest debugging print there is.
+
+<strong>Do f-strings work with multi-line strings?</strong> Yes, prefix a
+triple-quoted string with `f` and the braces work throughout.
+
+<strong>Is it safe to put user input in one?</strong> For output, yes. Never
+build SQL or shell commands this way &mdash; use parameters, or the injection
+is on you.
+
+<strong>Why does my f-string print braces literally?</strong> Because you
+doubled them, or because the `f` prefix is missing. Without the prefix the
+braces are ordinary characters.
+
+<strong>Can I format a value whose width I only know at runtime?</strong> Yes,
+nest a field in the spec: `f"{value:>{width}}"`.
+
+<strong>What is the difference between `!s` and no conversion?</strong>
+Nothing, in practice &mdash; `str` is the default. `!r` is the one worth
+typing.
+
+## Recap in one screen
+
+- The `f` prefix turns braces into slots holding any expression, evaluated
+  where it appears in the sentence.
+- After the colon is a spec handed to the object: `.2f`, `,`, `>8`, `%` and
+  `%d %B %Y` all work this way.
+- `!r` shows the `repr`, which is how you see quoting and stray whitespace.
+- Formatting changes the display, never the value &mdash; format at the edge
+  and keep full precision in the arithmetic.
+- `f"{value=}"` prints the expression and its value together.
+""")
+
+
+extend("sets_and_set_operations", """
+## Comparing two collections, concretely
+
+The operators turn four common questions into four characters:
+
+```python
+a = {"ana", "bo", "cy"}
+b = {"bo", "cy", "di"}
+
+print(sorted(a & b))
+print(sorted(a - b))
+print(sorted(a ^ b))
+print(a <= b, {"bo"} <= a, a.isdisjoint({"zz"}))
+```
+
+```
+['bo', 'cy']
+['ana']
+['ana', 'di']
+False True True
+```
+
+`&` is "in both", `-` is "in the first only", `^` is "in exactly one". Each
+replaces a loop containing an `if`, and each is far harder to get subtly wrong
+than the loop would be &mdash; there is no index, no accumulator, and no chance
+of testing the wrong direction.
+
+`sorted()` around each result is doing real work: a set has no order, so
+printing one directly gives an arrangement you must not depend on. Sorting on
+the way out is how you get a stable, readable result.
+
+The last line shows the comparison operators. `<=` is "is a subset of", so
+`{"bo"} <= a` asks whether every member of the left is in the right. `>=` is
+the superset direction, and `isdisjoint` asks whether two sets share nothing
+&mdash; which is cheaper than building the intersection just to see if it is
+empty.
+
+## The questions each operator answers
+
+The algebra is worth reading as English, because that is how you will recognise
+which one you want.
+
+**"Which do they have in common?"** is `a & b`. Shared tags, users in both
+groups, fields present in two records.
+
+**"What is in the new one that was not in the old one?"** is `new - old`. Added
+files, new permissions, keys that appeared. Reverse the operands for what was
+removed, and note that this is the operator people most often get the wrong way
+round.
+
+**"What changed either way?"** is `a ^ b`. It is the union of both differences,
+and it is the right answer for "what is not the same", which is usually what a
+diff wants.
+
+**"Is everything required actually present?"** is `required <= provided`, or
+equivalently `required - provided` being empty &mdash; and the second version
+is more useful in practice because it tells you *which* are missing rather than
+just that some are.
+
+**"Do these overlap at all?"** is `a.isdisjoint(b)`, which stops at the first
+shared item rather than computing the whole intersection.
+
+All five work with the method forms too &mdash; `intersection`, `difference`,
+`symmetric_difference`, `issubset` &mdash; and the methods accept any iterable,
+where the operators require both sides to be sets. `a & [1, 2]` raises;
+`a.intersection([1, 2])` does not.
+
+## Where a set fits among the collections
+
+Choosing a container is choosing what you give up, and stating it as a table
+makes the decision quick.
+
+A **list** keeps order and duplicates and allows indexing; membership testing
+scans. A **tuple** is the same and immutable, so it can be a key. A **set** has
+no order, no duplicates and no indexing; membership is constant time. A
+**dictionary** is a set of keys with a value attached to each, and it inherits
+the set's lookup speed for keys.
+
+The decision usually comes down to one question: what will you ask this
+collection most often? If the answer is "give me item three" or "what order did
+these arrive in", it is a list. If the answer is "is this one in here", it is a
+set. If the answer is "what is the value for this name", it is a dictionary.
+
+The case worth noticing is a list that is only ever asked "is this in here?".
+That is a set wearing the wrong type, and converting it once before a loop
+changes a scan per iteration into a lookup per iteration. It is one of the very
+few performance changes that is both trivial to make and frequently decisive.
+
+The reverse mistake is reaching for a set when duplicates carry meaning.
+Counting votes, recording events, keeping a history &mdash; the duplicates
+*are* the data, and a set silently deletes them.
+
+## Building one efficiently
+
+Three ways to get a set, and the differences matter once the input is large.
+
+`set(iterable)` is the direct conversion and the one to use when you already
+have the items. It is a single pass, and it works on any iterable including a
+generator, so `set(line.strip() for line in f)` never builds the intermediate
+list.
+
+A set comprehension, `{f(x) for x in items}`, builds and deduplicates in the
+same pass. This is better than `set([f(x) for x in items])`, which constructs
+the whole list first and then throws it away &mdash; the same waste as wrapping
+any comprehension in a converter.
+
+Adding in a loop with `add` is right when the items arrive one at a time or the
+loop is doing something else as well. `update` takes an iterable and adds all
+of it, so a loop that only calls `add` is usually one `update` in disguise.
+
+The one to avoid is repeatedly rebuilding: `seen = seen | {x}` inside a loop
+creates a whole new set on every iteration, which turns a linear job into a
+quadratic one. `seen.add(x)` modifies in place, and `seen |= other` does the
+same for a batch.
+
+## Questions people ask
+
+<strong>Why is `{}` an empty dictionary?</strong> Dictionaries had the braces
+first. `set()` is the only way to write an empty set.
+
+<strong>Can a set contain a list?</strong> No. Members must be hashable, and
+lists can change. Use a tuple, or a `frozenset` for a set of sets.
+
+<strong>Does `set()` preserve order?</strong> No. Use
+`list(dict.fromkeys(items))` to deduplicate while keeping first-seen order.
+
+<strong>Is `x in a_set` really constant time?</strong> On average, yes. It
+hashes once and looks in one place, regardless of size.
+
+<strong>Can I sort a set?</strong> `sorted(s)` returns a list. A set itself has
+no order to arrange.
+
+<strong>What is the difference between `remove` and `discard`?</strong>
+`remove` raises `KeyError` when the item is absent; `discard` does not.
+
+<strong>Are `1` and `True` different set members?</strong> No. They hash the
+same and compare equal, so `{1, True}` has one element.
+
+<strong>Can I use a set as a dictionary value?</strong> Yes. Only keys need to
+be hashable; values can be anything.
+
+## Recap in one screen
+
+- A set gives up order and duplicates and buys constant-time membership tests.
+- `&`, `|`, `-` and `^` answer "both", "either", "only the first" and "exactly
+  one" without a loop.
+- `{}` is an empty dictionary; `set()` is the empty set.
+- Members must be hashable, for the same reason dictionary keys must be: the
+  hash decides where the item is stored.
+- A list that is only ever asked "is this in here?" wants to be a set, and the
+  conversion is often the whole fix for a slow loop.
+""")
+
+
+extend("function_arguments", """
+## Watching the default accumulate
+
+The trap is more convincing when the shared object is visible:
+
+```python
+def add_item(item, basket=[]):
+    basket.append(item)
+    return basket
+
+
+print(add_item("a"))
+print(add_item("b"))
+print(add_item("c"))
+print("the default itself:", add_item.__defaults__)
+```
+
+```
+['a']
+['a', 'b']
+['a', 'b', 'c']
+the default itself: (['a', 'b', 'c'],)
+```
+
+The last line is the point. `__defaults__` holds the actual default values, and
+the list stored there has grown &mdash; it is not that each call somehow gets
+the previous result, it is that there has only ever been one list, created when
+`def` ran, and every call has been appending to it.
+
+Nothing about this is a special rule for functions. `basket=[]` is an
+expression evaluated once, at definition time, exactly like `x = []` at module
+level. The surprise comes from expecting the default to be re-evaluated on each
+call, which nothing in the syntax promises.
+
+The fix, once more, because it is worth having in your fingers:
+
+```python
+def add_item(item, basket=None):
+    if basket is None:
+        basket = []
+    basket.append(item)
+    return basket
+```
+
+`None` cannot accumulate anything, and the list is built inside the call where
+it belongs.
+
+## How a call is matched to a signature
+
+Understanding the binding order makes the error messages readable, and there
+are only four steps.
+
+Positional arguments are assigned to parameters left to right. Then keyword
+arguments are matched by name to whatever is left. Then any parameter still
+unfilled takes its default. Then, if a parameter is still unfilled and has no
+default, the call fails.
+
+That order explains the errors. `missing 1 required positional argument: 'x'`
+means step four found a gap. `got multiple values for argument 'x'` means a
+positional argument filled `x` in step one and a keyword tried to fill it again
+in step two &mdash; which is what happens when you pass the first argument
+positionally *and* by name. `got an unexpected keyword argument 'timeuot'`
+means step two found no parameter of that name, which is the typo case, and is
+exactly the error that `**kwargs` would have swallowed.
+
+Two rules follow from the same ordering. In a call, positional arguments must
+come before keyword ones, because Python cannot tell where a positional one
+belongs once names have started. And in a definition, parameters with defaults
+must come after those without, for the same reason from the other side.
+
+## Saying what a parameter expects
+
+Type hints do not convert or enforce anything at runtime, and they are still
+the cheapest documentation a signature can carry:
+
+```python
+def greet(name: str, times: int = 1) -> str:
+    return f"hello {name} " * times
+```
+
+The value is threefold. A reader learns what to pass without reading the body.
+An editor can complete and check the call. And a type checker run in CI catches
+the mismatch before it ships &mdash; which is the only one of the three that
+actually prevents anything.
+
+Two conventions are worth adopting with them. Annotate the public functions and
+skip the obvious internal ones; annotations on a two-line helper cost more to
+read than they explain. And when a parameter can be `None`, say so
+&mdash; `def find(name: str) -> User | None` &mdash; because that is the case
+callers most often forget and the one a checker most usefully flags.
+
+Hints also document the mutable-default fix nicely: `basket: list | None = None`
+states both the type and the fact that omitting it is allowed, which is exactly
+what the `None` sentinel means.
+
+## Choosing the default
+
+A default is a decision about what most callers want, and getting it wrong is
+quiet: nothing fails, every call site just gets a little longer.
+
+The test is simple. If most calls override the default, the default is wrong.
+Either it should be the value people actually pass, or the parameter should be
+required so that callers have to think about it. A default that exists only
+because the parameter felt like it needed one adds a choice without making one.
+
+Defaults should also be safe rather than convenient. A `timeout=None` meaning
+"wait forever" is a default that turns a slow dependency into a hung program;
+a finite timeout is the better choice even though it can fail. The same
+reasoning applies to `overwrite=False`, `strict=True` and `retries=0`: when in
+doubt, default to the behaviour whose failure is loud.
+
+And a default should not depend on the state of the world. Anything evaluated
+at definition time &mdash; the current directory, the time, an environment
+variable, a config object &mdash; is frozen at import and will be wrong for any
+program that changes it afterwards. `None` plus a lookup in the body reads the
+value when the call happens, which is nearly always what was meant.
+
+Finally, prefer a default over an optional parameter that changes the return
+type. A function that returns a number normally and a tuple when
+`verbose=True` has two signatures pretending to be one, and every caller has to
+know which it triggered.
+
+## Questions people ask
+
+<strong>Are arguments passed by value or by reference?</strong> Neither, in the
+C sense. The function gets another name for the same object, so mutating it is
+visible to the caller and rebinding is not.
+
+<strong>Can a default refer to another parameter?</strong> No. Defaults are
+evaluated at definition time, when no arguments exist. Use `None` and compute
+it in the body.
+
+<strong>Why must defaults come last?</strong> Otherwise a positional call could
+not tell which parameter a value was for.
+
+<strong>Is a tuple a safe default?</strong> Yes. Tuples are immutable, so there
+is nothing to accumulate.
+
+<strong>How do I force a caller to use names?</strong> Put a bare `*` before
+those parameters in the definition.
+
+<strong>Can I see a function's defaults?</strong> `f.__defaults__` for
+positional ones and `f.__kwdefaults__` for keyword-only ones.
+
+<strong>How many parameters is too many?</strong> When you are counting on your
+fingers at the call site. Group them into an object, or split the function.
+
+<strong>Can I make every parameter keyword-only?</strong> Yes, put the bare `*`
+first: `def f(*, a, b)`. Callers must then name both.
+
+## Recap in one screen
+
+- Arguments match by position first, then by name; positional ones come first
+  in a call and non-default parameters come first in a definition.
+- Defaults are evaluated once, when `def` runs &mdash; never default to a list,
+  dict or set.
+- `None` plus a check in the body is the idiomatic fix, and it reads correctly
+  in a type hint too.
+- A bare `*` makes the parameters after it keyword-only, which is how a call
+  site stops being a row of unlabelled values.
+- The signature is the part others read most; required parameters are
+  requirements, and a default should be the right choice most of the time.
 """)

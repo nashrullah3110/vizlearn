@@ -49,10 +49,6 @@ def add_item(item, basket=None):
 
 Immutable defaults &mdash; numbers, strings, `True`, `None`, tuples &mdash; are all safe. The rule is simply: never default a parameter to a list, dict or set.
 
-## Why this design
-
-It would be possible to re-evaluate defaults on every call, and some languages do. Python evaluates once because a default is just an expression bound at definition time, like any other value in the enclosing scope. Once you know that, the behaviour stops being surprising &mdash; but it is worth knowing before it costs you an afternoon.
-
 ## Keyword-only parameters
 
 Anything after a bare `*` in the definition can only be passed by name:
@@ -147,3 +143,165 @@ call. A function that appends to a list it was given has changed the caller's
 list. Sometimes that is the point and should be said in the name: `add_item`,
 `update_config`, `sort_in_place`. When it is not the point, copy at the top of
 the function or return a new object, and let the caller decide.
+
+## Watching the default accumulate
+
+The trap is more convincing when the shared object is visible:
+
+```python
+def add_item(item, basket=[]):
+    basket.append(item)
+    return basket
+
+
+print(add_item("a"))
+print(add_item("b"))
+print(add_item("c"))
+print("the default itself:", add_item.__defaults__)
+```
+
+```
+['a']
+['a', 'b']
+['a', 'b', 'c']
+the default itself: (['a', 'b', 'c'],)
+```
+
+The last line is the point. `__defaults__` holds the actual default values, and
+the list stored there has grown &mdash; it is not that each call somehow gets
+the previous result, it is that there has only ever been one list, created when
+`def` ran, and every call has been appending to it.
+
+Nothing about this is a special rule for functions. `basket=[]` is an
+expression evaluated once, at definition time, exactly like `x = []` at module
+level. The surprise comes from expecting the default to be re-evaluated on each
+call, which nothing in the syntax promises.
+
+The fix, once more, because it is worth having in your fingers:
+
+```python
+def add_item(item, basket=None):
+    if basket is None:
+        basket = []
+    basket.append(item)
+    return basket
+```
+
+`None` cannot accumulate anything, and the list is built inside the call where
+it belongs.
+
+## How a call is matched to a signature
+
+Understanding the binding order makes the error messages readable, and there
+are only four steps.
+
+Positional arguments are assigned to parameters left to right. Then keyword
+arguments are matched by name to whatever is left. Then any parameter still
+unfilled takes its default. Then, if a parameter is still unfilled and has no
+default, the call fails.
+
+That order explains the errors. `missing 1 required positional argument: 'x'`
+means step four found a gap. `got multiple values for argument 'x'` means a
+positional argument filled `x` in step one and a keyword tried to fill it again
+in step two &mdash; which is what happens when you pass the first argument
+positionally *and* by name. `got an unexpected keyword argument 'timeuot'`
+means step two found no parameter of that name, which is the typo case, and is
+exactly the error that `**kwargs` would have swallowed.
+
+Two rules follow from the same ordering. In a call, positional arguments must
+come before keyword ones, because Python cannot tell where a positional one
+belongs once names have started. And in a definition, parameters with defaults
+must come after those without, for the same reason from the other side.
+
+## Saying what a parameter expects
+
+Type hints do not convert or enforce anything at runtime, and they are still
+the cheapest documentation a signature can carry:
+
+```python
+def greet(name: str, times: int = 1) -> str:
+    return f"hello {name} " * times
+```
+
+The value is threefold. A reader learns what to pass without reading the body.
+An editor can complete and check the call. And a type checker run in CI catches
+the mismatch before it ships &mdash; which is the only one of the three that
+actually prevents anything.
+
+Two conventions are worth adopting with them. Annotate the public functions and
+skip the obvious internal ones; annotations on a two-line helper cost more to
+read than they explain. And when a parameter can be `None`, say so
+&mdash; `def find(name: str) -> User | None` &mdash; because that is the case
+callers most often forget and the one a checker most usefully flags.
+
+Hints also document the mutable-default fix nicely: `basket: list | None = None`
+states both the type and the fact that omitting it is allowed, which is exactly
+what the `None` sentinel means.
+
+## Choosing the default
+
+A default is a decision about what most callers want, and getting it wrong is
+quiet: nothing fails, every call site just gets a little longer.
+
+The test is simple. If most calls override the default, the default is wrong.
+Either it should be the value people actually pass, or the parameter should be
+required so that callers have to think about it. A default that exists only
+because the parameter felt like it needed one adds a choice without making one.
+
+Defaults should also be safe rather than convenient. A `timeout=None` meaning
+"wait forever" is a default that turns a slow dependency into a hung program;
+a finite timeout is the better choice even though it can fail. The same
+reasoning applies to `overwrite=False`, `strict=True` and `retries=0`: when in
+doubt, default to the behaviour whose failure is loud.
+
+And a default should not depend on the state of the world. Anything evaluated
+at definition time &mdash; the current directory, the time, an environment
+variable, a config object &mdash; is frozen at import and will be wrong for any
+program that changes it afterwards. `None` plus a lookup in the body reads the
+value when the call happens, which is nearly always what was meant.
+
+Finally, prefer a default over an optional parameter that changes the return
+type. A function that returns a number normally and a tuple when
+`verbose=True` has two signatures pretending to be one, and every caller has to
+know which it triggered.
+
+## Questions people ask
+
+<strong>Are arguments passed by value or by reference?</strong> Neither, in the
+C sense. The function gets another name for the same object, so mutating it is
+visible to the caller and rebinding is not.
+
+<strong>Can a default refer to another parameter?</strong> No. Defaults are
+evaluated at definition time, when no arguments exist. Use `None` and compute
+it in the body.
+
+<strong>Why must defaults come last?</strong> Otherwise a positional call could
+not tell which parameter a value was for.
+
+<strong>Is a tuple a safe default?</strong> Yes. Tuples are immutable, so there
+is nothing to accumulate.
+
+<strong>How do I force a caller to use names?</strong> Put a bare `*` before
+those parameters in the definition.
+
+<strong>Can I see a function's defaults?</strong> `f.__defaults__` for
+positional ones and `f.__kwdefaults__` for keyword-only ones.
+
+<strong>How many parameters is too many?</strong> When you are counting on your
+fingers at the call site. Group them into an object, or split the function.
+
+<strong>Can I make every parameter keyword-only?</strong> Yes, put the bare `*`
+first: `def f(*, a, b)`. Callers must then name both.
+
+## Recap in one screen
+
+- Arguments match by position first, then by name; positional ones come first
+  in a call and non-default parameters come first in a definition.
+- Defaults are evaluated once, when `def` runs &mdash; never default to a list,
+  dict or set.
+- `None` plus a check in the body is the idiomatic fix, and it reads correctly
+  in a type hint too.
+- A bare `*` makes the parameters after it keyword-only, which is how a call
+  site stops being a row of unlabelled values.
+- The signature is the part others read most; required parameters are
+  requirements, and a default should be the right choice most of the time.

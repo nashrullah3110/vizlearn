@@ -302,10 +302,6 @@ Each replaces a loop with an `if` inside it. "Which users have both skills" is o
 
 `{}` is an empty <em>dictionary</em>. It has to be, because dictionaries claimed the braces first. An empty set is `set()`. This is worth remembering because `{}` looks exactly like what you want and behaves nothing like it.
 
-## What cannot go in
-
-Set members must be hashable, for the same reason dictionary keys must be: the set decides where to store something from its hash, so that hash must never change. Numbers, strings and tuples are fine. Lists and dictionaries are not.
-
 ## When not to use one
 
 If order matters, if duplicates are meaningful, or if you need to index by position, use a list. A set answers one question extremely well &mdash; "is this in here?" &mdash; and refuses most others.
@@ -836,9 +832,6 @@ def add_item(item, basket=None):
 
 Immutable defaults &mdash; numbers, strings, `True`, `None`, tuples &mdash; are all safe. The rule is simply: never default a parameter to a list, dict or set.
 
-## Why this design
-
-It would be possible to re-evaluate defaults on every call, and some languages do. Python evaluates once because a default is just an expression bound at definition time, like any other value in the enclosing scope. Once you know that, the behaviour stops being surprising &mdash; but it is worth knowing before it costs you an afternoon.
 """,
     [{"q": "When is a default argument value evaluated?",
       "options": ["On every call", "Once, when the function is defined",

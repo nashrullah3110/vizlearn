@@ -31,10 +31,6 @@ Each replaces a loop with an `if` inside it. "Which users have both skills" is o
 
 `{}` is an empty <em>dictionary</em>. It has to be, because dictionaries claimed the braces first. An empty set is `set()`. This is worth remembering because `{}` looks exactly like what you want and behaves nothing like it.
 
-## What cannot go in
-
-Set members must be hashable, for the same reason dictionary keys must be: the set decides where to store something from its hash, so that hash must never change. Numbers, strings and tuples are fine. Lists and dictionaries are not.
-
 ## When not to use one
 
 If order matters, if duplicates are meaningful, or if you need to index by position, use a list. A set answers one question extremely well &mdash; "is this in here?" &mdash; and refuses most others.
@@ -128,3 +124,154 @@ Comparing two collections is the one people forget exists. "Which users are in
 both groups", "which required fields are missing", "which files changed" are all
 one operator rather than a loop with an `if` inside it, and the operator version
 is far harder to get subtly wrong.
+
+## Comparing two collections, concretely
+
+The operators turn four common questions into four characters:
+
+```python
+a = {"ana", "bo", "cy"}
+b = {"bo", "cy", "di"}
+
+print(sorted(a & b))
+print(sorted(a - b))
+print(sorted(a ^ b))
+print(a <= b, {"bo"} <= a, a.isdisjoint({"zz"}))
+```
+
+```
+['bo', 'cy']
+['ana']
+['ana', 'di']
+False True True
+```
+
+`&` is "in both", `-` is "in the first only", `^` is "in exactly one". Each
+replaces a loop containing an `if`, and each is far harder to get subtly wrong
+than the loop would be &mdash; there is no index, no accumulator, and no chance
+of testing the wrong direction.
+
+`sorted()` around each result is doing real work: a set has no order, so
+printing one directly gives an arrangement you must not depend on. Sorting on
+the way out is how you get a stable, readable result.
+
+The last line shows the comparison operators. `<=` is "is a subset of", so
+`{"bo"} <= a` asks whether every member of the left is in the right. `>=` is
+the superset direction, and `isdisjoint` asks whether two sets share nothing
+&mdash; which is cheaper than building the intersection just to see if it is
+empty.
+
+## The questions each operator answers
+
+The algebra is worth reading as English, because that is how you will recognise
+which one you want.
+
+**"Which do they have in common?"** is `a & b`. Shared tags, users in both
+groups, fields present in two records.
+
+**"What is in the new one that was not in the old one?"** is `new - old`. Added
+files, new permissions, keys that appeared. Reverse the operands for what was
+removed, and note that this is the operator people most often get the wrong way
+round.
+
+**"What changed either way?"** is `a ^ b`. It is the union of both differences,
+and it is the right answer for "what is not the same", which is usually what a
+diff wants.
+
+**"Is everything required actually present?"** is `required <= provided`, or
+equivalently `required - provided` being empty &mdash; and the second version
+is more useful in practice because it tells you *which* are missing rather than
+just that some are.
+
+**"Do these overlap at all?"** is `a.isdisjoint(b)`, which stops at the first
+shared item rather than computing the whole intersection.
+
+All five work with the method forms too &mdash; `intersection`, `difference`,
+`symmetric_difference`, `issubset` &mdash; and the methods accept any iterable,
+where the operators require both sides to be sets. `a & [1, 2]` raises;
+`a.intersection([1, 2])` does not.
+
+## Where a set fits among the collections
+
+Choosing a container is choosing what you give up, and stating it as a table
+makes the decision quick.
+
+A **list** keeps order and duplicates and allows indexing; membership testing
+scans. A **tuple** is the same and immutable, so it can be a key. A **set** has
+no order, no duplicates and no indexing; membership is constant time. A
+**dictionary** is a set of keys with a value attached to each, and it inherits
+the set's lookup speed for keys.
+
+The decision usually comes down to one question: what will you ask this
+collection most often? If the answer is "give me item three" or "what order did
+these arrive in", it is a list. If the answer is "is this one in here", it is a
+set. If the answer is "what is the value for this name", it is a dictionary.
+
+The case worth noticing is a list that is only ever asked "is this in here?".
+That is a set wearing the wrong type, and converting it once before a loop
+changes a scan per iteration into a lookup per iteration. It is one of the very
+few performance changes that is both trivial to make and frequently decisive.
+
+The reverse mistake is reaching for a set when duplicates carry meaning.
+Counting votes, recording events, keeping a history &mdash; the duplicates
+*are* the data, and a set silently deletes them.
+
+## Building one efficiently
+
+Three ways to get a set, and the differences matter once the input is large.
+
+`set(iterable)` is the direct conversion and the one to use when you already
+have the items. It is a single pass, and it works on any iterable including a
+generator, so `set(line.strip() for line in f)` never builds the intermediate
+list.
+
+A set comprehension, `{f(x) for x in items}`, builds and deduplicates in the
+same pass. This is better than `set([f(x) for x in items])`, which constructs
+the whole list first and then throws it away &mdash; the same waste as wrapping
+any comprehension in a converter.
+
+Adding in a loop with `add` is right when the items arrive one at a time or the
+loop is doing something else as well. `update` takes an iterable and adds all
+of it, so a loop that only calls `add` is usually one `update` in disguise.
+
+The one to avoid is repeatedly rebuilding: `seen = seen | {x}` inside a loop
+creates a whole new set on every iteration, which turns a linear job into a
+quadratic one. `seen.add(x)` modifies in place, and `seen |= other` does the
+same for a batch.
+
+## Questions people ask
+
+<strong>Why is `{}` an empty dictionary?</strong> Dictionaries had the braces
+first. `set()` is the only way to write an empty set.
+
+<strong>Can a set contain a list?</strong> No. Members must be hashable, and
+lists can change. Use a tuple, or a `frozenset` for a set of sets.
+
+<strong>Does `set()` preserve order?</strong> No. Use
+`list(dict.fromkeys(items))` to deduplicate while keeping first-seen order.
+
+<strong>Is `x in a_set` really constant time?</strong> On average, yes. It
+hashes once and looks in one place, regardless of size.
+
+<strong>Can I sort a set?</strong> `sorted(s)` returns a list. A set itself has
+no order to arrange.
+
+<strong>What is the difference between `remove` and `discard`?</strong>
+`remove` raises `KeyError` when the item is absent; `discard` does not.
+
+<strong>Are `1` and `True` different set members?</strong> No. They hash the
+same and compare equal, so `{1, True}` has one element.
+
+<strong>Can I use a set as a dictionary value?</strong> Yes. Only keys need to
+be hashable; values can be anything.
+
+## Recap in one screen
+
+- A set gives up order and duplicates and buys constant-time membership tests.
+- `&`, `|`, `-` and `^` answer "both", "either", "only the first" and "exactly
+  one" without a loop.
+- `{}` is an empty dictionary; `set()` is the empty set.
+- Members must be hashable, for the same reason dictionary keys must be: the
+  hash decides where the item is stored.
+- A list that is only ever asked "is this in here?" wants to be a set, and the
+  conversion is often the whole fix for a slow loop.
