@@ -2928,6 +2928,20 @@ A `Pipeline` executes its steps in the order given, so writing them in the wrong
 
 <strong>What about one-hot columns - do those get scaled?</strong> They are already 0 and 1, so standardising them mostly adds noise to the interpretation. It is common to scale only the numeric columns, which is what a `ColumnTransformer` is for.
 
+## Categories of model, and what each one wants
+
+A summary worth keeping, because "does this need scaling" comes up for every new estimator.
+
+**Needs it, badly.** k-nearest neighbours, k-means, SVM with any kernel, PCA and anything built on it, and neural networks. All of these either measure distance or descend a gradient, and both are dominated by whichever feature has the largest units.
+
+**Needs it, for the penalty.** Ridge, Lasso, ElasticNet, and `LogisticRegression` with its default L2. The fit itself would be unaffected, but the regularisation penalises coefficient magnitude, and magnitude depends on units.
+
+**Does not need it, and gains nothing.** Decision trees, random forests, extra trees, gradient boosting in all its varieties, and naive Bayes. These either split one column at a time or treat the columns independently.
+
+**Does not need it, but converges faster with it.** Plain `LinearRegression` has a closed-form solution and is genuinely indifferent; the iterative solvers used for very large problems are not.
+
+The rule that covers the whole table: if the algorithm ever adds two different features together, compares them, or measures a distance across them, it needs them on a common scale. If it only ever looks at one feature at a time, it does not.
+
 ## Things to try
 
 1. <strong>Run the second editor.</strong> 0.69 against 0.95, from one line. That is the argument in a single number.
