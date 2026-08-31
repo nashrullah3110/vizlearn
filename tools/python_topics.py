@@ -427,13 +427,6 @@ One loop over n items runs n bodies. Two nested loops over n items run n&times;n
 
 Doubling the input quadruples nested work. The second program on this page times both at three sizes so the shape is visible rather than asserted.
 
-## break only leaves one loop
-
-`break` exits the loop it is written in. Inside a nested pair, that is the inner loop; the outer one continues with its next pass. If you want out of both, the usual answers are to put the loops in a function and `return`, or to set a flag the outer loop checks.
-
-## When nesting is the wrong tool
-
-If both loops walk the same collection, you are comparing every pair, and that is often avoidable. "Does any pair sum to the target?" looks like a natural nested loop and is a single pass with a set. Nesting is right when the two dimensions are genuinely independent &mdash; rows and columns, users and permissions &mdash; and suspicious when they are the same thing twice.
 """,
     [{"q": "Two loops nested over the same 500-item list. How many inner bodies run?",
       "options": ["500", "1,000", "250,000", "It depends on the data"],
@@ -1526,9 +1519,6 @@ def __repr__(self):
 
 It costs two lines and pays for itself the first time you print a list of them.
 
-## When to write one
-
-Not for everything. If you have a function and some data it operates on, and they keep travelling together &mdash; passed to the same functions, returned in pairs &mdash; a class makes that relationship explicit. If you just need to return two values, a tuple is lighter and clearer.
 """,
     [{"q": "What is `self`?",
       "options": ["A reserved keyword", "The instance the method was called on",

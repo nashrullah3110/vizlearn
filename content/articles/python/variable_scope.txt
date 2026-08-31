@@ -121,3 +121,180 @@ names that happen to be defined in the builtin scope, and assigning to any of
 them inside your code hides the original for the rest of that scope. It is legal
 and it produces confusing failures later, usually when something calls `list(x)`
 and gets a `TypeError` about your list not being callable.
+
+## Watching the four scopes resolve
+
+LEGB is easier to trust once you have seen it choose:
+
+```python
+x = "global"
+
+def outer():
+    x = "enclosing"
+
+    def inner():
+        print("inner sees:", x)
+
+    inner()
+
+outer()
+print("module sees:", x)
+```
+
+```
+inner sees: enclosing
+module sees: global
+```
+
+`inner` never assigns `x`, so it looks outward: not local, so enclosing &mdash;
+and it stops there, at `outer`'s `x`, without ever reaching the module-level
+one. The module's `x` is untouched, because `outer`'s assignment created a name
+in `outer` rather than changing the global.
+
+Now the version that fails:
+
+```python
+def broken():
+    print(x)
+    x = "too late"
+
+broken()
+```
+
+```
+UnboundLocalError: cannot access local variable 'x' where it is not associated
+with a value
+```
+
+There is a perfectly good global `x`, and the `print` does not reach it. The
+assignment on the line *below* made `x` local for the whole function, so the
+`print` is reading a local that has not been given a value yet.
+
+The wording of that error changed in Python 3.11; older versions say "local
+variable 'x' referenced before assignment". Both describe the same thing, and
+the newer one is clearer about it.
+
+## Comprehensions have their own scope, loops do not
+
+Two things that look similar and differ, which explains a family of small
+surprises.
+
+A `for` loop does **not** create a scope. The loop variable is an ordinary
+local, it survives after the loop ends, and it overwrites anything of the same
+name. This is why `for i in range(3)` leaves `i` set to 2 afterwards, and why
+reusing a name in nested loops silently shadows.
+
+A comprehension **does** create one. Its loop variable lives only inside it,
+does not leak, and does not clobber a name of the same spelling outside. This
+changed in Python 3 specifically because the leaking was a common source of
+bugs.
+
+The consequence worth remembering is that a comprehension can read enclosing
+names but cannot see a class body's names. A comprehension written directly in
+a class body that refers to another class attribute raises `NameError`, because
+the class body is not a function scope and the comprehension's scope skips
+straight past it to the module. It is the one genuinely strange corner of
+Python's scoping, and the fix is to compute the value outside the class or pass
+it in through the iterable.
+
+## Where scope shows up in practice
+
+The rules are short; the situations where they bite are worth naming.
+
+**A function that "does not update" a counter.** Assigning to a module-level
+name inside a function creates a local instead. The function appears to run and
+the value never changes. `global` fixes it and is usually the wrong fix &mdash;
+returning the new value and assigning at the call site keeps the dependency
+visible.
+
+**A callback that captured the wrong value.** Functions built in a loop capture
+the *variable*, not its value, so they all see the final one. Binding it as a
+default argument &mdash; `lambda i=i: ...` &mdash; captures at definition time.
+This is the same late-binding behaviour that makes closures useful, seen from
+the wrong side.
+
+**A shadowed builtin.** Naming a variable `list`, `dict`, `sum`, `id` or
+`input` hides the builtin for the rest of that scope. The failure comes later,
+usually as `TypeError: 'list' object is not callable`, at a line that looks
+correct.
+
+**A name that only exists sometimes.** Assigning inside an `if` and reading
+after it works when the branch ran and raises `UnboundLocalError` when it did
+not. Initialise before the branch.
+
+All four are the same rule seen from different angles: assignment decides where
+a name lives, and it decides it for the whole function.
+
+## Why there is no block scope
+
+Coming from C, Java or JavaScript, the most surprising rule is that an `if` or
+a `for` does not create a scope. A name assigned inside one is visible after
+it, and the loop variable outlives the loop.
+
+This is deliberate, and the reasoning is the same as everywhere else in the
+language: functions are the unit of encapsulation, and adding a second, finer
+kind of scope would mean two sets of rules for readers to hold. A function body
+is one namespace, and where in that body a name was first assigned does not
+change what it refers to.
+
+It has practical consequences worth using rather than fighting. A value
+computed inside an `if` is available afterwards, so the common pattern of
+declaring a variable before a branch purely so it exists later is unnecessary
+&mdash; assign it in both branches instead. A loop can leave its last value
+behind on purpose, which is occasionally the neat way to say "the last item
+that matched".
+
+It also has one real hazard: a name assigned only inside a branch that did not
+run does not exist, and reading it raises `UnboundLocalError`. The compiler
+knows the name is local, so it does not fall back to a global of the same
+spelling. Initialising before the branch, or assigning on every path, is the
+fix &mdash; and the error is at least loud rather than silently reading
+something from an outer scope.
+
+The one exception, comprehensions, exists precisely because the leaking there
+was a genuine problem rather than a convenience.
+
+## Questions people ask
+
+<strong>Does an `if` or a `for` block create a scope?</strong> No. Only
+functions, classes, modules and comprehensions do.
+
+<strong>Can I read a global without declaring it?</strong> Yes. `global` is
+only needed to *assign* to one.
+
+<strong>What is the difference between `global` and `nonlocal`?</strong>
+`global` reaches module level; `nonlocal` reaches the nearest enclosing
+function. `nonlocal` fails if there is no such name.
+
+<strong>Why does `items.append(1)` work without `global`?</strong> Because it
+mutates the object rather than rebinding the name. Only assignment is affected.
+
+<strong>Does a class body count as an enclosing scope?</strong> No, and this is
+the exception that surprises people &mdash; methods do not see class-level
+names without `self` or the class name.
+
+<strong>Can I list what is in scope?</strong> `locals()` and `globals()` return
+dictionaries of the current names, which is occasionally useful for debugging.
+
+<strong>Is shadowing a builtin ever fine?</strong> In a two-line function where
+it is obvious, it does no harm. As a habit it costs more than the shorter name
+saves.
+
+<strong>Does `del x` remove a name from scope?</strong> It unbinds it, so a
+later read raises `NameError` or `UnboundLocalError`. It does not reach into an
+outer scope.
+
+<strong>Why can a method not see class attributes directly?</strong> Because a
+class body is not an enclosing scope for its methods. Reach them through
+`self.` or the class name.
+
+## Recap in one screen
+
+- Names resolve local, enclosing, global, builtin &mdash; first match wins.
+- If a name is assigned anywhere in a function it is local everywhere in that
+  function, including lines above the assignment.
+- `global` and `nonlocal` rebind rather than shadow, and both are usually a
+  sign that a return value would be better.
+- Mutating is not assigning: `items.append(x)` needs no declaration,
+  `items = [x]` creates a local.
+- A `for` loop shares the enclosing scope; a comprehension has its own.

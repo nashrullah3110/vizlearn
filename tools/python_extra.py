@@ -8048,3 +8048,572 @@ already paid once and the hidden dependency is not worth it.
 - One virtual environment per project, and `python3 -m pip` to be certain which
   interpreter you are installing into.
 """)
+
+
+extend("classes_and_objects", """
+## A small class, end to end
+
+Everything a plain class usually needs, in one block:
+
+```python
+class Account:
+    def __init__(self, owner, balance=0):
+        self.owner = owner
+        self.balance = balance
+
+    def deposit(self, amount):
+        if amount <= 0:
+            raise ValueError(f"deposit must be positive, got {amount}")
+        self.balance += amount
+        return self.balance
+
+    def __repr__(self):
+        return f"Account({self.owner!r}, {self.balance})"
+
+    def __eq__(self, other):
+        if not isinstance(other, Account):
+            return NotImplemented
+        return (self.owner, self.balance) == (other.owner, other.balance)
+
+
+a = Account("ana")
+a.deposit(50)
+
+print(a)
+print(a == Account("ana", 50))
+
+try:
+    a.deposit(-5)
+except ValueError as e:
+    print("ValueError:", e)
+```
+
+```
+Account('ana', 50)
+True
+ValueError: deposit must be positive, got -5
+```
+
+Four things earn their place. Every attribute is set in `__init__`, so reading
+it tells you everything the object holds. The method validates its input and
+says what it received, not just that something was wrong. `__repr__` uses `!r`
+on the owner so strings print quoted, which is what makes a `repr` unambiguous.
+And `__eq__` returns `NotImplemented` &mdash; not `False` &mdash; for unrelated
+types, which lets Python try the other object's comparison before giving up.
+
+## The dunder methods worth knowing
+
+Python's protocols are all spelled as double-underscore methods, and defining
+them is how your class gets to behave like a built-in type. Six cover most
+needs.
+
+`__repr__` is for programmers and should ideally look like the code that would
+recreate the object. `__str__` is for users; if you only write one, write
+`__repr__`, because `str()` falls back to it and the interactive prompt and
+containers use it regardless.
+
+`__eq__` decides what equality means. Define it and you almost always want
+`__hash__` too, because a class that defines `__eq__` without `__hash__`
+becomes unhashable and cannot go in a set or be a dictionary key. The pair must
+agree: objects that compare equal must hash the same.
+
+`__len__` gives `len()` and, as a side effect, truthiness. `__iter__` makes the
+object work in a `for` loop, in unpacking, and in `list()`. `__contains__`
+gives `in`, though `__iter__` alone provides a working fallback.
+
+The rest &mdash; arithmetic operators, context managers, comparisons &mdash;
+follow the same idea: Python asks the object, and the object answers by having
+the method. There is no separate interface to declare. A dataclass writes
+`__init__`, `__repr__` and `__eq__` for you, which is three of the six and the
+usual reason to reach for one.
+
+## Properties, for when an attribute needs logic
+
+Python has no tradition of writing `get_x()` and `set_x()` for every field,
+because it does not need one. Attributes start as plain attributes, and if one
+later needs validation or computation, `@property` converts it without changing
+a single call site.
+
+```python
+class Circle:
+    def __init__(self, radius):
+        self.radius = radius
+
+    @property
+    def area(self):
+        return 3.14159 * self.radius ** 2
+```
+
+`c.area` is now computed on access and written without brackets, so it reads
+like data. A matching `@area.setter` would let it be assigned, typically to
+validate: raising on a negative radius at the moment it is set rather than
+discovering it later in a calculation.
+
+The important consequence is cultural. In languages where adding validation
+means changing every caller, people write accessors for everything up front,
+just in case. In Python that insurance is unnecessary, so the idiomatic style
+is a plain attribute until the day it needs to be more &mdash; and the day it
+does, nothing outside the class changes.
+
+Use a property when the value is genuinely attribute-like: cheap, side-effect
+free, and conceptually part of the object's state. If it does real work, makes
+a network call, or can fail in interesting ways, a method with brackets is
+honest about that and a property is not.
+
+## What makes a class worth reading
+
+The mechanics of a class are simple; the judgement is in what goes on it, and
+a few habits separate classes people can use from classes people work around.
+
+**One responsibility, named.** If the class name needs "and" to describe it, it
+is two classes. A name that is a noun for a thing in the problem &mdash;
+`Invoice`, `Connection`, `Basket` &mdash; is a better sign than one built from
+patterns, like `InvoiceManager` or `DataHandler`, which usually means "some
+functions I put somewhere".
+
+**A small surface.** The methods a caller needs should be few and obvious, and
+everything else should carry a leading underscore. A class with twenty public
+methods is asking its callers to learn twenty things, and most of them
+generally turn out to be steps of two or three real operations.
+
+**Attributes that are all set in one place.** `__init__` should establish every
+attribute the object will ever have. Attributes that appear halfway through
+another method make the object's state depend on call order, which is exactly
+the thing that turns into "it works if you call `load()` first".
+
+**Methods that use `self`.** A method that never touches the instance is a
+function that has been filed in the wrong place. Moving it out makes it
+testable on its own and shortens the class.
+
+The underlying question is whether the class makes calling code shorter and
+clearer than the equivalent functions would. If it does not, the functions were
+the right answer, and Python is perfectly happy with a module full of them.
+
+## Testing one
+
+A class is easy to test when its state is small and its methods return values,
+and difficult when it is neither &mdash; which makes testability a useful
+design signal rather than a separate chore.
+
+The straightforward shape is: construct the object, call a method, assert on
+what came back or on one attribute. If that is awkward, the reason is usually
+one of three things. The constructor does real work, such as opening a file or
+making a request, so the object cannot be built in a test without the outside
+world; the fix is to take the connection as an argument rather than creating
+it. The method returns nothing and changes several attributes, so the assertion
+has to know internals; the fix is usually to return the result. Or the outcome
+depends on what was called earlier, in which case the test has to replay a
+sequence, and that is the sign that the state wants to be smaller.
+
+`__eq__` earns its place here too: it lets a test compare a whole object
+against an expected one in a line, instead of asserting on four attributes and
+missing the fifth.
+
+## Questions people ask
+
+<strong>Why does every method need `self`?</strong> Because
+`a.speak()` is `Dog.speak(a)` &mdash; the instance is passed explicitly rather
+than appearing by magic. Python prefers explicit.
+
+<strong>What is the difference between a class and an instance
+attribute?</strong> A class attribute is one object shared by everything; an
+instance attribute belongs to one object. Assignment always creates the
+instance one.
+
+<strong>Do I need getters and setters?</strong> No. Use plain attributes, and
+`@property` on the day one needs logic.
+
+<strong>What is `__slots__`?</strong> A declaration of the allowed attributes
+that saves memory for classes with many instances, at the cost of losing
+dynamic attributes. Worth it rarely.
+
+<strong>Should I write `__str__` or `__repr__`?</strong> `__repr__` first
+&mdash; it is what containers and the prompt use, and `str()` falls back to it.
+
+<strong>What is a `@staticmethod` for?</strong> A function that belongs with
+the class conceptually but uses neither the instance nor the class. A module
+function is often just as good.
+
+<strong>Why does my object print as an address?</strong> Because it has no
+`__repr__`. Two lines fix it permanently.
+
+## Recap in one screen
+
+- A class bundles data with the functions that operate on it; each instance
+  carries its own attributes and shares the methods.
+- Set every attribute in `__init__`, so reading the constructor tells you what
+  the object holds.
+- `self` is the instance, passed explicitly &mdash; `a.f()` is `Cls.f(a)`.
+- Class attributes are shared by every instance; assignment through `self`
+  always creates an instance attribute instead.
+- `__repr__` costs two lines and pays for itself the first time you print a
+  list of them; a dataclass writes it, `__init__` and `__eq__` for you.
+""")
+
+
+extend("nested_for_loops", """
+## A worked example: a formatted table
+
+Nested loops and the alignment that makes their output readable:
+
+```python
+for row in range(1, 4):
+    for col in range(1, 4):
+        print(f"{row * col:4}", end="")
+    print()
+```
+
+```
+   1   2   3
+   2   4   6
+   3   6   9
+```
+
+Two details do all the work. `end=""` on the inner `print` keeps the cells on
+one line, and the bare `print()` after the inner loop &mdash; indented to the
+outer loop &mdash; ends the row. Indent that second `print` one level further
+and every cell gets its own line; remove it and the whole table becomes one
+long line. The indentation is the logic.
+
+`f"{value:4}"` right-aligns each cell in four characters, which is what stops
+the columns drifting once the numbers reach two digits. Counting spaces by hand
+works until the data changes; a width does not.
+
+## itertools.product, the flat version
+
+When the nesting exists only to produce every combination, `product` flattens
+it into one loop:
+
+```python
+from itertools import product
+
+print([f"{x}{y}" for x, y in product("ab", [1, 2])])
+```
+
+```
+['a1', 'a2', 'b1', 'b2']
+```
+
+The order is the same as the nested loops it replaces: the last argument varies
+fastest, exactly as the innermost loop does. `product` takes any number of
+iterables, and `repeat=` gives the same one several times &mdash;
+`product(range(6), repeat=3)` is every three-dice roll without three levels of
+indentation.
+
+It is lazy, so it costs nothing until iterated, and it is the right tool when
+the combinations are the point: parameter sweeps, test matrices, every pairing
+of two lists. It is the wrong tool when the inner loop depends on the outer one
+&mdash; iterating the cells of each row, where the rows differ in length
+&mdash; because `product` pairs fixed sequences and cannot look at the outer
+value to decide what the inner one should be.
+
+`itertools.combinations` and `permutations` cover the related questions, and
+both avoid the nested loop plus index arithmetic that would otherwise be
+needed to compare every pair without comparing anything with itself.
+
+## The comprehension form, and its reading order
+
+Nested loops have a comprehension equivalent, and the clause order is the thing
+people get wrong:
+
+```python
+grid = [[1, 2], [3, 4]]
+
+print([value for row in grid for value in row])
+```
+
+```
+[1, 2, 3, 4]
+```
+
+The clauses appear in the same order as the equivalent nested `for` statements
+&mdash; outer first, inner second. That is worth stating plainly because the
+guess most people make is the opposite, and the wrong order raises a
+`NameError` about the inner variable, which at least fails loudly.
+
+What is genuinely confusing is a *nested comprehension*, where one comprehension
+appears inside another's expression: `[[f(x) for x in row] for row in grid]`
+produces a list of lists rather than a flat one. Here the reading order really
+does invert &mdash; the outer clause is on the right and the inner work on the
+left.
+
+Between the two, flattening with two `for` clauses is common and readable, and
+a comprehension inside a comprehension is where most people should stop and
+write the loop. The rule from elsewhere in the track applies: if it needs
+decoding rather than reading, the loop was the better answer.
+
+## Let the data decide the loops
+
+A nested loop is usually a description of the data's shape, and when the two
+disagree the loop is the thing that is wrong.
+
+If the data is a list of rows and each row is a list of cells, two loops are
+correct and the outer variable should be a row rather than an index. If the
+data is a flat list and the nesting exists to pair items with each other, the
+loops are doing a search and can often be replaced. If the data is a dictionary
+of lists, the outer loop takes `items()` and the inner takes the list, and the
+key is available at both levels without any bookkeeping.
+
+The mismatch worth watching for is a nested loop over data that is already
+flat. Code that iterates a list of records and then, inside, iterates the same
+list to find a matching record is describing a join, and a dictionary keyed on
+the join field turns it into one pass. The nesting was never about the shape of
+the data; it was a linear search wearing a loop.
+
+The opposite mismatch is a single loop over data that is genuinely nested,
+usually with manual index arithmetic to work out where each row starts. That is
+a flattened structure being reconstructed by hand, and reshaping the data once
+is easier than getting the arithmetic right at every use.
+
+The general habit: write the loops that match the structure you have, and if
+they are awkward, change the structure rather than the arithmetic.
+
+## Measuring, rather than guessing
+
+The cost of a nested loop can be read off the page, and when it matters it is
+still worth measuring, because the constant factors are not visible in the
+notation.
+
+Two things make a measurement useful. Run it at several input sizes, not one:
+a single number tells you how long something took, and three tell you how the
+time grows, which is the property that decides whether the code survives
+larger data. Doubling the input should roughly double a linear loop and
+quadruple a nested one, and seeing that ratio confirms which you have.
+
+And measure the thing itself, not the setup. `timeit` exists because a naive
+timing includes interpreter warm-up, the cost of building the test data, and
+whatever else happens to be in the block. It runs the snippet many times and
+reports the best, which is the number least polluted by everything else on the
+machine.
+
+The result is often surprising in the useful direction: a nested loop over
+fifty items is instant and not worth changing, while a linear loop that does
+something expensive per item can be the real cost. Reading the structure tells
+you how it scales; measuring tells you whether it matters yet.
+
+## Questions people ask
+
+<strong>Can I use the same variable name in both loops?</strong> You can, and
+the inner one shadows the outer for the rest of the body. It is legal and
+confusing.
+
+<strong>Does `continue` in the inner loop skip the outer one?</strong> No, it
+moves to the next inner iteration only.
+
+<strong>How do I break out of both loops?</strong> Put them in a function and
+`return`, which is cleaner than any flag.
+
+<strong>Is a nested loop always slow?</strong> No &mdash; it is slow when both
+loops grow with the input. A loop over n containing a loop over a fixed three
+items is linear.
+
+<strong>What if the inner loop needs the outer index?</strong> `enumerate` at
+both levels gives you both, without any `range(len(...))`.
+
+<strong>Why does my inner variable still have a value after the loop?</strong>
+Because a `for` loop does not have its own scope. The last value survives,
+unlike in a comprehension.
+
+<strong>Is `product` faster than nested loops?</strong> Slightly, and that is
+not the reason to use it. It is flatter to read.
+
+<strong>Should I worry about nesting depth for performance?</strong> Worry
+about how many times each loop runs, not how deep they are. Three shallow loops
+over three items each is nine iterations.
+
+<strong>Can I nest a comprehension inside a loop?</strong> Yes, and it often
+reads well &mdash; the loop handles the structure and the comprehension handles
+one row.
+
+## Recap in one screen
+
+- The inner loop runs completely on every pass of the outer one; the bodies
+  multiply rather than add.
+- Where the trailing `print()` is indented decides where rows end &mdash; the
+  indentation is the logic, not the formatting.
+- `break` leaves one loop; a function and `return` is the clean way out of
+  both.
+- Two loops over the same collection is `n` squared, and an inner loop that is
+  searching can usually be replaced by a set or a dictionary.
+- `itertools.product` flattens loops that exist only to produce combinations.
+""")
+
+
+extend("variable_scope", """
+## Watching the four scopes resolve
+
+LEGB is easier to trust once you have seen it choose:
+
+```python
+x = "global"
+
+def outer():
+    x = "enclosing"
+
+    def inner():
+        print("inner sees:", x)
+
+    inner()
+
+outer()
+print("module sees:", x)
+```
+
+```
+inner sees: enclosing
+module sees: global
+```
+
+`inner` never assigns `x`, so it looks outward: not local, so enclosing &mdash;
+and it stops there, at `outer`'s `x`, without ever reaching the module-level
+one. The module's `x` is untouched, because `outer`'s assignment created a name
+in `outer` rather than changing the global.
+
+Now the version that fails:
+
+```python
+def broken():
+    print(x)
+    x = "too late"
+
+broken()
+```
+
+```
+UnboundLocalError: cannot access local variable 'x' where it is not associated
+with a value
+```
+
+There is a perfectly good global `x`, and the `print` does not reach it. The
+assignment on the line *below* made `x` local for the whole function, so the
+`print` is reading a local that has not been given a value yet.
+
+The wording of that error changed in Python 3.11; older versions say "local
+variable 'x' referenced before assignment". Both describe the same thing, and
+the newer one is clearer about it.
+
+## Comprehensions have their own scope, loops do not
+
+Two things that look similar and differ, which explains a family of small
+surprises.
+
+A `for` loop does **not** create a scope. The loop variable is an ordinary
+local, it survives after the loop ends, and it overwrites anything of the same
+name. This is why `for i in range(3)` leaves `i` set to 2 afterwards, and why
+reusing a name in nested loops silently shadows.
+
+A comprehension **does** create one. Its loop variable lives only inside it,
+does not leak, and does not clobber a name of the same spelling outside. This
+changed in Python 3 specifically because the leaking was a common source of
+bugs.
+
+The consequence worth remembering is that a comprehension can read enclosing
+names but cannot see a class body's names. A comprehension written directly in
+a class body that refers to another class attribute raises `NameError`, because
+the class body is not a function scope and the comprehension's scope skips
+straight past it to the module. It is the one genuinely strange corner of
+Python's scoping, and the fix is to compute the value outside the class or pass
+it in through the iterable.
+
+## Where scope shows up in practice
+
+The rules are short; the situations where they bite are worth naming.
+
+**A function that "does not update" a counter.** Assigning to a module-level
+name inside a function creates a local instead. The function appears to run and
+the value never changes. `global` fixes it and is usually the wrong fix &mdash;
+returning the new value and assigning at the call site keeps the dependency
+visible.
+
+**A callback that captured the wrong value.** Functions built in a loop capture
+the *variable*, not its value, so they all see the final one. Binding it as a
+default argument &mdash; `lambda i=i: ...` &mdash; captures at definition time.
+This is the same late-binding behaviour that makes closures useful, seen from
+the wrong side.
+
+**A shadowed builtin.** Naming a variable `list`, `dict`, `sum`, `id` or
+`input` hides the builtin for the rest of that scope. The failure comes later,
+usually as `TypeError: 'list' object is not callable`, at a line that looks
+correct.
+
+**A name that only exists sometimes.** Assigning inside an `if` and reading
+after it works when the branch ran and raises `UnboundLocalError` when it did
+not. Initialise before the branch.
+
+All four are the same rule seen from different angles: assignment decides where
+a name lives, and it decides it for the whole function.
+
+## Why there is no block scope
+
+Coming from C, Java or JavaScript, the most surprising rule is that an `if` or
+a `for` does not create a scope. A name assigned inside one is visible after
+it, and the loop variable outlives the loop.
+
+This is deliberate, and the reasoning is the same as everywhere else in the
+language: functions are the unit of encapsulation, and adding a second, finer
+kind of scope would mean two sets of rules for readers to hold. A function body
+is one namespace, and where in that body a name was first assigned does not
+change what it refers to.
+
+It has practical consequences worth using rather than fighting. A value
+computed inside an `if` is available afterwards, so the common pattern of
+declaring a variable before a branch purely so it exists later is unnecessary
+&mdash; assign it in both branches instead. A loop can leave its last value
+behind on purpose, which is occasionally the neat way to say "the last item
+that matched".
+
+It also has one real hazard: a name assigned only inside a branch that did not
+run does not exist, and reading it raises `UnboundLocalError`. The compiler
+knows the name is local, so it does not fall back to a global of the same
+spelling. Initialising before the branch, or assigning on every path, is the
+fix &mdash; and the error is at least loud rather than silently reading
+something from an outer scope.
+
+The one exception, comprehensions, exists precisely because the leaking there
+was a genuine problem rather than a convenience.
+
+## Questions people ask
+
+<strong>Does an `if` or a `for` block create a scope?</strong> No. Only
+functions, classes, modules and comprehensions do.
+
+<strong>Can I read a global without declaring it?</strong> Yes. `global` is
+only needed to *assign* to one.
+
+<strong>What is the difference between `global` and `nonlocal`?</strong>
+`global` reaches module level; `nonlocal` reaches the nearest enclosing
+function. `nonlocal` fails if there is no such name.
+
+<strong>Why does `items.append(1)` work without `global`?</strong> Because it
+mutates the object rather than rebinding the name. Only assignment is affected.
+
+<strong>Does a class body count as an enclosing scope?</strong> No, and this is
+the exception that surprises people &mdash; methods do not see class-level
+names without `self` or the class name.
+
+<strong>Can I list what is in scope?</strong> `locals()` and `globals()` return
+dictionaries of the current names, which is occasionally useful for debugging.
+
+<strong>Is shadowing a builtin ever fine?</strong> In a two-line function where
+it is obvious, it does no harm. As a habit it costs more than the shorter name
+saves.
+
+<strong>Does `del x` remove a name from scope?</strong> It unbinds it, so a
+later read raises `NameError` or `UnboundLocalError`. It does not reach into an
+outer scope.
+
+<strong>Why can a method not see class attributes directly?</strong> Because a
+class body is not an enclosing scope for its methods. Reach them through
+`self.` or the class name.
+
+## Recap in one screen
+
+- Names resolve local, enclosing, global, builtin &mdash; first match wins.
+- If a name is assigned anywhere in a function it is local everywhere in that
+  function, including lines above the assignment.
+- `global` and `nonlocal` rebind rather than shadow, and both are usually a
+  sign that a return value would be better.
+- Mutating is not assigning: `items.append(x)` needs no declaration,
+  `items = [x]` creates a local.
+- A `for` loop shares the enclosing scope; a comprehension has its own.
+""")

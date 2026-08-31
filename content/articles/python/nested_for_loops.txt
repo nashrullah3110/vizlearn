@@ -28,14 +28,6 @@ One loop over n items runs n bodies. Two nested loops over n items run n&times;n
 
 Doubling the input quadruples nested work. The second program on this page times both at three sizes so the shape is visible rather than asserted.
 
-## break only leaves one loop
-
-`break` exits the loop it is written in. Inside a nested pair, that is the inner loop; the outer one continues with its next pass. If you want out of both, the usual answers are to put the loops in a function and `return`, or to set a flag the outer loop checks.
-
-## When nesting is the wrong tool
-
-If both loops walk the same collection, you are comparing every pair, and that is often avoidable. "Does any pair sum to the target?" looks like a natural nested loop and is a single pass with a set. Nesting is right when the two dimensions are genuinely independent &mdash; rows and columns, users and permissions &mdash; and suspicious when they are the same thing twice.
-
 ## Reading a grid, row by row
 
 The most common nested loop walks a two-dimensional structure:
@@ -140,3 +132,188 @@ indentation alone pushes the real work off the right of the screen.
 Pulling the inner loops into a named function costs nothing at runtime and
 gives each level a name that says what it is iterating over. It also gives you
 `return`, which is the cleanest way out of nested loops there is.
+
+## A worked example: a formatted table
+
+Nested loops and the alignment that makes their output readable:
+
+```python
+for row in range(1, 4):
+    for col in range(1, 4):
+        print(f"{row * col:4}", end="")
+    print()
+```
+
+```
+   1   2   3
+   2   4   6
+   3   6   9
+```
+
+Two details do all the work. `end=""` on the inner `print` keeps the cells on
+one line, and the bare `print()` after the inner loop &mdash; indented to the
+outer loop &mdash; ends the row. Indent that second `print` one level further
+and every cell gets its own line; remove it and the whole table becomes one
+long line. The indentation is the logic.
+
+`f"{value:4}"` right-aligns each cell in four characters, which is what stops
+the columns drifting once the numbers reach two digits. Counting spaces by hand
+works until the data changes; a width does not.
+
+## itertools.product, the flat version
+
+When the nesting exists only to produce every combination, `product` flattens
+it into one loop:
+
+```python
+from itertools import product
+
+print([f"{x}{y}" for x, y in product("ab", [1, 2])])
+```
+
+```
+['a1', 'a2', 'b1', 'b2']
+```
+
+The order is the same as the nested loops it replaces: the last argument varies
+fastest, exactly as the innermost loop does. `product` takes any number of
+iterables, and `repeat=` gives the same one several times &mdash;
+`product(range(6), repeat=3)` is every three-dice roll without three levels of
+indentation.
+
+It is lazy, so it costs nothing until iterated, and it is the right tool when
+the combinations are the point: parameter sweeps, test matrices, every pairing
+of two lists. It is the wrong tool when the inner loop depends on the outer one
+&mdash; iterating the cells of each row, where the rows differ in length
+&mdash; because `product` pairs fixed sequences and cannot look at the outer
+value to decide what the inner one should be.
+
+`itertools.combinations` and `permutations` cover the related questions, and
+both avoid the nested loop plus index arithmetic that would otherwise be
+needed to compare every pair without comparing anything with itself.
+
+## The comprehension form, and its reading order
+
+Nested loops have a comprehension equivalent, and the clause order is the thing
+people get wrong:
+
+```python
+grid = [[1, 2], [3, 4]]
+
+print([value for row in grid for value in row])
+```
+
+```
+[1, 2, 3, 4]
+```
+
+The clauses appear in the same order as the equivalent nested `for` statements
+&mdash; outer first, inner second. That is worth stating plainly because the
+guess most people make is the opposite, and the wrong order raises a
+`NameError` about the inner variable, which at least fails loudly.
+
+What is genuinely confusing is a *nested comprehension*, where one comprehension
+appears inside another's expression: `[[f(x) for x in row] for row in grid]`
+produces a list of lists rather than a flat one. Here the reading order really
+does invert &mdash; the outer clause is on the right and the inner work on the
+left.
+
+Between the two, flattening with two `for` clauses is common and readable, and
+a comprehension inside a comprehension is where most people should stop and
+write the loop. The rule from elsewhere in the track applies: if it needs
+decoding rather than reading, the loop was the better answer.
+
+## Let the data decide the loops
+
+A nested loop is usually a description of the data's shape, and when the two
+disagree the loop is the thing that is wrong.
+
+If the data is a list of rows and each row is a list of cells, two loops are
+correct and the outer variable should be a row rather than an index. If the
+data is a flat list and the nesting exists to pair items with each other, the
+loops are doing a search and can often be replaced. If the data is a dictionary
+of lists, the outer loop takes `items()` and the inner takes the list, and the
+key is available at both levels without any bookkeeping.
+
+The mismatch worth watching for is a nested loop over data that is already
+flat. Code that iterates a list of records and then, inside, iterates the same
+list to find a matching record is describing a join, and a dictionary keyed on
+the join field turns it into one pass. The nesting was never about the shape of
+the data; it was a linear search wearing a loop.
+
+The opposite mismatch is a single loop over data that is genuinely nested,
+usually with manual index arithmetic to work out where each row starts. That is
+a flattened structure being reconstructed by hand, and reshaping the data once
+is easier than getting the arithmetic right at every use.
+
+The general habit: write the loops that match the structure you have, and if
+they are awkward, change the structure rather than the arithmetic.
+
+## Measuring, rather than guessing
+
+The cost of a nested loop can be read off the page, and when it matters it is
+still worth measuring, because the constant factors are not visible in the
+notation.
+
+Two things make a measurement useful. Run it at several input sizes, not one:
+a single number tells you how long something took, and three tell you how the
+time grows, which is the property that decides whether the code survives
+larger data. Doubling the input should roughly double a linear loop and
+quadruple a nested one, and seeing that ratio confirms which you have.
+
+And measure the thing itself, not the setup. `timeit` exists because a naive
+timing includes interpreter warm-up, the cost of building the test data, and
+whatever else happens to be in the block. It runs the snippet many times and
+reports the best, which is the number least polluted by everything else on the
+machine.
+
+The result is often surprising in the useful direction: a nested loop over
+fifty items is instant and not worth changing, while a linear loop that does
+something expensive per item can be the real cost. Reading the structure tells
+you how it scales; measuring tells you whether it matters yet.
+
+## Questions people ask
+
+<strong>Can I use the same variable name in both loops?</strong> You can, and
+the inner one shadows the outer for the rest of the body. It is legal and
+confusing.
+
+<strong>Does `continue` in the inner loop skip the outer one?</strong> No, it
+moves to the next inner iteration only.
+
+<strong>How do I break out of both loops?</strong> Put them in a function and
+`return`, which is cleaner than any flag.
+
+<strong>Is a nested loop always slow?</strong> No &mdash; it is slow when both
+loops grow with the input. A loop over n containing a loop over a fixed three
+items is linear.
+
+<strong>What if the inner loop needs the outer index?</strong> `enumerate` at
+both levels gives you both, without any `range(len(...))`.
+
+<strong>Why does my inner variable still have a value after the loop?</strong>
+Because a `for` loop does not have its own scope. The last value survives,
+unlike in a comprehension.
+
+<strong>Is `product` faster than nested loops?</strong> Slightly, and that is
+not the reason to use it. It is flatter to read.
+
+<strong>Should I worry about nesting depth for performance?</strong> Worry
+about how many times each loop runs, not how deep they are. Three shallow loops
+over three items each is nine iterations.
+
+<strong>Can I nest a comprehension inside a loop?</strong> Yes, and it often
+reads well &mdash; the loop handles the structure and the comprehension handles
+one row.
+
+## Recap in one screen
+
+- The inner loop runs completely on every pass of the outer one; the bodies
+  multiply rather than add.
+- Where the trailing `print()` is indented decides where rows end &mdash; the
+  indentation is the logic, not the formatting.
+- `break` leaves one loop; a function and `return` is the clean way out of
+  both.
+- Two loops over the same collection is `n` squared, and an inner loop that is
+  searching can usually be replaced by a set or a dictionary.
+- `itertools.product` flattens loops that exist only to produce combinations.

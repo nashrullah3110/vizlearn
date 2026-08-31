@@ -53,10 +53,6 @@ def __repr__(self):
 
 It costs two lines and pays for itself the first time you print a list of them.
 
-## When to write one
-
-Not for everything. If you have a function and some data it operates on, and they keep travelling together &mdash; passed to the same functions, returned in pairs &mdash; a class makes that relationship explicit. If you just need to return two values, a tuple is lighter and clearer.
-
 ## When a class is the right answer
 
 Not everything should be a class. Python is not a language where you have to
@@ -116,3 +112,201 @@ That gives you `__init__`, a readable `__repr__` and equality comparison for
 free, which is three of the things you would otherwise write by hand and one -
 `__repr__` - that people usually skip and then miss the first time they print a
 list of them.
+
+## A small class, end to end
+
+Everything a plain class usually needs, in one block:
+
+```python
+class Account:
+    def __init__(self, owner, balance=0):
+        self.owner = owner
+        self.balance = balance
+
+    def deposit(self, amount):
+        if amount <= 0:
+            raise ValueError(f"deposit must be positive, got {amount}")
+        self.balance += amount
+        return self.balance
+
+    def __repr__(self):
+        return f"Account({self.owner!r}, {self.balance})"
+
+    def __eq__(self, other):
+        if not isinstance(other, Account):
+            return NotImplemented
+        return (self.owner, self.balance) == (other.owner, other.balance)
+
+
+a = Account("ana")
+a.deposit(50)
+
+print(a)
+print(a == Account("ana", 50))
+
+try:
+    a.deposit(-5)
+except ValueError as e:
+    print("ValueError:", e)
+```
+
+```
+Account('ana', 50)
+True
+ValueError: deposit must be positive, got -5
+```
+
+Four things earn their place. Every attribute is set in `__init__`, so reading
+it tells you everything the object holds. The method validates its input and
+says what it received, not just that something was wrong. `__repr__` uses `!r`
+on the owner so strings print quoted, which is what makes a `repr` unambiguous.
+And `__eq__` returns `NotImplemented` &mdash; not `False` &mdash; for unrelated
+types, which lets Python try the other object's comparison before giving up.
+
+## The dunder methods worth knowing
+
+Python's protocols are all spelled as double-underscore methods, and defining
+them is how your class gets to behave like a built-in type. Six cover most
+needs.
+
+`__repr__` is for programmers and should ideally look like the code that would
+recreate the object. `__str__` is for users; if you only write one, write
+`__repr__`, because `str()` falls back to it and the interactive prompt and
+containers use it regardless.
+
+`__eq__` decides what equality means. Define it and you almost always want
+`__hash__` too, because a class that defines `__eq__` without `__hash__`
+becomes unhashable and cannot go in a set or be a dictionary key. The pair must
+agree: objects that compare equal must hash the same.
+
+`__len__` gives `len()` and, as a side effect, truthiness. `__iter__` makes the
+object work in a `for` loop, in unpacking, and in `list()`. `__contains__`
+gives `in`, though `__iter__` alone provides a working fallback.
+
+The rest &mdash; arithmetic operators, context managers, comparisons &mdash;
+follow the same idea: Python asks the object, and the object answers by having
+the method. There is no separate interface to declare. A dataclass writes
+`__init__`, `__repr__` and `__eq__` for you, which is three of the six and the
+usual reason to reach for one.
+
+## Properties, for when an attribute needs logic
+
+Python has no tradition of writing `get_x()` and `set_x()` for every field,
+because it does not need one. Attributes start as plain attributes, and if one
+later needs validation or computation, `@property` converts it without changing
+a single call site.
+
+```python
+class Circle:
+    def __init__(self, radius):
+        self.radius = radius
+
+    @property
+    def area(self):
+        return 3.14159 * self.radius ** 2
+```
+
+`c.area` is now computed on access and written without brackets, so it reads
+like data. A matching `@area.setter` would let it be assigned, typically to
+validate: raising on a negative radius at the moment it is set rather than
+discovering it later in a calculation.
+
+The important consequence is cultural. In languages where adding validation
+means changing every caller, people write accessors for everything up front,
+just in case. In Python that insurance is unnecessary, so the idiomatic style
+is a plain attribute until the day it needs to be more &mdash; and the day it
+does, nothing outside the class changes.
+
+Use a property when the value is genuinely attribute-like: cheap, side-effect
+free, and conceptually part of the object's state. If it does real work, makes
+a network call, or can fail in interesting ways, a method with brackets is
+honest about that and a property is not.
+
+## What makes a class worth reading
+
+The mechanics of a class are simple; the judgement is in what goes on it, and
+a few habits separate classes people can use from classes people work around.
+
+**One responsibility, named.** If the class name needs "and" to describe it, it
+is two classes. A name that is a noun for a thing in the problem &mdash;
+`Invoice`, `Connection`, `Basket` &mdash; is a better sign than one built from
+patterns, like `InvoiceManager` or `DataHandler`, which usually means "some
+functions I put somewhere".
+
+**A small surface.** The methods a caller needs should be few and obvious, and
+everything else should carry a leading underscore. A class with twenty public
+methods is asking its callers to learn twenty things, and most of them
+generally turn out to be steps of two or three real operations.
+
+**Attributes that are all set in one place.** `__init__` should establish every
+attribute the object will ever have. Attributes that appear halfway through
+another method make the object's state depend on call order, which is exactly
+the thing that turns into "it works if you call `load()` first".
+
+**Methods that use `self`.** A method that never touches the instance is a
+function that has been filed in the wrong place. Moving it out makes it
+testable on its own and shortens the class.
+
+The underlying question is whether the class makes calling code shorter and
+clearer than the equivalent functions would. If it does not, the functions were
+the right answer, and Python is perfectly happy with a module full of them.
+
+## Testing one
+
+A class is easy to test when its state is small and its methods return values,
+and difficult when it is neither &mdash; which makes testability a useful
+design signal rather than a separate chore.
+
+The straightforward shape is: construct the object, call a method, assert on
+what came back or on one attribute. If that is awkward, the reason is usually
+one of three things. The constructor does real work, such as opening a file or
+making a request, so the object cannot be built in a test without the outside
+world; the fix is to take the connection as an argument rather than creating
+it. The method returns nothing and changes several attributes, so the assertion
+has to know internals; the fix is usually to return the result. Or the outcome
+depends on what was called earlier, in which case the test has to replay a
+sequence, and that is the sign that the state wants to be smaller.
+
+`__eq__` earns its place here too: it lets a test compare a whole object
+against an expected one in a line, instead of asserting on four attributes and
+missing the fifth.
+
+## Questions people ask
+
+<strong>Why does every method need `self`?</strong> Because
+`a.speak()` is `Dog.speak(a)` &mdash; the instance is passed explicitly rather
+than appearing by magic. Python prefers explicit.
+
+<strong>What is the difference between a class and an instance
+attribute?</strong> A class attribute is one object shared by everything; an
+instance attribute belongs to one object. Assignment always creates the
+instance one.
+
+<strong>Do I need getters and setters?</strong> No. Use plain attributes, and
+`@property` on the day one needs logic.
+
+<strong>What is `__slots__`?</strong> A declaration of the allowed attributes
+that saves memory for classes with many instances, at the cost of losing
+dynamic attributes. Worth it rarely.
+
+<strong>Should I write `__str__` or `__repr__`?</strong> `__repr__` first
+&mdash; it is what containers and the prompt use, and `str()` falls back to it.
+
+<strong>What is a `@staticmethod` for?</strong> A function that belongs with
+the class conceptually but uses neither the instance nor the class. A module
+function is often just as good.
+
+<strong>Why does my object print as an address?</strong> Because it has no
+`__repr__`. Two lines fix it permanently.
+
+## Recap in one screen
+
+- A class bundles data with the functions that operate on it; each instance
+  carries its own attributes and shares the methods.
+- Set every attribute in `__init__`, so reading the constructor tells you what
+  the object holds.
+- `self` is the instance, passed explicitly &mdash; `a.f()` is `Cls.f(a)`.
+- Class attributes are shared by every instance; assignment through `self`
+  always creates an instance attribute instead.
+- `__repr__` costs two lines and pays for itself the first time you print a
+  list of them; a dataclass writes it, `__init__` and `__eq__` for you.
