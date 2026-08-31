@@ -126,3 +126,319 @@ the same method and both call `super()`, the order of execution depends on the
 MRO, and reasoning about it stops being possible for anyone who did not write it.
 If you need `__mro__` to work out which code runs, the design has already cost
 more than it saved.
+
+## A hierarchy that earns itself
+
+Two classes, where the second genuinely is a kind of the first and changes one
+calculation:
+
+```python
+class Employee:
+    def __init__(self, name, salary):
+        self.name = name
+        self.salary = salary
+
+    def pay(self):
+        return self.salary / 12
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.name!r})"
+
+
+class Manager(Employee):
+    def __init__(self, name, salary, bonus):
+        super().__init__(name, salary)
+        self.bonus = bonus
+
+    def pay(self):
+        return super().pay() + self.bonus / 12
+
+
+staff = [Employee("ana", 60000), Manager("bo", 90000, 12000)]
+for person in staff:
+    print(person, round(person.pay(), 2))
+```
+
+That prints:
+
+```
+Employee('ana') 5000.0
+Manager('bo') 8500.0
+```
+
+Three things in that are worth copying. `Manager.pay` calls `super().pay()`
+rather than repeating `self.salary / 12`, so a change to how base pay is
+computed reaches both classes. `__repr__` uses `type(self).__name__` rather
+than the literal string `"Employee"`, so the subclass prints its own name for
+free. And the loop does not ask what kind of object it has &mdash; it calls
+`pay()` and lets each class answer. That last one is the point of the whole
+exercise; a loop full of `isinstance` checks has inheritance without the
+benefit.
+
+## What super() actually does
+
+`super()` is usually described as "call the parent", which is close enough
+until it isn't. What it really means is *the next class along in the MRO of the
+object's actual type* &mdash; and with one parent those are the same thing, so
+the shortcut survives a long time before it breaks.
+
+Here is where it stops being the same thing:
+
+```python
+class Base:
+    def greet(self):
+        return "base"
+
+class Left(Base):
+    def greet(self):
+        return "left -> " + super().greet()
+
+class Right(Base):
+    def greet(self):
+        return "right -> " + super().greet()
+
+class Both(Left, Right):
+    pass
+
+print(Both().greet())
+print([c.__name__ for c in Both.__mro__])
+```
+
+The output surprises most people the first time:
+
+```
+left -> right -> base
+['Both', 'Left', 'Right', 'Base', 'object']
+```
+
+`Left.greet` calls `super().greet()` and gets **`Right`**, not `Base` &mdash;
+even though `Right` is nowhere in `Left`'s definition. The MRO is computed from
+the type of the object, and `Both` puts `Right` after `Left`. This is what
+makes cooperative multiple inheritance possible: each class does its bit and
+delegates onward without knowing who is next.
+
+It is also why `super().__init__(...)` matters even when the parent's
+`__init__` looks empty. In a hierarchy someone else may extend later, breaking
+the chain breaks classes that do not exist yet.
+
+## Overriding without breaking the parent's promise
+
+An override replaces a method, and anything holding the parent type keeps
+calling it expecting the parent's behaviour. Two rules keep that honest.
+
+**Accept at least what the parent accepted.** If `Animal.feed(self, amount)`
+takes an amount, a subclass whose `feed(self)` takes none will fail whenever
+it is used through the parent's interface.
+
+**Return the same kind of thing.** A parent whose `area()` returns a number and
+a child whose `area()` returns a string will break the first caller that does
+arithmetic with it.
+
+The override that breaks both is the one that refuses:
+
+```python
+class ReadOnlyList(list):
+    def append(self, item):
+        raise TypeError("read only")
+```
+
+This looks like a reasonable restriction and is a trap. Everything that accepts
+a `list` is entitled to append to one, so `ReadOnlyList` is not a list in any
+useful sense &mdash; it just passes `isinstance` checks. If you want something
+that cannot be appended to, do not inherit from something that can; hold a list
+and expose only the methods you intend to support.
+
+## isinstance, and when checking the type is the wrong move
+
+`isinstance(x, Animal)` is true for `Animal` and for every subclass, which is
+what you almost always want. `type(x) is Animal` is true only for exact
+matches, and using it deliberately excludes subclasses &mdash; which is rarely
+what anyone means.
+
+Both are worth reaching for less often than people do. A chain like this:
+
+```python
+if isinstance(thing, Dog):
+    sound = "woof"
+elif isinstance(thing, Cat):
+    sound = "meow"
+```
+
+is inheritance being used for storage while the branching is still done by
+hand. The version that scales is a `speak()` method on each class and
+`thing.speak()` at the call site: adding a tenth animal then touches one new
+class rather than every chain in the codebase.
+
+The honest uses are narrow: validating an argument at a public boundary,
+handling genuinely unrelated types such as "a string or a list of strings", and
+writing `__eq__`, which has to decide what it can be compared against.
+
+## Where attributes are found
+
+Overriding is one case of a more general rule, and knowing the rule removes a
+whole category of confusion. When you write `obj.thing`, Python looks in the
+instance's own dictionary first, then the class, then each class along the MRO
+in order, and raises `AttributeError` if none of them has it.
+
+That ordering explains why assigning to an attribute on one instance does not
+affect the others, and why assigning on the class affects every instance that
+has not set its own:
+
+```python
+class Counter:
+    total = 0                      # on the class, shared
+
+    def bump(self):
+        self.total += 1            # reads class, writes instance
+
+
+a, b = Counter(), Counter()
+a.bump()
+print(a.total, b.total, Counter.total)
+```
+
+```
+1 0 0
+```
+
+`self.total += 1` reads `Counter.total` (0, found on the class), adds one, and
+*assigns* the result to `a`, which creates an instance attribute shadowing the
+class one. `b` and the class itself never change. This is the single most
+common surprise with class attributes, and it is not a special rule &mdash; it
+falls straight out of "reads search the chain, writes always land on the
+instance".
+
+The version that genuinely shares state has to say so:
+
+```python
+    def bump(self):
+        Counter.total += 1         # or type(self).total
+```
+
+And the version that catches people badly is a mutable class attribute, because
+appending to a list is a read followed by a mutation, not an assignment &mdash;
+so every instance really does share it. If each instance needs its own, create
+it in `__init__`.
+
+## Extending a built-in, and why it disappoints
+
+Subclassing `dict` or `list` looks like the obvious way to get a container with
+one extra behaviour, and it works less well than expected:
+
+```python
+class LoudDict(dict):
+    def __setitem__(self, key, value):
+        print("setting", key)
+        super().__setitem__(key, value)
+
+
+d = LoudDict()
+d["a"] = 1              # prints
+d.update({"b": 2})      # prints nothing
+print(dict(d))
+```
+
+```
+setting a
+{'a': 1, 'b': 2}
+```
+
+`update` is implemented in C and does not route through `__setitem__`, so the
+override is bypassed. The same applies to `dict(**d)`, `setdefault`, and the
+equivalents on `list`. The built-ins are not written as cooperating Python
+methods, and nothing promises they will call each other.
+
+Two ways out. `collections.UserDict` and `UserList` are pure-Python wrappers
+written so that every operation does go through the methods you can override.
+Or hold a plain `dict` as an attribute and expose only the operations you mean
+to support &mdash; composition again, and usually the better answer, because a
+container with one unusual rule is rarely a good substitute for the real thing
+everywhere a `dict` is accepted.
+
+## Alternative constructors, and why they take cls
+
+A class often needs more than one way to be built &mdash; from a string, from a
+row of a file, from a dictionary. Adding parameters to `__init__` for each one
+gets ugly quickly. A `classmethod` is the usual answer:
+
+```python
+class Point:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+    @classmethod
+    def from_text(cls, text):
+        x, y = text.split(",")
+        return cls(int(x), int(y))
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.x}, {self.y})"
+
+
+class Point3D(Point):
+    pass
+
+
+print(Point.from_text("3,4"))
+print(Point3D.from_text("3,4"))
+```
+
+```
+Point(3, 4)
+Point3D(3, 4)
+```
+
+The important detail is `cls`, not `Point`. A classmethod receives the class it
+was called on, so `Point3D.from_text` builds a `Point3D` without `Point3D`
+writing a line of code. Hard-coding `return Point(...)` would have given a
+`Point` from both calls, and the subclass would have silently lost its own
+type &mdash; the same failure as hard-coding a name in `__repr__`, from the
+same cause.
+
+## Questions people ask
+
+<strong>Do I have to call `super().__init__()`?</strong> Only if the parent's
+`__init__` does something you need &mdash; but it usually does, and skipping it
+fails later and further away, so call it unless you have a specific reason not
+to.
+
+<strong>Can a subclass add attributes the parent knows nothing about?</strong>
+Yes, and that is normal. `Manager` adding `bonus` is exactly the intended use.
+
+<strong>What is the difference between overriding and overloading?</strong>
+Overriding is replacing an inherited method, which Python does. Overloading is
+several versions of one function distinguished by argument types, which Python
+does not have &mdash; default arguments and `*args` cover the same ground.
+
+<strong>Should everything inherit from a common base?</strong> No. That is a
+habit from languages where it is required. Unrelated classes should be
+unrelated.
+
+<strong>How deep is too deep?</strong> Three levels is usually already a
+warning. The cost is not the depth itself but that finding which class defines
+a given method becomes a search.
+
+<strong>Why does my subclass print the parent's name?</strong> Because
+`__repr__` hard-codes a string. Use `type(self).__name__` and it follows the
+actual class.
+
+<strong>Why does `super()` need no arguments?</strong> Inside a class body Python
+supplies the class and the instance for you. The explicit
+`super(Dog, self)` form is the Python 2 spelling and still works, which is why
+you will see it in older code.
+
+<strong>Can I inherit from a class in another module?</strong> Yes, and it is
+normal &mdash; but remember that you are now coupled to that class's internals,
+so a library's undocumented base class is a risky parent.
+
+## Recap in one screen
+
+- Inherit when the child genuinely is a kind of the parent and can be used
+  anywhere the parent is expected; otherwise hold the other object instead.
+- `super()` means the next class in the MRO of the object's real type, not
+  literally the parent &mdash; which is what makes mixins work.
+- Overrides must accept what the parent accepted and return what it returned;
+  an override that raises is a sign the relationship is wrong.
+- Prefer a method call over a chain of `isinstance` checks; that is the
+  benefit you inherited for.
+- `type(self).__name__` in `__repr__` gives every subclass a correct one.

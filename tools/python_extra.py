@@ -2385,3 +2385,1286 @@ MRO, and reasoning about it stops being possible for anyone who did not write it
 If you need `__mro__` to work out which code runs, the design has already cost
 more than it saved.
 """)
+
+
+# --------------------------------------------------------------------------
+# Third pass. The sections above bring each topic to roughly 800 words, which
+# explains the feature and stops just as the reader starts asking the second
+# question. These take each page to around 2000: a worked example whose output
+# is printed rather than described, the question people actually arrive with,
+# and a recap that fits on one screen.
+# --------------------------------------------------------------------------
+
+
+extend("inheritance", """
+## A hierarchy that earns itself
+
+Two classes, where the second genuinely is a kind of the first and changes one
+calculation:
+
+```python
+class Employee:
+    def __init__(self, name, salary):
+        self.name = name
+        self.salary = salary
+
+    def pay(self):
+        return self.salary / 12
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.name!r})"
+
+
+class Manager(Employee):
+    def __init__(self, name, salary, bonus):
+        super().__init__(name, salary)
+        self.bonus = bonus
+
+    def pay(self):
+        return super().pay() + self.bonus / 12
+
+
+staff = [Employee("ana", 60000), Manager("bo", 90000, 12000)]
+for person in staff:
+    print(person, round(person.pay(), 2))
+```
+
+That prints:
+
+```
+Employee('ana') 5000.0
+Manager('bo') 8500.0
+```
+
+Three things in that are worth copying. `Manager.pay` calls `super().pay()`
+rather than repeating `self.salary / 12`, so a change to how base pay is
+computed reaches both classes. `__repr__` uses `type(self).__name__` rather
+than the literal string `"Employee"`, so the subclass prints its own name for
+free. And the loop does not ask what kind of object it has &mdash; it calls
+`pay()` and lets each class answer. That last one is the point of the whole
+exercise; a loop full of `isinstance` checks has inheritance without the
+benefit.
+
+## What super() actually does
+
+`super()` is usually described as "call the parent", which is close enough
+until it isn't. What it really means is *the next class along in the MRO of the
+object's actual type* &mdash; and with one parent those are the same thing, so
+the shortcut survives a long time before it breaks.
+
+Here is where it stops being the same thing:
+
+```python
+class Base:
+    def greet(self):
+        return "base"
+
+class Left(Base):
+    def greet(self):
+        return "left -> " + super().greet()
+
+class Right(Base):
+    def greet(self):
+        return "right -> " + super().greet()
+
+class Both(Left, Right):
+    pass
+
+print(Both().greet())
+print([c.__name__ for c in Both.__mro__])
+```
+
+The output surprises most people the first time:
+
+```
+left -> right -> base
+['Both', 'Left', 'Right', 'Base', 'object']
+```
+
+`Left.greet` calls `super().greet()` and gets **`Right`**, not `Base` &mdash;
+even though `Right` is nowhere in `Left`'s definition. The MRO is computed from
+the type of the object, and `Both` puts `Right` after `Left`. This is what
+makes cooperative multiple inheritance possible: each class does its bit and
+delegates onward without knowing who is next.
+
+It is also why `super().__init__(...)` matters even when the parent's
+`__init__` looks empty. In a hierarchy someone else may extend later, breaking
+the chain breaks classes that do not exist yet.
+
+## Overriding without breaking the parent's promise
+
+An override replaces a method, and anything holding the parent type keeps
+calling it expecting the parent's behaviour. Two rules keep that honest.
+
+**Accept at least what the parent accepted.** If `Animal.feed(self, amount)`
+takes an amount, a subclass whose `feed(self)` takes none will fail whenever
+it is used through the parent's interface.
+
+**Return the same kind of thing.** A parent whose `area()` returns a number and
+a child whose `area()` returns a string will break the first caller that does
+arithmetic with it.
+
+The override that breaks both is the one that refuses:
+
+```python
+class ReadOnlyList(list):
+    def append(self, item):
+        raise TypeError("read only")
+```
+
+This looks like a reasonable restriction and is a trap. Everything that accepts
+a `list` is entitled to append to one, so `ReadOnlyList` is not a list in any
+useful sense &mdash; it just passes `isinstance` checks. If you want something
+that cannot be appended to, do not inherit from something that can; hold a list
+and expose only the methods you intend to support.
+
+## isinstance, and when checking the type is the wrong move
+
+`isinstance(x, Animal)` is true for `Animal` and for every subclass, which is
+what you almost always want. `type(x) is Animal` is true only for exact
+matches, and using it deliberately excludes subclasses &mdash; which is rarely
+what anyone means.
+
+Both are worth reaching for less often than people do. A chain like this:
+
+```python
+if isinstance(thing, Dog):
+    sound = "woof"
+elif isinstance(thing, Cat):
+    sound = "meow"
+```
+
+is inheritance being used for storage while the branching is still done by
+hand. The version that scales is a `speak()` method on each class and
+`thing.speak()` at the call site: adding a tenth animal then touches one new
+class rather than every chain in the codebase.
+
+The honest uses are narrow: validating an argument at a public boundary,
+handling genuinely unrelated types such as "a string or a list of strings", and
+writing `__eq__`, which has to decide what it can be compared against.
+
+## Where attributes are found
+
+Overriding is one case of a more general rule, and knowing the rule removes a
+whole category of confusion. When you write `obj.thing`, Python looks in the
+instance's own dictionary first, then the class, then each class along the MRO
+in order, and raises `AttributeError` if none of them has it.
+
+That ordering explains why assigning to an attribute on one instance does not
+affect the others, and why assigning on the class affects every instance that
+has not set its own:
+
+```python
+class Counter:
+    total = 0                      # on the class, shared
+
+    def bump(self):
+        self.total += 1            # reads class, writes instance
+
+
+a, b = Counter(), Counter()
+a.bump()
+print(a.total, b.total, Counter.total)
+```
+
+```
+1 0 0
+```
+
+`self.total += 1` reads `Counter.total` (0, found on the class), adds one, and
+*assigns* the result to `a`, which creates an instance attribute shadowing the
+class one. `b` and the class itself never change. This is the single most
+common surprise with class attributes, and it is not a special rule &mdash; it
+falls straight out of "reads search the chain, writes always land on the
+instance".
+
+The version that genuinely shares state has to say so:
+
+```python
+    def bump(self):
+        Counter.total += 1         # or type(self).total
+```
+
+And the version that catches people badly is a mutable class attribute, because
+appending to a list is a read followed by a mutation, not an assignment &mdash;
+so every instance really does share it. If each instance needs its own, create
+it in `__init__`.
+
+## Extending a built-in, and why it disappoints
+
+Subclassing `dict` or `list` looks like the obvious way to get a container with
+one extra behaviour, and it works less well than expected:
+
+```python
+class LoudDict(dict):
+    def __setitem__(self, key, value):
+        print("setting", key)
+        super().__setitem__(key, value)
+
+
+d = LoudDict()
+d["a"] = 1              # prints
+d.update({"b": 2})      # prints nothing
+print(dict(d))
+```
+
+```
+setting a
+{'a': 1, 'b': 2}
+```
+
+`update` is implemented in C and does not route through `__setitem__`, so the
+override is bypassed. The same applies to `dict(**d)`, `setdefault`, and the
+equivalents on `list`. The built-ins are not written as cooperating Python
+methods, and nothing promises they will call each other.
+
+Two ways out. `collections.UserDict` and `UserList` are pure-Python wrappers
+written so that every operation does go through the methods you can override.
+Or hold a plain `dict` as an attribute and expose only the operations you mean
+to support &mdash; composition again, and usually the better answer, because a
+container with one unusual rule is rarely a good substitute for the real thing
+everywhere a `dict` is accepted.
+
+## Alternative constructors, and why they take cls
+
+A class often needs more than one way to be built &mdash; from a string, from a
+row of a file, from a dictionary. Adding parameters to `__init__` for each one
+gets ugly quickly. A `classmethod` is the usual answer:
+
+```python
+class Point:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+    @classmethod
+    def from_text(cls, text):
+        x, y = text.split(",")
+        return cls(int(x), int(y))
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.x}, {self.y})"
+
+
+class Point3D(Point):
+    pass
+
+
+print(Point.from_text("3,4"))
+print(Point3D.from_text("3,4"))
+```
+
+```
+Point(3, 4)
+Point3D(3, 4)
+```
+
+The important detail is `cls`, not `Point`. A classmethod receives the class it
+was called on, so `Point3D.from_text` builds a `Point3D` without `Point3D`
+writing a line of code. Hard-coding `return Point(...)` would have given a
+`Point` from both calls, and the subclass would have silently lost its own
+type &mdash; the same failure as hard-coding a name in `__repr__`, from the
+same cause.
+
+## Questions people ask
+
+<strong>Do I have to call `super().__init__()`?</strong> Only if the parent's
+`__init__` does something you need &mdash; but it usually does, and skipping it
+fails later and further away, so call it unless you have a specific reason not
+to.
+
+<strong>Can a subclass add attributes the parent knows nothing about?</strong>
+Yes, and that is normal. `Manager` adding `bonus` is exactly the intended use.
+
+<strong>What is the difference between overriding and overloading?</strong>
+Overriding is replacing an inherited method, which Python does. Overloading is
+several versions of one function distinguished by argument types, which Python
+does not have &mdash; default arguments and `*args` cover the same ground.
+
+<strong>Should everything inherit from a common base?</strong> No. That is a
+habit from languages where it is required. Unrelated classes should be
+unrelated.
+
+<strong>How deep is too deep?</strong> Three levels is usually already a
+warning. The cost is not the depth itself but that finding which class defines
+a given method becomes a search.
+
+<strong>Why does my subclass print the parent's name?</strong> Because
+`__repr__` hard-codes a string. Use `type(self).__name__` and it follows the
+actual class.
+
+<strong>Why does `super()` need no arguments?</strong> Inside a class body Python
+supplies the class and the instance for you. The explicit
+`super(Dog, self)` form is the Python 2 spelling and still works, which is why
+you will see it in older code.
+
+<strong>Can I inherit from a class in another module?</strong> Yes, and it is
+normal &mdash; but remember that you are now coupled to that class's internals,
+so a library's undocumented base class is a risky parent.
+
+## Recap in one screen
+
+- Inherit when the child genuinely is a kind of the parent and can be used
+  anywhere the parent is expected; otherwise hold the other object instead.
+- `super()` means the next class in the MRO of the object's real type, not
+  literally the parent &mdash; which is what makes mixins work.
+- Overrides must accept what the parent accepted and return what it returned;
+  an override that raises is a sign the relationship is wrong.
+- Prefer a method call over a chain of `isinstance` checks; that is the
+  benefit you inherited for.
+- `type(self).__name__` in `__repr__` gives every subclass a correct one.
+""")
+
+
+extend("input_and_output", """
+## Reading several values from one line
+
+People type more than one thing at a time, and `split()` is how you take them
+apart. Using a stand-in for the typed line, as the rest of this page does:
+
+```python
+raw = "3 12 7"
+
+a, b, c = raw.split()                      # three strings
+nums = [int(x) for x in raw.split()]       # three ints
+first, *rest = raw.split()                 # "3", ["12", "7"]
+
+print(a, b, c)
+print(nums, sum(nums))
+print(first, rest)
+```
+
+```
+3 12 7
+[3, 12, 7] 22
+3 ['12', '7']
+```
+
+`split()` with no argument is the one to reach for: it splits on any run of
+whitespace and ignores leading and trailing space, so a line typed with two
+spaces between values still works. `split(" ")` is the version that does not
+forgive that, and produces empty strings where the extra spaces were.
+
+The trap is unpacking a line whose length you assumed:
+
+```python
+a, b, c = "3 12".split()
+# ValueError: not enough values to unpack (expected 3, got 2)
+```
+
+The message is precise, which makes this an easy one to fix &mdash; but it is
+raised at the assignment, so a program that reads ten lines and unpacks each
+will stop on the first short one. Where the input comes from a person rather
+than a file you control, check the length before unpacking, or collect with a
+star and validate.
+
+## A menu loop, end to end
+
+Most small interactive programs are the same shape: show the options, read a
+choice, act on it, repeat until they quit. Written once properly it is worth
+keeping:
+
+```python
+ACTIONS = {"1": "add an item", "2": "list items", "q": "quit"}
+
+def menu(choices):
+    for key, label in ACTIONS.items():
+        print(f"  {key}) {label}")
+    for choice in choices:                 # stands in for input()
+        choice = choice.strip().lower()
+        if choice == "q":
+            print("bye")
+            break
+        if choice not in ACTIONS:
+            print(f"'{choice}' is not an option")
+            continue
+        print("->", ACTIONS[choice])
+
+menu(["1", "9", "2", "Q"])
+```
+
+```
+  1) add an item
+  2) list items
+  q) quit
+-> add an item
+'9' is not an option
+-> list items
+bye
+```
+
+The details that make it usable rather than merely working: the options are
+data in a dictionary rather than a chain of `elif`, so adding one is a single
+line; the choice is stripped and lowercased before anything looks at it, so
+`" Q "` works; an unknown choice says what was typed and loops rather than
+crashing; and quitting is an explicit option rather than Ctrl-C.
+
+In a real program the `for choice in choices` line becomes `while True:` with
+`choice = input("choose: ")`. Everything else stays as it is.
+
+## Why output sometimes appears in the wrong order
+
+Standard output is buffered when it is not a terminal. Python collects printed
+text and writes it in blocks, because one system call per line is slow. On
+screen this is invisible. Redirect to a file or pipe the program into another
+one and it becomes visible: output can appear late, and it can appear *after*
+things written to standard error, which is not buffered the same way.
+
+```python
+import sys
+
+print("step 1")                       # buffered
+print("warning", file=sys.stderr)     # not buffered
+print("step 2", flush=True)           # written immediately
+```
+
+Run that on a terminal and the order is what you wrote. Run `python3 s.py > out.txt`
+and the warning appears on screen before the file has anything in it.
+
+`flush=True` forces a write at that point. It is worth using for progress
+messages in a long-running script, and for anything printed just before an
+operation that might hang &mdash; otherwise the message you were relying on to
+tell you where it got stuck is still sitting in the buffer.
+
+The same applies to a crash: output already printed but not yet flushed can be
+lost if the process dies badly, which is one of the reasons `logging` is
+preferred to `print` once a script grows up.
+
+## Command-line arguments, the other input
+
+`input()` is not the only way a program receives values, and for anything you
+will run more than once it is the worse one. Arguments typed alongside the
+command arrive in `sys.argv`:
+
+```python
+import sys
+
+# $ python3 report.py sales.csv 2024
+print(sys.argv)          # ['report.py', 'sales.csv', '2024']
+name = sys.argv[1] if len(sys.argv) > 1 else "data.csv"
+```
+
+`sys.argv[0]` is the script's own name, so the real arguments start at index 1,
+and reading one that was not supplied raises `IndexError` &mdash; hence the
+length check, or a default.
+
+The difference matters more than it looks. A program driven by `input()` cannot
+be scripted, scheduled, or re-run with the same values without somebody typing
+them again. A program driven by arguments can be put in a shell script and
+repeated exactly. The rule of thumb: prompt for what a person decides in the
+moment, take as an argument anything the program needs every time it runs.
+
+Once there is more than one or two, `argparse` in the standard library is worth
+the twenty minutes &mdash; it gives `--flags`, defaults, type conversion, and a
+`--help` message generated from the same declaration.
+
+## Making a prompt hard to get wrong
+
+Most bad input is invited by the prompt. Three habits remove most of it:
+
+```python
+def ask_yes_no(answer, default=True):
+    answer = answer.strip().lower()
+    if not answer:
+        return default
+    return answer in ("y", "yes")
+
+
+for typed in ["Y", "no", "", "  YES "]:
+    print(repr(typed), "->", ask_yes_no(typed))
+```
+
+```
+'Y' -> True
+'no' -> False
+'' -> True
+'  YES ' -> True
+```
+
+**Say what the options are, and which one enter chooses.** A prompt reading
+`Continue? [Y/n]` tells the person both, and the capital letter is the
+convention for the default.
+
+**Normalise before comparing.** `strip().lower()` turns four different things a
+person might type into one thing your code has to handle.
+
+**Accept the obvious variants.** Someone who types `yes` when you asked for `y`
+has answered the question; refusing them is the program being difficult.
+
+The same three apply to any prompt, not just yes/no: show the units, show the
+default, and strip the input before you look at it.
+
+## Reading a password without showing it
+
+`input()` echoes what is typed, which is exactly wrong for a password. The
+standard library has the right tool:
+
+```python
+from getpass import getpass
+
+secret = getpass("Password: ")     # typed characters are not displayed
+```
+
+It reads from the terminal directly rather than from standard input, so it
+cannot be piped into &mdash; which is a feature. It also falls back to a plain
+`input()` with a warning when there is no real terminal, so check the
+environment rather than assuming the characters were hidden.
+
+The rule that goes with it: do not print a secret back out, do not put one in a
+default argument, and do not read one from `sys.argv`, because arguments are
+visible to anyone who can list the running processes. For anything automated,
+an environment variable or a file with restricted permissions is the usual
+answer, and `os.environ.get("API_KEY")` is how you read it.
+
+## Confirming before something irreversible
+
+When a program is about to delete, overwrite or send something, the prompt is
+the last line of defence, and a `[y/N]` is a weak one &mdash; people type `y`
+by reflex. For genuinely irreversible actions, ask for something that cannot be
+answered by reflex:
+
+```python
+def confirm(typed, expected):
+    return typed.strip() == expected
+
+
+target = "production"
+print(confirm("production", target))
+print(confirm("y", target))
+```
+
+```
+True
+False
+```
+
+Requiring the name to be typed out makes the person read what they are about to
+do. Note that this comparison is deliberately not lowercased or fuzzy-matched:
+everywhere else on this page the advice is to forgive input, and this is the
+one place where being strict is the point.
+
+## Questions people ask
+
+<strong>Why does `input()` return a string when I typed a number?</strong>
+Because it reads characters and has no way to know what you meant by them.
+`"42"` could be a quantity, a house number or a password.
+
+<strong>How do I read a number without crashing on bad input?</strong> Wrap
+`int()` in `try`/`except ValueError` and ask again &mdash; the loop earlier on
+this page is the standard shape.
+
+<strong>What is the difference between `print(x)` and `print(str(x))`?</strong>
+Nothing. `print` calls `str()` on each argument already.
+
+<strong>Why do my strings show up with quotes?</strong> You printed a
+container. `print(["a"])` shows the list's `repr`, which quotes its items;
+`print(", ".join(["a"]))` prints them as text.
+
+<strong>How do I print without a newline?</strong> `print(x, end="")`, then a
+bare `print()` when the line is finished.
+
+<strong>Can I read everything at once instead of line by line?</strong> Yes:
+`sys.stdin.read()` for the whole of standard input, or `sys.stdin` iterated
+like a file for one line at a time without `input`'s prompt handling.
+
+<strong>Why does my prompt appear after the input on some terminals?</strong>
+Because the prompt was printed with `print` and not flushed. `input()`'s own
+prompt argument does not have this problem, which is the reason to use it.
+
+<strong>How do I clear the screen or move the cursor?</strong> With terminal
+escape codes, or a library like `curses` or `rich`. There is nothing in `print`
+itself for it.
+
+<strong>Does `input()` strip the newline?</strong> Yes &mdash; it returns the
+line without the trailing newline, but with any spaces the person typed, which
+is why `strip()` is still worth calling.
+
+## Recap in one screen
+
+- `input()` always returns a string, and always without the trailing newline.
+- Convert explicitly, and expect the conversion to fail on real input &mdash;
+  `try`/`except ValueError` in a loop is the shape that survives a person.
+- `split()` with no argument handles ragged whitespace; unpacking a line
+  assumes a length, so check it first.
+- `sep` and `end` control what `print` puts between and after its arguments;
+  `file=sys.stderr` separates chatter from results.
+- Output is buffered when redirected. `flush=True` for progress messages you
+  need to see while the program is still running.
+""")
+
+
+extend("string_methods", """
+## replace, and the count nobody passes
+
+`replace` swaps every occurrence and, like everything else here, returns a new
+string:
+
+```python
+text = "a-b-c-d"
+print(text.replace("-", " "))
+print(text.replace("-", " ", 2))
+print(text)
+```
+
+```
+a b c d
+a b c-d
+a-b-c-d
+```
+
+The third argument caps how many are replaced, counting from the left, and it
+is the one people forget exists &mdash; it saves a regular expression
+surprisingly often. The last line is the reminder that `text` itself never
+changed.
+
+`count` answers the related question without doing the work: `text.count("-")`
+is 3 here, and returns 0 rather than raising when there are none.
+
+## A worked example: cleaning one messy line
+
+Real text arrives with the wrong spacing, the wrong case, and a newline on the
+end. The methods on this page compose into a single readable pass:
+
+```python
+raw = "  Ana , 91 ,  Physics\\n"
+
+name, score, subject = [f.strip() for f in raw.strip().split(",")]
+
+print(repr(name), int(score), repr(subject))
+```
+
+```
+'Ana' 91 'Physics'
+```
+
+Two strips are doing different jobs and both are needed. The outer
+`raw.strip()` removes the leading spaces and the trailing newline from the line
+as a whole. The one inside the comprehension removes the spaces around each
+field, which the outer one could not reach. Splitting first and stripping each
+piece is the general shape; stripping only the whole line leaves `" 91 "`,
+which `int()` happens to forgive and a string comparison does not.
+
+`repr()` in the output is there deliberately. Printing a string that still has
+a stray space looks identical to one that does not, and `repr` is how you see
+the difference.
+
+## Padding and aligning without counting spaces
+
+```python
+rows = [("ana", 91), ("bo", 7), ("caroline", 143)]
+for name, n in rows:
+    print(name.ljust(10, ".") + str(n).rjust(4))
+```
+
+```
+ana.......  91
+bo........   7
+caroline.. 143
+```
+
+`ljust`, `rjust` and `center` take a width and an optional fill character.
+`zfill` is the special case for numbers: `"7".zfill(3)` gives `"007"`, and it
+handles a leading minus sign correctly, which `rjust(3, "0")` does not.
+
+The f-string spellings are `f"{name:<10}"`, `f"{n:>4}"` and `f"{n:^4}"`, and
+they are usually the better choice because the value and its formatting stay
+together. The methods are worth knowing for when the width is computed rather
+than literal.
+
+## The is-something tests, and the one that lies
+
+```python
+print("42".isdigit(), "4.2".isdigit(), "-4".isdigit())
+print("42".isdecimal(), "\\u00b2".isdigit(), "\\u00b2".isdecimal())
+```
+
+```
+True False False
+True True False
+```
+
+`isdigit` is not "would `int()` accept this". It rejects a decimal point and a
+minus sign, and it accepts superscripts and other numeric characters that
+`int()` refuses. `isdecimal` is the stricter one and the closer match to what
+people usually mean.
+
+The reliable test for "is this a number" is to try the conversion:
+
+```python
+def is_int(text):
+    try:
+        int(text)
+    except ValueError:
+        return False
+    return True
+```
+
+That handles the minus sign, the surrounding whitespace and the underscores
+Python allows in numeric literals, all of which the `is` methods get wrong in
+one direction or the other. `isalpha`, `isspace` and `isupper` have no such
+problem and are safe to use directly.
+
+## Why strings are immutable at all
+
+Beginners meet immutability as an inconvenience &mdash; the reason `name.upper()`
+seems not to work. It is worth knowing what the language buys with it, because
+the same property explains behaviour in several other places.
+
+A string that cannot change can be shared without anyone worrying about who
+else holds it. Python takes advantage of that constantly: identical short
+strings in your source are often the same object in memory, string constants
+can be stored once and pointed at from many places, and passing a string to a
+function costs nothing regardless of its length, because nothing is copied.
+
+It also makes strings hashable, and therefore usable as dictionary keys and set
+members. A hash is computed from the contents; if the contents could change,
+the key would end up filed under a hash that no longer matches it, and lookups
+would silently fail. This is exactly why lists cannot be keys and tuples can.
+Every dictionary you index by name relies on strings being immutable.
+
+The cost is real and narrow: building a string by repeated concatenation is
+quadratic, because each step copies everything so far. That is the one place
+where the design bites, and `join` exists to cover it. Everywhere else, the
+guarantee that a string you were handed is the string you still have is worth
+considerably more than the ability to edit one in place.
+
+## Unicode, and what a character actually is
+
+A Python string is a sequence of Unicode code points, not bytes. For English
+text the distinction never comes up, and outside English it comes up
+immediately.
+
+`len("café")` is 4, which is what you would hope. But the same text can be
+written two ways in Unicode &mdash; as an `é` code point, or as `e` followed by
+a combining accent &mdash; and in the second form `len` reports 5 while the
+text looks identical on screen. `unicodedata.normalize("NFC", text)` collapses
+the second form into the first, and normalising before comparing is the fix for
+"these two strings look the same and are not equal".
+
+Emoji push this further: many are several code points joined together, so
+slicing a string by index can cut one in half and produce something that will
+not render. If you are truncating text that might contain them, count
+grapheme clusters with a library rather than characters.
+
+Encoding is the separate question of how those code points become bytes for a
+file or a network. `text.encode("utf-8")` produces `bytes`;
+`data.decode("utf-8")` goes back. The errors people hit &mdash;
+`UnicodeDecodeError` on reading a file, mojibake like `Ã©` where `é` should be
+&mdash; are almost always a file written in one encoding and read in another.
+UTF-8 is the right default everywhere, and specifying it explicitly when
+opening files is worth the few extra characters, because the default still
+varies by platform.
+
+## When to stop using string methods
+
+The methods on this page handle a great deal, and there is a point past which
+they stop being the right tool. The signal is a chain of `split`, `strip`,
+`find` and slicing that is getting longer each time the input surprises you.
+
+If the pattern is genuinely variable &mdash; optional whitespace, alternatives,
+repetition, groups you want to capture &mdash; that is what regular expressions
+are for, and `re.search` with a named group will be shorter and easier to fix
+than eight lines of index arithmetic. The trade is that a regular expression is
+harder to read for anyone who does not write them often, so it earns its place
+only when the string methods have genuinely run out.
+
+If the text is a known format, do not parse it by hand at all. JSON, CSV, INI
+files, dates, URLs and email addresses all have a module in the standard
+library that has already handled the edge cases you have not thought of yet:
+quoted commas inside a CSV field, escaped characters in JSON, timezone
+suffixes, percent-encoding. Hand-rolled parsing of a standard format is the
+most reliable way to produce a program that works on your test file and fails
+on real data.
+
+The rule that follows is a simple one. String methods for cleaning and simple
+splitting, a parser for anything with a specification, and regular expressions
+for the genuinely irregular middle ground.
+
+## Questions people ask
+
+<strong>Why does `strip()` not remove a suffix?</strong> Because its argument
+is a set of characters to remove from each end, not a string to match. Use
+`removesuffix` for the other job.
+
+<strong>Is `+` on strings actually slow?</strong> Not for a few pieces. It is
+slow inside a loop over thousands, because each `+` builds a whole new string.
+Collect into a list and `join` once.
+
+<strong>What is the difference between `find` and `index`?</strong> `find`
+returns -1 when absent, `index` raises `ValueError`. Pick based on whether
+absence is expected or a bug.
+
+<strong>How do I split on more than one separator?</strong> `re.split` from the
+`re` module &mdash; `str.split` takes one separator only.
+
+<strong>Why does `"".join(numbers)` fail?</strong> `join` requires strings.
+Convert first: `"".join(str(n) for n in numbers)`.
+
+<strong>Does `lower()` work for every language?</strong> Mostly.
+`casefold()` is the more aggressive version intended for caseless comparison,
+and it is what to use when the text is not guaranteed to be English.
+
+<strong>How do I check a string against several endings?</strong>
+`endswith` accepts a tuple: `name.endswith((".jpg", ".png"))`.
+
+## Recap in one screen
+
+- Every string method returns a new string; if you do not assign the result,
+  nothing happened.
+- `join` is called on the separator and needs strings; `split()` with no
+  argument is the forgiving version.
+- `strip` takes characters, not a suffix &mdash; `removeprefix` and
+  `removesuffix` exist for that.
+- `find` returns -1, `index` raises; `in` is the one to use when you only need
+  a yes or no.
+- `isdigit` is not "is a number" &mdash; try the conversion instead.
+""")
+
+
+extend("mutability_and_aliasing", """
+## Watching it happen with id()
+
+`id()` returns a number identifying an object for as long as it exists, which
+turns the whole topic from an assertion into something you can check:
+
+```python
+a = [1, 2]
+b = a
+before = id(a)
+
+a.append(3)
+print("after append :", id(a) == before, b)
+
+a = a + [4]
+print("after rebind :", id(a) == before, b)
+```
+
+```
+after append : True [1, 2, 3]
+after rebind : False [1, 2, 3]
+```
+
+The first line mutated the object, so the id is unchanged and `b` &mdash; the
+other name for that same object &mdash; sees the new item. The second line
+built a different list and pointed `a` at it, so the id changed and `b` still
+refers to the original, which now has three items rather than four.
+
+Every confusing aliasing bug is one of those two lines in disguise.
+
+## The augmented assignment asymmetry
+
+`a += [3]` and `a = a + [3]` look like the same statement written two ways.
+For lists they are not:
+
+```python
+a = [1, 2]
+b = a
+a += [3]
+print(a, b)
+
+a = [1, 2]
+b = a
+a = a + [3]
+print(a, b)
+```
+
+```
+[1, 2, 3] [1, 2, 3]
+[1, 2, 3] [1, 2]
+```
+
+`+=` on a list calls `__iadd__`, which extends the existing list in place and
+then rebinds the name to that same object &mdash; so every other name sees the
+change. `a + [3]` builds a new list and only then rebinds, leaving `b` alone.
+
+For numbers, strings and tuples there is no in-place option, so `+=` always
+behaves like the second form. This is why `+=` feels consistent right up until
+the first time it is used on a list that someone else is also holding.
+
+## A tuple is immutable, its contents are not
+
+```python
+t = ([1, 2], "fixed")
+
+t[0].append(3)
+print(t)
+
+try:
+    t[1] = "changed"
+except TypeError as e:
+    print("TypeError:", e)
+```
+
+```
+([1, 2, 3], 'fixed')
+TypeError: 'tuple' object does not support item assignment
+```
+
+The tuple guarantees that its slots keep pointing at the same objects. It
+promises nothing about those objects. A tuple of lists is therefore not a
+frozen structure, and &mdash; the practical consequence &mdash; it cannot be
+used as a dictionary key, because hashing it has to hash its contents and lists
+are unhashable.
+
+The sharpest corner in the language sits here:
+
+```python
+t = ([1],)
+try:
+    t[0] += [2]
+except TypeError as e:
+    print("TypeError:", e)
+print(t)
+```
+
+```
+TypeError: 'tuple' object does not support item assignment
+([1, 2],)
+```
+
+It raised **and** it worked. `t[0] += [2]` extends the list in place, and then
+tries to assign the result back into the tuple slot, which fails. The mutation
+has already happened by then. Nothing about this is worth relying on; it is
+worth recognising, because the error message points at the tuple while the
+damage is in the list.
+
+## Where this actually bites
+
+The rule is simple and the bugs are not, because in real code the two names for
+one object are usually far apart. Four shapes account for most of them.
+
+**A shared default.** A function with `def add(item, target=[])` creates that
+list once, when the function is defined, and every call that does not pass one
+uses the same list. Items accumulate across calls that look independent. The
+fix is `target=None` and `if target is None: target = []` in the body.
+
+**A configuration dictionary passed around.** One module reads a settings dict,
+tweaks a value "just for its own use", and every other module sees the change.
+This is the hardest version to find, because the code that made the change and
+the code that misbehaves may be in different files with nothing linking them.
+
+**A cached object handed to callers.** A function that builds a list once and
+returns the same list every time is fast and dangerous: the first caller to
+mutate the result has changed what every later caller receives. Returning a
+copy, or a tuple, closes it.
+
+**A class attribute holding a list.** Written on the class rather than in
+`__init__`, it belongs to the class, so every instance appends to the same one.
+Instances that were meant to be independent quietly share state.
+
+What the four have in common is that nobody wrote `b = a`. The second name
+arrived through an argument, a return value, a default or a class body. That is
+why "assignment does not copy" is worth internalising rather than memorising:
+the aliasing is rarely visible on the line where the bug appears.
+
+## A model that fits in your head
+
+Two sentences cover everything on this page.
+
+**Names point at objects.** A name is not storage; it is a label. Assignment
+moves a label. Several labels can point at one object, and the object has no
+idea how many.
+
+**Some objects can change, and some cannot.** If an object can change, then
+every label pointing at it sees the change, because there is only one object.
+If it cannot, the question never arises.
+
+Everything else follows. Why does mutating a list argument affect the caller?
+The parameter is another label on the same object. Why does `n += 1` inside a
+function not affect the caller? Integers cannot change, so `+=` must build a
+new one and move the local label to it. Why is a tuple of lists not frozen? The
+tuple's labels cannot be moved; the objects they point at can still change.
+
+When something surprising happens, the productive question is not "was this
+passed by value or by reference" but "how many names point at this object, and
+did that line move a label or change an object". `id()` answers the first half
+and the code in front of you answers the second.
+
+## Choosing immutability in your own code
+
+Once the distinction is clear, it becomes a design decision rather than a fact
+about builtins. Making your own objects immutable removes the entire class of
+bugs above, and Python gives you a few ways to do it.
+
+A `NamedTuple` or a dataclass declared with `@dataclass(frozen=True)` produces
+a class whose attributes cannot be reassigned after construction. Attempting it
+raises rather than silently succeeding, which turns a subtle shared-state bug
+into an immediate error at the line that caused it. Both are hashable, so they
+can be dictionary keys and set members, and both give you a readable `repr` for
+free.
+
+The pattern that follows is to build a new object rather than edit an existing
+one. A method that would have changed `self.total` instead returns a new
+instance with the new total, and callers rebind. This costs an allocation and
+buys the guarantee that nothing you handed to another part of the program can
+change underneath it.
+
+It is not the right default for everything. A large object that changes often
+&mdash; a buffer being filled, a cache, anything performance-sensitive &mdash;
+is better mutable, and Python's builtins reflect that. The useful habit is to
+reach for immutability for the things that travel: configuration, coordinates,
+records read from a file, anything passed between modules or stored in a
+dictionary. Keep mutability local, where you can see every name that points at
+the object.
+
+## Questions people ask
+
+<strong>How do I copy a list properly?</strong> `list(a)`, `a[:]` or `a.copy()`
+for one level. `copy.deepcopy(a)` when the items are themselves mutable and
+need copying too.
+
+<strong>Is `is` ever right for comparing values?</strong> Only for `None`,
+`True` and `False`. Everything else should use `==`.
+
+<strong>Why did my dictionary change when I only edited a copy?</strong>
+Because the copy was shallow and the value you edited is shared between both
+dictionaries.
+
+<strong>Are function arguments copied?</strong> No. The function gets another
+name for the same object, which is why mutating a list argument is visible to
+the caller.
+
+<strong>Why can a tuple be a dictionary key but not a list?</strong> Keys must
+hash to a stable value, and a list's contents can change, which would leave it
+filed in the wrong place.
+
+<strong>Does `sorted(x)` change `x`?</strong> No, it returns a new list.
+`x.sort()` is the in-place one, and it returns `None` &mdash; assigning its
+result is a common way to lose a list.
+
+<strong>What about strings, do I need to copy them?</strong> Never. They cannot
+be changed, so sharing one is always safe.
+
+## Recap in one screen
+
+- A name is a label on an object; assignment moves the label and never copies.
+- Mutating changes the object every name can see; rebinding changes one name.
+- `+=` mutates in place for lists and rebinds for immutables &mdash; the same
+  syntax, two behaviours.
+- Immutable contents can hold mutable objects, so a tuple is only as frozen as
+  what is in it.
+- Copy at the boundary when you store or return a caller's container.
+""")
+
+
+extend("lambda_map_filter", """
+## operator, the module that replaces most lambdas
+
+A large share of the lambdas people write do one of two things: pull out an
+item, or pull out an attribute. The standard library has both, and they are
+faster and more readable than the lambda:
+
+```python
+from operator import itemgetter
+
+people = [("ana", 91), ("bo", 78), ("cy", 91)]
+
+print(sorted(people, key=itemgetter(1), reverse=True))
+print(sorted(people, key=itemgetter(1, 0)))
+```
+
+```
+[('ana', 91), ('cy', 91), ('bo', 78)]
+[('bo', 78), ('ana', 91), ('cy', 91)]
+```
+
+`itemgetter(1)` is `lambda p: p[1]` with a name that says what it does, and
+`itemgetter(1, 0)` returns a tuple, which is how you sort by score and then by
+name without writing the tuple out. `attrgetter` is the same for objects, and
+`methodcaller("lower")` for calling a method on each item.
+
+Note the first result: `ana` comes before `cy` even though they tie, because
+`sorted` is stable and `ana` was first in the input. That guarantee is what
+makes sorting twice for a two-level sort work at all.
+
+## reduce, and why it is not a builtin any more
+
+`map` and `filter` survived the move to Python 3 as builtins. `reduce` did not,
+and lives in `functools`:
+
+```python
+from functools import reduce
+
+nums = [1, 2, 3, 4]
+print(reduce(lambda a, b: a * b, nums))
+print(sum(nums), max(nums), any(n > 3 for n in nums))
+```
+
+```
+24
+10 4 True
+```
+
+The reason for the demotion is on the second line. Nearly every real use of
+`reduce` is a sum, a maximum, a minimum, an `any` or an `all`, and each of
+those has a builtin that says what it means at a glance. What is left &mdash;
+a running product, folding a custom combine function over a sequence &mdash; is
+rare enough to be worth an import and a moment's thought from the reader.
+
+If you do reach for it, pass the initial value: `reduce(f, items, 0)` returns
+the initial value for an empty sequence instead of raising `TypeError`.
+
+## Where map and filter lead: itertools
+
+`map` and `filter` are the first two of a family. `itertools` holds the rest,
+and they share the same property of producing items on demand rather than
+building lists:
+
+```python
+from itertools import islice, chain, takewhile
+
+nums = range(1, 11)
+
+print(list(islice(nums, 3)))
+print(list(takewhile(lambda n: n < 4, nums)))
+print(list(chain([1, 2], [3, 4])))
+```
+
+```
+[1, 2, 3]
+[1, 2, 3]
+[1, 2, 3, 4]
+```
+
+`islice` takes the first few of anything, including an infinite generator.
+`takewhile` stops at the first item that fails the test, which is different
+from `filter` &mdash; `filter` would carry on and return 1, 2, 3 from the whole
+range while `takewhile` stops looking at 4. `chain` walks several iterables as
+one without building a combined list.
+
+The laziness is the point of all of them. A pipeline of `map`, `filter` and
+`islice` over a large file reads only as far as it needs to.
+
+## The three-line version of a common job
+
+Take rows, keep the ones that qualify, transform them, and summarise. Written
+with comprehensions, which is what most Python uses:
+
+```python
+rows = [("ana", 91), ("bo", 55), ("cy", 78), ("di", 43)]
+
+passed = [name for name, score in rows if score >= 60]
+best = max(rows, key=lambda r: r[1])
+
+print(passed)
+print(best)
+print(f"{len(passed)}/{len(rows)} passed")
+```
+
+```
+['ana', 'cy']
+('ana', 91)
+2/4 passed
+```
+
+One lambda appears, as a `key=` argument, which is exactly the place the
+earlier section said it belongs. The filtering and the transforming are done by
+the comprehension rather than by `filter` and `map`, and the result reads in
+the order it happens.
+
+## What "functional" means here, and what it does not
+
+`lambda`, `map` and `filter` arrive with a reputation attached, and it is worth
+separating the useful part from the folklore.
+
+The useful part is that functions are ordinary values in Python. A function can
+be stored in a list, passed as an argument, returned from another function, and
+kept in a dictionary. That is what makes `key=` arguments, decorators,
+callbacks and dispatch tables possible, and it is the single idea behind
+everything on this page. A lambda is not a special kind of function; it is the
+same object a `def` produces, written inline and left unnamed.
+
+The folklore is that using them makes code functional, and that functional code
+is better. Python is not a functional language and does not try to be. It has
+no tail-call optimisation, its lambdas are deliberately limited to one
+expression, and `reduce` was moved out of the builtins precisely to discourage
+the style. Guido van Rossum's stated preference was that a comprehension or a
+plain loop says the same thing more clearly to more readers.
+
+What actually transfers from functional programming, and is worth adopting, is
+smaller and less glamorous: prefer functions that return a new value over
+functions that modify their arguments; avoid depending on state that is not
+visible in the signature; and keep functions small enough to test on their own.
+None of that requires a lambda. A page of `def` statements can follow all three,
+and a chain of nested `map` and `filter` calls can violate them all while
+looking the part.
+
+## When a comprehension stops being the clearer choice
+
+The advice throughout this page is to reach for a comprehension first, so it is
+worth being precise about where that stops holding.
+
+A comprehension is doing too much when it has more than one `for` and a
+condition, when the expression at the front needs its own explanation, or when
+the whole thing no longer fits on one line without awkward wrapping. At that
+point it has become a loop that is harder to read than the loop would have
+been, and the honest move is to write the loop &mdash; or to name the inner
+step as a function and call it from a simple comprehension.
+
+The other case is when you need something a comprehension cannot do: a `break`,
+an early return, a `try`/`except` around one item, or anything that has to
+happen for its side effect rather than its value. A comprehension built purely
+for side effects, with its result thrown away, is a loop wearing the wrong
+clothes; write `for` and let the reader see what is happening.
+
+Nesting deserves its own warning. A comprehension inside another
+comprehension's expression is read outer-first and reasoned about
+inner-first, which is exactly the sort of thing that is fine while you are
+writing it and unpleasant three months later. Two statements are almost always
+better than one clever one.
+
+## Naming things the reader will meet
+
+Two words appear constantly in discussions of this material and are rarely
+defined, which makes a lot of otherwise good explanations hard to follow.
+
+A **higher-order function** is a function that takes a function as an argument
+or returns one. `sorted` is higher-order because of `key=`; so are `map`,
+`filter`, and every decorator you will write. There is nothing more to the term
+than that.
+
+A **closure** is a function that remembers a value from the scope where it was
+created, and keeps working after that scope has finished. The loop trap earlier
+on this page is a closure behaving exactly as specified and not as expected: the
+lambdas remembered the variable rather than the value it held at the time.
+
+## Questions people ask
+
+<strong>Can a lambda have more than one statement?</strong> No. The body is a
+single expression. If you need a statement, you need a `def`.
+
+<strong>Can a lambda have default arguments?</strong> Yes &mdash;
+`lambda x, n=2: x ** n` &mdash; and that is also the trick for capturing a loop
+variable by value.
+
+<strong>Why does printing `map(...)` show an object?</strong> Because it is a
+lazy iterator. Wrap it in `list()` to see the items.
+
+<strong>Is a comprehension faster than `map`?</strong> They are close.
+`map(int, items)` with an existing function is usually slightly faster;
+`map(lambda ..., items)` is usually slightly slower. Neither difference is a
+reason to choose one.
+
+<strong>What does `filter(None, items)` do?</strong> Drops every falsy item.
+`None` in the function slot means "use the item's own truthiness".
+
+<strong>Why can I not pickle a lambda?</strong> Pickling stores a reference by
+name and a lambda has none. That is why `multiprocessing` rejects them, and
+where `functools.partial` earns its place.
+
+<strong>Do `map` and `filter` work on dictionaries?</strong> They work on
+anything iterable, and iterating a dictionary gives its keys. Use
+`d.items()` when you want pairs.
+
+## Recap in one screen
+
+- A lambda is a single-expression function; use one as a `key=` argument and
+  write a `def` whenever it deserves a name.
+- `map` and `filter` are lazy iterators &mdash; consume them once, wrap in
+  `list()` to keep them.
+- Prefer a comprehension by default; `map(existing_function, items)` when it is
+  exactly that shape.
+- `operator.itemgetter` and `attrgetter` replace the most common lambdas and
+  read better.
+- `reduce` lives in `functools` because `sum`, `max`, `any` and `all` already
+  cover almost every use of it.
+""")

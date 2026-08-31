@@ -2322,10 +2322,6 @@ This is for output humans read &mdash; line numbers, ranked lists, steps. It cha
 ## It is lazy, and it takes any iterable
 
 `enumerate` does not build a list of pairs. It produces them one at a time as the loop asks, so it works on a file, a generator, or a sequence too large to hold in memory. It also works on strings, giving character positions.
-
-## When you do not need it
-
-If you never use the index, do not ask for it. `for name in names` is the shorter, clearer loop, and reaching for `enumerate` out of habit adds a variable nothing reads.
 """,
     [{"q": "What does `enumerate(['a', 'b'])` yield?",
       "options": ["'a', 'b'", "0, 1", "(0, 'a') then (1, 'b')", "A dictionary"],
@@ -2458,18 +2454,6 @@ zip_longest(a, b, fillvalue=0)  # pads instead, from itertools
 
 
 If the lists are supposed to be the same length, `strict=True` turns a silent bug into an immediate error. That is nearly always the better trade.
-
-## Unzipping
-
-The same function reverses itself with a star:
-
-who, what = zip(*pairs)
-
-`zip(*pairs)` spreads the list of pairs into arguments, so `zip` receives each pair as a separate iterable and re-pairs them by position. The results come back as tuples, not lists &mdash; wrap in `list()` if that matters.
-
-## It is lazy
-
-`zip` returns an iterator, not a list. It produces pairs as they are asked for, which is what lets it work on files and generators. It also means you can only walk it once: consume it in a loop and it is exhausted. `list(zip(...))` when you need to keep the result.
 """,
     [{"q": "`zip(['a','b','c'], [1,2])` produces how many pairs?",
       "options": ["3", "2", "An error", "5"],

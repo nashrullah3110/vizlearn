@@ -128,3 +128,277 @@ print(result)
 
 Then `script.py > out.txt` captures exactly the results and leaves the chatter
 on screen.
+
+## Reading several values from one line
+
+People type more than one thing at a time, and `split()` is how you take them
+apart. Using a stand-in for the typed line, as the rest of this page does:
+
+```python
+raw = "3 12 7"
+
+a, b, c = raw.split()                      # three strings
+nums = [int(x) for x in raw.split()]       # three ints
+first, *rest = raw.split()                 # "3", ["12", "7"]
+
+print(a, b, c)
+print(nums, sum(nums))
+print(first, rest)
+```
+
+```
+3 12 7
+[3, 12, 7] 22
+3 ['12', '7']
+```
+
+`split()` with no argument is the one to reach for: it splits on any run of
+whitespace and ignores leading and trailing space, so a line typed with two
+spaces between values still works. `split(" ")` is the version that does not
+forgive that, and produces empty strings where the extra spaces were.
+
+The trap is unpacking a line whose length you assumed:
+
+```python
+a, b, c = "3 12".split()
+# ValueError: not enough values to unpack (expected 3, got 2)
+```
+
+The message is precise, which makes this an easy one to fix &mdash; but it is
+raised at the assignment, so a program that reads ten lines and unpacks each
+will stop on the first short one. Where the input comes from a person rather
+than a file you control, check the length before unpacking, or collect with a
+star and validate.
+
+## A menu loop, end to end
+
+Most small interactive programs are the same shape: show the options, read a
+choice, act on it, repeat until they quit. Written once properly it is worth
+keeping:
+
+```python
+ACTIONS = {"1": "add an item", "2": "list items", "q": "quit"}
+
+def menu(choices):
+    for key, label in ACTIONS.items():
+        print(f"  {key}) {label}")
+    for choice in choices:                 # stands in for input()
+        choice = choice.strip().lower()
+        if choice == "q":
+            print("bye")
+            break
+        if choice not in ACTIONS:
+            print(f"'{choice}' is not an option")
+            continue
+        print("->", ACTIONS[choice])
+
+menu(["1", "9", "2", "Q"])
+```
+
+```
+  1) add an item
+  2) list items
+  q) quit
+-> add an item
+'9' is not an option
+-> list items
+bye
+```
+
+The details that make it usable rather than merely working: the options are
+data in a dictionary rather than a chain of `elif`, so adding one is a single
+line; the choice is stripped and lowercased before anything looks at it, so
+`" Q "` works; an unknown choice says what was typed and loops rather than
+crashing; and quitting is an explicit option rather than Ctrl-C.
+
+In a real program the `for choice in choices` line becomes `while True:` with
+`choice = input("choose: ")`. Everything else stays as it is.
+
+## Why output sometimes appears in the wrong order
+
+Standard output is buffered when it is not a terminal. Python collects printed
+text and writes it in blocks, because one system call per line is slow. On
+screen this is invisible. Redirect to a file or pipe the program into another
+one and it becomes visible: output can appear late, and it can appear *after*
+things written to standard error, which is not buffered the same way.
+
+```python
+import sys
+
+print("step 1")                       # buffered
+print("warning", file=sys.stderr)     # not buffered
+print("step 2", flush=True)           # written immediately
+```
+
+Run that on a terminal and the order is what you wrote. Run `python3 s.py > out.txt`
+and the warning appears on screen before the file has anything in it.
+
+`flush=True` forces a write at that point. It is worth using for progress
+messages in a long-running script, and for anything printed just before an
+operation that might hang &mdash; otherwise the message you were relying on to
+tell you where it got stuck is still sitting in the buffer.
+
+The same applies to a crash: output already printed but not yet flushed can be
+lost if the process dies badly, which is one of the reasons `logging` is
+preferred to `print` once a script grows up.
+
+## Command-line arguments, the other input
+
+`input()` is not the only way a program receives values, and for anything you
+will run more than once it is the worse one. Arguments typed alongside the
+command arrive in `sys.argv`:
+
+```python
+import sys
+
+# $ python3 report.py sales.csv 2024
+print(sys.argv)          # ['report.py', 'sales.csv', '2024']
+name = sys.argv[1] if len(sys.argv) > 1 else "data.csv"
+```
+
+`sys.argv[0]` is the script's own name, so the real arguments start at index 1,
+and reading one that was not supplied raises `IndexError` &mdash; hence the
+length check, or a default.
+
+The difference matters more than it looks. A program driven by `input()` cannot
+be scripted, scheduled, or re-run with the same values without somebody typing
+them again. A program driven by arguments can be put in a shell script and
+repeated exactly. The rule of thumb: prompt for what a person decides in the
+moment, take as an argument anything the program needs every time it runs.
+
+Once there is more than one or two, `argparse` in the standard library is worth
+the twenty minutes &mdash; it gives `--flags`, defaults, type conversion, and a
+`--help` message generated from the same declaration.
+
+## Making a prompt hard to get wrong
+
+Most bad input is invited by the prompt. Three habits remove most of it:
+
+```python
+def ask_yes_no(answer, default=True):
+    answer = answer.strip().lower()
+    if not answer:
+        return default
+    return answer in ("y", "yes")
+
+
+for typed in ["Y", "no", "", "  YES "]:
+    print(repr(typed), "->", ask_yes_no(typed))
+```
+
+```
+'Y' -> True
+'no' -> False
+'' -> True
+'  YES ' -> True
+```
+
+**Say what the options are, and which one enter chooses.** A prompt reading
+`Continue? [Y/n]` tells the person both, and the capital letter is the
+convention for the default.
+
+**Normalise before comparing.** `strip().lower()` turns four different things a
+person might type into one thing your code has to handle.
+
+**Accept the obvious variants.** Someone who types `yes` when you asked for `y`
+has answered the question; refusing them is the program being difficult.
+
+The same three apply to any prompt, not just yes/no: show the units, show the
+default, and strip the input before you look at it.
+
+## Reading a password without showing it
+
+`input()` echoes what is typed, which is exactly wrong for a password. The
+standard library has the right tool:
+
+```python
+from getpass import getpass
+
+secret = getpass("Password: ")     # typed characters are not displayed
+```
+
+It reads from the terminal directly rather than from standard input, so it
+cannot be piped into &mdash; which is a feature. It also falls back to a plain
+`input()` with a warning when there is no real terminal, so check the
+environment rather than assuming the characters were hidden.
+
+The rule that goes with it: do not print a secret back out, do not put one in a
+default argument, and do not read one from `sys.argv`, because arguments are
+visible to anyone who can list the running processes. For anything automated,
+an environment variable or a file with restricted permissions is the usual
+answer, and `os.environ.get("API_KEY")` is how you read it.
+
+## Confirming before something irreversible
+
+When a program is about to delete, overwrite or send something, the prompt is
+the last line of defence, and a `[y/N]` is a weak one &mdash; people type `y`
+by reflex. For genuinely irreversible actions, ask for something that cannot be
+answered by reflex:
+
+```python
+def confirm(typed, expected):
+    return typed.strip() == expected
+
+
+target = "production"
+print(confirm("production", target))
+print(confirm("y", target))
+```
+
+```
+True
+False
+```
+
+Requiring the name to be typed out makes the person read what they are about to
+do. Note that this comparison is deliberately not lowercased or fuzzy-matched:
+everywhere else on this page the advice is to forgive input, and this is the
+one place where being strict is the point.
+
+## Questions people ask
+
+<strong>Why does `input()` return a string when I typed a number?</strong>
+Because it reads characters and has no way to know what you meant by them.
+`"42"` could be a quantity, a house number or a password.
+
+<strong>How do I read a number without crashing on bad input?</strong> Wrap
+`int()` in `try`/`except ValueError` and ask again &mdash; the loop earlier on
+this page is the standard shape.
+
+<strong>What is the difference between `print(x)` and `print(str(x))`?</strong>
+Nothing. `print` calls `str()` on each argument already.
+
+<strong>Why do my strings show up with quotes?</strong> You printed a
+container. `print(["a"])` shows the list's `repr`, which quotes its items;
+`print(", ".join(["a"]))` prints them as text.
+
+<strong>How do I print without a newline?</strong> `print(x, end="")`, then a
+bare `print()` when the line is finished.
+
+<strong>Can I read everything at once instead of line by line?</strong> Yes:
+`sys.stdin.read()` for the whole of standard input, or `sys.stdin` iterated
+like a file for one line at a time without `input`'s prompt handling.
+
+<strong>Why does my prompt appear after the input on some terminals?</strong>
+Because the prompt was printed with `print` and not flushed. `input()`'s own
+prompt argument does not have this problem, which is the reason to use it.
+
+<strong>How do I clear the screen or move the cursor?</strong> With terminal
+escape codes, or a library like `curses` or `rich`. There is nothing in `print`
+itself for it.
+
+<strong>Does `input()` strip the newline?</strong> Yes &mdash; it returns the
+line without the trailing newline, but with any spaces the person typed, which
+is why `strip()` is still worth calling.
+
+## Recap in one screen
+
+- `input()` always returns a string, and always without the trailing newline.
+- Convert explicitly, and expect the conversion to fail on real input &mdash;
+  `try`/`except ValueError` in a loop is the shape that survives a person.
+- `split()` with no argument handles ragged whitespace; unpacking a line
+  assumes a length, so check it first.
+- `sep` and `end` control what `print` puts between and after its arguments;
+  `file=sys.stderr` separates chatter from results.
+- Output is buffered when redirected. `flush=True` for progress messages you
+  need to see while the program is still running.

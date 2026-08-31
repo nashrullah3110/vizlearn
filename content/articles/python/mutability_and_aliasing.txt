@@ -128,3 +128,226 @@ state neither of them knows about.
 The same reasoning applies on the way out: returning `self.items` directly hands
 callers a handle on your internals. Returning `list(self.items)` or a tuple keeps
 the boundary intact.
+
+## Watching it happen with id()
+
+`id()` returns a number identifying an object for as long as it exists, which
+turns the whole topic from an assertion into something you can check:
+
+```python
+a = [1, 2]
+b = a
+before = id(a)
+
+a.append(3)
+print("after append :", id(a) == before, b)
+
+a = a + [4]
+print("after rebind :", id(a) == before, b)
+```
+
+```
+after append : True [1, 2, 3]
+after rebind : False [1, 2, 3]
+```
+
+The first line mutated the object, so the id is unchanged and `b` &mdash; the
+other name for that same object &mdash; sees the new item. The second line
+built a different list and pointed `a` at it, so the id changed and `b` still
+refers to the original, which now has three items rather than four.
+
+Every confusing aliasing bug is one of those two lines in disguise.
+
+## The augmented assignment asymmetry
+
+`a += [3]` and `a = a + [3]` look like the same statement written two ways.
+For lists they are not:
+
+```python
+a = [1, 2]
+b = a
+a += [3]
+print(a, b)
+
+a = [1, 2]
+b = a
+a = a + [3]
+print(a, b)
+```
+
+```
+[1, 2, 3] [1, 2, 3]
+[1, 2, 3] [1, 2]
+```
+
+`+=` on a list calls `__iadd__`, which extends the existing list in place and
+then rebinds the name to that same object &mdash; so every other name sees the
+change. `a + [3]` builds a new list and only then rebinds, leaving `b` alone.
+
+For numbers, strings and tuples there is no in-place option, so `+=` always
+behaves like the second form. This is why `+=` feels consistent right up until
+the first time it is used on a list that someone else is also holding.
+
+## A tuple is immutable, its contents are not
+
+```python
+t = ([1, 2], "fixed")
+
+t[0].append(3)
+print(t)
+
+try:
+    t[1] = "changed"
+except TypeError as e:
+    print("TypeError:", e)
+```
+
+```
+([1, 2, 3], 'fixed')
+TypeError: 'tuple' object does not support item assignment
+```
+
+The tuple guarantees that its slots keep pointing at the same objects. It
+promises nothing about those objects. A tuple of lists is therefore not a
+frozen structure, and &mdash; the practical consequence &mdash; it cannot be
+used as a dictionary key, because hashing it has to hash its contents and lists
+are unhashable.
+
+The sharpest corner in the language sits here:
+
+```python
+t = ([1],)
+try:
+    t[0] += [2]
+except TypeError as e:
+    print("TypeError:", e)
+print(t)
+```
+
+```
+TypeError: 'tuple' object does not support item assignment
+([1, 2],)
+```
+
+It raised **and** it worked. `t[0] += [2]` extends the list in place, and then
+tries to assign the result back into the tuple slot, which fails. The mutation
+has already happened by then. Nothing about this is worth relying on; it is
+worth recognising, because the error message points at the tuple while the
+damage is in the list.
+
+## Where this actually bites
+
+The rule is simple and the bugs are not, because in real code the two names for
+one object are usually far apart. Four shapes account for most of them.
+
+**A shared default.** A function with `def add(item, target=[])` creates that
+list once, when the function is defined, and every call that does not pass one
+uses the same list. Items accumulate across calls that look independent. The
+fix is `target=None` and `if target is None: target = []` in the body.
+
+**A configuration dictionary passed around.** One module reads a settings dict,
+tweaks a value "just for its own use", and every other module sees the change.
+This is the hardest version to find, because the code that made the change and
+the code that misbehaves may be in different files with nothing linking them.
+
+**A cached object handed to callers.** A function that builds a list once and
+returns the same list every time is fast and dangerous: the first caller to
+mutate the result has changed what every later caller receives. Returning a
+copy, or a tuple, closes it.
+
+**A class attribute holding a list.** Written on the class rather than in
+`__init__`, it belongs to the class, so every instance appends to the same one.
+Instances that were meant to be independent quietly share state.
+
+What the four have in common is that nobody wrote `b = a`. The second name
+arrived through an argument, a return value, a default or a class body. That is
+why "assignment does not copy" is worth internalising rather than memorising:
+the aliasing is rarely visible on the line where the bug appears.
+
+## A model that fits in your head
+
+Two sentences cover everything on this page.
+
+**Names point at objects.** A name is not storage; it is a label. Assignment
+moves a label. Several labels can point at one object, and the object has no
+idea how many.
+
+**Some objects can change, and some cannot.** If an object can change, then
+every label pointing at it sees the change, because there is only one object.
+If it cannot, the question never arises.
+
+Everything else follows. Why does mutating a list argument affect the caller?
+The parameter is another label on the same object. Why does `n += 1` inside a
+function not affect the caller? Integers cannot change, so `+=` must build a
+new one and move the local label to it. Why is a tuple of lists not frozen? The
+tuple's labels cannot be moved; the objects they point at can still change.
+
+When something surprising happens, the productive question is not "was this
+passed by value or by reference" but "how many names point at this object, and
+did that line move a label or change an object". `id()` answers the first half
+and the code in front of you answers the second.
+
+## Choosing immutability in your own code
+
+Once the distinction is clear, it becomes a design decision rather than a fact
+about builtins. Making your own objects immutable removes the entire class of
+bugs above, and Python gives you a few ways to do it.
+
+A `NamedTuple` or a dataclass declared with `@dataclass(frozen=True)` produces
+a class whose attributes cannot be reassigned after construction. Attempting it
+raises rather than silently succeeding, which turns a subtle shared-state bug
+into an immediate error at the line that caused it. Both are hashable, so they
+can be dictionary keys and set members, and both give you a readable `repr` for
+free.
+
+The pattern that follows is to build a new object rather than edit an existing
+one. A method that would have changed `self.total` instead returns a new
+instance with the new total, and callers rebind. This costs an allocation and
+buys the guarantee that nothing you handed to another part of the program can
+change underneath it.
+
+It is not the right default for everything. A large object that changes often
+&mdash; a buffer being filled, a cache, anything performance-sensitive &mdash;
+is better mutable, and Python's builtins reflect that. The useful habit is to
+reach for immutability for the things that travel: configuration, coordinates,
+records read from a file, anything passed between modules or stored in a
+dictionary. Keep mutability local, where you can see every name that points at
+the object.
+
+## Questions people ask
+
+<strong>How do I copy a list properly?</strong> `list(a)`, `a[:]` or `a.copy()`
+for one level. `copy.deepcopy(a)` when the items are themselves mutable and
+need copying too.
+
+<strong>Is `is` ever right for comparing values?</strong> Only for `None`,
+`True` and `False`. Everything else should use `==`.
+
+<strong>Why did my dictionary change when I only edited a copy?</strong>
+Because the copy was shallow and the value you edited is shared between both
+dictionaries.
+
+<strong>Are function arguments copied?</strong> No. The function gets another
+name for the same object, which is why mutating a list argument is visible to
+the caller.
+
+<strong>Why can a tuple be a dictionary key but not a list?</strong> Keys must
+hash to a stable value, and a list's contents can change, which would leave it
+filed in the wrong place.
+
+<strong>Does `sorted(x)` change `x`?</strong> No, it returns a new list.
+`x.sort()` is the in-place one, and it returns `None` &mdash; assigning its
+result is a common way to lose a list.
+
+<strong>What about strings, do I need to copy them?</strong> Never. They cannot
+be changed, so sharing one is always safe.
+
+## Recap in one screen
+
+- A name is a label on an object; assignment moves the label and never copies.
+- Mutating changes the object every name can see; rebinding changes one name.
+- `+=` mutates in place for lists and rebinds for immutables &mdash; the same
+  syntax, two behaviours.
+- Immutable contents can hold mutable objects, so a tuple is only as frozen as
+  what is in it.
+- Copy at the boundary when you store or return a caller's container.

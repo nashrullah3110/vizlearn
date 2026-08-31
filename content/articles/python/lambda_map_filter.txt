@@ -107,3 +107,224 @@ because a great deal of existing Python uses them, and because they compose with
 the rest of `itertools`. Being able to read `filter(None, values)` - which drops
 falsy items, using `None` as "no function" - is more useful than an opinion about
 whether you would have written it that way.
+
+## operator, the module that replaces most lambdas
+
+A large share of the lambdas people write do one of two things: pull out an
+item, or pull out an attribute. The standard library has both, and they are
+faster and more readable than the lambda:
+
+```python
+from operator import itemgetter
+
+people = [("ana", 91), ("bo", 78), ("cy", 91)]
+
+print(sorted(people, key=itemgetter(1), reverse=True))
+print(sorted(people, key=itemgetter(1, 0)))
+```
+
+```
+[('ana', 91), ('cy', 91), ('bo', 78)]
+[('bo', 78), ('ana', 91), ('cy', 91)]
+```
+
+`itemgetter(1)` is `lambda p: p[1]` with a name that says what it does, and
+`itemgetter(1, 0)` returns a tuple, which is how you sort by score and then by
+name without writing the tuple out. `attrgetter` is the same for objects, and
+`methodcaller("lower")` for calling a method on each item.
+
+Note the first result: `ana` comes before `cy` even though they tie, because
+`sorted` is stable and `ana` was first in the input. That guarantee is what
+makes sorting twice for a two-level sort work at all.
+
+## reduce, and why it is not a builtin any more
+
+`map` and `filter` survived the move to Python 3 as builtins. `reduce` did not,
+and lives in `functools`:
+
+```python
+from functools import reduce
+
+nums = [1, 2, 3, 4]
+print(reduce(lambda a, b: a * b, nums))
+print(sum(nums), max(nums), any(n > 3 for n in nums))
+```
+
+```
+24
+10 4 True
+```
+
+The reason for the demotion is on the second line. Nearly every real use of
+`reduce` is a sum, a maximum, a minimum, an `any` or an `all`, and each of
+those has a builtin that says what it means at a glance. What is left &mdash;
+a running product, folding a custom combine function over a sequence &mdash; is
+rare enough to be worth an import and a moment's thought from the reader.
+
+If you do reach for it, pass the initial value: `reduce(f, items, 0)` returns
+the initial value for an empty sequence instead of raising `TypeError`.
+
+## Where map and filter lead: itertools
+
+`map` and `filter` are the first two of a family. `itertools` holds the rest,
+and they share the same property of producing items on demand rather than
+building lists:
+
+```python
+from itertools import islice, chain, takewhile
+
+nums = range(1, 11)
+
+print(list(islice(nums, 3)))
+print(list(takewhile(lambda n: n < 4, nums)))
+print(list(chain([1, 2], [3, 4])))
+```
+
+```
+[1, 2, 3]
+[1, 2, 3]
+[1, 2, 3, 4]
+```
+
+`islice` takes the first few of anything, including an infinite generator.
+`takewhile` stops at the first item that fails the test, which is different
+from `filter` &mdash; `filter` would carry on and return 1, 2, 3 from the whole
+range while `takewhile` stops looking at 4. `chain` walks several iterables as
+one without building a combined list.
+
+The laziness is the point of all of them. A pipeline of `map`, `filter` and
+`islice` over a large file reads only as far as it needs to.
+
+## The three-line version of a common job
+
+Take rows, keep the ones that qualify, transform them, and summarise. Written
+with comprehensions, which is what most Python uses:
+
+```python
+rows = [("ana", 91), ("bo", 55), ("cy", 78), ("di", 43)]
+
+passed = [name for name, score in rows if score >= 60]
+best = max(rows, key=lambda r: r[1])
+
+print(passed)
+print(best)
+print(f"{len(passed)}/{len(rows)} passed")
+```
+
+```
+['ana', 'cy']
+('ana', 91)
+2/4 passed
+```
+
+One lambda appears, as a `key=` argument, which is exactly the place the
+earlier section said it belongs. The filtering and the transforming are done by
+the comprehension rather than by `filter` and `map`, and the result reads in
+the order it happens.
+
+## What "functional" means here, and what it does not
+
+`lambda`, `map` and `filter` arrive with a reputation attached, and it is worth
+separating the useful part from the folklore.
+
+The useful part is that functions are ordinary values in Python. A function can
+be stored in a list, passed as an argument, returned from another function, and
+kept in a dictionary. That is what makes `key=` arguments, decorators,
+callbacks and dispatch tables possible, and it is the single idea behind
+everything on this page. A lambda is not a special kind of function; it is the
+same object a `def` produces, written inline and left unnamed.
+
+The folklore is that using them makes code functional, and that functional code
+is better. Python is not a functional language and does not try to be. It has
+no tail-call optimisation, its lambdas are deliberately limited to one
+expression, and `reduce` was moved out of the builtins precisely to discourage
+the style. Guido van Rossum's stated preference was that a comprehension or a
+plain loop says the same thing more clearly to more readers.
+
+What actually transfers from functional programming, and is worth adopting, is
+smaller and less glamorous: prefer functions that return a new value over
+functions that modify their arguments; avoid depending on state that is not
+visible in the signature; and keep functions small enough to test on their own.
+None of that requires a lambda. A page of `def` statements can follow all three,
+and a chain of nested `map` and `filter` calls can violate them all while
+looking the part.
+
+## When a comprehension stops being the clearer choice
+
+The advice throughout this page is to reach for a comprehension first, so it is
+worth being precise about where that stops holding.
+
+A comprehension is doing too much when it has more than one `for` and a
+condition, when the expression at the front needs its own explanation, or when
+the whole thing no longer fits on one line without awkward wrapping. At that
+point it has become a loop that is harder to read than the loop would have
+been, and the honest move is to write the loop &mdash; or to name the inner
+step as a function and call it from a simple comprehension.
+
+The other case is when you need something a comprehension cannot do: a `break`,
+an early return, a `try`/`except` around one item, or anything that has to
+happen for its side effect rather than its value. A comprehension built purely
+for side effects, with its result thrown away, is a loop wearing the wrong
+clothes; write `for` and let the reader see what is happening.
+
+Nesting deserves its own warning. A comprehension inside another
+comprehension's expression is read outer-first and reasoned about
+inner-first, which is exactly the sort of thing that is fine while you are
+writing it and unpleasant three months later. Two statements are almost always
+better than one clever one.
+
+## Naming things the reader will meet
+
+Two words appear constantly in discussions of this material and are rarely
+defined, which makes a lot of otherwise good explanations hard to follow.
+
+A **higher-order function** is a function that takes a function as an argument
+or returns one. `sorted` is higher-order because of `key=`; so are `map`,
+`filter`, and every decorator you will write. There is nothing more to the term
+than that.
+
+A **closure** is a function that remembers a value from the scope where it was
+created, and keeps working after that scope has finished. The loop trap earlier
+on this page is a closure behaving exactly as specified and not as expected: the
+lambdas remembered the variable rather than the value it held at the time.
+
+## Questions people ask
+
+<strong>Can a lambda have more than one statement?</strong> No. The body is a
+single expression. If you need a statement, you need a `def`.
+
+<strong>Can a lambda have default arguments?</strong> Yes &mdash;
+`lambda x, n=2: x ** n` &mdash; and that is also the trick for capturing a loop
+variable by value.
+
+<strong>Why does printing `map(...)` show an object?</strong> Because it is a
+lazy iterator. Wrap it in `list()` to see the items.
+
+<strong>Is a comprehension faster than `map`?</strong> They are close.
+`map(int, items)` with an existing function is usually slightly faster;
+`map(lambda ..., items)` is usually slightly slower. Neither difference is a
+reason to choose one.
+
+<strong>What does `filter(None, items)` do?</strong> Drops every falsy item.
+`None` in the function slot means "use the item's own truthiness".
+
+<strong>Why can I not pickle a lambda?</strong> Pickling stores a reference by
+name and a lambda has none. That is why `multiprocessing` rejects them, and
+where `functools.partial` earns its place.
+
+<strong>Do `map` and `filter` work on dictionaries?</strong> They work on
+anything iterable, and iterating a dictionary gives its keys. Use
+`d.items()` when you want pairs.
+
+## Recap in one screen
+
+- A lambda is a single-expression function; use one as a `key=` argument and
+  write a `def` whenever it deserves a name.
+- `map` and `filter` are lazy iterators &mdash; consume them once, wrap in
+  `list()` to keep them.
+- Prefer a comprehension by default; `map(existing_function, items)` when it is
+  exactly that shape.
+- `operator.itemgetter` and `attrgetter` replace the most common lambdas and
+  read better.
+- `reduce` lives in `functools` because `sum`, `max`, `any` and `all` already
+  cover almost every use of it.
