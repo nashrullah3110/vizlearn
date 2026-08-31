@@ -1,0 +1,236 @@
+title: The Confusion Matrix: A Practical Guide
+intro: Every classification metric is a fraction computed from four numbers. Looking at the four directly tells you things no fraction can.
+
+## What the table is
+
+The confusion matrix cross-tabulates what was true against what was predicted. Rows are the actual classes, columns are the predicted ones, and each cell counts how many samples fell into that combination.
+
+The diagonal is where the two agree &mdash; correct predictions. Everything off the diagonal is a mistake, and *which* off-diagonal cell it lands in tells you what kind.
+
+For two classes the convention is worth memorising because `ravel()` returns it in this order: **true negative, false positive, false negative, true positive**. Reading it as `tn, fp, fn, tp = cm.ravel()` is the standard line.
+
+The naming is easier than it looks once you read it as two words rather than one phrase. The second word is what the model *said*. The first word is whether it was *right*. So a false negative is a case the model called negative and was wrong about &mdash; a miss.
+
+
+## The four counts
+
+Rows are what was true, columns are what was predicted. Everything else on this page is arithmetic on these four numbers.
+
+```python-run
+from sklearn.metrics import confusion_matrix
+import numpy as np
+
+y_true = np.array([1]*10 + [0]*90)
+y_pred = np.zeros(100, dtype=int)
+y_pred[:6] = 1          # 6 caught
+y_pred[10:12] = 1       # 2 false alarms
+
+cm = confusion_matrix(y_true, y_pred)
+print("rows are actual, columns are predicted:")
+print(cm)
+print()
+tn, fp, fn, tp = cm.ravel()
+print("true negatives :", tn)
+print("false positives:", fp, "- flagged, and wrong")
+print("false negatives:", fn, "- missed")
+print("true positives :", tp)
+```
+
+## Every metric, derived from the table
+
+Precision, recall and accuracy are three different fractions of the same four counts.
+
+```python-run
+from sklearn.metrics import confusion_matrix, precision_score, recall_score
+import numpy as np
+
+y_true = np.array([1]*10 + [0]*90)
+y_pred = np.zeros(100, dtype=int)
+y_pred[:6] = 1
+y_pred[10:12] = 1
+tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+
+print("precision = tp/(tp+fp) = %d/%d = %.3f" % (tp, tp + fp, tp / (tp + fp)))
+print("recall    = tp/(tp+fn) = %d/%d = %.3f" % (tp, tp + fn, tp / (tp + fn)))
+print("accuracy  = (tp+tn)/all = %d/%d = %.3f"
+      % (tp + tn, len(y_true), (tp + tn) / len(y_true)))
+print()
+print("sklearn agrees: %.3f %.3f"
+      % (precision_score(y_true, y_pred), recall_score(y_true, y_pred)))
+```
+
+## With several classes it stops being 2x2
+
+And the interesting part is which classes get mistaken for which - which no single metric can tell you.
+
+```python-run
+from sklearn.metrics import confusion_matrix
+from sklearn.datasets import load_iris
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+
+data = load_iris()
+names = data.target_names
+# Sepal measurements only - deliberately not enough to separate the last two.
+X, y = data.data[:, :2], data.target
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.4,
+                                          random_state=1, stratify=y)
+
+model = LogisticRegression(max_iter=1000).fit(X_tr, y_tr)
+cm = confusion_matrix(y_te, model.predict(X_te))
+
+print("            " + "".join("%12s" % n for n in names))
+for i, row in enumerate(cm):
+    print("%-12s" % names[i] + "".join("%12d" % v for v in row))
+print()
+print("setosa is never confused; the other two are, and not equally")
+```
+
+## Normalise by row to compare unequal classes
+
+Raw counts are dominated by whichever class is largest. Row proportions are not.
+
+```python-run
+from sklearn.metrics import confusion_matrix
+import numpy as np
+
+y_true = np.array([1]*10 + [0]*990)
+y_pred = np.zeros(1000, dtype=int)
+y_pred[:7] = 1
+y_pred[10:60] = 1
+
+print("counts:")
+print(confusion_matrix(y_true, y_pred))
+print()
+print("normalised by row (what happened to each actual class):")
+print(np.round(confusion_matrix(y_true, y_pred, normalize="true"), 3))
+print()
+print("row normalisation is the useful one when the classes differ in size")
+```
+
+## labels= fixes the order and the missing classes
+
+Without it, a class the model never predicted can vanish from the table entirely.
+
+```python-run
+from sklearn.metrics import confusion_matrix
+import numpy as np
+
+y_true = np.array(["cat", "dog", "cat", "fish", "dog", "cat"])
+y_pred = np.array(["cat", "dog", "dog", "fish", "dog", "fish"])
+
+labels = ["cat", "dog", "fish"]
+cm = confusion_matrix(y_true, y_pred, labels=labels)
+print("labels=", labels)
+print(cm)
+print()
+print("passing labels= fixes the order and guarantees every class")
+print("appears, even one the model never predicted.")
+```
+
+## Read the rows the model got wrong
+
+The matrix says how many. The rows themselves say why.
+
+```python-run
+from sklearn.datasets import load_iris
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+data = load_iris()
+X, y = data.data[:, :2], data.target
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.4,
+                                          random_state=1, stratify=y)
+model = LogisticRegression(max_iter=1000).fit(X_tr, y_tr)
+pred = model.predict(X_te)
+
+wrong = np.flatnonzero(pred != y_te)
+print("misclassified:", len(wrong), "of", len(y_te))
+print()
+print(" sepal_len  sepal_wid   actual        predicted")
+for i in wrong[:6]:
+    print("%10.1f %10.1f   %-12s %-12s"
+          % (X_te[i][0], X_te[i][1], data.target_names[y_te[i]],
+             data.target_names[pred[i]]))
+```
+## Why it beats any single number
+
+A metric compresses the table into one figure, and compression loses exactly the information you need to improve the model.
+
+Accuracy of 0.94 could be 88 true negatives and 6 true positives with 4 misses and 2 false alarms &mdash; or it could be 94 true negatives, no true positives, and 6 misses, with the model never predicting the positive class at all. Those are completely different situations and accuracy reports them identically.
+
+The matrix distinguishes them immediately, and it does so before you have decided which metric matters. That is the practical argument for printing it first: it tells you what the model is doing, and only then do you choose the number that summarises it.
+
+It also tells you which direction to push. Too many false positives and too few false negatives means the threshold is too low. The reverse means it is too high. Both visible at a glance, neither visible in an accuracy score.
+
+## The multi-class version, and what it reveals
+
+With `k` classes the matrix is `k` by `k`, and the off-diagonal structure carries information that no averaged metric preserves.
+
+The editor above fits iris on sepal measurements only &mdash; deliberately insufficient &mdash; and the result is instructive. Setosa is classified perfectly, never confused with anything. Versicolor and virginica are confused with each other repeatedly, and **not symmetrically**: versicolor is called virginica 8 times, while virginica is called versicolor 5 times.
+
+That asymmetry is a real finding and it is invisible in an F1 score. It tells you the boundary between those two classes is drawn slightly off centre, and it tells you setosa is a solved problem while the other two need better features. A macro F1 of 0.78 tells you none of that.
+
+The general habit: on a multi-class problem, find the largest off-diagonal cell. It is almost always one specific pair being confused, and it is almost always the most productive thing to work on.
+
+## Normalising, and which way
+
+Raw counts are dominated by class size. On a 99-to-1 problem the true-negative cell is enormous and the rest are visually invisible, which makes the table hard to read even though the numbers are correct.
+
+`normalize="true"` divides each row by its total, giving the proportion of each actual class that went to each prediction. The diagonal then reads as per-class recall, and a row that is mostly off the diagonal shows a class the model handles badly regardless of how few samples it has.
+
+`normalize="pred"` divides by column instead, giving the proportion of each prediction that was correct &mdash; the diagonal reads as per-class precision.
+
+`normalize="all"` divides by the grand total, which is occasionally useful and usually the least informative of the three.
+
+Row normalisation is the default worth reaching for. It answers "what does the model do with each kind of case", which is the question that survives changes in class balance.
+
+## The labels argument
+
+`confusion_matrix` infers the classes from the data it is given, sorted. Two consequences bite.
+
+A class present in `y_true` but never predicted still appears &mdash; but a class absent from both, perhaps because the test split happened to contain none of it, disappears entirely, and the matrix silently becomes smaller than expected. Code that indexes into it by class position then reads the wrong cell.
+
+And the order is sorted, which for string labels is alphabetical: `["cat", "dog", "fish"]`. Assuming a different order and labelling the axes accordingly produces a table that is confidently wrong.
+
+Passing `labels=` fixes both. It guarantees the size, guarantees the order, and makes the code independent of which classes happened to turn up in a particular split. It is worth passing habitually rather than when a problem appears.
+
+## From the table to the rows
+
+The matrix says how many mistakes of each kind. The next question is always why, and answering it means looking at the samples themselves.
+
+Selecting the misclassified rows takes one line &mdash; `np.flatnonzero(pred != y_true)` &mdash; and reading a handful of them is consistently the most informative ten minutes available. Usually they have something in common: values near a boundary, a category the training data barely covered, missing fields that were imputed, or labels that are simply wrong in the source data.
+
+Each of those has a different response, and none of them is "try a different model". Mislabelled ground truth in particular is far more common than people expect, and no amount of tuning fixes it &mdash; the model is being penalised for being right.
+
+The editor above does exactly this for the iris confusion, and the misclassified rows are all sepal measurements in the overlapping middle of the two species. That is not a model problem; it is the honest answer that these two features do not separate those two classes, and the fix is petal measurements rather than a fancier classifier.
+
+## The other convention, and why it causes trouble
+
+scikit-learn puts truth on the rows and predictions on the columns. A good deal of the statistics literature does the opposite, and some textbooks put the positive class first rather than second.
+
+That means a matrix copied from a paper, a blog post or a lecture slide may be transposed relative to what `confusion_matrix` produces, and a transposed matrix swaps precision and recall without changing anything visible. The numbers all look plausible; they are simply answering the other question.
+
+Two habits prevent it. Print the matrix with labelled axes rather than as a bare array, which takes three lines and removes the ambiguity permanently. And sanity-check against a metric you trust: compute recall with `recall_score` and confirm it matches the diagonal cell divided by its row total. If it matches the column total instead, the orientation is not what you assumed.
+
+The same caution applies to the binary case, where the positive class is whichever label sorts second &mdash; `1` before `0` is not the order, `0` then `1` is. With string labels, `"no"` sorts before `"yes"`, which usually happens to be right, and with `"negative"` and `"positive"` it also happens to be right. With `"benign"` and `"malignant"` it is right for the wrong reason, and with labels where it is not, `pos_label=` is the argument that says so explicitly.
+
+## What it cannot tell you
+
+Two limits worth stating, because the matrix is otherwise so useful that it gets asked questions it cannot answer.
+
+It says nothing about confidence. Every cell counts hard predictions, so a case predicted positive at 0.51 and one at 0.99 are the same entry. A model can have an excellent matrix and terrible probabilities, or the reverse, and only the probability-based metrics distinguish them.
+
+And it describes one threshold. Change the threshold and every cell moves &mdash; that is the whole mechanism of the precision-recall trade. So a confusion matrix is a snapshot of one operating point, not a description of the model, and comparing two models by their matrices means comparing them at whatever threshold each happened to use.
+
+## Things to try
+
+1. <strong>Unpack the four counts.</strong> In the first editor, compute precision and recall yourself from `tn, fp, fn, tp` before looking at what the library returns.
+2. <strong>Find the worst pair.</strong> In the third editor, locate the largest off-diagonal cell and note that it is not mirrored.
+3. <strong>Switch the normalisation.</strong> In the fourth editor, compare `normalize="true"` with `normalize="pred"` and work out which diagonal is recall and which is precision.
+4. <strong>Read the mistakes.</strong> In the last editor, raise the slice to see all thirteen and look for what they have in common.
+
+## Where this leaves you
+
+Four counts for two classes, `k` by `k` for more, rows as truth and columns as prediction. Print it before choosing a metric, normalise by row when the classes are uneven, pass `labels=` so the shape is guaranteed, and read the rows behind the largest off-diagonal cell before changing anything.
