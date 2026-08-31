@@ -104,3 +104,163 @@ Imports are cheap after the first, but the first one runs the whole module. A
 library that does substantial work at import time makes every program that
 imports it slower to start, which is why heavy setup belongs in a function the
 caller chooses to call rather than at module level.
+
+## Circular imports, and how to break one
+
+Two modules that each import the other produce an error that reads as though
+something is missing when nothing is:
+
+```
+ImportError: cannot import name 'Order' from partially initialized module
+'models' (most likely due to a circular import)
+```
+
+The mechanism follows directly from "importing runs the file". Module A starts
+running and hits `from B import x`. B starts running and hits
+`from A import y` &mdash; but A is only half-finished, so `y` does not exist on
+it yet. Python has A in `sys.modules` already, so it does not re-run it; it
+hands back the partial module, and the name is missing.
+
+Three fixes, in order of preference.
+
+**Move the shared thing.** If A and B both need `Order`, it belongs in a third
+module that both import and neither imports back. Most circular imports are a
+missing module rather than an import problem.
+
+**Import inside the function.** Moving `from B import x` into the function that
+uses it delays it until both modules have finished loading. This works, and it
+hides a dependency from anyone scanning the file, so it is a fix rather than a
+design.
+
+**Import the module, not the name.** `import B` and then `B.x` at call time
+often works where `from B import x` does not, because the attribute is looked
+up when used rather than when imported.
+
+The one that does not work is reordering the imports, which usually moves the
+error rather than removing it.
+
+## Where installed packages come from
+
+`sys.path` explains where Python looks; it does not explain how anything got
+there, and the gap is where most beginner import confusion lives.
+
+`pip install requests` puts the package into the `site-packages` directory of
+whichever Python is running `pip`. If you have several Pythons &mdash; the
+system one, one from Homebrew, one from a virtual environment &mdash; then
+"pip installed it and Python cannot find it" almost always means two different
+interpreters. `python3 -m pip install x` avoids that entirely by installing
+into the interpreter you just named.
+
+A **virtual environment** is a directory containing its own interpreter link
+and its own `site-packages`. `python3 -m venv .venv` creates one and activating
+it puts its interpreter first on your `PATH`, so `pip` and `python` both refer
+to it. The point is isolation: two projects can depend on incompatible versions
+of the same library without either breaking, and the set of packages a project
+needs is a property of the project rather than of your machine.
+
+The practical rules are short. One environment per project. Record the
+dependencies in a file so the environment can be rebuilt. Never install into
+the system Python, which your operating system also uses. And when an import
+fails unexpectedly, `python3 -c "import sys; print(sys.executable)"` tells you
+which interpreter you are actually running, which resolves the question faster
+than anything else.
+
+## Organising modules of your own
+
+A module is a file, so organising code is organising files, and a few
+conventions save a lot of trouble.
+
+Group by what things *are for*, not by what they are. A `models.py`,
+`views.py`, `utils.py` split works until `utils.py` becomes the place
+everything lands. Splitting by feature &mdash; `orders.py`, `billing.py`
+&mdash; keeps related code together and keeps the imports between files
+shallow.
+
+Keep module-level code to definitions. Anything that runs work, opens files or
+makes network calls at import time makes every importer pay for it, including
+your test suite. Put it in a function and let the caller decide.
+
+Avoid naming a file after a module you also import. A local `random.py`
+shadows the standard library one for your whole program, and the resulting
+`AttributeError: module 'random' has no attribute 'randint'` looks impossible
+until you spot the file.
+
+And watch the direction of dependencies. If A imports B, B should not need A.
+When it does, the two are really one module, or there is a third one waiting to
+be extracted &mdash; which is the same conclusion the circular-import section
+reached from the other direction.
+
+## Reading an import error
+
+Four messages cover nearly every import failure, and each points somewhere
+specific.
+
+`ModuleNotFoundError: No module named 'requests'` means Python looked along
+`sys.path` and found nothing. Either it is not installed, or it is installed
+for a different interpreter. Check with `python3 -m pip list` using the same
+`python3` that failed.
+
+`ImportError: cannot import name 'X' from 'y'` means the module was found and
+does not contain that name. Either it is a typo, or the version installed is
+older than the one you are reading about, or it is a circular import and the
+module is only half-loaded &mdash; the message says so when it can.
+
+`AttributeError: module 'x' has no attribute 'y'` on a standard-library name is
+the shadowing case: a file of your own named `x.py` is earlier on the path than
+the real module. `print(x.__file__)` identifies it immediately.
+
+`ImportError: attempted relative import with no known parent package` means a
+file inside a package was run directly by path. Run it as
+`python -m package.module` instead.
+
+The common thread is that the message distinguishes "could not find the module"
+from "found it, could not find the name", and that distinction sends you to
+completely different places. Reading which of the two you have is most of the
+diagnosis.
+
+## Questions people ask
+
+<strong>What is `__init__.py` for?</strong> It marks a directory as a package
+and runs when the package is imported. It can be empty, and since Python 3.3 a
+package without one mostly works &mdash; but including it avoids surprises.
+
+<strong>Why does `from . import x` fail when I run the file?</strong> Relative
+imports need a parent package, which a file run by path does not have. Run it
+with `python -m package.module`.
+
+<strong>Does `import` run the whole module?</strong> Yes, top to bottom, once
+per program.
+
+<strong>How do I reload a module I changed?</strong>
+`importlib.reload(module)` in an interactive session. In a script, restart it
+&mdash; reloading has enough sharp edges that it is not worth relying on.
+
+<strong>Where is a module actually loaded from?</strong>
+`module.__file__` after importing it, which is the fastest way to confirm you
+have the one you meant.
+
+<strong>Is `import x` inside a function slow?</strong> Only the first time.
+After that it is a dictionary lookup in `sys.modules`.
+
+<strong>What is the difference between a module and a package?</strong> A
+module is a file; a package is a directory of modules. Both are imported the
+same way.
+
+<strong>Can a module import itself?</strong> It can, and it gets the partially
+initialised version from `sys.modules`. There is no good reason to.
+
+<strong>What does `if TYPE_CHECKING:` do?</strong> Guards imports that exist
+only for type hints, so they cost nothing at runtime and cannot cause a
+circular import.
+
+## Recap in one screen
+
+- Importing runs the file once, top to bottom, and caches the result in
+  `sys.modules`.
+- `import x` keeps the prefix and the provenance; `from x import y` is for one
+  or two heavily used names; `import *` hides both and can silently overwrite.
+- The `__main__` guard is what lets a file be both a script and an importable
+  module.
+- Circular imports mean a shared piece belongs in a third module.
+- One virtual environment per project, and `python3 -m pip` to be certain which
+  interpreter you are installing into.

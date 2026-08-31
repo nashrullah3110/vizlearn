@@ -9,12 +9,6 @@ None&nbsp;&nbsp;False&nbsp;&nbsp;0&nbsp;&nbsp;0.0&nbsp;&nbsp;""&nbsp;&nbsp;[]&nb
 
 Everything else is truthy. That includes `"0"`, `"False"`, `[0]` and `-1`, all of which catch people out because they look empty or negative in some sense and are not.
 
-## The idiomatic empty test
-
-if not items:
-
-is how Python asks "is this empty?", and it is preferred over `len(items) == 0` because it works on anything and reads as prose. For a list, a string or a dict, this is right and unremarkable.
-
 ## Where it goes wrong
 
 The trouble starts when a value can legitimately be `0` or `""`:
@@ -38,12 +32,6 @@ if result is None:
 This tests for one specific object, not for emptiness. It is true for `None` and nothing else &mdash; not for `0`, not for `""`. When a function returns "the thing, or None if there isn't one", this is the only correct test.
 
 The rule that follows: use truthiness when you mean "empty or zero or missing, and I treat them the same". Use `is None` when `None` means something distinct from a legitimate empty value.
-
-## Why `is` rather than `==`
-
-There is exactly one `None` object in a running program, so identity is the precise test and it is faster than equality. It also cannot be fooled: a class can define `__eq__` so that `x == None` is true for something that is not `None`. `is` compares the object itself.
-
-The same applies to the two default-argument patterns from earlier in the track: `if basket is None` is correct, and `if not basket` would treat an intentionally empty list as missing.
 
 ## Absent is not the same as empty
 
@@ -111,3 +99,218 @@ if len(items) == 0:      # works, but noisier
 
 The exception is when `items` might be `None`, because `not None` is also true.
 Then you need to say which case you mean.
+
+## The find() trap, run
+
+The classic case, with all three answers printed side by side:
+
+```python
+def find(items, target):
+    for i, item in enumerate(items):
+        if item == target:
+            return i
+    return None
+
+
+items = ["a", "b"]
+for target in ["a", "b", "z"]:
+    result = find(items, target)
+    print(target, result,
+          "not found" if not result else "found",
+          "|", "not found" if result is None else "found")
+```
+
+```
+a 0 not found | found
+b 1 found | found
+z None not found | not found
+```
+
+The middle column is the bug. `find` returned 0 &mdash; the item *was* found,
+at the first position &mdash; and `not result` reported it as missing. The
+right-hand column, testing `is None`, is correct for all three.
+
+Notice which case fails: the first element. A test suite that searches for
+something in the middle of a list passes, and the bug waits for real data where
+the match happens to be first. That is the characteristic shape of truthiness
+bugs &mdash; they are correct for most inputs, which is why they survive
+review.
+
+## Giving your own objects a truth value
+
+Truthiness is not a fixed list. Python asks the object, and any class can
+answer.
+
+When you write `if obj:`, Python calls `__bool__` if the class defines one. If
+it does not, it falls back to `__len__` and treats zero as false. If neither
+exists, the object is always truthy &mdash; which is why an instance of a plain
+class you wrote is true even when it holds nothing.
+
+```python
+class Basket:
+    def __init__(self, items):
+        self.items = items
+
+    def __len__(self):
+        return len(self.items)
+
+
+print(bool(Basket([])), len(Basket([])), bool(Basket([1])))
+```
+
+```
+False 0 True
+```
+
+Defining `__len__` gave the class a sensible truth value for free, which is why
+it is the usual choice for anything container-like. `__bool__` is for objects
+that have a notion of empty without a length &mdash; a connection that is open
+or closed, a result that succeeded or failed.
+
+The caution is that this is exactly the mechanism that makes truthiness
+ambiguous. An object that is falsy when empty cannot be distinguished from
+`None` by `if obj:`, so any code that treats "absent" and "empty" differently
+still has to use `is None`. Some libraries make this sharp: a pandas DataFrame
+raises rather than guessing when you put it in a condition, on the grounds that
+"empty" and "all values false" are both plausible readings.
+
+## When None itself is a valid value
+
+Occasionally `None` is a legitimate value in the data, and then it cannot also
+mean "absent". The standard answer is a sentinel: a unique object that means
+nothing else.
+
+```python
+MISSING = object()
+
+def get(mapping, key, default=MISSING):
+    if key in mapping:
+        return mapping[key]
+    if default is MISSING:
+        raise KeyError(key)
+    return default
+```
+
+`object()` creates something that is equal only to itself, so `default is
+MISSING` is true exactly when the caller did not pass a default. Now
+`get(d, "k", None)` and `get(d, "k")` mean different things &mdash; the first
+supplies `None` as the default, the second asks for an error &mdash; which is
+impossible if `None` is itself the sentinel.
+
+This is not a common need, and it is worth recognising because the standard
+library uses it. `dict.pop` distinguishes "no default given" from "default of
+`None`" in exactly this way, and several libraries expose their sentinel by
+name so callers can test against it.
+
+The plainer version of the same idea is a module-level constant with a name
+that says what it means, which reads better in a traceback than
+`<object object at 0x...>`.
+
+## Where None comes from
+
+`None` rarely gets written into your data deliberately. It arrives, and knowing
+the sources makes it predictable rather than mysterious.
+
+**A function that did not return.** Any function reaching its end without a
+`return` returns `None`, and so does a bare `return`. This is the biggest
+source: a function with a `return` inside an `if` and nothing after it returns
+`None` for every input that misses the branch, silently.
+
+**An in-place method.** `sort`, `reverse`, `append`, `update` and their
+relatives all return `None` on purpose, so `x = x.sort()` replaces a list with
+nothing.
+
+**A lookup with a default.** `d.get(k)` returns `None` when the key is absent,
+as do `os.environ.get`, `re.match` when the pattern does not match, and a great
+many library functions that mean "nothing here".
+
+**A database or JSON null.** `null` in JSON becomes `None`, and a nullable
+column comes back the same way. This is the one where `None` is genuinely part
+of the data rather than a signal, and where the "absent versus empty"
+distinction matters most.
+
+**An uninitialised attribute.** A class that sets `self.result = None` in
+`__init__` and fills it in later hands out `None` to anything that asks too
+early.
+
+The pattern across all five is that `None` marks the absence of a value rather
+than being one. When it turns up somewhere unexpected, the productive question
+is which of these produced it &mdash; and the answer is usually the first.
+
+## Saying "might be None" out loud
+
+The failure mode of `None` is that it travels. A function returns it, the
+caller passes it on, and the `AttributeError: 'NoneType' object has no
+attribute ...` appears three functions away from the one that produced it.
+
+Type hints are the cheapest defence, because they make the possibility part of
+the signature:
+
+```python
+def find_user(name: str) -> User | None:
+    ...
+```
+
+That says, to a reader and to a type checker, that every caller has to handle
+the `None` case. A checker will flag `find_user(x).email` as an error before it
+runs. On Python before 3.10 the spelling is `Optional[User]` from `typing`,
+which means exactly the same thing.
+
+The hint changes nothing at runtime, and that is fine &mdash; the value is in
+making the contract explicit. A function whose return type is `User` and which
+sometimes returns `None` is lying, and the fix is either to make the hint
+honest or to raise instead of returning nothing.
+
+Raising is often the better answer. If a caller has no sensible response to
+"not found", returning `None` just moves the crash somewhere less informative.
+Returning `None` is right when absence is ordinary and the caller will branch
+on it; raising is right when absence means something has gone wrong.
+
+## Questions people ask
+
+<strong>Is `if x:` faster than `if len(x) > 0:`?</strong> Marginally, and
+that is not the reason to prefer it. It reads better and works on anything.
+
+<strong>Why is `"False"` true?</strong> Because it is a non-empty string.
+Truthiness asks about emptiness, not about meaning.
+
+<strong>Should I write `if x == None`?</strong> No. `is None` is the
+convention, is faster, and cannot be overridden by a class.
+
+<strong>What is falsy that people forget?</strong> `0.0`, `Decimal(0)`,
+`range(0)`, and `datetime.time(0, 0)` in older Python &mdash; midnight was
+falsy until 3.5, which caused real bugs.
+
+<strong>How do I test "not None and not empty"?</strong> `if x:` covers both
+when `None` and empty should be treated alike. When they should not, say both:
+`if x is not None and len(x):`.
+
+<strong>Does `if not x` work on a generator?</strong> Not usefully. A generator
+is always truthy, even if it will produce nothing.
+
+<strong>Why does `numpy` raise on `if array:`?</strong> Because an array with
+several elements has no single truth value, and guessing would be wrong half
+the time.
+
+<strong>Is `None` the same as `null` in other languages?</strong> It plays the
+same role. The difference is that Python's is a real object with a type, so
+`type(None)` works and `None.__class__` is `NoneType`.
+
+<strong>Can I subclass `NoneType` or make another `None`?</strong> No.
+`NoneType` cannot be instantiated, which is what guarantees `is None` is
+reliable.
+
+<strong>Why does `print(f())` show `None` for my function?</strong> Because the
+function returned nothing. Usually a `return` is missing on one branch.
+
+## Recap in one screen
+
+- The falsy values are `None`, `False`, `0`, `0.0`, `""`, `[]`, `{}` and
+  `set()`; everything else is truthy, including `"0"` and `"False"`.
+- `if not x:` means "empty, zero or missing, and I treat them the same".
+- `x is None` means "this was never set", and is the only correct test when
+  zero or empty is a legitimate value.
+- Use `is` for `None` because there is exactly one of it and `__eq__` cannot
+  interfere.
+- Your own classes get truthiness from `__bool__`, then `__len__`, and are
+  otherwise always true.

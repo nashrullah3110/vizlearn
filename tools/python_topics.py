@@ -3130,12 +3130,6 @@ None&nbsp;&nbsp;False&nbsp;&nbsp;0&nbsp;&nbsp;0.0&nbsp;&nbsp;""&nbsp;&nbsp;[]&nb
 
 Everything else is truthy. That includes `"0"`, `"False"`, `[0]` and `-1`, all of which catch people out because they look empty or negative in some sense and are not.
 
-## The idiomatic empty test
-
-if not items:
-
-is how Python asks "is this empty?", and it is preferred over `len(items) == 0` because it works on anything and reads as prose. For a list, a string or a dict, this is right and unremarkable.
-
 ## Where it goes wrong
 
 The trouble starts when a value can legitimately be `0` or `""`:
@@ -3160,11 +3154,6 @@ This tests for one specific object, not for emptiness. It is true for `None` and
 
 The rule that follows: use truthiness when you mean "empty or zero or missing, and I treat them the same". Use `is None` when `None` means something distinct from a legitimate empty value.
 
-## Why `is` rather than `==`
-
-There is exactly one `None` object in a running program, so identity is the precise test and it is faster than equality. It also cannot be fooled: a class can define `__eq__` so that `x == None` is true for something that is not `None`. `is` compares the object itself.
-
-The same applies to the two default-argument patterns from earlier in the track: `if basket is None` is correct, and `if not basket` would treat an intentionally empty list as missing.
 """,
     [{"q": "Which of these is truthy?",
       "options": ["0", "''", "'0'", "[]"],

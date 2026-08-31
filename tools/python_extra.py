@@ -7441,3 +7441,598 @@ filtering should happen on demand.
 - One `for`, one filter, one conditional: past that a loop reads better and
   changes more safely.
 """)
+
+
+extend("none_and_truthiness", """
+## The find() trap, run
+
+The classic case, with all three answers printed side by side:
+
+```python
+def find(items, target):
+    for i, item in enumerate(items):
+        if item == target:
+            return i
+    return None
+
+
+items = ["a", "b"]
+for target in ["a", "b", "z"]:
+    result = find(items, target)
+    print(target, result,
+          "not found" if not result else "found",
+          "|", "not found" if result is None else "found")
+```
+
+```
+a 0 not found | found
+b 1 found | found
+z None not found | not found
+```
+
+The middle column is the bug. `find` returned 0 &mdash; the item *was* found,
+at the first position &mdash; and `not result` reported it as missing. The
+right-hand column, testing `is None`, is correct for all three.
+
+Notice which case fails: the first element. A test suite that searches for
+something in the middle of a list passes, and the bug waits for real data where
+the match happens to be first. That is the characteristic shape of truthiness
+bugs &mdash; they are correct for most inputs, which is why they survive
+review.
+
+## Giving your own objects a truth value
+
+Truthiness is not a fixed list. Python asks the object, and any class can
+answer.
+
+When you write `if obj:`, Python calls `__bool__` if the class defines one. If
+it does not, it falls back to `__len__` and treats zero as false. If neither
+exists, the object is always truthy &mdash; which is why an instance of a plain
+class you wrote is true even when it holds nothing.
+
+```python
+class Basket:
+    def __init__(self, items):
+        self.items = items
+
+    def __len__(self):
+        return len(self.items)
+
+
+print(bool(Basket([])), len(Basket([])), bool(Basket([1])))
+```
+
+```
+False 0 True
+```
+
+Defining `__len__` gave the class a sensible truth value for free, which is why
+it is the usual choice for anything container-like. `__bool__` is for objects
+that have a notion of empty without a length &mdash; a connection that is open
+or closed, a result that succeeded or failed.
+
+The caution is that this is exactly the mechanism that makes truthiness
+ambiguous. An object that is falsy when empty cannot be distinguished from
+`None` by `if obj:`, so any code that treats "absent" and "empty" differently
+still has to use `is None`. Some libraries make this sharp: a pandas DataFrame
+raises rather than guessing when you put it in a condition, on the grounds that
+"empty" and "all values false" are both plausible readings.
+
+## When None itself is a valid value
+
+Occasionally `None` is a legitimate value in the data, and then it cannot also
+mean "absent". The standard answer is a sentinel: a unique object that means
+nothing else.
+
+```python
+MISSING = object()
+
+def get(mapping, key, default=MISSING):
+    if key in mapping:
+        return mapping[key]
+    if default is MISSING:
+        raise KeyError(key)
+    return default
+```
+
+`object()` creates something that is equal only to itself, so `default is
+MISSING` is true exactly when the caller did not pass a default. Now
+`get(d, "k", None)` and `get(d, "k")` mean different things &mdash; the first
+supplies `None` as the default, the second asks for an error &mdash; which is
+impossible if `None` is itself the sentinel.
+
+This is not a common need, and it is worth recognising because the standard
+library uses it. `dict.pop` distinguishes "no default given" from "default of
+`None`" in exactly this way, and several libraries expose their sentinel by
+name so callers can test against it.
+
+The plainer version of the same idea is a module-level constant with a name
+that says what it means, which reads better in a traceback than
+`<object object at 0x...>`.
+
+## Where None comes from
+
+`None` rarely gets written into your data deliberately. It arrives, and knowing
+the sources makes it predictable rather than mysterious.
+
+**A function that did not return.** Any function reaching its end without a
+`return` returns `None`, and so does a bare `return`. This is the biggest
+source: a function with a `return` inside an `if` and nothing after it returns
+`None` for every input that misses the branch, silently.
+
+**An in-place method.** `sort`, `reverse`, `append`, `update` and their
+relatives all return `None` on purpose, so `x = x.sort()` replaces a list with
+nothing.
+
+**A lookup with a default.** `d.get(k)` returns `None` when the key is absent,
+as do `os.environ.get`, `re.match` when the pattern does not match, and a great
+many library functions that mean "nothing here".
+
+**A database or JSON null.** `null` in JSON becomes `None`, and a nullable
+column comes back the same way. This is the one where `None` is genuinely part
+of the data rather than a signal, and where the "absent versus empty"
+distinction matters most.
+
+**An uninitialised attribute.** A class that sets `self.result = None` in
+`__init__` and fills it in later hands out `None` to anything that asks too
+early.
+
+The pattern across all five is that `None` marks the absence of a value rather
+than being one. When it turns up somewhere unexpected, the productive question
+is which of these produced it &mdash; and the answer is usually the first.
+
+## Saying "might be None" out loud
+
+The failure mode of `None` is that it travels. A function returns it, the
+caller passes it on, and the `AttributeError: 'NoneType' object has no
+attribute ...` appears three functions away from the one that produced it.
+
+Type hints are the cheapest defence, because they make the possibility part of
+the signature:
+
+```python
+def find_user(name: str) -> User | None:
+    ...
+```
+
+That says, to a reader and to a type checker, that every caller has to handle
+the `None` case. A checker will flag `find_user(x).email` as an error before it
+runs. On Python before 3.10 the spelling is `Optional[User]` from `typing`,
+which means exactly the same thing.
+
+The hint changes nothing at runtime, and that is fine &mdash; the value is in
+making the contract explicit. A function whose return type is `User` and which
+sometimes returns `None` is lying, and the fix is either to make the hint
+honest or to raise instead of returning nothing.
+
+Raising is often the better answer. If a caller has no sensible response to
+"not found", returning `None` just moves the crash somewhere less informative.
+Returning `None` is right when absence is ordinary and the caller will branch
+on it; raising is right when absence means something has gone wrong.
+
+## Questions people ask
+
+<strong>Is `if x:` faster than `if len(x) > 0:`?</strong> Marginally, and
+that is not the reason to prefer it. It reads better and works on anything.
+
+<strong>Why is `"False"` true?</strong> Because it is a non-empty string.
+Truthiness asks about emptiness, not about meaning.
+
+<strong>Should I write `if x == None`?</strong> No. `is None` is the
+convention, is faster, and cannot be overridden by a class.
+
+<strong>What is falsy that people forget?</strong> `0.0`, `Decimal(0)`,
+`range(0)`, and `datetime.time(0, 0)` in older Python &mdash; midnight was
+falsy until 3.5, which caused real bugs.
+
+<strong>How do I test "not None and not empty"?</strong> `if x:` covers both
+when `None` and empty should be treated alike. When they should not, say both:
+`if x is not None and len(x):`.
+
+<strong>Does `if not x` work on a generator?</strong> Not usefully. A generator
+is always truthy, even if it will produce nothing.
+
+<strong>Why does `numpy` raise on `if array:`?</strong> Because an array with
+several elements has no single truth value, and guessing would be wrong half
+the time.
+
+<strong>Is `None` the same as `null` in other languages?</strong> It plays the
+same role. The difference is that Python's is a real object with a type, so
+`type(None)` works and `None.__class__` is `NoneType`.
+
+<strong>Can I subclass `NoneType` or make another `None`?</strong> No.
+`NoneType` cannot be instantiated, which is what guarantees `is None` is
+reliable.
+
+<strong>Why does `print(f())` show `None` for my function?</strong> Because the
+function returned nothing. Usually a `return` is missing on one branch.
+
+## Recap in one screen
+
+- The falsy values are `None`, `False`, `0`, `0.0`, `""`, `[]`, `{}` and
+  `set()`; everything else is truthy, including `"0"` and `"False"`.
+- `if not x:` means "empty, zero or missing, and I treat them the same".
+- `x is None` means "this was never set", and is the only correct test when
+  zero or empty is a legitimate value.
+- Use `is` for `None` because there is exactly one of it and `__eq__` cannot
+  interfere.
+- Your own classes get truthiness from `__bool__`, then `__len__`, and are
+  otherwise always true.
+""")
+
+
+extend("try_and_except", """
+## A retry loop, whole
+
+The most common real use of `try` outside parsing, with the loop `else` doing
+the "we ran out of attempts" branch:
+
+```python
+attempts = []
+
+def flaky():
+    attempts.append(1)
+    if len(attempts) < 3:
+        raise ConnectionError("timed out")
+    return "ok"
+
+
+for attempt in range(1, 5):
+    try:
+        print("result:", flaky())
+        break
+    except ConnectionError as e:
+        print(f"attempt {attempt} failed: {e}")
+else:
+    print("gave up")
+```
+
+```
+attempt 1 failed: timed out
+attempt 2 failed: timed out
+result: ok
+```
+
+Four details are worth copying. The `try` contains only the call that can fail,
+so a bug in the printing would not be caught as a connection problem. The
+`except` names one specific exception, so a `TypeError` from a refactor still
+crashes loudly. The `as e` keeps the message, which is the part that tells you
+*why* it failed. And the `break` on success means the `else` runs only when
+every attempt was used, which is exactly the "gave up" case.
+
+In production this would sleep between attempts, with the delay growing each
+time, and would only retry errors that are actually transient &mdash; a
+timeout, yes; a `PermissionError`, never, because retrying it will fail
+identically four more times and delay the real error.
+
+## The hierarchy, and what catching one gets you
+
+Exceptions form a tree, and catching a class catches every subclass beneath it.
+That is what makes `except Exception` catch almost everything, and it is also
+how you catch a useful family without listing its members.
+
+At the top is `BaseException`. Directly beneath it sit `SystemExit`,
+`KeyboardInterrupt` and `GeneratorExit` &mdash; the three that are *not*
+errors, but control flow. `Exception` holds everything else, and is what you
+should catch when you must catch broadly, because it leaves those three alone.
+This is the concrete difference between `except Exception:` and a bare
+`except:`, and it is the reason the bare form makes a program impossible to
+interrupt with Ctrl-C.
+
+Below `Exception`, the groupings are useful. `OSError` covers
+`FileNotFoundError`, `PermissionError`, `IsADirectoryError`, `TimeoutError` and
+the rest of the filesystem and network family, so `except OSError` is a
+reasonable way to say "anything the operating system refused".
+`ArithmeticError` covers `ZeroDivisionError` and `OverflowError`.
+`LookupError` covers `KeyError` and `IndexError`, which is occasionally exactly
+what you want when reaching into a structure that might be short or missing a
+field.
+
+Knowing the tree turns "catch specific exceptions" from a rule into something
+actionable: catch the narrowest class that covers the failures you actually
+have an answer for.
+
+## Raising with the cause attached
+
+When you catch an exception and raise a different one, the original is worth
+keeping:
+
+```python
+try:
+    try:
+        int("abc")
+    except ValueError as exc:
+        raise RuntimeError("could not read config") from exc
+except RuntimeError as e:
+    print(type(e).__name__ + ":", e)
+    print("caused by:", type(e.__cause__).__name__)
+```
+
+```
+RuntimeError: could not read config
+caused by: ValueError
+```
+
+`from exc` sets `__cause__`, and the printed traceback then shows both:
+the low-level failure, the line "The above exception was the direct cause of
+the following exception", and your higher-level message. You get the *what* and
+the *why* in one traceback.
+
+Without `from`, Python still attaches the original as `__context__` and prints
+"During handling of the above exception, another exception occurred" &mdash;
+which is nearly as useful and reads as accidental rather than deliberate.
+`raise ... from None` suppresses it entirely, which is occasionally right when
+the internal error is noise a caller cannot act on.
+
+The reason this matters is that translating exceptions is good practice. A
+library that lets a raw `KeyError` from its internal dictionary escape has
+leaked its implementation; one that raises `ConfigError("missing 'host'") from
+exc` has given the caller something to catch and the maintainer something to
+debug.
+
+## Exceptions of your own
+
+Defining one is a single line, and the payoff is that callers can catch exactly
+your failure:
+
+```python
+class ConfigError(Exception):
+    pass
+```
+
+Subclass `Exception`, not `BaseException`. Name it for the problem rather than
+the place, and end it with `Error` by convention.
+
+The reason to bother is selectivity. A caller who wants to handle a
+configuration problem and let everything else through cannot do that if you
+raised `ValueError`, because `ValueError` is also what `int()` raises three
+frames down. A dedicated class makes the handler precise.
+
+A small hierarchy pays off in a library: one base class such as
+`ThingError(Exception)`, with specific subclasses beneath it. Callers who want
+everything catch the base; callers who care about one case catch the subclass;
+and adding a new failure mode later does not break either.
+
+Attach the data rather than only formatting it into the message.
+An exception that stores `self.path` or `self.field` lets a handler make a
+decision, where a handler given only a string has to parse English to find out
+what went wrong.
+
+## The middle ground between crashing and swallowing
+
+The advice to let exceptions travel and the need for a program that keeps
+running are both real, and the space between them is where `logging` lives.
+
+A handler has three honest choices. Handle it &mdash; you know what the failure
+means and what to do instead. Translate it &mdash; catch it, raise something
+more meaningful with `from`, and let it continue upward. Or record it and
+re-raise, which is what `logging.exception` is for: it writes the message and
+the full traceback to wherever logs go, and a bare `raise` afterwards sends the
+exception on its way.
+
+```python
+try:
+    process(record)
+except ValueError:
+    logging.exception("skipping record %r", record.id)
+    continue
+```
+
+That pattern &mdash; log with the traceback, then skip this item and carry on
+&mdash; is the correct shape for batch work, where one bad record should not
+end a run over ten thousand. The crucial part is `logging.exception` rather
+than `logging.error`, because the first includes the traceback and the second
+throws it away.
+
+What is not an honest choice is `except Exception: pass`. It is the one form
+that destroys information without replacing it, and the resulting program does
+not fail &mdash; it produces output that is quietly incomplete, which is the
+hardest kind of wrong to notice.
+
+## Questions people ask
+
+<strong>What is the difference between `except:` and `except Exception:`?</strong>
+The bare form also catches `KeyboardInterrupt` and `SystemExit`, so it stops
+Ctrl-C from working. Never use it.
+
+<strong>Can I catch several exceptions in one handler?</strong> Yes, with a
+tuple: `except (KeyError, IndexError) as e:`.
+
+<strong>Does `finally` run if the `try` returns?</strong> Yes. It runs on every
+exit path, including `return` and `break`.
+
+<strong>What happens if `finally` itself raises?</strong> Its exception
+replaces whatever was in flight, which is why `finally` blocks should be
+simple.
+
+<strong>How do I re-raise after logging?</strong> A bare `raise` inside the
+handler re-raises the current exception with its original traceback intact.
+
+<strong>Should I use exceptions for control flow?</strong> Python does, more
+than most languages &mdash; `StopIteration` ends every `for` loop. Use them for
+the exceptional path, not as a substitute for an `if`.
+
+<strong>Is try/except slow?</strong> Setting up a `try` is nearly free; raising
+and catching is not. That is why "ask forgiveness" wins when failures are rare
+and loses when they are the common case.
+
+<strong>What is an exception group?</strong> From Python 3.11,
+`ExceptionGroup` carries several exceptions at once &mdash; raised by
+concurrent code where more than one task failed &mdash; and `except*` handles
+them selectively.
+
+## Recap in one screen
+
+- Catch the narrowest exception you have an answer for; a bare `except:` also
+  swallows Ctrl-C.
+- Keep the `try` block down to the line that can fail, and put the follow-up in
+  `else`.
+- `as e` keeps the detail, which is the part that makes the message useful.
+- `raise NewError(...) from exc` preserves the cause, so the traceback shows
+  both the what and the why.
+- An exception you cannot handle is information, not a problem &mdash; letting
+  it travel beats a quiet wrong answer.
+""")
+
+
+extend("modules_and_import", """
+## Circular imports, and how to break one
+
+Two modules that each import the other produce an error that reads as though
+something is missing when nothing is:
+
+```
+ImportError: cannot import name 'Order' from partially initialized module
+'models' (most likely due to a circular import)
+```
+
+The mechanism follows directly from "importing runs the file". Module A starts
+running and hits `from B import x`. B starts running and hits
+`from A import y` &mdash; but A is only half-finished, so `y` does not exist on
+it yet. Python has A in `sys.modules` already, so it does not re-run it; it
+hands back the partial module, and the name is missing.
+
+Three fixes, in order of preference.
+
+**Move the shared thing.** If A and B both need `Order`, it belongs in a third
+module that both import and neither imports back. Most circular imports are a
+missing module rather than an import problem.
+
+**Import inside the function.** Moving `from B import x` into the function that
+uses it delays it until both modules have finished loading. This works, and it
+hides a dependency from anyone scanning the file, so it is a fix rather than a
+design.
+
+**Import the module, not the name.** `import B` and then `B.x` at call time
+often works where `from B import x` does not, because the attribute is looked
+up when used rather than when imported.
+
+The one that does not work is reordering the imports, which usually moves the
+error rather than removing it.
+
+## Where installed packages come from
+
+`sys.path` explains where Python looks; it does not explain how anything got
+there, and the gap is where most beginner import confusion lives.
+
+`pip install requests` puts the package into the `site-packages` directory of
+whichever Python is running `pip`. If you have several Pythons &mdash; the
+system one, one from Homebrew, one from a virtual environment &mdash; then
+"pip installed it and Python cannot find it" almost always means two different
+interpreters. `python3 -m pip install x` avoids that entirely by installing
+into the interpreter you just named.
+
+A **virtual environment** is a directory containing its own interpreter link
+and its own `site-packages`. `python3 -m venv .venv` creates one and activating
+it puts its interpreter first on your `PATH`, so `pip` and `python` both refer
+to it. The point is isolation: two projects can depend on incompatible versions
+of the same library without either breaking, and the set of packages a project
+needs is a property of the project rather than of your machine.
+
+The practical rules are short. One environment per project. Record the
+dependencies in a file so the environment can be rebuilt. Never install into
+the system Python, which your operating system also uses. And when an import
+fails unexpectedly, `python3 -c "import sys; print(sys.executable)"` tells you
+which interpreter you are actually running, which resolves the question faster
+than anything else.
+
+## Organising modules of your own
+
+A module is a file, so organising code is organising files, and a few
+conventions save a lot of trouble.
+
+Group by what things *are for*, not by what they are. A `models.py`,
+`views.py`, `utils.py` split works until `utils.py` becomes the place
+everything lands. Splitting by feature &mdash; `orders.py`, `billing.py`
+&mdash; keeps related code together and keeps the imports between files
+shallow.
+
+Keep module-level code to definitions. Anything that runs work, opens files or
+makes network calls at import time makes every importer pay for it, including
+your test suite. Put it in a function and let the caller decide.
+
+Avoid naming a file after a module you also import. A local `random.py`
+shadows the standard library one for your whole program, and the resulting
+`AttributeError: module 'random' has no attribute 'randint'` looks impossible
+until you spot the file.
+
+And watch the direction of dependencies. If A imports B, B should not need A.
+When it does, the two are really one module, or there is a third one waiting to
+be extracted &mdash; which is the same conclusion the circular-import section
+reached from the other direction.
+
+## Reading an import error
+
+Four messages cover nearly every import failure, and each points somewhere
+specific.
+
+`ModuleNotFoundError: No module named 'requests'` means Python looked along
+`sys.path` and found nothing. Either it is not installed, or it is installed
+for a different interpreter. Check with `python3 -m pip list` using the same
+`python3` that failed.
+
+`ImportError: cannot import name 'X' from 'y'` means the module was found and
+does not contain that name. Either it is a typo, or the version installed is
+older than the one you are reading about, or it is a circular import and the
+module is only half-loaded &mdash; the message says so when it can.
+
+`AttributeError: module 'x' has no attribute 'y'` on a standard-library name is
+the shadowing case: a file of your own named `x.py` is earlier on the path than
+the real module. `print(x.__file__)` identifies it immediately.
+
+`ImportError: attempted relative import with no known parent package` means a
+file inside a package was run directly by path. Run it as
+`python -m package.module` instead.
+
+The common thread is that the message distinguishes "could not find the module"
+from "found it, could not find the name", and that distinction sends you to
+completely different places. Reading which of the two you have is most of the
+diagnosis.
+
+## Questions people ask
+
+<strong>What is `__init__.py` for?</strong> It marks a directory as a package
+and runs when the package is imported. It can be empty, and since Python 3.3 a
+package without one mostly works &mdash; but including it avoids surprises.
+
+<strong>Why does `from . import x` fail when I run the file?</strong> Relative
+imports need a parent package, which a file run by path does not have. Run it
+with `python -m package.module`.
+
+<strong>Does `import` run the whole module?</strong> Yes, top to bottom, once
+per program.
+
+<strong>How do I reload a module I changed?</strong>
+`importlib.reload(module)` in an interactive session. In a script, restart it
+&mdash; reloading has enough sharp edges that it is not worth relying on.
+
+<strong>Where is a module actually loaded from?</strong>
+`module.__file__` after importing it, which is the fastest way to confirm you
+have the one you meant.
+
+<strong>Is `import x` inside a function slow?</strong> Only the first time.
+After that it is a dictionary lookup in `sys.modules`.
+
+<strong>What is the difference between a module and a package?</strong> A
+module is a file; a package is a directory of modules. Both are imported the
+same way.
+
+<strong>Can a module import itself?</strong> It can, and it gets the partially
+initialised version from `sys.modules`. There is no good reason to.
+
+<strong>What does `if TYPE_CHECKING:` do?</strong> Guards imports that exist
+only for type hints, so they cost nothing at runtime and cannot cause a
+circular import.
+
+## Recap in one screen
+
+- Importing runs the file once, top to bottom, and caches the result in
+  `sys.modules`.
+- `import x` keeps the prefix and the provenance; `from x import y` is for one
+  or two heavily used names; `import *` hides both and can silently overwrite.
+- The `__main__` guard is what lets a file be both a script and an importable
+  module.
+- Circular imports mean a shared piece belongs in a third module.
+- One virtual environment per project, and `python3 -m pip` to be certain which
+  interpreter you are installing into.
+""")

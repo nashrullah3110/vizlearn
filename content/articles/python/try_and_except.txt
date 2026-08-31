@@ -110,3 +110,214 @@ there is a better tool: a context manager. `with open(...)` closes the file
 whether the block succeeded or raised, without the extra indentation and without
 the risk of forgetting. Reach for `finally` when there is no context manager for
 what you are doing, and for `with` when there is.
+
+## A retry loop, whole
+
+The most common real use of `try` outside parsing, with the loop `else` doing
+the "we ran out of attempts" branch:
+
+```python
+attempts = []
+
+def flaky():
+    attempts.append(1)
+    if len(attempts) < 3:
+        raise ConnectionError("timed out")
+    return "ok"
+
+
+for attempt in range(1, 5):
+    try:
+        print("result:", flaky())
+        break
+    except ConnectionError as e:
+        print(f"attempt {attempt} failed: {e}")
+else:
+    print("gave up")
+```
+
+```
+attempt 1 failed: timed out
+attempt 2 failed: timed out
+result: ok
+```
+
+Four details are worth copying. The `try` contains only the call that can fail,
+so a bug in the printing would not be caught as a connection problem. The
+`except` names one specific exception, so a `TypeError` from a refactor still
+crashes loudly. The `as e` keeps the message, which is the part that tells you
+*why* it failed. And the `break` on success means the `else` runs only when
+every attempt was used, which is exactly the "gave up" case.
+
+In production this would sleep between attempts, with the delay growing each
+time, and would only retry errors that are actually transient &mdash; a
+timeout, yes; a `PermissionError`, never, because retrying it will fail
+identically four more times and delay the real error.
+
+## The hierarchy, and what catching one gets you
+
+Exceptions form a tree, and catching a class catches every subclass beneath it.
+That is what makes `except Exception` catch almost everything, and it is also
+how you catch a useful family without listing its members.
+
+At the top is `BaseException`. Directly beneath it sit `SystemExit`,
+`KeyboardInterrupt` and `GeneratorExit` &mdash; the three that are *not*
+errors, but control flow. `Exception` holds everything else, and is what you
+should catch when you must catch broadly, because it leaves those three alone.
+This is the concrete difference between `except Exception:` and a bare
+`except:`, and it is the reason the bare form makes a program impossible to
+interrupt with Ctrl-C.
+
+Below `Exception`, the groupings are useful. `OSError` covers
+`FileNotFoundError`, `PermissionError`, `IsADirectoryError`, `TimeoutError` and
+the rest of the filesystem and network family, so `except OSError` is a
+reasonable way to say "anything the operating system refused".
+`ArithmeticError` covers `ZeroDivisionError` and `OverflowError`.
+`LookupError` covers `KeyError` and `IndexError`, which is occasionally exactly
+what you want when reaching into a structure that might be short or missing a
+field.
+
+Knowing the tree turns "catch specific exceptions" from a rule into something
+actionable: catch the narrowest class that covers the failures you actually
+have an answer for.
+
+## Raising with the cause attached
+
+When you catch an exception and raise a different one, the original is worth
+keeping:
+
+```python
+try:
+    try:
+        int("abc")
+    except ValueError as exc:
+        raise RuntimeError("could not read config") from exc
+except RuntimeError as e:
+    print(type(e).__name__ + ":", e)
+    print("caused by:", type(e.__cause__).__name__)
+```
+
+```
+RuntimeError: could not read config
+caused by: ValueError
+```
+
+`from exc` sets `__cause__`, and the printed traceback then shows both:
+the low-level failure, the line "The above exception was the direct cause of
+the following exception", and your higher-level message. You get the *what* and
+the *why* in one traceback.
+
+Without `from`, Python still attaches the original as `__context__` and prints
+"During handling of the above exception, another exception occurred" &mdash;
+which is nearly as useful and reads as accidental rather than deliberate.
+`raise ... from None` suppresses it entirely, which is occasionally right when
+the internal error is noise a caller cannot act on.
+
+The reason this matters is that translating exceptions is good practice. A
+library that lets a raw `KeyError` from its internal dictionary escape has
+leaked its implementation; one that raises `ConfigError("missing 'host'") from
+exc` has given the caller something to catch and the maintainer something to
+debug.
+
+## Exceptions of your own
+
+Defining one is a single line, and the payoff is that callers can catch exactly
+your failure:
+
+```python
+class ConfigError(Exception):
+    pass
+```
+
+Subclass `Exception`, not `BaseException`. Name it for the problem rather than
+the place, and end it with `Error` by convention.
+
+The reason to bother is selectivity. A caller who wants to handle a
+configuration problem and let everything else through cannot do that if you
+raised `ValueError`, because `ValueError` is also what `int()` raises three
+frames down. A dedicated class makes the handler precise.
+
+A small hierarchy pays off in a library: one base class such as
+`ThingError(Exception)`, with specific subclasses beneath it. Callers who want
+everything catch the base; callers who care about one case catch the subclass;
+and adding a new failure mode later does not break either.
+
+Attach the data rather than only formatting it into the message.
+An exception that stores `self.path` or `self.field` lets a handler make a
+decision, where a handler given only a string has to parse English to find out
+what went wrong.
+
+## The middle ground between crashing and swallowing
+
+The advice to let exceptions travel and the need for a program that keeps
+running are both real, and the space between them is where `logging` lives.
+
+A handler has three honest choices. Handle it &mdash; you know what the failure
+means and what to do instead. Translate it &mdash; catch it, raise something
+more meaningful with `from`, and let it continue upward. Or record it and
+re-raise, which is what `logging.exception` is for: it writes the message and
+the full traceback to wherever logs go, and a bare `raise` afterwards sends the
+exception on its way.
+
+```python
+try:
+    process(record)
+except ValueError:
+    logging.exception("skipping record %r", record.id)
+    continue
+```
+
+That pattern &mdash; log with the traceback, then skip this item and carry on
+&mdash; is the correct shape for batch work, where one bad record should not
+end a run over ten thousand. The crucial part is `logging.exception` rather
+than `logging.error`, because the first includes the traceback and the second
+throws it away.
+
+What is not an honest choice is `except Exception: pass`. It is the one form
+that destroys information without replacing it, and the resulting program does
+not fail &mdash; it produces output that is quietly incomplete, which is the
+hardest kind of wrong to notice.
+
+## Questions people ask
+
+<strong>What is the difference between `except:` and `except Exception:`?</strong>
+The bare form also catches `KeyboardInterrupt` and `SystemExit`, so it stops
+Ctrl-C from working. Never use it.
+
+<strong>Can I catch several exceptions in one handler?</strong> Yes, with a
+tuple: `except (KeyError, IndexError) as e:`.
+
+<strong>Does `finally` run if the `try` returns?</strong> Yes. It runs on every
+exit path, including `return` and `break`.
+
+<strong>What happens if `finally` itself raises?</strong> Its exception
+replaces whatever was in flight, which is why `finally` blocks should be
+simple.
+
+<strong>How do I re-raise after logging?</strong> A bare `raise` inside the
+handler re-raises the current exception with its original traceback intact.
+
+<strong>Should I use exceptions for control flow?</strong> Python does, more
+than most languages &mdash; `StopIteration` ends every `for` loop. Use them for
+the exceptional path, not as a substitute for an `if`.
+
+<strong>Is try/except slow?</strong> Setting up a `try` is nearly free; raising
+and catching is not. That is why "ask forgiveness" wins when failures are rare
+and loses when they are the common case.
+
+<strong>What is an exception group?</strong> From Python 3.11,
+`ExceptionGroup` carries several exceptions at once &mdash; raised by
+concurrent code where more than one task failed &mdash; and `except*` handles
+them selectively.
+
+## Recap in one screen
+
+- Catch the narrowest exception you have an answer for; a bare `except:` also
+  swallows Ctrl-C.
+- Keep the `try` block down to the line that can fail, and put the follow-up in
+  `else`.
+- `as e` keeps the detail, which is the part that makes the message useful.
+- `raise NewError(...) from exc` preserves the cause, so the traceback shows
+  both the what and the why.
+- An exception you cannot handle is information, not a problem &mdash; letting
+  it travel beats a quiet wrong answer.
