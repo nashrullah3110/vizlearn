@@ -44,44 +44,6 @@ Chained filters mean the same as one `and`. The `and` version is usually clearer
 
 A trailing `if` attaches to the clause it follows &mdash; here the inner loop. Placing a filter after the first `for` instead would filter rows rather than cells. When there are two loops and a condition, this is where a comprehension starts costing more to read than it saves, and the loop version is the kinder choice.
 
-## Two conditionals, two positions, two jobs
-
-This is the single point worth being certain about, because the two forms look
-similar, sit in the same expression, and do different things.
-
-The trailing `if` filters. It decides whether an item appears at all, so the
-result can be shorter than the input:
-
-```python
-[n for n in nums if n > 0]
-```
-
-The leading `if`/`else` chooses a value. Every item still appears, so the result
-is always the same length as the input:
-
-```python
-[n if n > 0 else 0 for n in nums]
-```
-
-A useful way to remember it: the front of a comprehension is the expression that
-produces each item, and an expression must always produce something - which is
-why the `else` is compulsory there and forbidden at the end.
-
-## Combining both
-
-They can appear together, and the reading order is worth stating explicitly:
-
-```python
-["high" if n > 100 else "low" for n in nums if n is not None]
-```
-
-The trailing filter runs first, deciding which items survive. The leading
-conditional then runs on each survivor, deciding what it becomes. Filter, then
-map - even though the map is written first.
-
-Once a line contains both, it is close to the limit of what reads well, and a
-second filter or a nested loop pushes it past.
-
 ## Filtering out None before working with values
 
 The combination above is not a contrived example; it is the common shape when
@@ -97,22 +59,252 @@ Written the other way round - a conditional expression testing for `None` on
 every item - the line is longer and still produces an entry for rows that had no
 score, which is usually not what was wanted.
 
-## Multiple conditions
-
-Several filters can be chained, and they behave as `and`:
-
-```python
-[n for n in nums if n > 0 if n % 2 == 0]
-```
-
-which is identical to writing `if n > 0 and n % 2 == 0`. The chained form
-occasionally reads better when the conditions test unrelated things; the
-combined form is more familiar. Neither is wrong, and consistency within a file
-matters more than the choice.
-
 ## Where to draw the line
 
 A comprehension carrying a filter, a conditional expression and a nested loop is
 a program written on one line. It will be correct and it will cost every future
 reader - including you - a slow minute. The loop version is four lines that
 never need decoding, and no reviewer has ever objected to it.
+
+## Both forms, side by side
+
+The difference is easiest to hold on to as a length:
+
+```python
+nums = [1, -2, 3, -4]
+
+print([n for n in nums if n > 0])
+print([n if n > 0 else 0 for n in nums])
+print([n if n > 0 else 0 for n in nums if n % 2])
+```
+
+```
+[1, 3]
+[1, 0, 3, 0]
+[1, 3]
+```
+
+The first is a filter: four in, two out. The second is a choice: four in, four
+out, with the failures replaced rather than removed. The third has both, and
+the reading order is the thing to fix in your head &mdash; the trailing filter
+runs first, keeping the odd numbers, and only then does the leading conditional
+run on what survived.
+
+Written out as a loop, the order is obvious:
+
+```python
+result = []
+for n in nums:
+    if n % 2:                 # the trailing filter
+        result.append(n if n > 0 else 0)
+```
+
+The comprehension writes the append expression first and the filter last, which
+is the reverse of the order they execute in. That is the single fact that makes
+combined comprehensions hard to read, and it is why one filter and one
+conditional is a sensible ceiling.
+
+## Why the else is compulsory in one place and forbidden in the other
+
+This looks like an inconsistency and is a direct consequence of what each `if`
+is doing.
+
+The `if` at the front is part of the **expression** that produces each item. An
+expression must produce a value on every path &mdash; there is nowhere for
+"produce nothing" to go, because the comprehension is going to append whatever
+it evaluates to. So the `else` is required, exactly as it is in a conditional
+expression anywhere else.
+
+The `if` at the end is a **filter clause**, part of the comprehension's
+machinery rather than of the expression. It answers one question: does this
+item continue to the expression, or not. There is no second branch for an
+`else` to introduce, because "not kept" is already the alternative.
+
+Trying the wrong one is worth doing once so the error is familiar.
+`[n for n in nums if n > 0 else 0]` is a `SyntaxError`, and the message points
+at the `else`. `[n if n > 0 for n in nums]` is also a `SyntaxError`, because
+the expression is incomplete.
+
+## Filtering to make the expression safe
+
+The execution order is not trivia; it is what lets the filter protect the
+expression:
+
+```python
+rows = [{"score": 50}, {"score": None}, {"score": 90}]
+
+print([r["score"] * 2 for r in rows if r["score"] is not None])
+```
+
+```
+[100, 180]
+```
+
+The `None` row never reaches the multiplication. Swap the two clauses in your
+head &mdash; expression first &mdash; and it would raise `TypeError` on the
+second row.
+
+This is the standard shape for data with gaps, and it is better than the
+alternative it is often confused with. Writing
+`[r["score"] * 2 if r["score"] is not None else None for r in rows]` produces
+an entry for every row, including a `None` in the middle of what is supposed to
+be a list of numbers, which pushes the problem to whatever consumes the result.
+
+Deciding between them is deciding what a missing value means: filter when the
+row should not be in the output, choose when it should be present with a
+substitute. Both are legitimate; picking one by accident is not.
+
+## Several filters, and the nested case
+
+Chained filters mean `and`:
+
+```python
+[n for n in nums if n > 0 if n % 2 == 0]
+```
+
+is identical to one filter with `and`. The chained form occasionally reads
+better when the conditions are unrelated tests; the combined form is more
+familiar. Neither is wrong.
+
+Nesting is where care is needed, because a trailing `if` attaches to the clause
+it follows:
+
+```python
+[n for row in grid for n in row if n % 2]
+```
+
+The filter is after the inner `for`, so it filters cells. Move it up, to
+`for row in grid if len(row) > 2 for n in row`, and it filters rows instead.
+Both are legal and they mean entirely different things, with no visual signal
+beyond position.
+
+The clauses read in the same order as the equivalent nested loops, outermost
+first. That is worth stating because the guess most people make is the
+opposite, and the code will run either way while producing the wrong answer.
+
+## The same two positions, everywhere
+
+Nothing on this page is specific to lists. Dict comprehensions, set
+comprehensions and generator expressions all carry the same two `if` positions
+with the same rules, and knowing that means learning it once.
+
+```python
+rows = [{"name": "ana", "score": 91}, {"name": "bo", "score": None}]
+
+print({r["name"]: r["score"] for r in rows if r["score"] is not None})
+print({r["name"] for r in rows if r["score"]})
+print(sum(r["score"] for r in rows if r["score"] is not None))
+```
+
+```
+{'ana': 91}
+{'ana'}
+91
+```
+
+The filter sits at the end in all three. A conditional expression, when used,
+sits at the front &mdash; in the value slot for a dict, in the item slot for a
+set or generator. In a dict comprehension it can appear in either the key or
+the value, or both, which is legal and almost always worse than a loop.
+
+The generator expression case is worth calling out because the filter there is
+doing something the others are not: it decides which items are ever computed at
+all. In a list comprehension a filtered-out item costs a test; in a generator
+feeding `sum` over a large file, the filter is what stops work from happening.
+
+## When the filter is expensive
+
+The trailing filter runs on every item, and the leading expression runs only on
+survivors. That is usually the efficient way round, and occasionally it is not.
+
+If the test itself is costly &mdash; a lookup, a regular expression, a parse
+&mdash; and the expression needs the same computed value, the naive
+comprehension does the work twice:
+
+```python
+[parse(line) for line in lines if parse(line) is not None]
+```
+
+`parse` runs twice for every line that survives. The walrus operator computes
+it once and reuses it:
+
+```python
+[value for line in lines if (value := parse(line)) is not None]
+```
+
+The assignment happens in the filter, and the name is available to the
+expression at the front &mdash; which reads oddly, since the expression is
+written first, but follows directly from the filter running first.
+
+Before Python 3.8 the idiom was a nested comprehension:
+`[v for v in (parse(l) for l in lines) if v is not None]`, computing the values
+in an inner generator and filtering the results. That still works and is
+arguably clearer, since it separates the two steps rather than hiding an
+assignment inside a condition.
+
+## The rule, in one line
+
+Everything on this page reduces to a sentence worth keeping: **the `if` at the
+front chooses a value and needs an `else`; the `if` at the end chooses an item
+and cannot have one.**
+
+If you can only remember one consequence of that, make it the length. A
+comprehension whose result must be the same length as the input needs the
+leading form. One whose result may be shorter needs the trailing form. Asking
+"how many items should come out" answers which `if` you want faster than
+recalling the syntax rules does.
+
+And when both appear, remember they run in the opposite order to the one they
+are written in. The filter decides what survives; the expression then decides
+what each survivor becomes. Every confusing combined comprehension is that
+inversion catching someone out.
+
+## Questions people ask
+
+<strong>Which `if` runs first?</strong> The trailing filter, always &mdash;
+even though the conditional expression is written before it.
+
+<strong>Can I use `else` with the trailing `if`?</strong> No, it is a syntax
+error. There is no second branch for a filter.
+
+<strong>Can I filter on the computed value rather than the source?</strong> Not
+directly, without computing it twice. The walrus operator does it in one pass:
+`[y for x in data if (y := f(x)) > 0]`.
+
+<strong>Does this work in dict and set comprehensions?</strong> Yes, identically.
+The two positions and their rules are the same in all of them.
+
+<strong>Are two filters slower than one `and`?</strong> No, they compile to the
+same thing.
+
+<strong>How many clauses is too many?</strong> One `for`, one filter, and
+optionally one conditional expression. Past that, the loop is easier to read
+and to change.
+
+<strong>Can the filter reference the loop variable of an outer clause?</strong>
+Yes. Every clause can see the variables bound by the clauses to its left.
+
+<strong>Can I put the filter before the `for`?</strong> No. The clause order is
+fixed: expression, then `for`, then any `if`. The only `if` that comes first is
+part of the expression.
+
+<strong>Why does my comprehension raise on some items?</strong> Almost always
+because the expression is running on items the filter should have removed
+&mdash; or because the filter is testing something different from what the
+expression uses.
+
+<strong>Is there a way to skip an item from the expression?</strong> No. An
+expression must produce something, so skipping is the filter's job. That
+separation is the reason for the two positions.
+
+## Recap in one screen
+
+- The trailing `if` filters and takes no `else`; the leading `if`/`else`
+  chooses and requires one.
+- Filter first, then the expression &mdash; the opposite of the written order.
+- That ordering is what lets a filter guard the expression against `None` or a
+  division by zero.
+- Chained filters mean `and`; in a nested comprehension a filter attaches to
+  the clause it follows.
+- One `for`, one filter, one conditional: past that a loop reads better and
+  changes more safely.

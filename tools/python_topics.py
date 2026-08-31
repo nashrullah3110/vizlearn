@@ -1644,16 +1644,6 @@ Inside an f-string, inside a comprehension, as an argument. A four-line `if` can
 
 An expression has to produce a value on every path, so there is no one-armed version. `x = 1 if cond` is a syntax error. If you want "set it only sometimes", that is a statement, and the statement form is what you want.
 
-## Where it stops helping
-
-Chaining is legal:
-
-"A" if s &gt;= 90 else "B" if s &gt;= 80 else "C" if s &gt;= 70 else "F"
-
-and it is the point where the form has outlived its usefulness. The reader has to scan to the end to find the default, and inserting a new band means editing the middle of a long line. The page prints the chained version beside a plain sequence of `if` statements; they agree on every input, and only one of them can be read at a glance.
-
-The rule that holds up: one condition, short values, one line. Two conditions, write the statement.
-
 ## The `or` lookalike
 
 This is the most common way the idea goes wrong:
@@ -1820,19 +1810,6 @@ case int() if n &lt; 0:
 
 The pattern narrows the shape, the guard narrows the value. Together they express "an integer, and a negative one" in the place where you are already looking.
 
-## The trap: a bare name matches everything
-
-case status:
-
-This does not compare against a variable called `status`. A bare name is a capture pattern: it matches anything and binds the name. It is the single most common `match` mistake, and it fails quietly &mdash; the first case swallows every value.
-
-To compare against a constant, use a dotted name (`case Status.OK:`), a literal, or a guard.
-
-## When to use it
-
-For two or three literal comparisons, `if` is shorter and everyone reads it. Reach for `match` when you are inspecting the *shape* of data &mdash; parsed JSON, events, commands, ASTs &mdash; where the alternative is a stack of `isinstance` checks and key lookups. That is the job it was added for.
-
-`match` needs Python 3.10 or newer.
 """,
     [{"q": "What does a bare `case status:` do?",
       "options": ["Compares against the variable status", "Matches anything and "

@@ -19,16 +19,6 @@ Inside an f-string, inside a comprehension, as an argument. A four-line `if` can
 
 An expression has to produce a value on every path, so there is no one-armed version. `x = 1 if cond` is a syntax error. If you want "set it only sometimes", that is a statement, and the statement form is what you want.
 
-## Where it stops helping
-
-Chaining is legal:
-
-"A" if s &gt;= 90 else "B" if s &gt;= 80 else "C" if s &gt;= 70 else "F"
-
-and it is the point where the form has outlived its usefulness. The reader has to scan to the end to find the default, and inserting a new band means editing the middle of a long line. The page prints the chained version beside a plain sequence of `if` statements; they agree on every input, and only one of them can be read at a glance.
-
-The rule that holds up: one condition, short values, one line. Two conditions, write the statement.
-
 ## The `or` lookalike
 
 This is the most common way the idea goes wrong:
@@ -95,3 +85,188 @@ def grade(score):
 The bands are now data, which means they can be changed, tested and displayed
 without touching the logic. That is usually the real win, and it is easy to
 miss while arguing about one-liners.
+
+## Seeing the or trap fail
+
+The `or` shorthand and the explicit conditional look interchangeable until a
+falsy value goes through them:
+
+```python
+def with_or(value):
+    return value or "default"
+
+def with_cond(value):
+    return value if value is not None else "default"
+
+for v in ["set", "", 0, None, False, []]:
+    print(repr(v), "->", repr(with_or(v)), repr(with_cond(v)))
+```
+
+```
+'set' -> 'set' 'set'
+'' -> 'default' ''
+0 -> 'default' 0
+None -> 'default' 'default'
+False -> 'default' False
+[] -> 'default' []
+```
+
+They agree on `"set"` and on `None`, and disagree on everything else. `or`
+replaces the empty string, the zero, the `False` and the empty list &mdash;
+every one of which might be a legitimate value somebody deliberately supplied.
+
+The cases where this matters are ordinary rather than exotic. A quantity of
+zero, an empty search box, a `False` flag the user actually turned off, an
+empty list meaning "no tags". In each, `or` silently substitutes a default over
+the top of a real answer, and the bug reads as "my setting does not take
+effect".
+
+`or` is still fine when every falsy value genuinely means "absent" &mdash;
+which is most often true for strings that are either a name or nothing. The
+discipline is to notice that you are making that claim rather than reaching for
+the shorter form by reflex.
+
+## It is an expression, and that is the whole distinction
+
+Everything on this page follows from one fact: `x if c else y` produces a
+value, and `if c:` does not.
+
+An expression can go wherever a value can. That is why it works inside an
+f-string, as a function argument, as a dictionary value, inside a comprehension
+and on the right of an assignment. A statement can go in none of those places,
+which is why the conditional expression is not a shorter `if` &mdash; it is the
+only form that fits where a value is required.
+
+The converse is equally firm. An expression must produce a value on every path,
+which is why the `else` is compulsory and why there is no one-armed version. It
+also cannot contain statements: no assignment, no `raise`, no `return` inside
+it. If the branches need to *do* something rather than *be* something, the
+statement form is the only option.
+
+This also explains the reading order. `x if c else y` puts the common case
+first because the whole thing is a value with a qualification attached, in the
+way English does &mdash; "the total, if there is one, otherwise zero". A
+statement starts with the question because it is about control flow, and
+control flow starts with a decision.
+
+## The walrus, and the other one-liner
+
+A near neighbour worth distinguishing, because both compress a few lines into
+one and they do different things.
+
+`:=`, the walrus operator, assigns *inside* an expression, so a value can be
+computed and tested in one place:
+`if (n := len(items)) > 10:` binds `n` and compares it, and `n` is then
+available in the body without a second call. In a comprehension it is the way
+to avoid computing something twice:
+`[y for x in data if (y := f(x)) is not None]` calls `f` once per item rather
+than once in the filter and again in the expression.
+
+The distinction from a conditional expression is clean. The walrus is about
+*naming* a value you are already computing; the conditional expression is about
+*choosing* between two values. They combine happily and neither replaces the
+other.
+
+Both share a caution: they earn their place when they remove a genuine
+repetition or make a line fit where a statement cannot. Used to compress code
+that was already clear, both make a reader stop, and neither is worth that.
+
+## Where you will actually meet it
+
+Four places account for nearly every conditional expression in real code, and
+all four share the property that a statement could not go there.
+
+**Inside an f-string.** `f"{count} item{'s' if count != 1 else ''}"` handles the
+plural without building the string in two steps. This is the single most common
+use, and it is worth having in your fingers.
+
+**As a default that depends on something.**
+`timeout=timeout if timeout is not None else DEFAULT` in an argument list, or
+as a dictionary value in a literal being constructed.
+
+**Inside a comprehension.** Choosing what each item becomes, as opposed to
+filtering which items appear &mdash; the distinction covered elsewhere in the
+track.
+
+**As a `key=` argument.** `sorted(rows, key=lambda r: r.score if r.score is not
+None else -1)` puts missing values at one end without filtering them out first.
+
+What none of these have in common with an `if` statement is that they are
+producing a value in the middle of an expression that is already underway. That
+is the whole niche, and reaching for the form outside it &mdash; on a line of
+its own, assigning to a variable, when a plain `if` would do &mdash; is where
+it starts costing readability rather than saving it.
+
+## When the statement is the better tool
+
+The conditional expression is not a compressed `if`, and treating it as one
+produces the code that gives it a bad name. Three signals that the statement
+form is what you want.
+
+**The branches do something rather than produce something.** Logging, raising,
+assigning to more than one name, calling for a side effect. None of these fit
+in an expression, and contorting them to fit &mdash; a tuple of calls, an `or`
+chain with a function that raises &mdash; produces code that is clever and
+unreadable in the same stroke.
+
+**There are more than two outcomes.** A chain of `else`s pushes the default to
+the far end of the line and makes inserting a case an edit in the middle of a
+string of keywords. A sequence of `if` statements, or a table of thresholds, is
+both clearer and easier to change.
+
+**Either branch is long.** Once the line wraps, the reader has to reassemble it
+across two lines to find where the condition sits. A four-line `if` costs three
+lines nobody has ever regretted.
+
+The version of the rule worth keeping: use the expression when you need a
+value *here*, in the middle of something else. Use the statement when you are
+deciding what the program does next.
+
+## Questions people ask
+
+<strong>Why is the condition in the middle?</strong> Because the expression is
+a value with a qualification, and putting the common case first makes it read
+as a sentence.
+
+<strong>Can I leave out the `else`?</strong> No. An expression must produce a
+value on every path.
+
+<strong>Can I nest them?</strong> Legally yes, readably no past one level. A
+sequence of `if` statements or a table of bands is clearer.
+
+<strong>Is it slower than an `if` statement?</strong> No, they compile to
+essentially the same bytecode.
+
+<strong>Can I use it on the left of an assignment?</strong> No.
+`(a if c else b) = 1` is not valid; only names and subscripts can be assigned
+to.
+
+<strong>What is Python's version of the ternary `?:`?</strong> This is it.
+Python spells it with words rather than punctuation, deliberately.
+
+<strong>Can I put a `raise` in one?</strong> No, `raise` is a statement.
+There is an idiom using `or` with a function that raises, and it is worse than
+writing the `if`.
+
+<strong>Does it short-circuit?</strong> Yes. Only the branch that is chosen is
+evaluated, so the other side can safely be something that would fail.
+
+<strong>Can I use it with `and`/`or` in the condition?</strong> Yes, and
+brackets are worth adding when you do &mdash; the precedence is correct but not
+obvious to a reader.
+
+<strong>Does it work in a lambda?</strong> Yes, and it is one of the few ways
+to get a decision into one, since a lambda body must be a single expression.
+
+## Recap in one screen
+
+- `value_if_true if condition else value_if_false` &mdash; the value first, the
+  condition second.
+- It is an expression, so it fits inside f-strings, comprehensions and argument
+  lists where a statement cannot.
+- The `else` is compulsory, because an expression must always produce
+  something.
+- `x or default` replaces every falsy value, not just `None`; use the explicit
+  `is not None` form when zero or empty is legitimate.
+- One condition and short values on one line; past that, write the statement or
+  put the bands in a list.

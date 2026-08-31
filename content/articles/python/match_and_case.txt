@@ -39,20 +39,6 @@ case int() if n &lt; 0:
 
 The pattern narrows the shape, the guard narrows the value. Together they express "an integer, and a negative one" in the place where you are already looking.
 
-## The trap: a bare name matches everything
-
-case status:
-
-This does not compare against a variable called `status`. A bare name is a capture pattern: it matches anything and binds the name. It is the single most common `match` mistake, and it fails quietly &mdash; the first case swallows every value.
-
-To compare against a constant, use a dotted name (`case Status.OK:`), a literal, or a guard.
-
-## When to use it
-
-For two or three literal comparisons, `if` is shorter and everyone reads it. Reach for `match` when you are inspecting the *shape* of data &mdash; parsed JSON, events, commands, ASTs &mdash; where the alternative is a stack of `isinstance` checks and key lookups. That is the job it was added for.
-
-`match` needs Python 3.10 or newer.
-
 ## Why it was added
 
 Python resisted a switch statement for decades on the grounds that a chain of
@@ -101,3 +87,280 @@ remembering, because a missing case here is a quiet no-op rather than an error.
 `if`/`elif` version is the only option, and for two or three literal
 comparisons it is the better one regardless: shorter, universally understood,
 and with none of the capture-pattern sharp edges.
+
+## Destructuring in one step
+
+The argument for `match` is not tidiness, it is that the pattern checks the
+shape and pulls the pieces out in the same breath:
+
+```python
+events = [
+    {"type": "click", "x": 10, "y": 20},
+    {"type": "key", "key": "a"},
+    {"type": "scroll", "amount": 3, "extra": "ignored"},
+    "not a dict",
+]
+
+for e in events:
+    match e:
+        case {"type": "click", "x": x, "y": y}:
+            print("click at", x, y)
+        case {"type": "key", "key": k}:
+            print("key", k)
+        case {"type": t}:
+            print("other event:", t)
+        case _:
+            print("unrecognised:", e)
+```
+
+```
+click at 10 20
+key a
+other event: scroll
+unrecognised: not a dict
+```
+
+Three things are worth noticing. The `scroll` event carries an `extra` key that
+no pattern mentions, and it still matches &mdash; mapping patterns check that
+the named keys are *present*, not that they are the only ones, which is what
+makes them usable against real payloads.
+
+The string falls through to `case _`, because a mapping pattern does not match
+a non-mapping. Written with `if`, that safety would have been an explicit
+`isinstance(e, dict)` that somebody has to remember.
+
+And `x`, `y`, `k` and `t` are bound by the match itself. The equivalent
+`if`-chain needs a key check and a lookup for each, in the right order, with
+the lookups repeating what the checks just established.
+
+## The bare name that swallows everything
+
+A bare name in a pattern does not compare against that name. It is a **capture
+pattern**: it matches anything at all and binds the name to whatever it caught.
+
+Python protects you from the obvious form of the mistake. Writing a capture
+before other cases is a compile-time error, and the message is unusually
+direct:
+
+```
+SyntaxError: name capture 'OK' makes remaining patterns unreachable
+```
+
+What it cannot protect you from is the same mistake in the last position, where
+there are no unreachable patterns to complain about:
+
+```python
+OK = 200
+
+for status in [200, 404, 500]:
+    match status:
+        case 404:
+            print(status, "not found")
+        case OK:
+            print(status, "matched OK")
+
+print("OK is now", OK)
+```
+
+```
+200 matched OK
+404 not found
+500 matched OK
+OK is now 500
+```
+
+500 "matched OK", because `case OK:` matched everything the earlier case did
+not. And the constant is gone &mdash; `OK` was rebound each time the capture
+fired, so after the loop it holds 500.
+
+The fix is a dotted name, which is a **value pattern** and does compare:
+
+```python
+class Status:
+    OK = 200
+
+for status in [200, 404, 500]:
+    match status:
+        case 404:
+            print(status, "not found")
+        case Status.OK:
+            print(status, "matched OK")
+        case _:
+            print(status, "unhandled")
+```
+
+```
+200 matched OK
+404 not found
+500 unhandled
+```
+
+This is why enums pair so naturally with `match`: `case Colour.RED` is
+unambiguous, and an enum gives you the dotted form for nothing. Literals work
+too. It is only bare names that capture.
+
+## Not exhaustive, and what that means
+
+Languages that popularised pattern matching usually check that every possible
+case is handled, and refuse to compile if one is missing. Python does not.
+
+If no case matches and there is no `case _`, the `match` statement simply does
+nothing and execution continues on the next line. No exception, no warning. A
+value that falls through leaves no trace, and the symptom appears later as a
+result that was never computed.
+
+That makes `case _` more important than a default clause usually is. Ending
+with one that raises &mdash; or at minimum logs the unhandled value &mdash;
+converts a silent no-op into something you can find:
+
+```python
+        case _:
+            raise ValueError(f"unhandled event: {event!r}")
+```
+
+The same applies inside a function returning a value: a `match` where every
+case returns will return `None` for an unmatched value, which then travels
+somewhere else before failing. Making the fallthrough explicit is the habit
+worth forming from the first `match` you write.
+
+## Guards, classes and the shapes worth knowing
+
+Beyond literals and mappings, three pattern kinds cover most real use.
+
+**Sequence patterns** match lists and tuples structurally. `case [x]` matches a
+one-item sequence, `case [first, *rest]` matches any non-empty one and splits
+it, `case []` matches empty. They do not match strings, which is deliberate
+&mdash; a string is a sequence of characters and matching it as one is almost
+never what anybody means.
+
+**Class patterns** match an instance and can read attributes:
+`case Point(x=0, y=y)` matches a `Point` whose `x` is zero and binds its `y`.
+Dataclasses and named tuples support the positional form, `case Point(0, y)`,
+via `__match_args__`.
+
+**Guards** attach a condition to a pattern with `if`:
+`case [x, y] if x == y` matches a two-item sequence whose items are equal. The
+pattern narrows the shape, the guard narrows the values, and a guard that fails
+lets the next case try &mdash; it does not abandon the whole `match`.
+
+The combination is what makes the feature earn its keyword. "A two-element list
+of integers where the first is negative" is one line, and the `if`-chain
+equivalent is a length check, two `isinstance` calls and a comparison in a
+specific order.
+
+## A worked example: a small command parser
+
+Every pattern kind in one function, doing the job `match` was added for:
+
+```python
+def run(command):
+    match command.split():
+        case ["quit"] | ["exit"]:
+            return "goodbye"
+        case ["add", *items] if items:
+            return f"adding {len(items)}: {', '.join(items)}"
+        case ["get", key]:
+            return f"looking up {key}"
+        case [verb, *_]:
+            return f"unknown command: {verb}"
+        case _:
+            return "say something"
+
+
+for line in ["quit", "add pen pad", "get colour", "add", "spin around", ""]:
+    print(f"{line!r:16} -> {run(line)}")
+```
+
+```
+'quit'           -> goodbye
+'add pen pad'    -> adding 2: pen, pad
+'get colour'     -> looking up colour
+'add'            -> unknown command: add
+'spin around'    -> unknown command: spin
+''               -> say something
+```
+
+Read the cases in order. The first uses `|` for alternatives, both of which are
+one-word sequences. The second matches `add` followed by any number of items
+and binds them, with a guard rejecting the case where there are none &mdash;
+which is why bare `"add"` falls through to the catch-all verb case rather than
+reporting "adding 0". The third requires exactly two words, so `get` with two
+arguments would not match it.
+
+The fourth is the interesting one: `[verb, *_]` matches any non-empty list,
+binds the first word and discards the rest with `_`. The last handles the empty
+string, whose `split()` gives `[]`, which no sequence pattern with a required
+element can match.
+
+Written as an `if`-chain, each of those becomes a length check plus an index
+plus a comparison, in an order that has to be right. Here the shape and the
+extraction are the same expression, and a case that does not fit simply does
+not match.
+
+## Enums, the natural partner
+
+The capture-pattern trap has a structural fix rather than a discipline one: use
+an enum, and the problem cannot arise.
+
+An enum member is always reached through a dotted name &mdash; `Colour.RED`,
+`Status.NOT_FOUND` &mdash; which makes every reference a value pattern by
+construction. There is no way to accidentally write the bare form, because the
+bare form does not name anything.
+
+Two further benefits follow. The set of valid values is written down in one
+place, so a reader can see what the `match` is dispatching over without
+gathering the cases. And because the members are objects rather than integers,
+a typo is an `AttributeError` at the point of the mistake rather than a case
+that silently never fires.
+
+This is the shape most `match` statements in well-organised code take: an enum
+or a set of classes defining the alternatives, and a `match` that handles each
+one and ends with a `case _` that raises. Between them, the two make the set of
+cases explicit and the missing case loud &mdash; recovering most of what the
+exhaustiveness checking of other languages provides, without the language doing
+it for you.
+
+## Questions people ask
+
+<strong>Is there fall-through like C's switch?</strong> No. The first matching
+case runs and the statement ends. No `break` is needed or allowed.
+
+<strong>Can I match on types?</strong> Yes, with a class pattern: `case int():`
+matches any integer. Note the brackets &mdash; `case int:` without them is a
+value pattern comparing against the type object.
+
+<strong>Does a mapping pattern require exact keys?</strong> No, extra keys are
+allowed. Use `**rest` to capture them.
+
+<strong>Can I bind the whole value as well as its parts?</strong> Yes, with
+`as`: `case {"type": "click"} as event`.
+
+<strong>Why does `case [x]` not match a string?</strong> Sequence patterns
+deliberately exclude `str`, `bytes` and `bytearray`.
+
+<strong>Is `match` a keyword now?</strong> It is a soft keyword, so existing
+code using `match` as a variable name still works.
+
+<strong>Should I convert my `if`-chains?</strong> Only where they are inspecting
+shape. For comparing one value against a few constants, the chain is fine and
+runs on older Python.
+
+<strong>Can a guard reference names bound by the pattern?</strong> Yes, and
+that is the usual reason to write one &mdash; the pattern binds, then the guard
+tests what it bound.
+
+<strong>Is `match` faster than an `if`-chain?</strong> For literals they are
+comparable. For structural patterns it is usually faster than the equivalent
+checks, and speed is not the reason to choose it.
+
+## Recap in one screen
+
+- `match` tests patterns, not conditions; the pattern checks shape and binds
+  parts in one step.
+- A bare name captures and matches everything &mdash; use a literal or a dotted
+  name to compare against a constant.
+- Mapping patterns allow extra keys; sequence patterns never match strings.
+- Nothing is exhaustive: an unmatched value falls through silently, so end with
+  `case _` that raises or logs.
+- Reach for it when inspecting the shape of data, and keep `if`/`elif` for a
+  few literal comparisons. Requires Python 3.10.

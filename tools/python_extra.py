@@ -1319,44 +1319,6 @@ version is easier to read and much easier to change later.
 
 
 add("conditional_comprehensions", """
-## Two conditionals, two positions, two jobs
-
-This is the single point worth being certain about, because the two forms look
-similar, sit in the same expression, and do different things.
-
-The trailing `if` filters. It decides whether an item appears at all, so the
-result can be shorter than the input:
-
-```python
-[n for n in nums if n > 0]
-```
-
-The leading `if`/`else` chooses a value. Every item still appears, so the result
-is always the same length as the input:
-
-```python
-[n if n > 0 else 0 for n in nums]
-```
-
-A useful way to remember it: the front of a comprehension is the expression that
-produces each item, and an expression must always produce something - which is
-why the `else` is compulsory there and forbidden at the end.
-
-## Combining both
-
-They can appear together, and the reading order is worth stating explicitly:
-
-```python
-["high" if n > 100 else "low" for n in nums if n is not None]
-```
-
-The trailing filter runs first, deciding which items survive. The leading
-conditional then runs on each survivor, deciding what it becomes. Filter, then
-map - even though the map is written first.
-
-Once a line contains both, it is close to the limit of what reads well, and a
-second filter or a nested loop pushes it past.
-
 ## Filtering out None before working with values
 
 The combination above is not a contrived example; it is the common shape when
@@ -1371,19 +1333,6 @@ check:
 Written the other way round - a conditional expression testing for `None` on
 every item - the line is longer and still produces an entry for rows that had no
 score, which is usually not what was wanted.
-
-## Multiple conditions
-
-Several filters can be chained, and they behave as `and`:
-
-```python
-[n for n in nums if n > 0 if n % 2 == 0]
-```
-
-which is identical to writing `if n > 0 and n % 2 == 0`. The chained form
-occasionally reads better when the conditions test unrelated things; the
-combined form is more familiar. Neither is wrong, and consistency within a file
-matters more than the choice.
 
 ## Where to draw the line
 
@@ -6758,4 +6707,718 @@ useful as a default factory.
   text needs an explicit mapping.
 - Narrowing conversions lose information silently &mdash; duplicates, order,
   precision, the difference between missing and `"None"`.
+""")
+
+
+extend("conditional_expressions", """
+## Seeing the or trap fail
+
+The `or` shorthand and the explicit conditional look interchangeable until a
+falsy value goes through them:
+
+```python
+def with_or(value):
+    return value or "default"
+
+def with_cond(value):
+    return value if value is not None else "default"
+
+for v in ["set", "", 0, None, False, []]:
+    print(repr(v), "->", repr(with_or(v)), repr(with_cond(v)))
+```
+
+```
+'set' -> 'set' 'set'
+'' -> 'default' ''
+0 -> 'default' 0
+None -> 'default' 'default'
+False -> 'default' False
+[] -> 'default' []
+```
+
+They agree on `"set"` and on `None`, and disagree on everything else. `or`
+replaces the empty string, the zero, the `False` and the empty list &mdash;
+every one of which might be a legitimate value somebody deliberately supplied.
+
+The cases where this matters are ordinary rather than exotic. A quantity of
+zero, an empty search box, a `False` flag the user actually turned off, an
+empty list meaning "no tags". In each, `or` silently substitutes a default over
+the top of a real answer, and the bug reads as "my setting does not take
+effect".
+
+`or` is still fine when every falsy value genuinely means "absent" &mdash;
+which is most often true for strings that are either a name or nothing. The
+discipline is to notice that you are making that claim rather than reaching for
+the shorter form by reflex.
+
+## It is an expression, and that is the whole distinction
+
+Everything on this page follows from one fact: `x if c else y` produces a
+value, and `if c:` does not.
+
+An expression can go wherever a value can. That is why it works inside an
+f-string, as a function argument, as a dictionary value, inside a comprehension
+and on the right of an assignment. A statement can go in none of those places,
+which is why the conditional expression is not a shorter `if` &mdash; it is the
+only form that fits where a value is required.
+
+The converse is equally firm. An expression must produce a value on every path,
+which is why the `else` is compulsory and why there is no one-armed version. It
+also cannot contain statements: no assignment, no `raise`, no `return` inside
+it. If the branches need to *do* something rather than *be* something, the
+statement form is the only option.
+
+This also explains the reading order. `x if c else y` puts the common case
+first because the whole thing is a value with a qualification attached, in the
+way English does &mdash; "the total, if there is one, otherwise zero". A
+statement starts with the question because it is about control flow, and
+control flow starts with a decision.
+
+## The walrus, and the other one-liner
+
+A near neighbour worth distinguishing, because both compress a few lines into
+one and they do different things.
+
+`:=`, the walrus operator, assigns *inside* an expression, so a value can be
+computed and tested in one place:
+`if (n := len(items)) > 10:` binds `n` and compares it, and `n` is then
+available in the body without a second call. In a comprehension it is the way
+to avoid computing something twice:
+`[y for x in data if (y := f(x)) is not None]` calls `f` once per item rather
+than once in the filter and again in the expression.
+
+The distinction from a conditional expression is clean. The walrus is about
+*naming* a value you are already computing; the conditional expression is about
+*choosing* between two values. They combine happily and neither replaces the
+other.
+
+Both share a caution: they earn their place when they remove a genuine
+repetition or make a line fit where a statement cannot. Used to compress code
+that was already clear, both make a reader stop, and neither is worth that.
+
+## Where you will actually meet it
+
+Four places account for nearly every conditional expression in real code, and
+all four share the property that a statement could not go there.
+
+**Inside an f-string.** `f"{count} item{'s' if count != 1 else ''}"` handles the
+plural without building the string in two steps. This is the single most common
+use, and it is worth having in your fingers.
+
+**As a default that depends on something.**
+`timeout=timeout if timeout is not None else DEFAULT` in an argument list, or
+as a dictionary value in a literal being constructed.
+
+**Inside a comprehension.** Choosing what each item becomes, as opposed to
+filtering which items appear &mdash; the distinction covered elsewhere in the
+track.
+
+**As a `key=` argument.** `sorted(rows, key=lambda r: r.score if r.score is not
+None else -1)` puts missing values at one end without filtering them out first.
+
+What none of these have in common with an `if` statement is that they are
+producing a value in the middle of an expression that is already underway. That
+is the whole niche, and reaching for the form outside it &mdash; on a line of
+its own, assigning to a variable, when a plain `if` would do &mdash; is where
+it starts costing readability rather than saving it.
+
+## When the statement is the better tool
+
+The conditional expression is not a compressed `if`, and treating it as one
+produces the code that gives it a bad name. Three signals that the statement
+form is what you want.
+
+**The branches do something rather than produce something.** Logging, raising,
+assigning to more than one name, calling for a side effect. None of these fit
+in an expression, and contorting them to fit &mdash; a tuple of calls, an `or`
+chain with a function that raises &mdash; produces code that is clever and
+unreadable in the same stroke.
+
+**There are more than two outcomes.** A chain of `else`s pushes the default to
+the far end of the line and makes inserting a case an edit in the middle of a
+string of keywords. A sequence of `if` statements, or a table of thresholds, is
+both clearer and easier to change.
+
+**Either branch is long.** Once the line wraps, the reader has to reassemble it
+across two lines to find where the condition sits. A four-line `if` costs three
+lines nobody has ever regretted.
+
+The version of the rule worth keeping: use the expression when you need a
+value *here*, in the middle of something else. Use the statement when you are
+deciding what the program does next.
+
+## Questions people ask
+
+<strong>Why is the condition in the middle?</strong> Because the expression is
+a value with a qualification, and putting the common case first makes it read
+as a sentence.
+
+<strong>Can I leave out the `else`?</strong> No. An expression must produce a
+value on every path.
+
+<strong>Can I nest them?</strong> Legally yes, readably no past one level. A
+sequence of `if` statements or a table of bands is clearer.
+
+<strong>Is it slower than an `if` statement?</strong> No, they compile to
+essentially the same bytecode.
+
+<strong>Can I use it on the left of an assignment?</strong> No.
+`(a if c else b) = 1` is not valid; only names and subscripts can be assigned
+to.
+
+<strong>What is Python's version of the ternary `?:`?</strong> This is it.
+Python spells it with words rather than punctuation, deliberately.
+
+<strong>Can I put a `raise` in one?</strong> No, `raise` is a statement.
+There is an idiom using `or` with a function that raises, and it is worse than
+writing the `if`.
+
+<strong>Does it short-circuit?</strong> Yes. Only the branch that is chosen is
+evaluated, so the other side can safely be something that would fail.
+
+<strong>Can I use it with `and`/`or` in the condition?</strong> Yes, and
+brackets are worth adding when you do &mdash; the precedence is correct but not
+obvious to a reader.
+
+<strong>Does it work in a lambda?</strong> Yes, and it is one of the few ways
+to get a decision into one, since a lambda body must be a single expression.
+
+## Recap in one screen
+
+- `value_if_true if condition else value_if_false` &mdash; the value first, the
+  condition second.
+- It is an expression, so it fits inside f-strings, comprehensions and argument
+  lists where a statement cannot.
+- The `else` is compulsory, because an expression must always produce
+  something.
+- `x or default` replaces every falsy value, not just `None`; use the explicit
+  `is not None` form when zero or empty is legitimate.
+- One condition and short values on one line; past that, write the statement or
+  put the bands in a list.
+""")
+
+
+extend("match_and_case", """
+## Destructuring in one step
+
+The argument for `match` is not tidiness, it is that the pattern checks the
+shape and pulls the pieces out in the same breath:
+
+```python
+events = [
+    {"type": "click", "x": 10, "y": 20},
+    {"type": "key", "key": "a"},
+    {"type": "scroll", "amount": 3, "extra": "ignored"},
+    "not a dict",
+]
+
+for e in events:
+    match e:
+        case {"type": "click", "x": x, "y": y}:
+            print("click at", x, y)
+        case {"type": "key", "key": k}:
+            print("key", k)
+        case {"type": t}:
+            print("other event:", t)
+        case _:
+            print("unrecognised:", e)
+```
+
+```
+click at 10 20
+key a
+other event: scroll
+unrecognised: not a dict
+```
+
+Three things are worth noticing. The `scroll` event carries an `extra` key that
+no pattern mentions, and it still matches &mdash; mapping patterns check that
+the named keys are *present*, not that they are the only ones, which is what
+makes them usable against real payloads.
+
+The string falls through to `case _`, because a mapping pattern does not match
+a non-mapping. Written with `if`, that safety would have been an explicit
+`isinstance(e, dict)` that somebody has to remember.
+
+And `x`, `y`, `k` and `t` are bound by the match itself. The equivalent
+`if`-chain needs a key check and a lookup for each, in the right order, with
+the lookups repeating what the checks just established.
+
+## The bare name that swallows everything
+
+A bare name in a pattern does not compare against that name. It is a **capture
+pattern**: it matches anything at all and binds the name to whatever it caught.
+
+Python protects you from the obvious form of the mistake. Writing a capture
+before other cases is a compile-time error, and the message is unusually
+direct:
+
+```
+SyntaxError: name capture 'OK' makes remaining patterns unreachable
+```
+
+What it cannot protect you from is the same mistake in the last position, where
+there are no unreachable patterns to complain about:
+
+```python
+OK = 200
+
+for status in [200, 404, 500]:
+    match status:
+        case 404:
+            print(status, "not found")
+        case OK:
+            print(status, "matched OK")
+
+print("OK is now", OK)
+```
+
+```
+200 matched OK
+404 not found
+500 matched OK
+OK is now 500
+```
+
+500 "matched OK", because `case OK:` matched everything the earlier case did
+not. And the constant is gone &mdash; `OK` was rebound each time the capture
+fired, so after the loop it holds 500.
+
+The fix is a dotted name, which is a **value pattern** and does compare:
+
+```python
+class Status:
+    OK = 200
+
+for status in [200, 404, 500]:
+    match status:
+        case 404:
+            print(status, "not found")
+        case Status.OK:
+            print(status, "matched OK")
+        case _:
+            print(status, "unhandled")
+```
+
+```
+200 matched OK
+404 not found
+500 unhandled
+```
+
+This is why enums pair so naturally with `match`: `case Colour.RED` is
+unambiguous, and an enum gives you the dotted form for nothing. Literals work
+too. It is only bare names that capture.
+
+## Not exhaustive, and what that means
+
+Languages that popularised pattern matching usually check that every possible
+case is handled, and refuse to compile if one is missing. Python does not.
+
+If no case matches and there is no `case _`, the `match` statement simply does
+nothing and execution continues on the next line. No exception, no warning. A
+value that falls through leaves no trace, and the symptom appears later as a
+result that was never computed.
+
+That makes `case _` more important than a default clause usually is. Ending
+with one that raises &mdash; or at minimum logs the unhandled value &mdash;
+converts a silent no-op into something you can find:
+
+```python
+        case _:
+            raise ValueError(f"unhandled event: {event!r}")
+```
+
+The same applies inside a function returning a value: a `match` where every
+case returns will return `None` for an unmatched value, which then travels
+somewhere else before failing. Making the fallthrough explicit is the habit
+worth forming from the first `match` you write.
+
+## Guards, classes and the shapes worth knowing
+
+Beyond literals and mappings, three pattern kinds cover most real use.
+
+**Sequence patterns** match lists and tuples structurally. `case [x]` matches a
+one-item sequence, `case [first, *rest]` matches any non-empty one and splits
+it, `case []` matches empty. They do not match strings, which is deliberate
+&mdash; a string is a sequence of characters and matching it as one is almost
+never what anybody means.
+
+**Class patterns** match an instance and can read attributes:
+`case Point(x=0, y=y)` matches a `Point` whose `x` is zero and binds its `y`.
+Dataclasses and named tuples support the positional form, `case Point(0, y)`,
+via `__match_args__`.
+
+**Guards** attach a condition to a pattern with `if`:
+`case [x, y] if x == y` matches a two-item sequence whose items are equal. The
+pattern narrows the shape, the guard narrows the values, and a guard that fails
+lets the next case try &mdash; it does not abandon the whole `match`.
+
+The combination is what makes the feature earn its keyword. "A two-element list
+of integers where the first is negative" is one line, and the `if`-chain
+equivalent is a length check, two `isinstance` calls and a comparison in a
+specific order.
+
+## A worked example: a small command parser
+
+Every pattern kind in one function, doing the job `match` was added for:
+
+```python
+def run(command):
+    match command.split():
+        case ["quit"] | ["exit"]:
+            return "goodbye"
+        case ["add", *items] if items:
+            return f"adding {len(items)}: {', '.join(items)}"
+        case ["get", key]:
+            return f"looking up {key}"
+        case [verb, *_]:
+            return f"unknown command: {verb}"
+        case _:
+            return "say something"
+
+
+for line in ["quit", "add pen pad", "get colour", "add", "spin around", ""]:
+    print(f"{line!r:16} -> {run(line)}")
+```
+
+```
+'quit'           -> goodbye
+'add pen pad'    -> adding 2: pen, pad
+'get colour'     -> looking up colour
+'add'            -> unknown command: add
+'spin around'    -> unknown command: spin
+''               -> say something
+```
+
+Read the cases in order. The first uses `|` for alternatives, both of which are
+one-word sequences. The second matches `add` followed by any number of items
+and binds them, with a guard rejecting the case where there are none &mdash;
+which is why bare `"add"` falls through to the catch-all verb case rather than
+reporting "adding 0". The third requires exactly two words, so `get` with two
+arguments would not match it.
+
+The fourth is the interesting one: `[verb, *_]` matches any non-empty list,
+binds the first word and discards the rest with `_`. The last handles the empty
+string, whose `split()` gives `[]`, which no sequence pattern with a required
+element can match.
+
+Written as an `if`-chain, each of those becomes a length check plus an index
+plus a comparison, in an order that has to be right. Here the shape and the
+extraction are the same expression, and a case that does not fit simply does
+not match.
+
+## Enums, the natural partner
+
+The capture-pattern trap has a structural fix rather than a discipline one: use
+an enum, and the problem cannot arise.
+
+An enum member is always reached through a dotted name &mdash; `Colour.RED`,
+`Status.NOT_FOUND` &mdash; which makes every reference a value pattern by
+construction. There is no way to accidentally write the bare form, because the
+bare form does not name anything.
+
+Two further benefits follow. The set of valid values is written down in one
+place, so a reader can see what the `match` is dispatching over without
+gathering the cases. And because the members are objects rather than integers,
+a typo is an `AttributeError` at the point of the mistake rather than a case
+that silently never fires.
+
+This is the shape most `match` statements in well-organised code take: an enum
+or a set of classes defining the alternatives, and a `match` that handles each
+one and ends with a `case _` that raises. Between them, the two make the set of
+cases explicit and the missing case loud &mdash; recovering most of what the
+exhaustiveness checking of other languages provides, without the language doing
+it for you.
+
+## Questions people ask
+
+<strong>Is there fall-through like C's switch?</strong> No. The first matching
+case runs and the statement ends. No `break` is needed or allowed.
+
+<strong>Can I match on types?</strong> Yes, with a class pattern: `case int():`
+matches any integer. Note the brackets &mdash; `case int:` without them is a
+value pattern comparing against the type object.
+
+<strong>Does a mapping pattern require exact keys?</strong> No, extra keys are
+allowed. Use `**rest` to capture them.
+
+<strong>Can I bind the whole value as well as its parts?</strong> Yes, with
+`as`: `case {"type": "click"} as event`.
+
+<strong>Why does `case [x]` not match a string?</strong> Sequence patterns
+deliberately exclude `str`, `bytes` and `bytearray`.
+
+<strong>Is `match` a keyword now?</strong> It is a soft keyword, so existing
+code using `match` as a variable name still works.
+
+<strong>Should I convert my `if`-chains?</strong> Only where they are inspecting
+shape. For comparing one value against a few constants, the chain is fine and
+runs on older Python.
+
+<strong>Can a guard reference names bound by the pattern?</strong> Yes, and
+that is the usual reason to write one &mdash; the pattern binds, then the guard
+tests what it bound.
+
+<strong>Is `match` faster than an `if`-chain?</strong> For literals they are
+comparable. For structural patterns it is usually faster than the equivalent
+checks, and speed is not the reason to choose it.
+
+## Recap in one screen
+
+- `match` tests patterns, not conditions; the pattern checks shape and binds
+  parts in one step.
+- A bare name captures and matches everything &mdash; use a literal or a dotted
+  name to compare against a constant.
+- Mapping patterns allow extra keys; sequence patterns never match strings.
+- Nothing is exhaustive: an unmatched value falls through silently, so end with
+  `case _` that raises or logs.
+- Reach for it when inspecting the shape of data, and keep `if`/`elif` for a
+  few literal comparisons. Requires Python 3.10.
+""")
+
+
+extend("conditional_comprehensions", """
+## Both forms, side by side
+
+The difference is easiest to hold on to as a length:
+
+```python
+nums = [1, -2, 3, -4]
+
+print([n for n in nums if n > 0])
+print([n if n > 0 else 0 for n in nums])
+print([n if n > 0 else 0 for n in nums if n % 2])
+```
+
+```
+[1, 3]
+[1, 0, 3, 0]
+[1, 3]
+```
+
+The first is a filter: four in, two out. The second is a choice: four in, four
+out, with the failures replaced rather than removed. The third has both, and
+the reading order is the thing to fix in your head &mdash; the trailing filter
+runs first, keeping the odd numbers, and only then does the leading conditional
+run on what survived.
+
+Written out as a loop, the order is obvious:
+
+```python
+result = []
+for n in nums:
+    if n % 2:                 # the trailing filter
+        result.append(n if n > 0 else 0)
+```
+
+The comprehension writes the append expression first and the filter last, which
+is the reverse of the order they execute in. That is the single fact that makes
+combined comprehensions hard to read, and it is why one filter and one
+conditional is a sensible ceiling.
+
+## Why the else is compulsory in one place and forbidden in the other
+
+This looks like an inconsistency and is a direct consequence of what each `if`
+is doing.
+
+The `if` at the front is part of the **expression** that produces each item. An
+expression must produce a value on every path &mdash; there is nowhere for
+"produce nothing" to go, because the comprehension is going to append whatever
+it evaluates to. So the `else` is required, exactly as it is in a conditional
+expression anywhere else.
+
+The `if` at the end is a **filter clause**, part of the comprehension's
+machinery rather than of the expression. It answers one question: does this
+item continue to the expression, or not. There is no second branch for an
+`else` to introduce, because "not kept" is already the alternative.
+
+Trying the wrong one is worth doing once so the error is familiar.
+`[n for n in nums if n > 0 else 0]` is a `SyntaxError`, and the message points
+at the `else`. `[n if n > 0 for n in nums]` is also a `SyntaxError`, because
+the expression is incomplete.
+
+## Filtering to make the expression safe
+
+The execution order is not trivia; it is what lets the filter protect the
+expression:
+
+```python
+rows = [{"score": 50}, {"score": None}, {"score": 90}]
+
+print([r["score"] * 2 for r in rows if r["score"] is not None])
+```
+
+```
+[100, 180]
+```
+
+The `None` row never reaches the multiplication. Swap the two clauses in your
+head &mdash; expression first &mdash; and it would raise `TypeError` on the
+second row.
+
+This is the standard shape for data with gaps, and it is better than the
+alternative it is often confused with. Writing
+`[r["score"] * 2 if r["score"] is not None else None for r in rows]` produces
+an entry for every row, including a `None` in the middle of what is supposed to
+be a list of numbers, which pushes the problem to whatever consumes the result.
+
+Deciding between them is deciding what a missing value means: filter when the
+row should not be in the output, choose when it should be present with a
+substitute. Both are legitimate; picking one by accident is not.
+
+## Several filters, and the nested case
+
+Chained filters mean `and`:
+
+```python
+[n for n in nums if n > 0 if n % 2 == 0]
+```
+
+is identical to one filter with `and`. The chained form occasionally reads
+better when the conditions are unrelated tests; the combined form is more
+familiar. Neither is wrong.
+
+Nesting is where care is needed, because a trailing `if` attaches to the clause
+it follows:
+
+```python
+[n for row in grid for n in row if n % 2]
+```
+
+The filter is after the inner `for`, so it filters cells. Move it up, to
+`for row in grid if len(row) > 2 for n in row`, and it filters rows instead.
+Both are legal and they mean entirely different things, with no visual signal
+beyond position.
+
+The clauses read in the same order as the equivalent nested loops, outermost
+first. That is worth stating because the guess most people make is the
+opposite, and the code will run either way while producing the wrong answer.
+
+## The same two positions, everywhere
+
+Nothing on this page is specific to lists. Dict comprehensions, set
+comprehensions and generator expressions all carry the same two `if` positions
+with the same rules, and knowing that means learning it once.
+
+```python
+rows = [{"name": "ana", "score": 91}, {"name": "bo", "score": None}]
+
+print({r["name"]: r["score"] for r in rows if r["score"] is not None})
+print({r["name"] for r in rows if r["score"]})
+print(sum(r["score"] for r in rows if r["score"] is not None))
+```
+
+```
+{'ana': 91}
+{'ana'}
+91
+```
+
+The filter sits at the end in all three. A conditional expression, when used,
+sits at the front &mdash; in the value slot for a dict, in the item slot for a
+set or generator. In a dict comprehension it can appear in either the key or
+the value, or both, which is legal and almost always worse than a loop.
+
+The generator expression case is worth calling out because the filter there is
+doing something the others are not: it decides which items are ever computed at
+all. In a list comprehension a filtered-out item costs a test; in a generator
+feeding `sum` over a large file, the filter is what stops work from happening.
+
+## When the filter is expensive
+
+The trailing filter runs on every item, and the leading expression runs only on
+survivors. That is usually the efficient way round, and occasionally it is not.
+
+If the test itself is costly &mdash; a lookup, a regular expression, a parse
+&mdash; and the expression needs the same computed value, the naive
+comprehension does the work twice:
+
+```python
+[parse(line) for line in lines if parse(line) is not None]
+```
+
+`parse` runs twice for every line that survives. The walrus operator computes
+it once and reuses it:
+
+```python
+[value for line in lines if (value := parse(line)) is not None]
+```
+
+The assignment happens in the filter, and the name is available to the
+expression at the front &mdash; which reads oddly, since the expression is
+written first, but follows directly from the filter running first.
+
+Before Python 3.8 the idiom was a nested comprehension:
+`[v for v in (parse(l) for l in lines) if v is not None]`, computing the values
+in an inner generator and filtering the results. That still works and is
+arguably clearer, since it separates the two steps rather than hiding an
+assignment inside a condition.
+
+## The rule, in one line
+
+Everything on this page reduces to a sentence worth keeping: **the `if` at the
+front chooses a value and needs an `else`; the `if` at the end chooses an item
+and cannot have one.**
+
+If you can only remember one consequence of that, make it the length. A
+comprehension whose result must be the same length as the input needs the
+leading form. One whose result may be shorter needs the trailing form. Asking
+"how many items should come out" answers which `if` you want faster than
+recalling the syntax rules does.
+
+And when both appear, remember they run in the opposite order to the one they
+are written in. The filter decides what survives; the expression then decides
+what each survivor becomes. Every confusing combined comprehension is that
+inversion catching someone out.
+
+## Questions people ask
+
+<strong>Which `if` runs first?</strong> The trailing filter, always &mdash;
+even though the conditional expression is written before it.
+
+<strong>Can I use `else` with the trailing `if`?</strong> No, it is a syntax
+error. There is no second branch for a filter.
+
+<strong>Can I filter on the computed value rather than the source?</strong> Not
+directly, without computing it twice. The walrus operator does it in one pass:
+`[y for x in data if (y := f(x)) > 0]`.
+
+<strong>Does this work in dict and set comprehensions?</strong> Yes, identically.
+The two positions and their rules are the same in all of them.
+
+<strong>Are two filters slower than one `and`?</strong> No, they compile to the
+same thing.
+
+<strong>How many clauses is too many?</strong> One `for`, one filter, and
+optionally one conditional expression. Past that, the loop is easier to read
+and to change.
+
+<strong>Can the filter reference the loop variable of an outer clause?</strong>
+Yes. Every clause can see the variables bound by the clauses to its left.
+
+<strong>Can I put the filter before the `for`?</strong> No. The clause order is
+fixed: expression, then `for`, then any `if`. The only `if` that comes first is
+part of the expression.
+
+<strong>Why does my comprehension raise on some items?</strong> Almost always
+because the expression is running on items the filter should have removed
+&mdash; or because the filter is testing something different from what the
+expression uses.
+
+<strong>Is there a way to skip an item from the expression?</strong> No. An
+expression must produce something, so skipping is the filter's job. That
+separation is the reason for the two positions.
+
+## Recap in one screen
+
+- The trailing `if` filters and takes no `else`; the leading `if`/`else`
+  chooses and requires one.
+- Filter first, then the expression &mdash; the opposite of the written order.
+- That ordering is what lets a filter guard the expression against `None` or a
+  division by zero.
+- Chained filters mean `and`; in a nested comprehension a filter attaches to
+  the clause it follows.
+- One `for`, one filter, one conditional: past that a loop reads better and
+  changes more safely.
 """)
