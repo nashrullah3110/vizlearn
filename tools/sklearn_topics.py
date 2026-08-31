@@ -3288,3 +3288,305 @@ One-hot for unordered categories with `handle_unknown="ignore"`, ordinal with an
          "why": "It takes only 1-D input and has no handle_unknown, so applying it to features gives an ordinal encoding that raises on any new category."},
     ],
 )
+
+
+# ---------------------------------------------------------------------------
+# 12. Pipelines
+# ---------------------------------------------------------------------------
+topic(
+    "pipelines",
+    "Pipelines",
+    "Preparing Data",
+    "One object holding every step, so that what is fitted on the training "
+    "fold stays fitted on the training fold - by construction rather than by "
+    "discipline.",
+    _svg(_box(10, 30, 34, 26, S, M) + _txt(27, 47, "impute", M, 7) +
+         _arrow(46, 43, 54, 43) +
+         _box(56, 30, 34, 26, S, M) + _txt(73, 47, "scale", M, 7) +
+         _arrow(92, 43, 100, 43) +
+         _box(102, 30, 44, 26, S, A) + _txt(124, 47, "model", A, 7) +
+         _txt(80, 74, "one fit(), one predict()", M, 7)),
+    [
+        ("Two ways to build one",
+         "The same object; the difference is whether you choose the step names.",
+         '''from sklearn.pipeline import make_pipeline, Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+
+auto = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+named = Pipeline([("scale", StandardScaler()),
+                  ("clf", LogisticRegression(max_iter=1000))])
+
+print("make_pipeline names them for you:", [n for n, _ in auto.steps])
+print("Pipeline lets you choose        :", [n for n, _ in named.steps])
+print()
+print("both are a single estimator with fit / predict / score")
+print("has fit?", hasattr(auto, "fit"), " has predict?", hasattr(auto, "predict"))
+'''),
+
+        ("Reaching inside a fitted pipeline",
+         "The steps are still there, fitted, and gettable three different ways.",
+         '''from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import load_wine
+
+X, y = load_wine(return_X_y=True)
+pipe = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)).fit(X, y)
+
+scaler = pipe.named_steps["standardscaler"]
+model = pipe.named_steps["logisticregression"]
+
+print("the fitted scaler's first three means:", scaler.mean_[:3].round(3))
+print("the fitted model's shape             :", model.coef_.shape)
+print()
+print("pipe[-1] is the last step:", type(pipe[-1]).__name__)
+print("pipe[0]  is the first    :", type(pipe[0]).__name__)
+'''),
+
+        ("Three steps, refitted inside every fold",
+         "Imputation and scaling both learn from data, and both are inside.",
+         '''from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+from sklearn.datasets import load_wine
+import numpy as np
+
+X, y = load_wine(return_X_y=True)
+X = X.copy()
+rng = np.random.RandomState(0)
+X[rng.rand(*X.shape) < 0.1] = np.nan          # 10% missing
+
+pipe = make_pipeline(SimpleImputer(strategy="median"),
+                     StandardScaler(),
+                     LogisticRegression(max_iter=1000))
+
+print("three steps, one call:", [n for n, _ in pipe.steps])
+print("cross-validated accuracy:", round(cross_val_score(pipe, X, y, cv=5).mean(), 4))
+print()
+print("the imputer's medians and the scaler's means are both")
+print("recomputed on the training part of every fold.")
+'''),
+
+        ("Tuning a parameter inside a step",
+         "Two underscores between the step name and the parameter, and a search "
+         "can reach anything.",
+         '''from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV
+from sklearn.datasets import load_wine
+
+X, y = load_wine(return_X_y=True)
+
+pipe = Pipeline([("scale", StandardScaler()),
+                 ("clf", LogisticRegression(max_iter=5000))])
+
+# stepname__parameter - two underscores
+grid = {"clf__C": [0.01, 0.1, 1, 10],
+        "scale__with_mean": [True, False]}
+
+search = GridSearchCV(pipe, grid, cv=5).fit(X, y)
+print("best parameters:", search.best_params_)
+print("best score     :", round(search.best_score_, 4))
+print()
+print("the double underscore reaches into a step:")
+print("  clf__C  means  the C of the step named clf")
+'''),
+
+        ("Saving the whole thing",
+         "The preprocessing is part of the model, so it has to travel with it.",
+         '''from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import load_wine
+from sklearn.model_selection import train_test_split
+import pickle
+
+X, y = load_wine(return_X_y=True)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3, random_state=0)
+
+pipe = make_pipeline(StandardScaler(),
+                     LogisticRegression(max_iter=1000)).fit(X_tr, y_tr)
+
+blob = pickle.dumps(pipe)
+restored = pickle.loads(blob)
+
+print("saved bytes:", len(blob))
+print("same predictions after a round trip:",
+      (restored.predict(X_te) == pipe.predict(X_te)).all())
+print()
+print("the scaler travels with the model, which is the point -")
+print("a model saved without it would receive raw features and be wrong.")
+'''),
+
+        ("Switching a step off",
+         "'passthrough' turns a step into a no-op, which makes the step itself "
+         "something a search can choose.",
+         '''from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import load_wine
+from sklearn.model_selection import cross_val_score
+
+X, y = load_wine(return_X_y=True)
+
+pipe = Pipeline([("scale", StandardScaler()),
+                 ("pca", PCA(n_components=5)),
+                 ("clf", LogisticRegression(max_iter=1000))])
+
+print("with PCA   :", round(cross_val_score(pipe, X, y, cv=5).mean(), 4))
+
+pipe.set_params(pca="passthrough")
+print("passthrough:", round(cross_val_score(pipe, X, y, cv=5).mean(), 4))
+print()
+print("'passthrough' disables a step without rebuilding the pipeline,")
+print("which is how a search can treat a whole step as a hyperparameter.")
+'''),
+    ],
+    [
+        "A pipeline <strong>is an estimator</strong>: it has "
+        "<code class='mono-font'>fit</code>, "
+        "<code class='mono-font'>predict</code> and "
+        "<code class='mono-font'>score</code>, and goes anywhere one goes.",
+        "<code class='mono-font'>fit</code> calls "
+        "<code class='mono-font'>fit_transform</code> on each step and "
+        "<code class='mono-font'>fit</code> on the last; "
+        "<code class='mono-font'>predict</code> calls only "
+        "<code class='mono-font'>transform</code>.",
+        "That asymmetry is the whole point - the held-out fold is transformed, "
+        "never fitted on.",
+        "<code class='mono-font'>make_pipeline</code> names the steps after "
+        "their classes; <code class='mono-font'>Pipeline</code> lets you name "
+        "them, which makes the search grid readable.",
+        "<code class='mono-font'>step__parameter</code>, with two underscores, "
+        "is how a search reaches a setting inside a step.",
+        "Pickle the pipeline, not the model - a model deployed without its "
+        "preprocessing gets raw features and is confidently wrong.",
+    ],
+    """title: Pipelines: A Practical Guide
+intro: A pipeline is not a convenience. It is the mechanism that makes every score in this track honest, and using one turns a rule you have to remember into a property of the code.
+
+## What it is
+
+A `Pipeline` chains transformers together and ends with an estimator, and the result behaves as a single estimator.
+
+That last sentence is the important one. A pipeline has `fit`, `predict` and `score`, so anywhere a model can go &mdash; `cross_val_score`, `GridSearchCV`, a pickle file, a comparison loop &mdash; a whole pipeline can go instead, with no changes to the surrounding code.
+
+What it does internally is straightforward. `fit` calls `fit_transform` on each step in turn, passing the output of one to the next, and `fit` on the final estimator. `predict` calls only `transform` on each step, then `predict` on the last.
+
+## The asymmetry is the point
+
+Look again at those two sentences: `fit` **fits** the transformers; `predict` only **transforms**.
+
+That asymmetry is what makes a pipeline more than plumbing. Inside a cross-validation loop, `fit` is called on the training folds &mdash; so the scaler computes its mean there, the imputer its median, the encoder its category list. Then `predict` runs on the held-out fold, which is transformed using those numbers and never contributes to them.
+
+Doing the same thing by hand means remembering, every time, to fit each transformer on the training part only, and to apply it to the test part without refitting. That is four or five opportunities per experiment to make a mistake that inflates the score and produces no error.
+
+The cross-validation module measured what that mistake costs: feature selection applied outside the folds reported 0.825 accuracy on data that was pure noise. A pipeline makes that particular mistake impossible to write.
+
+## Two constructors
+
+`make_pipeline(StandardScaler(), LogisticRegression())` names the steps automatically, lowercasing the class names. It is shorter and right for quick work.
+
+`Pipeline([("scale", StandardScaler()), ("clf", LogisticRegression())])` lets you name them. The names matter once you are tuning, because they appear in every parameter key: `clf__C` is far more readable than `logisticregression__C`, and it does not change if you swap the classifier for a different one.
+
+The rule of thumb: `make_pipeline` while exploring, `Pipeline` with short names once there is a search grid.
+
+Every step except the last must be a transformer &mdash; it must have `transform`. The last can be anything, including another transformer if the pipeline's purpose is preprocessing rather than prediction.
+
+## Getting at the fitted parts
+
+A fitted pipeline still contains its fitted steps, and there are three ways in.
+
+`pipe.named_steps["scale"]` uses the name. `pipe["scale"]` is the shorter form of the same thing. `pipe[0]` and `pipe[-1]` index by position, and `pipe[-1]` for the final estimator is the one you will write most.
+
+This is how you read `coef_` off the model at the end, or check what the scaler learned, or pull `get_feature_names_out()` from an encoder in the middle. The pipeline hides nothing; it only changes how you reach it.
+
+`pipe[:-1]` slices, returning a new pipeline of everything except the last step &mdash; occasionally useful for inspecting what the model actually receives.
+
+## Tuning through a pipeline
+
+Hyperparameters inside a pipeline are addressed as `stepname__parameter`, with **two** underscores.
+
+`{"clf__C": [0.01, 0.1, 1]}` tunes `C` on the step named `clf`. Nesting goes deeper with more underscores &mdash; a parameter inside a step inside a column transformer is `preprocess__num__imputer__strategy` &mdash; which looks unwieldy and is entirely mechanical.
+
+The consequence worth appreciating: a search can tune the **preprocessing** as well as the model. Whether to scale with the mean, which imputation strategy to use, how many PCA components to keep, and how the model is configured, all in one grid, all evaluated with the same honest cross-validation.
+
+`"passthrough"` extends this to whole steps. Setting a step to that string makes it a no-op, so `{"pca": ["passthrough", PCA(5), PCA(10)]}` treats the existence of the PCA step as itself a hyperparameter. The same trick lets a search choose between two entirely different models in one grid.
+
+## Deployment is where it pays off
+
+A model without its preprocessing is not a model.
+
+Saving only the estimator and applying scaling by hand at prediction time means reimplementing the transformation somewhere else, with the numbers copied across, and keeping the two in step forever. Every one of those is a place for the training and serving paths to diverge &mdash; and when they do, nothing raises. The model receives features on a different scale from the ones it was fitted on and produces confident nonsense.
+
+Pickling the pipeline saves the transformers and their learned parameters alongside the model, so the object that comes back does the whole job from raw features to prediction. The editor above round-trips one and confirms the predictions are identical.
+
+Two cautions on pickles that apply to any scikit-learn object. They are not a secure format &mdash; unpickling untrusted data executes code &mdash; and they are not portable across versions, so a pipeline pickled with one scikit-learn and loaded with another may fail or, worse, behave differently. Recording the version alongside the file is the minimum, and `skops` is the alternative for anything that has to be shared.
+
+## When not to reach for one
+
+Pipelines handle a sequence of steps applied to all the columns. Two situations need something else.
+
+**Different steps for different columns** &mdash; scaling the numeric ones and encoding the categorical ones &mdash; is what `ColumnTransformer` is for, and it slots into a pipeline as a single step.
+
+**Anything that changes the number of rows.** Dropping outliers, resampling for imbalance, aggregating. Pipelines transform features and pass the target through untouched, so a step that removed rows would leave `X` and `y` out of step. The `imbalanced-learn` package provides its own pipeline for exactly this case, and row-level filtering otherwise belongs before the pipeline, applied to the training data only.
+
+## Caching, when the fitting gets slow
+
+A grid search over a pipeline refits every step for every combination, and most of that work is repeated. Tuning only the classifier means the scaler and the imputer are refitted identically for each candidate, which is wasted time on anything expensive.
+
+`Pipeline(steps, memory="./cache")` caches the fitted transformers, keyed on the step and the data they were given. The first combination pays for the preprocessing; the rest reuse it. On a pipeline whose expensive part is the preprocessing &mdash; text vectorisation, a costly feature construction &mdash; this can be the difference between a search that finishes and one that does not.
+
+Two caveats. The cache is on disk and is not cleaned up automatically, so a long-running project accumulates directories. And it only helps when the transformer's inputs are genuinely identical, so it does nothing for a grid that tunes an early step.
+
+## Building your own step
+
+A pipeline accepts anything with `fit` and `transform`, which includes classes you write.
+
+For a stateless transformation &mdash; a log, a ratio between two columns, a date part &mdash; `FunctionTransformer(func)` wraps a plain function and needs nothing else. It is the shortest route into a pipeline and covers a surprising amount.
+
+When the step needs to *learn* something, subclassing `BaseEstimator` and `TransformerMixin` gives you the rest of the interface for free: `fit` stores what it learned on `self` with a trailing underscore, `transform` applies it, and `TransformerMixin` supplies `fit_transform`. `get_params` and `set_params` arrive from `BaseEstimator`, which is what makes the custom step tunable by a search like any other.
+
+The rule that keeps a custom step honest is the same as for the built-in ones: everything learned from data must be learned in `fit`, and `transform` must use only what `fit` stored. A transformer that computes a statistic inside `transform` recomputes it on the test fold, which is the leak the pipeline was supposed to prevent.
+
+## Things to try
+
+1. <strong>Confirm the interface.</strong> In the first editor, note that a pipeline has `fit` and `predict` &mdash; it is an estimator, not a wrapper you unwrap.
+2. <strong>Reach inside.</strong> In the second editor, try `pipe[:-1].transform(X)[:2]` to see exactly what the model receives.
+3. <strong>Tune the preprocessing.</strong> In the fourth editor, add `"scale__with_std": [True, False]` to the grid and see whether it changes the winner.
+4. <strong>Break it deliberately.</strong> Fit the scaler outside a pipeline on all of `X`, then cross-validate the model alone, and compare against the pipeline version.
+
+## Where this leaves you
+
+One object, fitted once, holding every step that learns anything. It makes cross-validation honest, makes the preprocessing tunable, and makes deployment a single file. There is no situation in this track where doing the steps by hand is preferable, and forming the habit early costs nothing.
+""",
+    [
+        {"q": "What does a pipeline's predict() do to the transformers?",
+         "options": ["Refits them", "Only calls transform", "Skips them", "Fits and transforms"],
+         "answer": 1,
+         "why": "fit fits them; predict only transforms. That asymmetry is what stops the held-out data influencing the transformation."},
+        {"q": "How do you tune C on a step named clf?",
+         "options": ["\"C\"", "\"clf.C\"", "\"clf__C\"", "\"clf-C\""],
+         "answer": 2,
+         "why": "Two underscores between the step name and the parameter. Nesting goes deeper with more of them."},
+        {"q": "What does setting a step to \"passthrough\" do?",
+         "options": ["Removes it permanently",
+                     "Makes it a no-op, so the step can be tuned in or out",
+                     "Runs it twice",
+                     "Skips fitting but still transforms"],
+         "answer": 1,
+         "why": "It turns the step into an identity, which lets a search treat the existence of the step as a hyperparameter."},
+        {"q": "Why pickle the pipeline rather than the model?",
+         "options": ["It is smaller",
+                     "The preprocessing is part of the model - without it the deployed model gets raw features",
+                     "Models cannot be pickled",
+                     "It is faster to load"],
+         "answer": 1,
+         "why": "A model fitted on scaled features and served raw ones produces confident nonsense, and nothing raises to tell you."},
+    ],
+)
