@@ -264,6 +264,24 @@ TOPICS = {
             "will do is to print it.",
         ],
     },
+    "pandas": {
+        "dir": "pandas",
+        "title": "pandas",
+        "h1": "pandas, by Running It",
+        "lead": "Labelled data - the index that drives everything, the copy warnings, "
+                "the joins and the group-bys, each one runnable on the page.",
+        "keywords": "pandas tutorial, pandas dataframe, pandas groupby, "
+                    "pandas merge join, settingwithcopywarning, pandas index",
+        "intro": [
+            "A DataFrame is not a spreadsheet and not a two-dimensional array. It "
+            "is a set of columns, each with its own dtype, sharing one index - and "
+            "almost everything that surprises people about pandas comes from that "
+            "index doing work they did not ask it to do.",
+            "This track works up from the Series and the index to selection, "
+            "missing data, group-by, joins, reshaping and time series. Every idea "
+            "arrives as a small program you can run and change on the page.",
+        ],
+    },
     "interview": {
         "dir": "interview",
         "title": "Interview Questions",
@@ -290,7 +308,7 @@ TOPICS = {
 
 # Display order on the hub and in the footer.
 TOPIC_ORDER = ["maths", "ml", "dl", "dsa", "nlp", "computer-vision", "db",
-               "gen-ai", "python", "pydantic", "fastapi", "numpy", "interview"]
+               "gen-ai", "python", "pydantic", "fastapi", "numpy", "pandas", "interview"]
 
 DIR_TO_TOPIC = {t["dir"]: k for k, t in TOPICS.items()}
 

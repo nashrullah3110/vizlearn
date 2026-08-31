@@ -1,0 +1,392 @@
+title: Filtering Rows
+intro: Masks, isin, between and query, and the parenthesis rule that catches everyone.
+
+## A mask is a Series
+
+`df["age"] >= 25` does not return rows. It returns a boolean Series, one value per row, carrying the same index as the frame.
+
+You then hand that mask to `.loc`, and pandas keeps the rows where it is `True`.
+
+Because the mask is an ordinary Series, everything you know applies to it. `mask.sum()` counts matches, since `True` is 1. `mask.mean()` gives the proportion. `~mask` inverts it. It can be stored in a variable, named, and reused.
+
+Naming masks is worth doing when a filter has several parts:
+
+```python
+adult = df["age"] >= 18
+local = df["city"] == "pune"
+recent = df["days"] < 30
+df.loc[adult & local & recent]
+```
+
+Each name documents a condition, and each can be counted separately when the result is unexpectedly empty &mdash; which is how you find out which clause is doing the damage.
+
+
+## A comparison gives a boolean Series
+
+Which you then hand to loc. The mask keeps the original index.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "name": ["ana", "raj", "kim", "sam"],
+    "age": [31, 25, 40, 19],
+})
+mask = df["age"] >= 25
+print("the mask itself:")
+print(mask)
+print()
+print("used to select:")
+print(df.loc[mask])
+print()
+print("count matches for free, because True is 1:")
+print("   matched:", int(mask.sum()), "of", len(mask))
+```
+
+## Parentheses are not optional
+
+<code>&</code> binds tighter than <code>&gt;</code>, so the obvious spelling parses wrongly.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"age": [19, 25, 31, 40]})
+
+good = df.loc[(df["age"] > 20) & (df["age"] < 35)]
+print("with parentheses:", list(good["age"]))
+
+try:
+    df.loc[df["age"] > 20 & df["age"] < 35]
+except Exception as e:
+    print("without them    :", type(e).__name__)
+    print("   ", str(e)[:70])
+
+print()
+try:
+    df.loc[(df["age"] > 20) and (df["age"] < 35)]
+except ValueError as e:
+    print("using `and`     : ValueError")
+    print("   ", str(e)[:66])
+print()
+print("Use & | ~ , never and/or/not, and parenthesise every condition.")
+```
+
+## isin and between
+
+Clearer than a chain of comparisons, and they read as the question you are asking.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "city": ["pune", "delhi", "goa", "pune"],
+    "age": [31, 25, 40, 19],
+})
+
+print("isin:")
+print(df.loc[df["city"].isin(["pune", "goa"])])
+print()
+print("between is inclusive on both sides by default:")
+print(list(df.loc[df["age"].between(25, 31), "age"]))
+print("   exclusive:", list(df.loc[df["age"].between(25, 31, inclusive="neither"), "age"]))
+print()
+print("negate with ~ :")
+print(list(df.loc[~df["city"].isin(["pune"]), "city"]))
+```
+
+## Missing values fail every test
+
+So a condition and its opposite can both drop the same row.
+
+```python-run
+import pandas as pd
+import numpy as np
+
+s = pd.Series([1.0, np.nan, 5.0])
+print("s > 2 :", list(s > 2))
+print("s <= 2:", list(s <= 2))
+print("   the NaN row is False in BOTH - it vanishes from either half.")
+print()
+print("counts:", int((s > 2).sum()), "+", int((s <= 2).sum()), "= 2, not 3")
+print()
+print("Handle it explicitly when it matters:")
+print("   isna :", list(s.isna()))
+print("   fillna first:", list(s.fillna(0) > 2))
+```
+
+## query, when the expression is long
+
+A string, so column names need no quoting - and no parentheses either.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "city": ["pune", "delhi", "goa", "pune"],
+    "age": [31, 25, 40, 19],
+    "score": [8.5, 9.1, 7.2, 6.0],
+})
+
+print(df.query("age > 20 and score > 7"))
+print()
+print("no parentheses needed, and `and` works here because it is")
+print("pandas' own parser rather than Python's operators.")
+print()
+print("reference a Python variable with @:")
+cutoff = 30
+print(list(df.query("age > @cutoff")["city"]))
+print()
+print("in / not in work too:")
+print(list(df.query("city in ['pune', 'goa']")["city"]))
+```
+
+## Filtering returns a new frame
+
+Which is why assigning into the result is the mistake the next module is about.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"name": ["ana", "raj"], "age": [31, 25]})
+sub = df.loc[df["age"] > 30]
+
+print("the filtered frame:")
+print(sub)
+print()
+print("its index kept the original labels:", list(sub.index))
+print()
+sub2 = df.loc[df["age"] > 30].reset_index(drop=True)
+print("reset_index(drop=True) renumbers:", list(sub2.index))
+print()
+print("Filtering never modifies the original:")
+print("   original still has", len(df), "rows")
+```
+## The parenthesis rule
+
+This is the single most common syntax error in pandas.
+
+`df["age"] > 20 & df["age"] < 35` does not mean what it looks like. In Python, `&` binds **tighter** than `>`, so this parses as `df["age"] > (20 & df["age"]) < 35`. The result is an error or, worse, something plausible.
+
+Every condition needs its own parentheses: `(df["age"] > 20) & (df["age"] < 35)`.
+
+The related mistake is `and` instead of `&`. Python's `and` needs a single truth value and a Series has many, so it raises "The truth value of a Series is ambiguous". That message always means the same thing: use `&`, and add parentheses.
+
+The three operators are `&` (and), `|` (or), `~` (not). There is no way to make Python's precedence rules cooperate here, so parenthesising becomes a reflex.
+
+## isin and between
+
+`df["city"].isin(["pune", "goa"])` is clearer and faster than `(df["city"] == "pune") | (df["city"] == "goa")`, and it scales to a list of any length &mdash; including one computed at runtime.
+
+`df["age"].between(25, 31)` is inclusive of both ends by default. The `inclusive` argument takes `"both"`, `"left"`, `"right"` or `"neither"`, which is worth passing explicitly whenever the boundary matters, because the default is not what everyone assumes.
+
+`~` negates either of them.
+
+## Missing values fail everything
+
+Every comparison involving `NaN` is `False`. That includes `>`, `<`, `==` and `!=`.
+
+The consequence is specific and easy to miss: `df[df["x"] > 2]` and `df[df["x"] <= 2]` do **not** partition the frame. Rows where `x` is missing are absent from both, and the two counts do not add up to the row count.
+
+This is usually the right default &mdash; an unknown value genuinely does not satisfy a condition &mdash; but it means "everything else" is not the same as "the negation of this condition" whenever missing data is possible.
+
+When missing rows should be handled rather than dropped, say so explicitly with `isna()`, or fill before filtering.
+
+## query
+
+`df.query("age > 20 and score > 7")` takes the condition as a string.
+
+Inside the string, column names are bare identifiers, `and`/`or`/`not` work normally, and no parentheses are needed for precedence. That makes long conditions much easier to read than the operator form.
+
+`@name` references a Python variable: `df.query("age > @cutoff")`.
+
+`in` and `not in` work against lists.
+
+The costs: column names with spaces need backticks, there is no editor autocompletion or type checking inside a string, and a typo becomes a runtime error rather than something a linter catches. `query` also has a small parsing overhead per call, which is irrelevant once and noticeable in a loop.
+
+Use it when a condition is long enough that the operator form is hard to read. Use operators otherwise.
+
+## Filtering copies
+
+`df.loc[mask]` returns a **new** frame. The original is untouched, and the result keeps the original index labels rather than renumbering.
+
+Both facts matter downstream. The surviving labels mean positional code breaks, and `reset_index(drop=True)` is the fix when you want a clean `0..n-1`.
+
+That the result is new &mdash; and specifically that it may be a copy rather than a view of the original &mdash; is what makes assigning into a filtered frame unreliable. That is the subject of the next module, and it is the single largest source of confusion in pandas.
+
+## A summary
+
+Build masks with comparisons, combine with `& | ~`, and parenthesise everything.
+
+Prefer `isin` and `between` where they fit; they say what you mean.
+
+Remember NaN fails every test, so a condition and its negation are not a partition.
+
+Reach for `query` when the expression is long, and for operators when it is short.
+
+And know that the result is a new object whose index came along for the ride.
+
+## Filtering on more than one column
+
+Conditions on different columns combine exactly like conditions on one:
+
+```python
+df.loc[(df["age"] >= 18) & (df["city"] == "pune")]
+```
+
+For a variable number of conditions &mdash; built from user input, or a config &mdash; combine them programmatically:
+
+```python
+from functools import reduce
+mask = reduce(lambda a, b: a & b, conditions)
+```
+
+`np.logical_and.reduce(conditions)` does the same thing. Either is better than building a query string, which loses type checking and invites injection if any part comes from outside.
+
+## Filtering by index rather than data
+
+`df.loc[["a", "c"]]` selects by label and **raises** if a label is missing.
+
+`df.reindex(["a", "c", "zz"])` selects by label and fills missing ones with `NaN` instead. The difference matters when you are conforming one frame to another's labels and absence is expected.
+
+`df[df.index.isin(wanted)]` filters by membership without requiring every label to exist.
+
+`df.index.str.startswith("2024")` works when the labels are strings, since an Index has the `.str` accessor too.
+
+## Filtering with a lookup from another frame
+
+The common task of "keep rows whose key appears in this other table" has two forms.
+
+`df[df["id"].isin(other["id"])]` is the direct one, and it is usually what you want. It cannot change the row count upward and needs no thought about join semantics.
+
+`df.merge(other[["id"]], on="id")` does the same thing as an inner join, and **can** multiply rows if `other` has duplicate ids. `isin` cannot.
+
+For "keep rows whose key does **not** appear", `~isin` is the whole answer, where the join equivalent needs an outer join with an indicator and a filter. This is one of the places `isin` is clearly better than a merge.
+
+## nlargest, sample and head as filters
+
+Not every subset comes from a condition.
+
+`df.nlargest(10, "sales")` &mdash; the top ten by a column, without sorting everything.
+
+`df.sample(n=100, random_state=0)` &mdash; a random subset, reproducible with the seed. `frac=0.1` takes a proportion.
+
+`df.head(1000)` &mdash; the first thousand, which is only meaningful if the order means something.
+
+`df.drop_duplicates(subset=["id"])` &mdash; one row per key.
+
+## Performance
+
+Filtering builds a boolean mask the length of the frame, then copies the matching rows. Both cost time proportional to the data.
+
+Three things that help on large frames:
+
+**Combine conditions before selecting.** `df[(a) & (b)]` allocates one result; `df[a][b]` allocates two.
+
+**Filter before computing**, not after. Every operation downstream then touches fewer rows &mdash; usually the largest structural win available.
+
+**Use a category dtype** for the columns you filter on repeatedly. Comparison then runs on integer codes rather than strings.
+
+`query` has a small parsing overhead per call, which is irrelevant once and measurable in a loop. It can also use `numexpr` for very large frames, which occasionally makes it faster than the operator form rather than slower.
+
+## The mistakes, collected
+
+**Missing parentheses.** `(a > 1) & (b < 2)`, always.
+
+**`and` instead of `&`.** The "truth value is ambiguous" error always means this.
+
+**Forgetting `na=False`** on a `.str` predicate, which raises as soon as the data has a gap.
+
+**Assuming a condition and its negation partition the frame.** They do not, when values can be missing.
+
+**Chained assignment on a filtered frame.** `df[mask]["col"] = x` &mdash; the subject of its own module, and the most expensive mistake here.
+
+**Forgetting the index came along.** `reset_index(drop=True)` when downstream code thinks positionally.
+
+## Filters that read well
+
+A filter is a statement about the data, and it is worth writing it as one.
+
+Naming masks does most of the work:
+
+```python
+is_adult = df["age"] >= 18
+in_scope = df["city"].isin(cities)
+recent   = df["date"] >= cutoff
+
+df.loc[is_adult & in_scope & recent]
+```
+
+Three benefits beyond readability: each mask can be counted separately when the result is unexpectedly empty; the masks can be reused for a complementary selection; and the combining line reads as the sentence it represents.
+
+For a filter that appears in several places, a small function returning the mask keeps the definition in one place:
+
+```python
+def active(d):
+    return (d["status"] == "open") & d["closed_at"].isna()
+```
+
+`df.loc[active(df)]` then means the same thing everywhere, and changing the definition changes it everywhere.
+
+## Debugging an empty result
+
+When a filter returns nothing, the cause is nearly always one of five things, and they can be checked in about a minute.
+
+**A type mismatch.** `df["id"] == 1` against a string column matches nothing. Check `df["id"].dtype`.
+
+**Whitespace or case.** `df["city"] == "Pune"` against `"pune "`. Check `df["city"].value_counts().head(20)`.
+
+**Missing values.** They fail every comparison, so a condition can exclude more than you think.
+
+**An `&` that should be `|`.** Conditions that cannot be true simultaneously.
+
+**A stale variable.** In a notebook, `df` is not what the cell above assumed.
+
+Counting each condition separately &mdash; `is_adult.sum()`, `in_scope.sum()` &mdash; identifies which clause is responsible in one step, which is far quicker than reasoning about the combination.
+
+## Filtering and the copy warning
+
+`sub = df[mask]` produces a new frame whose relationship to `df` is deliberately unspecified.
+
+Anything you then assign into `sub` may or may not affect `df`. This is the single most common route into the copy warning, and it is worth deciding at the point of filtering rather than at the point of assignment:
+
+`sub = df[mask].copy()` if `sub` is a separate dataset.
+
+`df.loc[mask, "col"] = ...` if you meant to change `df`.
+
+Adding `.copy()` to a filter you intend to modify costs seven characters and removes the question entirely.
+
+## A summary
+
+Build masks with comparisons; combine with `&`, `|`, `~`; parenthesise everything.
+
+Use `isin` and `between` where they fit, and `query` when the expression is long.
+
+Pass `na=False` on `.str` predicates.
+
+Remember that missing values fail every test, so a condition and its negation do not partition the frame.
+
+Name your masks when there is more than one.
+
+And `.copy()` the result if you are going to modify it.
+
+## A closing note
+
+Filtering is the most-used operation in pandas and has two persistent gotchas, both syntactic and both cheap to avoid.
+
+Parenthesise every condition, because `&` binds tighter than the comparison operators and the unparenthesised version parses into something else entirely. And use `&`, `|`, `~` rather than `and`, `or`, `not`, which need a single truth value that a Series cannot provide.
+
+The semantic gotcha is missing values. They fail every comparison, so a condition and its negation do not partition the frame, and rows quietly appear in neither half.
+
+Beyond that, the advice is about readability: name your masks when there is more than one, so each can be counted separately when the result is unexpectedly empty. Debugging a filter that returns nothing is nearly always a matter of finding which clause is responsible, and named masks turn that into one line rather than a process of elimination.
+
+## One more thing
+
+`df.query` accepts `engine="python"` for expressions the default parser cannot handle, and `inplace=True` which, as elsewhere, is best avoided.
+
+## In summary
+
+Comparisons give boolean Series; combine them with `&`, `|` and `~`, and parenthesise every one.
+
+`isin` and `between` read as the question being asked, and `query` earns its place when the expression is long.
+
+Missing values fail every test, so a condition and its negation do not partition the frame. And `.copy()` the result if you intend to modify it, which decides the copy question at the point it arises rather than at the point it bites.

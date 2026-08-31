@@ -1,0 +1,381 @@
+title: Sorting and Ranking
+intro: sort_values, nlargest and rank, and where the missing values end up.
+
+## sort_values
+
+`df.sort_values("sales")` sorts by one column. A list sorts by several, in order, and `ascending` takes a matching list so each key can have its own direction:
+
+```python
+df.sort_values(["city", "sales"], ascending=[True, False])
+```
+
+That is "by city A to Z, and within each city by sales high to low" &mdash; the shape of most reporting orders.
+
+The result is a **new** frame carrying the original index labels. If downstream code thinks positionally, `reset_index(drop=True)` afterwards.
+
+`kind` selects the algorithm. The default is not stable, so equal rows can come out in any order. Pass `kind="stable"` when ties must keep their original relative order &mdash; which matters if you are sorting by a second key after already sorting by a first, rather than passing both keys at once.
+
+
+## sort_values takes one column or several
+
+And returns a new frame, keeping the original index labels.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "city": ["pune", "delhi", "pune", "goa"],
+    "sales": [30, 20, 10, 20],
+})
+print("by sales:")
+print(df.sort_values("sales"))
+print()
+print("descending:")
+print(df.sort_values("sales", ascending=False))
+print()
+print("two keys, with different directions:")
+print(df.sort_values(["city", "sales"], ascending=[True, False]))
+print()
+print("the index came along - reset it if position matters:")
+print(list(df.sort_values("sales").index))
+```
+
+## Missing values go last, whatever the direction
+
+Which means descending order does not simply reverse ascending order.
+
+```python-run
+import pandas as pd
+import numpy as np
+
+s = pd.Series([3.0, np.nan, 1.0, 2.0])
+
+print("ascending :", list(s.sort_values()))
+print("descending:", list(s.sort_values(ascending=False)))
+print("   NaN is last in BOTH - it is not treated as large or small")
+print()
+print("na_position='first' moves it:")
+print("   ", list(s.sort_values(na_position="first")))
+print()
+print("so reversing a sorted result is not the same as sorting descending:")
+print("   reversed ascending:", list(s.sort_values()[::-1]))
+print("   sorted descending :", list(s.sort_values(ascending=False)))
+```
+
+## sort_index versus sort_values
+
+One orders by the labels, the other by the data.
+
+```python-run
+import pandas as pd
+
+s = pd.Series([10, 30, 20], index=["c", "a", "b"])
+
+print("original      :", dict(s))
+print("sort_index()  :", dict(s.sort_index()), "<- by LABEL")
+print("sort_values() :", dict(s.sort_values()), "<- by DATA")
+print()
+df = pd.DataFrame({"b": [1, 2], "a": [3, 4]})
+print("sort the columns alphabetically:")
+print(df.sort_index(axis=1))
+print()
+print("sort_index matters after a groupby, which returns")
+print("groups in sorted key order already.")
+```
+
+## nlargest beats sorting the whole frame
+
+When you only want the top few, do not order the rest.
+
+```python-run
+import pandas as pd
+import numpy as np
+import time
+
+rng = np.random.default_rng(0)
+df = pd.DataFrame({"v": rng.random(200_000)})
+
+t = time.perf_counter(); a = df.sort_values("v", ascending=False).head(5); t1 = time.perf_counter() - t
+t = time.perf_counter(); b = df.nlargest(5, "v"); t2 = time.perf_counter() - t
+
+print("sort then head : %.4f s" % t1)
+print("nlargest       : %.4f s" % t2)
+print("ratio          : %.1fx" % (t1 / max(t2, 1e-9)))
+print("same rows      :", a.index.equals(b.index))
+print()
+print("nsmallest is the other direction, and both take a column list")
+print("for tie-breaking.")
+```
+
+## rank, and what to do with ties
+
+The default averages tied ranks, which is often not what a leaderboard wants.
+
+```python-run
+import pandas as pd
+
+s = pd.Series([10, 20, 20, 40], index=["a", "b", "c", "d"])
+
+for how in ["average", "min", "max", "dense", "first"]:
+    print("%-8s :" % how, list(s.rank(method=how).astype(float)))
+
+print()
+print("average : the two 20s share rank 2.5")
+print("min     : both get 2, and 3 is skipped  (competition ranking)")
+print("dense   : both get 2, and the next is 3 (no gaps)")
+print("first   : ties broken by order of appearance")
+print()
+print("descending ranks:", list(s.rank(ascending=False).astype(float)))
+print("as a percentage :", [round(v, 2) for v in s.rank(pct=True)])
+```
+
+## Sorting is not free
+
+It is n log n and it copies, so do it once and late.
+
+```python-run
+import pandas as pd
+import numpy as np
+import time
+
+rng = np.random.default_rng(0)
+df = pd.DataFrame({"k": rng.integers(0, 1000, 300_000),
+                   "v": rng.random(300_000)})
+
+t = time.perf_counter(); df.sort_values("v"); full = time.perf_counter() - t
+t = time.perf_counter(); df["v"].max(); mx = time.perf_counter() - t
+
+print("sort 300k rows : %.4f s" % full)
+print("max of a column: %.6f s" % mx)
+print("sorting is %.0fx the cost of the reduction" % (full / max(mx, 1e-9)))
+print()
+print("If you only need the extreme, do not sort. If you need the top n,")
+print("use nlargest. Sort when the ORDER itself is the output.")
+```
+## Missing values sort last
+
+`NaN` goes to the **end** in both ascending and descending order. It is not treated as very large or very small; it is simply put aside.
+
+The consequence catches people: reversing an ascending sort is **not** the same as sorting descending, because the NaNs move relative to everything else.
+
+`na_position="first"` puts them at the front instead, which is useful when the missing rows are the ones you want to look at.
+
+## sort_index
+
+`sort_index()` orders by the index labels rather than the data. It is what you want after operations that leave the index shuffled, and it is required for label-range slicing on a non-unique index.
+
+`sort_index(axis=1)` orders the **columns** alphabetically, which is a quick way to make two frames comparable.
+
+Group-by results already come back sorted by key, so an extra `sort_index` there is usually redundant.
+
+## nlargest and nsmallest
+
+Sorting 200,000 rows to look at five is wasted work.
+
+`df.nlargest(5, "v")` finds the top five without ordering the rest, and the last-but-one editor measures the difference.
+
+Both take a list of columns for tie-breaking, and a `keep` argument controlling what happens when the boundary value is tied: `"first"`, `"last"` or `"all"`. `keep="all"` can return more than `n` rows, which is occasionally what you want and worth knowing before it surprises you.
+
+For a single extreme value, neither is needed: `df["v"].max()` is a reduction and far cheaper than any sort. `idxmax()` gives the label of the row that holds it, which is how you get "the row with the highest value" in one step.
+
+## rank
+
+`rank` converts values into positions, and the interesting part is what it does with ties.
+
+`method="average"` (the default) gives tied values the mean of the ranks they span &mdash; two values tied for 2nd and 3rd both get 2.5. That is the statistically conventional choice and it produces fractional ranks, which surprises people expecting integers.
+
+`method="min"` gives both 2 and skips 3. This is competition ranking, the "joint second" of a leaderboard.
+
+`method="max"` gives both 3.
+
+`method="dense"` gives both 2 and makes the next value 3 &mdash; no gaps, which is what you want for grouping into levels.
+
+`method="first"` breaks ties by order of appearance, giving strictly distinct integer ranks.
+
+`ascending=False` ranks from the top. `pct=True` returns percentiles rather than positions, which is the quick route to "what fraction of rows are below this one".
+
+`rank` also takes a `na_option`, and by default missing values get `NaN` ranks rather than being placed anywhere.
+
+## The cost
+
+Sorting is `O(n log n)` and allocates a new frame. On a large table it is one of the more expensive things you can do.
+
+Three cheaper alternatives cover most reasons people sort:
+
+**An extreme value**: `max`, `min`, `idxmax`, `idxmin` &mdash; a single linear pass.
+
+**A top n**: `nlargest` / `nsmallest`.
+
+**Deduplication order**: sorting is genuinely required here, and it is the one case where sorting before `drop_duplicates` is not optional.
+
+Sort when the order is the actual output &mdash; a report, a chart, a file someone will read. Otherwise there is usually a reduction that answers the same question for a fraction of the cost.
+
+## Sorting by something that is not a column
+
+`key=` applies a function to the sort keys before comparing, without changing the data:
+
+```python
+df.sort_values("city", key=lambda s: s.str.lower())
+```
+
+That sorts case-insensitively while leaving the original values intact. It is much cleaner than adding a helper column, sorting, and dropping it.
+
+For a **custom order** &mdash; small, medium, large &mdash; the right tool is an ordered categorical:
+
+```python
+df["size"] = pd.Categorical(df["size"], ["small", "medium", "large"], ordered=True)
+df.sort_values("size")
+```
+
+The order then belongs to the column and applies to every later sort, group-by and comparison, rather than being repeated at each call site.
+
+Sorting by string length, by the last character, or by any derived value is `key=` with the appropriate `.str` operation.
+
+## Sorting a group-by result
+
+Group-by output arrives sorted by key. Usually you want it sorted by the value:
+
+```python
+df.groupby("city")["sales"].sum().sort_values(ascending=False)
+```
+
+`sort=False` on the group-by itself skips the key sort, which is faster on many groups and gives order of first appearance.
+
+For "the top n within each group", the pattern is a group-wise rank and a filter:
+
+```python
+df[df.groupby("city")["sales"].rank(ascending=False) <= 3]
+```
+
+`groupby(...).head(3)` also works and takes the first three **rows** of each group in current order, so it needs a sort first to mean "the top three".
+
+## Stability, in practice
+
+The default sort is not stable, so equal elements can come out in any order.
+
+That matters in two situations.
+
+**A multi-pass sort.** Sorting by one column, then another, only works if the second sort preserves the first ordering. Pass `kind="stable"`, or better, sort by both keys in one call with a list.
+
+**Reproducible output.** Two runs on the same data can order ties differently, which makes diffs noisy and tests flaky. `kind="stable"` fixes it.
+
+The cost is small enough that using `kind="stable"` by default when the output is compared or written to a file is a reasonable habit.
+
+## Sorting large frames
+
+Sorting is `O(n log n)` and copies the frame. On a large table it is often the most expensive single operation in a script.
+
+The alternatives, in order of preference:
+
+**A reduction** &mdash; `max`, `min`, `idxmax`, `idxmin` for an extreme.
+
+**`nlargest` / `nsmallest`** for a top n.
+
+**`sort_index`** if the data is already nearly sorted by that key; it is cheaper than a full value sort.
+
+**Sorting once** and reusing the result, rather than sorting inside a loop or a function called repeatedly.
+
+And when the sort *is* the output &mdash; a report, a leaderboard, a file someone reads &mdash; it is not overhead, it is the deliverable.
+
+## Ranking, and what to do with ties
+
+The five methods differ only in tie handling, and the right choice depends on what the rank is for.
+
+For a **leaderboard**, `min` gives the familiar "joint second, then fourth".
+
+For **levels or bands**, `dense` avoids gaps.
+
+For a **statistic** &mdash; a rank correlation, a percentile &mdash; `average` is the conventional choice and is the default for that reason.
+
+For a **deterministic ordering** where ties must be broken, `first` uses order of appearance, which means the result depends on how the frame is sorted.
+
+`pct=True` gives percentile ranks in `[0, 1]`, which is the quick route to "what fraction of rows are at or below this one" and is comparable across datasets of different sizes.
+
+## Sorting the columns rather than the rows
+
+`df.sort_index(axis=1)` orders columns alphabetically, which makes two frames easier to compare and diffs easier to read.
+
+For a deliberate order, selection is clearer: `df[["id", "date", "value"]]`.
+
+For a partial order &mdash; pin some columns to the front, keep the rest &mdash; build the list:
+
+```python
+first = ["id", "date"]
+df = df[first + [c for c in df.columns if c not in first]]
+```
+
+That survives a schema change, where a hard-coded full list does not.
+
+## Sorting for output
+
+When the sort is the deliverable, a few details matter that do not otherwise.
+
+`na_position="first"` when missing rows are what the reader should notice.
+
+`key=` for case-insensitive or natural ordering.
+
+An **ordered categorical** for a domain order &mdash; small/medium/large &mdash; so every later operation uses it too.
+
+`reset_index(drop=True)` if row numbers will be displayed, so they read 0, 1, 2 rather than the original labels.
+
+`kind="stable"` so that re-running produces byte-identical output, which matters if the result is committed or diffed.
+
+## Ties, restated
+
+The choice of tie-handling is a decision about meaning, not a technicality:
+
+`average` &mdash; the statistical convention; produces fractional ranks.
+
+`min` &mdash; competition ranking; joint second, then fourth.
+
+`dense` &mdash; no gaps; for bands and levels.
+
+`max` &mdash; the pessimistic reading.
+
+`first` &mdash; arbitrary but deterministic, and dependent on the current row order.
+
+If ranks are shown to people, `min` or `dense` usually matches their expectations. If ranks feed a statistic, `average` is the right default.
+
+## A summary
+
+`sort_values` for data, `sort_index` for labels.
+
+A list of keys with a matching list of directions handles multi-key sorts in one call.
+
+Missing values go last in both directions, so reversing is not the same as descending.
+
+`nlargest`/`nsmallest` for a top n; `idxmax`/`idxmin` for a single extreme.
+
+`key=` for derived orderings; ordered categoricals for domain orderings.
+
+`kind="stable"` when ties must keep their order or output must be reproducible.
+
+And sorting is expensive &mdash; do it once, late, and only when the order is part of the answer.
+
+## A closing note
+
+Sorting is expensive and frequently unnecessary, which makes it worth asking what the order is for.
+
+If the answer is "to find the largest", a reduction does it in one pass. If it is "to find the top ten", `nlargest` does it without ordering the rest. If it is "so deduplication keeps the right row", the sort is essential and skipping it makes the result arbitrary. If it is "because the output is a report", the sort is the deliverable and its cost is the point.
+
+Ranking is the same operation asked differently, and its only real subtlety is ties. The default averages them, which produces fractional ranks and surprises people expecting integers; leaderboards usually want `min`, and bands usually want `dense`.
+
+And missing values sort last in both directions, which means reversing an ascending sort is not the same as sorting descending &mdash; a small asymmetry that produces a wrong answer at the ends.
+
+## One more thing
+
+`sort_values` accepts `ignore_index=True`, which renumbers the result rather than carrying the original labels along. That saves a separate `reset_index(drop=True)` when the sorted output is going to be displayed or written with row numbers.
+
+And `nlargest` and `nsmallest` exist on `groupby` objects too, so "the top three per group" is `df.groupby("city")["sales"].nlargest(3)` &mdash; which returns a MultiIndexed Series with the group and the original label, and usually wants `reset_index` before going anywhere else.
+
+## A note on reproducibility
+
+Output that will be committed to a repository, diffed, or compared between runs should be deterministic, and sorting is where non-determinism creeps in.
+
+The default sort is not stable, so tied rows can appear in different orders on different runs or different pandas versions. A file written from that output produces spurious diffs, and a test comparing it fails intermittently.
+
+`kind="stable"` fixes it, at a cost small enough to ignore.
+
+The same applies to group-by, which sorts keys by default but says nothing about the order of rows within a group, and to `drop_duplicates`, whose survivor depends entirely on the current order.
+
+For anything whose output is compared, the rule is: sort explicitly, sort stably, and make the sort keys sufficient to determine the order uniquely.

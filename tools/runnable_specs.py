@@ -21,7 +21,38 @@ def _fastapi_prelude():
     return PRELUDE + "\n\ndrive = _drive\n"
 
 
+def _pandas_prelude():
+    """Silence the pyarrow DeprecationWarning pandas raises on import.
+
+    Under Pyodide, "import pandas" warns that pyarrow will be required in
+    pandas 3.0. It is accurate, irrelevant here, and written to stderr - so
+    without this it is the first thing, in red, in every editor's output on
+    the track.
+
+    The filter matches that one message and is left installed, rather than
+    wrapping the import in catch_warnings: exiting that context invalidates
+    the per-module registry that stops a warning being shown twice, so the
+    warning came back the moment the reader imported pandas themselves.
+
+    Matching one message rather than ignoring DeprecationWarning wholesale
+    keeps the reader's own warnings visible, which several modules rely on.
+    """
+    return (
+        "import warnings\n\n"
+        "warnings.filterwarnings(\n"
+        "    \"ignore\", message=\"(?s).*Pyarrow will become a required.*\")\n\n"
+        "import pandas\n"
+    )
+
+
 SPECS = {
+    "pandas": {
+        # pandas ships with Pyodide, so this is a CDN fetch rather than a wheel.
+        "packages": "pandas",
+        "label": "pandas",
+        "filename": "example_%02d.py",
+        "prelude": _pandas_prelude,
+    },
     "numpy": {
         # numpy ships with Pyodide, so this is a CDN fetch rather than a wheel.
         "packages": "numpy",

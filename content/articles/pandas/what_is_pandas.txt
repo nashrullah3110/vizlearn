@@ -1,0 +1,329 @@
+title: What pandas Is For
+intro: Columns with names, types and an index, and why that differs from a 2-D array.
+
+## Two structures
+
+`Series` is a one-dimensional array of values **plus an index** of labels.
+
+`DataFrame` is a set of Series sharing one index. Each column has its own dtype.
+
+That second point is the practical difference from NumPy. A NumPy array has one dtype for the whole block; a DataFrame has one per column. A table with a name, an age, a score and a flag is four dtypes, and that is exactly the shape real data arrives in.
+
+Convert such a DataFrame to a NumPy array and every column collapses to the one type that can hold all of them &mdash; usually `object`, which is a list of pointers with extra steps. That collapse is worth seeing once, because it explains why pandas exists rather than everyone using arrays.
+
+
+## A DataFrame is columns, not a grid
+
+Each column has its own dtype. That is the difference from a NumPy array, and most of what follows comes from it.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "name": ["ana", "raj", "kim"],
+    "age": [31, 25, 40],
+    "score": [8.5, 9.1, 7.2],
+    "active": [True, False, True],
+})
+print(df)
+print()
+print("one dtype per column:")
+print(df.dtypes)
+print()
+print("a NumPy array has ONE dtype for everything. Forcing this to")
+print("an array collapses it to the only type that holds all four:")
+print("   ", df.to_numpy().dtype)
+```
+
+## The index is not row numbers
+
+It looks like 0,1,2 by default, which hides that it is a real labelled axis.
+
+```python-run
+import pandas as pd
+
+s = pd.Series([10, 20, 30])
+print("default index:", list(s.index))
+
+s2 = pd.Series([10, 20, 30], index=["a", "b", "c"])
+print("labelled     :", list(s2.index))
+print()
+print("s2['b'] ->", s2["b"], "  looked up by LABEL, not position")
+print()
+print("and the label survives filtering:")
+big = s2[s2 > 15]
+print(big)
+print("   the index is still b, c - not 0, 1")
+print()
+print("That surviving label is why the next module is about the index.")
+```
+
+## Operations align on the index
+
+This is the single biggest difference from arrays, and it is silent.
+
+```python-run
+import pandas as pd
+
+a = pd.Series([1, 2, 3], index=["x", "y", "z"])
+b = pd.Series([10, 20, 30], index=["z", "y", "x"])
+
+print("a:", dict(a))
+print("b:", dict(b), "<- reversed order")
+print()
+print("a + b aligns by LABEL, not position:")
+print(a + b)
+print()
+print("x: 1+30, y: 2+20, z: 3+10")
+print()
+print("NumPy would have added them position by position.")
+print("Missing labels become NaN rather than an error:")
+c = pd.Series([1, 1], index=["x", "q"])
+print(dict(a + c))
+```
+
+## Columns carry names all the way through
+
+You select by meaning rather than by remembering that salary is column 3.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "city": ["pune", "delhi", "pune", "delhi"],
+    "sales": [10, 20, 30, 40],
+})
+
+print("total by city, in one line:")
+print(df.groupby("city")["sales"].sum())
+print()
+print("the equivalent in plain Python needs a dict, a loop and a")
+print("decision about what to do with a missing key.")
+print()
+print("column names survive every operation:")
+print(list(df.groupby("city")["sales"].sum().index))
+```
+
+## Where pandas beats a dict of lists
+
+Not everywhere. It wins when the data is tabular and the questions are column-shaped.
+
+```python-run
+import pandas as pd
+
+rows = [
+    {"item": "pen", "qty": 3, "price": 10.0},
+    {"item": "book", "qty": 1, "price": 250.0},
+    {"item": "bag", "qty": 2, "price": 400.0},
+]
+df = pd.DataFrame(rows)
+
+df["total"] = df["qty"] * df["price"]
+print(df)
+print()
+print("revenue      :", float(df["total"].sum()))
+print("mean price   :", round(float(df["price"].mean()), 2))
+print("most expensive:", df.loc[df["price"].idxmax(), "item"])
+print()
+print("For three rows a loop is fine. The argument for pandas is that")
+print("this code does not change when there are three million.")
+```
+
+## What pandas is not for
+
+Knowing the boundary saves a lot of fighting with it.
+
+```python-run
+import pandas as pd
+import time
+
+n = 20_000
+df = pd.DataFrame({"a": range(n)})
+
+t = time.perf_counter()
+out = df["a"] * 2 + 1
+vec = time.perf_counter() - t
+
+t = time.perf_counter()
+out2 = df["a"].apply(lambda v: v * 2 + 1)
+loop = time.perf_counter() - t
+
+print("vectorised : %.4f s" % vec)
+print("apply      : %.4f s" % loop)
+print("ratio      : %.0fx" % (loop / max(vec, 1e-9)))
+print("same       :", out.equals(out2))
+print()
+print("apply is a Python loop wearing a method call. pandas is fast")
+print("only while you stay out of per-row Python.")
+```
+## The index does work you did not ask for
+
+The index looks like row numbers, because by default it is `0, 1, 2`. That default hides what it actually is: a labelled axis that participates in almost every operation.
+
+Two consequences arrive early and confuse people.
+
+**It survives filtering.** Filter a Series down to two of five rows and the index reads `1, 4`, not `0, 1`. The labels came along. Code that then indexes positionally gets the wrong rows or a `KeyError`.
+
+**Arithmetic aligns on it.** Adding two Series matches them up **by label**, not by position. If the labels are in different orders, pandas reorders for you. If one has a label the other lacks, the result is `NaN` there rather than an error.
+
+That alignment is a genuine feature &mdash; it is what makes combining data from different sources safe, because mismatches surface as NaN rather than as a silent off-by-one. It is also the single most surprising behaviour for anyone arriving from NumPy, where `+` is strictly positional.
+
+The index gets a module of its own next, because nearly every pandas confusion traces back to it.
+
+## Names instead of positions
+
+`df["salary"]` says what it selects. `arr[:, 3]` requires you to remember what column 3 was, and breaks silently when a column is inserted.
+
+That is not a small ergonomic point. It is most of why pandas code survives contact with changing data, and why a group-by is one line rather than a dict, a loop and a decision about missing keys.
+
+## When to use something else
+
+**Plain Python** for small, one-off, non-tabular work. A hundred records processed once does not justify the import, and a list of dicts is easier to read.
+
+**NumPy** when the data is genuinely homogeneous and numeric &mdash; a matrix, an image, a signal. pandas adds per-column bookkeeping you are not using, and costs both memory and speed for it.
+
+**A database** when the data does not fit in memory, or when several processes need it at once. pandas assumes one process and one machine.
+
+**Polars or DuckDB** when the data is large and the work is analytical. Both are considerably faster than pandas on big joins and aggregations.
+
+pandas is the right tool for tabular, in-memory, mixed-type data where the questions are column-shaped &mdash; which describes an enormous amount of real work.
+
+## The one performance rule
+
+pandas is a thin, convenient layer over compiled code. It is fast while the work happens inside that compiled layer, and slow the moment it has to call back into Python once per row.
+
+`apply`, `iterrows` and a `for` loop over rows all do exactly that. The last editor measures it, and the gap is large enough that it is usually the whole performance story of a pandas script.
+
+The rule: express operations on **whole columns**. `df["a"] * 2` operates on the column; `df["a"].apply(lambda v: v * 2)` operates on each value from Python and is far slower for the identical result.
+
+There are cases where `apply` is unavoidable, and a module later covers them. Most uses of it are not those cases.
+
+## How this track is organised
+
+The index and selection come first, because they cause the most confusion and everything else depends on them &mdash; including the copy warning, which gets a module to itself because nothing else in pandas wastes as much of people's time.
+
+Then cleaning: missing values, duplicates, strings, types.
+
+Then the aggregation work that is the reason to use pandas at all: group-by, joins, reshaping.
+
+Then time series, reading and writing files, and performance.
+
+Every module is short runnable programs rather than one long script, so you can change one line and see which rule produced which output.
+
+## Where pandas sits
+
+pandas is built **on** NumPy. Underneath each numeric column is a NumPy array, and the arithmetic that runs on a column is the same compiled code.
+
+What pandas adds is bookkeeping: labels for the rows, names and separate types for the columns, and a large library of operations that assume your data is a table rather than a matrix.
+
+That layering explains both its strengths and its costs. Column arithmetic is fast because NumPy is doing it. Anything that has to consult labels, reconcile dtypes, or fall back to Python objects is slower, and that is where pandas code goes wrong.
+
+Above pandas sit the tools that consume it: scikit-learn takes DataFrames, matplotlib and seaborn plot them, and most data pipelines pass them around. Knowing the layer below and the layer above tells you when to drop down to NumPy for speed and when to hand off entirely.
+
+## The vocabulary
+
+A few terms recur constantly, and being precise about them prevents confusion later.
+
+**Series** &mdash; one column: values plus an index, with a single dtype.
+
+**DataFrame** &mdash; several Series sharing one index.
+
+**Index** &mdash; the labels for the rows. The column names are also an Index.
+
+**dtype** &mdash; the type of one column. `object` usually means Python strings.
+
+**Axis** &mdash; `axis=0` is rows, `axis=1` is columns. As in NumPy, the axis you name is generally the one being collapsed or moved along, which is why `df.sum(axis=0)` gives a total per column.
+
+**NaN / NaT / pd.NA** &mdash; missing markers for floats, datetimes and the nullable types.
+
+## Reading pandas output
+
+Printed output carries more information than it appears to, and reading it saves a great many print statements.
+
+The **dtype line** under a Series tells you what you are holding. `int64` and `float64` are numeric; `object` almost always means strings; `datetime64[ns]` means dates have been parsed.
+
+The **index** is the left-hand column, and it is not row numbers. If it reads `0, 3, 7` rather than `0, 1, 2`, the frame has been filtered and the original labels came along.
+
+`Name:` under a Series gives the column it came from.
+
+`[5 rows x 3 columns]` at the bottom of a truncated frame is the real shape, which matters when the display has elided the middle.
+
+Three things worth setting in a notebook: `pd.set_option("display.max_columns", None)` to stop columns being hidden, `display.width` to control wrapping, and `display.float_format` to stop long decimals dominating a table.
+
+## A first session
+
+The shape of almost every piece of pandas work is the same:
+
+**Load** with `read_csv`, saying what you know about types and dates.
+
+**Look** &mdash; `shape`, `dtypes`, `head`, `info`, `describe`, and `value_counts` on the categorical columns.
+
+**Clean** &mdash; fix types, handle missing values, normalise text, remove or aggregate duplicates.
+
+**Reshape** &mdash; filter to what matters, join in what is missing, group and aggregate.
+
+**Output** &mdash; a table, a chart, or a file.
+
+Roughly half of real work is in the middle two steps, which is why this track spends most of its modules there rather than on the aggregation everyone thinks of as the interesting part.
+
+## Two habits worth starting with
+
+**Check after every step that changes the shape.** `len(df)` after a filter or a merge, `df.dtypes` after a load or a concat. Most pandas bugs are silent, and the ones that are not silent are usually caught by one of those two lines.
+
+**Prefer explicit over clever.** `df.loc[mask, "col"]` over `df[mask]["col"]`, named aggregation over positional, `.copy()` where you mean a copy. The explicit form is nearly always the one that keeps working when the data changes.
+
+## Questions that come up first
+
+**Do I need to learn NumPy before pandas?**
+
+Not before, but alongside. pandas hides NumPy most of the time, and then leaks it at exactly the moments that matter &mdash; dtypes, NaN behaviour, broadcasting, views versus copies. Every one of those is a NumPy concept wearing a pandas name, and the modules that cause the most trouble here are the ones where the NumPy layer shows through.
+
+**Why is my column `object`?**
+
+Because it holds Python objects rather than a uniform numeric type &mdash; almost always strings, sometimes mixed types from a messy source. It is the single most common cause of both slow code and surprising results, and `df.dtypes` is how you find it.
+
+**Why did my integers become floats?**
+
+A missing value. NumPy integer arrays cannot hold NaN, so pandas promotes the column. The nullable `Int64` type is the fix.
+
+**Why does my filter return an empty frame?**
+
+Usually a type mismatch &mdash; comparing a string column against a number &mdash; or whitespace and case differences in the values. `value_counts()` on the column shows both immediately.
+
+**Should I use pandas or SQL?**
+
+If the data lives in a database and the operation is a filter, join or aggregate, do it in SQL and bring back less data. pandas is for what happens after that, and for data that never was in a database.
+
+## What this track assumes
+
+That you can read Python, and that you have met lists and dicts. No statistics, no NumPy, and no prior pandas.
+
+The modules are ordered by dependency rather than by glamour. The index, selection and the copy warning come first because everything later depends on them and because they cause the most confusion. Cleaning comes next, because that is where most real time goes. Group-by, joins and reshaping come after, because they are what people think pandas is for and they only work properly once the earlier material is in place.
+
+Each module is six short programs and an article. The programs are the point: changing a value and re-running is the fastest way to find out what a rule actually does, and several of them are written so the output contradicts the guess most people would make.
+
+## The shortest useful summary
+
+A DataFrame is columns with names and types, sharing an index.
+
+The index takes part in almost everything, including alignment, which is silent.
+
+Selection is `.loc` for labels and `.iloc` for positions.
+
+Assignment goes in one `.loc` call, or through an explicit `.copy()`.
+
+Operations on whole columns are fast; anything per row is not.
+
+And when a result surprises you, the answer is nearly always in `df.dtypes`, `df.shape`, or the index &mdash; in that order.
+
+## A closing note
+
+pandas is a large library, and the temptation is to learn it as a list of methods. That does not work well, because the methods are not the hard part.
+
+The hard part is a small number of behaviours that run through everything: the index takes part in operations you did not ask it to; a column has one dtype and that dtype decides what is possible; selection returns something whose relationship to the original is not always specified; and anything that runs Python once per row is slow enough to dominate.
+
+Those four explain most of what surprises people, and each has a module here.
+
+The methods, by contrast, are searchable. Nobody remembers the argument order of `merge` or the exact spelling of every frequency alias, and nobody needs to.
+
+So the useful thing to take from this track is not coverage but a set of instincts: check `dtypes` after loading, check row counts after joining, know whether you are holding a copy, and stay out of per-row Python.

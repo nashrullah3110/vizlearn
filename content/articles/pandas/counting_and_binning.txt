@@ -1,0 +1,359 @@
+title: Counting and Binning
+intro: value_counts, cut and crosstab.
+
+## value_counts
+
+The most-used single method in exploratory work, and the first thing to run on any categorical column.
+
+By default it counts each distinct value and sorts by frequency, descending. Three arguments change what it tells you:
+
+`normalize=True` gives proportions rather than counts, which is what you want when comparing two datasets of different sizes.
+
+`dropna=False` includes missing values in the count. Without it, missing data is invisible here &mdash; and "invisible" is exactly the wrong property for the thing you most need to notice.
+
+`sort=False` keeps the values in their natural order rather than by frequency; `.sort_index()` afterwards does the same job more explicitly.
+
+On a DataFrame, `df.value_counts()` counts distinct **combinations** of all columns, which is a quick way to find duplicated records.
+
+
+## value_counts is the first thing to run
+
+Counts, shares, and the missing values you would otherwise not see.
+
+```python-run
+import pandas as pd
+import numpy as np
+
+s = pd.Series(["a", "b", "a", "c", "a", None])
+
+print(s.value_counts())
+print()
+print("with missing values included:")
+print(s.value_counts(dropna=False))
+print()
+print("as shares:")
+print((s.value_counts(normalize=True) * 100).round(1))
+print()
+print("sorted by label instead of by count:")
+print(s.value_counts().sort_index())
+```
+
+## cut makes bands from numbers
+
+You choose the edges, and every value lands in exactly one band.
+
+```python-run
+import pandas as pd
+
+ages = pd.Series([5, 17, 18, 35, 64, 65, 90])
+
+bands = pd.cut(ages, bins=[0, 17, 64, 200],
+               labels=["child", "adult", "senior"])
+print(pd.DataFrame({"age": ages, "band": bands}))
+print()
+print("bins are (left, right] - right-inclusive by default,")
+print("so 17 is a child and 18 is an adult.")
+print()
+print("counts per band:")
+print(bands.value_counts().sort_index())
+print()
+print("the result is a category, with an order:")
+print("   ", list(bands.cat.categories))
+```
+
+## Values outside the bins become NaN
+
+Silently, which is how rows disappear from a summary.
+
+```python-run
+import pandas as pd
+
+s = pd.Series([-5, 10, 50, 500])
+b = pd.cut(s, bins=[0, 100])
+
+print(pd.DataFrame({"value": s, "bin": b.astype(str)}))
+print()
+print("counted:", int(b.notna().sum()), "of", len(s))
+print("   -5 and 500 fall outside 0-100 and became NaN")
+print()
+print("use open-ended edges when the range is not known:")
+import numpy as np
+safe = pd.cut(s, bins=[-np.inf, 100, np.inf], labels=["low", "high"])
+print("   ", list(safe))
+```
+
+## qcut splits by quantile instead
+
+Equal-sized groups rather than equal-width bands.
+
+```python-run
+import pandas as pd
+import numpy as np
+
+s = pd.Series([1, 2, 3, 4, 5, 6, 100, 200])
+
+print("cut - equal WIDTH, so the outliers dominate:")
+print(pd.cut(s, 4).value_counts().sort_index())
+print()
+print("qcut - equal COUNT per bucket:")
+print(pd.qcut(s, 4).value_counts().sort_index())
+print()
+print("with names:")
+print(list(pd.qcut(s, 4, labels=["q1", "q2", "q3", "q4"])))
+print()
+print("qcut raises when there are too many repeats to split evenly -")
+print("duplicates='drop' merges the edges instead.")
+```
+
+## crosstab counts two things at once
+
+A frequency table of one variable against another.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "city": ["pune", "pune", "delhi", "delhi", "delhi"],
+    "plan": ["free", "paid", "free", "free", "paid"],
+})
+print(pd.crosstab(df["city"], df["plan"]))
+print()
+print("with totals:")
+print(pd.crosstab(df["city"], df["plan"], margins=True))
+print()
+print("as row percentages:")
+print((pd.crosstab(df["city"], df["plan"], normalize="index") * 100).round(0))
+```
+
+## Counting into a summary table
+
+value_counts on a group, and the two ways to lay it out.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "city": ["pune", "pune", "delhi", "delhi", "delhi"],
+    "plan": ["free", "paid", "free", "free", "paid"],
+})
+counts = df.groupby("city")["plan"].value_counts()
+print("long form:")
+print(counts)
+print()
+print("wide form:")
+print(counts.unstack(fill_value=0))
+print()
+print("which is what crosstab gave you directly - crosstab is the")
+print("shortcut, groupby is the general tool.")
+```
+## cut
+
+`pd.cut` turns a numeric column into named bands.
+
+```python
+pd.cut(ages, bins=[0, 17, 64, 200], labels=["child", "adult", "senior"])
+```
+
+Bins are **right-inclusive** by default &mdash; the interval is `(left, right]`. So with an edge at 17, the value 17 is a child and 18 is an adult. `right=False` flips this to `[left, right)`, which is what you usually want for things like age where the convention is "18 and over".
+
+Getting this backwards produces an off-by-one at every boundary, and it does not raise.
+
+The result is a **categorical** with an order, so it sorts correctly and groups efficiently.
+
+## Values outside the bins vanish
+
+Anything below the first edge or above the last becomes `NaN`.
+
+This is the failure mode to watch. A negative value, an outlier, a sentinel like `-1` or `9999` &mdash; all silently disappear from every count that follows, and the totals no longer match the row count.
+
+Two defences. Use `-np.inf` and `np.inf` as the outer edges when the range is not known in advance. And check `result.notna().sum()` against `len(df)` after binning, which takes one line and catches it immediately.
+
+Passing an integer instead of a list &mdash; `pd.cut(s, 4)` &mdash; makes four equal-width bins spanning the data, so nothing falls outside. That is safe but rarely gives meaningful boundaries.
+
+## qcut
+
+`pd.cut` makes bands of equal **width**. `pd.qcut` makes bands of equal **count**.
+
+The difference matters whenever the data is skewed. With a few large outliers, equal-width bins put almost every row in the first bucket and leave the rest nearly empty. Equal-count bins give you quartiles, deciles, or whatever split you asked for, each with the same number of rows.
+
+Use `cut` when the boundaries have external meaning &mdash; age brackets, price tiers, pass marks. Use `qcut` when you want relative position &mdash; top quartile, bottom decile.
+
+`qcut` raises when repeated values make an even split impossible. `duplicates="drop"` merges the offending edges and returns fewer bins than requested, which is usually acceptable and worth knowing about before it fails on a column of mostly-zeros.
+
+## crosstab
+
+`pd.crosstab(df["city"], df["plan"])` gives a frequency table: cities down the side, plans across the top, counts in the cells.
+
+`margins=True` adds row and column totals.
+
+`normalize="index"` gives row percentages, `"columns"` gives column percentages, and `True` gives the share of the grand total. Row percentages are usually the interesting ones &mdash; "what proportion of Delhi users are on the paid plan" &mdash; and are not the default.
+
+`values=` with `aggfunc=` turns it from a count into any aggregation, at which point it is `pivot_table` with different spelling.
+
+## The general form
+
+`crosstab` is a shortcut. The general tool is group-by:
+
+```python
+df.groupby("city")["plan"].value_counts().unstack(fill_value=0)
+```
+
+That gives the same table. The long form &mdash; before `unstack` &mdash; is often more useful for further processing, and the wide form is better for reading.
+
+Knowing both matters because `crosstab` runs out of road quickly: more than two variables, custom aggregations, or anything feeding another computation is easier with group-by. Reach for `crosstab` when you want a table to look at, and group-by when the result has somewhere else to go.
+
+## Counting combinations
+
+`df.value_counts()` on a whole frame counts distinct **row** combinations, which is a fast way to find duplicated records or to see which pairs of categories actually occur.
+
+`df[["city", "plan"]].value_counts()` restricts it to two columns and gives a Series with a MultiIndex &mdash; the long form of a crosstab.
+
+`normalize=True` works here too, giving the share of each combination.
+
+`df.groupby(["city", "plan"]).size()` gives the same numbers with a different name, and is worth knowing because it composes with other group-by operations.
+
+## Binning with meaningful edges
+
+The edges are usually the interesting decision, and there are three sources for them.
+
+**External definitions** &mdash; age brackets, tax bands, grade boundaries. These come from the domain, and `cut` with an explicit list is right.
+
+**The data's distribution** &mdash; quartiles, deciles. `qcut` with a count.
+
+**Round numbers** &mdash; `np.arange(0, 101, 10)` for ten-point bands. Readable, and often better for communication than quantiles even when quantiles are statistically neater.
+
+`cut` also accepts an integer, giving equal-width bins across the observed range. The boundaries are then arbitrary decimals, which is fine for a quick look and poor for anything anyone reads.
+
+`retbins=True` returns the edges alongside the result, which is how you apply the *same* bins to another dataset later &mdash; important when comparing two periods, because bins computed separately are not comparable.
+
+## Ordered categories from binning
+
+`cut` and `qcut` return an **ordered categorical**. That has three useful consequences.
+
+Sorting works in bin order rather than alphabetically, which is why `value_counts().sort_index()` produces a sensible table.
+
+Comparison works: `df[df["band"] > "low"]` is meaningful.
+
+Group-by on the result includes every bin, including empty ones &mdash; which is usually desirable in a report and occasionally surprising. `observed=True` restricts it to occupied bins.
+
+## Histograms
+
+`np.histogram` and `plt.hist` both bin and count in one step, and `pd.cut` plus `value_counts` gives the same numbers with labels you control.
+
+The bin count matters more than people expect: too few hides structure, too many turns the distribution into noise. `bins="auto"` in NumPy applies a rule of thumb, and looking at two or three bin counts is usually more informative than trusting one.
+
+For comparing distributions between groups, counts are misleading when the groups are different sizes. `normalize=True`, or `crosstab(..., normalize="index")`, puts them on a comparable footing.
+
+## The checks worth making
+
+After binning, three lines:
+
+```python
+binned.isna().sum()          # how many fell outside the bins
+binned.value_counts().sort_index()   # is any bin empty or dominant
+len(binned) == len(df)       # nothing lost
+```
+
+The first is the one that matters. Values outside the edges become `NaN` silently, and every count after that is computed on a subset without saying so.
+
+And when the bins will be reused &mdash; on next month's data, or on a test set &mdash; save the edges rather than recomputing them. Bins derived from different data are not comparable, and quantile bins in particular will differ every time.
+
+## Reusing bins across datasets
+
+Bins computed from one dataset do not apply to another, and comparing two sets of quantile bins computed separately is meaningless &mdash; the boundaries differ.
+
+`retbins=True` returns the edges:
+
+```python
+train_binned, edges = pd.cut(train["score"], 4, retbins=True)
+test_binned = pd.cut(test["score"], bins=edges)
+```
+
+The test data now uses the training boundaries, which is what makes the two comparable. Values outside the training range fall outside the bins and become `NaN`, which is honest &mdash; they are outside what the bins describe.
+
+The same applies to any before-and-after comparison, and to production scoring against a model trained earlier. Saving the edges alongside the model is part of saving the model.
+
+## Counting with weights
+
+`value_counts` counts rows. When each row represents several things &mdash; a quantity column, a sampling weight &mdash; counting rows is the wrong number.
+
+`df.groupby("city")["qty"].sum()` is the weighted version.
+
+`np.bincount`-style weighting has no direct `value_counts` equivalent, and group-by is the general answer.
+
+For crosstabs, `pd.crosstab(a, b, values=c, aggfunc="sum")` weights the cells by another column.
+
+## Cardinality as a diagnostic
+
+`nunique()` against `len(df)` classifies a column in one number:
+
+**1** &mdash; constant; carries no information.
+
+**2** &mdash; binary.
+
+**Low, relative to the rows** &mdash; a category; convert it.
+
+**Close to the row count** &mdash; an identifier; not a feature.
+
+**Moderate and unexpected** &mdash; usually a sign of unnormalised text, where the same value appears in several spellings.
+
+Running `df.nunique().sort_values()` across a new frame takes a second and tells you what kind of column each one is, which is the first thing you need to know.
+
+## A summary
+
+`value_counts` first, with `dropna=False` and sometimes `normalize=True`.
+
+`cut` for meaningful boundaries, `qcut` for equal-sized groups.
+
+Bins are right-inclusive by default; `right=False` flips it.
+
+Values outside the edges become `NaN` silently &mdash; use infinite outer edges, and check the count afterwards.
+
+Save the edges when the bins will be reused.
+
+`crosstab` for a table to look at; `groupby` plus `unstack` when the result goes somewhere else.
+
+And weight the counts when rows are not the unit you actually mean to count.
+
+## A closing note
+
+Counting is the least glamorous operation in pandas and the one that catches the most problems.
+
+`value_counts` on every categorical column, run before any analysis, finds the typos, the stray capitals, the trailing spaces and the categories nobody mentioned. Each of those would otherwise become a silently split group in an aggregation.
+
+Binning turns continuous data into the categories a question is actually about &mdash; age brackets, price tiers, quartiles. The two things to hold onto are that bins are right-inclusive by default, and that values outside the edges vanish into `NaN` without a word.
+
+Both are worth checking with one line each: the boundary convention against a value that sits on a boundary, and the count of non-missing results against the row count. Together they take a few seconds and prevent an entire class of quietly wrong summaries.
+
+## Two more things worth knowing
+
+`pd.cut` accepts `labels=False`, which returns the **bin number** rather than a label. That is what you want when the bins feed a model or a further computation rather than a report, and it avoids the categorical dtype entirely.
+
+`value_counts` has a `bins=` argument that bins and counts in one step for numeric data: `s.value_counts(bins=5)` is `pd.cut` followed by counting, which is convenient for a quick look at a distribution.
+
+And `pd.crosstab` accepts lists for either axis, giving hierarchical rows or columns, and `dropna=False` keeps combinations that never occurred. The second is worth knowing when two crosstabs must have the same shape to be compared &mdash; without it, a category absent from one dataset simply does not appear, and the tables no longer line up.
+
+## Counting for comparison
+
+Counts answer "how many". Comparing two groups needs proportions, because raw counts confound size with rate.
+
+A city with twice the population has twice the customers on any plan, and comparing the counts says nothing. `normalize="index"` on a crosstab, or `value_counts(normalize=True)` within a group-by, puts them on the same footing:
+
+```python
+(df.groupby("city")["plan"]
+   .value_counts(normalize=True)
+   .unstack(fill_value=0)
+   .round(3))
+```
+
+That reads as "what fraction of each city's customers are on each plan", which is usually the question people mean.
+
+The reverse normalisation &mdash; `normalize="columns"` &mdash; answers a different question: "what fraction of paid customers are in each city". Both are legitimate and they are not interchangeable, and stating which one a table shows is worth a line of text next to it, because the numbers alone do not say.
+
+## In summary
+
+`value_counts` on every categorical column is the cheapest diagnostic in pandas, and it finds the variants that would otherwise split a group-by silently.
+
+`cut` bands by boundaries you choose and `qcut` by quantiles, and the choice depends on whether the boundaries have external meaning or you want equal-sized groups.
+
+Two things to check every time: which convention the bin edges use, since they are right-inclusive by default, and how many values fell outside the edges, since those become `NaN` without a word and every count afterwards is computed on a subset.

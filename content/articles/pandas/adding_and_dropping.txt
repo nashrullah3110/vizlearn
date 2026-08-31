@@ -1,0 +1,399 @@
+title: Adding and Removing Columns
+intro: assign, drop, rename, and the alignment that decides what a new column contains.
+
+## Bracket assignment
+
+`df["total"] = df["qty"] * df["price"]` adds a column at the end.
+
+Two behaviours are worth stating because neither warns.
+
+A **scalar broadcasts**: `df["currency"] = "INR"` fills every row.
+
+An **existing name is replaced**, silently. There is no protection against overwriting a column by reusing its name, which is a real hazard in a long script where the column list is not in front of you.
+
+Column order is insertion order. `insert` is the only way to place one somewhere specific.
+
+
+## Assigning a new column
+
+Bracket assignment adds it at the end, or replaces it if the name exists.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"qty": [3, 1, 2], "price": [10.0, 250.0, 400.0]})
+
+df["total"] = df["qty"] * df["price"]
+print(df)
+print()
+df["currency"] = "INR"            # a scalar fills every row
+print("a scalar broadcasts:", list(df["currency"]))
+print()
+print("assigning an existing name replaces it, silently:")
+df["currency"] = "USD"
+print("   ", list(df["currency"]))
+print()
+print("column order is insertion order:", list(df.columns))
+```
+
+## assign returns a new frame
+
+Which is what makes it chainable, and what makes it safe.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"qty": [3, 1, 2], "price": [10.0, 250.0, 400.0]})
+
+out = (df
+       .assign(total=lambda d: d["qty"] * d["price"])
+       .assign(cheap=lambda d: d["total"] < 100))
+print(out)
+print()
+print("the original is untouched:", list(df.columns))
+print()
+print("the lambda sees the frame AS IT IS AT THAT POINT, so the second")
+print("assign can use the column the first one created.")
+```
+
+## Alignment decides what lands in the column
+
+Assigning a Series matches on the index, not on position.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"a": [1, 2, 3]}, index=["x", "y", "z"])
+
+s = pd.Series([100, 200, 300], index=["z", "y", "x"])
+df["aligned"] = s
+print("assigning a Series with a shuffled index:")
+print(df)
+print("   x got 300, because alignment is by LABEL")
+print()
+partial = pd.Series([9, 9], index=["x", "q"])
+df["partial"] = partial
+print()
+print("labels that do not match become NaN:")
+print(df[["a", "partial"]])
+print()
+print("a plain list has no index, so it goes in by POSITION:")
+df["by_pos"] = [7, 8, 9]
+print(list(df["by_pos"]))
+```
+
+## The filtered-assignment trap
+
+Computing from a subset and assigning back wipes every row that was not in it.
+
+```python-run
+import pandas as pd
+
+def fresh():
+    d = pd.DataFrame({"city": ["pune", "delhi", "pune"], "sales": [10, 20, 30]})
+    d["doubled"] = 0            # a column that already has values
+    return d
+
+a = fresh()
+sub = a[a["city"] == "pune"]
+a["doubled"] = sub["sales"] * 2
+print("whole-column assign from a subset:")
+print(a)
+print("   delhi was 0 and is now NaN - the assignment replaced the")
+print("   ENTIRE column, and alignment had nothing for that row.")
+
+b = fresh()
+b.loc[b["city"] == "pune", "doubled"] = b["sales"] * 2
+print()
+print("loc assignment touches only the selected rows:")
+print(b)
+print("   delhi kept its 0.")
+```
+
+## Dropping columns and rows
+
+The same method, steered by axis - and it returns a new frame by default.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"a": [1, 2], "b": [3, 4], "c": [5, 6]})
+
+print("drop a column:", list(df.drop(columns=["b"]).columns))
+print("drop a row   :", list(df.drop(index=[0]).index))
+print("original     :", list(df.columns), "<- unchanged")
+print()
+print("axis= works too, but columns=/index= say what you mean:")
+print("   ", list(df.drop("b", axis=1).columns))
+print()
+print("a missing name raises, unless you say otherwise:")
+try:
+    df.drop(columns=["zzz"])
+except KeyError as e:
+    print("    KeyError:", str(e)[:40])
+print("   errors='ignore':", list(df.drop(columns=["zzz"], errors="ignore").columns))
+```
+
+## Renaming, and inserting in a position
+
+rename takes a mapping; insert is the only way to choose where a column goes.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"a": [1, 2], "b": [3, 4]})
+
+print("rename by mapping:", list(df.rename(columns={"a": "alpha"}).columns))
+print("rename by function:", list(df.rename(columns=str.upper).columns))
+print()
+print("unknown keys are ignored silently - a typo just does nothing:")
+print("   ", list(df.rename(columns={"zzz": "nope"}).columns))
+print()
+df.insert(1, "middle", [9, 9])
+print("insert(1, ...) puts it at position 1:")
+print(df)
+print()
+print("reorder by selecting in the order you want:")
+print(list(df[["b", "middle", "a"]].columns))
+```
+## assign
+
+`df.assign(total=...)` returns a **new** frame rather than modifying in place.
+
+That makes it chainable, which is its main purpose:
+
+```python
+out = (df
+       .assign(total=lambda d: d["qty"] * d["price"])
+       .assign(cheap=lambda d: d["total"] < 100))
+```
+
+The lambda receives the frame **as it is at that point in the chain**, so the second `assign` can use the column the first one created. Passing a value directly rather than a lambda works too, but then it is computed against the original frame, which breaks in a chain.
+
+`assign` also keeps the original untouched, which is worth something in a notebook where cells get re-run out of order.
+
+The cost is a copy per call. In a hot loop that matters; in ordinary analysis code it does not, and the readability of a chain usually wins.
+
+## Alignment decides the contents
+
+This is the part that surprises people, and it is the index rule again.
+
+Assigning a **Series** aligns on the index. If the Series has the same labels in a different order, pandas reorders it to match &mdash; which is correct and is not what positional intuition expects. If the Series is missing some labels, those rows get `NaN`. If it has extra labels, they are dropped.
+
+Assigning a **list** or a NumPy array has no index to align on, so it goes in by position, and the length must match exactly or it raises.
+
+That difference means `df["x"] = some_series` and `df["x"] = some_series.values` can produce different columns from the same data. The first is usually what you want; the second is the escape hatch when you know the order is right and the labels are not.
+
+## The filtered-assignment trap
+
+The most common real instance:
+
+```python
+sub = df[df["city"] == "pune"]
+df["doubled"] = sub["sales"] * 2
+```
+
+`sub` has only the Pune rows, so the computed Series has only those labels. Alignment fills every other row with `NaN`.
+
+pandas did exactly what it promises. The author expected "compute for these rows and leave the others alone", which is a different operation:
+
+```python
+df.loc[df["city"] == "pune", "doubled"] = df["sales"] * 2
+```
+
+The difference is visible whenever the column **already exists**. Whole-column assignment replaces the entire column, so rows absent from the subset are overwritten with `NaN` &mdash; even if they held a perfectly good value a moment ago. The `.loc` form touches only the selected rows and leaves the rest alone.
+
+When the column does *not* already exist, both forms leave `NaN` in the unselected rows, because creating a column has to put something in every row. If you want a default there, create the column first and then overwrite the subset &mdash; which is exactly what the editor above does.
+
+## Dropping
+
+`df.drop(columns=["b"])` and `df.drop(index=[0])` both return a new frame.
+
+The `axis=` form works and is older; `columns=`/`index=` say what they mean and are worth preferring.
+
+A name that does not exist raises `KeyError`. That is usually helpful &mdash; it catches typos and stale column lists &mdash; and `errors="ignore"` turns it off when dropping optional columns.
+
+To drop in place, reassign: `df = df.drop(columns=["b"])`. The `inplace=True` argument exists, and is discouraged: it does not reliably avoid a copy, it breaks chaining, and it returns `None`, which makes `df = df.drop(..., inplace=True)` a silent way to destroy your frame.
+
+## Renaming
+
+`df.rename(columns={"a": "alpha"})` takes a mapping, and `columns=str.upper` takes a function applied to every name.
+
+The important quirk: **keys that do not match anything are ignored silently**. A typo in the old name does nothing at all and gives no indication. When a rename appears not to have worked, a misspelled key is the first thing to check.
+
+`df.columns = [...]` replaces every name at once and requires the right length. It is blunter and, for a full rename, clearer.
+
+For cleaning up messy headers, a function is usually better than a mapping:
+
+```python
+df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
+```
+
+That handles the whole frame without listing every column, and is worth running on anything that came from a spreadsheet.
+
+## Adding several columns at once
+
+`assign` takes any number of keyword arguments, and they are applied in order, so later ones can use earlier ones:
+
+```python
+df.assign(
+    total=lambda d: d["qty"] * d["price"],
+    with_tax=lambda d: d["total"] * 1.18,
+)
+```
+
+For column names that are not valid identifiers &mdash; a space, a leading digit &mdash; keyword arguments will not work, and bracket assignment is the only option. That is a reasonable argument for normalising column names early.
+
+Assigning several columns from one operation is the case `assign` handles less well. When a function returns several values per row, a common pattern is:
+
+```python
+df[["a", "b"]] = df["text"].str.split("-", expand=True)
+```
+
+The right-hand side must have the same number of columns as the left, and the index must align.
+
+## Reordering
+
+Column order is insertion order, and there is no `reorder` method.
+
+Three ways, in increasing robustness:
+
+`df[["b", "a", "c"]]` &mdash; select in the order you want. Fails loudly if a name is wrong, which is usually a feature.
+
+`df.insert(pos, name, values)` &mdash; place one column at a position, in place.
+
+Building the order from what exists:
+
+```python
+first = ["id", "date"]
+df = df[first + [c for c in df.columns if c not in first]]
+```
+
+That pins the columns you care about to the front and keeps the rest, without breaking when the schema changes.
+
+## Removing columns safely
+
+`drop(columns=[...])` raises on a name that does not exist, which catches typos and stale lists.
+
+`errors="ignore"` suppresses that, and is right when the columns are genuinely optional &mdash; dropping debug fields that may or may not be present.
+
+`df.drop(columns=df.filter(like="tmp_").columns)` drops by pattern, which survives changes in the exact names.
+
+For keeping rather than dropping, selecting is clearer: `df[["a", "b"]]` states what you want rather than what you do not, and does not need updating when new unwanted columns appear.
+
+## A note on inplace
+
+Most of these methods take `inplace=True`. It is worth being clear about why it is discouraged.
+
+It does **not** reliably avoid a copy, so the performance argument for it is largely false.
+
+It returns `None`, so `df = df.drop(columns=["a"], inplace=True)` silently sets `df` to `None` &mdash; a mistake that is easy to make and confusing to debug.
+
+It breaks method chaining.
+
+And it is on the way out: the pandas team has discussed removing it, and copy-on-write makes its remaining rationale weaker.
+
+Reassignment &mdash; `df = df.drop(columns=["a"])` &mdash; is clearer and no slower in practice.
+
+## Renaming, at scale
+
+For one or two columns, a mapping is fine.
+
+For a whole frame that arrived with human-written headers, a function over the Index is better:
+
+```python
+df.columns = (df.columns
+              .str.strip()
+              .str.lower()
+              .str.replace(r"[^a-z0-9]+", "_", regex=True)
+              .str.strip("_"))
+```
+
+This handles trailing spaces, capitals, punctuation and units-in-parentheses in one pass, and does not need to know what the columns are called.
+
+Doing it immediately after loading means every later reference uses predictable names, and it removes the class of bug where a column name has an invisible trailing space.
+
+`df.rename(columns=..., errors="raise")` makes a mapping strict, so a key that matches nothing raises instead of doing nothing silently. That is worth using when the rename is important.
+
+## Creating columns conditionally
+
+The three standard shapes, none of which needs `apply`:
+
+**Two branches** &mdash; `np.where(cond, a, b)`.
+
+**Several branches** &mdash; `np.select([c1, c2], [v1, v2], default=v3)`, evaluated in order.
+
+**Numeric bands** &mdash; `pd.cut`.
+
+**A lookup** &mdash; `df["k"].map(mapping)`.
+
+For a column that exists only for some rows, create it with a default first and then overwrite the subset:
+
+```python
+df["band"] = "unknown"
+df.loc[df["score"] >= 80, "band"] = "high"
+```
+
+That avoids the `NaN` that appears when a column is created directly for a subset, and it makes the default explicit rather than implied.
+
+## Types when adding a column
+
+A new column takes its dtype from what you assign. Two cases are worth watching.
+
+Assigning a Python list of integers gives `int64`; assigning one with a `None` in it gives `object` or `float64`. If the column is meant to be a nullable integer, say so: `pd.array([1, None], dtype="Int64")`.
+
+Assigning a string to a subset of a numeric column upcasts the **whole** column to `object`, silently, which makes every later numeric operation on it slow or wrong. If a column may hold either, that is usually a sign it should be two columns.
+
+## Dropping rows
+
+`drop(index=[...])` removes by label, which is fine for a handful of known labels and awkward otherwise.
+
+For a condition, filtering is clearer: `df[~mask]` says "everything except", and does not require knowing the labels.
+
+`df.drop(df[mask].index)` works and is a longer way of writing the same thing.
+
+`dropna`, `drop_duplicates` and `query` cover the common cases directly, and each says what it does in its name.
+
+## A summary
+
+`df["new"] = ...` adds or silently replaces.
+
+`assign` returns a new frame and chains; use a lambda inside a chain.
+
+Assigning a **Series** aligns on the index; a **list** goes in by position.
+
+Whole-column assignment from a subset overwrites the unmatched rows with `NaN`; `.loc` touches only the selection.
+
+`drop(columns=...)` raises on a missing name unless `errors="ignore"`.
+
+`rename` ignores keys that match nothing, so a typo does nothing at all.
+
+Normalise column names once, at load, with a function over `df.columns`.
+
+And prefer reassignment to `inplace=True`, which does not do what its name suggests.
+
+## A closing note
+
+Adding a column looks like the simplest thing in pandas and carries two traps.
+
+The first is silence: assigning to an existing name replaces it without a word, and a rename with a misspelled key does nothing without a word. Neither raises, and both are easy to miss in a long script.
+
+The second is alignment. A Series assigned to a column is matched by label, not position, so a value computed from a filtered subset fills the unmatched rows with `NaN` &mdash; and if the column already existed, it overwrites what was there. A plain list, having no index, goes in positionally instead. Two lines that look equivalent behave differently.
+
+The defences are small: use `.loc` when you mean "these rows only", check the column list after a rename, and normalise column names once at load so that later references are predictable.
+
+## One more thing
+
+`df.pop("col")` removes a column and returns it, which is occasionally the clearest way to move a column out of a frame and into a variable in one step.
+
+And `df.drop` accepts `level=` for a MultiIndexed frame, so a whole outer group can be removed by label without building a mask. Both are small conveniences, and both read better than the two-step alternatives when the intent is exactly what they describe.
+
+## In summary
+
+Adding and removing columns is mechanically simple, and the two things that bite are both about silence.
+
+Nothing warns when you overwrite a column by reusing its name, and nothing warns when a rename key matches nothing. Both leave the frame in a state that looks correct.
+
+And assignment is governed by alignment: a Series matches on labels, a list matches on position, and a whole-column assignment computed from a subset overwrites every unmatched row with `NaN` &mdash; including rows that held a perfectly good value a moment before.
+
+Using `.loc` when you mean "these rows only", normalising column names once at load, and checking the column list after a rename cover all of it.

@@ -1,0 +1,392 @@
+title: The MultiIndex
+intro: More than one level on an axis, and when to flatten it away.
+
+## It arrives whether you asked or not
+
+Almost nobody constructs a MultiIndex deliberately. It appears as the result of operations you were doing anyway:
+
+`groupby(["city", "year"])` gives one level per key.
+
+`concat(..., keys=[...])` adds a level naming the source.
+
+`stack()` moves a column level into the index.
+
+`agg` with several statistics per column gives hierarchical **columns**.
+
+So the practical question is rarely "should I build one" and almost always "I have one, now what".
+
+
+## Where it comes from
+
+You rarely build one on purpose - a groupby with two keys hands you one.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "city": ["pune", "pune", "delhi", "delhi"],
+    "year": [2023, 2024, 2023, 2024],
+    "sales": [10, 20, 30, 40],
+})
+out = df.groupby(["city", "year"])["sales"].sum()
+print(out)
+print()
+print("type  :", type(out.index).__name__)
+print("names :", out.index.names)
+print("levels:", [list(l) for l in out.index.levels])
+print()
+print("concat with keys= and unstack/stack produce them too.")
+```
+
+## Selecting through the levels
+
+A tuple addresses the levels in order; loc takes it.
+
+```python-run
+import pandas as pd
+
+s = pd.Series([10, 20, 30, 40], index=pd.MultiIndex.from_tuples(
+    [("pune", 2023), ("pune", 2024), ("delhi", 2023), ("delhi", 2024)],
+    names=["city", "year"]))
+
+print("one outer key gives a sub-Series:")
+print(s.loc["pune"])
+print()
+print("a tuple addresses both levels:", s.loc[("pune", 2024)])
+print()
+print("a list of outer keys:")
+print(list(s.loc[["pune", "delhi"]]))
+print()
+print("cross-section on an INNER level needs xs:")
+print(s.xs(2024, level="year"))
+```
+
+## slice(None) is the wildcard
+
+Because you cannot write a bare colon inside a tuple.
+
+```python-run
+import pandas as pd
+
+s = pd.Series([10, 20, 30, 40], index=pd.MultiIndex.from_tuples(
+    [("pune", 2023), ("pune", 2024), ("delhi", 2023), ("delhi", 2024)],
+    names=["city", "year"])).sort_index()
+
+print("every city, one year:")
+print(s.loc[(slice(None), 2024), ])
+print()
+print("pd.IndexSlice is the readable spelling:")
+idx = pd.IndexSlice
+print(s.loc[idx[:, 2024]])
+print()
+print("Selection on inner levels usually needs a SORTED index:")
+print("   is_monotonic_increasing:", s.index.is_monotonic_increasing)
+```
+
+## Aggregating over one level
+
+level= collapses a level without going back to a groupby.
+
+```python-run
+import pandas as pd
+
+s = pd.Series([10, 20, 30, 40], index=pd.MultiIndex.from_tuples(
+    [("pune", 2023), ("pune", 2024), ("delhi", 2023), ("delhi", 2024)],
+    names=["city", "year"]))
+
+print("total per city:")
+print(s.groupby(level="city").sum())
+print()
+print("total per year:")
+print(s.groupby(level="year").sum())
+print()
+print("both spellings work; level= is the one that reads clearly")
+print("when the keys are already in the index.")
+```
+
+## Columns can be hierarchical too
+
+Which is what agg with several statistics gives you.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "city": ["pune", "pune", "delhi"],
+    "sales": [10, 20, 30],
+    "units": [1, 2, 3],
+})
+out = df.groupby("city").agg({"sales": ["sum", "mean"], "units": "sum"})
+print(out)
+print()
+print("columns are a MultiIndex:", list(out.columns))
+print()
+print("select with a tuple:", list(out[("sales", "sum")]))
+print()
+print("flatten them - the step people forget:")
+out.columns = ["_".join(c).strip("_") for c in out.columns]
+print(list(out.columns))
+```
+
+## When to flatten it away
+
+A MultiIndex is powerful and awkward; reset_index is often the kinder answer.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "city": ["pune", "pune", "delhi"],
+    "year": [2023, 2024, 2023],
+    "sales": [10, 20, 30],
+})
+grouped = df.groupby(["city", "year"])["sales"].sum()
+
+print("as a MultiIndex Series:")
+print(grouped)
+print()
+print("reset_index gives an ordinary frame:")
+flat = grouped.reset_index()
+print(flat)
+print()
+print("or ask groupby not to make one:")
+print(df.groupby(["city", "year"], as_index=False)["sales"].sum())
+print()
+print("Keep the MultiIndex when you will select through it or unstack.")
+print("Flatten it when the result is going into a merge, a file or a chart.")
+```
+## Selecting
+
+The mental model: a tuple addresses the levels in order, the way a nested dictionary would.
+
+`s.loc["pune"]` selects on the outer level and returns a sub-object with that level dropped.
+
+`s.loc[("pune", 2024)]` addresses both levels and returns a scalar.
+
+`s.loc[["pune", "delhi"]]` takes a list of outer keys.
+
+The awkward case is selecting on an **inner** level while taking everything from the outer one. Two ways:
+
+`s.xs(2024, level="year")` is the readable form for a single cross-section.
+
+`s.loc[(slice(None), 2024), ]` is the general form. `slice(None)` is the wildcard, needed because you cannot write a bare colon inside a tuple. `pd.IndexSlice` makes it look more like normal slicing: `s.loc[pd.IndexSlice[:, 2024]]`.
+
+Selection on inner levels generally requires a **sorted** index. `sort_index()` first if you get a `UnsortedIndexError`, and as a habit after building one.
+
+## Aggregating over a level
+
+`s.groupby(level="city").sum()` collapses one level, keeping the others.
+
+That is usually what you want when the keys are already in the index &mdash; there is no need to `reset_index` and group by the column again.
+
+`sum(level=...)` used to exist as a shortcut and was removed; `groupby(level=...)` is the current spelling.
+
+`unstack()` moves a level into the columns and is often more useful than aggregating: it turns a two-level Series into a readable two-dimensional table.
+
+## Hierarchical columns
+
+`df.groupby("city").agg({"sales": ["sum", "mean"]})` gives columns that are tuples: `("sales", "sum")`.
+
+Selecting needs the tuple: `out[("sales", "sum")]`.
+
+This is where named aggregation earns its place. `agg(total=("sales", "sum"), avg=("sales", "mean"))` produces flat column names and skips this problem entirely.
+
+When you do end up with hierarchical columns, flattening is one line:
+
+```python
+out.columns = ["_".join(c).strip("_") for c in out.columns]
+```
+
+Forgetting that step is a common source of confusion later, when something downstream cannot find a column called `sales` because the column is really `("sales", "sum")`.
+
+## When to keep it, when to flatten
+
+**Keep it** when you are going to select through it, `unstack` it into a table, or aggregate over its levels. For genuinely hierarchical data &mdash; country/region/city, or a panel indexed by entity and date &mdash; it is the right structure and makes those operations natural.
+
+**Flatten it** when the result is leaving pandas or going into an operation that does not care about hierarchy: a merge, a CSV, a plotting call, a model.
+
+`reset_index()` turns index levels into ordinary columns. `groupby(..., as_index=False)` avoids creating one in the first place.
+
+The honest summary is that a MultiIndex is powerful and awkward in roughly equal measure. It rewards you when the hierarchy is real and the operations use it; it costs you an extra concept at every step when it is merely an artefact of how the result was computed. Most of the time, in ordinary analysis code, flattening early is the kinder choice.
+
+## Building one deliberately
+
+Occasionally you want a MultiIndex before any group-by:
+
+`pd.MultiIndex.from_tuples([...], names=[...])` &mdash; from explicit pairs.
+
+`pd.MultiIndex.from_product([["a","b"], [2023, 2024]])` &mdash; every combination, which is how you build a complete frame to reindex sparse data onto.
+
+`pd.MultiIndex.from_arrays([...])` &mdash; from parallel label arrays.
+
+`df.set_index(["city", "year"])` &mdash; from existing columns, which is the usual route.
+
+`from_product` plus `reindex` is the standard way to make a sparse panel dense: build every expected combination, reindex onto it, and the missing ones appear as `NaN` rather than being silently absent.
+
+## Sorting matters more here
+
+Selection on inner levels requires a **lexsorted** index. Without it, pandas raises `UnsortedIndexError` or performs badly.
+
+`df.index.is_monotonic_increasing` checks. `sort_index()` fixes.
+
+The habit worth forming is to call `sort_index()` immediately after building or reshaping a MultiIndexed object. It is cheap, it removes a class of error, and it makes label ranges work.
+
+`df.index.lexsort_depth` reports how many levels are sorted, which explains why selection works on the first level and fails on the second.
+
+## droplevel, swaplevel, reorder_levels
+
+`droplevel("year")` removes a level entirely &mdash; useful after selecting a single value from it leaves a redundant level behind.
+
+`swaplevel(0, 1)` exchanges two levels, and `sort_index()` afterwards is almost always needed for the result to be usable.
+
+`reorder_levels([...])` handles more than two.
+
+These come up after a `groupby` produced levels in an order that does not suit the next step, and they are cheaper than regrouping.
+
+## Aggregating and selecting together
+
+Two patterns cover most work with a MultiIndexed result.
+
+**Collapse a level**: `df.groupby(level="city").sum()`.
+
+**Move a level to columns**: `df.unstack("year")`, giving a wide table.
+
+`unstack` takes a `level` by name or position, and `fill_value` for the gaps. Chaining `unstack().plot()` is the usual route from a two-key group-by to a chart.
+
+`stack()` reverses it. In recent pandas it has a `future_stack=True` option that changes some edge-case behaviour around missing values; the default is being migrated, so pinning the behaviour explicitly is worth doing in code that must keep working.
+
+## Should you use one at all
+
+The honest position: a MultiIndex is the right structure for genuinely hierarchical data that you will select through, and an unnecessary complication otherwise.
+
+Signs it is earning its place:
+
+You select by partial key regularly.
+
+You aggregate over one level and keep the others.
+
+You unstack it into tables.
+
+The hierarchy is real &mdash; a panel indexed by entity and time, geography at several levels.
+
+Signs it is not:
+
+You immediately `reset_index()` after every operation that produces one.
+
+You are fighting `UnsortedIndexError` and `slice(None)`.
+
+The result is heading for a merge, a CSV or a plotting call.
+
+In the second case, `as_index=False` on the group-by avoids creating it at all, which is simpler than creating and flattening.
+
+## Getting values out
+
+A recurring need is turning a MultiIndexed result into something ordinary code can use.
+
+`reset_index()` &mdash; every level becomes a column.
+
+`reset_index(level="year")` &mdash; one level becomes a column, the rest stay.
+
+`droplevel("year")` &mdash; discard a level entirely.
+
+`to_frame()` on the index &mdash; the labels as a frame, for inspection.
+
+`list(df.index)` &mdash; the labels as tuples.
+
+`df.index.get_level_values("city")` &mdash; one level as a flat array, which is what you want for filtering or for building a mask without resetting anything.
+
+That last one is under-used: `df[df.index.get_level_values("year") == 2024]` filters on a level without any `slice(None)` syntax.
+
+## Column MultiIndexes in particular
+
+Hierarchical **columns** cause more day-to-day friction than hierarchical rows, because most code expects flat column names.
+
+They arrive from `agg` with a list of functions, from `pivot_table` with several value columns, and from `unstack`.
+
+The flattening idiom is worth memorising:
+
+```python
+df.columns = ["_".join(map(str, c)).strip("_") for c in df.columns]
+```
+
+`map(str, ...)` matters because levels are often not strings &mdash; a year is an integer, and `join` fails on it.
+
+The better answer is usually to avoid creating them: **named aggregation** produces flat names directly, and is clearer at the call site as well.
+
+## Performance
+
+A MultiIndex is a set of integer codes plus level values, so it is compact &mdash; often more so than the equivalent columns, because repeated labels are stored once.
+
+Selection is fast on a lexsorted index and slow otherwise, which is why `sort_index()` matters here more than elsewhere.
+
+Group-by on index levels is comparable to group-by on columns.
+
+The costs are in usability rather than speed: more concepts, more edge cases, and code that other people find harder to follow.
+
+## A summary
+
+They arrive from group-by, `concat(keys=)`, `stack` and `agg` rather than being built.
+
+A tuple addresses the levels; `xs` takes a cross-section; `slice(None)` is the wildcard.
+
+`sort_index()` after building one, always.
+
+`groupby(level=...)` aggregates over a level.
+
+`unstack` turns a level into columns and is often what you actually wanted.
+
+Flatten hierarchical columns with a join over the tuples, or avoid them with named aggregation.
+
+Keep it when the hierarchy is real and you select through it; `reset_index()` when it is an artefact.
+
+## Where it fits
+
+Hierarchical indexes are the price of hierarchical questions. A panel of entities over time, sales by region and city and month, a survey by respondent and question &mdash; all of these have a natural nesting, and a MultiIndex expresses it directly.
+
+The friction comes when the nesting is incidental rather than meaningful: a group-by on two keys produces one whether or not you wanted the structure.
+
+The test is whether you will use the hierarchy. If the next operation selects a level, aggregates over one, or unstacks it into a table, keep it. If the next operation is a merge, a plot or a file, flatten it and move on.
+
+Neither choice is permanent. `set_index` and `reset_index` are cheap and reversible, so the decision can be made per step rather than committed to at the start.
+
+The one thing worth doing consistently is `sort_index()` after building one. Almost every confusing MultiIndex error traces back to an unsorted index, and the fix is a single call that costs nothing on data of ordinary size.
+
+## Two more things worth knowing
+
+`df.index.names` gives the level names and is writable, so an index built without names can be labelled after the fact. Named levels make every later `groupby(level=...)`, `xs` and `unstack` call readable, and unnamed ones force you to count positions.
+
+`pd.IndexSlice` deserves a mention on its own. Written as `idx = pd.IndexSlice`, it turns the awkward `df.loc[(slice(None), 2024), :]` into `df.loc[idx[:, 2024], :]`, which is close enough to ordinary slicing to read at a glance.
+
+Finally, a MultiIndex on the **columns** and one on the **rows** can coexist, which is what `pivot_table` with lists for both `index` and `columns` produces. That is a genuinely useful shape for a printed report and a genuinely awkward one to compute against, which is the trade this whole module describes: the structure that displays best is rarely the structure that manipulates best.
+
+## A worked selection
+
+Putting the selection tools together on one object makes the pattern clearer than any of them alone.
+
+Given sales indexed by `(city, year)`:
+
+`s.loc["pune"]` &mdash; one city, all years, with the city level dropped.
+
+`s.loc[("pune", 2024)]` &mdash; a single value.
+
+`s.loc[["pune", "goa"]]` &mdash; two cities.
+
+`s.xs(2024, level="year")` &mdash; one year, all cities.
+
+`s.loc[pd.IndexSlice[:, 2024]]` &mdash; the same, in slice form.
+
+`s[s.index.get_level_values("year") == 2024]` &mdash; the same again, as an ordinary mask, and the form that composes with other conditions.
+
+`s.groupby(level="city").sum()` &mdash; totals per city.
+
+`s.unstack("year")` &mdash; a table, cities down, years across.
+
+Six ways to ask about one year, which is a fair summary of why MultiIndexes feel heavy. The last two are the ones worth reaching for by default: aggregate a level, or unstack it into a shape that reads.
+
+## In summary
+
+A MultiIndex arrives from operations you were doing anyway, and the useful question is whether to keep it.
+
+Keep it when the hierarchy is real and the next step selects a level, aggregates over one, or unstacks it into a table. Flatten it when the result is heading for a merge, a file or a chart.
+
+Sort it as soon as you build it, because most confusing errors here are an unsorted index. Use `xs` or a mask on `get_level_values` rather than fighting `slice(None)`. And prefer named aggregation, which avoids hierarchical columns entirely rather than requiring them to be flattened afterwards.

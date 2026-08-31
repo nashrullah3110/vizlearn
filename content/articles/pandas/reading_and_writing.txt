@@ -1,0 +1,368 @@
+title: Reading and Writing Files
+intro: read_csv's arguments, and the ones that prevent a class of bug.
+
+## Inference is convenient and lossy
+
+`read_csv` guesses a dtype per column. That is why it is pleasant to use and why the same three problems appear in almost every project.
+
+**Leading zeros disappear.** An id column of `007`, `008` is read as integers, and the zeros are gone permanently. No error, and the values still look like ids.
+
+**Dates stay text.** Nothing is parsed as a date unless you ask. The column sorts lexically, `.dt` does not work, and date arithmetic is unavailable.
+
+**One gap makes a column float.** NumPy integers cannot hold `NaN`, so a single missing value promotes the whole column, and ids print as `1001.0`.
+
+All three are fixed at read time by saying what you know.
+
+
+## read_csv infers, and inference is where bugs start
+
+Three columns, three wrong guesses, no errors.
+
+```python-run
+import pandas as pd
+import io
+
+csv = """id,joined,amount
+007,2024-01-05,1000
+008,2024-02-11,
+009,2024-03-30,3000
+"""
+df = pd.read_csv(io.StringIO(csv))
+print(df)
+print()
+print(df.dtypes)
+print()
+print("id     -> int64  : leading zeros gone, 007 is now 7")
+print("joined -> object : still text, so it will sort lexically")
+print("amount -> float64: one gap made the whole column float")
+```
+
+## Steering it with dtype and parse_dates
+
+Saying what you know is faster and safer than fixing it afterwards.
+
+```python-run
+import pandas as pd
+import io
+
+csv = """id,joined,amount
+007,2024-01-05,1000
+008,2024-02-11,
+009,2024-03-30,3000
+"""
+df = pd.read_csv(io.StringIO(csv),
+                 dtype={"id": str, "amount": "Int64"},
+                 parse_dates=["joined"])
+print(df)
+print()
+print(df.dtypes)
+print()
+print("id stayed '007', joined is a real timestamp, and amount is a")
+print("nullable integer that holds the gap without becoming float.")
+```
+
+## Only reading what you need
+
+usecols and nrows matter as soon as the file is large.
+
+```python-run
+import pandas as pd
+import io
+
+csv = "a,b,c,d\n" + "\n".join("%d,%d,%d,%d" % (i, i, i, i) for i in range(1000))
+
+full = pd.read_csv(io.StringIO(csv))
+part = pd.read_csv(io.StringIO(csv), usecols=["a", "d"])
+
+print("all columns :", full.shape, "%.1f KB" % (full.memory_usage(deep=True).sum() / 1e3))
+print("two columns :", part.shape, "%.1f KB" % (part.memory_usage(deep=True).sum() / 1e3))
+print()
+print("peek at a big file before committing to it:")
+print(pd.read_csv(io.StringIO(csv), nrows=3))
+```
+
+## Missing-value markers
+
+pandas knows the common ones and not yours.
+
+```python-run
+import pandas as pd
+import io
+
+csv = """name,score
+ana,10
+raj,N/A
+kim,missing
+sam,-999
+"""
+df = pd.read_csv(io.StringIO(csv))
+print(df)
+print("dtype:", df["score"].dtype, "<- object, because of the text markers")
+print()
+better = pd.read_csv(io.StringIO(csv), na_values=["missing", "-999"])
+print(better)
+print("dtype:", better["score"].dtype)
+print()
+print("'N/A' was recognised automatically; 'missing' and -999 were not.")
+```
+
+## Writing it back
+
+The index is written by default, which surprises people on the round trip.
+
+```python-run
+import pandas as pd
+import io
+
+df = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
+
+print("to_csv() writes the index as an unnamed first column:")
+print(df.to_csv())
+print("reading that back gives a stray column:")
+print(list(pd.read_csv(io.StringIO(df.to_csv())).columns))
+print()
+print("index=False is almost always what you want:")
+print(df.to_csv(index=False))
+print("   round trip:", list(pd.read_csv(io.StringIO(df.to_csv(index=False))).columns))
+```
+
+## CSV loses everything the frame knew
+
+Types, categories and the index are all just text on the way out.
+
+```python-run
+import pandas as pd
+import io
+
+df = pd.DataFrame({
+    "n": pd.Series([1, 2], dtype="Int64"),
+    "c": pd.Series(["a", "b"], dtype="category"),
+    "d": pd.to_datetime(["2024-01-01", "2024-02-01"]),
+})
+print("before:"); print(df.dtypes)
+print()
+back = pd.read_csv(io.StringIO(df.to_csv(index=False)))
+print("after a CSV round trip:"); print(back.dtypes)
+print()
+print("Int64 became int64, category became object, the date became text.")
+print("For anything that must survive, use parquet or pickle - or write")
+print("the dtypes down and restore them on read.")
+```
+## The arguments that matter
+
+`dtype={"id": str}` keeps identifiers as text. This is the fix for leading zeros, and it should be the default for anything that is a code rather than a quantity &mdash; postcodes, account numbers, phone numbers.
+
+`dtype={"amount": "Int64"}` uses the nullable integer type, so the column holds gaps without becoming float.
+
+`parse_dates=["joined"]` converts during the read, which is faster than converting after. Add `date_format=` when the format is known and unambiguous.
+
+`usecols=["a", "d"]` reads only the columns you name. On a wide file this saves both time and memory, and it is the single most effective argument for large data.
+
+`nrows=1000` reads a sample. Always look at a sample of an unfamiliar file before loading all of it &mdash; it is how you find out that the delimiter is wrong, or that there are three header rows, or that the file is not what you were told.
+
+`index_col="id"` sets the index during the read.
+
+`na_values=["missing", "-999"]` adds markers. pandas recognises a standard list &mdash; empty, `NA`, `N/A`, `null`, `NaN` and a few more &mdash; but it cannot know that this dataset writes `missing`, or that `-999` is a sentinel. Left alone, the text markers make the column `object` and the numeric sentinel is treated as a real value, which quietly poisons every average.
+
+`skiprows`, `header=None` and `names=[...]` handle files whose top is not a clean header row.
+
+`chunksize=n` returns an iterator of frames rather than one frame, which is how you process a file larger than memory.
+
+## Writing
+
+`to_csv()` writes the index as an unnamed first column by default.
+
+Read that file back and you get a spurious `Unnamed: 0` column. It is harmless, ubiquitous, and entirely avoidable: **pass `index=False`** unless the index is meaningful data.
+
+Other arguments worth knowing: `float_format="%.2f"` controls precision, `columns=` selects what to write, `sep=` changes the delimiter, and `encoding="utf-8"` is worth being explicit about when the data leaves your machine.
+
+## CSV loses what the frame knew
+
+A CSV is text. Everything pandas knew about the data is discarded on the way out:
+
+`Int64` becomes plain `int64` on the way back, or `float64` if there were gaps.
+
+`category` becomes `object`, and the category order is gone.
+
+Datetimes become strings again, unless the reader is told to parse them.
+
+The index becomes a column, or vanishes.
+
+That round-trip loss is the argument for a binary format when the data is going to be read back by pandas:
+
+**Parquet** (`to_parquet` / `read_parquet`) preserves dtypes, is columnar, compresses well, and is readable by many tools. It needs `pyarrow` installed &mdash; which is why the editors here use CSV.
+
+**Pickle** (`to_pickle`) preserves everything exactly, including categories and custom objects, but is Python-specific, version-fragile, and **executes code on load**. Never unpickle a file you did not create.
+
+**HDF5** suits very large numeric data with partial reads.
+
+For anything you will read back yourself, Parquet is usually the right answer. For anything a human or another tool must read, CSV is worth its losses &mdash; but write down the dtypes somewhere, because the reader will have to guess exactly as you did.
+
+## A loading routine
+
+Read a sample with `nrows`. Look at it. Decide the dtypes, the date columns, the missing markers and the columns you actually need. Then read the whole file with those arguments set.
+
+That takes a minute and removes most of what the cleaning modules exist to fix.
+
+## Files that are not quite CSV
+
+Real exports are rarely clean, and `read_csv` has an argument for each common defect.
+
+`sep="	"` for tab-separated; `sep=None` with `engine="python"` sniffs the delimiter.
+
+`skiprows=3` skips a preamble; `skiprows=lambda i: i % 2` skips selectively.
+
+`header=None` with `names=[...]` handles a file with no header row.
+
+`skipfooter=2` drops trailing summary lines, and requires `engine="python"`.
+
+`thousands=","` parses `1,234` as a number rather than leaving it as text. Without it, a single formatted number makes the whole column `object`.
+
+`decimal=","` handles European decimal commas.
+
+`encoding="latin-1"` when UTF-8 fails, which is the usual cause of a `UnicodeDecodeError` on files from older Windows tools.
+
+`quotechar` and `escapechar` for embedded delimiters.
+
+`comment="#"` ignores comment lines.
+
+When a file will not parse, working through that list is faster than writing a custom reader.
+
+## Reading in chunks
+
+`chunksize=n` returns an iterator of frames rather than one frame:
+
+```python
+totals = []
+for chunk in pd.read_csv(path, chunksize=100_000):
+    totals.append(chunk.groupby("city")["sales"].sum())
+result = pd.concat(totals).groupby(level=0).sum()
+```
+
+That processes a file larger than memory, provided the operation can be done piecewise. Sums, counts and group sums can; a median cannot, without more work.
+
+The pattern is: reduce each chunk, collect the small results, combine at the end. Collecting the raw chunks and concatenating them defeats the purpose.
+
+## Excel
+
+`pd.read_excel(path, sheet_name="Sheet1")` needs `openpyxl` for `.xlsx`.
+
+`sheet_name=None` reads **every** sheet into a dict of frames, which is the quickest way to see what a workbook contains.
+
+Excel files carry types, so dates usually arrive parsed &mdash; but they also carry merged cells, hidden rows and formatting that mean nothing to pandas, and a sheet that looks tabular on screen is often not.
+
+`header=`, `usecols="B:D"` and `skiprows=` do the same jobs as in `read_csv`.
+
+Writing several frames to one workbook uses `pd.ExcelWriter` as a context manager, with one `to_excel` call per sheet.
+
+## Compression and paths
+
+`read_csv` and `to_csv` handle compression transparently from the extension: `.gz`, `.bz2`, `.zip`, `.xz`. A gzipped CSV is often a third of the size and costs little to read.
+
+Both accept URLs as well as paths, which is convenient for public datasets and a bad idea in production code, where the file should be fetched and cached deliberately.
+
+`pathlib.Path` objects work anywhere a path string does.
+
+## Choosing a format
+
+**CSV** &mdash; universal, human-readable, lossy about types, slow to parse. Right when something other than pandas must read it.
+
+**Parquet** &mdash; typed, columnar, compressed, fast, readable by many tools. The right default for data pandas will read back. Needs `pyarrow`.
+
+**Pickle** &mdash; preserves everything exactly, Python-only, version-fragile, and **executes code on load**. Fine for a short-lived cache you created; never for input you did not.
+
+**JSON** &mdash; good for nested data, verbose for tabular, and `json_normalize` handles the flattening.
+
+**HDF5** &mdash; large numeric arrays with partial reads.
+
+**SQL** &mdash; when several processes need the data, or it outgrows one machine.
+
+The decision is mostly: who reads this next? If the answer is pandas, use Parquet. If it is a person or another tool, use CSV and accept the losses. If it is a system, use a database.
+
+## Writing for a round trip
+
+If pandas will read the file back, the goal is to lose nothing.
+
+Parquet does that: dtypes, categories and datetimes all survive, and it is smaller and faster than CSV.
+
+If Parquet is unavailable, CSV plus an explicit read specification is the workaround &mdash; record the dtypes alongside the file, and pass them on read:
+
+```python
+dtypes = df.dtypes.astype(str).to_dict()
+json.dump(dtypes, open("schema.json", "w"))
+```
+
+That is clumsy and it works. What does not work is assuming the reader will infer the same types you had, because inference depends on the data and the data changes.
+
+## Validating on load
+
+The most useful place for checks is immediately after reading, where a problem is closest to its cause:
+
+```python
+df = pd.read_csv(path, dtype=..., parse_dates=[...])
+
+assert list(df.columns) == expected_columns
+assert df["id"].is_unique
+assert df["date"].notna().all()
+assert len(df) > 0
+```
+
+Column-name checks are the highest value of these. An upstream export that renames or reorders columns is common, and without a check the failure appears much later as a `KeyError` or, worse, as a column of the wrong data under the right name.
+
+## Large files
+
+The order to try, as a file grows:
+
+`usecols` and `dtype` &mdash; often enough on its own, and always worth doing first.
+
+`nrows` for development, so the edit-run cycle stays fast.
+
+`chunksize` with per-chunk reduction, when the whole file cannot be held.
+
+Parquet, which reads only the columns requested and is far faster to parse.
+
+A database or DuckDB, when the data outgrows one machine's memory even column-wise.
+
+Reaching for the last option first is a common mistake; `usecols` and `dtype` frequently make a "too large" file comfortable.
+
+## A summary
+
+`read_csv` infers, and inference loses leading zeros, leaves dates as text, and turns integers with gaps into floats.
+
+`dtype`, `parse_dates`, `usecols` and `na_values` prevent all of that at read time.
+
+Read a sample with `nrows` before committing to a large file.
+
+`to_csv(index=False)` unless the index is data.
+
+CSV loses types; Parquet does not.
+
+`allow_pickle`-style trust applies to `read_pickle` too &mdash; never load one you did not create.
+
+Validate immediately after loading, especially the column names.
+
+And for a large file, `usecols` and `dtype` are the first thing to try, not the last.
+
+## A closing note
+
+The boundary between a file and a DataFrame is where most silent damage happens, and it is the cheapest place to prevent it.
+
+`read_csv` guesses, and its guesses lose leading zeros, leave dates as text, and turn integers with a single gap into floats. Every one of those is fixed by an argument, and every one of them is much harder to fix later &mdash; leading zeros in particular are gone for good.
+
+The habit worth building is to read a sample first, look at it, decide the types, and then read the file properly. That takes a minute and replaces an afternoon of confused debugging.
+
+On the way out, `index=False` unless the index is data, and Parquet rather than CSV whenever pandas will be the one reading it back. CSV is a text interchange format, and treating it as a storage format means accepting that everything the frame knew about its own types is discarded each time.
+
+## One more thing
+
+`read_csv` accepts a `converters` dict mapping column names to functions, applied during the read. It is slower than `dtype` and handles cases `dtype` cannot &mdash; stripping a currency symbol, parsing a bespoke format &mdash; without a separate cleaning pass afterwards.
+
+And `to_csv` with no path returns the CSV as a **string** rather than writing a file, which is how you round-trip through `io.StringIO` in a test, or hand the text to something that wants a string rather than a filename.
+
+## In summary
+
+The read is where types are decided, and inference makes three predictable mistakes: leading zeros lost, dates left as text, integers with a gap turned into floats.
+
+`dtype`, `parse_dates`, `usecols` and `na_values` prevent all three, cost nothing, and are far cheaper than repairing the damage afterwards.
+
+Read a sample first and look at it. Validate the column names on load. Write with `index=False`. And when pandas will be the one reading the file back, use Parquet, because CSV discards everything the frame knew about itself.

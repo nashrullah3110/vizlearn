@@ -17523,5 +17523,1331 @@ window.VIZLEARN_PRACTICE = [
     "w": "The star spreads the pairs into separate arguments, so zip re-groups them by position - the inverse of zipping."
    }
   ]
+ },
+ {
+  "path": "pandas/adding_and_dropping.html",
+  "title": "Adding and Removing Columns",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "What happens when you assign to an existing column name?",
+    "o": [
+     "It raises",
+     "It is silently replaced",
+     "It creates a duplicate",
+     "It warns"
+    ],
+    "a": 1,
+    "w": "There is no protection against overwriting a column by reusing its name - a real hazard in a long script."
+   },
+   {
+    "t": "You assign a Series whose index is in a different order. What lands in the column?",
+    "o": [
+     "The values in their original order",
+     "The values reordered to match the frame's index",
+     "NaN",
+     "An error"
+    ],
+    "a": 1,
+    "w": "Assigning a Series aligns by label; assigning a plain list goes in by position. That is why .values sometimes gives a different result."
+   },
+   {
+    "t": "An existing column holds 0 everywhere. What does `df['x'] = df[mask]['y'] * 2` do to the unmatched rows?",
+    "o": [
+     "Leaves them at 0",
+     "Overwrites them with NaN, because it replaces the whole column",
+     "Raises",
+     "Drops them"
+    ],
+    "a": 1,
+    "w": "Whole-column assignment replaces the entire column and alignment has nothing for those labels. df.loc[mask, 'x'] = ... touches only the selected rows."
+   },
+   {
+    "t": "What does `df.rename(columns={'typo': 'new'})` do when 'typo' does not exist?",
+    "o": [
+     "Raises KeyError",
+     "Nothing at all, silently",
+     "Creates the column",
+     "Warns"
+    ],
+    "a": 1,
+    "w": "Unmatched keys are ignored. When a rename appears not to have worked, a misspelled key is the first thing to check."
+   }
+  ]
+ },
+ {
+  "path": "pandas/counting_and_binning.html",
+  "title": "Counting and Binning",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "In `pd.cut(ages, bins=[0, 17, 64, 200])`, which band does 17 fall into?",
+    "o": [
+     "The second",
+     "The first, because bins are right-inclusive (left, right]",
+     "Neither",
+     "It raises"
+    ],
+    "a": 1,
+    "w": "Pass right=False for [left, right), which is what age conventions usually want. Getting it backwards is an off-by-one at every boundary, and it does not raise."
+   },
+   {
+    "t": "What happens to a value below the first bin edge?",
+    "o": [
+     "It joins the first bin",
+     "It becomes NaN, silently",
+     "It raises",
+     "It creates a new bin"
+    ],
+    "a": 1,
+    "w": "Outliers and sentinels disappear from every later count. Use -np.inf/np.inf edges, and check notna().sum() against len(df)."
+   },
+   {
+    "t": "When should you use `qcut` rather than `cut`?",
+    "o": [
+     "Always",
+     "When you want equal-sized groups rather than equal-width bands - especially on skewed data",
+     "For text columns",
+     "Never"
+    ],
+    "a": 1,
+    "w": "With a few large outliers, equal-width bins put nearly every row in the first bucket. Use cut when boundaries have external meaning."
+   },
+   {
+    "t": "Why pass `dropna=False` to `value_counts`?",
+    "o": [
+     "It is faster",
+     "Missing values are otherwise invisible - exactly the wrong property for what you most need to notice",
+     "It sorts the result",
+     "It normalises"
+    ],
+    "a": 1,
+    "w": "Together with normalize=True for shares, these are the two arguments worth reaching for by default."
+   }
+  ]
+ },
+ {
+  "path": "pandas/creating_dataframes.html",
+  "title": "Creating DataFrames",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "What does `pd.DataFrame({'a': [1,2,3], 'flag': True})` produce?",
+    "o": [
+     "An error",
+     "Three rows, with flag broadcast to True on each",
+     "One row",
+     "A flag column of NaN"
+    ],
+    "a": 1,
+    "w": "A scalar value is broadcast to every row, while list values must all have matching lengths."
+   },
+   {
+    "t": "Why does `pd.DataFrame({'a': 1, 'b': 2})` raise?",
+    "o": [
+     "Dicts are not supported",
+     "pandas cannot tell whether you meant one row or one column",
+     "The keys are too short",
+     "It needs an index"
+    ],
+    "a": 1,
+    "w": "Wrap it in a list for one row, or use from_dict(orient='index') for one column. Guessing would be worse than the error."
+   },
+   {
+    "t": "A CSV column of integers has one missing value. What dtype does it get?",
+    "o": [
+     "int64",
+     "float64, because integers cannot hold NaN",
+     "object",
+     "category"
+    ],
+    "a": 1,
+    "w": "This is why identifiers sometimes print as 1001.0. Check df.dtypes right after loading - it takes one line and catches the bug early."
+   },
+   {
+    "t": "What happened to `df.append()`?",
+    "o": [
+     "It is still the recommended way",
+     "It was removed in pandas 2.0, because it reallocated the whole frame each call",
+     "It was renamed",
+     "It only works on Series"
+    ],
+    "a": 1,
+    "w": "Collect rows into a Python list and construct once. pd.concat inside a loop is the same mistake in different clothing."
+   }
+  ]
+ },
+ {
+  "path": "pandas/datetimes.html",
+  "title": "Dates and Times",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "Why does a date column read as text often seem to sort correctly?",
+    "o": [
+     "pandas parses it silently",
+     "ISO format YYYY-MM-DD happens to sort correctly lexically",
+     "Text always sorts by date",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "The bug hides until the data arrives in another format - '15/01/2024' sorts before '01/03/2024' as text, with no error."
+   },
+   {
+    "t": "Why pass `format=` to `pd.to_datetime`?",
+    "o": [
+     "It is required",
+     "It removes the day-first/month-first ambiguity and is substantially faster",
+     "It handles time zones",
+     "It sorts the result"
+    ],
+    "a": 1,
+    "w": "05/04/2024 is 5 April in most of the world and 4 May in the US, and pandas has to pick one. An explicit format also skips inference."
+   },
+   {
+    "t": "What is the difference between `pd.Timedelta(months=1)` and `pd.DateOffset(months=1)`?",
+    "o": [
+     "None",
+     "A month is not a fixed duration - only DateOffset understands calendars",
+     "Timedelta is faster",
+     "DateOffset is deprecated"
+    ],
+    "a": 1,
+    "w": "'One month after 31 January' is a calendar question. Timedelta cannot answer it because it does not know what month it is in."
+   },
+   {
+    "t": "What does `s['2024-02']` do on a Series with a DatetimeIndex?",
+    "o": [
+     "Raises KeyError",
+     "Selects every row in February 2024",
+     "Returns one row",
+     "Returns the string"
+    ],
+    "a": 1,
+    "w": "Partial string indexing works because pandas understands the index is a timeline. s['2024'] selects the whole year."
+   }
+  ]
+ },
+ {
+  "path": "pandas/dtypes_and_memory.html",
+  "title": "Dtypes and Memory",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "Why does `memory_usage()` undercount a text column?",
+    "o": [
+     "It is buggy",
+     "It counts 8 bytes per pointer without following them to the strings",
+     "Text is compressed",
+     "It ignores the column"
+    ],
+    "a": 1,
+    "w": "Use deep=True, which follows the pointers. The gap between the two numbers is often a factor of ten."
+   },
+   {
+    "t": "When does converting a column to `category` cost more than it saves?",
+    "o": [
+     "Never",
+     "When the values are mostly distinct, since you store codes as well as values",
+     "On numeric data only",
+     "When the frame is small"
+    ],
+    "a": 1,
+    "w": "It pays when distinct values are well under half the row count, and enormously when they are a tiny fraction."
+   },
+   {
+    "t": "What is the difference between `int64` and `Int64`?",
+    "o": [
+     "Nothing",
+     "Int64 is nullable - it holds integers and missing values together using pd.NA",
+     "Int64 is faster",
+     "Int64 is 128-bit"
+    ],
+    "a": 1,
+    "w": "It fixes the oldest wart in pandas: a plain integer column with one gap becomes float64, so ids print as 1001.0"
+   },
+   {
+    "t": "How do you convert a messy text column to numbers without stopping at the first bad value?",
+    "o": [
+     "astype(int)",
+     "pd.to_numeric(s, errors='coerce')",
+     "astype(float)",
+     "s.map(int)"
+    ],
+    "a": 1,
+    "w": "It turns failures into NaN so you can find them: s[converted.isna() & s.notna()] gives the rows that were present and unconvertible."
+   }
+  ]
+ },
+ {
+  "path": "pandas/duplicates.html",
+  "title": "Duplicates",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "What does `duplicated()` return for the first occurrence of a repeated row?",
+    "o": [
+     "True",
+     "False",
+     "NaN",
+     "It raises"
+    ],
+    "a": 1,
+    "w": "That asymmetry is what makes df[~df.duplicated()] keep exactly one of each. Use keep=False to flag every copy when inspecting."
+   },
+   {
+    "t": "Why sort before `drop_duplicates(subset=['id'])`?",
+    "o": [
+     "It is faster",
+     "It keeps the first row in the frame's current order, which is otherwise arbitrary",
+     "It is required",
+     "To avoid NaN"
+    ],
+    "a": 1,
+    "w": "A silent error: you asked for one row per id and got one row per id, but which one depends on how the file happened to be written."
+   },
+   {
+    "t": "Five rows share a customer name but have different amounts. What is usually the right operation?",
+    "o": [
+     "drop_duplicates",
+     "groupby and aggregate",
+     "dropna",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "The rows carry independent information. Reaching for drop_duplicates when you meant groupby is a quiet way to lose most of a dataset."
+   },
+   {
+    "t": "Why assert `df['id'].is_unique` before a merge?",
+    "o": [
+     "It speeds up the merge",
+     "A duplicated key silently multiplies rows, inflating every later total",
+     "merge requires it",
+     "It sorts the frame"
+    ],
+    "a": 1,
+    "w": "Ten thousand rows join to eleven thousand and nobody notices. merge(validate='one_to_one') catches it at the join."
+   }
+  ]
+ },
+ {
+  "path": "pandas/filtering_rows.html",
+  "title": "Filtering Rows",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "Why does `df[df['age'] > 20 & df['age'] < 35]` fail?",
+    "o": [
+     "& is invalid in pandas",
+     "& binds tighter than >, so it parses as df['age'] > (20 & df['age']) < 35",
+     "You must use query",
+     "The columns are wrong"
+    ],
+    "a": 1,
+    "w": "Python's precedence rules cannot be made to cooperate here, so parenthesising every condition becomes a reflex."
+   },
+   {
+    "t": "Do `df[df['x'] > 2]` and `df[df['x'] <= 2]` together cover every row?",
+    "o": [
+     "Yes, always",
+     "No - rows where x is NaN fail both comparisons and appear in neither",
+     "Only for integers",
+     "Only if sorted"
+    ],
+    "a": 1,
+    "w": "Every comparison with NaN is False, so 'everything else' is not the same as 'the negation of this condition' when missing data is possible."
+   },
+   {
+    "t": "What does `between(25, 31)` include by default?",
+    "o": [
+     "Neither endpoint",
+     "Both endpoints",
+     "Only the left",
+     "Only the right"
+    ],
+    "a": 1,
+    "w": "The `inclusive` argument takes 'both', 'left', 'right' or 'neither' - worth passing explicitly whenever the boundary matters."
+   },
+   {
+    "t": "What does `@` mean inside a `query` string?",
+    "o": [
+     "A decorator",
+     "It references a Python variable from the surrounding scope",
+     "A column name",
+     "A comment"
+    ],
+    "a": 1,
+    "w": "df.query('age > @cutoff') uses the local variable cutoff. Inside the string, bare identifiers are column names."
+   }
+  ]
+ },
+ {
+  "path": "pandas/inspecting_data.html",
+  "title": "Looking at Data",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "Why check `df.dtypes` immediately after loading?",
+    "o": [
+     "To count rows",
+     "It reveals lost leading zeros, unparsed dates and integer columns turned float",
+     "It is required",
+     "To free memory"
+    ],
+    "a": 1,
+    "w": "None of those failures raise. They produce plausible output that is wrong, and surface much later somewhere unrelated."
+   },
+   {
+    "t": "Why is `head()` alone not enough?",
+    "o": [
+     "It is slow",
+     "It hides sorted, dated or partway-changing data - sample() shows the middle",
+     "It only shows one row",
+     "It drops columns"
+    ],
+    "a": 1,
+    "w": "tail() also catches trailing junk like summary rows or a footer the exporter added."
+   },
+   {
+    "t": "What does a mean far from the median tell you in `describe()`?",
+    "o": [
+     "Nothing",
+     "The distribution is skewed or has outliers, so mean-based summaries will mislead",
+     "The data is missing",
+     "The dtype is wrong"
+    ],
+    "a": 1,
+    "w": "A mean of 220 with a 50% of 30 says something important before you write any analysis."
+   },
+   {
+    "t": "What does `value_counts()` on a text column typically catch?",
+    "o": [
+     "Memory leaks",
+     "Typos, stray capitals and trailing spaces that would silently split a group-by",
+     "Missing dtypes",
+     "Row count"
+    ],
+    "a": 1,
+    "w": "'pune', 'Pune' and 'pune ' are three groups, and nothing warns you. Pass dropna=False to see missing values too."
+   }
+  ]
+ },
+ {
+  "path": "pandas/method_chaining.html",
+  "title": "Method Chaining",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "Why does `assign` take a lambda inside a chain?",
+    "o": [
+     "Style",
+     "So it sees the frame at that point, including columns earlier steps created",
+     "For speed",
+     "It is required syntax"
+    ],
+    "a": 1,
+    "w": "Without the lambda the expression is computed against the frame as it was before the chain started, which raises KeyError for a column made two steps earlier."
+   },
+   {
+    "t": "What is `df.pipe(f, x)` equivalent to?",
+    "o": [
+     "f(x, df)",
+     "f(df, x)",
+     "df.apply(f)",
+     "df.map(f)"
+    ],
+    "a": 1,
+    "w": "The gain is reading order - the nested form add_share(drop_small(df, 10)) reads inside out and gets worse with every step."
+   },
+   {
+    "t": "How do you inspect the middle of a chain without breaking it apart?",
+    "o": [
+     "You cannot",
+     "A pipe to a function that prints and returns its input unchanged",
+     "print inside assign",
+     "Split it always"
+    ],
+    "a": 1,
+    "w": "Most chain bugs are a shape or a column name, and printing d.shape and d.columns at each stage catches both."
+   },
+   {
+    "t": "What is the main practical cost of a very long chain?",
+    "o": [
+     "Speed",
+     "A traceback points at the whole expression rather than the link that failed",
+     "Memory",
+     "It mutates the original"
+    ],
+    "a": 1,
+    "w": "Chain a coherent stage and give it a name. Two named stages of five steps are far easier to debug than one of fifteen."
+   }
+  ]
+ },
+ {
+  "path": "pandas/missing_data.html",
+  "title": "Missing Data",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "Which test finds NaN, None and pd.NA alike?",
+    "o": [
+     "== None",
+     "== np.nan",
+     "isna()",
+     "is null"
+    ],
+    "a": 2,
+    "w": "NaN is not equal to anything including itself, so equality tests never work. isna() handles all three markers."
+   },
+   {
+    "t": "What does the default `df.dropna()` do?",
+    "o": [
+     "Drops rows that are entirely empty",
+     "Drops a row if any value in it is missing",
+     "Drops columns",
+     "Fills with zero"
+    ],
+    "a": 1,
+    "w": "Stricter than most people expect. how='all', thresh= and subset= loosen it, and subset is usually what you actually want."
+   },
+   {
+    "t": "What does filling with the column mean do to the variance?",
+    "o": [
+     "Nothing",
+     "Shrinks it, because the added points have no spread",
+     "Increases it",
+     "Sets it to zero"
+    ],
+    "a": 1,
+    "w": "The mean is preserved by construction, so it looks harmless - but anything downstream relying on dispersion is quietly wrong."
+   },
+   {
+    "t": "Why add an `x_missing` indicator column?",
+    "o": [
+     "To save memory",
+     "Because missingness is often informative, and filling erases it",
+     "It is required by pandas",
+     "To speed up dropna"
+    ],
+    "a": 1,
+    "w": "When a value is missing because of what it would have been, both dropping and imputing bias the result. The indicator keeps that signal."
+   }
+  ]
+ },
+ {
+  "path": "pandas/performance.html",
+  "title": "Performance",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "What is nearly always the largest performance problem in a pandas script?",
+    "o": [
+     "Reading files",
+     "Per-row Python - apply(axis=1), iterrows, or a loop over rows",
+     "Sorting",
+     "Memory fragmentation"
+    ],
+    "a": 1,
+    "w": "If a lambda indexes into a row, the operation is column arithmetic in disguise. This is worth 10-100x, ahead of everything else."
+   },
+   {
+    "t": "Why is `iterrows` never the right choice?",
+    "o": [
+     "It is deprecated",
+     "It is far slower than itertuples and converts each row to an object Series, losing dtypes",
+     "It skips rows",
+     "It only works on numeric data"
+    ],
+    "a": 1,
+    "w": "A row with an int and a string becomes object, so the integer arrives as an object. If you must iterate, use itertuples."
+   },
+   {
+    "t": "Why does `df.query(...).assign(...)` usually beat `df.assign(...).query(...)`?",
+    "o": [
+     "query is faster",
+     "Filtering first means the computation touches far fewer rows",
+     "assign is deprecated",
+     "They are identical"
+    ],
+    "a": 1,
+    "w": "Obvious stated plainly and routinely done backwards, because a filter reads more naturally at the end of a chain."
+   },
+   {
+    "t": "Does `inplace=True` avoid a copy?",
+    "o": [
+     "Yes, always",
+     "Generally no - it also breaks chaining and returns None",
+     "Only for drop",
+     "Only on Series"
+    ],
+    "a": 1,
+    "w": "It is not the optimisation it appears to be. Direct assignment df['b'] = ... does modify in place and skips the copy."
+   }
+  ]
+ },
+ {
+  "path": "pandas/reading_and_writing.html",
+  "title": "Reading and Writing Files",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "A CSV id column contains 007. What does `read_csv` do by default?",
+    "o": [
+     "Keeps it as '007'",
+     "Reads it as the integer 7, losing the zeros permanently",
+     "Raises",
+     "Makes it a category"
+    ],
+    "a": 1,
+    "w": "dtype={'id': str} at read time is the fix, and should be the default for anything that is a code rather than a quantity."
+   },
+   {
+    "t": "Which argument stops one missing value turning an integer column into float?",
+    "o": [
+     "na_values",
+     "dtype={'col': 'Int64'} - the nullable integer type",
+     "parse_dates",
+     "usecols"
+    ],
+    "a": 1,
+    "w": "NumPy integers cannot hold NaN, so a single gap promotes the whole column and ids start printing as 1001.0"
+   },
+   {
+    "t": "Why does a round-tripped CSV often gain an `Unnamed: 0` column?",
+    "o": [
+     "A pandas bug",
+     "to_csv writes the index by default - pass index=False",
+     "The file was corrupt",
+     "read_csv adds it"
+    ],
+    "a": 1,
+    "w": "Harmless, ubiquitous and entirely avoidable. Pass index=False unless the index is meaningful data."
+   },
+   {
+    "t": "What is lost when a DataFrame round-trips through CSV?",
+    "o": [
+     "Nothing",
+     "Dtypes, categories, category order and datetime types - it is all just text",
+     "Only the column names",
+     "Only missing values"
+    ],
+    "a": 1,
+    "w": "Use parquet when the data will be read back by pandas. CSV is worth its losses when a human or another tool must read it."
+   }
+  ]
+ },
+ {
+  "path": "pandas/pivot_and_melt.html",
+  "title": "Reshaping: pivot and melt",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "Why does `pivot` raise on duplicate index/column pairs?",
+    "o": [
+     "A limitation",
+     "There is no way to decide which value wins - the strictness tells you the data is not what you assumed",
+     "It is deprecated",
+     "Memory"
+    ],
+    "a": 1,
+    "w": "pivot_table aggregates instead. Note its aggfunc defaults to 'mean', which looks plausible when you expected a total."
+   },
+   {
+    "t": "What does `pivot_table`'s `aggfunc` default to?",
+    "o": [
+     "sum",
+     "mean",
+     "count",
+     "first"
+    ],
+    "a": 1,
+    "w": "Worth knowing before it surprises you - a pivot of sales that averages when you expected a total looks entirely reasonable."
+   },
+   {
+    "t": "What are `id_vars` in `melt`?",
+    "o": [
+     "The columns to unpivot",
+     "The columns to keep as identifiers, while everything else is unpivoted",
+     "The new column names",
+     "The index"
+    ],
+    "a": 1,
+    "w": "Name var_name and value_name too - the defaults are 'variable' and 'value', which say nothing."
+   },
+   {
+    "t": "Why keep data in long form and pivot only at the end?",
+    "o": [
+     "It uses less memory",
+     "Adding a category adds rows, not columns, so no downstream expression changes",
+     "pivot is slow",
+     "Long form sorts better"
+    ],
+    "a": 1,
+    "w": "In wide form a new year is a new column, and every expression naming the old ones has to change. Long form also composes with groupby and joins."
+   }
+  ]
+ },
+ {
+  "path": "pandas/sorting_and_ranking.html",
+  "title": "Sorting and Ranking",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "Where do NaN values go when sorting descending?",
+    "o": [
+     "First",
+     "Last, the same as ascending",
+     "They are dropped",
+     "It raises"
+    ],
+    "a": 1,
+    "w": "They are set aside rather than treated as large or small - which is why reversing an ascending sort is not the same as sorting descending."
+   },
+   {
+    "t": "You need the 5 highest rows from 200,000. What is the right call?",
+    "o": [
+     "sort_values then head",
+     "nlargest(5, col)",
+     "rank",
+     "max"
+    ],
+    "a": 1,
+    "w": "It finds the top five without ordering the rest. For a single extreme, idxmax is cheaper still."
+   },
+   {
+    "t": "Two values tie. What does the default `rank()` give them?",
+    "o": [
+     "Both 2",
+     "The average of the ranks they span, e.g. 2.5",
+     "Both 3",
+     "NaN"
+    ],
+    "a": 1,
+    "w": "The default is 'average', which produces fractional ranks. Use method='min' for leaderboard-style joint second, or 'dense' for no gaps."
+   },
+   {
+    "t": "When is sorting genuinely required rather than avoidable?",
+    "o": [
+     "To find a maximum",
+     "Before drop_duplicates, when which row survives matters",
+     "To count rows",
+     "To filter"
+    ],
+    "a": 1,
+    "w": "drop_duplicates keeps the first row in current order, so without an explicit sort the survivor is arbitrary."
+   }
+  ]
+ },
+ {
+  "path": "pandas/concat.html",
+  "title": "Stacking Frames with concat",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "What does `pd.concat([a, b])` do with the two frames' indexes?",
+    "o": [
+     "Renumbers from 0",
+     "Keeps both, so labels can repeat",
+     "Raises on a clash",
+     "Sorts them"
+    ],
+    "a": 1,
+    "w": "A repeated label is legal and invisible until .loc returns two rows where code expected one. Pass ignore_index=True unless the labels matter."
+   },
+   {
+    "t": "When stacking rows, how are columns matched?",
+    "o": [
+     "By position",
+     "By name, with missing ones filled with NaN",
+     "Alphabetically",
+     "By dtype"
+    ],
+    "a": 1,
+    "w": "A feature when column orders differ, and a trap when a name is misspelled in one source - you get two half-full columns rather than an error."
+   },
+   {
+    "t": "Two frames should correspond row-for-row but one was filtered. What does `concat(axis=1)` give?",
+    "o": [
+     "The correct pairing",
+     "More rows than either input, mostly NaN, because it aligns on labels",
+     "An error",
+     "The first frame only"
+    ],
+    "a": 1,
+    "w": "Reset both indexes first if you mean 'same rows, same order' - that makes the positional intent explicit."
+   },
+   {
+    "t": "Why avoid starting with an empty DataFrame and concatenating into it?",
+    "o": [
+     "It is illegal",
+     "It is quadratic, and the empty column's dtype can widen the result to object",
+     "It loses column names",
+     "It sorts the rows"
+    ],
+    "a": 1,
+    "w": "Collect pieces in a list and concat once - there is then no empty seed frame to poison the dtypes."
+   }
+  ]
+ },
+ {
+  "path": "pandas/string_methods.html",
+  "title": "Text Columns",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "Why does `df[df['name'].str.contains('a')]` sometimes raise?",
+    "o": [
+     "contains is deprecated",
+     "Missing values make the mask NaN, and a mask with NaN cannot index",
+     "The column is numeric",
+     "It needs regex=True"
+    ],
+    "a": 1,
+    "w": "Pass na=False every time you filter on a text predicate. The error appears only when the data has a gap, so it surfaces in production."
+   },
+   {
+    "t": "What does `s.str.contains('.')` match?",
+    "o": [
+     "Strings containing a literal dot",
+     "Every non-empty string, because contains takes a regex by default",
+     "Nothing",
+     "Only dots"
+    ],
+    "a": 1,
+    "w": "Pass regex=False for a literal search - it is also faster. Note startswith and endswith do not take a regex at all."
+   },
+   {
+    "t": "What does `str.extract` return for a row that does not match?",
+    "o": [
+     "An empty string",
+     "NaN across the row",
+     "The original value",
+     "It raises"
+    ],
+    "a": 1,
+    "w": "That makes non-matching input visible rather than silently mangled. Note extract returns text even for digits - convert with pd.to_numeric."
+   },
+   {
+    "t": "Why is `.str` slower than arithmetic on the same number of rows?",
+    "o": [
+     "It copies the frame",
+     "Object columns hold pointers to Python strings, so operations walk them one at a time",
+     "It uses regex always",
+     "It is not slower"
+    ],
+    "a": 1,
+    "w": "Clean text once at load time, and convert to category when values repeat so operations run on the distinct values instead."
+   }
+  ]
+ },
+ {
+  "path": "pandas/the_copy_warning.html",
+  "title": "The Copy Warning",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "Why can `df[mask]['col'] = x` fail to change `df`?",
+    "o": [
+     "masks are read-only",
+     "It is two operations - the write may land on a temporary the first bracket returned",
+     "'col' does not exist",
+     "It always works"
+    ],
+    "a": 1,
+    "w": "By the time Python calls __setitem__ on the intermediate, the information that this was one statement is gone."
+   },
+   {
+    "t": "Why can't pandas simply make chained assignment work?",
+    "o": [
+     "Nobody has implemented it",
+     "Whether the intermediate is a view or a copy depends on the internal block layout, so behaviour varies with the data",
+     "It is forbidden by Python",
+     "It would be too slow"
+    ],
+    "a": 1,
+    "w": "Columns are stored in blocks of like dtype, and which case you get is invisible in your code - it changes when a column's dtype changes."
+   },
+   {
+    "t": "You take `sub = df[df['city']=='pune']` and intend to edit it separately. What should you add?",
+    "o": [
+     "Nothing",
+     ".copy()",
+     ".loc",
+     "reset_index()"
+    ],
+    "a": 1,
+    "w": "It costs seven characters and removes the ambiguity entirely. Use df.loc[...] = ... instead if you meant to change the original."
+   },
+   {
+    "t": "What does copy-on-write change?",
+    "o": [
+     "It makes pandas slower",
+     "A selection never writes back to its parent, so you must use .loc to modify the original",
+     "It disables .loc",
+     "It copies every frame immediately"
+    ],
+    "a": 1,
+    "w": "It is the default in pandas 3.0. The name describes the implementation - data is still not copied until something is written."
+   }
+  ]
+ },
+ {
+  "path": "pandas/the_index.html",
+  "title": "The Index",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "After filtering a Series down to 3 of 5 rows, what is `result[0]` likely to do?",
+    "o": [
+     "Return the first row",
+     "Raise KeyError, because label 0 may no longer exist",
+     "Return NaN",
+     "Return all rows"
+    ],
+    "a": 1,
+    "w": "The surviving rows keep their original labels. Use .iloc[0] for position, or reset_index(drop=True) to renumber."
+   },
+   {
+    "t": "Two Series with partly overlapping labels are added. What happens to a label present in only one?",
+    "o": [
+     "It is dropped",
+     "It becomes NaN",
+     "It raises",
+     "It is treated as zero"
+    ],
+    "a": 1,
+    "w": "Alignment is a safety feature - a mismatch surfaces as NaN rather than a silent off-by-one. Use add(other, fill_value=0) to treat it as zero."
+   },
+   {
+    "t": "What does `s['a']` return when the label 'a' appears twice in the index?",
+    "o": [
+     "The first match",
+     "A Series containing both",
+     "An error",
+     "The last match"
+    ],
+    "a": 1,
+    "w": "The return type changes with the data, so code written against the scalar case breaks when a duplicate appears - usually in production."
+   },
+   {
+    "t": "What does `s.loc[100:200]` include?",
+    "o": [
+     "Up to but not including 200",
+     "Both endpoints, including 200",
+     "Only 100",
+     "Positions 100 to 200"
+    ],
+    "a": 1,
+    "w": "Label slicing is inclusive of the endpoint, unlike every other Python slice. It works on any unique index; only a non-unique unsorted one raises."
+   }
+  ]
+ },
+ {
+  "path": "pandas/multiindex.html",
+  "title": "The MultiIndex",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "Where do most MultiIndexes come from?",
+    "o": [
+     "Explicit construction",
+     "Operations you were doing anyway - groupby with several keys, concat(keys=), stack, agg",
+     "read_csv",
+     "sort_index"
+    ],
+    "a": 1,
+    "w": "The practical question is rarely 'should I build one' but 'I have one, now what'."
+   },
+   {
+    "t": "How do you select on an inner level while taking everything from the outer?",
+    "o": [
+     "s.loc[:, 2024]",
+     "s.xs(2024, level='year') or s.loc[(slice(None), 2024), ]",
+     "s[2024]",
+     "s.iloc[2024]"
+    ],
+    "a": 1,
+    "w": "slice(None) is the wildcard because you cannot write a bare colon inside a tuple. pd.IndexSlice is its readable spelling."
+   },
+   {
+    "t": "What does `agg({'sales': ['sum','mean']})` do to the columns?",
+    "o": [
+     "Nothing",
+     "Makes them hierarchical tuples like ('sales','sum')",
+     "Renames them",
+     "Drops one"
+    ],
+    "a": 1,
+    "w": "Named aggregation - agg(total=('sales','sum')) - produces flat names and skips the problem entirely."
+   },
+   {
+    "t": "When should you flatten a MultiIndex with `reset_index`?",
+    "o": [
+     "Always immediately",
+     "When the result feeds a merge, a file or a chart rather than being selected through",
+     "Never",
+     "Only for Series"
+    ],
+    "a": 1,
+    "w": "Keep it when the hierarchy is real and you will select through it or unstack. Flatten when it is merely an artefact of how the result was computed."
+   }
+  ]
+ },
+ {
+  "path": "pandas/time_series.html",
+  "title": "Time Series",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "What does `resample` require?",
+    "o": [
+     "A sorted frame",
+     "A DatetimeIndex - it raises without one",
+     "A frequency column",
+     "Numeric data"
+    ],
+    "a": 1,
+    "w": "df.set_index('date') after pd.to_datetime is the usual setup, and the step people skip before wondering why resample will not run."
+   },
+   {
+    "t": "What is the difference between `ffill` and `interpolate` when upsampling?",
+    "o": [
+     "None",
+     "ffill asserts the value held constant; interpolate asserts it moved smoothly",
+     "interpolate is faster",
+     "ffill only works on integers"
+    ],
+    "a": 1,
+    "w": "Different claims about the world. Both fabricate data - the question is which fabrication is less wrong for what the number means."
+   },
+   {
+    "t": "Why does `rolling(3).mean()` start with NaN?",
+    "o": [
+     "A bug",
+     "The window is not full - a three-row average from one row is not a three-row average",
+     "The data is missing",
+     "It needs sorting"
+    ],
+    "a": 1,
+    "w": "min_periods=1 overrides it, which is convenient and slightly dishonest at the edges."
+   },
+   {
+    "t": "What does pandas do if you call `diff()` on rows that are not in time order?",
+    "o": [
+     "Sorts them first",
+     "Returns meaningless numbers without warning",
+     "Raises",
+     "Returns NaN"
+    ],
+    "a": 1,
+    "w": "Order is assumed, not checked. sort_index() before any shift, diff, rolling or resample on data you did not sort yourself."
+   }
+  ]
+ },
+ {
+  "path": "pandas/what_is_pandas.html",
+  "title": "What pandas Is For",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "What is the main structural difference between a DataFrame and a 2-D NumPy array?",
+    "o": [
+     "Size",
+     "Each DataFrame column has its own dtype; an array has one for everything",
+     "DataFrames are faster",
+     "Arrays cannot hold numbers"
+    ],
+    "a": 1,
+    "w": "Converting a mixed DataFrame to an array collapses every column to the one type that holds them all, usually object - which is why pandas exists."
+   },
+   {
+    "t": "Two Series with the same labels in different orders are added. What happens?",
+    "o": [
+     "Added position by position",
+     "Aligned by label first, then added",
+     "An error",
+     "Only the first is returned"
+    ],
+    "a": 1,
+    "w": "Alignment is by label, not position, and missing labels become NaN rather than raising. This is the biggest departure from NumPy."
+   },
+   {
+    "t": "After filtering a Series down to 2 of 5 rows, what does the index look like?",
+    "o": [
+     "0, 1",
+     "The original labels of the surviving rows",
+     "Empty",
+     "It is dropped"
+    ],
+    "a": 1,
+    "w": "The labels come along. Code that then indexes positionally gets the wrong rows or a KeyError."
+   },
+   {
+    "t": "Why is `df['a'].apply(lambda v: v*2)` slower than `df['a'] * 2`?",
+    "o": [
+     "apply copies the data",
+     "apply calls back into Python once per row instead of staying in compiled code",
+     "apply is deprecated",
+     "They are the same speed"
+    ],
+    "a": 1,
+    "w": "pandas is fast while work stays inside the compiled layer. Per-row Python is usually the entire performance story of a slow pandas script."
+   }
+  ]
+ },
+ {
+  "path": "pandas/apply_and_map.html",
+  "title": "apply, map and Vectorising",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "What happens to a value not present in the dict passed to `map`?",
+    "o": [
+     "It is kept",
+     "It becomes NaN",
+     "It raises",
+     "It becomes an empty string"
+    ],
+    "a": 1,
+    "w": "A typo in a key silently blanks a column. Use .map(lookup).fillna(s) to keep the original where there was no match."
+   },
+   {
+    "t": "Why is `df.apply(func, axis=1)` the slowest common pattern?",
+    "o": [
+     "It sorts the frame",
+     "It constructs a Series object for every row on top of the Python call",
+     "It copies columns",
+     "It uses regex"
+    ],
+    "a": 1,
+    "w": "The tell is a lambda indexing into the row - that is column arithmetic, which runs in compiled code."
+   },
+   {
+    "t": "What is the vectorised replacement for a two-branch conditional apply?",
+    "o": [
+     "map",
+     "np.where(cond, a, b)",
+     "groupby",
+     "pd.cut"
+    ],
+    "a": 1,
+    "w": "For several conditions, np.select evaluates in order with first match winning. For numeric bands, pd.cut."
+   },
+   {
+    "t": "When is `apply` a reasonable choice?",
+    "o": [
+     "Never",
+     "Wrapping an existing scalar function, per-row logic with no array form, or a small frame",
+     "For all arithmetic",
+     "Only with axis=1"
+    ],
+    "a": 1,
+    "w": "Optimising an apply over 200 rows is wasted effort. The question is whether the frame is large enough for the difference to matter."
+   }
+  ]
+ },
+ {
+  "path": "pandas/groupby_basics.html",
+  "title": "groupby",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "What happens to rows whose group key is NaN?",
+    "o": [
+     "They form their own group",
+     "They are dropped by default",
+     "They raise",
+     "They join the first group"
+    ],
+    "a": 1,
+    "w": "Group totals then quietly fail to match the frame total. Pass dropna=False, and check the totals match after any group-by that matters."
+   },
+   {
+    "t": "Why prefer named aggregation over a dict?",
+    "o": [
+     "It is faster",
+     "Output columns are named explicitly and come back flat rather than as a MultiIndex",
+     "It handles NaN",
+     "Dicts are deprecated"
+    ],
+    "a": 1,
+    "w": "It also lets several statistics come from the same input column, and saves a column-flattening step almost every time."
+   },
+   {
+    "t": "A group has 5 rows, 2 with a missing sales value. What do `size()` and `count()` report for sales?",
+    "o": [
+     "5 and 5",
+     "5 and 3",
+     "3 and 3",
+     "3 and 5"
+    ],
+    "a": 1,
+    "w": "size counts rows, count counts non-missing values. Using count where you meant size undercounts exactly where data is imperfect."
+   },
+   {
+    "t": "Why is iterating over a groupby usually wrong for computing?",
+    "o": [
+     "It raises",
+     "It runs Python once per group - the same trap as apply",
+     "It loses the keys",
+     "It sorts wrongly"
+    ],
+    "a": 1,
+    "w": "Iterating is fine for inspection. If you are accumulating results in a list inside the loop, there is nearly always an agg for it."
+   }
+  ]
+ },
+ {
+  "path": "pandas/loc_and_iloc.html",
+  "title": "loc and iloc",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "On a default index, how many rows does `df.loc[1:3]` return?",
+    "o": [
+     "Two",
+     "Three - .loc includes the endpoint",
+     "Four",
+     "It raises"
+    ],
+    "a": 1,
+    "w": "df.iloc[1:3] returns two. Labels have no natural 'one past the end', so .loc has to be inclusive."
+   },
+   {
+    "t": "Why does `.iloc` reject a boolean Series?",
+    "o": [
+     "It is a bug",
+     "A Series carries an index, and .iloc is defined to ignore labels - accepting one would be ambiguous",
+     "Booleans are unsupported",
+     "It only takes integers"
+    ],
+    "a": 1,
+    "w": "It accepts a plain list or array of booleans. Use .to_numpy() on the mask to strip the index."
+   },
+   {
+    "t": "Which assignment reliably modifies `df`?",
+    "o": [
+     "df[mask]['col'] = x",
+     "df.loc[mask, 'col'] = x",
+     "df['col'][mask] = x",
+     "All of them"
+    ],
+    "a": 1,
+    "w": "One .loc call is a single indexing operation on df itself. Chained brackets may write to a temporary and silently do nothing."
+   },
+   {
+    "t": "When do `.loc[0]` and `.iloc[0]` refer to different rows?",
+    "o": [
+     "Never",
+     "After any filter, sort, join or set_index changes the index",
+     "Only on Series",
+     "Only with strings"
+    ],
+    "a": 1,
+    "w": "On a fresh frame label and position coincide, which is exactly why the difference goes unnoticed until something breaks it."
+   }
+  ]
+ },
+ {
+  "path": "pandas/merge_and_join.html",
+  "title": "merge and join",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "What is `merge`'s default `how`?",
+    "o": [
+     "left",
+     "inner - which silently drops unmatched rows",
+     "outer",
+     "right"
+    ],
+    "a": 1,
+    "w": "A join meant to add a column can quietly remove rows, and the only sign is a row count you were not checking. Note join() defaults to left instead."
+   },
+   {
+    "t": "A key appears twice on the right. What happens?",
+    "o": [
+     "It raises",
+     "Every matching left row is duplicated, inflating later totals",
+     "The extra row is dropped",
+     "It becomes NaN"
+    ],
+    "a": 1,
+    "w": "Nothing warns, because many-to-many is a legitimate operation. validate='many_to_one' turns it into an error."
+   },
+   {
+    "t": "A join matches nothing even though the keys look identical. What is the usual cause?",
+    "o": [
+     "A pandas bug",
+     "A dtype mismatch - 1 as int never matches '1' as str",
+     "Too many rows",
+     "Missing index"
+    ],
+    "a": 1,
+    "w": "Whitespace and case do the same to string keys. Check both key columns' dtypes, and use indicator=True to see what matched."
+   },
+   {
+    "t": "What does `indicator=True` add?",
+    "o": [
+     "A row count",
+     "A _merge column saying whether each row came from left_only, right_only or both",
+     "A validation error",
+     "An index"
+    ],
+    "a": 1,
+    "w": "value_counts() on it summarises the whole join in one line - far better than guessing why rows went missing."
+   }
+  ]
+ },
+ {
+  "path": "pandas/groupby_transform.html",
+  "title": "transform and filter",
+  "cat": "pandas",
+  "q": [
+   {
+    "t": "What is the difference between `agg` and `transform`?",
+    "o": [
+     "None",
+     "agg returns one row per group; transform returns one row per original row",
+     "transform is faster",
+     "agg works on strings only"
+    ],
+    "a": 1,
+    "w": "Because transform stays aligned with the original index, it assigns straight back as a column."
+   },
+   {
+    "t": "Why is `transform` safer than aggregate-then-merge?",
+    "o": [
+     "It is newer",
+     "It never leaves the original index, so it cannot change the row count or order",
+     "It handles strings",
+     "It is lazy"
+    ],
+    "a": 1,
+    "w": "The merge route can drop NaN keys, multiply rows on a non-unique key, or reorder the result. transform can do none of those."
+   },
+   {
+    "t": "What does `groupby(...).filter(pred)` return?",
+    "o": [
+     "Groups",
+     "Rows belonging to groups where the predicate was True",
+     "One row per group",
+     "A boolean Series"
+    ],
+    "a": 1,
+    "w": "The predicate is asked once per group and applies to all its rows. The result has the same columns as the input."
+   },
+   {
+    "t": "Why prefer `g.rank()` over `g.transform('rank')`?",
+    "o": [
+     "No difference",
+     "rank is already a per-row groupby method - it is clearer and faster",
+     "transform cannot rank",
+     "rank sorts the frame"
+    ],
+    "a": 1,
+    "w": "cumsum, cumcount, shift, diff and pct_change are the same - they return per-row results without needing transform."
+   }
+  ]
  }
 ];

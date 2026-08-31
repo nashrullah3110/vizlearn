@@ -1,0 +1,380 @@
+title: apply, map and Vectorising
+intro: The escape hatch, what it costs, and the form that usually replaces it.
+
+## Three different things
+
+`Series.map` looks each value up in a dict, a Series, or a function. It is for **substitution**.
+
+`Series.apply` calls a function on each value. It is for **computation** that has no array form.
+
+`DataFrame.apply` calls a function on each column (`axis=0`) or each row (`axis=1`).
+
+`DataFrame.map` &mdash; formerly `applymap` &mdash; calls a function on every individual cell.
+
+They look interchangeable in small examples and are not, and the differences show up in both speed and behaviour with missing values.
+
+
+## map replaces values from a dict
+
+The simplest of the three, and it is a lookup rather than a loop you write.
+
+```python-run
+import pandas as pd
+
+s = pd.Series(["a", "b", "c", "z"])
+lookup = {"a": "apple", "b": "banana", "c": "cherry"}
+
+print("map with a dict:")
+print(list(s.map(lookup)))
+print("   'z' was not in the dict and became NaN")
+print()
+print("na_action='ignore' skips missing input instead of calling on it:")
+print(list(pd.Series(["a", None]).map(lookup, na_action="ignore")))
+print()
+print("keep unmatched values with a fallback:")
+print(list(s.map(lookup).fillna(s)))
+```
+
+## apply on a Series runs your function per value
+
+Which is a Python loop, however it is spelled.
+
+```python-run
+import pandas as pd
+
+s = pd.Series([1, 2, 3, 4])
+
+print("apply:", list(s.apply(lambda v: v * 2 + 1)))
+print("vectorised:", list(s * 2 + 1))
+print("same:", list(s.apply(lambda v: v * 2 + 1)) == list(s * 2 + 1))
+print()
+print("apply is not doing anything clever - it calls the function")
+print("once per element and collects the results.")
+print()
+print("it can return anything, which is its only real advantage:")
+print("   ", list(s.apply(lambda v: "even" if v % 2 == 0 else "odd")))
+```
+
+## What it costs
+
+The same result, an order of magnitude apart.
+
+```python-run
+import pandas as pd
+import numpy as np
+import time
+
+n = 200_000
+s = pd.Series(np.arange(n))
+
+t = time.perf_counter(); a = s.apply(lambda v: v * 2 + 1); t_apply = time.perf_counter() - t
+t = time.perf_counter(); b = s * 2 + 1; t_vec = time.perf_counter() - t
+t = time.perf_counter(); c = pd.Series([v * 2 + 1 for v in s]); t_list = time.perf_counter() - t
+
+print("apply             : %.4f s" % t_apply)
+print("list comprehension: %.4f s" % t_list)
+print("vectorised        : %.4f s" % t_vec)
+print("apply is %.0fx slower than vectorised" % (t_apply / max(t_vec, 1e-9)))
+print()
+print("same values:", a.tolist() == b.tolist() == c.tolist())
+print("dtypes     : apply %s, vectorised %s" % (a.dtype, b.dtype))
+print("   equals() would say False - it compares dtype too, and going")
+print("   through Python ints can widen the result.")
+```
+
+## apply on a DataFrame gets whole rows or columns
+
+axis=1 is the row-wise form, and it is the slowest thing here.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"a": [1, 2, 3], "b": [10, 20, 30]})
+
+print("axis=0 (default): the function gets each COLUMN")
+print(df.apply(lambda col: col.max() - col.min()))
+print()
+print("axis=1: the function gets each ROW as a Series")
+print(list(df.apply(lambda row: row["a"] * row["b"], axis=1)))
+print()
+print("but that same result is a single vectorised expression:")
+print(list(df["a"] * df["b"]))
+print()
+print("axis=1 builds a Series object per row. It is the form most")
+print("worth removing when a script is slow.")
+```
+
+## Replacing the common apply patterns
+
+Almost every row-wise apply has a vectorised equivalent.
+
+```python-run
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({"score": [10, 55, 80], "city": ["pune", "delhi", "pune"]})
+
+print("a conditional  ->  np.where")
+print("  ", list(np.where(df["score"] >= 50, "pass", "fail")))
+print()
+print("several conditions  ->  np.select")
+conds = [df["score"] >= 80, df["score"] >= 50]
+print("  ", list(np.select(conds, ["A", "B"], default="C")))
+print()
+print("a lookup  ->  map")
+print("  ", list(df["city"].map({"pune": 1, "delhi": 2})))
+print()
+print("bands  ->  pd.cut")
+print("  ", list(pd.cut(df["score"], [0, 49, 79, 100], labels=["low", "mid", "high"])))
+print()
+print("string work  ->  .str")
+print("  ", list(df["city"].str.upper()))
+```
+
+## When apply is the right answer
+
+It exists for a reason - just not for arithmetic.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"text": ["a b c", "d e", "f"]})
+
+# genuinely awkward to vectorise: a per-row parse returning several fields
+def parse(row):
+    parts = row["text"].split()
+    return pd.Series({"first": parts[0], "n": len(parts)})
+
+print(df.apply(parse, axis=1))
+print()
+print("Reasonable uses:")
+print("  - calling an existing scalar function you cannot rewrite")
+print("  - per-row logic with no array equivalent")
+print("  - small frames, where clarity beats speed")
+print()
+print("The test: is the frame big enough for the difference to matter?")
+print("On 200 rows, apply is fine. On 200,000 it is the bottleneck.")
+```
+## map
+
+`s.map({"a": "apple"})` replaces values by lookup.
+
+Anything not in the mapping becomes `NaN`. That is a reasonable default and frequently not what people want &mdash; a typo in a key silently blanks a column.
+
+`s.map(lookup).fillna(s)` keeps the original where there was no match, which is usually the intended behaviour for a partial rename.
+
+`na_action="ignore"` skips missing input rather than passing `NaN` to the function, which matters when the function would fail on it.
+
+`map` with a dict is fast, because it is a lookup rather than a call. `map` with a **function** is exactly as slow as `apply`.
+
+## What apply costs
+
+`apply` does not vectorise anything. It calls your function once per element and assembles the results.
+
+The third editor measures it: on 200,000 rows, `apply` runs roughly an order of magnitude slower than the equivalent arithmetic, and is no faster than a plain list comprehension &mdash; because that is essentially what it is.
+
+There is a persistent belief that `apply` is "the pandas way" and therefore fast. It is neither. It is the escape hatch for when there is no array expression.
+
+## axis=1 is the expensive one
+
+`df.apply(func, axis=1)` constructs a **Series object for every row** and passes it to your function. That is object creation per row on top of the Python call.
+
+It is the single most common reason a pandas script is slow, and it is nearly always replaceable.
+
+The tell is a lambda that indexes into the row: `lambda row: row["a"] * row["b"]`. That is `df["a"] * df["b"]`, which operates on whole columns in compiled code.
+
+## The replacements
+
+Nearly every row-wise `apply` is one of a handful of patterns:
+
+**A conditional** &mdash; `np.where(cond, a, b)`. The vectorised if/else.
+
+**Several conditions** &mdash; `np.select([c1, c2], [v1, v2], default=v3)`. Evaluated in order, first match wins.
+
+**A lookup** &mdash; `map` with a dict.
+
+**Numeric bands** &mdash; `pd.cut`.
+
+**String work** &mdash; the `.str` accessor.
+
+**Row-wise arithmetic** &mdash; ordinary column arithmetic.
+
+**A group statistic per row** &mdash; `groupby(...).transform(...)`.
+
+Between them these cover the large majority of real cases. When you find yourself writing `apply(axis=1)`, it is worth thirty seconds to check this list first.
+
+## When apply is right
+
+It genuinely earns its place in a few situations.
+
+**Wrapping an existing scalar function** you cannot or should not rewrite &mdash; a parser, a validator, a call into another library.
+
+**Per-row logic with no array equivalent** &mdash; something that branches on several columns in a way `np.select` cannot express cleanly, or that returns a variable number of fields.
+
+**Returning several columns at once**, by returning a Series from the function, as the last editor shows.
+
+**Small frames**, where the whole operation takes microseconds either way and clarity is the only thing that matters.
+
+That last point deserves emphasis. Optimising an `apply` over 200 rows is wasted effort, and a readable `apply` can be better code than a clever vectorised expression nobody can modify. The question is always whether the frame is large enough for the difference to matter.
+
+## If it must stay a loop
+
+When the logic really is sequential and per-row, and the frame is large, pandas is not the tool. The options are to move the loop into NumPy, compile it with Numba, or restructure the problem.
+
+What is never right is `iterrows`. It is slower than `apply(axis=1)`, it loses dtypes by converting each row to an object Series, and there is no situation where it is the best available option. `itertuples` is considerably faster if you genuinely need to iterate, and preserves types.
+
+## DataFrame.map and the applymap rename
+
+`DataFrame.map(func)` applies a function to **every cell**. It was called `applymap` until pandas 2.1, and the old name is deprecated.
+
+It is rarely the right tool. Applying a function to every cell of a table usually means either the operation belongs on specific columns, or the frame should have been reshaped first.
+
+The legitimate uses are formatting for display and elementwise type coercion across a homogeneous frame &mdash; both of which are end-of-pipeline steps.
+
+## Returning several values
+
+A function that returns a Series gives several columns:
+
+```python
+df.apply(lambda r: pd.Series({"a": ..., "b": ...}), axis=1)
+```
+
+That works and is slow twice over &mdash; a Python call and a Series construction per row.
+
+The faster shape is usually to compute each output column separately with vectorised expressions, even if that means traversing the input more than once. Three passes over a column in compiled code beat one pass in Python by a wide margin.
+
+When the computation genuinely produces several values at once and cannot be split, `zip(*df.apply(...))` or building lists and assigning at the end avoids the Series construction.
+
+## result_type and the empty-frame trap
+
+`df.apply(func, axis=1)` on an **empty** frame does not call the function at all, so pandas cannot infer the result shape. The result is often an empty DataFrame where the code expected an empty Series, and the next operation fails with a confusing error.
+
+Code that runs `apply` on a frame that may be empty should handle that case explicitly, because the failure appears only when the input happens to be empty &mdash; which is exactly the edge case least likely to be tested.
+
+`result_type=` controls how a list-returning function is interpreted: `"expand"` makes columns, `"reduce"` keeps a Series.
+
+## Choosing the right escape hatch
+
+When something genuinely cannot be vectorised, `apply` is not the only option, and often not the best one.
+
+**`np.vectorize`** &mdash; despite the name, a loop. It handles broadcasting and dtypes for you, and offers no speed benefit.
+
+**A list comprehension over `zip` of the columns** &mdash; frequently *faster* than `apply(axis=1)`, because it skips the per-row Series construction. Less idiomatic, measurably quicker.
+
+**`itertuples`** &mdash; fast iteration with dtypes preserved, when you need the whole row.
+
+**Numba** &mdash; compiles a numeric loop to machine code. The right answer when the logic is genuinely sequential and the frame is large.
+
+**Restructuring** &mdash; often the real answer. A loop over rows to look something up is a `merge`. A loop to compute a group statistic is a `transform`. A loop with a condition is `np.select`.
+
+## A worked replacement
+
+A row-wise function with branching:
+
+```python
+def band(row):
+    if row["score"] >= 80:
+        return "A"
+    elif row["score"] >= 50:
+        return "B" if row["city"] == "pune" else "C"
+    return "F"
+
+df["band"] = df.apply(band, axis=1)
+```
+
+becomes:
+
+```python
+conds = [
+    df["score"] >= 80,
+    (df["score"] >= 50) & (df["city"] == "pune"),
+    df["score"] >= 50,
+]
+df["band"] = np.select(conds, ["A", "B", "C"], default="F")
+```
+
+The conditions are evaluated in order and the first match wins, which is exactly the semantics of the if/elif chain. It is longer to read the first time and orders of magnitude faster, and the conditions can be built programmatically in a way the function cannot.
+
+## The honest summary
+
+`apply` is not forbidden. It is a Python loop with a pandas-shaped interface, and it should be used when that is what you want: awkward per-row logic, an existing function you cannot rewrite, or a frame small enough that the difference is unmeasurable.
+
+The mistake is reaching for it reflexively for arithmetic, conditionals and lookups, all of which have vectorised forms that are shorter as well as faster.
+
+## Mapping with a Series
+
+`map` accepts a Series as well as a dict, which makes a lookup table out of another frame:
+
+```python
+lookup = ref.set_index("code")["label"]
+df["label"] = df["code"].map(lookup)
+```
+
+This is often better than a merge for a simple one-column lookup. It cannot multiply rows, it needs no `how` or `validate`, and unmatched codes become `NaN` rather than dropping the row.
+
+The requirement is that the lookup's index is unique. If it is not, `map` raises &mdash; which is a better failure than a merge silently duplicating rows.
+
+For a lookup that must bring several columns, a merge is the right tool.
+
+## Missing values in apply and map
+
+`map` passes `NaN` to the function unless `na_action="ignore"`. A function that calls `.lower()` or does arithmetic will fail on it, and the traceback points at your function rather than at the data.
+
+`apply` does the same.
+
+Two options: guard inside the function, or filter first and assign back through `.loc`. The second is usually cleaner, because it keeps the function simple:
+
+```python
+ok = df["text"].notna()
+df.loc[ok, "parsed"] = df.loc[ok, "text"].apply(parse)
+```
+
+## Measuring before optimising
+
+`apply` is slow relative to vectorised operations and fast relative to nothing at all. Whether it matters depends entirely on size.
+
+On a thousand rows, an `apply` takes about a millisecond. Replacing it with `np.select` saves a millisecond and costs readability if the logic is genuinely branchy.
+
+On a million rows, the same `apply` takes seconds and dominates the script.
+
+The decision rule is to measure the actual frame, not to apply a blanket rule. `%timeit` on the real data answers it in seconds, and often the answer is that this particular `apply` is irrelevant and a different line is the problem.
+
+## A summary
+
+`map` for lookups &mdash; dict or Series &mdash; and remember unmatched keys become `NaN`.
+
+`apply` on a Series is a loop; on a frame with `axis=1` it is a slower loop.
+
+`DataFrame.map` (formerly `applymap`) touches every cell and is rarely the right tool.
+
+`np.where`, `np.select`, `pd.cut`, `.str` and `transform` replace most row-wise applies.
+
+A list comprehension over `zip` of columns often beats `apply(axis=1)`.
+
+`iterrows` is never the right choice; `itertuples` if you must iterate.
+
+And the size of the frame decides whether any of this matters.
+
+## A closing note
+
+`apply` occupies a strange place: it is the most reached-for method in pandas and rarely the right one.
+
+The reason is that it looks like the pandas way of doing something per row, and pandas has a reputation for speed, so it feels like it should be fast. It is a Python loop with a method-call interface, and it is no faster than the list comprehension it replaces.
+
+Nearly every row-wise `apply` is one of a handful of patterns with a vectorised form: a conditional is `np.where` or `np.select`, a lookup is `map`, a numeric band is `pd.cut`, string work is `.str`, and a group statistic is `transform`.
+
+That said, the honest position is not that `apply` is forbidden. On a small frame the difference is unmeasurable, and a readable `apply` beats a clever expression nobody can modify. The mistake is reaching for it by default rather than deciding, and never measuring whether it matters.
+
+## One more thing
+
+`Series.map` accepts a **function with a default** through `collections.defaultdict`, which is the neat way to map known values and leave everything else at a fallback without a separate `fillna`.
+
+And `apply` on a groupby is where `include_groups=False` now matters: in pandas 2.2 the grouping columns are passed to the function by default and that behaviour is being changed, so passing the argument explicitly is how you write code that behaves the same before and after the change.
+
+## In summary
+
+`map` substitutes, `apply` computes, and both call Python once per element.
+
+Nearly every row-wise `apply` has a vectorised equivalent &mdash; `np.where`, `np.select`, `map`, `pd.cut`, `.str`, `transform` &mdash; that is shorter as well as faster.
+
+`apply` remains the right answer for genuinely awkward per-row logic, for wrapping a function you cannot rewrite, and on frames small enough that the difference is unmeasurable. The mistake is reaching for it without deciding, and never measuring whether it matters.

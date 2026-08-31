@@ -1,0 +1,384 @@
+title: Looking at Data
+intro: The six calls to make before writing any analysis.
+
+## Why this comes before anything else
+
+Most pandas bugs are not bugs in pandas. They are assumptions about the data that were never checked: a column that is text where you expected numbers, an identifier that lost its leading zeros, a category with four spellings, a date column that is still strings.
+
+None of these raise. They produce plausible output that is wrong, and the error surfaces much later, somewhere unrelated.
+
+Six calls catch nearly all of it, and together they take under a minute.
+
+
+## shape and dtypes first
+
+Two lines that catch most of what goes wrong at the boundary.
+
+```python-run
+import pandas as pd
+import io
+
+csv = """id,name,age,joined
+001,ana,31,2021-04-05
+002,raj,,2022-01-10
+003,kim,40,2020-11-30
+"""
+df = pd.read_csv(io.StringIO(csv))
+
+print("shape :", df.shape, "(rows, columns)")
+print()
+print(df.dtypes)
+print()
+print("Three things to notice, none of which raised:")
+print("  id     -> int64, so the leading zeros are gone")
+print("  age    -> float64, because one value is missing")
+print("  joined -> object, because dates are not parsed by default")
+```
+
+## head, tail and sample
+
+Look at the data. The first rows are often not representative.
+
+```python-run
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({
+    "day": range(1, 21),
+    "sales": list(range(10, 30)),
+})
+print("head(3):"); print(df.head(3))
+print()
+print("tail(3):"); print(df.tail(3))
+print()
+print("sample is the one that shows you the middle:")
+print(df.sample(3, random_state=0))
+print()
+print("head alone hides sorted data, dated data and anything that")
+print("changes partway through the file.")
+```
+
+## info gives dtypes, nulls and memory together
+
+The single most useful call on an unfamiliar frame.
+
+```python-run
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({
+    "a": [1, 2, 3, 4],
+    "b": [1.5, np.nan, 3.5, np.nan],
+    "c": ["x", "y", "x", None],
+})
+df.info()
+print()
+print("Read the Non-Null Count column against the row count:")
+print("  b has 2 of 4, c has 3 of 4.")
+```
+
+## describe, and what it leaves out
+
+Numeric columns only, unless you ask otherwise.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "score": [10, 20, 30, 40, 1000],
+    "grade": ["a", "b", "a", "c", "a"],
+})
+print(df.describe())
+print()
+print("the text column is missing. include='all' brings it in:")
+print(df.describe(include="all"))
+print()
+print("Note the mean of score is 220 - one outlier moved it past every")
+print("value but one. Compare mean with the 50% row to spot that.")
+```
+
+## Counting missing values
+
+Per column, as a proportion, and which rows are affected.
+
+```python-run
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({
+    "a": [1, np.nan, 3, np.nan],
+    "b": [1, 2, 3, 4],
+    "c": [np.nan, np.nan, np.nan, 4.0],
+})
+print("missing per column:")
+print(df.isna().sum())
+print()
+print("as a share of rows:")
+print((df.isna().mean() * 100).round(1))
+print()
+print("rows with any missing value:", int(df.isna().any(axis=1).sum()), "of", len(df))
+print("rows that are complete     :", int(df.notna().all(axis=1).sum()))
+```
+
+## value_counts for the categorical columns
+
+The fastest way to find typos, stray categories and unexpected cardinality.
+
+```python-run
+import pandas as pd
+
+s = pd.Series(["pune", "delhi", "pune", "Pune", "delhi", "pune ", None])
+
+print(s.value_counts())
+print()
+print("four spellings of two cities - trailing space and a capital.")
+print()
+print("dropna=False shows the missing values too:")
+print(s.value_counts(dropna=False))
+print()
+print("normalize gives shares:")
+print((s.value_counts(normalize=True) * 100).round(1))
+print()
+print("nunique:", s.nunique(), " (excludes NaN by default)")
+```
+## shape and dtypes
+
+`df.shape` gives `(rows, columns)`. It confirms the file loaded as expected, and catches the case where a delimiter was misread and everything landed in one column.
+
+`df.dtypes` is the important one. Three failures show up here and nowhere else:
+
+**An identifier read as an integer.** `001` becomes `1`, and the leading zeros are gone permanently. Fix at read time with `dtype={"id": str}`.
+
+**An integer column turned float** because one value is missing. NumPy integers cannot hold NaN, so pandas promotes. The symptom downstream is ids printing as `1001.0`.
+
+**A numeric column read as `object`** because one row contains a stray non-numeric value. Every later numeric operation then either fails or silently operates on strings.
+
+Running these two lines immediately after loading is the highest-value habit in this module.
+
+## head, tail, sample
+
+Look at the data. Not the summary &mdash; the actual rows.
+
+`head()` shows the first five. That is fine for a random file and misleading for a sorted one, a dated one, or one where the format changes partway through.
+
+`tail()` catches trailing junk: summary rows, blank lines, a footer the exporter added.
+
+`sample(n, random_state=0)` shows the middle, which is where the surprises usually live. Passing `random_state` makes it reproducible, which matters if you are going to discuss what you saw.
+
+## info
+
+`df.info()` prints dtypes, non-null counts and memory usage together.
+
+The non-null count is the part to read carefully. Compare it against the row count for each column: a column with 400 non-null out of 10,000 rows is effectively empty and any analysis using it is built on 4% of the data.
+
+`memory_usage="deep"` gives the true cost of object columns, which the default underestimates badly because it counts the pointers rather than the strings they point at.
+
+## describe
+
+`df.describe()` gives count, mean, standard deviation, min, max and quartiles for **numeric columns only**.
+
+`include="all"` adds text columns, reporting count, unique, top and frequency for them instead.
+
+The most useful reading of it is the **mean against the median** (the 50% row). When they are far apart, the distribution is skewed or contains outliers, and every mean-based summary you were about to compute will mislead. A `mean` of 220 with a `50%` of 30 is telling you something important before you have written any analysis.
+
+`min` and `max` are also worth a glance for impossible values: a negative age, a date in 1900, a price of zero.
+
+## Missing values
+
+`df.isna().sum()` counts them per column. `df.isna().mean()` gives the proportion, which is easier to judge than a raw count.
+
+`df.isna().any(axis=1).sum()` counts rows affected by any missing value &mdash; the number you would lose to `dropna()`, and often much larger than any single column's count.
+
+Doing this before deciding how to handle missing data means the decision is informed rather than reflexive. Dropping 2% of rows is different from dropping 60%.
+
+## value_counts
+
+For every text or categorical column, run `value_counts()`.
+
+It finds, in one line: typos, inconsistent capitalisation, trailing whitespace, unexpected categories, and cardinality far higher than expected (often a sign the column is really an identifier).
+
+The last editor shows two cities appearing as four values &mdash; `pune`, `Pune`, and `pune ` with a trailing space. A group-by on that column would produce four groups, and nothing would warn you.
+
+`dropna=False` includes missing values in the count, which is otherwise invisible here.
+
+`normalize=True` gives shares rather than counts, which is the right form when comparing distributions between datasets.
+
+## A starting routine
+
+```python
+df.shape
+df.dtypes
+df.head()
+df.sample(5, random_state=0)
+df.info()
+df.describe(include="all")
+df.isna().mean()
+```
+
+Then `value_counts()` on each text column.
+
+It is not glamorous and it is not optional. Every one of these calls has a specific failure it catches, and the alternative is finding that failure later, in a result you have already shown someone.
+
+## Making the display readable
+
+Default display settings hide things, and hidden data is data you will not check.
+
+`pd.set_option("display.max_columns", None)` stops columns being elided into `...`, which is the single most useful setting on a wide frame.
+
+`pd.set_option("display.width", 200)` controls wrapping.
+
+`pd.set_option("display.max_rows", 100)` shows more before truncating.
+
+`pd.set_option("display.float_format", "{:.2f}".format)` stops fifteen decimal places dominating every table.
+
+These affect display only, never the data. In a notebook they are worth putting in the first cell.
+
+## Reading info carefully
+
+`df.info()` packs four things into one output, and each deserves a look.
+
+**The row count** in the header, against what you expected from the source.
+
+**Non-Null Count** per column, against that row count. This is the fastest way to find a column that is mostly empty.
+
+**Dtype** per column. `object` on something that should be numeric is a problem; `float64` on something that should be integer usually means a missing value.
+
+**Memory usage**, which needs `memory_usage="deep"` to be truthful about text columns.
+
+A column with, say, 400 non-null out of 200,000 rows is effectively empty. Any analysis using it is built on 0.2% of the data, and it is better to know that before building the analysis than after presenting it.
+
+## describe, beyond the defaults
+
+`percentiles=[0.01, 0.5, 0.99]` changes which quantiles are shown. The 1st and 99th are often more informative than the quartiles for spotting outliers.
+
+`include="all"` adds non-numeric columns, reporting `count`, `unique`, `top` and `freq` for them.
+
+`include=["object"]` or `exclude=["number"]` restrict it.
+
+`df.describe().T` transposes the result, which is much easier to read when there are many columns &mdash; one row per column instead of one column per column.
+
+Three readings worth making a habit:
+
+**mean against 50%** &mdash; far apart means skew or outliers.
+
+**min and max** &mdash; look for impossible values: a negative age, a zero price, a date in 1900.
+
+**std of zero** &mdash; a constant column, which carries no information and is often a sign something upstream went wrong.
+
+## Looking at the missing rows, not just counting them
+
+Counting missing values tells you how much. Looking at *which* rows are missing tells you why.
+
+```python
+df[df["income"].isna()].head()
+```
+
+If those rows share something &mdash; the same source, the same date range, the same category &mdash; then the data is not missing at random, and both dropping and imputing will bias the result.
+
+`df.isna().sum(axis=1).value_counts()` shows how many rows have 0, 1, 2... missing values. A long tail means a few badly broken rows; a big spike at one value often means an entire column is absent for a subset of the data.
+
+## Comparing two frames
+
+When something changes and you want to know what, three tools:
+
+`df.equals(other)` &mdash; exact, including dtypes.
+
+`df.compare(other)` &mdash; shows only the cells that differ, side by side. It requires identical shape and labels, which makes it right for before-and-after checks on the same data.
+
+`set(a.columns) ^ set(b.columns)` &mdash; the symmetric difference of column names, which is usually where the discrepancy is.
+
+## The routine, as a block
+
+```python
+pd.set_option("display.max_columns", None)
+
+df = pd.read_csv(path, nrows=1000)   # a sample first
+df.shape
+df.dtypes
+df.head()
+df.sample(5, random_state=0)
+df.info(memory_usage="deep")
+df.describe(include="all").T
+df.isna().mean().sort_values(ascending=False)
+for c in df.select_dtypes("object"):
+    print(df[c].value_counts(dropna=False).head())
+```
+
+That is a minute of work and it answers most of the questions you would otherwise discover the hard way: what types things are, where the gaps are, which categories are messy, and whether the file is what you were told it was.
+
+## Profiling a frame quickly
+
+For a fast overall picture beyond `describe`, three one-liners cover most of it:
+
+```python
+df.nunique().sort_values()                      # cardinality per column
+df.isna().mean().sort_values(ascending=False)   # missingness per column
+df.memory_usage(deep=True).sort_values(ascending=False)
+```
+
+Cardinality is the most under-used of the three. A column with one distinct value carries no information. A column with as many distinct values as rows is an identifier, not a feature. Everything interesting is in between, and the ranking tells you which columns are which without opening any of them.
+
+## Checking assumptions explicitly
+
+Looking at data is better than not looking, and asserting is better than looking, because an assertion keeps checking after you stop paying attention.
+
+```python
+assert df["id"].is_unique
+assert df["age"].between(0, 120).all()
+assert set(df["status"]) <= {"open", "closed"}
+assert df["date"].notna().all()
+```
+
+Each of these encodes something you believe about the data. When the belief stops being true &mdash; a new export, a changed upstream system &mdash; the script stops rather than producing a quietly wrong answer.
+
+That is worth more than any amount of exploratory looking, because the looking happens once and the assertions happen every run.
+
+## The shape of a first pass
+
+The order matters, because each step informs the next.
+
+**Shape and dtypes** &mdash; is this the file I think it is?
+
+**head, tail, sample** &mdash; does the data look like data?
+
+**info** &mdash; where are the gaps and how big is this?
+
+**describe** &mdash; are there impossible or extreme values?
+
+**value_counts on categoricals** &mdash; are the categories what I expect, and how many are there?
+
+**Missingness pattern** &mdash; are the gaps random or structured?
+
+Only then is it worth writing any analysis. Every one of these steps has caught, for someone, a problem that would otherwise have surfaced in a result presented to someone else.
+
+## Two habits that pay repeatedly
+
+**Look at the rows you are about to drop.** Before `dropna`, before a filter, before deduplication &mdash; `df[mask].head()`. If the rows you are discarding share a pattern, you are not removing noise, you are removing a category.
+
+**Compare counts before and after every step that can change them.** A filter, a merge, a group-by, a concat. One number, checked, catches silent row multiplication and silent row loss, which between them account for a large share of wrong answers in data work.
+
+## A closing note
+
+Every one of these calls exists because someone shipped a wrong answer that one of them would have caught.
+
+The routine is short enough to run without thinking about it, and the discipline is to run it **before** writing any analysis rather than after a result looks odd. By the time a number looks wrong, the cheap explanations have been ruled out and the expensive debugging has started.
+
+The single highest-value line is `df.dtypes`. It catches the identifier read as an integer, the date left as text, and the numeric column turned into strings by one stray value &mdash; three failures that produce plausible output and no error.
+
+The second is `value_counts` on the categorical columns, which finds the variants that would silently split a group-by.
+
+Neither takes more than a few seconds, and together they answer most of what you need to know about a file you have not seen before.
+
+## One more thing
+
+`df.head()` and `df.tail()` can be combined into one view with `pd.concat([df.head(3), df.tail(3)])`, which shows both ends of a sorted frame at once &mdash; useful when the interesting rows are the extremes.
+
+And `df.sample(frac=1)` shuffles the whole frame, which is occasionally the honest way to look at data that arrived in a meaningful order, since the first rows of a sorted file are not representative of anything.
+
+## In summary
+
+Six calls, run before any analysis, catch most of what goes wrong: `shape`, `dtypes`, `head`/`sample`, `info`, `describe`, and `value_counts` on the categorical columns.
+
+`dtypes` is the one that earns its place. It reveals the identifier read as a number, the date still stored as text, and the numeric column turned into strings by a single stray value &mdash; three failures that produce plausible output and no error at all.
+
+And an assertion is worth more than a look, because the look happens once and the assertion happens every run.

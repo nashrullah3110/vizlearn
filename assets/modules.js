@@ -4074,6 +4074,214 @@ window.VIZLEARN_MODULES = [
   "topic": "python",
   "icon": "code",
   "desc": ""
+ },
+ {
+  "title": "Adding and Removing Columns",
+  "path": "pandas/adding_and_dropping.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Counting and Binning",
+  "path": "pandas/counting_and_binning.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Creating DataFrames",
+  "path": "pandas/creating_dataframes.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Dates and Times",
+  "path": "pandas/datetimes.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Dtypes and Memory",
+  "path": "pandas/dtypes_and_memory.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Duplicates",
+  "path": "pandas/duplicates.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Filtering Rows",
+  "path": "pandas/filtering_rows.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Looking at Data",
+  "path": "pandas/inspecting_data.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Method Chaining",
+  "path": "pandas/method_chaining.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Missing Data",
+  "path": "pandas/missing_data.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Performance",
+  "path": "pandas/performance.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Reading and Writing Files",
+  "path": "pandas/reading_and_writing.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Reshaping: pivot and melt",
+  "path": "pandas/pivot_and_melt.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Sorting and Ranking",
+  "path": "pandas/sorting_and_ranking.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Stacking Frames with concat",
+  "path": "pandas/concat.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Text Columns",
+  "path": "pandas/string_methods.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "The Copy Warning",
+  "path": "pandas/the_copy_warning.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "The Index",
+  "path": "pandas/the_index.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "The MultiIndex",
+  "path": "pandas/multiindex.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "Time Series",
+  "path": "pandas/time_series.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "What pandas Is For",
+  "path": "pandas/what_is_pandas.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "apply, map and Vectorising",
+  "path": "pandas/apply_and_map.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "groupby",
+  "path": "pandas/groupby_basics.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "loc and iloc",
+  "path": "pandas/loc_and_iloc.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "merge and join",
+  "path": "pandas/merge_and_join.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
+ },
+ {
+  "title": "transform and filter",
+  "path": "pandas/groupby_transform.html",
+  "category": "pandas",
+  "topic": "pandas",
+  "icon": "table",
+  "desc": ""
  }
 ];
 

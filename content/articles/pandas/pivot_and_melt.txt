@@ -1,0 +1,370 @@
+title: Reshaping: pivot and melt
+intro: Long to wide and back, and when each shape is right.
+
+## Two shapes
+
+The same data can be laid out two ways.
+
+**Long** (or tidy) has one row per observation, with columns naming the variable and holding the value. City, year, sales &mdash; four rows for two cities over two years.
+
+**Wide** has one row per subject and a column per variable. Two rows, one per city, with a `2023` and a `2024` column.
+
+Neither is more correct. They suit different purposes, and most real work involves converting between them.
+
+Long form is better for **storage and computation**. Adding a year adds rows, not columns, so nothing downstream changes. Group-by works naturally. Missing combinations simply do not appear. Databases and most plotting libraries expect it.
+
+Wide form is better for **reading**. A table with years across the top is what people want to look at, and it is what a spreadsheet or a report needs.
+
+
+## Long and wide, the same data
+
+One row per observation, or one row per subject with a column per variable.
+
+```python-run
+import pandas as pd
+
+long = pd.DataFrame({
+    "city": ["pune", "pune", "delhi", "delhi"],
+    "year": [2023, 2024, 2023, 2024],
+    "sales": [10, 20, 30, 40],
+})
+print("long - one row per observation:")
+print(long)
+print()
+wide = long.pivot(index="city", columns="year", values="sales")
+print("wide - one row per city, one column per year:")
+print(wide)
+print()
+print("Same numbers. Long is better for storage and computation,")
+print("wide is better for reading and for a chart.")
+```
+
+## melt goes the other way
+
+Column names become values in a variable column.
+
+```python-run
+import pandas as pd
+
+wide = pd.DataFrame({
+    "city": ["pune", "delhi"],
+    "2023": [10, 30],
+    "2024": [20, 40],
+})
+print("wide:"); print(wide)
+print()
+long = wide.melt(id_vars="city", var_name="year", value_name="sales")
+print("melted:"); print(long)
+print()
+print("id_vars are the columns to KEEP as identifiers; everything")
+print("else is unpivoted. Naming both output columns is worth doing -")
+print("the defaults are 'variable' and 'value'.")
+```
+
+## pivot fails on duplicates
+
+Because it has no way to decide which value wins.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "city": ["pune", "pune", "delhi"],
+    "year": [2024, 2024, 2024],
+    "sales": [10, 20, 30],
+})
+print("pune/2024 appears twice:")
+print(df)
+print()
+try:
+    df.pivot(index="city", columns="year", values="sales")
+except ValueError as e:
+    print("pivot ->", type(e).__name__)
+    print("   ", str(e)[:58])
+print()
+print("pivot_table aggregates instead of failing:")
+print(df.pivot_table(index="city", columns="year", values="sales", aggfunc="sum"))
+```
+
+## pivot_table is the general tool
+
+It aggregates, fills and totals - pivot is the strict special case.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "city": ["pune", "pune", "delhi", "delhi"],
+    "plan": ["free", "paid", "free", "free"],
+    "sales": [10, 20, 30, 40],
+})
+print(df.pivot_table(index="city", columns="plan", values="sales",
+                     aggfunc="sum"))
+print()
+print("fill the gaps and add totals:")
+print(df.pivot_table(index="city", columns="plan", values="sales",
+                     aggfunc="sum", fill_value=0, margins=True))
+print()
+print("several statistics at once:")
+print(df.pivot_table(index="city", values="sales", aggfunc=["sum", "mean", "count"]))
+print()
+try:
+    df.pivot_table(index="city", values="sales", aggfunc=["sum", "size"])
+except AttributeError as e:
+    print("but 'size' in that list raises:", type(e).__name__)
+    print("   groupby handles it fine, which is the fallback:")
+    print(df.groupby("city")["sales"].agg(["sum", "size"]))
+```
+
+## stack and unstack move index levels
+
+The same reshape, expressed through the index rather than columns.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"a": [1, 2], "b": [3, 4]}, index=["x", "y"])
+print("wide:"); print(df)
+print()
+s = df.stack()
+print("stacked - columns became an index level:")
+print(s)
+print("   index:", s.index.names, "->", list(s.index)[:2], "...")
+print()
+print("unstack puts it back:")
+print(s.unstack())
+print()
+print("This is what groupby-with-two-keys plus unstack was doing.")
+```
+
+## Which shape to work in
+
+Long for computing, wide for reading - and pandas prefers long.
+
+```python-run
+import pandas as pd
+
+long = pd.DataFrame({
+    "city": ["pune", "pune", "delhi", "delhi"],
+    "year": [2023, 2024, 2023, 2024],
+    "sales": [10, 20, 30, 40],
+})
+print("in long form, a new question is one groupby:")
+print(long.groupby("year")["sales"].sum())
+print()
+wide = long.pivot(index="city", columns="year", values="sales")
+print("in wide form, the same question needs column arithmetic:")
+print(wide.sum())
+print()
+print("and adding a year means adding a COLUMN in wide form, which")
+print("changes every expression that named the old ones.")
+print()
+print("Keep data long; pivot at the end, for display.")
+```
+## pivot
+
+`df.pivot(index="city", columns="year", values="sales")` goes long to wide.
+
+Three arguments: what becomes the row index, what becomes the columns, and what fills the cells.
+
+`pivot` is strict. If a given index/column pair appears more than once, it **raises**, because there is no way to decide which value wins. That strictness is a feature &mdash; it tells you the data is not what you assumed rather than silently keeping one row.
+
+## pivot_table
+
+`pivot_table` is the general version: when a cell has several values, it **aggregates** them.
+
+```python
+df.pivot_table(index="city", columns="plan", values="sales", aggfunc="sum")
+```
+
+`aggfunc` defaults to `"mean"`, which is worth knowing before it surprises you &mdash; a pivot table of sales that averages when you expected a total looks entirely plausible.
+
+`fill_value` replaces the `NaN` in empty cells, usually with 0.
+
+`margins=True` adds row and column totals, labelled `All`.
+
+A list for `aggfunc` gives several statistics; a list for `index` or `columns` gives hierarchical axes.
+
+One wart, current as of pandas 2.2: `"size"` inside an `aggfunc` **list** raises `AttributeError`, while `"count"` in the same position works. `groupby(...).agg(["sum", "size"])` handles it without complaint, and is the fallback when you want a row count alongside other statistics. The difference between the two is the one from the group-by module &mdash; `size` counts rows, `count` counts non-missing values.
+
+`pivot_table` is essentially group-by with a nicer layout, and anything it does can be done with `groupby` plus `unstack`. It is worth using when the output is a table for a human.
+
+## melt
+
+`melt` goes wide to long.
+
+```python
+wide.melt(id_vars="city", var_name="year", value_name="sales")
+```
+
+`id_vars` are the columns to keep as identifiers. Everything else is unpivoted into two columns: one holding the old column names, one holding the values.
+
+Name both outputs. The defaults are `variable` and `value`, which say nothing and have to be renamed later anyway.
+
+`value_vars` restricts which columns are melted, when you want to unpivot some and keep others as identifiers.
+
+This is the operation for data that arrived from a spreadsheet with one column per month &mdash; a shape that is convenient to type and painful to compute with.
+
+## stack and unstack
+
+The same reshape expressed through the index.
+
+`stack()` moves the innermost **column** level into the index, making the frame taller and narrower. `unstack()` moves the innermost **index** level into the columns.
+
+These are what you reach for after a group-by with several keys, where the result already has a MultiIndex. `groupby(["city","year"]).sum().unstack()` gives the wide table directly.
+
+`unstack(fill_value=0)` fills the gaps, and `unstack(level=0)` chooses which level moves when there are more than two.
+
+## Which to work in
+
+The practical advice is to **keep data long and pivot at the end**.
+
+The reason is maintenance. In wide form, a new year means a new column, and every expression that named the old columns has to change. In long form it means new rows, and nothing changes at all.
+
+Long form also composes with everything else in pandas &mdash; group-by, filtering, joins all assume one row per observation.
+
+Pivot when the output is a table someone will read, a chart, or a file for a tool that expects wide. That is a display step, and it belongs at the end of the pipeline rather than the middle.
+
+## Tidy data
+
+The long form has a name and a definition, from Hadley Wickham's tidy data:
+
+Each **variable** is a column. Each **observation** is a row. Each type of observational unit is a table.
+
+Data that follows those rules composes with everything: group-by, filtering, joins and most plotting libraries all assume it.
+
+The common violations are worth recognising, because each has a standard fix.
+
+**Column headers are values, not variable names** &mdash; a column per year. Fix with `melt`.
+
+**Several variables in one column** &mdash; a `measure` column holding both height and weight. Fix with `pivot`.
+
+**Variables in both rows and columns** &mdash; fix with `melt` then `pivot`.
+
+**Several values in one cell** &mdash; `"a, b, c"` in one field. Fix with `str.split` and `explode`.
+
+## explode
+
+`df.explode("tags")` turns a column of lists into one row per element, repeating the other columns.
+
+It is the tool for data that arrived with several values per cell:
+
+```python
+df.assign(tag=df["tags"].str.split(",")).explode("tag")
+```
+
+Each tag becomes its own row, at which point it can be grouped and counted normally.
+
+The inverse is a group-by with `list` or `", ".join` as the aggregation.
+
+`explode` produces duplicate index labels, so `reset_index(drop=True)` usually follows.
+
+## pivot_table in more depth
+
+Beyond the basics, three arguments do real work.
+
+`aggfunc` accepts a **dict** keyed by column, so different values can be summarised differently in one table.
+
+`index` and `columns` accept **lists**, giving hierarchical axes &mdash; region and city down the side, year and quarter across the top.
+
+`dropna=False` keeps columns that are entirely empty, which matters when the table must have a fixed shape for comparison.
+
+`margins_name` renames the `All` row and column.
+
+The output is a frame with a MultiIndex on one or both axes, so the flattening step from the MultiIndex module usually follows if the result is going anywhere other than the screen.
+
+## Reshaping and memory
+
+Wide data with many empty cells is sparse, and pivoting long data into it can allocate far more than the input.
+
+A long frame with 100,000 rows covering 5,000 users and 3,000 products pivots into a 15,000,000-cell table, most of it `NaN`. The long form held 100,000 values.
+
+That is the main practical argument for staying long: the wide form materialises every combination, whether or not it occurred.
+
+When a wide layout is genuinely needed for a sparse dataset, `pivot_table` with `fill_value=0` at least avoids the float promotion that `NaN` forces, and a sparse dtype or a different tool is worth considering past a certain size.
+
+## Which operation, by shape
+
+**Long to wide, no duplicates** &mdash; `pivot`.
+
+**Long to wide, with aggregation** &mdash; `pivot_table`.
+
+**Wide to long** &mdash; `melt`.
+
+**Column level into index** &mdash; `stack`.
+
+**Index level into columns** &mdash; `unstack`.
+
+**Lists in cells into rows** &mdash; `explode`.
+
+**A frequency table of two variables** &mdash; `crosstab`, or `groupby` plus `unstack`.
+
+The reliable way to choose is to write down the shape you have and the shape you want, in rows and columns, and pick the operation that moves one to the other. Reshaping goes wrong when it is attempted by trial and error rather than by naming the target.
+
+## Reshaping for a chart
+
+Most plotting expects one of two shapes, and knowing which saves a lot of trial and error.
+
+`df.plot()` on a **wide** frame draws one line per column, using the index as the x-axis. That is why `groupby(...).unstack().plot()` works so neatly &mdash; unstack produces exactly that shape.
+
+Seaborn and similar libraries generally want **long** data, with columns naming the variable and the value, and a `hue=` argument doing the splitting.
+
+So the reshape before plotting depends on the library, and it is usually one call in either direction. Knowing which shape the function wants is faster than adjusting the data until the chart looks right.
+
+## Round-tripping
+
+`melt` then `pivot` returns to where you started, provided the identifier columns uniquely determine a row. If they do not, `pivot` raises on duplicates &mdash; which is a useful check that the identifiers are what you thought.
+
+That round trip is a quick way to test an assumption about the data's grain: if `pivot` complains, the key you believed was unique is not.
+
+## Column names after reshaping
+
+`pivot` and `pivot_table` use the values of the `columns` argument as column names, so the result's columns are data. That has two consequences.
+
+They may not be valid identifiers &mdash; a year is an integer, a product name may contain spaces &mdash; so `df.column_name` will not work and `df["2024"]` may need to be `df[2024]`.
+
+They change when the data changes. Code that names them breaks when a new category appears, which is the maintenance argument for staying long.
+
+`rename_axis(columns=None)` removes the axis name that pivoting leaves behind, which otherwise shows up as a stray label above the columns when printing.
+
+## A summary
+
+Long is one row per observation; wide is one row per subject.
+
+`pivot` for long to wide with unique pairs; `pivot_table` when aggregation is needed.
+
+`melt` for wide to long, naming both output columns.
+
+`stack`/`unstack` do the same through index levels.
+
+`explode` for lists in cells.
+
+Wide materialises every combination, so it can be far larger than the long form.
+
+Work long, pivot at the end, for display.
+
+And when a reshape is confusing, write down the shape you have and the shape you want &mdash; the operation follows from that, and trial and error rarely converges.
+
+## A closing note
+
+Reshaping is the operation people most often approach by trial and error, and the one where that approach works worst.
+
+The reliable method is to write down the shape you have and the shape you want &mdash; what is a row, what is a column &mdash; and pick the operation that moves between them. Long to wide is `pivot`, or `pivot_table` if any cell would hold more than one value. Wide to long is `melt`. Through the index instead of named columns, it is `stack` and `unstack`.
+
+The default that catches people is `pivot_table`'s `aggfunc="mean"`. A table of sales that quietly averages where you expected a total looks entirely plausible, and nothing indicates otherwise.
+
+And the structural advice is to stay long until the end. Wide data materialises every combination whether it occurred or not, and every new category changes the columns &mdash; and therefore every expression that names them.
+
+## One more thing
+
+`melt` accepts `ignore_index=False`, which keeps the original index rather than renumbering. That matters when the identifiers you want to keep are in the index rather than in columns, since `id_vars` only names columns.
+
+And `wide_to_long` handles the specific case of columns named with a stem and a suffix &mdash; `sales_2023`, `sales_2024` &mdash; unpivoting them into a stem column and a suffix column in one call, which is otherwise a `melt` followed by a `str.extract`.
+
+## In summary
+
+Long form is one row per observation and composes with everything; wide form is one row per subject and reads better.
+
+Convert with `pivot` and `melt`, or through the index with `stack` and `unstack`, and use `pivot_table` when a cell could hold more than one value &mdash; remembering that its `aggfunc` defaults to `mean`.
+
+Work long and pivot at the end. In wide form a new category is a new column, and every expression that named the old columns has to change.

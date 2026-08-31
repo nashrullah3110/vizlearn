@@ -1,0 +1,362 @@
+title: Dates and Times
+intro: Parsing them, the .dt accessor, and why a text date breaks everything downstream.
+
+## They arrive as text
+
+`read_csv` does not parse dates unless you tell it to. A date column comes in as `object`, and everything you do with it is then string behaviour wearing a date's clothes.
+
+Sorting is lexical. For ISO format &mdash; `YYYY-MM-DD` &mdash; that happens to give the right answer, which is why the problem often goes unnoticed until the data arrives in another format. `"15/01/2024"` sorts before `"01/03/2024"` as text, and there is no error.
+
+Comparison has the same problem, as does anything asking for a month, a weekday or a difference in days.
+
+The fix is `pd.to_datetime`, or `parse_dates=["col"]` at read time, which is faster because it happens during the read.
+
+Checking `df.dtypes` after loading catches this, which is why it is in the inspection routine.
+
+
+## Dates arrive as text
+
+And text sorts and compares the wrong way, silently.
+
+```python-run
+import pandas as pd
+
+s = pd.Series(["2024-03-01", "2024-01-15", "2024-11-02"])
+print("dtype as read:", s.dtype)
+print("sorted as text:", list(s.sort_values()))
+print("   looks fine - ISO dates happen to sort correctly as text")
+print()
+bad = pd.Series(["01/03/2024", "15/01/2024", "02/11/2024"])
+print("but any other format does not:")
+print("   ", list(bad.sort_values()))
+print()
+d = pd.to_datetime(s)
+print("after to_datetime:", d.dtype)
+print("   ", list(d.sort_values().dt.strftime("%Y-%m-%d")))
+```
+
+## Parsing, and being explicit about format
+
+Ambiguous formats are guessed, and the guess is not always yours.
+
+```python-run
+import pandas as pd
+
+print("day-first vs month-first is genuinely ambiguous:")
+print("   default  :", pd.to_datetime("05/04/2024").strftime("%d %b %Y"))
+print("   dayfirst :", pd.to_datetime("05/04/2024", dayfirst=True).strftime("%d %b %Y"))
+print()
+print("an explicit format removes the guess and is much faster:")
+d = pd.to_datetime(["05/04/2024", "06/04/2024"], format="%d/%m/%Y")
+print("   ", list(d.strftime("%Y-%m-%d")))
+print()
+print("bad values stop the parse unless you say otherwise:")
+mixed = pd.Series(["2024-01-01", "not a date", "2024-02-01"])
+try:
+    pd.to_datetime(mixed)
+except Exception as e:
+    print("    ->", type(e).__name__)
+print("   errors='coerce':", list(pd.to_datetime(mixed, errors="coerce")))
+```
+
+## The .dt accessor
+
+The same idea as .str, for the parts of a timestamp.
+
+```python-run
+import pandas as pd
+
+s = pd.to_datetime(pd.Series([
+    "2024-01-15 09:30:00", "2024-06-02 18:45:00", "2024-11-30 23:05:00"]))
+
+print("year   :", list(s.dt.year))
+print("month  :", list(s.dt.month))
+print("day    :", list(s.dt.day))
+print("hour   :", list(s.dt.hour))
+print("weekday:", list(s.dt.day_name()))
+print("quarter:", list(s.dt.quarter))
+print()
+print("date drops the time part:", list(s.dt.date))
+print("normalize keeps it a timestamp at midnight:")
+print("   ", list(s.dt.normalize().dt.strftime("%Y-%m-%d %H:%M")))
+print()
+print("format for output with strftime:")
+print("   ", list(s.dt.strftime("%d %b %Y")))
+```
+
+## Arithmetic gives durations
+
+Subtracting timestamps produces a Timedelta, which has its own accessor.
+
+```python-run
+import pandas as pd
+
+start = pd.to_datetime(pd.Series(["2024-01-01", "2024-03-15"]))
+end = pd.to_datetime(pd.Series(["2024-01-11", "2024-04-01"]))
+
+gap = end - start
+print("difference:", list(gap))
+print("dtype     :", gap.dtype)
+print()
+print("as numbers:")
+print("   days   :", list(gap.dt.days))
+print("   hours  :", list((gap.dt.total_seconds() / 3600).astype(int)))
+print()
+print("add a duration:")
+print("   ", list((start + pd.Timedelta(days=30)).dt.strftime("%Y-%m-%d")))
+print()
+print("offsets understand calendars in a way timedeltas do not:")
+print("   +1 month:", list((start + pd.DateOffset(months=1)).dt.strftime("%Y-%m-%d")))
+```
+
+## A DatetimeIndex unlocks time selection
+
+Put the dates in the index and you can slice by period.
+
+```python-run
+import pandas as pd
+import numpy as np
+
+idx = pd.date_range("2024-01-01", periods=90, freq="D")
+s = pd.Series(np.arange(90), index=idx)
+
+print("select a whole month by string:")
+print("   len(s['2024-02']) =", len(s["2024-02"]))
+print()
+print("a range, inclusive of both ends:")
+print("   len(s['2024-01-10':'2024-01-20']) =", len(s["2024-01-10":"2024-01-20"]))
+print()
+print("date_range builds the axis:")
+print("   ", list(pd.date_range("2024-01-01", periods=3, freq="ME").strftime("%Y-%m-%d")))
+print("   ", list(pd.date_range("2024-01-01", periods=3, freq="W").strftime("%Y-%m-%d")))
+```
+
+## Time zones, briefly
+
+Naive and aware timestamps do not mix, and the error is worth meeting once.
+
+```python-run
+import pandas as pd
+
+naive = pd.to_datetime(pd.Series(["2024-01-01 12:00"]))
+aware = naive.dt.tz_localize("UTC")
+
+print("naive:", list(naive.astype(str)))
+print("aware:", list(aware.astype(str)))
+print()
+print("converting to another zone:")
+print("   ", list(aware.dt.tz_convert("Asia/Kolkata").astype(str)))
+print()
+try:
+    naive - aware
+except Exception as e:
+    print("naive - aware ->", type(e).__name__)
+    print("   ", str(e)[:62])
+print()
+print("Pick one and stay there. Storing UTC and converting only for")
+print("display is the convention that causes the fewest surprises.")
+```
+## Parsing
+
+`pd.to_datetime` is good at guessing, and guessing is the problem.
+
+`05/04/2024` is 5 April in most of the world and 4 May in the United States. pandas has to pick one, and it will not necessarily pick yours.
+
+`dayfirst=True` states the convention. Better still, `format="%d/%m/%Y"` states the whole shape. That removes the ambiguity **and** is substantially faster, because pandas can skip inference entirely &mdash; on a large column the difference is large enough to notice.
+
+For messy input, `errors="coerce"` turns unparseable values into `NaT` (the datetime equivalent of NaN) rather than raising on the first bad row. Then `df[df["date"].isna()]` shows you exactly what failed, which is far more useful than a traceback naming one value.
+
+`NaT` behaves like NaN: it fails every comparison and is caught by `isna()`.
+
+## The .dt accessor
+
+Exactly parallel to `.str`.
+
+`s.dt.year`, `.month`, `.day`, `.hour`, `.minute` pull out components as integers.
+
+`s.dt.day_name()` and `s.dt.month_name()` give text.
+
+`s.dt.quarter`, `.dayofweek`, `.dayofyear`, `.is_month_end` cover the derived questions that would otherwise need arithmetic.
+
+`s.dt.date` drops the time and returns Python `date` objects &mdash; note that this gives an `object` column, which is usually not what you want. `s.dt.normalize()` keeps it a proper datetime column set to midnight, and is the better choice for grouping by day.
+
+`s.dt.strftime(fmt)` formats for output, returning text. That is the last step before display, not something to do in the middle of a pipeline.
+
+## Arithmetic
+
+Subtracting two datetime columns gives a `timedelta64` column.
+
+`gap.dt.days` gives whole days; `gap.dt.total_seconds()` gives the full duration as a float, which is what you want for anything sub-day or for converting to arbitrary units.
+
+Adding a fixed duration uses `pd.Timedelta(days=30)`.
+
+Adding a **calendar** period uses `pd.DateOffset(months=1)`. The distinction matters: a month is not a fixed number of days, so "one month after 31 January" is a calendar question, not an arithmetic one. `DateOffset` handles month ends and leap years; `Timedelta` cannot, because it does not know what month it is in.
+
+## DatetimeIndex
+
+Putting the dates in the index unlocks the time-aware selection that makes pandas pleasant for time series.
+
+`s["2024-02"]` selects the whole of February. `s["2024"]` selects the year. This is **partial string indexing**, and it works because pandas understands the index is a timeline.
+
+`s["2024-01-10":"2024-01-20"]` slices a range, inclusive of both endpoints as label slicing always is.
+
+`pd.date_range(start, periods=n, freq=...)` builds such an index. The frequency aliases are worth knowing: `D` daily, `W` weekly, `ME` month end, `MS` month start, `h` hourly. Note that pandas 2.2 renamed several of these &mdash; `M` became `ME` and `H` became `h` &mdash; so older code raises a deprecation warning or an error depending on version.
+
+A DatetimeIndex is also what `resample` requires, which is the subject of a later module.
+
+## Time zones
+
+A timestamp is either **naive** (no zone) or **aware** (a zone attached). The two cannot be compared or subtracted, and the error when you try is clear.
+
+`s.dt.tz_localize("UTC")` attaches a zone to naive timestamps, asserting what they always meant. `s.dt.tz_convert("Asia/Kolkata")` converts an aware timestamp to another zone.
+
+Getting these backwards is the usual mistake: `tz_localize` on data that is already aware raises, and `tz_convert` on naive data raises too.
+
+The convention that causes the fewest problems is to store everything in UTC and convert only for display. Mixed-zone data in one column is not representable as a proper datetime dtype at all &mdash; it falls back to `object` &mdash; which is a strong hint that normalising early is the right move.
+
+## Parsing performance
+
+Date parsing is one of the slowest parts of loading a large file, and it is almost entirely avoidable.
+
+`pd.to_datetime` without a format tries to infer one, per value in the worst case. With `format=` it uses a single known pattern and runs far faster &mdash; often by an order of magnitude on a large column.
+
+`format="ISO8601"` handles the common ISO variants without full inference.
+
+`cache=True` (the default for large inputs) helps enormously when the same date string repeats, as it does in any dataset with many rows per day.
+
+Parsing at read time with `parse_dates=` is faster than parsing afterwards, because pandas can do it while it already has the strings in hand.
+
+## Periods and offsets
+
+`Timestamp` is a point in time. `Period` is a span &mdash; a whole month, a quarter, a year.
+
+`s.dt.to_period("M")` converts timestamps to monthly periods. Grouping by that is often more natural than grouping by year and month separately, and it sorts correctly.
+
+`PeriodIndex` supports arithmetic in period units: adding 1 to a monthly period gives the next month, without the day-of-month ambiguity that plagues timestamp arithmetic.
+
+Offsets sit between the two. `pd.offsets.MonthEnd(1)`, `BusinessDay(3)`, `Week(weekday=0)` describe calendar movements. `df["date"] + pd.offsets.MonthEnd(0)` snaps each date to the end of its month, which is a common alignment step before joining monthly data.
+
+Business-day offsets understand weekends, and can take a holiday calendar, which is the sort of thing that is tedious to write by hand and easy to get subtly wrong.
+
+## Components, and the leap-year trap
+
+`.dt.year`, `.month`, `.day` are obvious. Two are not.
+
+`.dt.isocalendar()` returns ISO year, week and day, which is what you want for week-based reporting. The ISO year is **not** always the calendar year &mdash; the first days of January can belong to the previous ISO year &mdash; so grouping by `.dt.year` and ISO week together produces wrong groups at the boundary.
+
+`.dt.dayofweek` is 0 for Monday; `.dt.day_name()` gives the name and respects locale settings.
+
+Computing an age or a duration in years by dividing days by 365 is wrong by a day every four years and accumulates. For exact calendar differences, subtract periods or use `dateutil.relativedelta`.
+
+## Time zones, in more depth
+
+The rule that avoids nearly all trouble: **store UTC, convert for display**.
+
+`tz_localize` attaches a zone to naive timestamps, asserting what they always meant. It raises on data that is already aware.
+
+`tz_convert` moves an aware timestamp to another zone. It raises on naive data.
+
+Getting these the wrong way round is the usual error, and the messages are clear about which you needed.
+
+Two edge cases are worth knowing because they are real and they raise:
+
+**Ambiguous times** &mdash; when clocks go back, an hour occurs twice. `ambiguous="infer"`, `True`, `False`, or `NaT` decides.
+
+**Nonexistent times** &mdash; when clocks go forward, an hour does not exist. `nonexistent="shift_forward"` or `NaT` decides.
+
+Both only appear on real local-time data crossing a DST boundary, which is exactly when you least want a surprise.
+
+A column mixing time zones cannot be a proper datetime dtype and falls back to `object`, losing `.dt` entirely. Normalising on the way in prevents that.
+
+## A checklist for date columns
+
+Parse them at read time, with an explicit format.
+
+Check `dtype` afterwards &mdash; `datetime64[ns]` means it worked, `object` means it did not.
+
+Check the range with `min()` and `max()`. Dates in 1970 usually mean a zero timestamp; dates in 2099 usually mean a sentinel.
+
+Decide on a time zone and apply it once.
+
+Set the index if you will resample or select by period.
+
+Sort, if anything downstream will `diff`, `shift` or `rolling`.
+
+## Common date mistakes
+
+**Not parsing at all.** The column stays `object`, sorts lexically, and `.dt` raises. Check `dtypes`.
+
+**Letting the format be inferred** on ambiguous data. `05/04` is two different dates depending on convention.
+
+**Dividing days by 365** to get years. Wrong by a day every four years, and it accumulates.
+
+**Grouping by `.dt.year` and ISO week together.** The ISO year differs from the calendar year at the start of January, so the boundary weeks land in the wrong group.
+
+**Mixing naive and aware timestamps.** Raises, which is the good case; the bad case is a column that falls back to `object` and loses `.dt`.
+
+**Using `.dt.date`** and getting an `object` column. `.dt.normalize()` keeps it a datetime.
+
+**Assuming rows are sorted.** `diff` and `rolling` produce numbers regardless.
+
+## Working with durations
+
+A `timedelta64` column comes from subtracting two datetime columns.
+
+`gap.dt.days` truncates toward zero and discards the remainder; `gap.dt.total_seconds()` keeps everything and is the safer basis for converting to arbitrary units.
+
+`gap.dt.components` breaks a duration into days, hours, minutes and so on as separate columns.
+
+Durations aggregate: `mean`, `sum` and `describe` all work, and print in a readable form.
+
+For business durations &mdash; elapsed working days rather than calendar days &mdash; `np.busday_count` is the tool, and it takes a holiday list.
+
+## Generating date ranges
+
+`pd.date_range(start, end)` or `pd.date_range(start, periods=n, freq=...)` builds an axis.
+
+Three uses worth knowing:
+
+**Reindexing onto a complete calendar**, so missing days become explicit `NaN` rows rather than being absent.
+
+**Building test data** with a known shape.
+
+**Checking for gaps** &mdash; comparing the actual index against a complete range shows exactly which periods are missing:
+
+```python
+full = pd.date_range(s.index.min(), s.index.max(), freq="D")
+missing = full.difference(s.index)
+```
+
+That is a better answer than counting rows, because it names the gaps.
+
+`pd.bdate_range` does the same for business days.
+
+## A summary
+
+Parse at read time with an explicit format.
+
+Check the dtype is `datetime64[ns]` afterwards, and check the min and max for sentinel dates.
+
+`.dt` for components, `strftime` only for display.
+
+`Timedelta` for fixed durations, `DateOffset` for calendar ones.
+
+Store UTC; convert for display.
+
+Set a `DatetimeIndex` when you need period selection or `resample`.
+
+Sort before anything that compares a row with its neighbour.
+
+And remember pandas 2.2 renamed the frequency aliases &mdash; `M` to `ME`, `H` to `h` &mdash; which is the usual reason a copied example no longer runs.
+
+## A closing note
+
+Dates arrive as text, and everything that follows depends on noticing that.
+
+An unparsed date column sorts lexically, cannot do arithmetic, and has no `.dt`. For ISO-formatted dates the lexical sort happens to be correct, which is precisely why the problem often survives until the data arrives in a different format.
+
+Parsing with an explicit `format=` removes both the ambiguity between day-first and month-first and most of the parsing cost, which on a large column is substantial.
+
+After that, the two things worth being deliberate about are time zones and calendar arithmetic. Store UTC and convert for display, because mixed-zone columns cannot be a proper datetime dtype at all. And use `DateOffset` rather than `Timedelta` when you mean a calendar month, since a month is not a fixed number of days and only one of the two knows that.
+
+Finally, pandas 2.2 renamed the frequency aliases. When a copied example stops working, that is usually why.

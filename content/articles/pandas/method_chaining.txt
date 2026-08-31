@@ -1,0 +1,430 @@
+title: Method Chaining
+intro: Writing a pipeline as one expression.
+
+## What it buys
+
+Most pandas methods return a new object, which means they compose:
+
+```python
+out = (df
+       .query("year == 2024")
+       .assign(doubled=lambda d: d["sales"] * 2)
+       .groupby("city", as_index=False)["doubled"].sum())
+```
+
+Three things follow, and they are the actual argument for the style.
+
+**No intermediate names.** The `tmp`, `tmp2`, `df_clean`, `df_clean2` sequence is where stale-variable bugs live &mdash; particularly in a notebook where cells run out of order, and `df` is no longer what the cell above assumed.
+
+**Nothing is mutated.** The original frame is untouched, so re-running a cell gives the same answer. That alone removes a large class of notebook confusion.
+
+**Each line is one operation.** The chain reads top to bottom in the order the work happens, which nested function calls do not.
+
+The wrapping parentheses are what allow the line breaks. Without them the expression has to fit on one line or carry backslashes.
+
+
+## The same work, two ways
+
+Intermediate names against one expression.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "city": ["pune", "delhi", "pune", "goa"],
+    "sales": [10, 20, 30, 5],
+    "year": [2024, 2024, 2023, 2024],
+})
+
+# step by step
+tmp = df[df["year"] == 2024]
+tmp = tmp.assign(doubled=tmp["sales"] * 2)
+stepwise = tmp.groupby("city", as_index=False)["doubled"].sum()
+
+# chained
+chained = (df
+           .query("year == 2024")
+           .assign(doubled=lambda d: d["sales"] * 2)
+           .groupby("city", as_index=False)["doubled"].sum())
+
+print(chained)
+print()
+print("identical:", stepwise.equals(chained))
+print()
+print("No tmp, no tmp2, and no chance of using a stale one.")
+```
+
+## lambda is what makes assign chain
+
+It sees the frame at that point, not the one you started with.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"a": [1, 2, 3]})
+
+out = (df
+       .assign(b=lambda d: d["a"] * 10)
+       .assign(c=lambda d: d["b"] + 1))
+print(out)
+print()
+print("the second assign used the column the first one made.")
+print()
+print("without the lambda it would have to exist already:")
+try:
+    df.assign(b=df["a"] * 10, c=df["b"] + 1)
+except KeyError as e:
+    print("   KeyError:", e)
+```
+
+## pipe puts your own function in the chain
+
+For steps that are not a pandas method.
+
+```python-run
+import pandas as pd
+
+def drop_small(d, threshold):
+    return d[d["sales"] >= threshold]
+
+def add_share(d):
+    return d.assign(share=(d["sales"] / d["sales"].sum() * 100).round(1))
+
+df = pd.DataFrame({"city": ["pune", "delhi", "goa"], "sales": [30, 20, 5]})
+
+out = (df
+       .pipe(drop_small, threshold=10)
+       .pipe(add_share))
+print(out)
+print()
+print("pipe(f, args) is just f(df, args), written so it reads in order.")
+print("Without it the chain has to be turned inside out: add_share(drop_small(df, 10))")
+```
+
+## Debugging a chain
+
+The usual objection, and the usual answer.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"city": ["pune", "delhi"], "sales": [30, 20]})
+
+def show(d, label):
+    print("%-10s shape %s cols %s" % (label, d.shape, list(d.columns)))
+    return d
+
+out = (df
+       .pipe(show, "start")
+       .assign(doubled=lambda d: d["sales"] * 2)
+       .pipe(show, "after assign")
+       .query("doubled > 40")
+       .pipe(show, "after filter"))
+print()
+print(out)
+print()
+print("A pipe that prints and returns unchanged lets you see inside")
+print("without breaking the chain apart.")
+```
+
+## Where chaining stops helping
+
+Long chains hide where things went wrong.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+
+try:
+    (df
+     .assign(c=lambda d: d["a"] + d["b"])
+     .assign(d=lambda d: d["c"] * 2)
+     .assign(e=lambda d: d["typo"] + 1)
+     .assign(f=lambda d: d["e"] / 2))
+except KeyError as e:
+    print("KeyError:", e)
+print()
+print("The traceback points at the chain, not at which link failed.")
+print("Four steps is comfortable. Fifteen is a debugging problem, and")
+print("breaking it into two named stages costs nothing.")
+```
+
+## A realistic pipeline
+
+Load, clean, aggregate - as one readable expression.
+
+```python-run
+import pandas as pd
+import io
+
+csv = """city,plan,amount
+ Pune ,free,10
+delhi,paid,20
+PUNE,paid,30
+goa,free,
+"""
+out = (pd.read_csv(io.StringIO(csv))
+       .assign(city=lambda d: d["city"].str.strip().str.lower())
+       .dropna(subset=["amount"])
+       .astype({"amount": "int64"})
+       .groupby(["city", "plan"], as_index=False)["amount"].sum()
+       .sort_values("amount", ascending=False)
+       .reset_index(drop=True))
+print(out)
+print()
+print("Six steps, no intermediate names, and each line is one idea.")
+```
+## assign and the lambda
+
+`assign` is what makes computation chainable, and the lambda is what makes `assign` work mid-chain.
+
+`d.assign(b=d["a"] * 10)` computes against the frame **as it was before the chain started**. Inside a chain that is usually wrong, and if the column it needs was created two steps earlier it raises `KeyError`.
+
+`d.assign(b=lambda d: d["a"] * 10)` receives the frame **at that point**, so it sees everything earlier steps produced.
+
+Use the lambda form by default in a chain. It costs eight characters and removes the class of error entirely.
+
+## pipe
+
+Not every step is a pandas method. `pipe` inserts your own function without breaking the chain:
+
+```python
+df.pipe(drop_small, threshold=10).pipe(add_share)
+```
+
+`df.pipe(f, x)` is exactly `f(df, x)`. The gain is order: the nested form, `add_share(drop_small(df, 10))`, reads inside out and gets worse with every step.
+
+For this to work, your functions should take a frame as the first argument and return a frame. That is a good shape for them anyway &mdash; it makes them testable in isolation.
+
+## Debugging
+
+The standard objection to chaining is that you cannot see what is happening in the middle, and cannot set a breakpoint on a step.
+
+The answer is a pipe that inspects and returns unchanged:
+
+```python
+def show(d, label):
+    print(label, d.shape, list(d.columns))
+    return d
+```
+
+Dropped into the chain, it prints the shape at each stage without changing the result. Most chain bugs are a shape or a column name, and that catches both.
+
+For a heavier version, log `d.head()` or write the intermediate to a file. The principle is the same: a function that returns its input can go anywhere in a chain.
+
+## Where to stop
+
+Chaining is a style, not a virtue, and it stops paying at some length.
+
+**The traceback problem.** When a fifteen-step chain raises `KeyError: 'typo'`, the traceback points at the whole expression. You know it failed; you do not immediately know where. The last-but-one editor shows this.
+
+**The reading problem.** A chain is one expression, so it has to be understood as a whole. Past a certain length that is harder than reading five named steps.
+
+**The reuse problem.** An intermediate result needed twice has to be computed twice, or the chain has to be broken anyway.
+
+A workable rule: chain a coherent stage &mdash; loading and cleaning, or aggregating and formatting &mdash; and give each stage a name.
+
+```python
+clean = (raw.pipe(normalise_columns).dropna(subset=["id"]))
+summary = (clean.groupby("city").agg(...).sort_values("total"))
+```
+
+Two names instead of ten, and each chain is short enough to debug.
+
+## Where it fits
+
+The style suits **load, clean, aggregate** work particularly well, because that work is naturally a sequence of transformations with no branching.
+
+It suits exploratory notebook work, because immutability makes re-running cells safe.
+
+It suits less well anything with branching logic, loops, or steps whose output feeds two different places &mdash; at which point named intermediates are simply clearer, and there is nothing wrong with using them.
+
+## Which methods chain
+
+Anything returning a DataFrame or Series can be chained, which is most of the API:
+
+Selection &mdash; `query`, `loc` with a callable, `filter`, `head`, `sample`, `nlargest`.
+
+Modification &mdash; `assign`, `rename`, `drop`, `astype`, `fillna`, `replace`, `round`.
+
+Reshaping &mdash; `sort_values`, `set_index`, `reset_index`, `melt`, `pivot`, `stack`, `unstack`, `explode`.
+
+Aggregation &mdash; `groupby(...).agg(...)`, `value_counts`, `describe`.
+
+Anything else &mdash; `pipe`.
+
+The methods that break a chain are the ones returning `None`: anything with `inplace=True`, and `sort` / `shuffle`-style in-place methods. That is one more reason to avoid `inplace`.
+
+## Naming the stages
+
+The practical shape for a real script is a few named stages rather than one long chain:
+
+```python
+raw = pd.read_csv(path, dtype=..., parse_dates=[...])
+
+clean = (raw
+         .pipe(normalise_columns)
+         .dropna(subset=["id"])
+         .astype({"id": "string"}))
+
+summary = (clean
+           .query("year == 2024")
+           .groupby("city", as_index=False)
+           .agg(total=("sales", "sum")))
+```
+
+Each stage is short enough to debug, each name says what the data is at that point, and the intermediates are available for inspection without breaking anything apart.
+
+That structure also tests well: `normalise_columns` and each stage can be checked independently.
+
+## Chaining and memory
+
+Each step in a chain allocates. A ten-step chain on a large frame allocates ten frames, though earlier ones are freed as it proceeds, so peak memory is roughly two at a time rather than ten.
+
+That is acceptable for most work and worth knowing when the frame is large enough that a single copy is significant.
+
+Filtering early in the chain reduces every allocation after it, which is the same advice as everywhere else and matters more here because there are more of them.
+
+## Common chaining mistakes
+
+**Forgetting the lambda in `assign`.** The expression is then evaluated against the pre-chain frame, and raises if it needs a column made mid-chain.
+
+**Using `inplace=True` in a chain.** Returns `None`, and the next method raises `AttributeError` on `NoneType`.
+
+**Assuming the index survives.** `reset_index(drop=True)` at the point it matters, not at the end.
+
+**A chain that is really two operations.** If an intermediate is needed twice, the chain has to compute it twice or be broken. Break it.
+
+**Debugging by deleting lines.** Better to insert a `pipe` that prints, which does not change the structure.
+
+## When not to chain
+
+Chaining suits linear transformation. It does not suit:
+
+**Branching** &mdash; different handling depending on a condition.
+
+**Loops** &mdash; over files, groups or parameters.
+
+**Reuse** &mdash; an intermediate needed by two downstream steps.
+
+**Error handling** &mdash; a try/except around one step.
+
+In all four cases, named intermediates are clearer, and reaching for a chain anyway produces code that is harder to read than the thing it replaced.
+
+The style is a tool for the common case of "load, clean, aggregate, output", where it genuinely reads better than the alternative. It is not a standard to hold all code to.
+
+## A realistic shape for a script
+
+Chaining works best as a few named stages rather than one long expression or a hundred separate statements:
+
+```python
+def load(path):
+    return pd.read_csv(path, dtype=DTYPES, parse_dates=["date"])
+
+def clean(d):
+    return (d
+            .rename(columns=str.lower)
+            .dropna(subset=["id"])
+            .assign(city=lambda x: x["city"].str.strip().str.lower())
+            .drop_duplicates(subset=["id"], keep="last"))
+
+def summarise(d):
+    return (d
+            .query("date >= @CUTOFF")
+            .groupby("city", as_index=False)
+            .agg(total=("sales", "sum"), orders=("sales", "size"))
+            .sort_values("total", ascending=False))
+
+result = summarise(clean(load(path)))
+```
+
+Each function is testable on its own, each chain is short enough to debug, and the top-level line reads as what the script does.
+
+`load(path).pipe(clean).pipe(summarise)` expresses the same thing in chain form, which reads in order rather than inside out.
+
+## Chaining and notebooks
+
+The style suits notebooks particularly well, for a reason worth stating: cells get re-run, out of order, repeatedly.
+
+A chain does not mutate its input, so re-running a cell gives the same result. A sequence of in-place modifications does not &mdash; running it twice applies the transformation twice, and the frame is now wrong in a way nothing indicates.
+
+That failure is common enough that "restart and run all" is standard advice. Chaining removes most of the need for it.
+
+## Readability in practice
+
+A few conventions make chains easier to read:
+
+One operation per line.
+
+Wrapping parentheses, so no backslashes are needed.
+
+A blank line between logical stages within a long chain.
+
+`pipe` for anything that is not a pandas method, rather than breaking out.
+
+Names for intermediates at genuine stage boundaries.
+
+And a limit: if you cannot see the whole chain on one screen, split it. The point of the style is clarity, and a chain that has to be scrolled has stopped providing it.
+
+## A summary
+
+Chaining removes intermediate names and the stale-variable bugs that come with them.
+
+Nothing is mutated, so re-running is safe.
+
+`assign` needs a lambda to see the frame mid-chain.
+
+`pipe` inserts your own functions in reading order.
+
+A `pipe` that prints and returns its input lets you debug without breaking the chain.
+
+Long chains hide which link failed &mdash; name coherent stages instead.
+
+And it is a style for linear transformation, not a rule for all code; branching, loops and reuse are clearer with names.
+
+## A closing note
+
+Method chaining is one of the few stylistic choices in pandas that changes how many bugs you write rather than merely how the code looks.
+
+The mechanism is not elegance. It is that intermediate names are where stale state lives: `df_clean` that was cleaned by an earlier version of the cell above, `tmp2` that is a filtered copy of `tmp` from before the filter changed. A chain has nowhere for that to hide.
+
+The immutability matters for the same reason. Code that does not modify its input produces the same answer on the second run as the first, which is the property notebooks most often lack.
+
+Against that, a chain is one expression, and one expression fails as a unit. The balance is struck by keeping chains to a coherent stage and giving each stage a name &mdash; which is ordinary good structure, applied to data transformation.
+
+## Two more things worth knowing
+
+`pipe` has a second form for functions whose frame argument is not first: `df.pipe((func, "data"), other_arg)` tells pandas which parameter receives the frame. It is rarely needed, and it exists so that third-party functions with awkward signatures can still be chained.
+
+`assign` accepts plain values as well as lambdas, and mixing the two in one call is legal. The rule is that a plain value is evaluated once, against the frame as it was before the chain started, so a plain value referring to a column made mid-chain will fail. Using lambdas uniformly avoids having to hold that distinction in mind.
+
+Finally, chains and comments coexist badly &mdash; there is no natural place to explain a step. That is a real argument for named stages: a function name is a comment that cannot drift out of date.
+
+## Chaining and testing
+
+One practical benefit of the named-stage structure is that it makes a pipeline testable without any test framework ceremony.
+
+Each stage takes a frame and returns a frame, so each can be checked on a small hand-built input:
+
+```python
+def test_clean():
+    raw = pd.DataFrame({"ID": [1, 1, None], "City": [" Pune ", "pune", "goa"]})
+    out = clean(raw)
+    assert len(out) == 1
+    assert list(out["city"]) == ["pune"]
+```
+
+That is a genuine unit test of a data transformation, and it is possible only because `clean` is a function rather than a sequence of statements operating on a global `df`.
+
+The same structure makes the pipeline reusable across scripts and notebooks, and makes it obvious where a new step belongs. Chaining, in this reading, is less about elegance than about pushing data transformations into functions that can be named, tested and reused &mdash; which is ordinary software practice arriving somewhere it is often skipped.
+
+## In summary
+
+Chaining is a style that suits linear transformation, which is most of what data cleaning is.
+
+It removes intermediate names and the stale-state bugs that live in them, it does not mutate its input so re-running is safe, and it reads in the order the work happens.
+
+Its costs are real: a failure points at the whole expression, an intermediate needed twice forces a break, and branching or looping does not fit at all.
+
+The resolution is named stages of a handful of steps each, which keeps the benefits and makes each stage short enough to debug and small enough to test.

@@ -1,0 +1,404 @@
+title: Duplicates
+intro: Finding repeated rows and deciding which one to keep.
+
+## duplicated marks the copies
+
+`df.duplicated()` returns a boolean Series: `True` for a row that has been seen before, `False` for its first occurrence.
+
+That asymmetry is deliberate. It means `df[~df.duplicated()]` keeps exactly one of each, and `df[df.duplicated()]` shows you what would be removed.
+
+`keep` controls which occurrence is treated as the original:
+
+`keep="first"` (the default) flags every copy after the first.
+
+`keep="last"` flags every copy before the last.
+
+`keep=False` flags **all** of them, including the first. This is the one to use when inspecting, because it shows you the complete groups rather than half of each.
+
+
+## duplicated flags the repeats, not the original
+
+The first occurrence is False by default, which is what makes it a drop mask.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "name": ["ana", "raj", "ana", "kim", "raj"],
+    "city": ["pune", "delhi", "pune", "goa", "delhi"],
+})
+print(df.assign(dup=df.duplicated()))
+print()
+print("total duplicated rows:", int(df.duplicated().sum()))
+print()
+print("keep='last' flags the earlier ones instead:")
+print(list(df.duplicated(keep="last")))
+print("keep=False flags EVERY copy, including the first:")
+print(list(df.duplicated(keep=False)))
+```
+
+## subset is where the meaning lives
+
+Rows are rarely duplicated in every column - usually just in the key.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "id": [1, 2, 1, 3],
+    "name": ["ana", "raj", "ana", "kim"],
+    "score": [10, 20, 99, 30],
+})
+print(df)
+print()
+print("whole-row duplicates:", int(df.duplicated().sum()),
+      "<- none, the scores differ")
+print("duplicate ids       :", int(df.duplicated(subset=["id"]).sum()))
+print()
+print("That is the real question: is 'id' supposed to be unique?")
+print(df[df.duplicated(subset=["id"], keep=False)])
+```
+
+## drop_duplicates keeps the first by default
+
+So the row you keep depends on the order the frame happens to be in.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({
+    "id": [1, 1, 2],
+    "updated": ["2024-01-01", "2024-06-01", "2024-03-01"],
+    "score": [10, 99, 20],
+})
+print("as loaded:")
+print(df.drop_duplicates(subset=["id"]))
+print()
+print("that kept score 10 - the FIRST row, not the newest.")
+print()
+best = df.sort_values("updated").drop_duplicates(subset=["id"], keep="last")
+print("sort first, then keep='last':")
+print(best)
+print()
+print("Deduplication without an explicit sort is a coin flip.")
+```
+
+## Duplicates that are not identical
+
+Whitespace and case make two spellings of the same thing.
+
+```python-run
+import pandas as pd
+
+s = pd.Series(["Pune", "pune ", "PUNE", "delhi"])
+print("raw value_counts:")
+print(s.value_counts())
+print()
+clean = s.str.strip().str.lower()
+print("after strip().lower():")
+print(clean.value_counts())
+print()
+print("duplicates before:", int(s.duplicated().sum()))
+print("duplicates after :", int(clean.duplicated().sum()))
+print()
+print("Normalise before deduplicating, or you keep four cities.")
+```
+
+## Counting instead of dropping
+
+Sometimes the repeat is the data, and you want it aggregated.
+
+```python-run
+import pandas as pd
+
+orders = pd.DataFrame({
+    "customer": ["ana", "raj", "ana", "ana", "kim"],
+    "amount": [100, 200, 50, 75, 300],
+})
+print("how many rows per customer:")
+print(orders["customer"].value_counts())
+print()
+print("collapse them into one row each:")
+print(orders.groupby("customer", as_index=False)
+      .agg(orders=("amount", "size"), total=("amount", "sum")))
+print()
+print("Dropping duplicates here would have thrown away real orders.")
+```
+
+## Checking uniqueness as an assertion
+
+Cheaper to state the assumption than to debug the join that breaks later.
+
+```python-run
+import pandas as pd
+
+df = pd.DataFrame({"id": [1, 2, 3], "v": [10, 20, 30]})
+dupe = pd.DataFrame({"id": [1, 2, 2], "v": [10, 20, 30]})
+
+for name, frame in [("clean", df), ("with a repeat", dupe)]:
+    unique = frame["id"].is_unique
+    print("%-14s id unique: %s" % (name, unique))
+
+print()
+print("as a hard check:")
+try:
+    assert dupe["id"].is_unique, "id must be unique"
+except AssertionError as e:
+    print("   AssertionError:", e)
+print()
+print("A duplicated key silently multiplies rows in a merge, which is")
+print("the subject of a later module and a very common surprise.")
+```
+## subset is the important argument
+
+Whole-row duplicates &mdash; every column identical &mdash; are the easy case and often not the real one.
+
+The question that usually matters is whether a **key** is repeated. Two rows with the same customer id and different scores are not identical rows, but they may well be a data problem.
+
+`df.duplicated(subset=["id"])` asks that question. Combined with `keep=False`, it shows you every conflicting group:
+
+```python
+df[df.duplicated(subset=["id"], keep=False)].sort_values("id")
+```
+
+That is the first thing to run when a key is supposed to be unique and something downstream suggests it is not.
+
+## Order decides what survives
+
+`drop_duplicates` keeps the first matching row **in the frame's current order**.
+
+That order is whatever the data happened to arrive in. If the rows represent versions of a record and you want the newest, keeping the first is arbitrary &mdash; it will be right sometimes and wrong sometimes, and nothing will tell you which.
+
+Sort deliberately first:
+
+```python
+df.sort_values("updated").drop_duplicates(subset=["id"], keep="last")
+```
+
+Now "the newest per id" is what the code says, and it does not depend on how the file was written.
+
+This is one of the most common silent errors in data cleaning, because the result always looks plausible: you asked for one row per id and you got one row per id.
+
+## Near-duplicates
+
+Exact matching misses the duplicates that actually occur in real data.
+
+`"Pune"`, `"pune "` and `"PUNE"` are three distinct values to pandas and one city to everyone else. So are `"Ltd"` and `"Ltd."`, or a name with a double space.
+
+Normalise before deduplicating:
+
+```python
+df["city"] = df["city"].str.strip().str.lower()
+```
+
+`value_counts()` on the column before and after is the quickest way to see how much difference it made, and to spot the variants you had not thought of.
+
+For genuinely fuzzy matching &mdash; misspellings, transpositions &mdash; pandas has nothing built in, and the answer is a dedicated library. But stripping and lowercasing catches the large majority of real cases and costs one line.
+
+## Sometimes the repeat is the data
+
+Not every repeated value is an error. Five orders from the same customer are five orders.
+
+The tell is whether the rows carry independent information. If the duplicate rows differ in a meaningful column, dropping them destroys data; the operation you want is an aggregation:
+
+```python
+orders.groupby("customer", as_index=False).agg(
+    orders=("amount", "size"),
+    total=("amount", "sum"),
+)
+```
+
+That collapses each customer to one row and keeps what the repeats were telling you.
+
+Reaching for `drop_duplicates` when you meant `groupby` is a quiet way to lose most of a dataset.
+
+## Assert uniqueness where you assume it
+
+`s.is_unique` is a cheap check, and `df.index.is_unique` covers the index.
+
+Where a key is supposed to be unique &mdash; because it is a primary key, or because a later merge depends on it &mdash; an explicit assertion is worth the line:
+
+```python
+assert df["id"].is_unique, "id must be unique"
+```
+
+The reason is specific: a duplicated key on either side of a `merge` silently multiplies rows. Ten thousand rows join to eleven thousand, nobody notices, and every subsequent sum is inflated. `merge(..., validate="one_to_one")` catches it at the join, and asserting earlier catches it closer to the cause.
+
+## Duplicates as a data-quality signal
+
+A duplicate is rarely just a duplicate. It usually means one of a small number of things, and identifying which changes what you should do.
+
+**A repeated load.** The same file processed twice, or an append that ran again. Whole-row duplicates, exact. Safe to drop.
+
+**A join that multiplied rows.** Duplicates in some columns and not others, appearing only after a merge. The fix is at the merge, not here.
+
+**Genuine repeated events.** Two orders from the same customer. Not duplicates at all; aggregate rather than drop.
+
+**Multiple versions of a record.** Same key, different timestamps. Keep one, and *which* one matters &mdash; sort first.
+
+**Near-duplicates from inconsistent entry.** Same entity, different spelling. Normalise first, or you will keep both.
+
+Running `df.duplicated().sum()` and `df.duplicated(subset=[key]).sum()` and comparing the two numbers usually tells you which case you are in.
+
+## Finding what differs
+
+When a key is duplicated but the rows are not identical, the useful question is which columns disagree:
+
+```python
+dupes = df[df.duplicated(subset=["id"], keep=False)].sort_values("id")
+```
+
+Sorting by the key puts the conflicting rows next to each other, which makes the differing column obvious by eye on a small number of groups.
+
+For a systematic answer, group by the key and count distinct values per column:
+
+```python
+df.groupby("id").nunique().max()
+```
+
+Any column with a maximum above 1 disagrees somewhere. That points straight at the columns worth investigating.
+
+## Deduplicating with a rule
+
+"Keep the newest" is the most common rule, and it is two steps:
+
+```python
+df.sort_values("updated").drop_duplicates(subset=["id"], keep="last")
+```
+
+"Keep the most complete" is a different rule and needs a helper column:
+
+```python
+df.assign(filled=df.notna().sum(axis=1))
+  .sort_values("filled")
+  .drop_duplicates(subset=["id"], keep="last")
+```
+
+"Merge the rows" &mdash; taking the first non-missing value of each column &mdash; is a group-by:
+
+```python
+df.groupby("id", as_index=False).first()
+```
+
+`first()` skips missing values, so it combines partial records rather than picking one. That is often what people actually want when they reach for `drop_duplicates`.
+
+## Duplicated columns and index labels
+
+Duplicate **column names** are legal and cause real confusion: `df["a"]` returns a DataFrame rather than a Series when two columns are called `a`.
+
+`df.columns.duplicated()` finds them, and they usually arrive from a merge with overlapping names or a bad header row.
+
+`df.loc[:, ~df.columns.duplicated()]` keeps the first of each.
+
+Duplicate **index labels** have the same problem for row selection, and `reset_index(drop=True)` is the usual fix.
+
+## Before a join, always
+
+The single highest-value use of everything in this module is the check before a merge:
+
+```python
+assert df["id"].is_unique
+```
+
+on whichever side is supposed to be unique.
+
+A duplicate there multiplies rows silently, inflates every subsequent total, and is invisible in the output. Checking costs one line, and `merge(..., validate="many_to_one")` makes the check part of the operation itself.
+
+## Duplicates and the index
+
+Row duplicates and **index** duplicates are different problems with different symptoms.
+
+A duplicated index makes `.loc[label]` return several rows where code expects one, breaks `reindex`, and makes some joins raise.
+
+`df.index.is_unique` checks it; `df[df.index.duplicated(keep=False)]` shows the offenders; `reset_index(drop=True)` fixes it when the labels carry no meaning.
+
+Duplicated index labels usually arrive from `concat` without `ignore_index=True`, or from `explode`, or from a group-by result that was reshaped. None of them warns.
+
+## Fuzzy duplicates
+
+Exact matching finds only the easy cases. Real duplicate records differ in ways that require judgement:
+
+Whitespace and case &mdash; fixed by normalising, and worth doing always.
+
+Punctuation &mdash; `"Ltd"` and `"Ltd."`.
+
+Abbreviations &mdash; `"Street"` and `"St"`.
+
+Transpositions and typos &mdash; genuinely fuzzy.
+
+Different formats for the same value &mdash; phone numbers, dates as text.
+
+pandas handles the first two well and the rest not at all. For the rest, the honest options are a normalisation function encoding the domain's conventions, or a dedicated record-linkage library. What does not work is hoping `drop_duplicates` will catch them.
+
+The practical approach: normalise aggressively into a **separate** key column, deduplicate on that, and keep the original values. That way the matching is explicit and the data is not damaged.
+
+## Counting rather than removing
+
+Before dropping anything, it is worth knowing what the duplicates represent:
+
+```python
+counts = df["id"].value_counts()
+counts[counts > 1]
+```
+
+If most keys appear once and a few appear twice, that is probably a data-entry issue. If every key appears exactly three times, the data has a structure you have not accounted for &mdash; three records per entity, perhaps one per year &mdash; and deduplicating would destroy it.
+
+That distinction is not visible from the duplicate count alone, and it changes the correct action completely.
+
+## A summary
+
+`duplicated()` flags repeats but not the first; `keep=False` flags every copy.
+
+`subset=` asks the question that usually matters: is the **key** duplicated?
+
+`drop_duplicates` keeps the first in current order &mdash; sort first if which survives matters.
+
+Normalise case and whitespace before deduplicating.
+
+Repeated rows carrying independent information want `groupby`, not `drop_duplicates`.
+
+`groupby(...).first()` merges partial records rather than picking one.
+
+And assert uniqueness before any merge that depends on it, because a duplicated key there multiplies rows and inflates every total downstream.
+
+## A closing note
+
+The word "duplicate" hides several different situations, and choosing the right action depends on which one you have.
+
+An exact repeated row from a double load can be dropped without thought. Two versions of a record need a sort and a rule about which survives. Repeated events carrying independent information need aggregating, not dropping. Near-duplicates from inconsistent text need normalising first, or they will not be found at all.
+
+The diagnostic that separates them is comparing whole-row duplicates against key duplicates. If the key repeats but the row does not, something differs between the copies, and that difference is the thing to look at before deciding anything.
+
+And the highest-value use of everything here is the check before a join. A duplicated key multiplies rows, inflates every total downstream, and produces output that looks entirely reasonable. One assertion prevents it.
+
+## Two more things worth knowing
+
+`drop_duplicates` accepts `ignore_index=True`, which renumbers the result rather than leaving gaps in the index where rows were removed. Without it the surviving labels are the original ones, which is correct and occasionally surprising when the result is printed.
+
+`df.duplicated()` compares whole rows including `NaN`, and two rows with a missing value in the same column **do** count as duplicates of each other &mdash; unlike almost everywhere else in pandas, where `NaN` never equals `NaN`. That inconsistency is deliberate and useful here, since two identically incomplete rows usually are duplicates.
+
+And for finding duplicates across a subset of columns while keeping the rest, `df.groupby(keys).filter(lambda g: len(g) > 1)` returns every row belonging to a repeated key, which is the inspection view that `keep=False` gives more directly.
+
+## Deduplicating across sources
+
+The hardest version of this problem is not duplicates within one table but the same entity appearing in two.
+
+The steps are always the same, and only the third is difficult.
+
+**Normalise** both sides into a comparable key &mdash; case, whitespace, punctuation, and any domain-specific standardisation.
+
+**Match** on the key, with `merge` or `isin`.
+
+**Decide** what to do with near-matches that the key does not unify.
+
+pandas handles the first two well. The third is record linkage, and it is a genuinely open problem for messy data: the same person may appear with a different spelling, a maiden name, a typo'd date of birth.
+
+The pragmatic middle ground is to match exactly on a normalised key, count how many records fail to match, and inspect a sample of those. Often a small number of normalisation rules &mdash; drop punctuation, standardise abbreviations &mdash; resolves most of them, and the rest are genuinely ambiguous and better flagged for a human than resolved by code.
+
+## In summary
+
+`duplicated` flags every copy but the first, which is what makes it a drop mask; `keep=False` flags them all, which is what you want for inspection.
+
+The question that matters is usually about the **key** rather than the whole row, and `subset=` asks it.
+
+Sort before dropping, or which row survives is arbitrary. Normalise text first, or the same value counts as several. And if the repeated rows carry independent information, the operation you want is an aggregation, not a deletion.
