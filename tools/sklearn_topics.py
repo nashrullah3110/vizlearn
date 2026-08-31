@@ -3554,6 +3554,14 @@ When the step needs to *learn* something, subclassing `BaseEstimator` and `Trans
 
 The rule that keeps a custom step honest is the same as for the built-in ones: everything learned from data must be learned in `fit`, and `transform` must use only what `fit` stored. A transformer that computes a statistic inside `transform` recomputes it on the test fold, which is the leak the pipeline was supposed to prevent.
 
+<strong>Can a pipeline end in a transformer?</strong> Yes. It then has `transform` rather than `predict`, which is useful when the pipeline exists to prepare features for something else.
+
+<strong>How do I see what the model actually receives?</strong> `pipe[:-1].transform(X)` runs every step except the last and hands back the array the estimator was given.
+
+<strong>Does a pipeline slow anything down?</strong> No. It calls the same methods in the same order; the only overhead is a few attribute lookups.
+
+<strong>Can I add a step to a fitted pipeline?</strong> You can modify `pipe.steps`, and the result is unfitted from that point on. Building a new pipeline is clearer.
+
 ## Things to try
 
 1. <strong>Confirm the interface.</strong> In the first editor, note that a pipeline has `fit` and `predict` &mdash; it is an estimator, not a wrapper you unwrap.
