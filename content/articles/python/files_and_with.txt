@@ -44,10 +44,6 @@ Lines keep their trailing `\n`, which is why `line.rstrip()` appears in almost e
 
 `open("nope.txt")` raises `FileNotFoundError`, it does not return an empty file. Handle it, or let it propagate &mdash; both are reasonable, but do not check with `os.path.exists` first: the file can disappear between the check and the open, and the `try` handles that correctly anyway.
 
-## Text and encoding
-
-Files open in text mode and decode using your platform's default encoding, which differs between machines. For anything portable, say what you mean: `open(path, encoding="utf-8")`.
-
 ## Paths, and why pathlib is worth the switch
 
 String concatenation for paths breaks across operating systems and on edge cases
@@ -107,3 +103,207 @@ you want for images, archives, and anything you are copying rather than reading.
 The mistake in the other direction is more common: opening a text file in binary
 mode and then being puzzled that comparisons against strings all fail, because
 `b"abc"` and `"abc"` are different types that never compare equal.
+
+## A worked example, start to finish
+
+Writing a file, reading it back and summarising it, using the tools from this
+page rather than the ones from the `os` module:
+
+```python
+from pathlib import Path
+
+path = Path("scores.txt")
+path.write_text("ana 91\nbo 78\ncy 91\n", encoding="utf-8")
+
+total = count = 0
+for line in path.read_text(encoding="utf-8").splitlines():
+    name, score = line.split()
+    total += int(score)
+    count += 1
+
+print(count, "rows, mean", round(total / count, 1))
+```
+
+```
+3 rows, mean 86.7
+```
+
+`splitlines()` rather than `split("\n")` because it handles the line endings of
+files written on other systems, and because it does not leave an empty string
+at the end from the final newline. `encoding="utf-8"` appears on both calls,
+because the default is the platform's and the platform's is not yours.
+
+For a file of this size, reading it whole is fine. The version that scales is
+the loop over the open file, which holds one line at a time:
+
+```python
+with path.open(encoding="utf-8") as f:
+    for line in f:
+        name, score = line.split()
+```
+
+Both are correct. The difference only matters when the file stops fitting in
+memory, which is the point at which it matters a great deal.
+
+## What `with` actually is
+
+`with` is not special syntax for files. It works with any object implementing
+two methods, and knowing that turns it from a rule into a tool.
+
+An object is a **context manager** if it has `__enter__`, called on the way in,
+and `__exit__`, called on the way out. `open` returns one, so does a lock, a
+database connection, a temporary directory, and anything from `contextlib`.
+`__exit__` runs whether the block finished normally, returned, or raised, which
+is the guarantee the whole construct exists to provide.
+
+The `as` name receives whatever `__enter__` returns &mdash; for a file, the
+file object itself. That is why `with open(...) as f` gives you `f` and why the
+name is optional when the object is only needed for its side effect.
+
+Writing one is a decorator and a `yield`:
+
+```python
+from contextlib import contextmanager
+
+@contextmanager
+def timer(label):
+    import time
+    start = time.perf_counter()
+    yield
+    print(label, round(time.perf_counter() - start, 3))
+```
+
+Everything before the `yield` is setup, everything after is cleanup, and the
+`yield` is where the body of the `with` runs. This is the same generator
+machinery from elsewhere in the track, used for a completely different purpose.
+
+Several managers can share one statement:
+`with open(a) as f, open(b, "w") as g:` opens both and closes both, in reverse
+order, even if the second `open` raises.
+
+## Do not parse standard formats by hand
+
+The single most common mistake with files is treating a structured format as
+plain text. CSV is the usual victim, because it looks like `split(",")` will
+work, and it does until a field contains a comma inside quotes &mdash; at which
+point the parse silently produces the wrong number of columns.
+
+The standard library has a module for each of the formats you are likely to
+meet. `csv` handles quoting, embedded newlines and different delimiters, and
+`csv.DictReader` gives you dictionaries keyed by the header row. `json` handles
+escaping, Unicode and nesting, and round-trips to Python types.
+`configparser` reads INI files. `sqlite3` is there when a file of records has
+started to want queries.
+
+Each of them costs one import and removes an entire category of bug you would
+otherwise discover on somebody else's data. The rule is worth stating plainly:
+if the format has a name, something in the standard library already reads it.
+
+## Where file code goes wrong in practice
+
+Four failures account for most of it, and none of them are exotic.
+
+**The path is relative to the wrong place.** A relative path is resolved
+against the process's working directory, not the script's location, so the same
+program works when run from its own folder and fails from anywhere else. If a
+file lives beside the script, `Path(__file__).parent / "data.txt"` says so.
+
+**The file is open longer than intended.** A file opened without `with` and
+never closed keeps a handle and, on writes, keeps data in a buffer that has not
+reached the disk. On a short script the interpreter cleans up on exit and the
+bug is invisible; in a long-running program it accumulates until the process
+hits the operating system's limit.
+
+**The encoding was assumed.** This is the failure that travels: it works on the
+machine that wrote the file and raises `UnicodeDecodeError` on a colleague's.
+Name the encoding on every text-mode open.
+
+**The write was not atomic.** A program that dies mid-write leaves a truncated
+file where the good one used to be. The write-then-rename pattern earlier on
+this page costs two lines and removes the possibility.
+
+## Line endings, and the translation you did not ask for
+
+Text mode does more than decode bytes into characters: it also translates line
+endings, and knowing that explains a family of confusing results.
+
+Windows ends lines with carriage-return plus newline; everything else uses a
+newline alone. Python's text mode hides the difference. On reading, any of the
+variants becomes a plain newline in your string, which is why a loop over lines
+behaves identically on every platform. On writing, a newline is translated back
+into whatever the platform uses.
+
+That is almost always what you want, and it has two consequences worth
+knowing. First, the string you read is not byte-for-byte what is in the file,
+so a length computed from the text can differ from the file size. Second, if
+you open a file in binary mode you get no translation at all, and lines end
+with whatever the file actually contains &mdash; which is why text read as
+binary often shows a trailing carriage return that seems to have come from
+nowhere.
+
+The one place it actively causes trouble is the `csv` module, which does its
+own line-ending handling. Opening a CSV without `newline=""` lets both layers
+translate, and the result is a blank line between every row on Windows. The
+documented fix is exactly that argument, and it is worth passing habitually
+rather than discovering the need for it later.
+
+`newline=""` is also what you want when reading a file whose exact line endings
+matter &mdash; a diff tool, a formatter, anything that must write back what it
+read without silently changing it.
+
+## Questions people ask
+
+<strong>Do I still need `f.close()` if I use `with`?</strong> No. That is the
+entire point of `with`.
+
+<strong>What is the difference between `"w"` and `"a"`?</strong> `"w"` empties
+the file the moment it opens. `"a"` keeps what is there and writes at the end.
+
+<strong>How do I check whether a file exists?</strong> `Path(p).exists()`
+&mdash; but for opening, prefer to just open it and handle
+`FileNotFoundError`, because the file can vanish between the check and the
+open.
+
+<strong>Why does my file have blank lines between rows?</strong> On Windows,
+opening a CSV without `newline=""` produces doubled line endings. Pass
+`newline=""` to `open` when using the `csv` module.
+
+<strong>Can I read a file backwards?</strong> Not directly. Read the lines and
+reverse them, or seek from the end if the file is too big for that.
+
+<strong>What does `errors="replace"` do?</strong> Substitutes a placeholder for
+bytes that cannot be decoded, so you get something rather than an exception.
+Useful for salvage, not for data you care about.
+
+<strong>Is `pathlib` slower than string paths?</strong> Marginally, and never
+enough to matter next to the file system call that follows.
+
+<strong>Can I open the same file twice?</strong> Yes, and on most systems you
+can even open it for reading and writing at once. Whether that is a good idea
+is a different question.
+
+<strong>What does `f.seek(0)` do?</strong> Moves the position back to the
+start, which is how you read a file a second time without reopening it.
+
+<strong>Why is my file empty until the program ends?</strong> Because the data
+is still in a buffer. Closing the file &mdash; which `with` does &mdash; or
+calling `f.flush()` writes it out.
+
+<strong>Should I use `os.path` or `pathlib`?</strong> `pathlib` for new code.
+`os.path` is not deprecated and you will keep meeting it, so both are worth
+reading fluently.
+
+<strong>How do I append to a file that might not exist?</strong> Mode `"a"`
+creates it if it is missing, so no check is needed.
+
+## Recap in one screen
+
+- `with` closes the file whether the block ends normally or raises; it is the
+  correct way to open one, not a style choice.
+- Iterating the file object reads one line at a time and works on files larger
+  than memory.
+- `"w"` truncates on open; `"a"` appends; `"x"` refuses to overwrite.
+- Name `encoding="utf-8"` on every text-mode open, because the default varies
+  by machine.
+- If the format has a name &mdash; CSV, JSON, INI &mdash; use the module rather
+  than splitting strings.

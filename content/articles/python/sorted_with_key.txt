@@ -16,14 +16,6 @@ sorted(rows, key=lambda r: r["score"])  # by a dict field
 ```
 
 
-## Tuple keys give you tiebreaks
-
-Return a tuple and Python compares the first element, then the second where the first ties:
-
-sorted(data, key=lambda t: (t[1], t[0]))
-
-"By count, then alphabetically" in one expression. Negate a number to reverse just that field: `(-count, name)` sorts by count descending and name ascending, which `reverse=True` cannot express because it flips everything.
-
 ## sorted() versus .sort()
 
 
@@ -45,22 +37,6 @@ Python's sort is stable: items that compare equal keep their original relative o
 
 `key` is called exactly once per item, not on every comparison, so an expensive key function is affordable. Doing the same work inside a comparison would cost far more.
 
-## What key actually does
-
-`key` takes a function, calls it once on every element, and sorts by whatever
-comes back. The original items are what you get out - the key is used for
-comparison only, and then discarded.
-
-That single sentence explains most of what people find confusing. The function
-is not a comparison between two items; it is a transformation of one item into
-something sortable. So `key=len` sorts by length, `key=str.lower` sorts
-case-insensitively, and `key=lambda r: r["score"]` sorts records by a field
-without changing them.
-
-It also explains why `key` is fast. Each element is transformed once, not once
-per comparison, which is why this is preferred over the old `cmp` approach that
-Python removed in version 3.
-
 ## Sorting by more than one thing
 
 Return a tuple, and the sort compares position by position:
@@ -78,25 +54,24 @@ p.name)` gives highest score first, then name ascending. For strings there is no
 negation, and the usual answer is two stable sorts, applied least significant
 first.
 
-## Stability, and why it is useful
+## Why in-place methods return None
 
-Python's sort is stable: items that compare equal keep their original order.
-That is what makes the two-pass approach work at all, and it is a guarantee you
-can rely on rather than an implementation detail.
+`nums.sort()` returning `None` looks like an oversight and is a deliberate
+convention that runs through the whole standard library. `list.reverse`,
+`list.append`, `list.extend`, `dict.update` and `set.add` all return `None` for
+the same reason: they changed the object rather than producing a new one, and
+returning the object would invite `x = x.sort()`, which reads as though a new
+list came back.
 
-## sorted versus .sort
+By returning nothing, the method makes that line obviously wrong the moment you
+try to use the result. The `None` is not a missing return value; it is the
+signal that the work happened somewhere else.
 
-`sorted(x)` returns a new list and leaves the original alone. `x.sort()` reorders
-in place and returns `None`. The second is the source of a small, common bug:
-
-```python
-names = names.sort()      # names is now None
-```
-
-The method returns `None` deliberately, as a signal that it mutated rather than
-produced. Every in-place method in the standard library does the same -
-`reverse`, `append`, `extend`, `update` - and once you know the convention, the
-`None` stops being a surprise and starts being a hint.
+Once the convention is familiar it becomes a reading aid. A method that returns
+`None` mutated something. A function that returns a value left its inputs
+alone. `sorted`, `reversed`, `sorted`'s relatives in `itertools`, and every
+string method follow the second pattern, which is why none of them ever
+surprise you by changing what you passed in.
 
 ## The same key everywhere
 
@@ -104,3 +79,232 @@ produced. Every in-place method in the standard library does the same -
 and mean the same thing by it, so `max(people, key=lambda p: p.score)` finds the
 top scorer without sorting anything - which is both faster and clearer than
 sorting and taking the last element.
+
+## A worked example: ranking records
+
+The shape that comes up constantly &mdash; sort records by one field, break
+ties with another, and print them aligned:
+
+```python
+rows = [
+    {"name": "ana", "score": 91, "team": "red"},
+    {"name": "bo", "score": 78, "team": "blue"},
+    {"name": "cy", "score": 91, "team": "blue"},
+]
+
+for r in sorted(rows, key=lambda r: (-r["score"], r["name"])):
+    print(f"{r['name']:<5}{r['score']:>4}  {r['team']}")
+```
+
+```
+ana    91  red
+cy     91  blue
+bo     78  blue
+```
+
+The key returns a tuple, so the sort compares scores first and names only where
+scores tie. The minus sign reverses the score alone, which `reverse=True` could
+not do &mdash; it would have reversed the names as well, putting `cy` before
+`ana`.
+
+This is worth having in your fingers, because "highest first, then
+alphabetical" is what almost every leaderboard, report and ranking actually
+wants, and it is one expression rather than a comparison function.
+
+## Sorting things that cannot be compared
+
+Python refuses to guess an order between unrelated types:
+
+```python
+try:
+    sorted([3, "1", 2])
+except TypeError as e:
+    print("TypeError:", e)
+```
+
+```
+TypeError: '<' not supported between instances of 'str' and 'int'
+```
+
+This is deliberate. Languages that allow it produce orderings that depend on
+implementation details, and the resulting bugs are far worse than an exception.
+The fix is to say what you mean with a key: `key=str` to sort them as text,
+`key=int` if they are all numeric in disguise.
+
+`None` is the version of this that shows up in real data, because a missing
+field is very often `None` and `None` cannot be compared with anything. Rather
+than filtering the rows out, put the missing ones at one end:
+
+```python
+rows = [("ana", 91), ("bo", None), ("cy", 78)]
+print(sorted(rows, key=lambda r: (r[1] is None, r[1])))
+```
+
+```
+[('cy', 78), ('ana', 91), ('bo', None)]
+```
+
+The first element of the key is a boolean, and `False` sorts before `True`, so
+everything with a value comes first and the missing ones collect at the end.
+Swap it to `r[1] is not None` to put them first instead. The second element is
+only ever compared between rows that agree on the first, so `None` is never
+compared with a number.
+
+## Case, accents and numbers inside strings
+
+Sorting text has three traps that only appear once the data stops being tidy.
+
+**Case.** The default sort is by code point, so every capital letter sorts
+before every lowercase one and `["banana", "Apple"]` comes back with `Apple`
+first. `key=str.lower` fixes it, and `key=str.casefold` is the stricter version
+for text that is not guaranteed to be English.
+
+**Accents.** `é` sorts after `z` by code point, which is wrong in every
+language that uses it. The standard library's `locale.strxfrm` sorts according
+to the user's locale, and for anything serious the `PyICU` library does it
+properly. For an internal report, `unicodedata.normalize` plus stripping the
+combining marks is often enough.
+
+**Numbers inside names.** `["file10", "file2"]` sorts with `file10` first,
+because `1` is before `2` as text. This is the "natural sort" problem, and the
+fix is a key that splits the string into text and numeric runs and converts the
+numeric ones, so the comparison happens between integers rather than digits.
+
+All three have the same shape as everything else on this page: the data is not
+what you want to compare, so transform it in the key and leave it alone in the
+result.
+
+## What sorting costs, and when not to
+
+Python's sort is Timsort, which is O(n log n) in general and considerably
+faster than that on data with existing order &mdash; already-sorted input is
+close to linear, and so is data made of sorted runs. That is not an accident;
+it was designed for real data, which is usually partly ordered.
+
+The practical consequence is that sorting is cheap enough to stop thinking
+about at ordinary sizes. Where it is worth thinking about is when you do not
+actually need a sorted sequence:
+
+If you want the single largest or smallest item, `max` and `min` take the same
+`key` and do it in one pass rather than n log n. If you want the top few,
+`heapq.nlargest(k, items, key=...)` beats sorting when k is small relative to
+n. If you want to know whether anything qualifies, `any` with a generator stops
+at the first hit. And if you are sorting the same list repeatedly inside a
+loop, sort it once outside the loop instead.
+
+The one that catches people is sorting to find a maximum. `sorted(items)[-1]`
+is correct, does far more work than necessary, and reads less clearly than
+`max(items)`.
+
+## Grouping, which needs sorting first
+
+`itertools.groupby` collapses runs of equal items into groups, and it is the
+most common reason to sort something you did not otherwise need in order.
+
+The important property is that it only groups *adjacent* items. It walks the
+sequence once and starts a new group whenever the key changes, which means
+unsorted input produces a group every time the value changes back and forth
+rather than one group per distinct value. Sorting by the same key first is what
+makes the grouping complete, and forgetting to is the single mistake everyone
+makes with it once.
+
+```python
+from itertools import groupby
+
+rows = [("red", "ana"), ("blue", "bo"), ("red", "cy")]
+rows.sort(key=lambda r: r[0])
+
+for team, members in groupby(rows, key=lambda r: r[0]):
+    print(team, [m for _, m in members])
+```
+
+```
+blue ['bo']
+red ['ana', 'cy']
+```
+
+The same `key` appears twice, in the sort and in the group, and it has to be
+the same key for the result to make sense. The second thing to know is that
+the groups are iterators over the original sequence, not lists, and they become
+invalid once you move to the next group &mdash; which is why the example
+materialises each one inside the loop rather than collecting the groups and
+using them afterwards.
+
+For grouping without sorting, a `defaultdict(list)` and a single loop is
+simpler, does not require order, and gives you real lists. `groupby` earns its
+place when the data is already sorted, when the sequence is too large to hold,
+or when you want the runs rather than the totals.
+
+## Making your own objects sortable
+
+`key=` handles most cases, and occasionally the ordering belongs to the object
+itself rather than to one call site. Then the object should carry it.
+
+Defining `__lt__` is enough for `sorted`, `min` and `max`, because they need
+only "is this one less than that one". The other comparisons &mdash; `<=`, `>`,
+`>=` &mdash; are separate methods and are not inferred, so an object with only
+`__lt__` sorts correctly and raises on `>=`. `functools.total_ordering` fills
+the rest in from `__lt__` and `__eq__`, at a small runtime cost.
+
+The shorter route is a dataclass. `@dataclass(order=True)` writes all six
+comparison methods, comparing the fields in the order they are declared, which
+is exactly the tuple-key behaviour with the tuple written for you. Fields you
+do not want in the comparison are excluded with
+`field(compare=False)`, which is how you keep a name or an id out of the
+ordering while leaving it on the object.
+
+The judgement is about where the ordering belongs. If there is one natural
+order for the type &mdash; a version number, a date range, a playing card
+&mdash; put it on the class and every call site benefits. If different callers
+want different orders, `key=` at each call site is the honest answer, and
+building one in as "the" order will mislead the next reader.
+
+One rule applies whichever you choose: the ordering must be consistent with
+equality, and it must be total. Objects that compare equal must not also
+compare less-than, and every pair must be comparable. A sort that receives an
+inconsistent ordering does not raise; it produces a result that is quietly
+wrong and changes with the input order.
+
+## Questions people ask
+
+<strong>Can `key` return anything?</strong> Anything comparable with itself.
+Numbers, strings and tuples of those are the usual choices.
+
+<strong>How do I sort descending by one field and ascending by another?</strong>
+Negate the descending one in a tuple key, or do two stable sorts, least
+significant first.
+
+<strong>Does `sorted` work on a dictionary?</strong> Yes, and it sorts the keys.
+Use `d.items()` when you want pairs.
+
+<strong>Is `reverse=True` the same as reversing afterwards?</strong> Not
+exactly. `reverse=True` keeps ties in their original order; sorting then
+reversing flips the ties too.
+
+<strong>What happened to `cmp`?</strong> Removed in Python 3. If you genuinely
+need a comparison function, `functools.cmp_to_key` converts one into a key.
+
+<strong>Can I sort a generator?</strong> Yes &mdash; `sorted` accepts any
+iterable and returns a list. It has to consume the whole thing to do it.
+
+<strong>Why is my sort not stable?</strong> It is. If tied items appear to
+move, the key is distinguishing them in a way you did not intend.
+
+<strong>Does sorting a list of dictionaries need a key?</strong> Yes.
+Dictionaries are not orderable, so without one you get a `TypeError`.
+
+<strong>How large can a list be before sorting is slow?</strong> Far larger
+than most programs handle. Sorting a million small items takes well under a
+second, and the cost is usually dominated by whatever built the list.
+
+## Recap in one screen
+
+- `key` transforms each item once and sorts on the result; the items you get
+  back are unchanged.
+- A tuple key gives tiebreaks; negate a number to reverse one field without
+  reversing the rest.
+- `sorted` returns a new list, `.sort()` returns `None` &mdash; that `None` is
+  the convention for every in-place method.
+- The sort is stable, which is what makes two-pass sorting work.
+- `max`, `min`, `heapq.nlargest` and `groupby` take the same `key`; reach for
+  them when you do not need everything in order.

@@ -52,14 +52,6 @@ A generator walks forward once and does not rewind. If you need the values twice
 
 Round brackets instead of square. Identical syntax to a comprehension, no list built. Inside a call you can drop the extra brackets: `sum(n * n for n in nums)`.
 
-## Pipelines
-
-Generators compose. Each stage pulls from the one before it, so a chain of three generators still holds one value at a time:
-
-doubled(evens(naturals()))
-
-No stage stores anything, and nothing runs until the end of the chain is asked for a value. That is the pattern behind most stream processing in Python, and it is why generators are worth the concept even when memory is not tight.
-
 ## What "lazy" buys you in practice
 
 Three things, and they are easy to state concretely.
@@ -125,3 +117,215 @@ Small collections, results you need twice, anything you want to index, and
 anything you want to print for debugging. A generator that you immediately wrap
 in `list()` has bought nothing, and a comprehension says what you meant more
 directly.
+
+## Watching a pipeline run
+
+The claim that a generator pipeline handles one item at a time end to end is
+easier to believe when you can see the order:
+
+```python
+def numbers():
+    for n in [1, 2, 3]:
+        print("  produced", n)
+        yield n
+
+def doubled(source):
+    for n in source:
+        print("    doubled", n * 2)
+        yield n * 2
+
+for value in doubled(numbers()):
+    print("got", value)
+```
+
+```
+  produced 1
+    doubled 2
+got 2
+  produced 2
+    doubled 4
+got 4
+  produced 3
+    doubled 6
+got 6
+```
+
+Nothing is batched. `numbers` produces one value, `doubled` transforms that one
+value, the loop receives it, and only then does anything ask for the second.
+The list-building equivalent would have printed all three "produced" lines
+first, then all three "doubled" lines.
+
+This is the whole argument for generators in six lines of output. Memory stays
+flat because only one item is in flight, and if the loop stopped after the
+first value, `numbers` would never produce the third.
+
+## A generator is an iterator, and what that means
+
+`for` is not special syntax for lists. It calls `iter()` on whatever it is
+given to get an iterator, then calls `next()` on that repeatedly until
+`StopIteration` is raised, and that exception is what ends the loop.
+
+A generator function returns an object implementing exactly that protocol, which
+is why it works everywhere a list does &mdash; in a `for`, in `sum`, in
+`list()`, in unpacking. It is also why the same object can only be walked once:
+an iterator holds a position, and there is no way to move it backwards.
+
+Seeing the protocol directly makes the behaviour concrete:
+
+```python
+def two():
+    yield 1
+    yield 2
+
+g = two()
+print(next(g), next(g))
+try:
+    next(g)
+except StopIteration:
+    print("exhausted")
+```
+
+```
+1 2
+exhausted
+```
+
+Two details follow from this. `iter()` on a list returns a *new* iterator each
+time, which is why a list can be looped over repeatedly; `iter()` on a
+generator returns the generator itself, which is why it cannot. And a `return`
+inside a generator does not return a value to the caller &mdash; it raises
+`StopIteration`, and any value goes on the exception rather than to the loop.
+
+## Where generators surprise people
+
+Three behaviours account for most of the confusion, and all three follow from
+laziness.
+
+**Nothing runs until you ask.** Calling a generator function executes none of
+its body. If the first line validates an argument and raises, the exception
+arrives at the first `next()`, not at the call &mdash; possibly in a completely
+different function. Where that matters, split it: a normal function that
+validates and then returns the generator.
+
+**The values are computed late.** A generator expression that closes over a
+variable reads that variable when it runs, not when it was written. Rebind the
+variable in between and the generator sees the new value, which is the same
+late-binding behaviour as the lambda-in-a-loop trap.
+
+**Exhaustion is silent.** A second pass over a used generator produces nothing
+and raises nothing. The symptom is an empty result far from the cause, and the
+diagnosis is almost always that something already consumed it &mdash;
+frequently a `sum()` or a `len(list(...))` written for a debugging print.
+
+The habit that avoids all three: decide early whether a thing is a stream or a
+collection. If it is a collection, call `list()` on it once and pass the list
+around.
+
+## send, throw and close
+
+A generator can also receive values, which is the feature that made Python's
+coroutines possible before `async` existed.
+
+`g.send(value)` resumes the generator and makes the paused `yield` expression
+evaluate to `value`, rather than to `None` as it does with `next()`. That turns
+the generator from a producer into something that can be fed &mdash; the
+classic example is a running average that accepts numbers and yields the mean
+so far.
+
+`g.throw(exc)` raises an exception at the point of the `yield`, letting the
+generator handle it or clean up. `g.close()` raises `GeneratorExit` there,
+which is what lets a `finally` or a `with` inside a generator run its cleanup
+when the generator is discarded.
+
+In everyday code you will use none of these directly. They are worth knowing
+because they explain things you will see: why `contextlib.contextmanager` can
+turn a generator into a `with` block, why a `with` inside a generator is safe,
+and why `async def` looks so much like a generator &mdash; it grew out of one.
+
+## Generators against the class you would otherwise write
+
+Before generators, producing a sequence lazily meant writing a class with the
+iterator protocol on it by hand. Comparing the two is the clearest way to see
+what `yield` actually saves.
+
+The class version has to store its own state as attributes, decide in `__next__`
+what to do next based on those attributes, and raise `StopIteration` itself
+when it is finished. Anything with a loop in it becomes a state machine: what
+was a `for` and an `if` turns into a counter, a flag, and a chain of
+conditionals reconstructing where it had got to.
+
+The generator version stores the state implicitly. The local variables, the
+position in the loop, the depth of the nesting &mdash; all of it is the paused
+frame, and `yield` is where it pauses. That is why a generator for walking a
+nested structure is four lines and the equivalent class is thirty: recursion
+and loops carry the state for you, and a class has to make it explicit.
+
+There is still a case for the class. It can hold methods other than iteration,
+it can be reset, it can expose its position, and it can implement `__len__` so
+that `len()` works. A generator can do none of those. When the object is a
+collection with an order, a class is right; when it is a process that produces
+values, `yield` is right.
+
+The practical version of that rule: if you find yourself writing
+`self.index`, `self.buffer` and a `__next__` full of branches, the code you
+meant to write is a generator function with a loop in it.
+
+## Questions people ask
+
+<strong>What is the difference between a generator and a list
+comprehension?</strong> Brackets. `[x for x in y]` builds a list;
+`(x for x in y)` produces values on demand.
+
+<strong>Can I get the length of a generator?</strong> Not without consuming it.
+`sum(1 for _ in g)` counts it, and leaves it exhausted.
+
+<strong>Can a generator have a `return`?</strong> Yes, and it ends the
+generator. The returned value is attached to `StopIteration` rather than handed
+to the loop.
+
+<strong>Are generators faster than lists?</strong> Not per item. They are
+faster to start, use far less memory, and avoid work the consumer never asks
+for.
+
+<strong>Can I index a generator?</strong> No. Use `itertools.islice` to skip
+and take, or build a list.
+
+<strong>What is the difference between `yield` and `yield from`?</strong>
+`yield` produces one value; `yield from` produces every value of another
+iterable, and passes `send` and `throw` through to it.
+
+<strong>Why does my generator not raise until later?</strong> Because the body
+does not run until the first value is requested.
+
+<strong>Can I nest generator expressions?</strong> Yes, and the inner one is
+consumed lazily too. Readability is usually the limit rather than any
+technical one.
+
+<strong>Do generators work with `in`?</strong> Yes, and the test consumes the
+generator up to the match, leaving the rest. Testing twice will not behave the
+way you expect.
+
+<strong>Is a file object a generator?</strong> Not exactly, but it is an
+iterator over lines, which is why `for line in f` works and why it too can only
+be walked once without seeking back.
+
+<strong>Can two loops share one generator?</strong> They can consume it between
+them, each taking whatever the other has not. That is occasionally useful and
+much more often a bug.
+
+<strong>What happens to a generator I stop halfway?</strong> It stays paused
+until it is garbage-collected, at which point `GeneratorExit` is raised inside
+it so `finally` blocks and `with` statements can clean up.
+
+## Recap in one screen
+
+- A generator function returns an object; the body runs only when values are
+  asked for.
+- One pass, no length, no indexing &mdash; call `list()` when you need any of
+  those.
+- Memory is flat regardless of the size of the sequence, which is what makes
+  infinite sequences and huge files workable.
+- A pipeline of generators moves one item end to end at a time, doing no work
+  the consumer does not ask for.
+- `for` works by calling `next()` until `StopIteration`; a generator simply
+  implements that protocol.

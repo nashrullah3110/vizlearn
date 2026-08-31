@@ -2559,14 +2559,6 @@ sorted(rows, key=lambda r: r["score"])  # by a dict field
 ```
 
 
-## Tuple keys give you tiebreaks
-
-Return a tuple and Python compares the first element, then the second where the first ties:
-
-sorted(data, key=lambda t: (t[1], t[0]))
-
-"By count, then alphabetically" in one expression. Negate a number to reverse just that field: `(-count, name)` sorts by count descending and name ascending, which `reverse=True` cannot express because it flips everything.
-
 ## sorted() versus .sort()
 
 
@@ -4697,9 +4689,6 @@ Lines keep their trailing `\\n`, which is why `line.rstrip()` appears in almost 
 
 `open("nope.txt")` raises `FileNotFoundError`, it does not return an empty file. Handle it, or let it propagate &mdash; both are reasonable, but do not check with `os.path.exists` first: the file can disappear between the check and the open, and the `try` handles that correctly anyway.
 
-## Text and encoding
-
-Files open in text mode and decode using your platform's default encoding, which differs between machines. For anything portable, say what you mean: `open(path, encoding="utf-8")`.
 """,
     [{"q": "What does `with` do for a file?",
       "options": ["Makes reading faster", "Closes it when the block ends, even "
@@ -4992,14 +4981,6 @@ A generator walks forward once and does not rewind. If you need the values twice
 (n * n for n in nums)
 
 Round brackets instead of square. Identical syntax to a comprehension, no list built. Inside a call you can drop the extra brackets: `sum(n * n for n in nums)`.
-
-## Pipelines
-
-Generators compose. Each stage pulls from the one before it, so a chain of three generators still holds one value at a time:
-
-doubled(evens(naturals()))
-
-No stage stores anything, and nothing runs until the end of the chain is asked for a value. That is the pattern behind most stream processing in Python, and it is why generators are worth the concept even when memory is not tight.
 """,
     [{"q": "What does calling a generator function do?",
       "options": ["Runs the body and returns a list", "Returns a generator "

@@ -1210,22 +1210,6 @@ wrap it in `list()`.
 
 
 add("sorted_with_key", """
-## What key actually does
-
-`key` takes a function, calls it once on every element, and sorts by whatever
-comes back. The original items are what you get out - the key is used for
-comparison only, and then discarded.
-
-That single sentence explains most of what people find confusing. The function
-is not a comparison between two items; it is a transformation of one item into
-something sortable. So `key=len` sorts by length, `key=str.lower` sorts
-case-insensitively, and `key=lambda r: r["score"]` sorts records by a field
-without changing them.
-
-It also explains why `key` is fast. Each element is transformed once, not once
-per comparison, which is why this is preferred over the old `cmp` approach that
-Python removed in version 3.
-
 ## Sorting by more than one thing
 
 Return a tuple, and the sort compares position by position:
@@ -1243,25 +1227,24 @@ p.name)` gives highest score first, then name ascending. For strings there is no
 negation, and the usual answer is two stable sorts, applied least significant
 first.
 
-## Stability, and why it is useful
+## Why in-place methods return None
 
-Python's sort is stable: items that compare equal keep their original order.
-That is what makes the two-pass approach work at all, and it is a guarantee you
-can rely on rather than an implementation detail.
+`nums.sort()` returning `None` looks like an oversight and is a deliberate
+convention that runs through the whole standard library. `list.reverse`,
+`list.append`, `list.extend`, `dict.update` and `set.add` all return `None` for
+the same reason: they changed the object rather than producing a new one, and
+returning the object would invite `x = x.sort()`, which reads as though a new
+list came back.
 
-## sorted versus .sort
+By returning nothing, the method makes that line obviously wrong the moment you
+try to use the result. The `None` is not a missing return value; it is the
+signal that the work happened somewhere else.
 
-`sorted(x)` returns a new list and leaves the original alone. `x.sort()` reorders
-in place and returns `None`. The second is the source of a small, common bug:
-
-```python
-names = names.sort()      # names is now None
-```
-
-The method returns `None` deliberately, as a signal that it mutated rather than
-produced. Every in-place method in the standard library does the same -
-`reverse`, `append`, `extend`, `update` - and once you know the convention, the
-`None` stops being a surprise and starts being a hint.
+Once the convention is familiar it becomes a reading aid. A method that returns
+`None` mutated something. A function that returns a value left its inputs
+alone. `sorted`, `reversed`, `sorted`'s relatives in `itertools`, and every
+string method follow the second pattern, which is why none of them ever
+surprise you by changing what you passed in.
 
 ## The same key everywhere
 
@@ -4253,4 +4236,658 @@ loop's `else` and leaves the outer one to finish normally.
   chances to be wrong.
 - The same `else` is on `try`, meaning the same thing: the interruption did
   not happen.
+""")
+
+
+extend("files_and_with", """
+## A worked example, start to finish
+
+Writing a file, reading it back and summarising it, using the tools from this
+page rather than the ones from the `os` module:
+
+```python
+from pathlib import Path
+
+path = Path("scores.txt")
+path.write_text("ana 91\\nbo 78\\ncy 91\\n", encoding="utf-8")
+
+total = count = 0
+for line in path.read_text(encoding="utf-8").splitlines():
+    name, score = line.split()
+    total += int(score)
+    count += 1
+
+print(count, "rows, mean", round(total / count, 1))
+```
+
+```
+3 rows, mean 86.7
+```
+
+`splitlines()` rather than `split("\\n")` because it handles the line endings of
+files written on other systems, and because it does not leave an empty string
+at the end from the final newline. `encoding="utf-8"` appears on both calls,
+because the default is the platform's and the platform's is not yours.
+
+For a file of this size, reading it whole is fine. The version that scales is
+the loop over the open file, which holds one line at a time:
+
+```python
+with path.open(encoding="utf-8") as f:
+    for line in f:
+        name, score = line.split()
+```
+
+Both are correct. The difference only matters when the file stops fitting in
+memory, which is the point at which it matters a great deal.
+
+## What `with` actually is
+
+`with` is not special syntax for files. It works with any object implementing
+two methods, and knowing that turns it from a rule into a tool.
+
+An object is a **context manager** if it has `__enter__`, called on the way in,
+and `__exit__`, called on the way out. `open` returns one, so does a lock, a
+database connection, a temporary directory, and anything from `contextlib`.
+`__exit__` runs whether the block finished normally, returned, or raised, which
+is the guarantee the whole construct exists to provide.
+
+The `as` name receives whatever `__enter__` returns &mdash; for a file, the
+file object itself. That is why `with open(...) as f` gives you `f` and why the
+name is optional when the object is only needed for its side effect.
+
+Writing one is a decorator and a `yield`:
+
+```python
+from contextlib import contextmanager
+
+@contextmanager
+def timer(label):
+    import time
+    start = time.perf_counter()
+    yield
+    print(label, round(time.perf_counter() - start, 3))
+```
+
+Everything before the `yield` is setup, everything after is cleanup, and the
+`yield` is where the body of the `with` runs. This is the same generator
+machinery from elsewhere in the track, used for a completely different purpose.
+
+Several managers can share one statement:
+`with open(a) as f, open(b, "w") as g:` opens both and closes both, in reverse
+order, even if the second `open` raises.
+
+## Do not parse standard formats by hand
+
+The single most common mistake with files is treating a structured format as
+plain text. CSV is the usual victim, because it looks like `split(",")` will
+work, and it does until a field contains a comma inside quotes &mdash; at which
+point the parse silently produces the wrong number of columns.
+
+The standard library has a module for each of the formats you are likely to
+meet. `csv` handles quoting, embedded newlines and different delimiters, and
+`csv.DictReader` gives you dictionaries keyed by the header row. `json` handles
+escaping, Unicode and nesting, and round-trips to Python types.
+`configparser` reads INI files. `sqlite3` is there when a file of records has
+started to want queries.
+
+Each of them costs one import and removes an entire category of bug you would
+otherwise discover on somebody else's data. The rule is worth stating plainly:
+if the format has a name, something in the standard library already reads it.
+
+## Where file code goes wrong in practice
+
+Four failures account for most of it, and none of them are exotic.
+
+**The path is relative to the wrong place.** A relative path is resolved
+against the process's working directory, not the script's location, so the same
+program works when run from its own folder and fails from anywhere else. If a
+file lives beside the script, `Path(__file__).parent / "data.txt"` says so.
+
+**The file is open longer than intended.** A file opened without `with` and
+never closed keeps a handle and, on writes, keeps data in a buffer that has not
+reached the disk. On a short script the interpreter cleans up on exit and the
+bug is invisible; in a long-running program it accumulates until the process
+hits the operating system's limit.
+
+**The encoding was assumed.** This is the failure that travels: it works on the
+machine that wrote the file and raises `UnicodeDecodeError` on a colleague's.
+Name the encoding on every text-mode open.
+
+**The write was not atomic.** A program that dies mid-write leaves a truncated
+file where the good one used to be. The write-then-rename pattern earlier on
+this page costs two lines and removes the possibility.
+
+## Line endings, and the translation you did not ask for
+
+Text mode does more than decode bytes into characters: it also translates line
+endings, and knowing that explains a family of confusing results.
+
+Windows ends lines with carriage-return plus newline; everything else uses a
+newline alone. Python's text mode hides the difference. On reading, any of the
+variants becomes a plain newline in your string, which is why a loop over lines
+behaves identically on every platform. On writing, a newline is translated back
+into whatever the platform uses.
+
+That is almost always what you want, and it has two consequences worth
+knowing. First, the string you read is not byte-for-byte what is in the file,
+so a length computed from the text can differ from the file size. Second, if
+you open a file in binary mode you get no translation at all, and lines end
+with whatever the file actually contains &mdash; which is why text read as
+binary often shows a trailing carriage return that seems to have come from
+nowhere.
+
+The one place it actively causes trouble is the `csv` module, which does its
+own line-ending handling. Opening a CSV without `newline=""` lets both layers
+translate, and the result is a blank line between every row on Windows. The
+documented fix is exactly that argument, and it is worth passing habitually
+rather than discovering the need for it later.
+
+`newline=""` is also what you want when reading a file whose exact line endings
+matter &mdash; a diff tool, a formatter, anything that must write back what it
+read without silently changing it.
+
+## Questions people ask
+
+<strong>Do I still need `f.close()` if I use `with`?</strong> No. That is the
+entire point of `with`.
+
+<strong>What is the difference between `"w"` and `"a"`?</strong> `"w"` empties
+the file the moment it opens. `"a"` keeps what is there and writes at the end.
+
+<strong>How do I check whether a file exists?</strong> `Path(p).exists()`
+&mdash; but for opening, prefer to just open it and handle
+`FileNotFoundError`, because the file can vanish between the check and the
+open.
+
+<strong>Why does my file have blank lines between rows?</strong> On Windows,
+opening a CSV without `newline=""` produces doubled line endings. Pass
+`newline=""` to `open` when using the `csv` module.
+
+<strong>Can I read a file backwards?</strong> Not directly. Read the lines and
+reverse them, or seek from the end if the file is too big for that.
+
+<strong>What does `errors="replace"` do?</strong> Substitutes a placeholder for
+bytes that cannot be decoded, so you get something rather than an exception.
+Useful for salvage, not for data you care about.
+
+<strong>Is `pathlib` slower than string paths?</strong> Marginally, and never
+enough to matter next to the file system call that follows.
+
+<strong>Can I open the same file twice?</strong> Yes, and on most systems you
+can even open it for reading and writing at once. Whether that is a good idea
+is a different question.
+
+<strong>What does `f.seek(0)` do?</strong> Moves the position back to the
+start, which is how you read a file a second time without reopening it.
+
+<strong>Why is my file empty until the program ends?</strong> Because the data
+is still in a buffer. Closing the file &mdash; which `with` does &mdash; or
+calling `f.flush()` writes it out.
+
+<strong>Should I use `os.path` or `pathlib`?</strong> `pathlib` for new code.
+`os.path` is not deprecated and you will keep meeting it, so both are worth
+reading fluently.
+
+<strong>How do I append to a file that might not exist?</strong> Mode `"a"`
+creates it if it is missing, so no check is needed.
+
+## Recap in one screen
+
+- `with` closes the file whether the block ends normally or raises; it is the
+  correct way to open one, not a style choice.
+- Iterating the file object reads one line at a time and works on files larger
+  than memory.
+- `"w"` truncates on open; `"a"` appends; `"x"` refuses to overwrite.
+- Name `encoding="utf-8"` on every text-mode open, because the default varies
+  by machine.
+- If the format has a name &mdash; CSV, JSON, INI &mdash; use the module rather
+  than splitting strings.
+""")
+
+
+extend("sorted_with_key", """
+## A worked example: ranking records
+
+The shape that comes up constantly &mdash; sort records by one field, break
+ties with another, and print them aligned:
+
+```python
+rows = [
+    {"name": "ana", "score": 91, "team": "red"},
+    {"name": "bo", "score": 78, "team": "blue"},
+    {"name": "cy", "score": 91, "team": "blue"},
+]
+
+for r in sorted(rows, key=lambda r: (-r["score"], r["name"])):
+    print(f"{r['name']:<5}{r['score']:>4}  {r['team']}")
+```
+
+```
+ana    91  red
+cy     91  blue
+bo     78  blue
+```
+
+The key returns a tuple, so the sort compares scores first and names only where
+scores tie. The minus sign reverses the score alone, which `reverse=True` could
+not do &mdash; it would have reversed the names as well, putting `cy` before
+`ana`.
+
+This is worth having in your fingers, because "highest first, then
+alphabetical" is what almost every leaderboard, report and ranking actually
+wants, and it is one expression rather than a comparison function.
+
+## Sorting things that cannot be compared
+
+Python refuses to guess an order between unrelated types:
+
+```python
+try:
+    sorted([3, "1", 2])
+except TypeError as e:
+    print("TypeError:", e)
+```
+
+```
+TypeError: '<' not supported between instances of 'str' and 'int'
+```
+
+This is deliberate. Languages that allow it produce orderings that depend on
+implementation details, and the resulting bugs are far worse than an exception.
+The fix is to say what you mean with a key: `key=str` to sort them as text,
+`key=int` if they are all numeric in disguise.
+
+`None` is the version of this that shows up in real data, because a missing
+field is very often `None` and `None` cannot be compared with anything. Rather
+than filtering the rows out, put the missing ones at one end:
+
+```python
+rows = [("ana", 91), ("bo", None), ("cy", 78)]
+print(sorted(rows, key=lambda r: (r[1] is None, r[1])))
+```
+
+```
+[('cy', 78), ('ana', 91), ('bo', None)]
+```
+
+The first element of the key is a boolean, and `False` sorts before `True`, so
+everything with a value comes first and the missing ones collect at the end.
+Swap it to `r[1] is not None` to put them first instead. The second element is
+only ever compared between rows that agree on the first, so `None` is never
+compared with a number.
+
+## Case, accents and numbers inside strings
+
+Sorting text has three traps that only appear once the data stops being tidy.
+
+**Case.** The default sort is by code point, so every capital letter sorts
+before every lowercase one and `["banana", "Apple"]` comes back with `Apple`
+first. `key=str.lower` fixes it, and `key=str.casefold` is the stricter version
+for text that is not guaranteed to be English.
+
+**Accents.** `é` sorts after `z` by code point, which is wrong in every
+language that uses it. The standard library's `locale.strxfrm` sorts according
+to the user's locale, and for anything serious the `PyICU` library does it
+properly. For an internal report, `unicodedata.normalize` plus stripping the
+combining marks is often enough.
+
+**Numbers inside names.** `["file10", "file2"]` sorts with `file10` first,
+because `1` is before `2` as text. This is the "natural sort" problem, and the
+fix is a key that splits the string into text and numeric runs and converts the
+numeric ones, so the comparison happens between integers rather than digits.
+
+All three have the same shape as everything else on this page: the data is not
+what you want to compare, so transform it in the key and leave it alone in the
+result.
+
+## What sorting costs, and when not to
+
+Python's sort is Timsort, which is O(n log n) in general and considerably
+faster than that on data with existing order &mdash; already-sorted input is
+close to linear, and so is data made of sorted runs. That is not an accident;
+it was designed for real data, which is usually partly ordered.
+
+The practical consequence is that sorting is cheap enough to stop thinking
+about at ordinary sizes. Where it is worth thinking about is when you do not
+actually need a sorted sequence:
+
+If you want the single largest or smallest item, `max` and `min` take the same
+`key` and do it in one pass rather than n log n. If you want the top few,
+`heapq.nlargest(k, items, key=...)` beats sorting when k is small relative to
+n. If you want to know whether anything qualifies, `any` with a generator stops
+at the first hit. And if you are sorting the same list repeatedly inside a
+loop, sort it once outside the loop instead.
+
+The one that catches people is sorting to find a maximum. `sorted(items)[-1]`
+is correct, does far more work than necessary, and reads less clearly than
+`max(items)`.
+
+## Grouping, which needs sorting first
+
+`itertools.groupby` collapses runs of equal items into groups, and it is the
+most common reason to sort something you did not otherwise need in order.
+
+The important property is that it only groups *adjacent* items. It walks the
+sequence once and starts a new group whenever the key changes, which means
+unsorted input produces a group every time the value changes back and forth
+rather than one group per distinct value. Sorting by the same key first is what
+makes the grouping complete, and forgetting to is the single mistake everyone
+makes with it once.
+
+```python
+from itertools import groupby
+
+rows = [("red", "ana"), ("blue", "bo"), ("red", "cy")]
+rows.sort(key=lambda r: r[0])
+
+for team, members in groupby(rows, key=lambda r: r[0]):
+    print(team, [m for _, m in members])
+```
+
+```
+blue ['bo']
+red ['ana', 'cy']
+```
+
+The same `key` appears twice, in the sort and in the group, and it has to be
+the same key for the result to make sense. The second thing to know is that
+the groups are iterators over the original sequence, not lists, and they become
+invalid once you move to the next group &mdash; which is why the example
+materialises each one inside the loop rather than collecting the groups and
+using them afterwards.
+
+For grouping without sorting, a `defaultdict(list)` and a single loop is
+simpler, does not require order, and gives you real lists. `groupby` earns its
+place when the data is already sorted, when the sequence is too large to hold,
+or when you want the runs rather than the totals.
+
+## Making your own objects sortable
+
+`key=` handles most cases, and occasionally the ordering belongs to the object
+itself rather than to one call site. Then the object should carry it.
+
+Defining `__lt__` is enough for `sorted`, `min` and `max`, because they need
+only "is this one less than that one". The other comparisons &mdash; `<=`, `>`,
+`>=` &mdash; are separate methods and are not inferred, so an object with only
+`__lt__` sorts correctly and raises on `>=`. `functools.total_ordering` fills
+the rest in from `__lt__` and `__eq__`, at a small runtime cost.
+
+The shorter route is a dataclass. `@dataclass(order=True)` writes all six
+comparison methods, comparing the fields in the order they are declared, which
+is exactly the tuple-key behaviour with the tuple written for you. Fields you
+do not want in the comparison are excluded with
+`field(compare=False)`, which is how you keep a name or an id out of the
+ordering while leaving it on the object.
+
+The judgement is about where the ordering belongs. If there is one natural
+order for the type &mdash; a version number, a date range, a playing card
+&mdash; put it on the class and every call site benefits. If different callers
+want different orders, `key=` at each call site is the honest answer, and
+building one in as "the" order will mislead the next reader.
+
+One rule applies whichever you choose: the ordering must be consistent with
+equality, and it must be total. Objects that compare equal must not also
+compare less-than, and every pair must be comparable. A sort that receives an
+inconsistent ordering does not raise; it produces a result that is quietly
+wrong and changes with the input order.
+
+## Questions people ask
+
+<strong>Can `key` return anything?</strong> Anything comparable with itself.
+Numbers, strings and tuples of those are the usual choices.
+
+<strong>How do I sort descending by one field and ascending by another?</strong>
+Negate the descending one in a tuple key, or do two stable sorts, least
+significant first.
+
+<strong>Does `sorted` work on a dictionary?</strong> Yes, and it sorts the keys.
+Use `d.items()` when you want pairs.
+
+<strong>Is `reverse=True` the same as reversing afterwards?</strong> Not
+exactly. `reverse=True` keeps ties in their original order; sorting then
+reversing flips the ties too.
+
+<strong>What happened to `cmp`?</strong> Removed in Python 3. If you genuinely
+need a comparison function, `functools.cmp_to_key` converts one into a key.
+
+<strong>Can I sort a generator?</strong> Yes &mdash; `sorted` accepts any
+iterable and returns a list. It has to consume the whole thing to do it.
+
+<strong>Why is my sort not stable?</strong> It is. If tied items appear to
+move, the key is distinguishing them in a way you did not intend.
+
+<strong>Does sorting a list of dictionaries need a key?</strong> Yes.
+Dictionaries are not orderable, so without one you get a `TypeError`.
+
+<strong>How large can a list be before sorting is slow?</strong> Far larger
+than most programs handle. Sorting a million small items takes well under a
+second, and the cost is usually dominated by whatever built the list.
+
+## Recap in one screen
+
+- `key` transforms each item once and sorts on the result; the items you get
+  back are unchanged.
+- A tuple key gives tiebreaks; negate a number to reverse one field without
+  reversing the rest.
+- `sorted` returns a new list, `.sort()` returns `None` &mdash; that `None` is
+  the convention for every in-place method.
+- The sort is stable, which is what makes two-pass sorting work.
+- `max`, `min`, `heapq.nlargest` and `groupby` take the same `key`; reach for
+  them when you do not need everything in order.
+""")
+
+
+extend("generators_and_yield", """
+## Watching a pipeline run
+
+The claim that a generator pipeline handles one item at a time end to end is
+easier to believe when you can see the order:
+
+```python
+def numbers():
+    for n in [1, 2, 3]:
+        print("  produced", n)
+        yield n
+
+def doubled(source):
+    for n in source:
+        print("    doubled", n * 2)
+        yield n * 2
+
+for value in doubled(numbers()):
+    print("got", value)
+```
+
+```
+  produced 1
+    doubled 2
+got 2
+  produced 2
+    doubled 4
+got 4
+  produced 3
+    doubled 6
+got 6
+```
+
+Nothing is batched. `numbers` produces one value, `doubled` transforms that one
+value, the loop receives it, and only then does anything ask for the second.
+The list-building equivalent would have printed all three "produced" lines
+first, then all three "doubled" lines.
+
+This is the whole argument for generators in six lines of output. Memory stays
+flat because only one item is in flight, and if the loop stopped after the
+first value, `numbers` would never produce the third.
+
+## A generator is an iterator, and what that means
+
+`for` is not special syntax for lists. It calls `iter()` on whatever it is
+given to get an iterator, then calls `next()` on that repeatedly until
+`StopIteration` is raised, and that exception is what ends the loop.
+
+A generator function returns an object implementing exactly that protocol, which
+is why it works everywhere a list does &mdash; in a `for`, in `sum`, in
+`list()`, in unpacking. It is also why the same object can only be walked once:
+an iterator holds a position, and there is no way to move it backwards.
+
+Seeing the protocol directly makes the behaviour concrete:
+
+```python
+def two():
+    yield 1
+    yield 2
+
+g = two()
+print(next(g), next(g))
+try:
+    next(g)
+except StopIteration:
+    print("exhausted")
+```
+
+```
+1 2
+exhausted
+```
+
+Two details follow from this. `iter()` on a list returns a *new* iterator each
+time, which is why a list can be looped over repeatedly; `iter()` on a
+generator returns the generator itself, which is why it cannot. And a `return`
+inside a generator does not return a value to the caller &mdash; it raises
+`StopIteration`, and any value goes on the exception rather than to the loop.
+
+## Where generators surprise people
+
+Three behaviours account for most of the confusion, and all three follow from
+laziness.
+
+**Nothing runs until you ask.** Calling a generator function executes none of
+its body. If the first line validates an argument and raises, the exception
+arrives at the first `next()`, not at the call &mdash; possibly in a completely
+different function. Where that matters, split it: a normal function that
+validates and then returns the generator.
+
+**The values are computed late.** A generator expression that closes over a
+variable reads that variable when it runs, not when it was written. Rebind the
+variable in between and the generator sees the new value, which is the same
+late-binding behaviour as the lambda-in-a-loop trap.
+
+**Exhaustion is silent.** A second pass over a used generator produces nothing
+and raises nothing. The symptom is an empty result far from the cause, and the
+diagnosis is almost always that something already consumed it &mdash;
+frequently a `sum()` or a `len(list(...))` written for a debugging print.
+
+The habit that avoids all three: decide early whether a thing is a stream or a
+collection. If it is a collection, call `list()` on it once and pass the list
+around.
+
+## send, throw and close
+
+A generator can also receive values, which is the feature that made Python's
+coroutines possible before `async` existed.
+
+`g.send(value)` resumes the generator and makes the paused `yield` expression
+evaluate to `value`, rather than to `None` as it does with `next()`. That turns
+the generator from a producer into something that can be fed &mdash; the
+classic example is a running average that accepts numbers and yields the mean
+so far.
+
+`g.throw(exc)` raises an exception at the point of the `yield`, letting the
+generator handle it or clean up. `g.close()` raises `GeneratorExit` there,
+which is what lets a `finally` or a `with` inside a generator run its cleanup
+when the generator is discarded.
+
+In everyday code you will use none of these directly. They are worth knowing
+because they explain things you will see: why `contextlib.contextmanager` can
+turn a generator into a `with` block, why a `with` inside a generator is safe,
+and why `async def` looks so much like a generator &mdash; it grew out of one.
+
+## Generators against the class you would otherwise write
+
+Before generators, producing a sequence lazily meant writing a class with the
+iterator protocol on it by hand. Comparing the two is the clearest way to see
+what `yield` actually saves.
+
+The class version has to store its own state as attributes, decide in `__next__`
+what to do next based on those attributes, and raise `StopIteration` itself
+when it is finished. Anything with a loop in it becomes a state machine: what
+was a `for` and an `if` turns into a counter, a flag, and a chain of
+conditionals reconstructing where it had got to.
+
+The generator version stores the state implicitly. The local variables, the
+position in the loop, the depth of the nesting &mdash; all of it is the paused
+frame, and `yield` is where it pauses. That is why a generator for walking a
+nested structure is four lines and the equivalent class is thirty: recursion
+and loops carry the state for you, and a class has to make it explicit.
+
+There is still a case for the class. It can hold methods other than iteration,
+it can be reset, it can expose its position, and it can implement `__len__` so
+that `len()` works. A generator can do none of those. When the object is a
+collection with an order, a class is right; when it is a process that produces
+values, `yield` is right.
+
+The practical version of that rule: if you find yourself writing
+`self.index`, `self.buffer` and a `__next__` full of branches, the code you
+meant to write is a generator function with a loop in it.
+
+## Questions people ask
+
+<strong>What is the difference between a generator and a list
+comprehension?</strong> Brackets. `[x for x in y]` builds a list;
+`(x for x in y)` produces values on demand.
+
+<strong>Can I get the length of a generator?</strong> Not without consuming it.
+`sum(1 for _ in g)` counts it, and leaves it exhausted.
+
+<strong>Can a generator have a `return`?</strong> Yes, and it ends the
+generator. The returned value is attached to `StopIteration` rather than handed
+to the loop.
+
+<strong>Are generators faster than lists?</strong> Not per item. They are
+faster to start, use far less memory, and avoid work the consumer never asks
+for.
+
+<strong>Can I index a generator?</strong> No. Use `itertools.islice` to skip
+and take, or build a list.
+
+<strong>What is the difference between `yield` and `yield from`?</strong>
+`yield` produces one value; `yield from` produces every value of another
+iterable, and passes `send` and `throw` through to it.
+
+<strong>Why does my generator not raise until later?</strong> Because the body
+does not run until the first value is requested.
+
+<strong>Can I nest generator expressions?</strong> Yes, and the inner one is
+consumed lazily too. Readability is usually the limit rather than any
+technical one.
+
+<strong>Do generators work with `in`?</strong> Yes, and the test consumes the
+generator up to the match, leaving the rest. Testing twice will not behave the
+way you expect.
+
+<strong>Is a file object a generator?</strong> Not exactly, but it is an
+iterator over lines, which is why `for line in f` works and why it too can only
+be walked once without seeking back.
+
+<strong>Can two loops share one generator?</strong> They can consume it between
+them, each taking whatever the other has not. That is occasionally useful and
+much more often a bug.
+
+<strong>What happens to a generator I stop halfway?</strong> It stays paused
+until it is garbage-collected, at which point `GeneratorExit` is raised inside
+it so `finally` blocks and `with` statements can clean up.
+
+## Recap in one screen
+
+- A generator function returns an object; the body runs only when values are
+  asked for.
+- One pass, no length, no indexing &mdash; call `list()` when you need any of
+  those.
+- Memory is flat regardless of the size of the sequence, which is what makes
+  infinite sequences and huge files workable.
+- A pipeline of generators moves one item end to end at a time, doing no work
+  the consumer does not ask for.
+- `for` works by calling `next()` until `StopIteration`; a generator simply
+  implements that protocol.
 """)
