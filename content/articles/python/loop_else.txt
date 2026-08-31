@@ -110,3 +110,186 @@ someone else's loop is exactly the kind of thing that makes a reader guess.
 Guessing wrong here is easy, because the plain-English reading of "else" is the
 opposite of the truth in the case people usually check first - the empty
 sequence, where the else still runs.
+
+## The same else, on try
+
+`else` appears in a third place in Python, and seeing it there is what makes the
+loop version stop feeling arbitrary:
+
+```python
+try:
+    value = int(text)
+except ValueError:
+    print("not a number")
+else:
+    print("parsed", value)
+finally:
+    print("done")
+```
+
+The `else` on a `try` runs when no exception was raised. The `else` on a loop
+runs when no `break` happened. In both cases the block means *the thing we were
+guarding against did not occur* &mdash; the exception did not fire, the search
+did not find an early exit.
+
+Read that way, the loop version is consistent with the rest of the language
+rather than an oddity bolted on. It is still a badly chosen keyword, because
+"else" in an `if` means "the condition was false" and in these two places it
+means "the interruption did not happen". But there is one idea behind both, and
+knowing it is easier than memorising two unrelated rules.
+
+The `try` version has a second, practical reason to exist: it keeps the `try`
+block down to the line that can actually raise. Code that should only run on
+success goes in the `else`, where it is not accidentally protected by the
+`except`, so an unrelated `ValueError` from the success path is not silently
+caught by a handler meant for the parse.
+
+## A worked example: searching nested data
+
+The shape `for/else` fits is a search that has to report failure, and nesting
+is where the flag-based alternative starts to hurt:
+
+```python
+grid = [[1, 2], [3, 4], [5, 6]]
+
+for row in grid:
+    if 4 in row:
+        print("found in", row)
+        break
+else:
+    print("not found")
+```
+
+```
+found in [3, 4]
+```
+
+Change the target to 9 and the `else` prints "not found". No flag, no variable
+that has to be initialised before the loop and checked after it, and the
+failure branch sits visually attached to the loop it belongs to.
+
+The equivalent with a flag is four lines longer and has three places to make a
+mistake: forgetting to initialise, forgetting to set it, and checking it with
+the wrong sense. None of those are hard mistakes to avoid, and all of them are
+mistakes that get made.
+
+## Where it sits among break and continue
+
+The three of them describe what happens to a loop, and it helps to hold them
+together.
+
+`break` leaves the loop immediately, skipping the `else`. It is the only thing
+that skips the `else`, which is the entire rule.
+
+`continue` skips the rest of the current iteration and goes on to the next one.
+It does not affect the `else` at all &mdash; a loop that `continue`s every
+single time still finishes normally, and the `else` still runs.
+
+`return` inside a loop leaves the function altogether, so the `else` never runs
+and neither does anything after the loop. This is why a search written inside a
+function usually does not need `for/else`: returning early makes the failure
+case the last line of the function, which most readers find easier than an
+attached block.
+
+The one that surprises people is the empty sequence. A loop over an empty list
+runs zero times, never breaks, and therefore *does* run its `else`. If you read
+`else` as "if the loop did not run", this is precisely backwards, and it is the
+case worth testing yourself on.
+
+## Reading it in real code
+
+The reason to learn a construct you may choose not to write is that you will
+meet it. `for/else` appears in the standard library and in long-lived
+codebases, usually in exactly the search-and-report-failure shape described
+here, and occasionally in parsing code where several loops each have their own
+failure branch.
+
+When you meet one, the reliable move is to find the `break`. If there is one,
+the `else` is the no-break branch and the loop is a search. If there is no
+`break` anywhere in the body, the `else` is decoration and means nothing at all
+&mdash; and that is worth noticing, because it is usually a sign that somebody
+wrote it expecting a different behaviour.
+
+## Why it is still in the language
+
+Features this misunderstood usually get removed, and this one has not been,
+which is worth a moment.
+
+It cannot be removed without breaking working code, and the amount of Python in
+existence that uses it is small but real. More to the point, the behaviour is
+not wrong &mdash; it does something useful, has no edge cases, and the only
+complaint anyone makes is about the keyword. Changing the keyword would break
+just as much code as removing the feature, and adding `nobreak` as a synonym
+would mean two ways to write one thing, which the language actively avoids.
+
+So it stays, mildly awkward and occasionally useful, and the practical position
+for anyone learning Python is the one this page has taken throughout: learn to
+read it fluently, and make your own choice about writing it. Neither choice is
+wrong. What is wrong is meeting one in unfamiliar code and guessing.
+
+## Testing a loop that has one
+
+If you do write `for/else`, it has two paths and both deserve a test, which is
+easy to forget because the failure path has no code of its own to point at.
+
+The three cases that matter are: the item is found, so the `break` fires and
+the `else` is skipped; the item is absent from a non-empty sequence, so the
+loop finishes and the `else` runs; and the sequence is empty, which also runs
+the `else`. That third case is the one most likely to be missing from a test
+suite and most likely to be wrong in the code, because it is the case where the
+plain-English reading of "else" and the actual behaviour disagree.
+
+If the empty case should behave differently from the not-found case &mdash; and
+sometimes it should, because "you gave me nothing to search" is not the same
+answer as "I searched and it is not there" &mdash; then `for/else` cannot
+express that on its own, and an explicit check before the loop is the honest
+way to say it.
+
+## Questions people ask
+
+<strong>Does the `else` run if the loop body never executes?</strong> Yes. Zero
+iterations means no `break`, so the `else` runs. This is the case most people
+guess wrong.
+
+<strong>Does `continue` skip the `else`?</strong> No. Only `break` does.
+
+<strong>Does `return` inside the loop run the `else`?</strong> No &mdash; the
+function has already left.
+
+<strong>Does an exception skip the `else`?</strong> Yes, unless it is caught
+inside the loop. The exception propagates and nothing after the loop runs.
+
+<strong>Can I use `else` on a comprehension?</strong> No. The `else` you can
+write inside a comprehension is part of a conditional expression, which is an
+unrelated feature.
+
+<strong>Is there an `else` for `while`?</strong> Yes, with the same rule: it
+runs when the condition became false, and not when a `break` ended the loop.
+
+<strong>Should I use it in code others will read?</strong> In a short function
+where the loop is a search, yes. Buried in a long function, a comment or an
+early `return` may serve the next reader better.
+
+<strong>Do other languages have this?</strong> Very few. It comes from a
+long-standing idea in structured programming, and Python is the mainstream
+language most associated with it, which is part of why it is unfamiliar.
+
+<strong>Does a linter complain about it?</strong> Some flag a loop `else` with
+no `break` in the body, which is exactly the case where it means nothing. That
+is a useful warning to have switched on.
+
+<strong>Can I use `break` inside a nested loop and reach the outer
+`else`?</strong> No. `break` leaves only the loop it is in, so it skips that
+loop's `else` and leaves the outer one to finish normally.
+
+## Recap in one screen
+
+- The `else` on a loop runs when the loop finished without a `break` &mdash;
+  read it as `nobreak`.
+- Zero iterations still counts as finishing, so the `else` runs for an empty
+  sequence.
+- `continue` does not affect it; `break` and `return` are what skip it.
+- It replaces the found-flag pattern in searches, removing a variable and two
+  chances to be wrong.
+- The same `else` is on `try`, meaning the same thing: the interruption did
+  not happen.

@@ -3668,3 +3668,589 @@ anything iterable, and iterating a dictionary gives its keys. Use
 - `reduce` lives in `functools` because `sum`, `max`, `any` and `all` already
   cover almost every use of it.
 """)
+
+
+extend("range_step", """
+## Why the stop is excluded, and why it is the right choice
+
+"The stop is never included" is easy to memorise and easy to resent. It is
+worth a paragraph on why the language chose it, because once the reasoning is
+clear the off-by-one errors mostly stop.
+
+A half-open interval &mdash; one that includes the start and excludes the stop
+&mdash; has three properties that a closed interval does not. The length is the
+subtraction: `range(a, b)` produces exactly `b - a` numbers, with no correction
+term to remember. The empty case is expressible: `range(3, 3)` is empty, where a
+closed interval would have no way to say "nothing" without a special case. And
+adjacent ranges join without a gap and without an overlap: `range(0, 5)` and
+`range(5, 10)` between them cover 0 to 9, each number exactly once, which is
+what makes splitting work.
+
+The same choice runs through slicing, which is why `a[:3]` and `a[3:]`
+reconstruct the whole list and why `len(a[i:j])` is `j - i`. Learning it once
+covers both, and the pattern is deliberate rather than accidental.
+
+The place it still catches people is counting down, where the exclusive end is
+below the last value you want rather than above it. That is not a different
+rule, but it does read differently, which is why it deserves its own attention.
+
+## Chunking, the most common use of a step
+
+The step exists for a specific job more often than for skipping numbers:
+walking a sequence in fixed-size pieces.
+
+```python
+items = list("abcdefgh")
+size = 3
+
+for i in range(0, len(items), size):
+    print(items[i:i + size])
+```
+
+```
+['a', 'b', 'c']
+['d', 'e', 'f']
+['g', 'h']
+```
+
+The last chunk is short and needs no special handling, because slicing does not
+complain when the end is past the length. That is the second time on this page
+that a rule which looks like leniency turns out to remove a branch.
+
+This shape appears whenever something has a batch limit: rows to insert per
+query, items per API request, lines per page. The alternative is an index and a
+counter, which is more code and more places to be wrong by one.
+
+## Floats, and stepping by a fraction
+
+`range(0, 1, 0.1)` raises `TypeError`, which reads like a limitation and is
+closer to a favour. The reason is that a fractional step accumulates error:
+
+```python
+x, vals = 0.0, []
+while x < 1.0:
+    vals.append(x)
+    x += 0.1
+
+print(len(vals), vals[-1])
+```
+
+```
+11 0.9999999999999999
+```
+
+Eleven values, where the obvious reading of the loop promises ten, and the last
+is not 0.9. Adding 0.1 repeatedly compounds the tiny error in representing 0.1
+in binary, and after ten additions the running total is a hair under 1.0 &mdash;
+so the condition holds one more time than intended. The number of iterations now
+depends on rounding error rather than on anything you wrote.
+
+The reliable pattern is to count in integers and divide once at the end:
+
+```python
+print([i / 10 for i in range(0, 10, 2)])
+```
+
+```
+[0.0, 0.2, 0.4, 0.6, 0.8]
+```
+
+Each value is computed from an exact integer rather than from the previous
+value, so no error accumulates and the number of items is fixed by the `range`.
+For anything more involved, `numpy.arange` and `numpy.linspace` exist, and
+`linspace` is the one to prefer because you give it the count rather than the
+step.
+
+## The range(len(...)) habit, and what to write instead
+
+A large share of the `range` calls in beginner code are `range(len(items))`,
+used to get at the items:
+
+```python
+for i in range(len(items)):
+    print(items[i])
+```
+
+This works and is worth unlearning. It introduces an index that nothing needs,
+it reads as arithmetic rather than as iteration, and it is the version that
+produces `IndexError` when the bound is computed slightly wrong. `for item in
+items` says the same thing with less to get wrong.
+
+The three cases that look like they need it usually do not. If you want the
+position alongside the item, `enumerate(items)` gives both. If you are walking
+two sequences together, `zip(a, b)` pairs them. If you are comparing each item
+with the next, `zip(items, items[1:])` gives consecutive pairs.
+
+What is left is genuinely index-based work: writing into a list at a computed
+position, stepping by more than one, or walking backwards by index. Those are
+real, and they are a small minority.
+
+## Reading a range at a glance
+
+Three questions come up constantly when reading someone else's loop, and all
+three have arithmetic answers that are worth being able to do without running
+anything.
+
+**How many numbers is that?** For a positive step, it is the distance divided
+by the step, rounded up: `range(0, 10, 3)` covers a distance of 10 in steps of
+3, giving 4 numbers. The rounding up is what catches people, and it is why
+`range(0, 10, 3)` gives four values rather than three.
+
+**What is the last one?** It is the largest value below the stop that you can
+reach from the start by whole steps. For `range(0, 10, 3)` that is 9. When the
+step divides the distance exactly, as in `range(0, 10, 2)`, the last value is
+the stop minus the step &mdash; 8, not 10 &mdash; because the stop itself is
+never included.
+
+**Does it produce anything at all?** Only if the start is on the correct side
+of the stop for the direction of travel. Ascending needs `start < stop`,
+descending needs `start > stop`. Neither raises when it is wrong; you get an
+empty range, and a loop that silently does nothing.
+
+That last one is worth dwelling on, because it is the failure mode that costs
+the most time. An exception tells you where to look. A loop that runs zero
+times leaves no trace at all, and the symptom appears later as an empty result
+or an unchanged variable. When a loop appears not to have happened, printing
+`list(the_range)` is usually a faster diagnosis than reading the arithmetic
+again.
+
+## Questions people ask
+
+<strong>Why does `range(5, 0)` produce nothing?</strong> Because the default
+step is 1, so it is counting up from 5 towards 0 and stops immediately. You
+need `range(5, 0, -1)`.
+
+<strong>Is `range` a generator?</strong> No. It is a lazy sequence: it can be
+iterated many times, it has a length, and it supports indexing and slicing. A
+generator has none of those.
+
+<strong>How do I get a list from a range?</strong> `list(range(5))`. It is
+worth asking whether you need one &mdash; a loop does not.
+
+<strong>Why is `x in range(n)` fast?</strong> It does arithmetic rather than
+scanning, so it is constant time regardless of the size of the range.
+
+<strong>Can the step be negative and the start below the stop?</strong> It can
+be written, and it produces an empty range. Nothing is raised.
+
+<strong>Does `range` work with very large numbers?</strong> Yes.
+`range(10**18)` is created instantly, because nothing is stored but the three
+values.
+
+<strong>How do I include the stop?</strong> Add one to it. That is the honest
+answer, and `range(1, n + 1)` is how you count from 1 to n.
+
+<strong>Can I slice a range?</strong> Yes, and you get another range back:
+`range(10)[2:5]` is `range(2, 5)`. Nothing is materialised.
+
+<strong>Why does `range` compare equal to another range with different
+arguments?</strong> Because ranges compare by the sequence they produce, not by
+their start, stop and step. `range(0) == range(2, 2)` is `True`; both are empty.
+
+<strong>Is there a version that includes the stop?</strong> Not in the
+standard library. `numpy.linspace` is the closest, and it takes a count rather
+than a step, which sidesteps the question.
+
+<strong>What does a negative index do on a range?</strong> The same as on any
+sequence: `range(10)[-1]` is 9. It is computed rather than looked up, so it is
+instant even on an enormous range.
+
+<strong>Should I ever store a range in a variable?</strong> Yes, when the same
+sequence of numbers is used twice. Unlike a generator it can be iterated again,
+so it is safe to reuse.
+
+## Recap in one screen
+
+- One argument is stop, two are start and stop, three add a step; the stop is
+  always excluded.
+- The half-open interval makes the length a subtraction, lets ranges be empty,
+  and lets adjacent ranges tile without gaps.
+- Counting down needs both a negative step and a stop below the start, and a
+  wrong sign gives an empty range rather than an error.
+- `range` refuses floats on purpose; count in integers and divide once.
+- `range(len(items))` is usually `enumerate`, `zip`, or just iterating the
+  items.
+""")
+
+
+extend("dictionary_methods", """
+## Counter, and the four things it gives you
+
+Counting is common enough that the standard library has a dictionary subclass
+for it, and knowing four of its behaviours removes a lot of hand-written code:
+
+```python
+from collections import Counter
+
+text = "the cat and the hat and the bat"
+counts = Counter(text.split())
+
+print(counts.most_common(2))
+print(counts["the"], counts["dog"])
+print(sum(counts.values()))
+```
+
+```
+[('the', 3), ('and', 2)]
+3 0
+8
+```
+
+First, it counts anything iterable in one call, so the loop disappears. Second,
+`most_common(n)` sorts by count and gives the top n, which is the question
+people actually want answered and is otherwise a `sorted` with a `key`. Third,
+a missing key returns 0 rather than raising &mdash; and, unlike `defaultdict`,
+it does not insert the key on access, so reading does not quietly grow the
+dictionary. Fourth, counters support arithmetic: `a + b` merges counts and
+`a - b` subtracts them, which is a neat way to diff two collections.
+
+It is still a dictionary, so everything else on this page applies to it.
+
+## What can be a key, and why
+
+Any object can be a key if it is hashable, which in practice means immutable
+all the way down. Strings, numbers, booleans and tuples of those are fine.
+Lists, dictionaries and sets are not, and a tuple containing a list is not
+either, because hashing it has to hash its contents.
+
+The reason is how a dictionary works. It computes a hash of the key, uses that
+to decide where to store the entry, and looks in the same place later. If a key
+could change after insertion, its hash would change, and the entry would be
+sitting somewhere the lookup will never search. Rather than allow that, Python
+refuses to hash mutable types at all.
+
+Two consequences are worth knowing. `1`, `1.0` and `True` all hash the same and
+compare equal, so they are the *same key* &mdash; `{1: "a", True: "b"}` has one
+entry. And a tuple key is the standard way to index by more than one thing:
+`grid[(row, col)]` is a perfectly ordinary dictionary lookup, and the brackets
+around the tuple are optional.
+
+Custom classes are hashable by default, using identity, which means two
+distinct instances with identical contents are different keys. If you want them
+to be the same key, define `__eq__` and `__hash__` together &mdash; or use a
+frozen dataclass, which writes both for you.
+
+## A dictionary instead of a chain of elif
+
+Once functions can be values, a dictionary replaces a whole shape of code:
+
+```python
+def add(a, b): return a + b
+def sub(a, b): return a - b
+
+OPS = {"+": add, "-": sub}
+
+print(OPS["+"](3, 4))
+print(OPS.get("*", lambda a, b: None)(3, 4))
+```
+
+```
+7
+None
+```
+
+Compared with an `if`/`elif` chain, this separates the table of options from the
+code that uses it. Adding an operation is one dictionary entry rather than
+another branch, the set of valid options can be listed with `OPS.keys()`, and
+the same table can drive a help message or validate input.
+
+The pattern generalises well beyond arithmetic: handlers keyed by message type,
+formatters keyed by file extension, validators keyed by field name. It is the
+same idea as the menu earlier in the track, and it is worth reaching for
+whenever a chain of `elif` is comparing one value against a list of constants.
+
+Where an `if` chain is still better: when the conditions are not simple equality
+&mdash; ranges, combinations, anything needing `and` &mdash; a dictionary cannot
+express the question, and forcing it to is worse than the chain.
+
+## Getting the items out in a useful order
+
+A dictionary keeps insertion order, which is rarely the order you want to
+report in. `sorted` takes the same `key` argument here as everywhere else, and
+`d.items()` gives it pairs to work with.
+
+Sorting by key is `sorted(d.items())`, which works because tuples compare
+element by element and the key is first. Sorting by value needs a key function
+that reaches for the second element &mdash; `key=lambda kv: kv[1]`, or
+`key=itemgetter(1)` &mdash; and adding `reverse=True` gives you largest first.
+For a top-n rather than a full sort, `heapq.nlargest(3, d.items(), key=...)`
+does less work, and `Counter.most_common(3)` does it for you when the values
+are counts.
+
+The result is a list of tuples, not a dictionary. If you need a dictionary back
+in that order, wrap it: `dict(sorted(d.items()))` builds a new one, and since
+3.7 the insertion order it gets is the sorted order you just produced. This is
+the standard way to produce a "sorted dictionary" in Python, and it is worth
+knowing that it is a snapshot &mdash; later insertions go on the end, not into
+their sorted position.
+
+One detail that bites when sorting by value: ties come out in whatever order
+they were already in, because `sorted` is stable. That is usually what you
+want, and when it is not, the fix is a tuple key that names the tiebreak
+explicitly, such as `key=lambda kv: (-kv[1], kv[0])` for "highest count first,
+then alphabetical".
+
+## Comprehensions over dictionaries
+
+The methods on this page and dictionary comprehensions cover the same ground
+from two directions, and knowing which reads better saves a lot of loops.
+
+A comprehension is the right tool when you are building a new dictionary from
+an old one: filtering out entries below a threshold, transforming every value,
+swapping keys and values, or building a lookup table from a list of records.
+`{k: v for k, v in d.items() if v > 0}` is one line, and the alternative is
+three lines with an accumulator.
+
+The methods are the right tool when you are updating a dictionary in place, or
+when the operation has a name &mdash; `update`, `setdefault`, `pop`. Rebuilding
+a whole dictionary with a comprehension in order to change one entry is
+wasteful and reads as though something more complicated is happening.
+
+The case where people reach for the wrong one is counting and grouping. A
+comprehension cannot accumulate, because each iteration produces an independent
+entry with no access to what came before. That is exactly why `Counter`,
+`setdefault` and `defaultdict` exist, and why a grouping loop stays a loop.
+
+## Questions people ask
+
+<strong>Is `d.get(k)` the same as `d[k]` with a `try`?</strong> Effectively yes,
+and `get` is clearer. Use brackets when a missing key means a bug.
+
+<strong>Why did my loop raise "dictionary changed size during iteration"?</strong>
+Because you added or removed a key while iterating a live view. Iterate
+`list(d)` instead.
+
+<strong>What is the difference between `update` and `|`?</strong> `update`
+modifies in place and returns `None`; `|` returns a new dictionary and leaves
+both operands alone.
+
+<strong>Are dictionaries sorted?</strong> No. They keep insertion order, which
+is not the same thing. `sorted(d.items())` when you want sorted.
+
+<strong>How do I invert a dictionary?</strong>
+`{v: k for k, v in d.items()}`, remembering that duplicate values collapse
+&mdash; the last one wins.
+
+<strong>Is `defaultdict` always better than `setdefault`?</strong> No.
+`defaultdict` creates an entry on any missing lookup, including a typo, which
+can hide bugs. Use it when every access should create a default.
+
+<strong>How do I get the first key?</strong> `next(iter(d))`. There is no
+indexing, because a dictionary is not a sequence.
+
+<strong>Can I use `+` to merge two dictionaries?</strong> No. Use `|` on 3.9 and
+later, `{**a, **b}` before that, or `update` for in-place.
+
+<strong>Does `pop` work without a key?</strong> `popitem()` removes and returns
+the last inserted pair, which is useful for draining a dictionary in a loop.
+
+<strong>How do I count without importing Counter?</strong>
+`d[k] = d.get(k, 0) + 1` in a loop. `Counter` is faster and clearer, but the
+one-liner is worth knowing for when the import is not worth it.
+
+<strong>What happens if I use an unhashable key by mistake?</strong> You get
+`TypeError: unhashable type: 'list'` at the moment of insertion, which names
+the type and is one of the clearer error messages in the language.
+
+<strong>Is there a frozen dictionary?</strong> Not in the standard library.
+`types.MappingProxyType(d)` gives a read-only view of one, which covers most of
+the reasons people want it.
+
+## Recap in one screen
+
+- `get` reads with a fallback, `setdefault` reads and inserts, `defaultdict`
+  inserts on every miss &mdash; pick by what should happen to the dictionary.
+- `items()` is the loop you usually want; `keys()`, `values()` and `items()`
+  are live views, not snapshots.
+- Iterate `list(d)` whenever the loop body might change the dictionary.
+- Keys must be hashable, which means immutable all the way down; tuples are
+  the standard multi-part key.
+- A dictionary of functions replaces a chain of `elif` that is testing one
+  value against constants.
+""")
+
+
+extend("loop_else", """
+## The same else, on try
+
+`else` appears in a third place in Python, and seeing it there is what makes the
+loop version stop feeling arbitrary:
+
+```python
+try:
+    value = int(text)
+except ValueError:
+    print("not a number")
+else:
+    print("parsed", value)
+finally:
+    print("done")
+```
+
+The `else` on a `try` runs when no exception was raised. The `else` on a loop
+runs when no `break` happened. In both cases the block means *the thing we were
+guarding against did not occur* &mdash; the exception did not fire, the search
+did not find an early exit.
+
+Read that way, the loop version is consistent with the rest of the language
+rather than an oddity bolted on. It is still a badly chosen keyword, because
+"else" in an `if` means "the condition was false" and in these two places it
+means "the interruption did not happen". But there is one idea behind both, and
+knowing it is easier than memorising two unrelated rules.
+
+The `try` version has a second, practical reason to exist: it keeps the `try`
+block down to the line that can actually raise. Code that should only run on
+success goes in the `else`, where it is not accidentally protected by the
+`except`, so an unrelated `ValueError` from the success path is not silently
+caught by a handler meant for the parse.
+
+## A worked example: searching nested data
+
+The shape `for/else` fits is a search that has to report failure, and nesting
+is where the flag-based alternative starts to hurt:
+
+```python
+grid = [[1, 2], [3, 4], [5, 6]]
+
+for row in grid:
+    if 4 in row:
+        print("found in", row)
+        break
+else:
+    print("not found")
+```
+
+```
+found in [3, 4]
+```
+
+Change the target to 9 and the `else` prints "not found". No flag, no variable
+that has to be initialised before the loop and checked after it, and the
+failure branch sits visually attached to the loop it belongs to.
+
+The equivalent with a flag is four lines longer and has three places to make a
+mistake: forgetting to initialise, forgetting to set it, and checking it with
+the wrong sense. None of those are hard mistakes to avoid, and all of them are
+mistakes that get made.
+
+## Where it sits among break and continue
+
+The three of them describe what happens to a loop, and it helps to hold them
+together.
+
+`break` leaves the loop immediately, skipping the `else`. It is the only thing
+that skips the `else`, which is the entire rule.
+
+`continue` skips the rest of the current iteration and goes on to the next one.
+It does not affect the `else` at all &mdash; a loop that `continue`s every
+single time still finishes normally, and the `else` still runs.
+
+`return` inside a loop leaves the function altogether, so the `else` never runs
+and neither does anything after the loop. This is why a search written inside a
+function usually does not need `for/else`: returning early makes the failure
+case the last line of the function, which most readers find easier than an
+attached block.
+
+The one that surprises people is the empty sequence. A loop over an empty list
+runs zero times, never breaks, and therefore *does* run its `else`. If you read
+`else` as "if the loop did not run", this is precisely backwards, and it is the
+case worth testing yourself on.
+
+## Reading it in real code
+
+The reason to learn a construct you may choose not to write is that you will
+meet it. `for/else` appears in the standard library and in long-lived
+codebases, usually in exactly the search-and-report-failure shape described
+here, and occasionally in parsing code where several loops each have their own
+failure branch.
+
+When you meet one, the reliable move is to find the `break`. If there is one,
+the `else` is the no-break branch and the loop is a search. If there is no
+`break` anywhere in the body, the `else` is decoration and means nothing at all
+&mdash; and that is worth noticing, because it is usually a sign that somebody
+wrote it expecting a different behaviour.
+
+## Why it is still in the language
+
+Features this misunderstood usually get removed, and this one has not been,
+which is worth a moment.
+
+It cannot be removed without breaking working code, and the amount of Python in
+existence that uses it is small but real. More to the point, the behaviour is
+not wrong &mdash; it does something useful, has no edge cases, and the only
+complaint anyone makes is about the keyword. Changing the keyword would break
+just as much code as removing the feature, and adding `nobreak` as a synonym
+would mean two ways to write one thing, which the language actively avoids.
+
+So it stays, mildly awkward and occasionally useful, and the practical position
+for anyone learning Python is the one this page has taken throughout: learn to
+read it fluently, and make your own choice about writing it. Neither choice is
+wrong. What is wrong is meeting one in unfamiliar code and guessing.
+
+## Testing a loop that has one
+
+If you do write `for/else`, it has two paths and both deserve a test, which is
+easy to forget because the failure path has no code of its own to point at.
+
+The three cases that matter are: the item is found, so the `break` fires and
+the `else` is skipped; the item is absent from a non-empty sequence, so the
+loop finishes and the `else` runs; and the sequence is empty, which also runs
+the `else`. That third case is the one most likely to be missing from a test
+suite and most likely to be wrong in the code, because it is the case where the
+plain-English reading of "else" and the actual behaviour disagree.
+
+If the empty case should behave differently from the not-found case &mdash; and
+sometimes it should, because "you gave me nothing to search" is not the same
+answer as "I searched and it is not there" &mdash; then `for/else` cannot
+express that on its own, and an explicit check before the loop is the honest
+way to say it.
+
+## Questions people ask
+
+<strong>Does the `else` run if the loop body never executes?</strong> Yes. Zero
+iterations means no `break`, so the `else` runs. This is the case most people
+guess wrong.
+
+<strong>Does `continue` skip the `else`?</strong> No. Only `break` does.
+
+<strong>Does `return` inside the loop run the `else`?</strong> No &mdash; the
+function has already left.
+
+<strong>Does an exception skip the `else`?</strong> Yes, unless it is caught
+inside the loop. The exception propagates and nothing after the loop runs.
+
+<strong>Can I use `else` on a comprehension?</strong> No. The `else` you can
+write inside a comprehension is part of a conditional expression, which is an
+unrelated feature.
+
+<strong>Is there an `else` for `while`?</strong> Yes, with the same rule: it
+runs when the condition became false, and not when a `break` ended the loop.
+
+<strong>Should I use it in code others will read?</strong> In a short function
+where the loop is a search, yes. Buried in a long function, a comment or an
+early `return` may serve the next reader better.
+
+<strong>Do other languages have this?</strong> Very few. It comes from a
+long-standing idea in structured programming, and Python is the mainstream
+language most associated with it, which is part of why it is unfamiliar.
+
+<strong>Does a linter complain about it?</strong> Some flag a loop `else` with
+no `break` in the body, which is exactly the case where it means nothing. That
+is a useful warning to have switched on.
+
+<strong>Can I use `break` inside a nested loop and reach the outer
+`else`?</strong> No. `break` leaves only the loop it is in, so it skips that
+loop's `else` and leaves the outer one to finish normally.
+
+## Recap in one screen
+
+- The `else` on a loop runs when the loop finished without a `break` &mdash;
+  read it as `nobreak`.
+- Zero iterations still counts as finishing, so the `else` runs for an empty
+  sequence.
+- `continue` does not affect it; `break` and `return` are what skip it.
+- It replaces the found-flag pattern in searches, removing a variable and two
+  chances to be wrong.
+- The same `else` is on `try`, meaning the same thing: the interruption did
+  not happen.
+""")

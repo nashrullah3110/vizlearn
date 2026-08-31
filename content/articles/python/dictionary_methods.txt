@@ -124,3 +124,197 @@ defaults |= overrides                  # in place
 Later keys win in all three. This is the clean way to layer configuration, and
 it beats a loop of `if key not in d` conditions because the precedence is stated
 by the order of the operands rather than buried in the logic.
+
+## Counter, and the four things it gives you
+
+Counting is common enough that the standard library has a dictionary subclass
+for it, and knowing four of its behaviours removes a lot of hand-written code:
+
+```python
+from collections import Counter
+
+text = "the cat and the hat and the bat"
+counts = Counter(text.split())
+
+print(counts.most_common(2))
+print(counts["the"], counts["dog"])
+print(sum(counts.values()))
+```
+
+```
+[('the', 3), ('and', 2)]
+3 0
+8
+```
+
+First, it counts anything iterable in one call, so the loop disappears. Second,
+`most_common(n)` sorts by count and gives the top n, which is the question
+people actually want answered and is otherwise a `sorted` with a `key`. Third,
+a missing key returns 0 rather than raising &mdash; and, unlike `defaultdict`,
+it does not insert the key on access, so reading does not quietly grow the
+dictionary. Fourth, counters support arithmetic: `a + b` merges counts and
+`a - b` subtracts them, which is a neat way to diff two collections.
+
+It is still a dictionary, so everything else on this page applies to it.
+
+## What can be a key, and why
+
+Any object can be a key if it is hashable, which in practice means immutable
+all the way down. Strings, numbers, booleans and tuples of those are fine.
+Lists, dictionaries and sets are not, and a tuple containing a list is not
+either, because hashing it has to hash its contents.
+
+The reason is how a dictionary works. It computes a hash of the key, uses that
+to decide where to store the entry, and looks in the same place later. If a key
+could change after insertion, its hash would change, and the entry would be
+sitting somewhere the lookup will never search. Rather than allow that, Python
+refuses to hash mutable types at all.
+
+Two consequences are worth knowing. `1`, `1.0` and `True` all hash the same and
+compare equal, so they are the *same key* &mdash; `{1: "a", True: "b"}` has one
+entry. And a tuple key is the standard way to index by more than one thing:
+`grid[(row, col)]` is a perfectly ordinary dictionary lookup, and the brackets
+around the tuple are optional.
+
+Custom classes are hashable by default, using identity, which means two
+distinct instances with identical contents are different keys. If you want them
+to be the same key, define `__eq__` and `__hash__` together &mdash; or use a
+frozen dataclass, which writes both for you.
+
+## A dictionary instead of a chain of elif
+
+Once functions can be values, a dictionary replaces a whole shape of code:
+
+```python
+def add(a, b): return a + b
+def sub(a, b): return a - b
+
+OPS = {"+": add, "-": sub}
+
+print(OPS["+"](3, 4))
+print(OPS.get("*", lambda a, b: None)(3, 4))
+```
+
+```
+7
+None
+```
+
+Compared with an `if`/`elif` chain, this separates the table of options from the
+code that uses it. Adding an operation is one dictionary entry rather than
+another branch, the set of valid options can be listed with `OPS.keys()`, and
+the same table can drive a help message or validate input.
+
+The pattern generalises well beyond arithmetic: handlers keyed by message type,
+formatters keyed by file extension, validators keyed by field name. It is the
+same idea as the menu earlier in the track, and it is worth reaching for
+whenever a chain of `elif` is comparing one value against a list of constants.
+
+Where an `if` chain is still better: when the conditions are not simple equality
+&mdash; ranges, combinations, anything needing `and` &mdash; a dictionary cannot
+express the question, and forcing it to is worse than the chain.
+
+## Getting the items out in a useful order
+
+A dictionary keeps insertion order, which is rarely the order you want to
+report in. `sorted` takes the same `key` argument here as everywhere else, and
+`d.items()` gives it pairs to work with.
+
+Sorting by key is `sorted(d.items())`, which works because tuples compare
+element by element and the key is first. Sorting by value needs a key function
+that reaches for the second element &mdash; `key=lambda kv: kv[1]`, or
+`key=itemgetter(1)` &mdash; and adding `reverse=True` gives you largest first.
+For a top-n rather than a full sort, `heapq.nlargest(3, d.items(), key=...)`
+does less work, and `Counter.most_common(3)` does it for you when the values
+are counts.
+
+The result is a list of tuples, not a dictionary. If you need a dictionary back
+in that order, wrap it: `dict(sorted(d.items()))` builds a new one, and since
+3.7 the insertion order it gets is the sorted order you just produced. This is
+the standard way to produce a "sorted dictionary" in Python, and it is worth
+knowing that it is a snapshot &mdash; later insertions go on the end, not into
+their sorted position.
+
+One detail that bites when sorting by value: ties come out in whatever order
+they were already in, because `sorted` is stable. That is usually what you
+want, and when it is not, the fix is a tuple key that names the tiebreak
+explicitly, such as `key=lambda kv: (-kv[1], kv[0])` for "highest count first,
+then alphabetical".
+
+## Comprehensions over dictionaries
+
+The methods on this page and dictionary comprehensions cover the same ground
+from two directions, and knowing which reads better saves a lot of loops.
+
+A comprehension is the right tool when you are building a new dictionary from
+an old one: filtering out entries below a threshold, transforming every value,
+swapping keys and values, or building a lookup table from a list of records.
+`{k: v for k, v in d.items() if v > 0}` is one line, and the alternative is
+three lines with an accumulator.
+
+The methods are the right tool when you are updating a dictionary in place, or
+when the operation has a name &mdash; `update`, `setdefault`, `pop`. Rebuilding
+a whole dictionary with a comprehension in order to change one entry is
+wasteful and reads as though something more complicated is happening.
+
+The case where people reach for the wrong one is counting and grouping. A
+comprehension cannot accumulate, because each iteration produces an independent
+entry with no access to what came before. That is exactly why `Counter`,
+`setdefault` and `defaultdict` exist, and why a grouping loop stays a loop.
+
+## Questions people ask
+
+<strong>Is `d.get(k)` the same as `d[k]` with a `try`?</strong> Effectively yes,
+and `get` is clearer. Use brackets when a missing key means a bug.
+
+<strong>Why did my loop raise "dictionary changed size during iteration"?</strong>
+Because you added or removed a key while iterating a live view. Iterate
+`list(d)` instead.
+
+<strong>What is the difference between `update` and `|`?</strong> `update`
+modifies in place and returns `None`; `|` returns a new dictionary and leaves
+both operands alone.
+
+<strong>Are dictionaries sorted?</strong> No. They keep insertion order, which
+is not the same thing. `sorted(d.items())` when you want sorted.
+
+<strong>How do I invert a dictionary?</strong>
+`{v: k for k, v in d.items()}`, remembering that duplicate values collapse
+&mdash; the last one wins.
+
+<strong>Is `defaultdict` always better than `setdefault`?</strong> No.
+`defaultdict` creates an entry on any missing lookup, including a typo, which
+can hide bugs. Use it when every access should create a default.
+
+<strong>How do I get the first key?</strong> `next(iter(d))`. There is no
+indexing, because a dictionary is not a sequence.
+
+<strong>Can I use `+` to merge two dictionaries?</strong> No. Use `|` on 3.9 and
+later, `{**a, **b}` before that, or `update` for in-place.
+
+<strong>Does `pop` work without a key?</strong> `popitem()` removes and returns
+the last inserted pair, which is useful for draining a dictionary in a loop.
+
+<strong>How do I count without importing Counter?</strong>
+`d[k] = d.get(k, 0) + 1` in a loop. `Counter` is faster and clearer, but the
+one-liner is worth knowing for when the import is not worth it.
+
+<strong>What happens if I use an unhashable key by mistake?</strong> You get
+`TypeError: unhashable type: 'list'` at the moment of insertion, which names
+the type and is one of the clearer error messages in the language.
+
+<strong>Is there a frozen dictionary?</strong> Not in the standard library.
+`types.MappingProxyType(d)` gives a read-only view of one, which covers most of
+the reasons people want it.
+
+## Recap in one screen
+
+- `get` reads with a fallback, `setdefault` reads and inserts, `defaultdict`
+  inserts on every miss &mdash; pick by what should happen to the dictionary.
+- `items()` is the loop you usually want; `keys()`, `values()` and `items()`
+  are live views, not snapshots.
+- Iterate `list(d)` whenever the loop body might change the dictionary.
+- Keys must be hashable, which means immutable all the way down; tuples are
+  the standard multi-part key.
+- A dictionary of functions replaces a chain of `elif` that is testing one
+  value against constants.

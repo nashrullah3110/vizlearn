@@ -107,3 +107,203 @@ The third argument to a slice is the same step, with the same rules, which is
 why `[::2]` takes every second item and `[::-1]` reverses. Learning the
 behaviour once covers both, and the exclusive-stop rule is what makes
 `a[:n]` and `a[n:]` fit together with no gap and no overlap.
+
+## Why the stop is excluded, and why it is the right choice
+
+"The stop is never included" is easy to memorise and easy to resent. It is
+worth a paragraph on why the language chose it, because once the reasoning is
+clear the off-by-one errors mostly stop.
+
+A half-open interval &mdash; one that includes the start and excludes the stop
+&mdash; has three properties that a closed interval does not. The length is the
+subtraction: `range(a, b)` produces exactly `b - a` numbers, with no correction
+term to remember. The empty case is expressible: `range(3, 3)` is empty, where a
+closed interval would have no way to say "nothing" without a special case. And
+adjacent ranges join without a gap and without an overlap: `range(0, 5)` and
+`range(5, 10)` between them cover 0 to 9, each number exactly once, which is
+what makes splitting work.
+
+The same choice runs through slicing, which is why `a[:3]` and `a[3:]`
+reconstruct the whole list and why `len(a[i:j])` is `j - i`. Learning it once
+covers both, and the pattern is deliberate rather than accidental.
+
+The place it still catches people is counting down, where the exclusive end is
+below the last value you want rather than above it. That is not a different
+rule, but it does read differently, which is why it deserves its own attention.
+
+## Chunking, the most common use of a step
+
+The step exists for a specific job more often than for skipping numbers:
+walking a sequence in fixed-size pieces.
+
+```python
+items = list("abcdefgh")
+size = 3
+
+for i in range(0, len(items), size):
+    print(items[i:i + size])
+```
+
+```
+['a', 'b', 'c']
+['d', 'e', 'f']
+['g', 'h']
+```
+
+The last chunk is short and needs no special handling, because slicing does not
+complain when the end is past the length. That is the second time on this page
+that a rule which looks like leniency turns out to remove a branch.
+
+This shape appears whenever something has a batch limit: rows to insert per
+query, items per API request, lines per page. The alternative is an index and a
+counter, which is more code and more places to be wrong by one.
+
+## Floats, and stepping by a fraction
+
+`range(0, 1, 0.1)` raises `TypeError`, which reads like a limitation and is
+closer to a favour. The reason is that a fractional step accumulates error:
+
+```python
+x, vals = 0.0, []
+while x < 1.0:
+    vals.append(x)
+    x += 0.1
+
+print(len(vals), vals[-1])
+```
+
+```
+11 0.9999999999999999
+```
+
+Eleven values, where the obvious reading of the loop promises ten, and the last
+is not 0.9. Adding 0.1 repeatedly compounds the tiny error in representing 0.1
+in binary, and after ten additions the running total is a hair under 1.0 &mdash;
+so the condition holds one more time than intended. The number of iterations now
+depends on rounding error rather than on anything you wrote.
+
+The reliable pattern is to count in integers and divide once at the end:
+
+```python
+print([i / 10 for i in range(0, 10, 2)])
+```
+
+```
+[0.0, 0.2, 0.4, 0.6, 0.8]
+```
+
+Each value is computed from an exact integer rather than from the previous
+value, so no error accumulates and the number of items is fixed by the `range`.
+For anything more involved, `numpy.arange` and `numpy.linspace` exist, and
+`linspace` is the one to prefer because you give it the count rather than the
+step.
+
+## The range(len(...)) habit, and what to write instead
+
+A large share of the `range` calls in beginner code are `range(len(items))`,
+used to get at the items:
+
+```python
+for i in range(len(items)):
+    print(items[i])
+```
+
+This works and is worth unlearning. It introduces an index that nothing needs,
+it reads as arithmetic rather than as iteration, and it is the version that
+produces `IndexError` when the bound is computed slightly wrong. `for item in
+items` says the same thing with less to get wrong.
+
+The three cases that look like they need it usually do not. If you want the
+position alongside the item, `enumerate(items)` gives both. If you are walking
+two sequences together, `zip(a, b)` pairs them. If you are comparing each item
+with the next, `zip(items, items[1:])` gives consecutive pairs.
+
+What is left is genuinely index-based work: writing into a list at a computed
+position, stepping by more than one, or walking backwards by index. Those are
+real, and they are a small minority.
+
+## Reading a range at a glance
+
+Three questions come up constantly when reading someone else's loop, and all
+three have arithmetic answers that are worth being able to do without running
+anything.
+
+**How many numbers is that?** For a positive step, it is the distance divided
+by the step, rounded up: `range(0, 10, 3)` covers a distance of 10 in steps of
+3, giving 4 numbers. The rounding up is what catches people, and it is why
+`range(0, 10, 3)` gives four values rather than three.
+
+**What is the last one?** It is the largest value below the stop that you can
+reach from the start by whole steps. For `range(0, 10, 3)` that is 9. When the
+step divides the distance exactly, as in `range(0, 10, 2)`, the last value is
+the stop minus the step &mdash; 8, not 10 &mdash; because the stop itself is
+never included.
+
+**Does it produce anything at all?** Only if the start is on the correct side
+of the stop for the direction of travel. Ascending needs `start < stop`,
+descending needs `start > stop`. Neither raises when it is wrong; you get an
+empty range, and a loop that silently does nothing.
+
+That last one is worth dwelling on, because it is the failure mode that costs
+the most time. An exception tells you where to look. A loop that runs zero
+times leaves no trace at all, and the symptom appears later as an empty result
+or an unchanged variable. When a loop appears not to have happened, printing
+`list(the_range)` is usually a faster diagnosis than reading the arithmetic
+again.
+
+## Questions people ask
+
+<strong>Why does `range(5, 0)` produce nothing?</strong> Because the default
+step is 1, so it is counting up from 5 towards 0 and stops immediately. You
+need `range(5, 0, -1)`.
+
+<strong>Is `range` a generator?</strong> No. It is a lazy sequence: it can be
+iterated many times, it has a length, and it supports indexing and slicing. A
+generator has none of those.
+
+<strong>How do I get a list from a range?</strong> `list(range(5))`. It is
+worth asking whether you need one &mdash; a loop does not.
+
+<strong>Why is `x in range(n)` fast?</strong> It does arithmetic rather than
+scanning, so it is constant time regardless of the size of the range.
+
+<strong>Can the step be negative and the start below the stop?</strong> It can
+be written, and it produces an empty range. Nothing is raised.
+
+<strong>Does `range` work with very large numbers?</strong> Yes.
+`range(10**18)` is created instantly, because nothing is stored but the three
+values.
+
+<strong>How do I include the stop?</strong> Add one to it. That is the honest
+answer, and `range(1, n + 1)` is how you count from 1 to n.
+
+<strong>Can I slice a range?</strong> Yes, and you get another range back:
+`range(10)[2:5]` is `range(2, 5)`. Nothing is materialised.
+
+<strong>Why does `range` compare equal to another range with different
+arguments?</strong> Because ranges compare by the sequence they produce, not by
+their start, stop and step. `range(0) == range(2, 2)` is `True`; both are empty.
+
+<strong>Is there a version that includes the stop?</strong> Not in the
+standard library. `numpy.linspace` is the closest, and it takes a count rather
+than a step, which sidesteps the question.
+
+<strong>What does a negative index do on a range?</strong> The same as on any
+sequence: `range(10)[-1]` is 9. It is computed rather than looked up, so it is
+instant even on an enormous range.
+
+<strong>Should I ever store a range in a variable?</strong> Yes, when the same
+sequence of numbers is used twice. Unlike a generator it can be iterated again,
+so it is safe to reuse.
+
+## Recap in one screen
+
+- One argument is stop, two are start and stop, three add a step; the stop is
+  always excluded.
+- The half-open interval makes the length a subtraction, lets ranges be empty,
+  and lets adjacent ranges tile without gaps.
+- Counting down needs both a negative step and a stop below the start, and a
+  wrong sign gives an empty range rather than an error.
+- `range` refuses floats on purpose; count in integers and divide once.
+- `range(len(items))` is usually `enumerate`, `zip`, or just iterating the
+  items.
