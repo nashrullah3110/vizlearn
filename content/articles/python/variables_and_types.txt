@@ -1,10 +1,6 @@
 title: Variables and Types: A Practical Guide
 intro: A name is not a box. It is a label that points at a value.
 
-## The idea in brief
-
-When you write <code class="mono-font">age = 36</code>, Python creates the value <code class="mono-font">36</code> and points the name <code class="mono-font">age</code> at it. The value lives on its own; the name is just a label. Assign again and the label moves — the old value is left behind, and once nothing references it, it is cleaned up.
-
 ## Why types matter
 
 The type of a value decides what the operators mean. <code class="mono-font">+</code> on two <code class="mono-font">int</code>s adds them; <code class="mono-font">+</code> on two <code class="mono-font">str</code>s concatenates them. Neither is "wrong" — the behaviour follows the type. When a program does something surprising, nine times out of ten a value is a different type than you assumed, and <code class="mono-font">type()</code> settles it in one line.
@@ -134,6 +130,92 @@ int("abc")       # ValueError - not a valid integer
 
 `bool()` has rules worth memorising, because they drive every `if` statement: `0`, `0.0`, `""`, `[]`, `{}`, `()` and `None` are falsy; everything else is truthy. That is why `if items:` is the idiomatic way to ask "is this list non-empty".
 
+## Checking what you actually have
+
+When a program does something inexplicable, the fastest first move is to stop
+assuming what a value is and ask:
+
+```python
+values = ["42", 42, 42.0, True, None, [42]]
+
+for v in values:
+    print(f"{str(v):6} {type(v).__name__:9} {isinstance(v, int)}")
+```
+
+```
+42     str       False
+42     int       True
+42.0   float     False
+True   bool      True
+None   NoneType  False
+[42]   list      False
+```
+
+Three things in that output are worth pausing on. `"42"` and `42` print
+identically and are entirely different values &mdash; which is exactly why a
+plain `print` can leave you none the wiser and `print(f"{v=}")`, which shows
+the `repr`, would have made the quotes visible.
+
+`True` reports as an `int`, because `bool` is a subclass of `int`. That is not
+a quirk to work around; it is what makes `sum(conditions)` count how many held.
+
+And `isinstance` says yes for the subclass where `type(v) is int` would say no.
+That is the reason `isinstance` is the one to use in real code: it accepts
+subclasses, which is almost always what you want, and `type(x) is Y` should be
+reserved for the rare case where you deliberately mean to exclude them.
+
+## Everything from outside is text
+
+The single most common type surprise has one cause: data arriving from beyond
+your program is text, whatever it looks like.
+
+`input()` returns a string. A file read line by line gives strings. `sys.argv`
+holds strings. `os.environ` values are strings. A CSV read without a converter
+gives strings, including the columns full of digits. HTML form fields are
+strings. Command output is bytes, which decode to strings.
+
+JSON is the one exception worth knowing, and it is a partial one: `json.load`
+does produce real numbers, booleans and `None`, because the format records
+types. But its object keys always come back as strings, so a dictionary keyed
+by integers does not survive a save-and-load round trip.
+
+The habit that follows is to convert at the boundary. Parse the input once,
+where it arrives, into the types the rest of the program should work with, and
+handle the failure there. Everything downstream then gets a real `int`, `date`
+or `Decimal`, and none of it has to defend against text.
+
+The alternative &mdash; converting at each point of use &mdash; means the same
+conversion written in five places, five chances for them to disagree about what
+an empty string means, and a value whose type a reader has to infer from
+context rather than read.
+
+## Objects outlive names, and names outlive nothing
+
+Assignment moves a label; it does not create or destroy the thing being
+labelled. Two consequences are worth being explicit about.
+
+An object survives as long as *something* refers to it. Rebinding a name does
+not delete what it pointed at &mdash; if another name still refers to it, that
+object is unchanged and perfectly usable. This is why `b = a` followed by
+`a = something_else` leaves `b` holding the original.
+
+An object with no remaining references is cleaned up automatically. CPython
+does this immediately, by counting references, which is why a file left open in
+a short script usually gets closed anyway when the variable goes out of scope
+&mdash; and why relying on that instead of `with` is a habit that fails the
+moment the program is long-running or the object is caught in a reference
+cycle.
+
+`del name` removes the name, not the object. If other names refer to it,
+nothing is freed; if none do, the object becomes unreachable and is collected.
+Reading the name afterwards raises `NameError`, which is the same error as
+using a name that never existed, because from Python's point of view that is
+now the situation.
+
+None of this needs managing. It is worth knowing only because it explains why
+"deleting" a variable does not always free memory, and why two names for one
+list keep behaving as one list no matter what happens to either name.
+
 ## Questions people ask
 
 <strong>Do I have to declare types?</strong> No. Type hints are optional and ignored at runtime; they exist for tools and readers.
@@ -147,6 +229,18 @@ int("abc")       # ValueError - not a valid integer
 <strong>Is there a limit on integer size?</strong> No. Python integers grow to whatever memory allows, which is why `2 ** 1000` just works.
 
 <strong>What does `id(x)` show?</strong> The object's identity &mdash; effectively its address. It is how you can prove two names point at the same object.
+
+<strong>Does Python have constants?</strong> Not enforced. The convention is an
+uppercase name, `MAX_RETRIES = 5`, which tells readers not to reassign it and
+does not stop them.
+
+<strong>Why is `type(True)` bool but `isinstance(True, int)` True?</strong>
+Because `bool` is a subclass of `int`. `True` genuinely is an integer, equal to
+1, as well as being a boolean.
+
+<strong>How much memory does a variable use?</strong> The name costs almost
+nothing; the object is what has a size. `sys.getsizeof(obj)` reports it,
+excluding anything the object refers to.
 
 ## Recap in one screen
 

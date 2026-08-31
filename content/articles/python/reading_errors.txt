@@ -5,10 +5,6 @@ intro: The message is the instruction.
 
 When Python cannot do what a line asks, it stops and prints a traceback. Read it from the <b>bottom up</b>: the last line is the error type and a plain-English description, and the line just above tells you which line of your code triggered it. Everything higher is the path that led there, which matters only once you have functions calling functions.
 
-## Errors happen at the point of failure, not the point of the mistake
-
-The line named in a traceback is where things <em>broke</em>, which is not always where you went wrong. A variable assigned the wrong value on line 2 may only cause an error on line 40. The traceback gives you a place to start looking, not always the culprit - so check what the values actually are before assuming the named line is at fault.
-
 ## A traceback is a map, read from the bottom
 
 An error message looks intimidating and is actually the most helpful output Python produces. It has three parts, and the useful one is at the bottom.
@@ -76,10 +72,6 @@ Two of those have a signature cause worth memorising. `AttributeError: 'NoneType
 3. <strong>Run the second editor as-is.</strong> A NameError for <code class='mono-font'>totl</code> - a typo of <code class='mono-font'>total</code>, which is what that error almost always means.
 4. <strong>Work through the rest.</strong> Comment out the NameError line, uncomment the TypeError one, and run. Repeat for ValueError and ZeroDivisionError, reading each message before fixing it.
 
-## Where that leaves you
-
-A traceback is read bottom-up: the last line is the error type and description, the line above is where it happened. The common types each point at a specific fix - NameError at a typo, TypeError at a conversion, ValueError at the data, IndexError and KeyError at something you asked for that is not there. The named line is where it broke, which is not always where the mistake was.
-
 ## Handling errors on purpose
 
 Once you can read an error, the next step is deciding which ones your program should survive.
@@ -134,6 +126,105 @@ except FileNotFoundError as exc:
 
 Two extras worth having: `logging` instead of `print` once a program is more than a script, and `python3 -m pdb script.py` to start under the debugger from the first line.
 
+## The messages worth recognising on sight
+
+Some error messages have one overwhelmingly likely cause, and knowing them
+turns a search into a glance.
+
+**`'NoneType' object has no attribute ...`** &mdash; a function returned
+`None` when you expected a value. Very often an in-place method: `items =
+items.sort()` or `text = text.replace(...)` without keeping the result.
+
+**`'NoneType' object is not subscriptable`** &mdash; the same cause, one line
+later: something returned `None` and you indexed it.
+
+**`list indices must be integers or slices, not str`** &mdash; you have a list
+where you thought you had a dictionary. Usually the JSON you parsed is an array
+at the top level, not an object.
+
+**`unhashable type: 'list'`** &mdash; a list used as a dictionary key or put in
+a set. A tuple is the fix.
+
+**`can only concatenate str (not "int") to str`** &mdash; `+` between text and
+a number. An f-string is the fix, not `str()` around everything.
+
+**`SyntaxError` on a line that looks perfect** &mdash; a bracket or quote left
+open on the line above. Python only notices when it reaches the next statement.
+
+**`IndentationError: unexpected indent`** &mdash; usually tabs mixed with
+spaces, which look identical on screen.
+
+**`local variable referenced before assignment`** &mdash; the name is assigned
+somewhere later in the same function, which makes it local everywhere in that
+function, including above the assignment.
+
+Each of these is worth reading as a sentence about *what Python found*, not
+about what you meant. The message describes the state of the program at the
+moment it stopped, and that state is a fact you can work backwards from.
+
+## Errors inside a loop
+
+An exception raised inside a loop ends the whole loop, not just that pass, and
+that is worth deciding about deliberately rather than discovering.
+
+For a batch job over many records, one malformed row should usually not stop
+the other nine thousand. The shape that handles it wraps the smallest failing
+step, records what went wrong with enough detail to find the row again, and
+continues:
+
+```python
+for n, row in enumerate(rows, start=1):
+    try:
+        process(row)
+    except ValueError as exc:
+        print(f"row {n}: skipped - {exc}")
+```
+
+Two details make this useful rather than merely quiet. The row number comes
+from `enumerate`, so the report says *which* row, which is the difference
+between a message you can act on and one you cannot. And the exception's own
+text is included rather than replaced by a generic phrase, because that text is
+the specific reason.
+
+The opposite decision is equally legitimate. If one bad row means the input
+file is wrong, stopping immediately is correct, and catching the error would
+turn a clear failure into a partial output nobody notices is partial. What is
+not legitimate is `except Exception: pass`, which chooses neither and discards
+the evidence for both.
+
+A middle course worth knowing: collect the failures rather than printing them,
+and raise at the end if there were any. That processes everything it can,
+reports every problem in one go rather than one per run, and still fails
+overall &mdash; which is usually what a person running a batch actually wants.
+
+## Errors you raise yourself
+
+Reading errors well is half of it; the other half is producing ones the next
+person can read.
+
+**Name the value.** `raise ValueError(f"age must be positive, got {age!r}")`
+ends a debugging session that `raise ValueError("invalid input")` would have
+started. The `!r` matters &mdash; it shows quotes and whitespace, so a stray
+space in a string is visible rather than invisible.
+
+**Pick the right type.** `ValueError` when the value is wrong, `TypeError` when
+the type is wrong, `KeyError` or `IndexError` for lookups, `FileNotFoundError`
+and its `OSError` relatives for the filesystem. A caller can then catch exactly
+what they can handle, which they cannot do if everything is a bare `Exception`.
+
+**Raise early.** Validating an argument at the top of a function reports the
+problem at the call that caused it. Letting a bad value travel three functions
+deep produces a traceback pointing at code that is entirely correct.
+
+**Say what should happen instead**, where it is not obvious. "config missing at
+/etc/app.conf" is better than "config missing", and "expected one of: red,
+green, blue" is better than "invalid colour".
+
+The test is whether the message alone, without the traceback, would tell
+somebody what to fix. That is a high bar and worth aiming at, because the
+person reading it is usually you, six months later, with no memory of the
+function at all.
+
 ## Questions people ask
 
 <strong>Why does the error point at a line that looks correct?</strong> Because a bracket or quote opened on a previous line was never closed, so Python only noticed at the next statement.
@@ -147,6 +238,18 @@ Two extras worth having: `logging` instead of `print` once a program is more tha
 <strong>How do I see errors in a notebook?</strong> The traceback appears under the cell, and `%debug` in the next cell opens a post-mortem debugger at the point of failure.
 
 <strong>Can I make my own exceptions?</strong> Yes, and you should for libraries: `class ConfigError(Exception): pass` lets callers catch exactly your failure and nothing else.
+
+<strong>Why does my traceback show library code I never wrote?</strong> Because
+the exception was raised inside the library, called from your code. Find the
+last frame naming your own file &mdash; that is where to start.
+
+<strong>What is the difference between an error and a warning?</strong> A
+warning is printed and execution continues; an error stops the program unless
+something catches it.
+
+<strong>Can I make tracebacks shorter?</strong> `traceback.print_exc(limit=n)`
+trims frames, and some test runners do it for you. The bottom frames are the
+ones you usually want, so trim from the top.
 
 ## Recap in one screen
 
