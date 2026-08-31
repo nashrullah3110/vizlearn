@@ -19971,5 +19971,56 @@ window.VIZLEARN_PRACTICE = [
     "w": "cumsum, cumcount, shift, diff and pct_change are the same - they return per-row results without needing transform."
    }
   ]
+ },
+ {
+  "path": "sklearn/what_is_scikit_learn.html",
+  "title": "fit, predict, transform",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "What does a trailing underscore on an attribute mean?",
+    "o": [
+     "It is private",
+     "It was learned during fit",
+     "It is deprecated",
+     "It is a hyperparameter you set"
+    ],
+    "a": 1,
+    "w": "Attributes like coef_ and classes_ do not exist until fit has run. Names without the underscore are settings you chose."
+   },
+   {
+    "t": "What shape must X be?",
+    "o": [
+     "1-D, one entry per sample",
+     "2-D, samples as rows and features as columns",
+     "Whatever shape y is",
+     "2-D, features as rows"
+    ],
+    "a": 1,
+    "w": "One row per sample, one column per feature - which is why a single feature still needs reshape(-1, 1)."
+   },
+   {
+    "t": "What does a transformer have instead of predict?",
+    "o": [
+     "evaluate",
+     "apply",
+     "transform",
+     "convert"
+    ],
+    "a": 2,
+    "w": "Transformers produce new features rather than a target, and fit_transform does both steps in one call."
+   },
+   {
+    "t": "Why does fit return the estimator?",
+    "o": [
+     "To report success",
+     "So that Model().fit(X, y) can be written on one line",
+     "It returns the predictions",
+     "It returns the score"
+    ],
+    "a": 1,
+    "w": "Every fit returns self, which is what makes the constructor-and-fit one-liner work."
+   }
+  ]
  }
 ];

@@ -327,29 +327,34 @@ print("math already loaded:", "math" in sys.modules)</script>
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">A module is a file of Python. import runs it once and gives you access to what it defines. The forms of import differ only in what ends up in your namespace, and that difference matters more than it first appears.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-import-and-why-not">import * and why not</h3>
+                    <h3>The three forms</h3>
+                    <pre><code class="language-python">import math            # math.sqrt(9)
+from math import sqrt  # sqrt(9)
+import numpy as np     # np.array(...)</code></pre><p>The first keeps the module as a prefix. That is a feature: reading <code>math.sqrt</code> a hundred lines later tells you immediately where it came from, and it cannot collide with anything of yours.</p><p>The second is shorter and right when you use one or two names heavily and there is no ambiguity.</p><p><code>as</code> renames on the way in, for length (<code>numpy as np</code>) or to avoid a clash with a name you already have.</p>
+                </div>
+                <div>
+                    <h3>import * and why not</h3>
                     <p>from math import *</p><p>This pulls in every public name at once. Two problems, and the second is the serious one.</p><p>You can no longer tell where a name came from. <code>sqrt(16)</code> appears from nowhere, and finding its source means guessing which of the star-imports supplied it.</p><p>Worse, it silently overwrites. If you defined <code>gamma</code> and then star-import a module that also defines <code>gamma</code>, yours is gone with no warning at all &mdash; the page demonstrates precisely that, printing the function's own output before and after.</p><p>The place it is acceptable is an interactive session where you are exploring, and even there it is a habit worth not forming.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-imports-are-cached">Imports are cached</h3>
+                    <h3>Imports are cached</h3>
                     <p>Importing a module twice does not run it twice. Python keeps a table in <code>sys.modules</code> and hands back the same module object. So imports are cheap to repeat, and any code at the top level of a module runs exactly once per program &mdash; which is why putting slow work or side effects at module level is a trap.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-imports-go">Where imports go</h3>
+                    <h3>Where imports go</h3>
                     <p>At the top of the file, one per line, standard library first, then third-party, then your own. That is not aesthetics: an import buried inside a function runs on every call and hides a dependency from anyone scanning the file.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-standard-library-is-large">The standard library is large</h3>
+                    <h3>The standard library is large</h3>
                     <p>Before installing anything, check what ships with Python. <code>collections</code>, <code>itertools</code>, <code>datetime</code>, <code>json</code>, <code>random</code>, <code>statistics</code>, <code>pathlib</code> and <code>re</code> cover an enormous amount of everyday work, and the page uses three of them in six lines.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-a-module-actually-is">What a module actually is</h3>
+                    <h3>What a module actually is</h3>
                     <p>A module is a file, and importing it runs that file top to bottom, once. Every function definition, class definition and top-level statement executes at that moment, and the resulting names become attributes of the module object.</p><p>That single fact explains several things at once. It explains why top-level code in a module runs when someone imports it, which is why print statements left at module level surface in surprising places. It explains why circular imports are a problem: two modules each trying to finish running before the other can. And it explains the caching - having run it once, Python keeps the result.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-main-guard">The <code>__main__</code> guard</h3>
+                    <h3>The <code>__main__</code> guard</h3>
                     <p>Because importing runs the file, a script that does work at the top level does that work when imported too. The guard prevents it:</p><pre><code class="language-python">def main():
     ...
 
@@ -357,41 +362,41 @@ if __name__ == &quot;__main__&quot;:
     main()</code></pre><p><code>__name__</code> is <code>"__main__"</code> when the file is run directly and the module's name when it is imported. So the file can be both a usable script and an importable module, which is what makes it testable - a test can import <code>main</code> without running it.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-packages-and-relative-imports">Packages and relative imports</h3>
+                    <h3>Packages and relative imports</h3>
                     <p>A directory with an <code>__init__.py</code> is a package, and modules inside it can import from each other relatively:</p><pre><code class="language-python">from . import helpers          # same package
 from .models import Record     # a module in the same package</code></pre><p>Relative imports only work inside a package and only when the package is being imported, not when a file inside it is run directly as a script. That restriction is behind a large share of <code>ImportError: attempted relative import with no known parent package</code> messages, and the usual answer is to run the module with <code>python -m package.module</code> rather than by path.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-python-looks">Where Python looks</h3>
+                    <h3>Where Python looks</h3>
                     <p>Imports resolve against <code>sys.path</code>, which starts with the directory of the script being run, then the standard library, then installed packages. The first match wins, and that ordering is why a local file named <code>random.py</code> or <code>json.py</code> shadows the standard library module of the same name and produces errors that look impossible.</p><p>Naming a file after a module you also import is worth avoiding for exactly this reason - the failure is confusing out of all proportion to the mistake.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-import-cost">Import cost</h3>
+                    <h3>Import cost</h3>
                     <p>Imports are cheap after the first, but the first one runs the whole module. A library that does substantial work at import time makes every program that imports it slower to start, which is why heavy setup belongs in a function the caller chooses to call rather than at module level.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-circular-imports-and-how-to-break-one">Circular imports, and how to break one</h3>
+                    <h3>Circular imports, and how to break one</h3>
                     <p>Two modules that each import the other produce an error that reads as though something is missing when nothing is:</p><pre><code>ImportError: cannot import name &#x27;Order&#x27; from partially initialized module
 &#x27;models&#x27; (most likely due to a circular import)</code></pre><p>The mechanism follows directly from "importing runs the file". Module A starts running and hits <code>from B import x</code>. B starts running and hits <code>from A import y</code> &mdash; but A is only half-finished, so <code>y</code> does not exist on it yet. Python has A in <code>sys.modules</code> already, so it does not re-run it; it hands back the partial module, and the name is missing.</p><p>Three fixes, in order of preference.</p><p><strong>Move the shared thing.</strong> If A and B both need <code>Order</code>, it belongs in a third module that both import and neither imports back. Most circular imports are a missing module rather than an import problem.</p><p><strong>Import inside the function.</strong> Moving <code>from B import x</code> into the function that uses it delays it until both modules have finished loading. This works, and it hides a dependency from anyone scanning the file, so it is a fix rather than a design.</p><p><strong>Import the module, not the name.</strong> <code>import B</code> and then <code>B.x</code> at call time often works where <code>from B import x</code> does not, because the attribute is looked up when used rather than when imported.</p><p>The one that does not work is reordering the imports, which usually moves the error rather than removing it.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-installed-packages-come-from">Where installed packages come from</h3>
+                    <h3>Where installed packages come from</h3>
                     <p><code>sys.path</code> explains where Python looks; it does not explain how anything got there, and the gap is where most beginner import confusion lives.</p><p><code>pip install requests</code> puts the package into the <code>site-packages</code> directory of whichever Python is running <code>pip</code>. If you have several Pythons &mdash; the system one, one from Homebrew, one from a virtual environment &mdash; then "pip installed it and Python cannot find it" almost always means two different interpreters. <code>python3 -m pip install x</code> avoids that entirely by installing into the interpreter you just named.</p><p>A <strong>virtual environment</strong> is a directory containing its own interpreter link and its own <code>site-packages</code>. <code>python3 -m venv .venv</code> creates one and activating it puts its interpreter first on your <code>PATH</code>, so <code>pip</code> and <code>python</code> both refer to it. The point is isolation: two projects can depend on incompatible versions of the same library without either breaking, and the set of packages a project needs is a property of the project rather than of your machine.</p><p>The practical rules are short. One environment per project. Record the dependencies in a file so the environment can be rebuilt. Never install into the system Python, which your operating system also uses. And when an import fails unexpectedly, <code>python3 -c "import sys; print(sys.executable)"</code> tells you which interpreter you are actually running, which resolves the question faster than anything else.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-organising-modules-of-your-own">Organising modules of your own</h3>
+                    <h3>Organising modules of your own</h3>
                     <p>A module is a file, so organising code is organising files, and a few conventions save a lot of trouble.</p><p>Group by what things *are for*, not by what they are. A <code>models.py</code>, <code>views.py</code>, <code>utils.py</code> split works until <code>utils.py</code> becomes the place everything lands. Splitting by feature &mdash; <code>orders.py</code>, <code>billing.py</code> &mdash; keeps related code together and keeps the imports between files shallow.</p><p>Keep module-level code to definitions. Anything that runs work, opens files or makes network calls at import time makes every importer pay for it, including your test suite. Put it in a function and let the caller decide.</p><p>Avoid naming a file after a module you also import. A local <code>random.py</code> shadows the standard library one for your whole program, and the resulting <code>AttributeError: module 'random' has no attribute 'randint'</code> looks impossible until you spot the file.</p><p>And watch the direction of dependencies. If A imports B, B should not need A. When it does, the two are really one module, or there is a third one waiting to be extracted &mdash; which is the same conclusion the circular-import section reached from the other direction.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-reading-an-import-error">Reading an import error</h3>
+                    <h3>Reading an import error</h3>
                     <p>Four messages cover nearly every import failure, and each points somewhere specific.</p><p><code>ModuleNotFoundError: No module named 'requests'</code> means Python looked along <code>sys.path</code> and found nothing. Either it is not installed, or it is installed for a different interpreter. Check with <code>python3 -m pip list</code> using the same <code>python3</code> that failed.</p><p><code>ImportError: cannot import name 'X' from 'y'</code> means the module was found and does not contain that name. Either it is a typo, or the version installed is older than the one you are reading about, or it is a circular import and the module is only half-loaded &mdash; the message says so when it can.</p><p><code>AttributeError: module 'x' has no attribute 'y'</code> on a standard-library name is the shadowing case: a file of your own named <code>x.py</code> is earlier on the path than the real module. <code>print(x.__file__)</code> identifies it immediately.</p><p><code>ImportError: attempted relative import with no known parent package</code> means a file inside a package was run directly by path. Run it as <code>python -m package.module</code> instead.</p><p>The common thread is that the message distinguishes "could not find the module" from "found it, could not find the name", and that distinction sends you to completely different places. Reading which of the two you have is most of the diagnosis.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>What is <code>__init__.py</code> for?</strong> It marks a directory as a package and runs when the package is imported. It can be empty, and since Python 3.3 a package without one mostly works &mdash; but including it avoids surprises.</p><p><strong>Why does <code>from . import x</code> fail when I run the file?</strong> Relative imports need a parent package, which a file run by path does not have. Run it with <code>python -m package.module</code>.</p><p><strong>Does <code>import</code> run the whole module?</strong> Yes, top to bottom, once per program.</p><p><strong>How do I reload a module I changed?</strong> <code>importlib.reload(module)</code> in an interactive session. In a script, restart it &mdash; reloading has enough sharp edges that it is not worth relying on.</p><p><strong>Where is a module actually loaded from?</strong> <code>module.__file__</code> after importing it, which is the fastest way to confirm you have the one you meant.</p><p><strong>Is <code>import x</code> inside a function slow?</strong> Only the first time. After that it is a dictionary lookup in <code>sys.modules</code>.</p><p><strong>What is the difference between a module and a package?</strong> A module is a file; a package is a directory of modules. Both are imported the same way.</p><p><strong>Can a module import itself?</strong> It can, and it gets the partially initialised version from <code>sys.modules</code>. There is no good reason to.</p><p><strong>What does <code>if TYPE_CHECKING:</code> do?</strong> Guards imports that exist only for type hints, so they cost nothing at runtime and cannot cause a circular import.</p><p><strong>Should I import inside a function to speed up startup?</strong> Only for genuinely heavy optional dependencies. For anything else the cost is already paid once and the hidden dependency is not worth it.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Importing runs the file once, top to bottom, and caches the result in <code>sys.modules</code>.</li><li><code>import x</code> keeps the prefix and the provenance; <code>from x import y</code> is for one or two heavily used names; <code>import *</code> hides both and can silently overwrite.</li><li>The <code>__main__</code> guard is what lets a file be both a script and an importable module.</li><li>Circular imports mean a shared piece belongs in a third module.</li><li>One virtual environment per project, and <code>python3 -m pip</code> to be certain which interpreter you are installing into.</li></ul>
                 </div>
             </div>
@@ -449,7 +454,7 @@ from .models import Record     # a module in the same package</code></pre><p>Rel
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

@@ -327,51 +327,51 @@ print("with block   :", g.closed, " <- closed automatically")</script>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <div>
-                    <h3 id="vz-s-a-note-about-this-page">A note about this page</h3>
+                    <h3>A note about this page</h3>
                     <p>These editors run Python in your browser against an in-memory filesystem. The files are real while the program runs and vanish afterwards, so everything below behaves exactly as it would on your machine &mdash; it just does not persist.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-with-and-why">with, and why</h3>
+                    <h3>with, and why</h3>
                     <pre><code class="language-python">with open(&quot;notes.txt&quot;) as f:
     content = f.read()</code></pre><p>When the block ends the file is closed, whether it ended normally or by raising. Doing it by hand means <code>f.close()</code> in a <code>finally</code>, and forgetting it leaves the handle open &mdash; which on a long-running program eventually exhausts the operating system's limit, and on a write leaves data sitting in a buffer that never reaches the disk.</p><p><code>with</code> is not a style preference here. It is the correct way to open a file.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-three-ways-to-read">Three ways to read</h3>
+                    <h3>Three ways to read</h3>
                     <pre><code class="language-python">f.read()       # the whole thing as one string
 f.readlines()  # a list of lines
 for line in f: # one line at a time</code></pre><p>The third is the one to reach for by default. It holds a single line in memory regardless of file size, so it works on a file larger than your RAM, and it reads no worse than the others.</p><p>Lines keep their trailing <code>\n</code>, which is why <code>line.rstrip()</code> appears in almost every loop over a file.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-modes">The modes</h3>
+                    <h3>The modes</h3>
                     <p>"r"&nbsp;&nbsp;read, the default &mdash; raises if the file is missing<br>"w"&nbsp;&nbsp;write &mdash; <strong>truncates immediately</strong><br>"a"&nbsp;&nbsp;append &mdash; writes to the end<br>"x"&nbsp;&nbsp;create &mdash; raises if it already exists</p><p><code>"w"</code> is the dangerous one. It empties the file the moment it is opened, before you write anything, so an <code>open(path, "w")</code> that then raises leaves you with nothing. When you mean "add to this", <code>"a"</code> is the mode.</p><p><code>"x"</code> is worth remembering when overwriting would be a bug: it refuses rather than destroying.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-missing-files-raise">Missing files raise</h3>
+                    <h3>Missing files raise</h3>
                     <p><code>open("nope.txt")</code> raises <code>FileNotFoundError</code>, it does not return an empty file. Handle it, or let it propagate &mdash; both are reasonable, but do not check with <code>os.path.exists</code> first: the file can disappear between the check and the open, and the <code>try</code> handles that correctly anyway.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-paths-and-why-pathlib-is-worth-the-switch">Paths, and why pathlib is worth the switch</h3>
+                    <h3>Paths, and why pathlib is worth the switch</h3>
                     <p>String concatenation for paths breaks across operating systems and on edge cases like trailing slashes. <code>pathlib</code> handles both and reads better:</p><pre><code class="language-python">from pathlib import Path
 
 data = Path(&quot;content&quot;) / &quot;articles&quot; / &quot;notes.txt&quot;
 text = data.read_text(encoding=&quot;utf-8&quot;)</code></pre><p><code>read_text</code> and <code>write_text</code> open, read or write, and close in one call, which covers the common case where you want the whole file and do not need to stream it. For anything iterative, <code>data.open()</code> gives you the same file object <code>open</code> would.</p><p><code>Path</code> also carries the questions you would otherwise ask the <code>os</code> module: <code>.exists()</code>, <code>.suffix</code>, <code>.stem</code>, <code>.parent</code>, <code>.glob("*.txt")</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-encoding-is-not-optional-in-practice">Encoding is not optional in practice</h3>
+                    <h3>Encoding is not optional in practice</h3>
                     <p>Text mode decodes bytes into a string using an encoding, and if you do not name one, Python uses the platform default. That default differs between machines, which is how a script that works on one computer produces <code>UnicodeDecodeError</code> on another, with data that has not changed.</p><p>Naming it removes the whole class of problem:</p><pre><code class="language-python">open(path, encoding=&quot;utf-8&quot;)</code></pre><p>If you are handling files you did not create and cannot assume, <code>errors="replace"</code> lets you read something rather than crashing, at the cost of substituting the bytes it could not decode.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-writing-safely">Writing safely</h3>
+                    <h3>Writing safely</h3>
                     <p>Writing directly over the only copy of a file has an obvious failure mode: if the program dies halfway, the original is gone and the replacement is incomplete. The standard remedy is to write beside it and rename:</p><pre><code class="language-python">tmp = path.with_suffix(&quot;.tmp&quot;)
 tmp.write_text(new_content, encoding=&quot;utf-8&quot;)
 tmp.replace(path)</code></pre><p><code>replace</code> is atomic on the same filesystem, so a reader sees either the old file or the new one and never a half-written one.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-binary-mode">Binary mode</h3>
+                    <h3>Binary mode</h3>
                     <p>Adding <code>b</code> - <code>open(path, "rb")</code> - skips decoding and gives bytes. That is what you want for images, archives, and anything you are copying rather than reading. The mistake in the other direction is more common: opening a text file in binary mode and then being puzzled that comparisons against strings all fail, because <code>b"abc"</code> and <code>"abc"</code> are different types that never compare equal.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-worked-example-start-to-finish">A worked example, start to finish</h3>
+                    <h3>A worked example, start to finish</h3>
                     <p>Writing a file, reading it back and summarising it, using the tools from this page rather than the ones from the <code>os</code> module:</p><pre><code class="language-python">from pathlib import Path
 
 path = Path(&quot;scores.txt&quot;)
@@ -388,7 +388,7 @@ print(count, &quot;rows, mean&quot;, round(total / count, 1))</code></pre><pre><
         name, score = line.split()</code></pre><p>Both are correct. The difference only matters when the file stops fitting in memory, which is the point at which it matters a great deal.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-with-actually-is">What <code>with</code> actually is</h3>
+                    <h3>What <code>with</code> actually is</h3>
                     <p><code>with</code> is not special syntax for files. It works with any object implementing two methods, and knowing that turns it from a rule into a tool.</p><p>An object is a <strong>context manager</strong> if it has <code>__enter__</code>, called on the way in, and <code>__exit__</code>, called on the way out. <code>open</code> returns one, so does a lock, a database connection, a temporary directory, and anything from <code>contextlib</code>. <code>__exit__</code> runs whether the block finished normally, returned, or raised, which is the guarantee the whole construct exists to provide.</p><p>The <code>as</code> name receives whatever <code>__enter__</code> returns &mdash; for a file, the file object itself. That is why <code>with open(...) as f</code> gives you <code>f</code> and why the name is optional when the object is only needed for its side effect.</p><p>Writing one is a decorator and a <code>yield</code>:</p><pre><code class="language-python">from contextlib import contextmanager
 
 @contextmanager
@@ -399,23 +399,23 @@ def timer(label):
     print(label, round(time.perf_counter() - start, 3))</code></pre><p>Everything before the <code>yield</code> is setup, everything after is cleanup, and the <code>yield</code> is where the body of the <code>with</code> runs. This is the same generator machinery from elsewhere in the track, used for a completely different purpose.</p><p>Several managers can share one statement: <code>with open(a) as f, open(b, "w") as g:</code> opens both and closes both, in reverse order, even if the second <code>open</code> raises.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-do-not-parse-standard-formats-by-hand">Do not parse standard formats by hand</h3>
+                    <h3>Do not parse standard formats by hand</h3>
                     <p>The single most common mistake with files is treating a structured format as plain text. CSV is the usual victim, because it looks like <code>split(",")</code> will work, and it does until a field contains a comma inside quotes &mdash; at which point the parse silently produces the wrong number of columns.</p><p>The standard library has a module for each of the formats you are likely to meet. <code>csv</code> handles quoting, embedded newlines and different delimiters, and <code>csv.DictReader</code> gives you dictionaries keyed by the header row. <code>json</code> handles escaping, Unicode and nesting, and round-trips to Python types. <code>configparser</code> reads INI files. <code>sqlite3</code> is there when a file of records has started to want queries.</p><p>Each of them costs one import and removes an entire category of bug you would otherwise discover on somebody else's data. The rule is worth stating plainly: if the format has a name, something in the standard library already reads it.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-file-code-goes-wrong-in-practice">Where file code goes wrong in practice</h3>
+                    <h3>Where file code goes wrong in practice</h3>
                     <p>Four failures account for most of it, and none of them are exotic.</p><p><strong>The path is relative to the wrong place.</strong> A relative path is resolved against the process's working directory, not the script's location, so the same program works when run from its own folder and fails from anywhere else. If a file lives beside the script, <code>Path(__file__).parent / "data.txt"</code> says so.</p><p><strong>The file is open longer than intended.</strong> A file opened without <code>with</code> and never closed keeps a handle and, on writes, keeps data in a buffer that has not reached the disk. On a short script the interpreter cleans up on exit and the bug is invisible; in a long-running program it accumulates until the process hits the operating system's limit.</p><p><strong>The encoding was assumed.</strong> This is the failure that travels: it works on the machine that wrote the file and raises <code>UnicodeDecodeError</code> on a colleague's. Name the encoding on every text-mode open.</p><p><strong>The write was not atomic.</strong> A program that dies mid-write leaves a truncated file where the good one used to be. The write-then-rename pattern earlier on this page costs two lines and removes the possibility.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-line-endings-and-the-translation-you-did-not-ask">Line endings, and the translation you did not ask for</h3>
+                    <h3>Line endings, and the translation you did not ask for</h3>
                     <p>Text mode does more than decode bytes into characters: it also translates line endings, and knowing that explains a family of confusing results.</p><p>Windows ends lines with carriage-return plus newline; everything else uses a newline alone. Python's text mode hides the difference. On reading, any of the variants becomes a plain newline in your string, which is why a loop over lines behaves identically on every platform. On writing, a newline is translated back into whatever the platform uses.</p><p>That is almost always what you want, and it has two consequences worth knowing. First, the string you read is not byte-for-byte what is in the file, so a length computed from the text can differ from the file size. Second, if you open a file in binary mode you get no translation at all, and lines end with whatever the file actually contains &mdash; which is why text read as binary often shows a trailing carriage return that seems to have come from nowhere.</p><p>The one place it actively causes trouble is the <code>csv</code> module, which does its own line-ending handling. Opening a CSV without <code>newline=""</code> lets both layers translate, and the result is a blank line between every row on Windows. The documented fix is exactly that argument, and it is worth passing habitually rather than discovering the need for it later.</p><p><code>newline=""</code> is also what you want when reading a file whose exact line endings matter &mdash; a diff tool, a formatter, anything that must write back what it read without silently changing it.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Do I still need <code>f.close()</code> if I use <code>with</code>?</strong> No. That is the entire point of <code>with</code>.</p><p><strong>What is the difference between <code>"w"</code> and <code>"a"</code>?</strong> <code>"w"</code> empties the file the moment it opens. <code>"a"</code> keeps what is there and writes at the end.</p><p><strong>How do I check whether a file exists?</strong> <code>Path(p).exists()</code> &mdash; but for opening, prefer to just open it and handle <code>FileNotFoundError</code>, because the file can vanish between the check and the open.</p><p><strong>Why does my file have blank lines between rows?</strong> On Windows, opening a CSV without <code>newline=""</code> produces doubled line endings. Pass <code>newline=""</code> to <code>open</code> when using the <code>csv</code> module.</p><p><strong>Can I read a file backwards?</strong> Not directly. Read the lines and reverse them, or seek from the end if the file is too big for that.</p><p><strong>What does <code>errors="replace"</code> do?</strong> Substitutes a placeholder for bytes that cannot be decoded, so you get something rather than an exception. Useful for salvage, not for data you care about.</p><p><strong>Is <code>pathlib</code> slower than string paths?</strong> Marginally, and never enough to matter next to the file system call that follows.</p><p><strong>Can I open the same file twice?</strong> Yes, and on most systems you can even open it for reading and writing at once. Whether that is a good idea is a different question.</p><p><strong>What does <code>f.seek(0)</code> do?</strong> Moves the position back to the start, which is how you read a file a second time without reopening it.</p><p><strong>Why is my file empty until the program ends?</strong> Because the data is still in a buffer. Closing the file &mdash; which <code>with</code> does &mdash; or calling <code>f.flush()</code> writes it out.</p><p><strong>Should I use <code>os.path</code> or <code>pathlib</code>?</strong> <code>pathlib</code> for new code. <code>os.path</code> is not deprecated and you will keep meeting it, so both are worth reading fluently.</p><p><strong>How do I append to a file that might not exist?</strong> Mode <code>"a"</code> creates it if it is missing, so no check is needed.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li><code>with</code> closes the file whether the block ends normally or raises; it is the correct way to open one, not a style choice.</li><li>Iterating the file object reads one line at a time and works on files larger than memory.</li><li><code>"w"</code> truncates on open; <code>"a"</code> appends; <code>"x"</code> refuses to overwrite.</li><li>Name <code>encoding="utf-8"</code> on every text-mode open, because the default varies by machine.</li><li>If the format has a name &mdash; CSV, JSON, INI &mdash; use the module rather than splitting strings.</li></ul>
                 </div>
             </div>
@@ -473,7 +473,7 @@ def timer(label):
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>fit, predict, transform | VizLearn</title>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-ZT6JM33V5J');
+    </script>
+    <!-- The font stylesheet is render-blocking and lives on another origin, so
+         the browser cannot paint until it has done DNS, TCP and TLS for two
+         hosts it has not met. Warming both connections while the HTML is still
+         parsing takes that off the critical path. gstatic serves the font
+         files themselves and is fetched anonymously, hence crossorigin. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'light';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+                .py-note {
+            border-left: 2px solid var(--border-subtle);
+            padding-left: 0.9rem;
+            line-height: 1.7;
+        }
+        .py-note code { color: var(--accent-primary); }
+        .vz-pt-lead { margin-top: 0.5rem; max-width: 60ch; color: var(--text-muted); }
+
+        /* A step is numbered so the sequence reads as a sequence rather than
+           as six unrelated demos. */
+        .vz-step-head { display: flex; align-items: baseline; gap: 0.6rem; }
+        .vz-step-n {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+            font-weight: 700; color: var(--accent-primary);
+            border: 1px solid var(--border-subtle); border-radius: 5px;
+            padding: 0.1rem 0.4rem; flex: none;
+        }
+        .vz-step-blurb {
+            margin: 0.55rem 0 0.9rem; line-height: 1.7;
+            color: var(--text-muted); max-width: 68ch;
+        }
+        .vz-step-blurb code {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.85em;
+            color: var(--accent-primary);
+        }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen light-mode">
+<!-- Light is the default, so it ships on the tag: the theme script runs at the
+     bottom of the body, and waiting for it would flash dark on every load.
+     This removes the class before any content is parsed for readers who chose
+     dark, so neither theme flashes the other. -->
+<script>if(localStorage.getItem("theme")==="dark")document.body.classList.remove("light-mode");</script>
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-3 md:gap-4">
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <svg class="vz-icon text-sm" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/></svg>
+                    <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)" aria-label="Back to Home">
+                        <svg class="vz-icon text-xs" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.2 288 416 288c17.7 0 32-14.3 32-32s-14.3-32-32-32l-306.7 0L214.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <svg class="vz-icon hidden dark-icon" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M361.5 1.2c5 2.1 8.6 6.6 9.6 11.9L391 121l107.9 19.8c5.3 1 9.8 4.6 11.9 9.6s1.5 10.7-1.6 15.2L446.9 256l62.3 90.3c3.1 4.5 3.7 10.2 1.6 15.2s-6.6 8.6-11.9 9.6L391 391 371.1 498.9c-1 5.3-4.6 9.8-9.6 11.9s-10.7 1.5-15.2-1.6L256 446.9l-90.3 62.3c-4.5 3.1-10.2 3.7-15.2 1.6s-8.6-6.6-9.6-11.9L121 391 13.1 371.1c-5.3-1-9.8-4.6-11.9-9.6s-1.5-10.7 1.6-15.2L65.1 256 2.8 165.7c-3.1-4.5-3.7-10.2-1.6-15.2s6.6-8.6 11.9-9.6L121 121 140.9 13.1c1-5.3 4.6-9.8 9.6-11.9s10.7-1.5 15.2 1.6L256 65.1 346.3 2.8c4.5-3.1 10.2-3.7 15.2-1.6zM160 256a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zm224 0a128 128 0 1 0 -256 0 128 128 0 1 0 256 0z"/></svg>
+                        <svg class="vz-icon hidden light-icon" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M223.5 32C100 32 0 132.3 0 256S100 480 223.5 480c60.6 0 115.5-24.2 155.8-63.4c5-4.9 6.3-12.5 3.1-18.7s-10.1-9.7-17-8.5c-9.8 1.7-19.8 2.6-30.1 2.6c-96.9 0-175.5-78.8-175.5-176c0-65.8 36-123.1 89.3-153.3c6.1-3.5 9.2-10.5 7.7-17.3s-7.3-11.9-14.3-12.5c-6.3-.5-12.6-.8-19-.8z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+        <div class="mb-8 animate-fade-in">
+            <nav class="flex flex-wrap items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)" aria-label="Breadcrumb"><a href="../index.html" class="hover:text-green-400 transition-colors">Home</a><span aria-hidden="true">/</span><a href="../sklearn/" class="hover:text-green-400 transition-colors">scikit-learn</a><span aria-hidden="true">/</span><span aria-current="page">The API</span></nav>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">fit, predict, transform</h1>
+            <p class="vz-pt-lead">Three method names that every model in the library shares - which is why swapping one model for another is a one-line change.</p>
+        </div>
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
+                <div class="card-container">
+                    <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
+                    <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
+                        <div class="py-note"><strong>fit</strong> learns from data, <strong>predict</strong> produces a target, <strong>transform</strong> produces new features. Every object in the library is some combination of those three.</div>
+                        <div class="py-note">An attribute ending in <code class='mono-font'>_</code> was learned during fit. One without was set by you.</div>
+                        <div class="py-note"><code class='mono-font'>X</code> is 2-D with one row per sample and one column per feature; <code class='mono-font'>y</code> is 1-D with one entry per sample.</div>
+                        <div class="py-note">A single feature still needs two dimensions - <code class='mono-font'>reshape(-1, 1)</code> is the usual fix.</div>
+                        <div class="py-note"><code class='mono-font'>fit</code> returns the estimator, which is why <code class='mono-font'>Model().fit(X, y)</code> chains.</div>
+                        <div class="py-note">Calling <code class='mono-font'>predict</code> before <code class='mono-font'>fit</code> raises <code class='mono-font'>NotFittedError</code> rather than guessing.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <!-- auto-article-vizlearn -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full" data-vz-prose>
+        <div class="card-container animate-fade-in">
+<!-- VIZLEARN:ARTICLE:BEGIN (generated by tools/build_articles.py) -->
+            <div class="card-header">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">fit, predict, transform: A Practical Guide</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">scikit-learn has one interface and about two hundred algorithms behind it. Learning the interface is most of learning the library.</p>
+            </div>
+            <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <div>
+                    <h3>The problem it solves</h3>
+                    <p>Every machine-learning library has to answer the same question: how does a program hand data to an algorithm and get an answer back. scikit-learn answered it once, in 2007, and then made every algorithm in the library answer it the same way.</p><p>The result is that <code>fit</code>, <code>predict</code> and <code>transform</code> are almost the whole API. A linear regression, a random forest, a support-vector machine and a k-means clustering all expose the same three methods, so the code around a model does not change when the model does.</p>
+                </div>
+                <div>
+                    <h3>Every model is the same three methods</h3>
+                    <p>The library's whole design is that you learn the interface once, not once per algorithm.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LinearRegression
+
+# Six houses: one feature (rooms), one target (price in thousands).
+X = [[1], [2], [3], [4], [5], [6]]
+y = [50, 70, 90, 110, 130, 150]
+
+model = LinearRegression()
+print("before fit :", hasattr(model, "coef_"))
+
+model.fit(X, y)
+print("after fit  :", hasattr(model, "coef_"))
+
+print("prediction for 7 rooms:", model.predict([[7]]))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>The trailing underscore means learned</h3>
+                    <p>Attributes ending in an underscore did not exist until fit ran. It is a naming convention, and it is the whole story of what fitting does.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LinearRegression
+
+X = [[1], [2], [3], [4], [5], [6]]
+y = [50, 70, 90, 110, 130, 150]
+
+model = LinearRegression().fit(X, y)
+
+print("coef_      :", model.coef_)
+print("intercept_ :", round(model.intercept_, 6))
+
+# Set before fit, by you. No underscore.
+print("fit_intercept (a setting you chose):", model.fit_intercept)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>fit returns the estimator, so it chains</h3>
+                    <p>Every fit returns self. That is why you will see .fit(X, y) attached to the constructor on one line.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LinearRegression
+
+X = [[1], [2], [3]]
+y = [2, 4, 6]
+
+model = LinearRegression()
+same = model.fit(X, y)
+
+print("fit returned the same object:", same is model)
+print("so this one-liner works     :",
+      LinearRegression().fit(X, y).predict([[4]]))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Transformers use transform instead of predict</h3>
+                    <p>A model predicts a target. A transformer changes the features. The fit half is identical.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.preprocessing import StandardScaler
+
+X = [[10], [20], [30], [40]]
+
+scaler = StandardScaler()
+scaler.fit(X)
+
+print("mean_  :", scaler.mean_)
+print("scale_ :", scaler.scale_)
+print()
+print("transformed:")
+print(scaler.transform(X).ravel())</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Swapping the model is one line</h3>
+                    <p>Same data, same calls, different algorithm - which is the payoff for having one interface.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.neighbors import KNeighborsRegressor
+
+# Deliberately not a straight line, so the three models disagree.
+X = [[1], [2], [3], [4], [5], [6]]
+y = [50, 62, 90, 96, 130, 150]
+
+for model in [LinearRegression(),
+              DecisionTreeRegressor(random_state=0),
+              KNeighborsRegressor(n_neighbors=2)]:
+    model.fit(X, y)
+    guess = model.predict([[3.5]])[0]
+    print("%-24s %6.1f" % (type(model).__name__, guess))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>X is always 2-D, y is always 1-D</h3>
+                    <p>The single most common error message on this track comes from getting this wrong, and it tells you exactly what it wanted.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LinearRegression
+import numpy as np
+
+X = np.array([[1], [2], [3]])
+y = np.array([2, 4, 6])
+print("X.shape:", X.shape, " y.shape:", y.shape)
+
+flat = np.array([1, 2, 3])
+try:
+    LinearRegression().fit(flat, y)
+except ValueError as e:
+    print()
+    print("ValueError:", str(e).splitlines()[0])
+    print()
+    print("fix: flat.reshape(-1, 1) ->", flat.reshape(-1, 1).shape)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>fit learns, predict answers</h3>
+                    <p><code>fit(X, y)</code> shows the estimator the data and the answers, and it stores what it worked out on the object. <code>predict(X)</code> takes new data with no answers and produces them.</p><p>The split matters more than it looks. Fitting and predicting are separate calls because they happen at different times on different data &mdash; you fit once on data you have, and predict many times on data you did not have when you fitted.</p>
+                </div>
+                <div>
+                    <h3>The underscore convention</h3>
+                    <p>scikit-learn marks learned attributes with a trailing underscore, and the convention is worth taking seriously because it divides an estimator into two halves.</p><p>Attributes without an underscore are <strong>hyperparameters</strong>: settings you chose, passed to the constructor, present before any data was seen. <code>n_neighbors</code>, <code>max_depth</code>, <code>fit_intercept</code>.</p><p>Attributes with a trailing underscore are <strong>learned</strong>: they did not exist before <code>fit</code> and they came from the data. <code>coef_</code>, <code>intercept_</code>, <code>feature_importances_</code>, <code>classes_</code>.</p><p>Reading an estimator therefore tells you what it was told and what it worked out, and the two never get confused. It also means <code>hasattr(model, "coef_")</code> is a reliable test for "has this been fitted", which is exactly what the library's own <code>check_is_fitted</code> does.</p>
+                </div>
+                <div>
+                    <h3>Transformers change features rather than predicting</h3>
+                    <p>A transformer is the other half of the library. Instead of <code>predict</code> it has <code>transform</code>, and instead of producing a target it produces a new version of <code>X</code>.</p><p><code>StandardScaler</code> is the canonical one: <code>fit</code> computes the mean and standard deviation of each column, <code>transform</code> subtracts and divides. <code>OneHotEncoder</code>, <code>SimpleImputer</code> and <code>PCA</code> are all the same shape.</p><p><code>fit_transform</code> does both in one call and is the one you will write most often on training data. It is not merely shorthand &mdash; for some transformers it is faster than doing the two separately, which is why it exists as its own method.</p><p>The rule that matters: <strong>fit on training data only, transform everything</strong>. A scaler fitted on the test set has learned from data the model is supposed to have never seen, and the score you get afterwards is not a score.</p>
+                </div>
+                <div>
+                    <h3>The shapes</h3>
+                    <p><code>X</code> is two-dimensional: rows are samples, columns are features. <code>y</code> is one-dimensional: one value per row of <code>X</code>.</p><p>That holds even when there is one feature, which is where beginners meet their first error. A list of six numbers is six samples of nothing, not one sample of six features, and scikit-learn refuses to guess which you meant. <code>reshape(-1, 1)</code> turns a flat array into a column, and the error message says so explicitly.</p>
+                </div>
+                <div>
+                    <h3>The two kinds of estimator</h3>
+                    <p>Everything in the library is one of two things, and telling them apart tells you which method to call.</p><p>A <strong>predictor</strong> ends in a target. <code>LinearRegression</code>, <code>LogisticRegression</code>, <code>RandomForestClassifier</code>, <code>KMeans</code> &mdash; you <code>fit</code> them and then <code>predict</code>. Classifiers additionally offer <code>predict_proba</code>, which returns the probability of each class rather than the winning one.</p><p>A <strong>transformer</strong> ends in new features. <code>StandardScaler</code>, <code>OneHotEncoder</code>, <code>SimpleImputer</code>, <code>PCA</code> &mdash; you <code>fit</code> them and then <code>transform</code>. There is no target to produce, so there is no <code>predict</code>.</p><p>The two compose: a chain of transformers followed by one predictor is the shape of essentially every real scikit-learn program, and <code>Pipeline</code> exists to hold exactly that chain and give it the same <code>fit</code>/<code>predict</code> interface as a single estimator. That is why the API is worth learning first &mdash; a whole pipeline is used the same way as the simplest model in the library.</p>
+                </div>
+                <div>
+                    <h3>score, and what it means for each</h3>
+                    <p>Every predictor has a <code>score(X, y)</code> method, and the number it returns is not the same quantity for all of them.</p><p>For a <strong>classifier</strong>, <code>score</code> is accuracy: the proportion of predictions that were right. For a <strong>regressor</strong>, it is R&sup2;: how much of the variation in the target the model accounts for, where 1.0 is perfect and 0.0 is no better than always guessing the mean. R&sup2; can be negative, which means the model is worse than that guess.</p><p>Both are conveniences rather than recommendations. Accuracy is misleading whenever the classes are imbalanced, and R&sup2; says nothing about whether the errors are large in the units you care about. Later modules replace both with metrics that answer a specific question, and the <code>metrics</code> module holds several dozen of them.</p><p>What <code>score</code> is genuinely useful for is a quick comparison on the same data with the same model type, and for the cross-validation helpers, which call it by default when you do not name a metric.</p>
+                </div>
+                <div>
+                    <h3>Hyperparameters are set at construction</h3>
+                    <p>The constructor takes the settings, and there are usually many of them with sensible defaults. <code>RandomForestClassifier()</code> works, and so does <code>RandomForestClassifier(n_estimators=500, max_depth=8, random_state=0)</code>.</p><p>Two methods make those settings inspectable. <code>get_params()</code> returns every hyperparameter as a dictionary, including the defaults you did not pass, which is the fastest way to find out what an estimator can be configured with. <code>set_params(**kw)</code> changes them on an existing object.</p><p>Those two are not conveniences either &mdash; they are what makes automated tuning possible. <code>GridSearchCV</code> works by calling <code>set_params</code> with each combination in turn, which is why it can tune any estimator in the library, including ones written after it, and any step inside a pipeline.</p><p>The corollary is worth remembering: an estimator is fully described by its hyperparameters plus its fitted attributes. Nothing else is hidden on it.</p>
+                </div>
+                <div>
+                    <h3>random_state, and reproducibility</h3>
+                    <p>Anything in the library that makes a random choice takes a <code>random_state</code>. Splitting data, initialising k-means, sampling features in a random forest, shuffling folds &mdash; all of them.</p><p>Passing an integer makes the run reproducible: the same data and the same seed give the same result, every time, on any machine. Leaving it out gives a different answer on each run, which makes two scores incomparable and a bug impossible to reproduce.</p><p>The habit worth forming early is to pass <code>random_state=0</code> to everything that accepts it while you are learning or debugging, and to think carefully before removing it. The one time you genuinely want it left out is when you are deliberately measuring how much the result varies between runs &mdash; which is a real question, and one that a single seeded number cannot answer.</p>
+                </div>
+                <div>
+                    <h3>When an estimator has not been fitted</h3>
+                    <p>Calling <code>predict</code> before <code>fit</code> raises <code>NotFittedError</code> rather than returning nonsense, and the message names the estimator and tells you to call <code>fit</code>.</p><p>That check exists because the alternative is worse. An unfitted model has no coefficients, and a library that quietly returned zeros or <code>None</code> would produce a program that runs, produces numbers, and is entirely meaningless.</p><p>It is also why the underscore convention matters practically rather than only stylistically: <code>check_is_fitted</code> works by looking for attributes ending in an underscore. An estimator you write yourself gets the same behaviour for free by following the same convention.</p>
+                </div>
+                <div>
+                    <h3>Why one interface was the right decision</h3>
+                    <p>It is worth appreciating how unusual this is. Most machine-learning code before scikit-learn had a shape per algorithm: one library wanted a matrix and a separate label vector, another wanted them combined, a third wanted a configuration file. Comparing two algorithms meant rewriting the code around them, which meant people compared far fewer than they should have.</p><p>Fixing the interface changed what is cheap. Swapping a model becomes one line, so trying five is a loop rather than a project. Cross-validation can be written once and work with anything, because it only needs <code>fit</code>, <code>predict</code> and <code>score</code>. A pipeline can hold arbitrary steps, because every step honours <code>fit</code> and <code>transform</code>. A tuner can search any estimator, because <code>get_params</code> and <code>set_params</code> are universal.</p><p>None of that required the algorithms to have anything in common mathematically. A decision tree and a linear model share no theory at all; they share three method names, and that turned out to be enough to build the entire ecosystem of helpers on top.</p><p>The practical consequence for someone learning: time spent on the API is not overhead before the interesting part. It *is* the part that transfers. The estimators are individually simple to use once the shape is familiar, and the modules that follow spend most of their words on when each one is appropriate and how to tell whether it worked, rather than on how to call it.</p>
+                </div>
+                <div>
+                    <h3>What the library deliberately does not do</h3>
+                    <p>Knowing the boundary saves looking for things that are not there.</p><p>scikit-learn does not do deep learning. There is a small <code>MLPClassifier</code>, useful for a demonstration and not for real work; anything serious belongs in PyTorch or a similar library. It does not do GPUs. It does not do sequence models, text generation, or anything with the word "neural" beyond that one estimator.</p><p>It does not handle data loading, cleaning or plotting. Data arrives as arrays or DataFrames that pandas produced, and results are plotted with matplotlib. Those are separate libraries on purpose, and the boundary is clean: scikit-learn takes numeric arrays and returns numeric arrays.</p><p>It also does not do statistical inference. A linear model gives you coefficients and no p-values, no confidence intervals and no hypothesis tests, because the library is built around prediction rather than explanation. <code>statsmodels</code> is the library for that question, and reaching for it is the right answer rather than a workaround.</p>
+                </div>
+                <div>
+                    <h3>Things to try</h3>
+                    <ol><li><strong>Run the first editor.</strong> <code>hasattr(model, "coef_")</code> is False before <code>fit</code> and True after. That is the whole of what fitting does, visible in one line.</li><li><strong>Change the data.</strong> Make the relationship non-linear &mdash; <code>y = [1, 4, 9, 16, 25, 36]</code> &mdash; and watch <code>coef_</code> become a compromise rather than an exact fit.</li><li><strong>Swap the model.</strong> In the fifth editor, add <code>from sklearn.svm import SVR</code> and put <code>SVR()</code> in the list. Nothing else changes.</li><li><strong>Break the shape.</strong> In the last editor, read the error properly. It names the shape it got and the shape it wanted.</li></ol>
+                </div>
+                <div>
+                    <h3>Where this leaves you</h3>
+                    <p>Three method names, one shape convention and one naming convention cover the surface of the entire library. Everything after this is which estimator to reach for and how to avoid fooling yourself about how well it worked.</p>
+                </div>
+            </div>
+<!-- VIZLEARN:ARTICLE:END -->
+        </div>
+    </section>
+
+    <script>
+        (function () {
+            var btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            var sun = btn.querySelector('.dark-icon');
+            var moon = btn.querySelector('.light-icon');
+
+            function paint(theme) {
+                if (theme === 'light') {
+                    document.body.classList.add('light-mode');
+                    moon.classList.remove('hidden');
+                    sun.classList.add('hidden');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    sun.classList.remove('hidden');
+                    moon.classList.add('hidden');
+                }
+            }
+
+            paint(localStorage.getItem('theme') || 'light');
+
+            btn.addEventListener('click', function () {
+                var next = document.body.classList.contains('light-mode') ? 'dark' : 'light';
+                localStorage.setItem('theme', next);
+                paint(next);
+            });
+        })();
+    </script>
+
+</body>
+</html>

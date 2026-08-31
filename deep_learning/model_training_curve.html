@@ -537,61 +537,64 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Two lines tell you almost everything about a training run. Learning to read the gap between them is the fastest diagnostic skill in machine learning.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-reading-real-numbers">Reading real numbers</h3>
+                    <h3>The four shapes</h3>
+                    <ul><li><strong>Both high and flat</strong> &mdash; underfitting. The model has not got enough capacity, or has not trained long enough, to capture the pattern.</li><li><strong>Both falling and close together</strong> &mdash; healthy. Keep going.</li><li><strong>Training falling, validation turning upward</strong> &mdash; overfitting. The turning point is where you should have stopped.</li><li><strong>Validation below training</strong> &mdash; usually not a miracle. Dropout is active during training but not evaluation, or the validation split happens to be easier.</li></ul>
+                </div>
+                <div>
+                    <h3>Reading real numbers</h3>
                     <p>Training loss 0.08, validation loss 0.34. The gap of 0.26 is the model's memorisation of the training set &mdash; that is overfitting, no matter how good 0.08 looks in isolation.</p><p>Training loss 0.31, validation loss 0.33. A tiny gap, but both are high. The model is not overfitting; it simply is not good enough yet. These two situations need opposite responses, which is exactly why looking at one curve is not enough.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-reading-the-gap-between-the-curves">Reading the gap between the curves</h3>
+                    <h3>Reading the gap between the curves</h3>
                     <p>The two curves matter less individually than the distance between them, and how that distance changes over time.</p><p>A gap that stays narrow while both curves fall is a healthy run. A gap that opens steadily &mdash; training continuing down while validation flattens or rises &mdash; is overfitting, and the epoch where validation turns is where early stopping should trigger. Both curves flat and high means the model has not got started: check the learning rate before assuming the architecture is too small.</p><p>The size of the gap is not itself a problem. A large but stable gap on a model whose validation loss is still the best you have achieved is fine; it is the <em>trend</em> in validation loss that decides whether to stop.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-curves-that-mean-something-is-broken">Curves that mean something is broken</h3>
+                    <h3>Curves that mean something is broken</h3>
                     <ul><li><strong>Loss becomes NaN.</strong> Exploding gradients or a numerical error such as log(0). Lower the learning rate, clip the gradient norm, and check for unscaled inputs.</li><li><strong>Loss is completely flat from step one.</strong> Nothing is learning. Usually a learning rate near zero, a disconnected graph, or gradients not flowing &mdash; verify the optimiser is actually stepping the parameters you think it is.</li><li><strong>Loss oscillates violently without trending down.</strong> Learning rate too high. Divide by ten.</li><li><strong>Validation loss much lower than training loss.</strong> Normally dropout and batch norm being active during training only. If the gap is large and persistent, suspect a leak or a validation split that is easier than the training set.</li><li><strong>Loss drops sharply at each epoch boundary.</strong> The data is not being reshuffled, so the model is memorising batch order.</li></ul>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-a-healthy-run-looks-like">What a healthy run looks like</h3>
+                    <h3>What a healthy run looks like</h3>
                     <p>A steep initial drop as the model learns the easy structure, then a long shallow decline as it refines. Validation tracks training closely at first and gradually separates. Both curves are noisy step to step &mdash; that is mini-batch sampling, not instability &mdash; and the trend over a window of epochs is what to judge.</p><p>If loss is still falling meaningfully when training ends, you stopped too early. If validation has been flat or rising for many epochs, you trained too long and the useful checkpoint is behind you.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-most-informative-plot-in-machine-learning">The most informative plot in machine learning</h3>
+                    <h3>The most informative plot in machine learning</h3>
                     <p>Two lines &mdash; training loss and validation loss against epochs &mdash; diagnose more problems faster than any other single output.</p><p>Read them together, never separately. The <strong>level</strong> of the training curve measures bias: how well the model can fit at all. The <strong>gap</strong> between the curves measures variance: how much of that fit was memorisation.</p><div class="vz-table-wrap"><table><thead><tr><th>Shape</th><th>Diagnosis</th><th>Action</th></tr></thead><tbody><tr><td>Both falling, close together</td><td>Healthy, still learning</td><td>Keep training</td></tr><tr><td>Both flat and high</td><td>Underfitting</td><td>Bigger model, better features, higher rate</td></tr><tr><td>Training falls, validation rises</td><td>Overfitting</td><td>Regularise, augment, stop earlier</td></tr><tr><td>Training falls, validation flat</td><td>Mild overfitting or a ceiling</td><td>More data or regularisation</td></tr><tr><td>Both flat from step one</td><td>Learning rate far too low, or a bug</td><td>Check gradients and the rate</td></tr><tr><td>Loss jumps to <code>NaN</code></td><td>Rate too high, or <code>log(0)</code></td><td>Lower the rate, clip gradients</td></tr><tr><td>Validation below training</td><td>Augmentation or dropout artefact, or a leak</td><td>Check the pipeline</td></tr></tbody></table></div><p>That last row is worth expanding. Validation loss below training loss is usually benign: dropout and augmentation are active during training and disabled at validation, so the training number is measured under harder conditions. If neither is in use, suspect a leak.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-reading-the-shape-of-the-descent">Reading the shape of the descent</h3>
+                    <h3>Reading the shape of the descent</h3>
                     <p>Beyond the broad diagnosis, the curve's shape carries specific information.</p><p><strong>A sharp initial drop then a long plateau</strong> is normal. The model learns the easy structure &mdash; class priors, obvious features &mdash; in the first epoch or two, and the rest is slow refinement.</p><p><strong>A staircase</strong> means a step learning-rate schedule; each drop is a rate reduction letting the model settle into a narrower minimum.</p><p><strong>A sudden improvement in the final epochs</strong> is the cosine schedule's low-rate phase working as intended. Expect it, and set early-stopping patience long enough not to cut it off.</p><p><strong>A sudden permanent jump upwards</strong> means the learning rate was too high for the sharper region the model had entered. The weights have been thrown somewhere worse. A decaying schedule prevents it.</p><p><strong>Noise batch to batch, smooth across epochs</strong> is expected. Judge the trend over several epochs; a single bad epoch is not a signal.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-curves-worth-plotting-beyond-the-loss">Curves worth plotting beyond the loss</h3>
+                    <h3>Curves worth plotting beyond the loss</h3>
                     <p><strong>Learning rate.</strong> Plot it alongside the loss and the connection between schedule and progress becomes visible immediately. It also catches the common bug of a scheduler stepped at the wrong interval.</p><p><strong>Gradient norm per layer.</strong> A steady decay from output to input means vanishing gradients; values in the thousands mean exploding. This is the fastest diagnosis available for a network that will not train.</p><p><strong>The task metric.</strong> Accuracy or F1 alongside the loss, because they can diverge &mdash; loss rising while accuracy holds means growing overconfidence rather than worse classification.</p><p><strong>The fraction of zero activations.</strong> Around 50% after ReLU is healthy; 90% and rising means units are dying.</p><p>Logging all four costs almost nothing and turns debugging from guesswork into reading.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-try-this-above">Try this above</h3>
+                    <h3>Try this above</h3>
                     <ol><li>Set <strong>Model Complexity</strong> low and <strong>Data Noise</strong> low. Both curves flatten out high &mdash; the underfitting signature.</li><li>Raise <strong>Model Complexity</strong> and let it run the full <strong>Total Epochs</strong>. Find the epoch where validation stops falling and starts to climb.</li><li>Raise <strong>Data Noise</strong> and repeat. The turning point arrives earlier, because there is more noise available to memorise.</li><li>Set <strong>Learning Rate</strong> too high and watch both curves become jagged rather than smooth.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-usually-goes-wrong">What usually goes wrong</h3>
+                    <h3>What usually goes wrong</h3>
                     <p><strong>Judging on training loss alone.</strong> It almost always keeps falling. A model can drive training loss to nearly zero while getting steadily worse at its actual job.<strong>Training for a fixed epoch count.</strong> The right number is wherever validation loss bottoms out, and that moves with every change to the data, the model or the learning rate.<strong>Reading noise as trend.</strong> With a small validation set, a wobble of a couple of percent between epochs is sampling noise. Wait for a sustained rise before concluding anything.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-in-one-line">In one line</h3>
+                    <h3>In one line</h3>
                     <p>The gap between the curves is the diagnosis; either curve alone is not.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-learning-curves-a-different-plot-with-a-similar-">Learning curves: a different plot with a similar name</h3>
+                    <h3>Learning curves: a different plot with a similar name</h3>
                     <p>A <strong>learning curve</strong> plots performance against the amount of training data rather than against epochs, and it answers a question no other diagnostic does: <em>would more data help?</em></p><p>Train on 10%, 20%, … 100% of the data and plot both scores:</p><p><strong>Both curves converging to a high error</strong> means you are limited by the model, not the data. More rows will not help; more capacity or better features will.</p><p><strong>A large remaining gap, with validation error still falling</strong> means you are limited by data. Collecting more is the highest-value action available.</p><p><strong>Validation error flat as data grows</strong ​means you have enough data for this model, and the remaining error is model bias or irreducible noise.</p><p>That distinction is worth an afternoon of compute before committing to an expensive annotation project.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-practical-checklist">A practical checklist</h3>
+                    <h3>A practical checklist</h3>
                     <p>When a training run looks wrong, work through this in order:</p><ol><li><strong>Can the model overfit 20 examples?</strong> If not, it is a bug &mdash; wrong labels, a broken loss, gradients not reaching the parameters.</li><li><strong>Is the initial loss about ln(C)?</strong> If not, the output layer or the labels are misaligned.</li><li><strong>Is the learning rate right?</strong> A short exponential sweep answers this in a minute.</li><li><strong>Are the inputs scaled?</strong> Unscaled features look like every other problem.</li><li><strong>Are gradients reaching the early layers?</strong> Log per-layer norms.</li><li><strong>Is the validation set representative and large enough?</strong> A few hundred examples give metrics that swing several percent.</li><li><strong>Is the data shuffled?</strong> Batches sorted by class break batch normalisation.</li></ol><p>Most training failures are caught by the first four.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>How many epochs should I train for?</strong> Until validation stops improving, with early stopping deciding rather than a fixed number.</p><p><strong>Should the training loss reach zero?</strong> On real data, no &mdash; noise sets a floor. Reaching zero usually means memorisation.</p><p><strong>Why is my validation loss so noisy?</strong> A small validation set, or a high learning rate. Increase the set size or smooth over several epochs.</p><p><strong>My training loss is lower than validation from the start. Overfitting?</strong> Not necessarily &mdash; some gap is normal from the first epoch. Watch whether it <em>widens</em>.</p><p><strong>Should I plot loss or accuracy?</strong> Both. Loss is the smoother signal; accuracy is what you report, and the two can disagree informatively.</p><p><strong>What if both curves are flat at exactly the same value?</strong> The model is predicting a constant. Check the learning rate, the initialisation, and whether the optimiser is stepping at all.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>The level of the training curve measures bias; the gap between the curves measures variance.</li><li>Falling together is healthy; diverging is overfitting; both flat and high is underfitting.</li><li>A final-epoch improvement is the learning-rate schedule working &mdash; do not stop before it.</li><li>Log the learning rate, per-layer gradient norms and the task metric alongside the loss.</li><li>A learning curve against dataset size is what tells you whether more data would help.</li></ul>
                 </div>
             </div>
@@ -621,7 +624,7 @@
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

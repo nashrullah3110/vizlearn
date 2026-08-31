@@ -322,9 +322,12 @@ SELECT level, name FROM chain ORDER BY level, name;
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The one construct in SQL that can follow a chain of unknown length.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-two-halves">The two halves</h3>
+                    <h3>Why plain SQL cannot do this</h3>
+                    <p>A self-join resolves one level of a hierarchy. Two joins resolve two. To resolve five you write five, and to resolve "however many there are" you cannot write anything at all, because the number of joins would have to depend on data the query has not read yet.</p><p>A <strong>recursive CTE</strong> removes that limit. It runs a query, feeds the result back into itself, and keeps going until a round produces nothing new.</p>
+                </div>
+                <div>
+                    <h3>The two halves</h3>
                     <pre><code>WITH RECURSIVE chain(...) AS (
     &lt;anchor&gt;                -- runs once
     UNION ALL
@@ -333,24 +336,24 @@ SELECT level, name FROM chain ORDER BY level, name;
 SELECT ... FROM chain;</code></pre><p>The <strong>anchor</strong> is an ordinary query. It runs once and produces the starting rows. In the first variant it selects the employee whose <code>manager_id</code> is NULL &mdash; the root.</p><p>The <strong>recursive step</strong> is a query that refers to the CTE by name. It runs against the rows the previous round produced, not against everything accumulated so far. That distinction is what makes the walk proceed one level at a time.</p><p>Execution goes: anchor produces Ada. Step runs against {Ada} and produces Grace and Alan. Step runs against {Grace, Alan} and produces Edsger, Barbara, Donald. Step runs against those and produces Tony. Then Niklaus. Then the step finds nobody reporting to Niklaus, returns no rows, and the recursion halts.</p><p><strong>The empty result is the only stopping condition.</strong> There is no iteration limit and no depth check unless you write one.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-carrying-state-through">Carrying state through</h3>
+                    <h3>Carrying state through</h3>
                     <p>The <code>level</code> column in the starter query is not special syntax. It is an ordinary column: the anchor sets it to 1, and the step sets it to <code>c.level + 1</code>. Anything computed the same way rides along with the recursion.</p><p>The third variant builds a text path this way, concatenating each name onto the one before to produce <code>Ada &gt; Grace &gt; Edsger &gt; Tony</code>. Ordering by that string gives a correctly nested listing, which is a small trick worth knowing: sorting by path sorts a tree into document order.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-direction-is-just-the-join-condition">Direction is just the join condition</h3>
+                    <h3>Direction is just the join condition</h3>
                     <p>Run the second variant. It starts at Niklaus and walks *up*, and the only thing that changed is which side of the join condition is which:</p><pre><code>down:  JOIN chain c ON e.manager_id = c.id
 up:    JOIN up    u ON u.manager_id = m.id</code></pre><p>Same construct, opposite direction. Ancestors and descendants are the same problem with the arrow reversed.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-generating-rows-from-nothing">Generating rows from nothing</h3>
+                    <h3>Generating rows from nothing</h3>
                     <p>The fourth variant has no table in it. The anchor is <code>SELECT 1</code> and the step adds one until it reaches ten.</p><p>This is how you produce a sequence without a helper table: a row per day across a date range so a report shows zeros for days with no sales, a row per bucket for a histogram, a numbers table for splitting strings. It is one of the most useful applications and the one people find last.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-cycles">Cycles</h3>
+                    <h3>Cycles</h3>
                     <p>Everything above assumes the data is a tree. If someone becomes their own manager's manager, the step never returns empty and the query runs until the server stops it.</p><p>Real data acquires cycles. The defences, in increasing order of robustness:</p><ul><li>Carry a depth column and add <code>WHERE level &lt; 50</code> to the step.</li><li>Carry the path and add <code>WHERE instr(path, e.name) = 0</code> to refuse revisiting.</li><li>Use <code>UNION</code> instead of <code>UNION ALL</code>, which deduplicates &mdash; this stops a cycle but costs a comparison against the whole accumulated set each round.</li><li>In PostgreSQL, use the <code>CYCLE</code> clause, which does this properly.</li></ul><p>A depth cap costs almost nothing and turns a hung query into a wrong-but-finite answer, which is far easier to notice.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>No termination guard.</strong> Cyclic data plus <code>UNION ALL</code> runs forever.</p><p><strong>An anchor that matches too much.</strong> If the anchor selects every row rather than the roots, every row is a starting point and the result is enormous.</p><p><strong>Expecting the step to see everything found so far.</strong> It sees the previous round only. Aggregating across all levels has to happen in the outer query.</p><p><strong>Recursing over a large table without an index on the join column.</strong> Each round is a join. Without an index each round is a scan.</p>
                 </div>
             </div>
@@ -409,7 +412,7 @@ up:    JOIN up    u ON u.manager_id = m.id</code></pre><p>Same construct, opposi
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

@@ -294,9 +294,21 @@ except TypeError as e:
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Why can a tuple be a dictionary key but a list cannot?</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-run-it">Run it</h3>
+                    <h3>The requirement</h3>
+                    <p>A dictionary key must be <strong>hashable</strong>, which means two things: it has a <code>__hash__</code> method returning a stable integer, and it can be compared for equality.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src">d = {}
+d["text"] = 1           # str - hashable
+d[(1, 2)] = 2           # tuple - hashable
+d[frozenset({1})] = 3   # frozenset - hashable
+print("stored:", d)
+
+try:
+    d[[1, 2]] = 4
+except TypeError as e:
+    print("list  :", type(e).__name__ + ":", e)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>1</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><p>The rule follows directly from how a dictionary works. The hash determines which slot an entry occupies. If a key's hash changed after insertion, the entry would sit in a slot the new hash does not point to &mdash; unreachable, and effectively lost.</p><p>So the requirement is not arbitrary strictness; it is what keeps the structure coherent.</p>
+                </div>
+                <div>
+                    <h3>Run it</h3>
                     <p>What is and is not hashable, then a class that breaks the contract on purpose &mdash; mutating a key after insertion and losing the entry, exactly as the visualisation describes.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src"># Keys must be hashable, because the hash is the address.
 from dataclasses import dataclass
 
@@ -360,7 +372,7 @@ except Exception as e:
     print("and it cannot be mutated:", type(e).__name__, "-", e)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>2</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-demonstrating-the-failure">Demonstrating the failure</h3>
+                    <h3>Demonstrating the failure</h3>
                     <p>Python prevents this for built-in types, and a custom class can be made to break it:</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src">class Sloppy:
     def __init__(self, value):
         self.value = value
@@ -381,7 +393,7 @@ except KeyError:
     print("lookup after mutation: KeyError - the key is lost in its own dict")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>3</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><p>The entry exists, the key object is the same object, and it cannot be found. The lookup computes the new hash, goes to a different slot, finds nothing, and raises.</p><p>That is the concrete answer to "why?" &mdash; and being able to construct the failure demonstrates real understanding rather than recall.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-hash-equality-contract">The hash-equality contract</h3>
+                    <h3>The hash-equality contract</h3>
                     <p>Two rules govern the relationship, and violating the first is the more serious error.</p><p><strong>If two objects are equal, their hashes must be equal.</strong> Otherwise two keys that compare equal land in different slots, both exist in the dictionary, and <code>d[k]</code> returns whichever was found first.</p><p><strong>If two objects have the same hash, they need not be equal.</strong> That is an ordinary collision, resolved by comparing the keys and probing.</p><p>Consequences for custom classes:</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src">class Point:
     def __init__(self, x, y):
         self.x, self.y = x, y
@@ -395,19 +407,19 @@ d3 = {p: "origin-ish"}
 print("lookup:", d3[Point(1, 2)])</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>4</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><p>Hash exactly the fields that <code>__eq__</code> compares. Hashing more fields breaks the first rule; hashing fewer merely causes extra collisions, which is safe but slower.</p><p><strong>Defining <code>__eq__</code> without <code>__hash__</code> makes a class unhashable in Python 3.</strong> That is deliberate: the default <code>__hash__</code> is identity-based, which would contradict a value-based <code>__eq__</code>. Python removes it rather than let you violate the contract silently.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-invariant-being-protected">The invariant being protected</h3>
+                    <h3>The invariant being protected</h3>
                     <p>Equal objects must have equal hashes, and an object's hash must not change while it is in use as a key. Both follow from how the table works: the hash is the address, so a moving hash is a moving address.</p><p>Python enforces this by making mutable built-ins unhashable. <code>list</code>, <code>dict</code> and <code>set</code> all set <code>__hash__ = None</code>, which is why the error is <code>unhashable type</code> rather than something about dictionaries.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-it-goes-all-the-way-down">It goes all the way down</h3>
+                    <h3>It goes all the way down</h3>
                     <p>A tuple is hashable only if everything in it is. <code>(1, 2)</code> is a fine key; <code>(1, [2])</code> is not, because the tuple's hash is derived from its contents and one of them can change.</p><p><code>frozenset</code> is the immutable set, and it is hashable for the same reason. <code>set</code> is not, which is why you cannot have a set of sets without it.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-custom-objects">Custom objects</h3>
+                    <h3>Custom objects</h3>
                     <p>By default a custom object hashes by identity, so two equal-looking instances are different keys. Define <code>__eq__</code> and Python sets <code>__hash__</code> to <code>None</code> &mdash; because you have redefined equality and the default hash no longer agrees with it.</p><p>To make it usable as a key, define <code>__hash__</code> too, over the same fields <code>__eq__</code> uses, and do not mutate those fields afterwards. <code>@dataclass(frozen=True)</code> does all of this correctly for you.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-is-hashable-and-what-is-not">What is hashable, and what is not</h3>
+                    <h3>What is hashable, and what is not</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Type</th><th>Hashable</th><th>Note</th></tr></thead><tbody><tr><td><code>int</code>, <code>float</code>, <code>str</code>, <code>bytes</code></td><td>Yes</td><td>Immutable</td></tr><tr><td><code>tuple</code></td><td>Yes, if its contents are</td><td>A tuple containing a list is not</td></tr><tr><td><code>frozenset</code></td><td>Yes</td><td>The immutable set</td></tr><tr><td><code>None</code>, <code>True</code>, <code>False</code></td><td>Yes</td><td>Singletons</td></tr><tr><td><code>list</code>, <code>dict</code>, <code>set</code></td><td>No</td><td>Mutable</td></tr><tr><td><code>bytearray</code></td><td>No</td><td>Mutable</td></tr><tr><td>Custom class, default</td><td>Yes</td><td>Identity-based hash</td></tr><tr><td>Custom class with <code>__eq__</code> only</td><td><strong>No</strong></td><td><code>__hash__</code> is removed</td></tr><tr><td><code>dataclass(frozen=True)</code></td><td>Yes</td><td>Generates both correctly</td></tr></tbody></table></div><p>The tuple row is the subtle one:</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src">print("hash((1, 2)) :", hash((1, 2)), "- fine")
 
 try:
@@ -416,19 +428,19 @@ except TypeError as e:
     print("hash((1,[2])):", type(e).__name__ + ":", e)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>5</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><p>A tuple's hash is derived from its contents, so a tuple containing something mutable cannot have a stable hash.</p><p>The dataclass row is the practical shortcut: <code>@dataclass(frozen=True)</code> generates <code>__eq__</code> and <code>__hash__</code> consistently and makes the instance immutable, which is exactly what a value object used as a key should be.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-workarounds-when-a-key-is-mutable">The workarounds when a key is mutable</h3>
+                    <h3>The workarounds when a key is mutable</h3>
                     <p><strong>Convert to a tuple.</strong> <code>tuple(my_list)</code> is the usual answer, and it snapshots the values at that moment &mdash; later changes to the list do not affect the key, which is what you want.</p><p><strong>Use a <code>frozenset</code></strong> when order should not matter: <code>frozenset(["a", "b"])</code> equals <code>frozenset(["b", "a"])</code>.</p><p><strong>Serialise to a string</strong> &mdash; <code>json.dumps(obj, sort_keys=True)</code> &mdash; for nested structures. Works, and it is slow and fragile about key ordering and types.</p><p><strong>Use a canonical form.</strong> For dictionaries, <code>tuple(sorted(d.items()))</code> is the common conversion, assuming the values are themselves hashable.</p><p><strong>Use the object's id</strong> if identity rather than value is the right notion of "same". That is what the default hash does.</p><p>The general principle worth stating: <strong>if you need a mutable object as a key, what you actually need is an immutable snapshot of the parts that identify it.</strong></p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-this-appears-in-interviews">Why this appears in interviews</h3>
+                    <h3>Why this appears in interviews</h3>
                     <p>The question is a proxy for whether you understand hash tables rather than just use them. It tests four things:</p><p><strong>Do you know the mechanism?</strong> Hash determines slot, so a changing hash orphans the entry.</p><p><strong>Do you know the contract?</strong> Equal objects must hash equally.</p><p><strong>Do you know Python's safeguard?</strong> Defining <code>__eq__</code> alone removes <code>__hash__</code>.</p><p><strong>Can you produce the failure?</strong> Constructing the mutable-key bug is the difference between explanation and recitation.</p><p>It also connects to the practical questions asked alongside it &mdash; why <code>in</code> is slow on a list, how a dictionary works internally, and why strings are immutable. All four are the same underlying topic approached from different directions.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Why is a tuple hashable but a list not?</strong> Tuples are immutable, so their hash is stable. Lists are not.</p><p><strong>Can I hash a nested structure?</strong> Only if every part is hashable. A tuple containing a list is not.</p><p><strong>What if I define <code>__hash__</code> without <code>__eq__</code>?</strong> Legal &mdash; equality falls back to identity, so two equal-valued objects are different keys. Usually not what you want.</p><p><strong>Are custom objects hashable by default?</strong> Yes, by identity &mdash; two instances with the same field values are different keys.</p><p><strong>How do I make a class usable as a key?</strong> <code>@dataclass(frozen=True)</code>, or define <code>__eq__</code> and <code>__hash__</code> over the same fields.</p><p><strong>Does a bad <code>__hash__</code> break correctness or just speed?</strong> An <em>inconsistent</em> hash breaks correctness. A merely poor one that collides often only costs speed.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>The hash determines the slot, so a key whose hash could change would orphan its entry.</li><li>Hashable means a stable <code>__hash__</code> plus equality comparison &mdash; which in practice means immutable.</li><li>Equal objects must have equal hashes; equal hashes need not mean equal objects.</li><li>Defining <code>__eq__</code> without <code>__hash__</code> makes a class unhashable, deliberately.</li><li>Convert mutable keys to tuples or frozensets &mdash; an immutable snapshot of what identifies the object.</li></ul>
                 </div>
             </div>
@@ -488,7 +500,7 @@ except TypeError as e:
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

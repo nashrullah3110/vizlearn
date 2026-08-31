@@ -231,26 +231,29 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">A one-line change to the target that improves calibration, and the reason the loss no longer reaches zero.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-change">The change</h3>
+                    <h3>The problem with a hard target</h3>
+                    <p>Cross-entropy with a one-hot target asks the model to put probability 1 on the correct class and 0 on everything else.</p><p>Softmax cannot produce exactly 1. It approaches it as the correct logit runs away from the others, and reaches it only in the limit. So the target is unattainable, the gradient never vanishes, and training keeps pushing the logit gap wider for as long as you let it.</p><p>The consequences are familiar. The model becomes <strong>overconfident</strong>, reporting 0.99 on cases it gets wrong. It <strong>overfits</strong>, because widening logits on training examples is always an available way to reduce the loss. And it is <strong>badly calibrated</strong>, in exactly the way [the calibration module](../machine_learning/probability_calibration.html) measures.</p>
+                </div>
+                <div>
+                    <h3>The change</h3>
                     <p>Move a little probability off the correct class and spread it over the others:</p><pre><code>target[correct]  =  1 - eps + eps/K
 target[others]   =  eps/K</code></pre><p>Drag epsilon and watch the bars. At 0 you have the one-hot target. At 0.1 the true class asks for 0.91 and each of nine others asks for about 0.011.</p><p>That is the entire technique.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-it-fixes-the-problem">Why it fixes the problem</h3>
+                    <h3>Why it fixes the problem</h3>
                     <p>The readout gives the <strong>optimal logit gap</strong>: how far apart the logits have to be to match the target exactly.</p><p>At epsilon 0 it is infinite, which is the problem restated. At epsilon 0.1 it is a specific finite number, and once the model reaches it the gradient is zero. The model now has a reason to *stop*.</p><p>That is the mechanism. Not noise, not regularisation in the weight-decay sense &mdash; a reachable target where before there was none.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-loss-will-not-reach-zero">The loss will not reach zero</h3>
+                    <h3>The loss will not reach zero</h3>
                     <p>The readout also gives the minimum achievable loss, which is the entropy of the smoothed target.</p><p>A model matching the smoothed target perfectly still reports a loss around 0.5 at typical settings. This surprises people who expect training loss to approach zero, and it is not a bug: you changed what perfect means.</p><p>It also means training and validation losses are no longer comparable with runs that did not use smoothing. Compare accuracy, or compare like with like.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-it-buys-and-what-it-costs">What it buys, and what it costs</h3>
+                    <h3>What it buys, and what it costs</h3>
                     <p><strong>Better calibration.</strong> The headline benefit. Confidences become closer to observed accuracies.</p><p><strong>Better generalisation.</strong> Consistent small gains across image classification and translation. It was in the Inception-v3 paper and in the original Transformer, at 0.1 in both, and 0.1 has been the default ever since.</p><p><strong>Tighter class clusters.</strong> Representations of a class group more tightly, with more even distances between classes.</p><p>That last one has a cost. <strong>Label smoothing hurts distillation.</strong> A student learns from the teacher's full output distribution, and the informative part is the relative sizes of the *wrong* classes &mdash; that this dog was slightly cat and not at all lorry. Smoothing deliberately flattens exactly that, erasing what the student was supposed to learn. If a model is going to be a distillation teacher, train it without.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Epsilon too large.</strong> Past about 0.2 you are actively teaching the model that wrong answers are plausible, and accuracy falls. Drag it up and watch the target flatten.</p><p><strong>Comparing losses across runs.</strong> The floor moved.</p><p><strong>Using it on a teacher model.</strong> It removes the dark knowledge distillation depends on.</p><p><strong>Applying it to regression.</strong> It is a change to a categorical target and has no meaning without one.</p><p><strong>Expecting it to fix a badly calibrated model on its own.</strong> It helps; explicit [temperature scaling](../machine_learning/probability_calibration.html) on a validation set helps more, and the two combine.</p>
                 </div>
             </div>
@@ -308,7 +311,7 @@ target[others]   =  eps/K</code></pre><p>Drag epsilon and watch the bars. At 0 y
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

@@ -29,6 +29,7 @@ DIR_META = {
     "numpy": ("NumPy", "sigma"),
     "pandas": ("pandas", "table"),
     "matplotlib": ("matplotlib", "chart"),
+    "sklearn": ("scikit-learn", "sigma"),
     "interview": ("Interview", "interview"),
 }
 

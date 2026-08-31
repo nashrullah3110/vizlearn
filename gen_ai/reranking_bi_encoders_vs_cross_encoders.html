@@ -232,22 +232,25 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Spend the expensive model only on the candidates that survived the cheap one.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-two-stage-pattern">The two-stage pattern</h3>
+                    <h3>The idea in brief</h3>
+                    <p>A <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">bi-encoder</a> embeds the query and every document <em>separately</em>, ahead of time — that is what makes the embeddings precomputable and search fast, but it also means the model never looks at a query and a document together. A <strong>cross-encoder</strong> takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable.</p>
+                </div>
+                <div>
+                    <h3>The two-stage pattern</h3>
                     <p>Cross-encoders are far more accurate but cost too much to run over an entire corpus — a million documents means a million forward passes per query. The standard fix is two stages: a cheap bi-encoder (or BM25, or both) retrieves a shortlist of maybe 20-100 candidates, and only that shortlist is re-scored by the expensive cross-encoder, which then decides the final order. You pay the cross-encoder's cost dozens of times per query instead of millions of times.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-two-ways-to-score-a-query-against-a-document">Two ways to score a query against a document</h3>
+                    <h3>Two ways to score a query against a document</h3>
                     <p><strong>A bi-encoder</strong> embeds the query and the document <em>separately</em>, then compares the two vectors. Because documents can be embedded ahead of time, search is a fast vector comparison over a precomputed index.</p><p><strong>A cross-encoder</strong> takes the query and one document <em>together</em> as a single input and outputs a relevance score. The model attends across both, so every query term can interact with every document term &mdash; and nothing can be precomputed.</p><p class="mono-font">bi-encoder:&nbsp;&nbsp;&nbsp;score = cos(embed(q), embed(d))</p>
 <p class="mono-font">cross-encoder:&nbsp;score = model(q, d)</p><p>That structural difference produces the entire trade-off:</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>Bi-encoder</th><th>Cross-encoder</th></tr></thead><tbody><tr><td>Documents embedded in advance</td><td>Yes</td><td>No</td></tr><tr><td>Query cost</td><td>One embedding, then vector search</td><td>One model pass <em>per document</em></td></tr><tr><td>Scales to millions</td><td>Yes</td><td>No</td></tr><tr><td>Accuracy</td><td>Good</td><td>Substantially better</td></tr><tr><td>Interaction between q and d</td><td>None until the comparison</td><td>Full attention across both</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-the-two-stage-pipeline-exists">Why the two-stage pipeline exists</h3>
+                    <h3>Why the two-stage pipeline exists</h3>
                     <p>A cross-encoder over a million documents means a million model passes per query. Impossible.</p><p>A bi-encoder over a million documents is one embedding plus an indexed vector search. Milliseconds.</p><p>So the standard arrangement uses each for what it is good at:</p><ol><li><strong>Retrieve</strong> 50&ndash;100 candidates with the bi-encoder (and BM25, fused). Fast, broad, some noise.</li><li><strong>Rerank</strong> those candidates with the cross-encoder. Expensive per item, affordable on 50.</li><li><strong>Pass</strong> the top 3&ndash;10 to the model.</li></ol><p>The insight is that recall and precision can be separated. Stage one needs high recall &mdash; the right document must be <em>somewhere</em> in the 50. Stage two provides precision, ordering them accurately.</p><p>Measured on standard benchmarks, adding a cross-encoder reranker typically improves nDCG by 10&ndash;20% over dense retrieval alone. It is one of the highest-value additions to a RAG pipeline, and it is often skipped.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-in-code">In code</h3>
+                    <h3>In code</h3>
                     <pre><code class="language-python">from sentence_transformers import SentenceTransformer, CrossEncoder
 
 # stage 1: bi-encoder, over the whole index
@@ -263,27 +266,27 @@ scores = ce.predict(pairs)
 ranked = [c for _, c in sorted(zip(scores, candidates), reverse=True)][:5]</code></pre><p>Note the shapes: the bi-encoder embeds once and compares against a precomputed matrix; the cross-encoder receives 50 (query, document) pairs and returns 50 scores. The second call is where the latency is, and it is batched.</p><p>Rough latency for 50 candidates with a small cross-encoder on a GPU: 20&ndash;50ms. On a CPU, several hundred milliseconds &mdash; which is why reranker size is a real deployment decision.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-try-it-yourself">Try it yourself</h3>
+                    <h3>Try it yourself</h3>
                     <ol><li><strong>Read Stage 1.</strong> Pure cosine similarity over word overlap. One candidate about python <em>the snake</em> ranks deceptively high — it shares the words "python" and "memory" with the query, and a bi-encoder scoring query and document independently has no way to notice they mean something different in context.</li><li><strong>Turn on the reranker.</strong> The final order changes: the snake document drops sharply, and a genuinely on-topic document that Stage 1 under-ranked moves up. This is what "reading query and document together" catches that comparing two independent vectors cannot.</li><li><strong>Turn it back off.</strong> The order reverts to pure Stage 1 — the reranker did not change what was retrieved, only the order the survivors are returned in.</li><li><strong>Read the cost panel.</strong> The bi-encoder cost is already paid, before the query ever arrived. The cross-encoder cost is exactly the number of candidates it re-scores — six forward passes, not a million.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-worth-remembering">Worth remembering</h3>
+                    <h3>Worth remembering</h3>
                     <p>A bi-encoder scores query and document independently, which is what makes it fast enough to search a whole corpus but blind to interactions between them — a lexical coincidence can outrank a genuine match. A cross-encoder reads both together and catches that, at a cost that only scales with the shortlist, not the corpus. Two-stage retrieval — cheap and broad, then expensive and narrow — is how production search gets both speed and accuracy instead of choosing one.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-choosing-a-reranker">Choosing a reranker</h3>
+                    <h3>Choosing a reranker</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Option</th><th>Character</th></tr></thead><tbody><tr><td>MiniLM cross-encoder</td><td>Small, fast, strong baseline</td></tr><tr><td>Larger cross-encoders</td><td>Better, several times slower</td></tr><tr><td>Multilingual variants</td><td>When the corpus is not English</td></tr><tr><td>ColBERT (late interaction)</td><td>Between the two &mdash; token-level vectors, precomputable</td></tr><tr><td>LLM-as-reranker</td><td>Prompt a model to score relevance; flexible, expensive</td></tr></tbody></table></div><p><strong>ColBERT</strong> deserves a mention as the genuine middle ground. It stores a vector per <em>token</em> rather than per document, and scores by matching query tokens against document tokens at query time. That gives much of a cross-encoder's fine-grained interaction while keeping the document side precomputable &mdash; at the cost of a far larger index.</p><p><strong>LLM reranking</strong> &mdash; asking a language model to rate each candidate's relevance, or to order a list &mdash; is flexible and adapts to instructions, and it is slow and expensive enough that it is usually reserved for small candidate sets or offline evaluation.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-how-many-candidates-to-rerank">How many candidates to rerank</h3>
+                    <h3>How many candidates to rerank</h3>
                     <p>The parameter to tune, and it is a straight latency-versus-quality trade.</p><div class="vz-table-wrap"><table><thead><tr><th>Candidates</th><th>Effect</th></tr></thead><tbody><tr><td>10</td><td>Fast, and the reranker can only reorder what stage one already ranked highly</td></tr><tr><td>50</td><td>The usual choice &mdash; enough room to rescue a mid-ranked document</td></tr><tr><td>100&ndash;200</td><td>Better recall, noticeably slower</td></tr></tbody></table></div><p>The number to measure is stage one's <strong>recall@n</strong>: if recall@50 is 0.95 and recall@100 is 0.96, reranking 100 buys almost nothing. If recall@50 is 0.7, the bottleneck is retrieval, not ranking, and fixing chunking or adding hybrid search matters more than a bigger reranker.</p><p>That diagnostic ordering is worth stating plainly: <strong>reranking cannot recover a document that was never retrieved.</strong></p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Do I need a reranker?</strong> If retrieval quality limits your system and latency allows 20&ndash;50ms, it is one of the best available improvements.</p><p><strong>Can a cross-encoder replace the bi-encoder?</strong> Only on a very small corpus. It cannot be indexed.</p><p><strong>How many candidates should I rerank?</strong> 50 is the standard starting point; tune from measured recall.</p><p><strong>Is an LLM a good reranker?</strong> Effective and expensive. Use a purpose-trained cross-encoder for production paths.</p><p><strong>Does reranking help with the "lost in the middle" problem?</strong> Yes &mdash; it puts the most relevant chunk first, where the model attends to it most.</p><p><strong>Can I fine-tune a reranker?</strong> Yes, on (query, relevant, irrelevant) triples from your own data. It often beats a general model by a wide margin on a specific domain.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>A bi-encoder embeds query and document separately, so documents can be indexed and search is fast.</li><li>A cross-encoder reads both together, which is far more accurate and cannot be precomputed.</li><li>Use both: broad cheap retrieval for recall, then reranking for precision.</li><li>Rerank around 50 candidates; measure stage-one recall to know whether that is the bottleneck.</li><li>Reranking cannot rescue a document that retrieval never returned.</li></ul>
                 </div>
             </div>
@@ -404,7 +407,7 @@ ranked = [c for _, c in sorted(zip(scores, candidates), reverse=True)][:5]</code
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

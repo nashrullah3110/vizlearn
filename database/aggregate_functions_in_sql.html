@@ -304,25 +304,28 @@ FROM   readings;
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Five functions that collapse many rows into one, and the one behaviour they share that quietly changes your answers.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-count-and-count-col-are-different-functions">COUNT(*) and COUNT(col) are different functions</h3>
+                    <h3>Many rows in, one value out</h3>
+                    <p>An aggregate function takes a set of rows and returns a single value. With no <code>GROUP BY</code>, the set is the whole table; with one, it is each group in turn.</p><p>The five that matter are <code>COUNT</code>, <code>SUM</code>, <code>AVG</code>, <code>MIN</code> and <code>MAX</code>. Run the starter query and all five appear side by side over the same nine rows. The numbers do not agree with each other in the way you might expect, and the reason is NULL.</p>
+                </div>
+                <div>
+                    <h3>COUNT(*) and COUNT(col) are different functions</h3>
                     <p>This is the single most useful distinction on the page.</p><p><code>COUNT(*)</code> counts <strong>rows</strong>. It does not look at any column, cannot be affected by NULL, and answers "how many records are there".</p><p><code>COUNT(temp_c)</code> counts <strong>non-NULL values in that column</strong>. It answers "how many records actually have a reading".</p><p>The table has nine rows and four of them have no temperature. So <code>COUNT(*)</code> is 9 and <code>COUNT(temp_c)</code> is 5, and the gap between them is a free measure of missing data:</p><pre><code>SELECT COUNT(*) - COUNT(temp_c) AS missing FROM readings;</code></pre><p>That one line is worth reaching for whenever a column's quality is in question. It needs no subquery, no <code>IS NULL</code> filter and no second pass.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-everything-else-skips-null-silently">Everything else skips NULL silently</h3>
+                    <h3>Everything else skips NULL silently</h3>
                     <p><code>SUM</code>, <code>AVG</code>, <code>MIN</code> and <code>MAX</code> all ignore NULL. They do not fail, warn, or return NULL because a NULL was present &mdash; they behave as though those rows were not there.</p><p>For <code>SUM</code>, <code>MIN</code> and <code>MAX</code> this is almost always what you want. For <code>AVG</code> it is the thing that catches people, because <strong>AVG divides by the count of values, not the count of rows</strong>:</p><pre><code>AVG(temp_c)  =  SUM(temp_c) / COUNT(temp_c)</code></pre><p>Run the second variant. Three numbers appear that all have a claim to being "the average temperature", and they differ substantially:</p><div class="vz-table-wrap"><table><thead><tr><th>Expression</th><th>What it means</th></tr></thead><tbody><tr><td><code>AVG(temp_c)</code></td><td>mean of the readings that exist</td></tr><tr><td><code>AVG(COALESCE(temp_c, 0))</code></td><td>mean if a broken sensor means zero degrees</td></tr><tr><td><code>SUM(temp_c) / COUNT(*)</code></td><td>total spread across all rows including the broken ones</td></tr></tbody></table></div><p>Which is correct depends entirely on what NULL means in your data. If the sensor failed, the first is right and the others are nonsense &mdash; a broken sensor is not a reading of zero. If NULL means "no sales that day", the second may well be right. The database cannot decide this for you, and it will not ask.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-empty-group">The empty group</h3>
+                    <h3>The empty group</h3>
                     <p>Run the fourth variant. It restricts to the rows that have no reading at all, so there are four rows and zero values, and every aggregate has to say what it does with nothing.</p><p><code>COUNT(*)</code> is 4 and <code>COUNT(temp_c)</code> is 0, as expected. <code>SUM</code>, <code>AVG</code>, <code>MIN</code> and <code>MAX</code> all come back <strong>NULL</strong> &mdash; not zero, and not an error. The rule is that an aggregate over zero values returns NULL, and the single exception is <code>COUNT</code>, which returns 0 because counting nothing genuinely is zero.</p><p>This matters when an aggregate feeds arithmetic. <code>SUM(amount) * 1.2</code> over a group with no rows is NULL, and NULL propagates through every operation it touches until something wraps it in <code>COALESCE</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-group-by-and-the-shape-of-the-result">GROUP BY and the shape of the result</h3>
+                    <h3>GROUP BY and the shape of the result</h3>
                     <p>Adding <code>GROUP BY station</code> changes the result from one row to one row per station. The rule that follows is the one beginners trip on: every column in the <code>SELECT</code> list must either be aggregated or appear in the <code>GROUP BY</code>.</p><p>The reason is that the query has to produce exactly one value per group. Given three readings for <code>north</code>, there is no answer to "what is the id" &mdash; there are three, and the database will not choose one. Some engines historically allowed it and returned an arbitrary row, which is worse than an error because it works until it does not.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Using AVG on data where NULL means zero.</strong> The average silently rises. Use <code>COALESCE</code> when absence really is a zero.</p><p><strong>Assuming COUNT(col) is a faster COUNT(*).</strong> They answer different questions. On a nullable column they return different numbers.</p><p><strong>Filtering aggregates in WHERE.</strong> <code>WHERE COUNT(*) &gt; 5</code> is an error &mdash; <code>WHERE</code> runs before grouping, so no counts exist yet. That is what [HAVING](having_in_sql.html) is for.</p><p><strong>Forgetting that NULL breaks arithmetic.</strong> One NULL anywhere in an expression makes the whole expression NULL.</p>
                 </div>
             </div>
@@ -381,7 +384,7 @@ FROM   readings;
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

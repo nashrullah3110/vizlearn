@@ -454,55 +454,55 @@
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <div>
-                    <h3 id="vz-s-the-problem-it-solves">The problem it solves</h3>
+                    <h3>The problem it solves</h3>
                     <p>A <strong>relational database</strong> stores data in <strong>tables</strong> of rows and columns, where every table describes one kind of thing &mdash; customers, orders, products &mdash; and tables are connected by shared key values rather than by nesting data inside each other.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-keys-are-the-whole-trick">Keys are the whole trick</h3>
+                    <h3>Keys are the whole trick</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td>Primary key</td><td>Identifies a row uniquely; never NULL</td></tr><tr><td>Foreign key</td><td>Points at another table's primary key</td></tr><tr><td>Composite key</td><td>A primary key made of several columns</td></tr><tr><td>Candidate key</td><td>Any column set that could serve as primary</td></tr><tr><td>Surrogate key</td><td>An artificial id (integer or UUID) with no business meaning</td></tr><tr><td>Natural key</td><td>A real-world identifier, such as an ISBN or email</td></tr></tbody></table></div><p>The foreign key is what turns a pile of tables into a database. Declared properly, it makes an order pointing at a non-existent customer impossible &mdash; not unlikely, not caught by a validation function somewhere, but rejected by the engine for every client that ever connects.</p><p>Surrogate versus natural keys is one of the few genuinely contested design questions. Surrogate keys are stable (people change email addresses) and compact, so most schemas use them. The right answer is usually both: a surrogate primary key for references, plus a <code>UNIQUE</code> constraint on the natural key so the real-world rule is still enforced.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-split-the-data-at-all">Why Split the Data at All?</h3>
+                    <h3>Why Split the Data at All?</h3>
                     <p>Switch this lab to <strong>one flat table</strong> and look at the red cells. The customer's name and city now repeat on every order they ever placed. That redundancy causes three classic problems:</p><ul><li><strong>Update anomaly</strong> &mdash; changing a customer's name means finding and editing every copy. Miss one and your data now contradicts itself. Press the rename button in both models and compare the counts.</li><li><strong>Insertion anomaly</strong> &mdash; you cannot record a new customer until they place an order, because there is nowhere to put them.</li><li><strong>Deletion anomaly</strong> &mdash; deleting a customer's only order erases the customer entirely.</li></ul><strong>Normalisation</strong> is the process of splitting tables until each fact is stored exactly once. The cost is that answering a question often requires a <span class="mono-font">JOIN</span> &mdash; and that trade, correctness for a little query effort, is the central bargain of the relational model.
                 </div>
                 <div>
-                    <h3 id="vz-s-acid-the-other-half-of-the-promise">ACID: the other half of the promise</h3>
+                    <h3>ACID: the other half of the promise</h3>
                     <p>The relational model describes how data is arranged. ACID describes what happens when several people change it at once, and it is the reason banks and hospitals run on these systems.</p><ul><li><strong>Atomicity</strong> &mdash; a transaction happens completely or not at all. No half-finished transfer.</li><li><strong>Consistency</strong> &mdash; every constraint holds before and after. No orphaned rows.</li><li><strong>Isolation</strong> &mdash; concurrent transactions do not see each other's unfinished work.</li><li><strong>Durability</strong> &mdash; once committed, it survives a power cut.</li></ul><p>Together those guarantees mean the application does not have to reason about concurrency in the general case. Without them, every developer touching the system would have to get locking right, every time, for ever.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-tables-rows-and-the-idea-underneath">Tables, rows and the idea underneath</h3>
+                    <h3>Tables, rows and the idea underneath</h3>
                     <p>A relational database stores data in tables: rows are records, columns are attributes, and every row in a table has the same columns. That much is just a spreadsheet.</p><p>What makes it <em>relational</em> is that tables refer to each other by value rather than by pointer. An order does not contain a customer; it contains a customer <em>id</em>, and the database can follow that id to the customers table whenever asked. Nothing is nested, nothing is duplicated, and the connections are made at query time.</p><p>That design decision, from Edgar Codd's 1970 paper, is why the model has outlasted everything built to replace it. Because relationships are values rather than structure, you can ask questions nobody anticipated when the schema was designed &mdash; join any two tables on any matching columns, and the answer comes out. A system that stored orders inside customers would answer "orders per customer" instantly and "customers per product" only with a full rewrite.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-split-the-data-at-all-2">Why split the data at all</h3>
+                    <h3>Why split the data at all</h3>
                     <p>Splitting has an obvious cost: getting a customer's name onto their order list requires a join. The benefits are less obvious until something goes wrong without them.</p><p>Store the customer's city on every order and one customer moving house means updating hundreds of rows. Miss one and the database now contains two contradictory answers to the same question, with no way to tell which is right.</p><p>Store it once, in the customers table, and the update touches a single row. Everything that references that customer sees the new value immediately, because there is only one value.</p><p>This is the argument for normalisation in a sentence: <strong>each fact should be stored in exactly one place</strong>. The join is the price, and the database is extremely good at joins.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-exploration-guide">Exploration guide</h3>
+                    <h3>Exploration guide</h3>
                     <ol><li><strong>Click a customer row.</strong> Their orders light up in the orders table &mdash; that is the foreign key doing its job.</li><li><strong>Click an order.</strong> The single product it references is highlighted. One value, one link, no ambiguity.</li><li><strong>Switch to the flat table</strong> and watch the cell count rise while the number of tables drops to one. Every red cell is a duplicated fact.</li><li><strong>Run the rename in both models.</strong> Normalised: one cell changes. Flat: several &mdash; and every one is an opportunity to get it wrong.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-summing-up">Summing up</h3>
+                    <h3>Summing up</h3>
                     <p>Store each fact once, identify it with a primary key, and reference it with a foreign key. The database then enforces the relationships for you. Flattening everything looks simpler until the first time you have to change something.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-sql-and-why-it-survived">SQL, and why it survived</h3>
+                    <h3>SQL, and why it survived</h3>
                     <p>SQL is a <em>declarative</em> language: you describe the result you want, not the steps to produce it. <code>SELECT name FROM customers WHERE country = 'UK'</code> says nothing about indexes, scan order or join algorithms &mdash; the query planner decides all of that, and can change its mind as the data grows.</p><p>That separation is why a query written in 1995 still runs, and runs faster, on hardware and engines that did not exist then. It is also why two people write the same query differently and get the same plan.</p><p>The language is standardised (SQL:2023 is the current revision), and every engine adds its own extensions. The core &mdash; <code>SELECT</code>, joins, aggregation, transactions &mdash; is portable; date functions, string functions, upserts and window frame details are where dialects diverge.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-main-engines-briefly">The main engines, briefly</h3>
+                    <h3>The main engines, briefly</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Engine</th><th>Character</th></tr></thead><tbody><tr><td>PostgreSQL</td><td>Standards-compliant, extensible, strong JSON and geospatial support</td></tr><tr><td>MySQL / MariaDB</td><td>Ubiquitous in web hosting, fast simple reads, historically laxer about standards</td></tr><tr><td>SQLite</td><td>A single file, embedded in phones, browsers and applications everywhere</td></tr><tr><td>SQL Server</td><td>Microsoft's, deep integration with the .NET and Windows ecosystem</td></tr><tr><td>Oracle</td><td>Enterprise features and enterprise licensing</td></tr></tbody></table></div><p>SQLite deserves a mention beyond its size: it is probably the most widely deployed database in the world, and it is a full relational engine with transactions, constraints and window functions in a file you can email.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-relational-or-not">Relational or not?</h3>
+                    <h3>Relational or not?</h3>
                     <p>The honest comparison is not "relational versus NoSQL" but "which set of guarantees does this workload need".</p><p>Relational databases are the right default when your data has clear structure and relationships, when you need transactions across several records, when queries will be ad hoc and unpredictable, and when correctness matters more than raw write throughput. That covers the large majority of business applications.</p><p>Non-relational stores earn their place with genuinely schema-less documents, with write volumes that need horizontal sharding beyond what one node can serve, with key-value caching, with graph traversal many levels deep, and with time-series ingestion at enormous rates.</p><p>Note that the gap has narrowed from both sides. PostgreSQL stores and indexes JSON documents competently; several document databases now offer multi-document transactions. "Use the right tool" increasingly means "check whether the relational one already does it", because frequently it does.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Is a relational database slow?</strong> Not for the workloads it was designed for. A well-indexed PostgreSQL instance answers point queries in microseconds and handles tens of thousands of transactions a second on ordinary hardware.</p><p><strong>What does "relation" mean?</strong> The mathematical term for a table &mdash; a set of tuples &mdash; not the relationships between tables, which is the common assumption.</p><p><strong>Do I need to normalise everything?</strong> Normalise by default, denormalise deliberately for measured read paths. Starting denormalised because it might be faster is how schemas become unmaintainable.</p><p><strong>Can relational databases scale?</strong> Vertically, very far. Horizontally, with more effort &mdash; read replicas are straightforward, sharding writes is not. Managed distributed SQL systems now offer horizontal scaling with relational semantics.</p><p><strong>What is a view?</strong> A saved query that behaves like a table. It stores no data; it re-runs each time. A materialised view does store the result and needs refreshing.</p><p><strong>Is JSON in a relational database a mistake?</strong> Not when used for genuinely variable data such as event payloads or user preferences. It becomes one when you put fields you regularly filter and join on inside a JSON blob instead of in columns.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Data lives in tables; rows are records and columns are attributes.</li><li>Tables reference each other by value through foreign keys, which is what makes arbitrary joins possible.</li><li>Each fact is stored once, so an update happens in one place.</li><li>ACID transactions make concurrency the database's problem rather than yours.</li><li>SQL is declarative: you state the result, the planner chooses how.</li></ul>
                 </div>
             </div>
@@ -532,7 +532,7 @@
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

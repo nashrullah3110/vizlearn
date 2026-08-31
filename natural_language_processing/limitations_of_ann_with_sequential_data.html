@@ -499,55 +499,55 @@
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <div>
-                    <h3 id="vz-s-the-setup">The Setup</h3>
+                    <h3>The Setup</h3>
                     <p>A classic feed-forward network (ANN / MLP) is a brilliant function approximator — for <em>fixed-size, unordered</em> inputs. Sequential data violates both assumptions at once: sentences have different lengths, and their meaning lives in the ordering. The result is three distinct failure modes.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-limitation-1-the-input-layer-is-a-fixed-width-do">Limitation 1: The Input Layer is a Fixed-Width Door</h3>
+                    <h3>Limitation 1: The Input Layer is a Fixed-Width Door</h3>
                     <p>The first layer of an ANN has a hard-coded number of neurons. A 6-slot network offers exactly two bad options for real text: <strong>truncate</strong> longer inputs (information destroyed before learning even starts) or <strong>pad</strong> shorter ones with dummy values (the network wastes capacity learning to ignore filler). There is no third option — the architecture physically cannot stretch.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-limitation-2-order-blindness">Limitation 2: Order Blindness</h3>
+                    <h3>Limitation 2: Order Blindness</h3>
                     <p>The standard fixed-size representation for text — bag of words — counts word occurrences and discards positions. "Dog bites man" and "man bites dog" produce <strong>bit-for-bit identical vectors</strong>, so the network is mathematically incapable of distinguishing them, no matter how long you train. Whatever information lives in the ordering is gone before the first neuron fires.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-limitation-3-no-memory-between-inputs">Limitation 3: No Memory Between Inputs</h3>
+                    <h3>Limitation 3: No Memory Between Inputs</h3>
                     <p>Each forward pass is an island. When an ANN processes word 5, it retains nothing about words 1–4 unless they were crammed into the same fixed input. There is no persistent state that flows from one step to the next — which is precisely the thing a <strong>recurrent cell</strong> adds, carrying a hidden state h&#8348; forward through time.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-a-plain-network-cannot-do-with-a-sequence">What a plain network cannot do with a sequence</h3>
+                    <h3>What a plain network cannot do with a sequence</h3>
                     <p>A standard feed-forward network takes a fixed-size vector and produces an output. Text is not a fixed-size vector, and forcing it to be one costs three specific things.</p><p><strong>It cannot handle variable length.</strong> A network with 100 input units takes exactly 100 numbers. A 5-word sentence and a 500-word document cannot both be fed to it without padding to a fixed maximum &mdash; wasting most of the input on short texts and truncating long ones.</p><p><strong>It has no notion of order.</strong> Flatten "the dog bit the man" into 5 embedding vectors concatenated, and the network sees position 1, position 2 and so on as unrelated input slots. It can learn that slot 2 tends to hold a noun, and it learns nothing transferable about nouns at other positions.</p><p><strong>It shares nothing across positions.</strong> A pattern learned at position 3 has to be learned again, separately, at position 40. Every position needs its own examples, so the data requirement multiplies by the sequence length.</p><p>That third point is the deepest. It is the same argument as for convolution in images: without parameter sharing along the relevant axis, the model wastes capacity relearning the same thing.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-concrete-failure">The concrete failure</h3>
+                    <h3>The concrete failure</h3>
                     <p>Take sentiment classification on a fixed 100-word window with 300-dimensional embeddings. Flattened, that is 30,000 input values.</p><ul><li>A first hidden layer of 512 units needs 30,000 × 512 = <strong>15.4 million weights</strong>, for one layer, on a task a recurrent model handles with a few hundred thousand.</li><li>"Not good" appearing at words 3&ndash;4 and at words 60&ndash;61 are, to the network, two unrelated patterns in unrelated input slots.</li><li>A 12-word review pads to 100, so 88% of the input is filler, and the network must learn to ignore it.</li><li>A 200-word review is truncated, and the second half is simply unavailable.</li></ul><p>Every one of those is a structural consequence of treating an ordered variable-length sequence as a fixed-size vector.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-each-successor-fixes">What each successor fixes</h3>
+                    <h3>What each successor fixes</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Architecture</th><th>Fixes</th><th>By</th></tr></thead><tbody><tr><td>1-D CNN</td><td>Position sharing, some order</td><td>Sliding filters along the sequence</td></tr><tr><td>RNN</td><td>Variable length, order, sharing</td><td>One state carried step by step</td></tr><tr><td>LSTM / GRU</td><td>Long-range decay</td><td>Gated additive memory</td></tr><tr><td>Transformer</td><td>Range and parallelism</td><td>Attention plus positional encoding</td></tr></tbody></table></div><p>A <strong>1-D convolution</strong> is the smallest change that helps: a filter slides along the sequence, so a pattern learned anywhere applies everywhere, and the parameter count drops enormously. Its limit is the receptive field &mdash; a filter of width 5 sees five words, and reaching further needs depth.</p><p>An <strong>RNN</strong> processes one element at a time, carrying a state, so the same weights apply at every position and any length is accepted. Its limit is gradient decay over distance, and no parallelism.</p><p>A <strong>transformer</strong> makes every position one step from every other and computes them all simultaneously. Its limit is quadratic cost in length.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-experiments-to-try">Experiments to try</h3>
+                    <h3>Experiments to try</h3>
                     <ol><li><strong>Load the long sentence.</strong> The 9-word input overflows the 6 slots — the red strip shows words the network will simply never see.</li><li><strong>Load the short sentence.</strong> Now the network pads with &lt;PAD&gt; tokens — filler the model has to learn to ignore.</li><li><strong>Run the comparison.</strong> Both sentences produce the exact same bag-of-words vector — the "SAME VECTOR" verdict is the whole argument for sequence-aware models in one screenshot.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-short-of-it">The short of it</h3>
+                    <h3>The short of it</h3>
                     <p>ANNs don't fail on sequences because they are weak — they fail because their architecture makes three promises (fixed size, unordered input, stateless processing) that sequential data breaks. Recurrent networks are the structural fix: variable-length input consumed one step at a time, with a hidden state that remembers.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-a-plain-network-is-still-fine">Where a plain network is still fine</h3>
+                    <h3>Where a plain network is still fine</h3>
                     <p>The limitations are real and they are not universal. A feed-forward network on a fixed window is perfectly reasonable when:</p><ul><li><strong>The sequence has a genuinely fixed length</strong> &mdash; a sensor reading at 24 fixed hourly points, a form with a known number of fields.</li><li><strong>The features are engineered summaries</strong> rather than raw sequence. Mean, standard deviation, trend, min and max over a window turn a sequence into a small fixed vector, and a plain network or a gradient-boosted model on those features is often excellent.</li><li><strong>Order does not carry the signal</strong> &mdash; some classification tasks are genuinely bag-of-words problems.</li><li><strong>You want a baseline.</strong> TF-IDF plus logistic regression is a feed-forward model on a fixed vector, and it is a strong baseline for text classification.</li></ul><p>That second row is worth emphasising because it is the pragmatic answer in time-series work: windowing plus engineered features plus gradient boosting frequently beats a sequence model on business data with limited history, and it is far cheaper to build.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-parameter-sharing-principle">The parameter-sharing principle</h3>
+                    <h3>The parameter-sharing principle</h3>
                     <p>Stepping back, the same idea appears wherever a structure repeats:</p><div class="vz-table-wrap"><table><thead><tr><th>Domain</th><th>Repeats along</th><th>Shared by</th></tr></thead><tbody><tr><td>Images</td><td>Space</td><td>Convolution filters</td></tr><tr><td>Sequences</td><td>Time</td><td>Recurrent weights</td></tr><tr><td>Sequences</td><td>Position</td><td>Transformer layers</td></tr><tr><td>Graphs</td><td>Nodes</td><td>Message functions</td></tr></tbody></table></div><p>In each case the model encodes an assumption: that a pattern is equally meaningful wherever it occurs. That assumption is what reduces the parameter count and the data requirement, and it is exactly what a plain feed-forward network lacks along the sequence axis.</p><p>When the assumption is false &mdash; when absolute position genuinely matters &mdash; sharing hurts, which is why transformers need explicit positional encodings and why some vision tasks use locally-connected layers without sharing.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Can I just pad everything to a fixed length?</strong> You can, and you inherit wasted capacity on short inputs, truncation on long ones, and no sharing across positions.</p><p><strong>Is a 1-D CNN good enough for text?</strong> Often, for classification. It is fast and captures local phrases well. It cannot reach across a document the way attention can.</p><p><strong>Why do transformers need positional encodings if they handle sequences?</strong> Attention itself is order-blind &mdash; it computes a weighted mixture over a set. Position has to be injected separately.</p><p><strong>Do I always need a sequence model for time series?</strong> No. Windowing plus engineered features plus gradient boosting is a strong and often superior baseline.</p><p><strong>What about very long documents?</strong> Chunk them, embed each chunk, and pool or retrieve &mdash; or use a long-context model. Feeding 50,000 tokens to a standard transformer is expensive.</p><p><strong>Is order always important?</strong> No. For topic classification, bag-of-words often suffices. For anything involving negation, syntax or reasoning, it is essential.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>A plain network needs fixed-size input, so sequences must be padded or truncated.</li><li>It treats each position as an unrelated input slot, so patterns are not shared across positions.</li><li>The parameter count explodes: a flattened 100-word window into 512 units is 15 million weights.</li><li>Convolutions share along position; RNNs carry a state; transformers attend across all positions.</li><li>Fixed-length or well-summarised sequences are still legitimate feed-forward problems.</li></ul>
                 </div>
             </div>
@@ -576,7 +576,7 @@
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

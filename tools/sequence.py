@@ -539,6 +539,9 @@ SEQUENCE = {
         "matplotlib/layout_and_spacing.html",
         "matplotlib/common_mistakes.html",
     ],
+    "sklearn": [
+        "sklearn/what_is_scikit_learn.html",
+    ],
     "pydantic": [
         "pydantic/what_is_pydantic.html",
         "pydantic/your_first_basemodel.html",

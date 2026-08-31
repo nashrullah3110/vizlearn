@@ -300,6 +300,26 @@ TOPICS = {
             "shows it under the output, so a change to a line is a change you see.",
         ],
     },
+    "sklearn": {
+        "dir": "sklearn",
+        "title": "scikit-learn",
+        "h1": "scikit-learn, by Fitting It",
+        "lead": "One interface, the models behind it, and the evaluation that "
+                "stops you believing a number that is not real - every example "
+                "fitted on the page.",
+        "keywords": "scikit-learn tutorial, sklearn pipeline, train test split, "
+                    "cross validation, standardscaler, gridsearchcv, data leakage, "
+                    "python machine learning",
+        "intro": [
+            "scikit-learn has one interface and about two hundred algorithms "
+            "behind it. fit, predict and transform are most of the API, and once "
+            "they are familiar a new model is a new import and nothing else.",
+            "The harder half is not the models but knowing whether a score is "
+            "real. This track spends as much time on splitting, cross-validation, "
+            "pipelines and leakage as on the estimators, because that is where "
+            "the mistakes are. Every editor fits a real model in your browser.",
+        ],
+    },
     "interview": {
         "dir": "interview",
         "title": "Interview Questions",
@@ -326,7 +346,7 @@ TOPICS = {
 
 # Display order on the hub and in the footer.
 TOPIC_ORDER = ["maths", "ml", "dl", "dsa", "nlp", "computer-vision", "db",
-               "gen-ai", "python", "pydantic", "fastapi", "numpy", "pandas", "matplotlib", "interview"]
+               "gen-ai", "python", "pydantic", "fastapi", "numpy", "pandas", "matplotlib", "sklearn", "interview"]
 
 DIR_TO_TOPIC = {t["dir"]: k for k, t in TOPICS.items()}
 

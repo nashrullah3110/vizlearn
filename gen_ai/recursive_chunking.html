@@ -290,37 +290,40 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">What is recursive character chunking, and why is it the default?</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-separator-list-is-the-whole-configuration">The separator list is the whole configuration</h3>
+                    <h3>Why not just split every N characters</h3>
+                    <p>Fixed-size splitting is one line and cuts wherever it lands &mdash; mid-sentence, mid-word, mid-number. The retrieved chunk then starts halfway through a thought, and the generator has to answer from a fragment.</p><p>Recursive splitting keeps the size limit and spends it on the best boundary available. Chunks vary in length, which is fine: a chunk is a unit of meaning, not a unit of storage.</p>
+                </div>
+                <div>
+                    <h3>The separator list is the whole configuration</h3>
                     <p>The default is roughly <code>["\n\n", "\n", ". ", " ", ""]</code> &mdash; paragraph, line, sentence, word, character. It descends only when a piece still exceeds the limit, so the last entry fires only on text with no whitespace at all.</p><p>Change the list to match the document type. Code wants <code>["\nclass ", "\ndef ", "\n\n"]</code>; Markdown wants heading markers first. That is the cheapest large improvement available to a RAG pipeline, and it is usually left at the default.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-overlap-and-what-it-costs">Overlap, and what it costs</h3>
+                    <h3>Overlap, and what it costs</h3>
                     <p>Chunks usually overlap by 10&ndash;20% so a sentence spanning a boundary appears whole in at least one of them. The cost is real: overlap inflates the index, and duplicated text means near-identical chunks compete in the results, crowding out genuinely different ones.</p><p>Recursive chunking is the right default and it is still structure-blind &mdash; it does not know a heading from a sentence. That is what the structure-aware and semantic variants address.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-choosing-the-size-and-why-there-is-no-default">Choosing the size, and why there is no default</h3>
+                    <h3>Choosing the size, and why there is no default</h3>
                     <p>Chunk size is a trade between two failures. Too small and a chunk lacks the context to be understood alone &mdash; a sentence about "the second condition" without the first. Too large and the chunk covers several topics, so its embedding is an average of all of them and matches none precisely, while also burning context budget on material the query did not need.</p><p>The useful framing is that a chunk should be <strong>one retrievable idea</strong>. For dense prose that is often a paragraph, 200&ndash;500 tokens. For reference material with short entries it is much smaller. For code it is a function, whatever that costs in tokens.</p><p>Do not pick from a blog post. Build a small evaluation set of real questions, measure <a href="recall_at_k.html">recall@k</a> at three or four sizes, and take the winner. The difference between 200 and 800 tokens on a real corpus is routinely larger than the difference between two embedding models.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-overlap-and-the-deduplication-it-forces">Overlap, and the deduplication it forces</h3>
+                    <h3>Overlap, and the deduplication it forces</h3>
                     <p>Overlap exists because a boundary can fall mid-argument however carefully it is chosen. Repeating the last 10&ndash;20% of each chunk at the start of the next means a straddling sentence appears whole somewhere.</p><p>It costs more than index size. Overlapping chunks are near-duplicates, so a query matching the overlapped region retrieves both, and your top 5 is really a top 3 with two copies. That crowds out genuinely different evidence, and it is the reason <a href="maximal_marginal_relevance.html">maximal marginal relevance</a> and other diversity-aware selection strategies exist.</p><p>If overlap is doing a lot of work for you, that is usually a signal the separators are wrong rather than that more overlap is needed. Fixing the boundaries is cheaper than paying for redundancy on every query.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-tuning-the-separator-list-per-format">Tuning the separator list per format</h3>
+                    <h3>Tuning the separator list per format</h3>
                     <p>The default list &mdash; paragraph, line, sentence, word, character &mdash; assumes prose. Changing it for the document type is the single cheapest improvement available, and it is almost always left alone.</p><p><strong>Code:</strong> lead with <code>\nclass </code>, <code>\ndef </code>, <code>\n\n</code>, so a function stays whole and a chunk is a unit someone could actually read.</p><p><strong>Markdown:</strong> lead with heading markers, which turns the recursive splitter into a cheap approximation of <a href="structure_aware_chunking.html">structure-aware chunking</a>.</p><p><strong>Transcripts:</strong> split on speaker turns before sentences, so a chunk holds one person's contribution rather than half of two.</p><p><strong>CSV and logs:</strong> split on lines and never below, because a half-row is meaningless.</p><p>Every one of these is a few characters of configuration against an embedding-model migration, and they routinely produce more improvement.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-splitting-on-the-largest-natural-boundary-that-f">Splitting on the largest natural boundary that fits</h3>
+                    <h3>Splitting on the largest natural boundary that fits</h3>
                     <p>Fixed-size chunking cuts at character 500 whatever is there &mdash; mid-sentence, mid-word, between a heading and its content. Recursive chunking fixes that with one idea: try a list of separators in order, from coarsest to finest, and use the largest unit that fits the size limit.</p><p>The default separator list, in order:</p><p class="mono-font">["\n\n", "\n", ". ", " ", ""]</p><p>Paragraph break, then line break, then sentence end, then word boundary, then individual characters as a last resort.</p><p>The algorithm: try to split the text on the first separator. If the resulting pieces are all within the size limit, done. If a piece is still too large, recurse into it with the <em>next</em> separator. The empty string at the end guarantees termination &mdash; a 600-character word will be cut, because it has to be.</p><p>That is the whole method, and it is the sensible default for almost every corpus. It costs nothing extra, respects natural boundaries the vast majority of the time, and degrades gracefully.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-boundaries-matter">Why boundaries matter</h3>
+                    <h3>Why boundaries matter</h3>
                     <p>A chunk cut mid-sentence damages retrieval in two specific ways.</p><p><strong>The embedding is of a fragment.</strong> "the entitlement is 39 weeks provided that the employee has completed two years of" is a partial thought, and its vector is correspondingly muddled &mdash; it does not sit where either complete idea would sit.</p><p><strong>The retrieved text is unusable.</strong> Even if it matches, passing a truncated sentence to the model means the answer is incomplete, or the model completes it from imagination.</p><p>Compare with a chunk that ends at a paragraph break: complete thoughts, a sharp embedding, and text that can be quoted.</p><div class="vz-table-wrap"><table><thead><tr><th>Split at</th><th>Chunk quality</th></tr></thead><tbody><tr><td>Character count</td><td>Fragments, broken words</td></tr><tr><td>Word boundary</td><td>Complete words, broken sentences</td></tr><tr><td>Sentence end</td><td>Complete sentences, possibly mid-topic</td></tr><tr><td>Paragraph break</td><td>Complete thoughts &mdash; the target</td></tr><tr><td>Section heading</td><td>Complete topics &mdash; better still</td></tr></tbody></table></div><p>Recursive splitting reaches for the highest row it can.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-size-and-overlap">Size and overlap</h3>
+                    <h3>Size and overlap</h3>
                     <pre><code class="language-python">from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 splitter = RecursiveCharacterTextSplitter(
@@ -332,31 +335,31 @@ splitter = RecursiveCharacterTextSplitter(
 chunks = splitter.split_text(document)</code></pre><p><strong>Size</strong> is a compromise between context and precision. 200&ndash;500 tokens (roughly 800&ndash;2,000 characters) is the usual range. Too small and the chunk lacks context; too large and the embedding averages over several topics.</p><p><strong>Overlap</strong> of 10&ndash;20% means consecutive chunks share their boundary text, so a sentence spanning a split appears whole in at least one chunk. The cost is duplicated storage and occasionally two near-identical results, which deduplication or MMR handles.</p><p>One detail that catches people: <strong>character count is not token count</strong>. <code>chunk_size=1000</code> in characters is roughly 250 tokens for English prose and considerably fewer for code or non-Latin scripts. If the downstream constraint is a token budget, measure in tokens &mdash; most splitters accept a token-counting length function.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-things-to-try">Things to try</h3>
+                    <h3>Things to try</h3>
                     <ol><li>Drop the <strong>chunk size</strong> to 60. More pieces fall through to sentence and then word level, and chunks start ending mid-sentence.</li><li>Switch <strong>separators</strong> to <em>fixed size</em>. Every boundary lands wherever the character count ran out &mdash; watch the mid-sentence count climb.</li><li>Raise the size to 260 with recursive separators. One chunk holds the whole passage, which retrieves as a single coarse unit.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-to-remember">What to remember</h3>
+                    <h3>What to remember</h3>
                     <p>Recursive chunking splits on the largest natural boundary that fits, descending through a priority list of separators only when a piece is still oversized. The separator list is the whole configuration, and tailoring it to the document type is the cheapest large improvement available to a RAG pipeline.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-custom-separators-for-real-formats">Custom separators for real formats</h3>
+                    <h3>Custom separators for real formats</h3>
                     <p>The default list is tuned for prose. Other content wants different boundaries, and specifying them is where most of the available improvement lies.</p><p><strong>Markdown:</strong></p><p class="mono-font">["\n## ", "\n### ", "\n\n", "\n", ". ", " ", ""]</p><p>Headings first, so a section stays whole where possible.</p><p><strong>Code:</strong></p><p class="mono-font">["\nclass ", "\ndef ", "\n\n", "\n", " ", ""]</p><p>Class and function boundaries first. A half-function is not retrievable knowledge, and this ordering keeps definitions intact.</p><p><strong>HTML:</strong> strip tags first, or use a splitter that understands the tag structure. Splitting raw HTML on newlines produces chunks full of markup.</p><p><strong>Transcripts:</strong> split on speaker turns (<code>"\nSpeaker: "</code>) before paragraphs.</p><p><strong>Legal text:</strong> section and clause numbering (<code>"\nSection "</code>, <code>"\n("</code>) carries the structure.</p><p>Most splitter libraries ship language-aware variants for common programming languages, which encode exactly this idea.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-sits-among-the-strategies">Where it sits among the strategies</h3>
+                    <h3>Where it sits among the strategies</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Strategy</th><th>Cost</th><th>Quality</th></tr></thead><tbody><tr><td>Fixed size</td><td>Lowest</td><td>Poor &mdash; broken sentences</td></tr><tr><td>Recursive</td><td>Lowest</td><td>Good &mdash; the sensible default</td></tr><tr><td>Structure-aware</td><td>Low</td><td>Better where markup exists</td></tr><tr><td>Semantic</td><td>High &mdash; an embedding per sentence</td><td>Best on unstructured prose</td></tr><tr><td>Parent-child</td><td>Moderate</td><td>Best of precision and context</td></tr></tbody></table></div><p>Recursive chunking is the right starting point because it is nearly free and captures most of the benefit. The upgrades worth considering after it:</p><p><strong>Structure-aware</strong> if the documents have real headings &mdash; use them, and prepend the heading path to each chunk so it carries context.</p><p><strong>Parent-child</strong> if chunks need to be small for precision and large for context. Index small, return the parent section.</p><p><strong>Semantic</strong> only if the documents are continuous prose with no usable structure, and only after measuring that chunking is genuinely the bottleneck.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-common-mistakes">Common mistakes</h3>
+                    <h3>Common mistakes</h3>
                     <ul><li><strong>Confusing characters with tokens,</strong> so chunks are four times smaller than intended.</li><li><strong>No overlap,</strong> so a sentence spanning a boundary is lost from both chunks.</li><li><strong>Too much overlap</strong> (50%+), which duplicates storage and fills results with near-identical chunks.</li><li><strong>Using prose separators on code,</strong> splitting functions in half.</li><li><strong>Splitting tables,</strong> which destroys them. Extract tables separately and keep each whole.</li><li><strong>Not storing the source and position,</strong> so citations cannot be produced later.</li><li><strong>Chunking before cleaning,</strong> so boilerplate and navigation text become chunks.</li></ul>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>What chunk size should I use?</strong> Start at 300&ndash;500 tokens with 15% overlap, then evaluate recall@k on your own question set.</p><p><strong>Is recursive chunking better than semantic?</strong> Cheaper and frequently comparable on structured documents. Semantic wins on unstructured prose &mdash; measure rather than assume.</p><p><strong>Should overlap be characters or sentences?</strong> Either. Sentence-based overlap is cleaner because it never cuts mid-thought.</p><p><strong>How do I handle very long paragraphs?</strong> The recursion handles it &mdash; it falls through to sentence and then word boundaries.</p><p><strong>Can chunk sizes vary within one index?</strong> Yes, and it is often right: a table or a function is one chunk whatever its length.</p><p><strong>Does the separator order matter?</strong> Substantially. It encodes which boundaries you consider most important, and putting headings first is usually the largest single improvement.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Try separators from coarsest to finest, taking the largest unit that fits &mdash; paragraphs, then lines, then sentences, then words.</li><li>The empty separator at the end guarantees termination on pathological input.</li><li>200&ndash;500 tokens with 10&ndash;20% overlap covers most corpora.</li><li>Customise the separator list for the format: headings for Markdown, <code>def</code>/<code>class</code> for code, speaker turns for transcripts.</li><li>Measure in tokens if the downstream budget is tokens, and store source and position for citations.</li></ul>
                 </div>
             </div>
@@ -416,7 +419,7 @@ chunks = splitter.split_text(document)</code></pre><p><strong>Size</strong> is a
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

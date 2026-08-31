@@ -239,21 +239,24 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Index the needle, return the haystack it came from.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-searching-one-thing-returning-another">Searching one thing, returning another</h3>
+                    <h3>The problem it solves</h3>
+                    <p><a href="chunking_strategies_for_rag.html" style="color: var(--accent-primary)">Chunking</a> forces a trade-off. A small chunk concentrates the query's terms, so its similarity score is high and the match is precise &mdash; but on its own it may be a fragment that answers nothing. A large chunk carries the surrounding context that makes an answer possible, but dilutes the matching terms among hundreds of unrelated words, so it scores worse and may not be retrieved at all.</p>
+                </div>
+                <div>
+                    <h3>Searching one thing, returning another</h3>
                     <p>A parent document retriever refuses the trade. It splits each document into small <strong>child chunks</strong> and indexes only those, so retrieval is as precise as small chunks allow. But when a child chunk wins, what gets passed to the model is the <strong>parent</strong> it came from. The score decides <em>which</em> document is relevant; the parent decides <em>how much text</em> the model sees. Two chunks from the same parent collapse to one passage, so the context window is not spent sending the same document twice.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-chunk-size-dilemma-and-a-way-out-of-it">The chunk-size dilemma, and a way out of it</h3>
+                    <h3>The chunk-size dilemma, and a way out of it</h3>
                     <p>Chunking forces a compromise. Small chunks embed precisely &mdash; a 100-token passage is about one thing, so its vector is sharp. Large chunks carry context &mdash; the paragraph that explains what "this" refers to.</p><p>You cannot have both from one chunk size. The parent document retriever resolves it by using <strong>different units for retrieval and for generation</strong>.</p><p><strong>Index small.</strong> Split documents into child chunks of 100&ndash;200 tokens and embed those. Retrieval operates on them, so matching is precise.</p><p><strong>Return large.</strong> Each child records which parent section it came from. When a child matches, fetch and return the parent &mdash; 800&ndash;2,000 tokens of surrounding context &mdash; and pass that to the model.</p><p class="mono-font">query &rarr; match a 150-token child &rarr; return its 1,000-token parent &rarr; into the prompt</p><p>So precision comes from the small unit and context from the large one, with no compromise between them.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-it-works">Why it works</h3>
+                    <h3>Why it works</h3>
                     <p>Consider a handbook section on parental leave. Somewhere in it: "Employees with two years' service are entitled to 39 weeks."</p><p><strong>Indexed as one 2,000-token section:</strong> the embedding averages over pay, notice periods, eligibility, forms and return-to-work arrangements. A query about "39 weeks entitlement" matches weakly, because that sentence is 2% of the vector.</p><p><strong>Indexed as 150-token children:</strong> one child is almost entirely about entitlement duration. The query matches it strongly.</p><p><strong>But that child alone</strong> may not say which type of leave it refers to, or that the two-year condition is measured at a particular date. The parent does.</p><p>Retrieving the child and returning the parent gets both. This is the same reasoning behind sentence-window retrieval, at a coarser granularity.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-deduplication-and-the-detail-people-miss">Deduplication, and the detail people miss</h3>
+                    <h3>Deduplication, and the detail people miss</h3>
                     <p>Several children frequently match the same parent &mdash; a query about parental leave may match three passages within one section.</p><p>Without deduplication, the same parent is returned three times, consuming the context budget and telling the model nothing new. Worse, it displaces other parents that would have added information.</p><p>So the retrieval step must:</p><ol><li>Search over children and take the top k.</li><li>Map each to its parent id.</li><li><strong>Deduplicate by parent id</strong>, keeping the best child's score.</li><li>Return the distinct parents, ordered by that score.</li></ol><p>That means retrieving more children than the number of parents you want &mdash; ask for 20 children to end up with 5 distinct parents. A common implementation mistake is retrieving 5 children and returning 2 parents, silently halving the context passed to the model.</p><pre><code class="language-python">def retrieve_parents(query, k_children=20, n_parents=5):
     children = child_index.search(query, k=k_children)
     seen, parents = set(), []
@@ -266,31 +269,31 @@
     return parents</code></pre>
                 </div>
                 <div>
-                    <h3 id="vz-s-guided-experiments">Guided experiments</h3>
+                    <h3>Guided experiments</h3>
                     <ol><li><strong>Read the child list at chunk size 8.</strong> The winning chunk is a short fragment. Read it alone and ask whether it actually answers the question &mdash; it names a duration but not what the duration applies to.</li><li><strong>Turn off "Return the parent".</strong> The model now receives only those fragments. The word count drops sharply, and so does the chance of a usable answer.</li><li><strong>Turn it back on and watch the passage count.</strong> Two separate child chunks hit the same document, but only one parent passage is returned &mdash; the deduplication is doing real work.</li><li><strong>Drag the chunk size up to 24.</strong> Each child is now most of its parent. The top score actually goes <em>up</em> &mdash; a longer window catches more of the query's words &mdash; but the selection gets worse: the second slot now goes to a different product's document, and the model is sent 53 words instead of 29 for the same question.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-summing-up">Summing up</h3>
+                    <h3>Summing up</h3>
                     <p>Precision of retrieval and sufficiency of context are different requirements, and chunk size cannot satisfy both at once. Indexing small children while returning their parents lets the score come from the tightest possible match and the context come from the whole document. The cost is a larger prompt, which is why deduplicating parents matters: without it, three good chunks from one document would send that document three times.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-choosing-the-two-sizes">Choosing the two sizes</h3>
+                    <h3>Choosing the two sizes</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Level</th><th>Typical size</th><th>Purpose</th></tr></thead><tbody><tr><td>Child</td><td>100&ndash;250 tokens</td><td>Precise embedding and matching</td></tr><tr><td>Parent</td><td>600&ndash;2,000 tokens</td><td>Context for the model</td></tr></tbody></table></div><p>The ratio matters more than the absolute numbers. A parent roughly 5&ndash;10&times; the child is the usual arrangement.</p><p>Two sensible ways to define the parent:</p><p><strong>Structural.</strong> The parent is a real section &mdash; a Markdown heading's content, an HTML section, a chapter. Semantically coherent by construction, and variable in size.</p><p><strong>Fixed-window.</strong> The parent is a fixed number of tokens centred on the child. Predictable sizes, and it may cut across topic boundaries.</p><p>Structural parents are better where the documents have structure, which most real corpora do. Store the heading path with each parent and prepend it, so the model knows where in the document the passage sits.</p><p>A related variant, <strong>sentence-window retrieval</strong>, indexes single sentences and returns the two or three either side. Same idea, finer granularity, and it suits question answering where the answer is one sentence but its meaning depends on its neighbours.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-costs-and-trade-offs">Costs and trade-offs</h3>
+                    <h3>Costs and trade-offs</h3>
                     <p><strong>Storage.</strong> Both levels are stored &mdash; children as vectors in the index, parents as text in a document store. The parents are usually kept outside the vector index, since they are fetched by id rather than searched.</p><p><strong>Context budget.</strong> Parents are large, so fewer fit. Five 1,000-token parents is 5,000 tokens before the question and instructions. That is the real constraint, and it is why parent size and the number returned must be chosen together.</p><p><strong>Redundancy.</strong> Overlapping parents can repeat content. Structural parents avoid most of this; fixed windows do not.</p><p><strong>Complexity.</strong> Two stores to keep consistent. When a document changes, both its children and its parent must be updated, and a partial update leaves children pointing at stale parents.</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>Flat chunking</th><th>Parent-child</th></tr></thead><tbody><tr><td>Retrieval precision</td><td>Compromise</td><td>High</td></tr><tr><td>Context completeness</td><td>Compromise</td><td>High</td></tr><tr><td>Storage</td><td>One store</td><td>Two stores</td></tr><tr><td>Context tokens used</td><td>Moderate</td><td>Higher</td></tr><tr><td>Implementation</td><td>Simple</td><td>Moderate</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-when-it-helps-most">When it helps most</h3>
+                    <h3>When it helps most</h3>
                     <p><strong>Long structured documents</strong> &mdash; handbooks, manuals, legal texts, standards. The structure gives natural parents and the length makes flat chunking painful.</p><p><strong>Questions whose answers need surrounding context</strong> to be interpreted &mdash; conditions, exceptions, definitions that appear earlier in the section.</p><p><strong>Corpora with heavy cross-referencing</strong>, where a passage says "as described above".</p><p>Where it helps least: short documents that are already about one thing (FAQ entries, product descriptions, support tickets), where the whole document is a reasonable chunk and the extra machinery buys nothing.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Is this the same as sentence-window retrieval?</strong> The same pattern at a different granularity &mdash; sentence windows index single sentences and expand by neighbours; parent-child indexes small chunks and returns sections.</p><p><strong>How many children should I retrieve?</strong> Enough that deduplication still leaves the number of parents you want &mdash; typically 3&ndash;5&times; as many.</p><p><strong>Should parents overlap?</strong> Usually not, if they are structural sections. Overlapping fixed windows waste context.</p><p><strong>Can I rerank?</strong> Yes, and rerank the <em>children</em> before mapping to parents &mdash; the child is the unit whose relevance you measured.</p><p><strong>Does it work with hybrid search?</strong> Yes. Run both retrievers over the children, fuse the ranks, then map to parents.</p><p><strong>What if a parent is enormous?</strong> Cap it, or introduce a middle level. A 10,000-token parent defeats the purpose by filling the context.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Index small chunks for precise matching; return their larger parent sections for context.</li><li>It removes the chunk-size compromise rather than splitting the difference.</li><li>Deduplicate by parent id, and retrieve several times more children than the parents you need.</li><li>Structural parents (sections) beat fixed windows where documents have structure.</li><li>Best on long structured documents; unnecessary on short self-contained ones.</li></ul>
                 </div>
             </div>
@@ -454,7 +457,7 @@
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

@@ -4458,6 +4458,14 @@ window.VIZLEARN_MODULES = [
   "topic": "pandas",
   "icon": "table",
   "desc": ""
+ },
+ {
+  "title": "fit, predict, transform",
+  "path": "sklearn/what_is_scikit_learn.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
  }
 ];
 

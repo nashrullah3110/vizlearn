@@ -292,25 +292,28 @@ ORDER  BY shard, id;
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The last resort of scaling, what it buys, and the four things it takes away.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-shard-key">The shard key</h3>
+                    <h3>What it is</h3>
+                    <p>Sharding splits a dataset across independent database servers. Each <strong>shard</strong> holds a subset of the rows and knows nothing about the others.</p><p>The distinction from [partitioning](partitioning_in_databases.html) is the machine boundary, and it is the whole difficulty. Partitions share a query planner, a transaction manager and a lock table. Shards share nothing, so anything that needed a global view has to be rebuilt in the application or given up.</p>
+                </div>
+                <div>
+                    <h3>The shard key</h3>
                     <p>One column decides where a row lives. Usually the key is hashed and the remainder taken modulo the shard count, so a routing rule might be <code>shard = hash(customer_id) % 4</code>.</p><p>The query above computes exactly that for a set of customers, and the variants show what different access patterns cost.</p><p>The consequence is stark and worth stating as a rule:</p><p><strong>A query that names the shard key touches one node. A query that does not touches all of them.</strong></p><p>A lookup by <code>customer_id</code> is a single-node request and stays fast as the fleet grows. A report grouped by <code>product_id</code> has to be sent to every shard and the partial results merged &mdash; a *scatter-gather*, whose latency is the slowest shard's, not the average.</p><p>So the shard key is not a schema detail. It is a decision about which queries stay cheap forever and which never will, and it is extremely expensive to change afterwards.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-you-give-up">What you give up</h3>
+                    <h3>What you give up</h3>
                     <p><strong>Cross-shard joins.</strong> Customers on shard 1, orders on shard 3, and no engine can join them. Either the join moves into the application, or related data is deliberately placed together &mdash; sharding orders by <code>customer_id</code> so a customer's orders live beside them.</p><p><strong>Global uniqueness.</strong> <code>UNIQUE(email)</code> cannot be enforced across independent servers. The usual answers are a separate lookup service that owns emails, or generating ids that are unique by construction &mdash; UUIDs, or Snowflake-style ids with a shard number embedded.</p><p><strong>Cross-shard transactions.</strong> ACID stops at the shard boundary. Spanning shards means two-phase commit, which is slow and introduces a coordinator that can fail mid-protocol, or sagas, which are eventually consistent with explicit compensation. Most teams design so that transactions never span shards.</p><p><strong><code>AUTO_INCREMENT</code>.</strong> Every shard would start at 1. Ids must come from elsewhere.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-rebalancing">Rebalancing</h3>
+                    <h3>Rebalancing</h3>
                     <p>Adding a shard when the rule is <code>hash(key) % 4</code> changes it to <code>% 5</code>, and almost every row's destination moves. Migrating the whole dataset while serving traffic is the single worst part of operating a sharded system.</p><p>Two designs avoid it. <strong>Consistent hashing</strong> places shards on a ring so adding one moves only the keys in its arc, rather than reshuffling everything. <strong>Virtual buckets</strong> hash keys into a fixed large number of buckets &mdash; say 1024 &mdash; and map buckets to physical shards; adding a shard moves a few buckets and the hash rule never changes. The bucket approach is what most modern systems use, because moving is then a matter of copying a bucket and updating a map.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-do-the-cheaper-things-first">Do the cheaper things first</h3>
+                    <h3>Do the cheaper things first</h3>
                     <p>Sharding is close to irreversible and touches every part of the application. Before it:</p><ol><li><strong>Index properly.</strong> A great many "we need to shard" conversations end at a missing [composite index](composite_and_covering_indexes.html).</li><li><strong>Read replicas</strong>, if reads dominate. Cheap, and reversible.</li><li><strong>Caching</strong>, for the hot small set.</li><li><strong>Partitioning</strong>, if one table is the problem.</li><li><strong>A bigger machine.</strong> Unglamorous, and modern hardware goes a very long way.</li></ol><p>Shard when writes exceed what one machine can take, or the working set no longer fits in memory anywhere, and not before.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>A shard key with skew.</strong> Sharding by country puts most of the traffic on one node. Check the distribution of real values.</p><p><strong>Sharding by a key the queries do not use.</strong> Every query becomes scatter-gather, and you have bought distributed-systems problems for no throughput.</p><p><strong>Assuming transactions still work.</strong> They work within a shard. Across shards they do not, and code written before sharding usually assumes otherwise.</p><p><strong>Forgetting the slowest shard sets the latency.</strong> One degraded node makes every fan-out query slow.</p>
                 </div>
             </div>
@@ -369,7 +372,7 @@ ORDER  BY shard, id;
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

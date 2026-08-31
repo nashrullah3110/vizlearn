@@ -499,15 +499,15 @@ queue = nodes with in-degree <span class="lit">0</span>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <div>
-                    <h3 id="vz-s-the-problem-it-solves">The problem it solves</h3>
+                    <h3>The problem it solves</h3>
                     <p>A <strong>topological sort</strong> orders the vertices of a directed graph so that every edge points forwards: if A must happen before B, A appears earlier. It answers "in what order can I do these dependent tasks?"</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-it-requires-a-dag">It Requires a DAG</h3>
+                    <h3>It Requires a DAG</h3>
                     <p>A valid ordering exists <strong>if and only if</strong> the graph is a <em>directed acyclic graph</em> &mdash; directed edges, no cycles. If A depends on B and B depends on A, no order can satisfy both.</p><p>Select <strong>Circular dependency</strong> and run it: the algorithm stalls with nodes left over. That stall <em>is</em> the cycle detection, which is why the same code powers "circular dependency detected" errors in build tools.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-kahn-s-algorithm">Kahn's algorithm</h3>
+                    <h3>Kahn's algorithm</h3>
                     <p>Repeatedly take a vertex with no remaining incoming edges &mdash; nothing left that must come first &mdash; and remove it.</p><pre><code class="language-python">from collections import deque
 
 def topo_sort(graph, nodes):
@@ -531,19 +531,19 @@ def topo_sort(graph, nodes):
     return order</code></pre><p>The final check is the cycle detection, and it is elegant: if a cycle exists, every vertex in it always has at least one unremoved predecessor, so none ever reaches indegree zero and the output is short. No separate cycle search is needed.</p><p>O(V + E) time, and the structure is BFS-shaped &mdash; which is why it is easy to reason about and easy to parallelise.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-order-is-not-unique">The Order Is Not Unique</h3>
+                    <h3>The Order Is Not Unique</h3>
                     <p>Whenever the ready queue holds more than one node, any of them may go next &mdash; each choice yields a different but equally valid ordering. Watch the queue readout: when it holds several nodes, that is genuine freedom.</p><p>This is why build systems can parallelise: everything sitting in the ready queue at the same moment has no dependency on the others and can run simultaneously.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-you-meet-it-daily">Where You Meet It Daily</h3>
+                    <h3>Where You Meet It Daily</h3>
                     <ul><li><strong>Build systems</strong> &mdash; compile dependencies before dependents.</li><li><strong>Package managers</strong> &mdash; npm, pip and apt install in dependency order and report cycles.</li><li><strong>Spreadsheets</strong> &mdash; recalculate cells in formula-dependency order; circular references are exactly a detected cycle.</li><li><strong>Course planning</strong> &mdash; the prerequisite example in this lab.</li><li><strong>Task schedulers and CI pipelines</strong> &mdash; stage ordering.</li></ul>
                 </div>
                 <div>
-                    <h3 id="vz-s-ordering-things-that-depend-on-each-other">Ordering things that depend on each other</h3>
+                    <h3>Ordering things that depend on each other</h3>
                     <p>A topological sort produces a linear ordering of a directed graph's vertices such that every edge points forwards &mdash; if A must happen before B, A appears earlier.</p><p>That is the answer to every dependency question: build order, task scheduling, module loading, course prerequisites.</p><p>Given dependencies A&rarr;C, B&rarr;C, C&rarr;D, one valid order is A, B, C, D. So is B, A, C, D. <strong>The ordering is not unique</strong>, and any order respecting all the edges is correct &mdash; which matters, because it means two implementations can disagree and both be right.</p><p>The requirement is that the graph is a <strong>directed acyclic graph</strong>. A cycle means a circular dependency, and no valid ordering exists &mdash; A before B before C before A is unsatisfiable. Detecting that is part of the algorithm's job.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-dfs-with-finishing-times">DFS with finishing times</h3>
+                    <h3>DFS with finishing times</h3>
                     <p>The alternative uses depth-first search: run DFS, and prepend each vertex to the output when it <em>finishes</em> (after all its descendants).</p><pre><code class="language-python">def topo_sort_dfs(graph, nodes):
     WHITE, GREY, BLACK = 0, 1, 2
     colour = {n: WHITE for n in nodes}
@@ -565,19 +565,19 @@ def topo_sort(graph, nodes):
     return order[::-1]                      # reverse the finishing order</code></pre><p>The reversal is the key insight: a vertex finishes only after everything it points to has finished, so reversing the finishing sequence puts prerequisites first.</p><p>The three-colour scheme detects cycles properly. Meeting a <strong>grey</strong> vertex means an edge back to the current path &mdash; a cycle. Meeting a <strong>black</strong> one means a finished subtree, which is fine. Using a single visited set conflates the two and reports cycles that do not exist.</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>Kahn's</th><th>DFS</th></tr></thead><tbody><tr><td>Structure</td><td>Queue, BFS-like</td><td>Recursion, DFS</td></tr><tr><td>Cycle detection</td><td>Output length is short</td><td>Grey vertex encountered</td></tr><tr><td>Parallelisable</td><td>Yes &mdash; all indegree-0 nodes are independent</td><td>No</td></tr><tr><td>Recursion depth risk</td><td>None</td><td>Yes, on deep graphs</td></tr><tr><td>Lexicographic order</td><td>Use a heap instead of a queue</td><td>Awkward</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-things-to-try">Things to try</h3>
-                    <ol><li><strong>Run the build pipeline.</strong> Only in-degree-0 nodes can start &mdash; those with no prerequisites at all.<button class="vz-run" type="button" data-vz-run="0" aria-label="Run this experiment in the visualisation: Run the build pipeline"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Watch in-degrees fall</strong> as each node is output. A node becomes ready the moment its count reaches zero.</li><li><strong>Note when the queue holds two or more nodes.</strong> Those tasks are independent and could run in parallel.</li><li><strong>Switch to the circular dependency.</strong> The queue empties with nodes still unprocessed &mdash; the algorithm has proved no valid order exists.<button class="vz-run" type="button" data-vz-run="1" aria-label="Run this experiment in the visualisation: Switch to the circular dependency"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Look at the in-degrees of the stuck nodes.</strong> None reaches zero, because each waits on another inside the cycle.<button class="vz-run" type="button" data-vz-run="2" aria-label="Run this experiment in the visualisation: Look at the in-degrees of the stuck nodes"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li></ol>
+                    <h3>Things to try</h3>
+                    <ol><li><strong>Run the build pipeline.</strong> Only in-degree-0 nodes can start &mdash; those with no prerequisites at all.</li><li><strong>Watch in-degrees fall</strong> as each node is output. A node becomes ready the moment its count reaches zero.</li><li><strong>Note when the queue holds two or more nodes.</strong> Those tasks are independent and could run in parallel.</li><li><strong>Switch to the circular dependency.</strong> The queue empties with nodes still unprocessed &mdash; the algorithm has proved no valid order exists.</li><li><strong>Look at the in-degrees of the stuck nodes.</strong> None reaches zero, because each waits on another inside the cycle.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-summing-up">Summing up</h3>
+                    <h3>Summing up</h3>
                     <p>Topological sort orders a DAG so dependencies always precede dependents, in O(V+E) via in-degree counting. When it cannot output every node, the leftovers form a cycle — making it both a scheduler and a circular-dependency detector.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-is-used">Where it is used</h3>
+                    <h3>Where it is used</h3>
                     <ul><li><strong>Build systems.</strong> <code>make</code>, Bazel, Gradle and every dependency-aware build tool topologically sorts targets. A circular dependency is reported as an error, and that error is this algorithm's cycle detection.</li><li><strong>Package managers.</strong> Installing dependencies before the things that need them.</li><li><strong>Task and job scheduling</strong> in workflow engines &mdash; Airflow DAGs are named after the requirement.</li><li><strong>Spreadsheet recalculation.</strong> Cells depend on other cells; a circular reference error is a detected cycle.</li><li><strong>Compiler passes</strong> and module initialisation order.</li><li><strong>Course prerequisites</strong> and curriculum planning.</li><li><strong>Database migrations</strong> applied in dependency order.</li><li><strong>Dynamic programming on a DAG,</strong> where the topological order is the correct evaluation order.</li></ul><p>That last one is worth expanding: on a DAG, processing vertices in topological order guarantees that a vertex's dependencies are already computed. Longest path in a DAG &mdash; NP-hard in a general graph &mdash; becomes linear this way.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-choosing-among-valid-orders">Choosing among valid orders</h3>
+                    <h3>Choosing among valid orders</h3>
                     <p>Because many orderings are valid, applications often want a specific one.</p><p><strong>Lexicographically smallest.</strong> Replace Kahn's queue with a min-heap, so the smallest available vertex is always taken next. Useful when output must be deterministic and reproducible.</p><p><strong>Maximum parallelism.</strong> Kahn's algorithm naturally produces <em>levels</em>: all vertices with indegree 0 at the start can run simultaneously, then their successors, and so on. Grouping by level rather than emitting a flat list gives the schedule with the shortest critical path.</p><pre><code class="language-python">def topo_levels(graph, nodes):
     indegree = compute_indegrees(graph, nodes)
     level = [n for n in nodes if indegree[n] == 0]
@@ -594,15 +594,15 @@ def topo_sort(graph, nodes):
     return levels</code></pre><p>That levelled form is what a build system uses to decide what can compile in parallel, and it is a small change from the standard algorithm.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-common-mistakes">Common mistakes</h3>
+                    <h3>Common mistakes</h3>
                     <ul><li><strong>Not detecting cycles.</strong> Without the length check, a cyclic graph silently produces a partial ordering that looks valid.</li><li><strong>Using a single visited set in the DFS version,</strong> which cannot distinguish a back edge from a cross edge and reports false cycles.</li><li><strong>Forgetting isolated vertices.</strong> A vertex with no edges never appears in an edge list and must be added explicitly.</li><li><strong>Assuming the order is unique</strong> and writing tests that expect one specific sequence.</li><li><strong>Applying it to an undirected graph,</strong> where the concept does not apply.</li><li><strong>Recursion depth</strong> in the DFS version on a long chain.</li></ul>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>What if the graph has a cycle?</strong> No topological order exists. Kahn's algorithm produces a short output; the DFS version hits a grey vertex.</p><p><strong>Is the order unique?</strong> Only when the graph is a single chain. Otherwise many valid orders exist.</p><p><strong>Kahn's or DFS?</strong> Kahn's for parallel scheduling, lexicographic control and no recursion limit. DFS when you are already doing a DFS or need finishing times for something else.</p><p><strong>How do I get a deterministic order?</strong> Use a heap instead of a queue in Kahn's algorithm.</p><p><strong>Can it handle disconnected graphs?</strong> Yes &mdash; all indegree-0 vertices seed the queue, whichever component they are in.</p><p><strong>How is this related to DFS cycle detection?</strong> They are the same traversal; topological sort is the finishing order, and a back edge to a grey vertex is the cycle.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Order the vertices so every edge points forwards &mdash; the answer to every dependency question.</li><li>Requires a DAG; a cycle means no valid order exists, and the algorithm detects it.</li><li>Kahn's repeatedly removes indegree-0 vertices; a short output means a cycle.</li><li>DFS prepends each vertex on finishing, and needs three colours to detect cycles correctly.</li><li>Grouping Kahn's output into levels gives the maximum-parallelism schedule, which is what build systems use.</li></ul>
                 </div>
             </div>
@@ -683,7 +683,7 @@ print("never reached in-degree 0:", stuck)</script><div class="vz-code-bar"><spa
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

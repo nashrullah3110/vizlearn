@@ -232,28 +232,31 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The idea that lets a long report run while the database keeps taking writes.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-versions-instead-of-locks">Versions instead of locks</h3>
+                    <h3>The problem with locks</h3>
+                    <p>The simple way to keep transactions from interfering is locking: a reader takes a shared lock, a writer takes an exclusive one, and the two cannot be held at once.</p><p>It is correct, and on a busy system it is miserable. A report that scans a large table holds read locks for its whole run, so every write to that table waits. Meanwhile a long write transaction blocks every reader. The database spends its time queueing rather than working, and the symptom is an application that is fast until it is inexplicably not.</p>
+                </div>
+                <div>
+                    <h3>Versions instead of locks</h3>
                     <p><strong>Multi-version concurrency control</strong> removes the conflict by refusing to destroy anything. A write does not overwrite a row; it creates a *new version* of it, and the old version stays until nobody can still need it.</p><p>Every transaction is given a <strong>snapshot</strong> &mdash; effectively a rule saying which versions count as visible &mdash; fixed at the moment it starts, or at the moment each statement starts, depending on the [isolation level](isolation_levels.html).</p><p>A reader that began before a write simply continues to see the older version. Nothing waits.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-each-version-carries">What each version carries</h3>
+                    <h3>What each version carries</h3>
                     <p>Conceptually each row version records which transaction created it and which transaction deleted it:</p><pre><code>id  | balance | created_by | deleted_by
 ----+---------+------------+-----------
 7   |   1000  |    100     |    142
 7   |    850  |    142     |    NULL</code></pre><p>Transaction 142 changed the balance. It did not edit the first line; it marked it deleted and appended the second. A transaction with a snapshot older than 142 is shown the first version, a newer one the second. Visibility becomes an arithmetic comparison of transaction ids rather than a queue.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-mvcc-does-not-solve">What MVCC does not solve</h3>
+                    <h3>What MVCC does not solve</h3>
                     <p>This is the part that gets missed. MVCC eliminates reader/writer conflicts. It does <strong>not</strong> eliminate writer/writer conflicts.</p><p>Two transactions updating the same row still contend: the second must wait for the first to commit or roll back, because they would otherwise both produce a new version from the same old one and one update would vanish. That is the [lost update](isolation_levels.html) problem, and MVCC's answer to it is either a lock on that row or a serialisation failure at commit.</p><p>So the rule is: <strong>readers never wait, writers to the same row still do.</strong></p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-cost-garbage">The cost: garbage</h3>
+                    <h3>The cost: garbage</h3>
                     <p>Old versions accumulate. Something has to decide when a version can no longer be seen by any live snapshot and reclaim the space.</p><p>In PostgreSQL that job is <code>VACUUM</code>, usually run by autovacuum. When it cannot keep up &mdash; typically because a very old transaction is still open and pinning every version created since &mdash; tables <strong>bloat</strong>: the row count is unchanged while the file grows, and every scan reads more pages for the same data.</p><p>The practical consequence is worth stating plainly: <strong>a transaction left open does damage even when it is doing nothing</strong>, because it holds back cleanup for the whole database. An idle-in-transaction connection is a bug, not a small inefficiency.</p><p>Different engines pay this differently. PostgreSQL keeps old versions in the table itself and vacuums them. MySQL's InnoDB keeps them in a separate undo log and purges it. Oracle uses undo segments, and the same open-transaction problem appears as <code>ORA-01555 snapshot too old</code> &mdash; the old version needed was already discarded.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Long-running transactions.</strong> They pin versions across the entire database. Keep them short, and never leave one open across a user interaction.</p><p><strong>Assuming no waiting at all.</strong> Writers to the same row still contend, and the error surfaces as a lock wait or a serialisation failure.</p><p><strong>Treating table bloat as a disk problem.</strong> It is a symptom of vacuum not keeping up, and adding disk hides it rather than fixing it.</p><p><strong>Counting rows to check for bloat.</strong> The row count is right; the file size is the thing that grew.</p>
                 </div>
             </div>
@@ -311,7 +314,7 @@
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

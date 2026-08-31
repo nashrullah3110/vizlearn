@@ -495,25 +495,28 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The structure that trades instant access for instant insertion.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-fundamental-trade-off">The Fundamental Trade-off</h3>
+                    <h3>Before the details</h3>
+                    <p>A <strong>linked list</strong> stores each element in its own <em>node</em>, which also holds a pointer to the next node. Unlike an array, the elements need not sit next to each other in memory &mdash; the pointers are what impose the order.</p>
+                </div>
+                <div>
+                    <h3>The Fundamental Trade-off</h3>
                     <p>An array gives you <span class="mono-font">arr[500]</span> in <strong>O(1)</strong> because the address is pure arithmetic: start + 500 &times; itemsize. A linked list has no such shortcut &mdash; you must start at the head and follow 500 pointers. That is <strong>O(n)</strong>.</p><p>In exchange, inserting into the middle of an array costs O(n) because everything after the insertion point must shift up. In a linked list, once you are at the right place, insertion is <strong>O(1)</strong>: create the node and rewire two pointers. Nothing moves.</p><p>Watch the cost table as you insert at position 0 versus the end &mdash; the traversal is where the time goes, never the insertion itself.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-rewiring-step-by-step">Rewiring, Step by Step</h3>
+                    <h3>Rewiring, Step by Step</h3>
                     <p>To insert node <span class="mono-font">N</span> after node <span class="mono-font">P</span>:</p><span class="cm">// N points to the rest of the list</span><span class="cm">// P now points to N</span> <strong>Order matters absolutely.</strong> Do those two lines the other way round and you overwrite <span class="mono-font">P.next</span> before reading it &mdash; the remainder of the list becomes unreachable and is lost. This is the classic linked-list bug.
                 </div>
                 <div>
-                    <h3 id="vz-s-singly-vs-doubly-linked">Singly vs Doubly Linked</h3>
+                    <h3>Singly vs Doubly Linked</h3>
                     <ul><li><strong>Singly linked</strong> &mdash; one pointer per node. Less memory, but you can only travel forward, and deleting a node requires knowing its <em>predecessor</em>.</li><li><strong>Doubly linked</strong> &mdash; <span class="mono-font">next</span> and <span class="mono-font">prev</span>. Costs more memory but allows backward traversal and O(1) deletion given only the node itself.</li></ul><p>That last property is why LRU caches use a doubly linked list: when a hash lookup hands you a node, you can unlink and re-insert it at the front in constant time.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-arrays-often-win-anyway">Why Arrays Often Win Anyway</h3>
+                    <h3>Why Arrays Often Win Anyway</h3>
                     <p>Big-O says linked lists should beat arrays for insertion-heavy work. In practice arrays frequently win regardless, because of <strong>cache locality</strong>. Array elements sit contiguously in memory, so the CPU loads many at once. Linked-list nodes are scattered, and each pointer hop risks a cache miss costing hundreds of cycles.</p><p>This is a good reminder that Big-O counts operations, not time. Modern advice: reach for a dynamic array by default, and a linked list when you specifically need O(1) splicing with a node reference already in hand.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-nodes-joined-by-references">Nodes joined by references</h3>
+                    <h3>Nodes joined by references</h3>
                     <p>A linked list stores each element in a <strong>node</strong> that holds a value and a reference to the next node. Nothing is contiguous in memory, and there is no index.</p><pre><code class="language-python">class Node:
     def __init__(self, value, nxt=None):
         self.value = value
@@ -523,7 +526,7 @@
 head = Node(1, Node(2, Node(3)))</code></pre><p>That single design difference from an array produces every trade-off:</p><div class="vz-table-wrap"><table><thead><tr><th>Operation</th><th>Linked list</th><th>Array / Python list</th></tr></thead><tbody><tr><td>Access by index</td><td>O(n) &mdash; must walk</td><td>O(1)</td></tr><tr><td>Insert at front</td><td>O(1)</td><td>O(n) &mdash; shifts everything</td></tr><tr><td>Insert after a known node</td><td>O(1)</td><td>O(n)</td></tr><tr><td>Insert at end</td><td>O(1) with a tail pointer</td><td>O(1) amortised</td></tr><tr><td>Delete a known node</td><td>O(1)</td><td>O(n)</td></tr><tr><td>Search</td><td>O(n)</td><td>O(n)</td></tr><tr><td>Memory per element</td><td>Value plus a pointer</td><td>Value only</td></tr><tr><td>Cache behaviour</td><td>Poor</td><td>Excellent</td></tr></tbody></table></div><p>The last two rows are why Python's <code>list</code> is used almost everywhere despite the theoretical advantages above. A pointer per element is substantial overhead, and following pointers to scattered memory addresses defeats the CPU cache &mdash; frequently making an O(n) array scan faster in practice than an O(n) list walk.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-insertion-is-o-1-only-if-you-are-already-the">Why insertion is O(1) only if you are already there</h3>
+                    <h3>Why insertion is O(1) only if you are already there</h3>
                     <p>The advertised advantage &mdash; O(1) insertion and deletion &mdash; has a precondition that is easy to gloss over: you must <strong>already hold a reference</strong> to the relevant node.</p><p>Inserting after a node you have is three assignments. Inserting at position 500 means walking 500 nodes first, so the operation is O(n) overall.</p><p>That is why linked lists win in specific situations rather than generally: when you are already traversing, when you hold node references from elsewhere, or when you only ever touch the ends.</p><pre><code class="language-python">def insert_after(node, value):
     node.next = Node(value, node.next)      # O(1), given the node
 
@@ -532,19 +535,19 @@ def delete_after(node):
         node.next = node.next.next          # O(1), and the node is orphaned</code></pre><p>For deleting a node you hold in a <em>singly</em> linked list, you need its predecessor &mdash; which you do not have. That is what doubly linked lists solve.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-singly-doubly-circular">Singly, doubly, circular</h3>
+                    <h3>Singly, doubly, circular</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Type</th><th>Each node holds</th><th>Enables</th></tr></thead><tbody><tr><td>Singly linked</td><td>next</td><td>Minimal memory; forward traversal only</td></tr><tr><td>Doubly linked</td><td>next and prev</td><td>Backwards traversal; O(1) delete given the node</td></tr><tr><td>Circular</td><td>Last points to first</td><td>Round-robin iteration</td></tr></tbody></table></div><p><strong>Doubly linked</strong> is the practically important variant, because O(1) deletion given only the node is exactly what an LRU cache needs: a hash table maps keys to nodes, and the node can be unlinked and moved to the front in constant time.</p><p>That combination &mdash; hash table plus doubly linked list &mdash} is the standard LRU implementation, and it is the clearest example of a linked list being the right tool.</p><p><strong>Circular</strong> lists suit round-robin scheduling and buffers where there is no natural end.</p><p>The sentinel or dummy-head trick is worth knowing: allocate one node before the real head, so insertion and deletion never need a special case for the first element. It removes most of the null checks that make linked-list code error-prone.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-try-it-yourself">Try it yourself</h3>
-                    <ol><li><strong>Insert at position 0.</strong> Zero traversal steps &mdash; genuinely O(1), the linked list's best case.</li><li><strong>Insert at the end.</strong> The cost table shows the traversal dominating; the rewiring is still just two assignments.</li><li><strong>Delete from the middle</strong> and watch the pointer of the previous node jump over the removed one. Nothing else in the list moves.</li><li><strong>Search for a value.</strong> Every node must be checked in order &mdash; no binary search is possible, because you cannot jump to the middle.</li><li><strong>Switch to doubly linked</strong> and note the backward arrows, plus the extra pointer each node now has to store.<button class="vz-run" type="button" data-vz-run="0" aria-label="Run this experiment in the visualisation: Switch to doubly linked"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li></ol>
+                    <h3>Try it yourself</h3>
+                    <ol><li><strong>Insert at position 0.</strong> Zero traversal steps &mdash; genuinely O(1), the linked list's best case.</li><li><strong>Insert at the end.</strong> The cost table shows the traversal dominating; the rewiring is still just two assignments.</li><li><strong>Delete from the middle</strong> and watch the pointer of the previous node jump over the removed one. Nothing else in the list moves.</li><li><strong>Search for a value.</strong> Every node must be checked in order &mdash; no binary search is possible, because you cannot jump to the middle.</li><li><strong>Switch to doubly linked</strong> and note the backward arrows, plus the extra pointer each node now has to store.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-that-leaves-you">Where that leaves you</h3>
+                    <h3>Where that leaves you</h3>
                     <p>Linked lists make insertion and deletion cheap and access expensive &mdash; the exact opposite of arrays. Use them when you hold a reference to the node you need and are splicing constantly; otherwise an array's cache behaviour usually beats the theory.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-classic-manipulations">The classic manipulations</h3>
+                    <h3>The classic manipulations</h3>
                     <p><strong>Reversal</strong> is the canonical exercise, and the three-pointer form is worth knowing by heart:</p><pre><code class="language-python">def reverse(head):
     prev = None
     while head:
@@ -556,19 +559,19 @@ def delete_after(node):
     return slow</code></pre><p><strong>Cycle detection</strong> (Floyd's algorithm) uses the same pointers and checks whether they meet. Resetting one to the head after they meet and advancing both by one finds the cycle's entry point.</p><p><strong>Merging two sorted lists</strong> requires only pointer rearrangement and no extra allocation, which is why merge sort on a linked list uses O(1) extra space where merge sort on an array uses O(n).</p><p>Those four cover most linked-list problems, and all four are single-pass with constant extra memory.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-when-to-actually-use-one">When to actually use one</h3>
+                    <h3>When to actually use one</h3>
                     <p><strong>Genuinely good uses:</strong></p><ul><li><strong>LRU caches</strong> &mdash; doubly linked list plus hash map.</li><li><strong>Queues and deques</strong> &mdash; though <code>collections.deque</code> uses a block-based structure that is better than a pure linked list.</li><li><strong>Adjacency lists</strong> in some graph representations.</li><li><strong>Free lists</strong> in memory allocators.</li><li><strong>Undo stacks</strong> and version chains where nodes are held by reference.</li><li><strong>Immutable and persistent lists</strong> in functional languages, where sharing a tail between versions is free.</li></ul><p><strong>Poor uses:</strong></p><ul><li>Anything needing indexed access.</li><li>Anything where a Python <code>list</code> would do, which is most application code.</li><li>Large collections traversed frequently &mdash; the cache penalty is real and often decisive.</li></ul><p>In Python specifically, you will rarely implement one. <code>list</code> covers dynamic arrays, <code>collections.deque</code> covers double-ended queues efficiently. Linked lists appear as interview material and inside libraries rather than in ordinary code &mdash; which does not make them unimportant, because the pointer-manipulation reasoning transfers to trees and graphs.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-common-mistakes">Common mistakes</h3>
+                    <h3>Common mistakes</h3>
                     <ul><li><strong>Losing the head reference</strong> while traversing, so the list becomes unreachable.</li><li><strong>Not handling the empty list or single node.</strong> Most linked-list bugs live at these boundaries; a sentinel node removes them.</li><li><strong>Assigning pointers in the wrong order,</strong> orphaning the rest of the list. Read what you need before overwriting it.</li><li><strong>Forgetting to update the tail pointer</strong> when appending or deleting at the end.</li><li><strong>Creating a cycle accidentally,</strong> which turns any traversal into an infinite loop.</li><li><strong>Deleting a node in a singly linked list without its predecessor,</strong> which cannot be done properly &mdash; the usual hack copies the next node's value and deletes that node instead, and it fails on the last node.</li></ul>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Why use a linked list when arrays are faster?</strong> For O(1) insertion and deletion at a held reference, and when there is no capacity to resize. Those cases are narrower than textbooks suggest.</p><p><strong>Is a Python list a linked list?</strong> No &mdash; it is a dynamic array of pointers, contiguous, with O(1) indexing.</p><p><strong>How do I find the length?</strong> Walk it: O(n). Maintain a counter if the length is needed often.</p><p><strong>Singly or doubly linked?</strong> Doubly if you need backwards traversal or O(1) deletion given a node; singly to save the pointer.</p><p><strong>Why is <code>collections.deque</code> fast?</strong> It is a doubly linked list of fixed-size blocks, so it gets O(1) ends with much better cache behaviour than one node per element.</p><p><strong>Are linked lists still relevant?</strong> As a data structure in application code, rarely. As the reasoning behind trees, graphs, allocators and persistent structures, very.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Each node holds a value and a reference; nothing is contiguous and there is no index.</li><li>O(1) insertion and deletion &mdash; but only at a node you already hold; reaching position k is O(n).</li><li>Doubly linked lists enable O(1) deletion given the node, which is what LRU caches rely on.</li><li>Poor cache behaviour and a pointer per element make arrays faster in practice for most work.</li><li>Use a sentinel head to remove the empty-list and first-element special cases that cause most bugs.</li></ul>
                 </div>
             </div>
@@ -672,7 +675,7 @@ print("reversed     :", ll)</script><div class="vz-code-bar"><span class="vz-cod
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

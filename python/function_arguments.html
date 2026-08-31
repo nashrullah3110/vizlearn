@@ -322,13 +322,16 @@ print("after another call       :", id(add_item.__defaults__[0]))</script>
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Python matches arguments to parameters two ways &mdash; by position and by name &mdash; and gives parameters default values. One of those defaults has a trap in it that every Python programmer meets exactly once.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-defaults">Defaults</h3>
+                    <h3>Positional and keyword</h3>
+                    <p>def greet(name, greeting="Hello"):</p><p><code>greet("ana")</code> matches by position: the first argument becomes <code>name</code>. <code>greet("ana", greeting="Hi")</code> names the second explicitly. Both reach the same function; the difference is what the call site tells a reader.</p><p>Keywords earn their place when the value alone is meaningless. <code>send(msg, True)</code> tells you nothing; <code>send(msg, urgent=True)</code> tells you everything. A boolean argument is almost always worth naming.</p><p>One rule: in a call, positional arguments come first. <code>f(greeting="Hi", "ana")</code> is a syntax error, because Python cannot tell where the positional one was meant to go.</p>
+                </div>
+                <div>
+                    <h3>Defaults</h3>
                     <p>A parameter with a default becomes optional:</p><p>def greet(name, greeting="Hello", excited=False):</p><p>Callers supply what they care about and ignore the rest. Defaults must come after all non-default parameters, for the same reason: otherwise a positional call would be ambiguous.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-mutable-default-trap">The mutable default trap</h3>
+                    <h3>The mutable default trap</h3>
                     <p>This looks reasonable and is not:</p><pre><code class="language-python">def add_item(item, basket=[]):
     basket.append(item)
     return basket</code></pre><p>Call it three times with no basket and you get one item, then two, then three &mdash; all in the same list. The reason is a single rule with a large consequence: <strong>default values are evaluated once, when the <code>def</code> runs</strong>, not on each call. That one list is created at definition time and reused forever, so every mutation accumulates.</p><p>The second program on this page prints the id of the default object before and after a call, to show it really is the same object rather than a new one that happens to have old contents.</p><p>The fix is idiomatic and worth memorising:</p><pre><code class="language-python">def add_item(item, basket=None):
@@ -336,7 +339,7 @@ print("after another call       :", id(add_item.__defaults__[0]))</script>
         basket = []</code></pre><p><code>None</code> is immutable, so there is nothing to accumulate, and the fresh list is built inside the call where it belongs.</p><p>Immutable defaults &mdash; numbers, strings, <code>True</code>, <code>None</code>, tuples &mdash; are all safe. The rule is simply: never default a parameter to a list, dict or set.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-keyword-only-parameters">Keyword-only parameters</h3>
+                    <h3>Keyword-only parameters</h3>
                     <p>Anything after a bare <code>*</code> in the definition can only be passed by name:</p><pre><code class="language-python">def connect(host, *, timeout=30, retries=3):
     ...
 
@@ -344,33 +347,33 @@ connect(&quot;db.local&quot;, timeout=5)      # fine
 connect(&quot;db.local&quot;, 5)              # TypeError</code></pre><p>This is how you stop a call site from becoming a row of unlabelled values. <code>connect("db.local", 5, 2)</code> tells a reader nothing; forcing the names makes the call self-documenting, and it means you can reorder or add options later without breaking anyone.</p><p>The mirror image is <code>/</code>, which marks parameters as positional-only. It appears in the standard library more than in application code.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-arguments-are-evaluated-at-the-call">Arguments are evaluated at the call</h3>
+                    <h3>Arguments are evaluated at the call</h3>
                     <pre><code class="language-python">def log(message, when=now()):    # now() runs ONCE, at definition</code></pre><p>This is the same rule as the mutable default, wearing different clothes. If you want the current time on each call, compute it inside:</p><pre><code class="language-python">def log(message, when=None):
     if when is None:
         when = now()</code></pre><p>Any expression in a default - a function call, a list, a dict, an object - is evaluated once when the <code>def</code> statement runs, and the result is reused forever.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-too-many-parameters-is-a-design-signal">Too many parameters is a design signal</h3>
+                    <h3>Too many parameters is a design signal</h3>
                     <p>A function with eight parameters is hard to call correctly and hard to change. Two usual remedies:</p><ul><li>group related arguments into a small object or a dataclass, so <code>draw(config)</code> replaces <code>draw(x, y, w, h, colour, border, alpha, z)</code></li><li>split the function, because eight parameters often means it is doing more than one job</li></ul><p>Neither is a rule, but if you are counting arguments on your fingers at the call site, the call site is telling you something.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-argument-order-in-the-definition">Argument order in the definition</h3>
+                    <h3>Argument order in the definition</h3>
                     <p>Positional first, then defaults, then <code>*args</code>, then keyword-only, then <code>**kwargs</code>. Python enforces most of that, and the error messages are clear when you get it wrong - unlike the mutable default, which never complains at all.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-the-signature-communicates">What the signature communicates</h3>
+                    <h3>What the signature communicates</h3>
                     <p>A function signature is the part other people read most and change least. It is worth treating as an interface rather than an accident of how the function grew.</p><p>Parameters with no default are requirements: the caller must supply them and the function cannot work without them. Parameters with defaults are options, and the default should be the choice that is right most of the time. If you find yourself writing a default that callers nearly always override, the default is wrong and it is quietly making every call site longer.</p><p>Order matters for reading as much as for the language. Put the thing the function is about first - the data, the object, the path - and the modifiers after it. <code>resize(image, width=800)</code> reads correctly; <code>resize(width=800, image=img)</code> is legal and reads backwards.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-passing-arguments-through">Passing arguments through</h3>
+                    <h3>Passing arguments through</h3>
                     <p>When one function calls another and wants to forward whatever it was given, the star forms do it without repeating the signature. That is the right tool for wrappers, decorators and thin adapters, where repeating the parameters would mean updating two places every time the inner function changes.</p><p>It is the wrong tool for a function people call directly. <code>def process(*args, **kwargs)</code> gives the caller no idea what to pass, gives the editor nothing to complete, and turns a mistake that would have been a clear <code>TypeError</code> into a <code>KeyError</code> somewhere deeper. Be explicit at the surface and flexible only where you are genuinely forwarding.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-mutable-arguments-not-just-mutable-defaults">Mutable arguments, not just mutable defaults</h3>
+                    <h3>Mutable arguments, not just mutable defaults</h3>
                     <p>The default-argument trap gets the attention, but the same underlying fact - that arguments are passed by reference to the same object - applies to every call. A function that appends to a list it was given has changed the caller's list. Sometimes that is the point and should be said in the name: <code>add_item</code>, <code>update_config</code>, <code>sort_in_place</code>. When it is not the point, copy at the top of the function or return a new object, and let the caller decide.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-watching-the-default-accumulate">Watching the default accumulate</h3>
+                    <h3>Watching the default accumulate</h3>
                     <p>The trap is more convincing when the shared object is visible:</p><pre><code class="language-python">def add_item(item, basket=[]):
     basket.append(item)
     return basket
@@ -389,24 +392,24 @@ the default itself: ([&#x27;a&#x27;, &#x27;b&#x27;, &#x27;c&#x27;],)</code></pre
     return basket</code></pre><p><code>None</code> cannot accumulate anything, and the list is built inside the call where it belongs.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-how-a-call-is-matched-to-a-signature">How a call is matched to a signature</h3>
+                    <h3>How a call is matched to a signature</h3>
                     <p>Understanding the binding order makes the error messages readable, and there are only four steps.</p><p>Positional arguments are assigned to parameters left to right. Then keyword arguments are matched by name to whatever is left. Then any parameter still unfilled takes its default. Then, if a parameter is still unfilled and has no default, the call fails.</p><p>That order explains the errors. <code>missing 1 required positional argument: 'x'</code> means step four found a gap. <code>got multiple values for argument 'x'</code> means a positional argument filled <code>x</code> in step one and a keyword tried to fill it again in step two &mdash; which is what happens when you pass the first argument positionally *and* by name. <code>got an unexpected keyword argument 'timeuot'</code> means step two found no parameter of that name, which is the typo case, and is exactly the error that <code>**kwargs</code> would have swallowed.</p><p>Two rules follow from the same ordering. In a call, positional arguments must come before keyword ones, because Python cannot tell where a positional one belongs once names have started. And in a definition, parameters with defaults must come after those without, for the same reason from the other side.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-saying-what-a-parameter-expects">Saying what a parameter expects</h3>
+                    <h3>Saying what a parameter expects</h3>
                     <p>Type hints do not convert or enforce anything at runtime, and they are still the cheapest documentation a signature can carry:</p><pre><code class="language-python">def greet(name: str, times: int = 1) -&gt; str:
     return f&quot;hello {name} &quot; * times</code></pre><p>The value is threefold. A reader learns what to pass without reading the body. An editor can complete and check the call. And a type checker run in CI catches the mismatch before it ships &mdash; which is the only one of the three that actually prevents anything.</p><p>Two conventions are worth adopting with them. Annotate the public functions and skip the obvious internal ones; annotations on a two-line helper cost more to read than they explain. And when a parameter can be <code>None</code>, say so &mdash; <code>def find(name: str) -&gt; User | None</code> &mdash; because that is the case callers most often forget and the one a checker most usefully flags.</p><p>Hints also document the mutable-default fix nicely: <code>basket: list | None = None</code> states both the type and the fact that omitting it is allowed, which is exactly what the <code>None</code> sentinel means.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-choosing-the-default">Choosing the default</h3>
+                    <h3>Choosing the default</h3>
                     <p>A default is a decision about what most callers want, and getting it wrong is quiet: nothing fails, every call site just gets a little longer.</p><p>The test is simple. If most calls override the default, the default is wrong. Either it should be the value people actually pass, or the parameter should be required so that callers have to think about it. A default that exists only because the parameter felt like it needed one adds a choice without making one.</p><p>Defaults should also be safe rather than convenient. A <code>timeout=None</code> meaning "wait forever" is a default that turns a slow dependency into a hung program; a finite timeout is the better choice even though it can fail. The same reasoning applies to <code>overwrite=False</code>, <code>strict=True</code> and <code>retries=0</code>: when in doubt, default to the behaviour whose failure is loud.</p><p>And a default should not depend on the state of the world. Anything evaluated at definition time &mdash; the current directory, the time, an environment variable, a config object &mdash; is frozen at import and will be wrong for any program that changes it afterwards. <code>None</code> plus a lookup in the body reads the value when the call happens, which is nearly always what was meant.</p><p>Finally, prefer a default over an optional parameter that changes the return type. A function that returns a number normally and a tuple when <code>verbose=True</code> has two signatures pretending to be one, and every caller has to know which it triggered.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Are arguments passed by value or by reference?</strong> Neither, in the C sense. The function gets another name for the same object, so mutating it is visible to the caller and rebinding is not.</p><p><strong>Can a default refer to another parameter?</strong> No. Defaults are evaluated at definition time, when no arguments exist. Use <code>None</code> and compute it in the body.</p><p><strong>Why must defaults come last?</strong> Otherwise a positional call could not tell which parameter a value was for.</p><p><strong>Is a tuple a safe default?</strong> Yes. Tuples are immutable, so there is nothing to accumulate.</p><p><strong>How do I force a caller to use names?</strong> Put a bare <code>*</code> before those parameters in the definition.</p><p><strong>Can I see a function's defaults?</strong> <code>f.__defaults__</code> for positional ones and <code>f.__kwdefaults__</code> for keyword-only ones.</p><p><strong>How many parameters is too many?</strong> When you are counting on your fingers at the call site. Group them into an object, or split the function.</p><p><strong>Can I make every parameter keyword-only?</strong> Yes, put the bare <code>*</code> first: <code>def f(*, a, b)</code>. Callers must then name both.</p><p><strong>Does the order of keyword arguments matter?</strong> Not to Python. They are matched by name, so any order works &mdash; though matching the signature's order helps a reader.</p><p><strong>Can two parameters share a default object?</strong> They can, and they should not if it is mutable, because then both accumulate into the same thing.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Arguments match by position first, then by name; positional ones come first in a call and non-default parameters come first in a definition.</li><li>Defaults are evaluated once, when <code>def</code> runs &mdash; never default to a list, dict or set.</li><li><code>None</code> plus a check in the body is the idiomatic fix, and it reads correctly in a type hint too.</li><li>A bare <code>*</code> makes the parameters after it keyword-only, which is how a call site stops being a row of unlabelled values.</li><li>The signature is the part others read most; required parameters are requirements, and a default should be the right choice most of the time.</li></ul>
                 </div>
             </div>
@@ -464,7 +467,7 @@ the default itself: ([&#x27;a&#x27;, &#x27;b&#x27;, &#x27;c&#x27;],)</code></pre
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

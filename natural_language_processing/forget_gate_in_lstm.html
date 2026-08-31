@@ -535,45 +535,48 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Before an LSTM writes anything new, it decides what of the past is still worth keeping. That single decision is what makes long-term memory possible.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-it-is-a-dimmer-not-a-switch">It Is a Dimmer, Not a Switch</h3>
+                    <h3>What the Gate Actually Is</h3>
+                    <p>The Forget Gate is a small neural layer with a <strong>sigmoid</strong> output. It reads the merged vector $[H_{t-1}, X_t]$ and produces one number between 0 and 1 <em>for every slot in the cell state</em>:</p><p>$$f_t = \sigma(W_f \cdot [H_{t-1}, X_t] + b_f)$$</p><p>Those numbers are then multiplied element-by-element into the old memory: $f_t \odot C_{t-1}$. A slot that receives <strong>1</strong> is copied forward perfectly. A slot that receives <strong>0</strong> is erased. Everything in between is partial fading.</p>
+                </div>
+                <div>
+                    <h3>It Is a Dimmer, Not a Switch</h3>
                     <p>The word "gate" suggests open or closed, but the sigmoid makes it a <strong>dimmer per dimension</strong>. In a real trained LSTM the forget vector might look like $[0.98, 0.03, 0.71, 0.99, \dots]$ &mdash; the cell holds on to some facts with near-perfect fidelity while dumping others in the same time step.</p><p>This is the crucial difference from a plain RNN. An RNN squashes its <em>entire</em> state through $\tanh$ at every step, so everything decays together. The LSTM decides <em>slot by slot</em>, so a subject noun can survive twenty words while a comma is discarded immediately.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-forgetting-compounds-and-that-is-the-whole-story">Forgetting Compounds — and That Is the Whole Story</h3>
+                    <h3>Forgetting Compounds — and That Is the Whole Story</h3>
                     <p>Memory does not decay once, it decays <em>repeatedly</em>. If the gate emits roughly the same value $f$ each step, the fraction of the original signal still present after $n$ steps is:</p><p>$$\text{survival} = f^{\,n}$$</p><p>Because this is exponential, small differences in $f$ produce enormous differences in reach. Play with the slider in the <strong>Forget Gate Lab</strong> and watch the two survival bars:</p><ul><li>$f = 0.5$ &mdash; after only 5 steps just <strong>3%</strong> remains. This is effectively short-term memory.</li><li>$f = 0.9$ &mdash; after 20 steps about <strong>12%</strong> survives. Usable long-range context.</li><li>$f = 1.0$ &mdash; the memory is <strong>perfectly preserved</strong>, no matter how many steps pass.</li></ul><p>That last case is the reason LSTMs defeat the vanishing gradient. When $f_t \approx 1$, the update becomes $C_t \approx C_{t-1} + \text{something}$ &mdash; pure addition. Gradients flowing backwards along this path are multiplied by $f_t \approx 1$ instead of being squashed, so they survive the trip.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-practitioner-s-trick-positive-forget-bias">A Practitioner's Trick: Positive Forget Bias</h3>
+                    <h3>A Practitioner's Trick: Positive Forget Bias</h3>
                     <p>At initialisation the weights are near zero, so $f_t \approx \sigma(0) = 0.5$ &mdash; the network starts out forgetting half its memory every single step and struggles to learn anything long-range. The standard fix is to initialise the forget-gate bias $b_f$ to <strong>+1 or +2</strong>, which pushes the gate to roughly 0.73&ndash;0.88 from the start. The cell begins life inclined to remember, and learns what to discard from there.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-deciding-what-to-drop">Deciding what to drop</h3>
+                    <h3>Deciding what to drop</h3>
                     <p>The forget gate is the first thing an LSTM cell computes, and it answers one question: <em>of everything currently in memory, how much of each part should survive this step?</em></p><p class="mono-font">f&#7511; = &sigma;(W&#7584; &middot; [h&#7511;&#8331;&#8321;, x&#7511;] + b&#7584;)</p><p>It takes the previous hidden state and the current input, produces a vector the same width as the cell state, and squashes every element through a sigmoid to between 0 and 1. Then:</p><p class="mono-font">c&#7511; = f&#7511; &#8857; c&#7511;&#8331;&#8321; + (new information)</p><p>The multiplication is <strong>elementwise</strong>, which is the crucial detail. Each dimension of the cell state is scaled independently, so the gate can keep one dimension entirely (a coefficient of 1) while erasing another (a coefficient of 0) in the same step.</p><div class="vz-table-wrap"><table><thead><tr><th>Gate value</th><th>Effect on that dimension</th></tr></thead><tbody><tr><td>1.0</td><td>Keep completely</td></tr><tr><td>0.7</td><td>Keep most of it, decay slowly</td></tr><tr><td>0.3</td><td>Mostly discard</td></tr><tr><td>0.0</td><td>Erase entirely</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-it-learns-to-do">What it learns to do</h3>
+                    <h3>What it learns to do</h3>
                     <p>Concretely, in a language model, the forget gate learns to clear state at boundaries.</p><p>Suppose a dimension of the cell state tracks the grammatical number of the current subject, so that the verb can agree with it. When a new sentence begins, that information is no longer relevant &mdash; it would actively mislead. A trained forget gate learns to output near 0 for that dimension when it sees a full stop, and near 1 while the sentence continues.</p><p>Other observed behaviours: clearing after a closing bracket, resetting on a topic shift, and dropping a tracked entity once a new one is introduced.</p><p>The gate does not "know" any of this. It is a learned function of the previous state and the current input, and these behaviours are what minimising the loss produced.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-it-is-the-gradient-s-protector">Why it is the gradient's protector</h3>
+                    <h3>Why it is the gradient's protector</h3>
                     <p>The forget gate is also the reason LSTMs handle long sequences, and the mechanism is a single derivative.</p><p>Differentiating the cell update with respect to the previous cell state gives:</p><p class="mono-font">&part;c&#7511; / &part;c&#7511;&#8331;&#8321; = f&#7511;</p><p>That is it &mdash; the forget gate itself. So the gradient flowing back through k steps is multiplied by the product of k forget-gate values.</p><p>If the network has learned to keep a piece of information, those values are near 1, and the product stays near 1 across many steps. The gradient reaches back essentially undamped, and the network can learn that something 100 steps ago mattered.</p><p>Compare a plain RNN, where the per-step factor is the derivative of a tanh times a weight matrix &mdash; a quantity nothing constrains to be near 1, and which is usually below it. That is the whole difference between failing at 20 steps and succeeding at 200.</p><p>There is a practical corollary: <strong>the forget gate bias is often initialised to 1</strong> (rather than 0), so the gate starts open and information is preserved by default. The network then learns when to close it. Initialising it at 0 means the gate starts half-closed, memory decays from the first step, and training is measurably slower.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-try-it-yourself">Try it yourself</h3>
+                    <h3>Try it yourself</h3>
                     <ol><li><strong>Run the simulation.</strong> Follow the highlighted route: the merged input climbs into the glowing $f_t$ box, and the gate's answer travels straight up to the $\times$ operator sitting on the cell-state conveyor.</li><li><strong>Drag the slider to 0.</strong> The gate box on the canvas dims to nothing &mdash; a closed gate multiplies the memory by zero. Both survival bars collapse instantly.</li><li><strong>Drag it to 1.00.</strong> The survival bars stay full at every horizon. Nothing decays. This is the behaviour every long-context model depends on.</li><li><strong>Sit at 0.9 and compare the 5-step and 20-step bars.</strong> Notice how a gate that looks "mostly open" still loses most of its signal over a long sentence &mdash; forgetting is exponential, and intuition tends to underestimate it.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-in-one-line">In one line</h3>
+                    <h3>In one line</h3>
                     <p>The Forget Gate is the only component that can <em>remove</em> information from an LSTM's long-term memory, and it does so multiplicatively and permanently. Keeping it near 1 turns the cell state into a protected highway across time; letting it drift toward 0 collapses the LSTM back into a forgetful RNN. Next, see how new information gets written in: the <strong>Input Gate</strong>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-three-gates-together">The three gates together</h3>
+                    <h3>The three gates together</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Gate</th><th>Activation</th><th>Question</th><th>Applied to</th></tr></thead><tbody><tr><td>Forget</td><td>Sigmoid</td><td>What should I drop?</td><td>The old cell state</td></tr><tr><td>Input</td><td>Sigmoid</td><td>What new information is worth storing?</td><td>The candidate</td></tr><tr><td>Output</td><td>Sigmoid</td><td>What should I expose now?</td><td>tanh of the cell state</td></tr></tbody></table></div><p>All three use a sigmoid, because a gate must be a fraction between 0 and 1. The <em>content</em> they control &mdash; the candidate memory &mdash; uses tanh, because content should be able to be negative.</p><p>Note that forget and input are separate gates in an LSTM, which means the cell can keep everything <em>and</em> add new information at full strength in the same step. A GRU merges them into one update gate with coefficients <code>z</code> and <code>1 − z</code>, so keeping more necessarily means adding less. That is the expressiveness the GRU trades away for a quarter fewer parameters.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-inspecting-a-trained-gate">Inspecting a trained gate</h3>
+                    <h3>Inspecting a trained gate</h3>
                     <p>Forget-gate activations are unusually interpretable for a neural network internal, and they are worth looking at when debugging a sequence model.</p><pre><code class="language-python"># PyTorch&#x27;s fused LSTM does not expose gates; a manual cell does
 class Cell(nn.Module):
     def forward(self, x, state):
@@ -586,11 +589,11 @@ class Cell(nn.Module):
         return h, (h, c), f          # return f to inspect it</code></pre><p>What to look for:</p><p><strong>Forget values stuck near 0</strong> across the whole sequence mean memory is being wiped every step, and the cell is behaving like a plain feed-forward layer. Check the bias initialisation.</p><p><strong>Forget values stuck near 1</strong> mean nothing is ever cleared, so the state accumulates without bound and old information crowds out new.</p><p><strong>Sharp drops at sentence or clause boundaries</strong> are the healthy pattern &mdash; the gate has learned where context resets.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Why is it called "forget" when 1 means keep?</strong> The value is the <em>retention</em> coefficient. The name refers to the gate's purpose, not to its numeric direction &mdash; a genuine source of confusion.</p><p><strong>Can it forget completely?</strong> A sigmoid never reaches exactly 0, so it asymptotes rather than erasing outright. In practice values of 0.01 are effectively erasure.</p><p><strong>Why initialise the bias to 1?</strong> So the gate starts open and memory is preserved by default, which trains faster and better than starting half-closed.</p><p><strong>Does the forget gate cause vanishing gradients?</strong> It is the reason they are <em>avoided</em> &mdash; when it is near 1, the gradient passes back undamped. Consistently small values would cause decay, which is what the bias initialisation guards against.</p><p><strong>Is it shared across dimensions?</strong> No &mdash; it produces one value per cell-state dimension, so each can be managed independently.</p><p><strong>Do GRUs have a forget gate?</strong> Not separately. Its update gate does the job of both forget and input, with coupled coefficients.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>The forget gate outputs one retention coefficient per cell-state dimension, between 0 and 1.</li><li>It multiplies the old cell state elementwise, so each dimension is kept or cleared independently.</li><li>Trained gates learn to clear state at sentence, clause and topic boundaries.</li><li><code>∂cₜ/∂cₜ₋₁</code> is exactly the forget gate &mdash; near 1 means the gradient survives many steps.</li><li>Initialise its bias to 1 so memory is preserved by default and the network learns when to clear.</li></ul>
                 </div>
             </div>
@@ -619,7 +622,7 @@ class Cell(nn.Module):
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

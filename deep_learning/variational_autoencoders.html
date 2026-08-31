@@ -231,29 +231,32 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Turning an autoencoder into something you can sample from, and the two forces that have to be balanced to do it.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-encoding-to-a-distribution">Encoding to a distribution</h3>
+                    <h3>The problem with a plain autoencoder</h3>
+                    <p>An [autoencoder](autoencoders.html) maps each input to a single point in the latent space, and nothing organises those points. Nearby codes need not decode to similar things, and the space between clusters is undefined territory.</p><p>So you cannot generate. Pick a random latent vector and decode it, and you almost certainly land somewhere the decoder was never trained, and the output is noise.</p><p>A VAE fixes this by making the latent space <strong>continuous and bounded</strong> &mdash; by construction, not by hope.</p>
+                </div>
+                <div>
+                    <h3>Encoding to a distribution</h3>
                     <p>The encoder outputs a mean and a standard deviation rather than a point, and the code is *sampled* from that distribution during training.</p><p>That single change does the work. Because the same input produces different codes on different passes, the decoder must handle a whole neighbourhood, not a point. Neighbourhoods overlap and the space fills in.</p><p>Drag the sigma control and watch the clusters spread. At small sigma you have a plain autoencoder again, with tight clumps and gaps between them. At large sigma the neighbourhoods swallow each other.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-reparameterisation-trick">The reparameterisation trick</h3>
+                    <h3>The reparameterisation trick</h3>
                     <p>There is an obstacle: you cannot backpropagate through a sampling operation. Sampling is not a differentiable function of the parameters that produced the distribution.</p><p>The trick is to move the randomness out of the path:</p><pre><code>z  =  mu  +  sigma * epsilon        with epsilon ~ N(0, 1)</code></pre><p>Now the random part, <code>epsilon</code>, is an input rather than an operation. The gradient flows to <code>mu</code> and <code>sigma</code> normally, because with <code>epsilon</code> fixed the expression is an ordinary differentiable function of them.</p><p>That is the whole trick, it is two lines of code, and VAEs were not trainable without it. It reappears in other places where a sample must be differentiated through &mdash; the Gumbel-softmax does the same job for discrete variables.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-two-terms-in-tension">Two terms in tension</h3>
+                    <h3>Two terms in tension</h3>
                     <pre><code>loss  =  reconstruction error  +  KL( encoder distribution || prior )</code></pre><p>The <strong>reconstruction</strong> term wants tight, well-separated codes: the easiest thing to decode accurately.</p><p>The <strong>KL</strong> term wants every encoded distribution to look like the prior &mdash; the dashed circle. It is what makes the space samplable, because if every code looks like a draw from the prior then a draw from the prior looks like a code.</p><p>They pull against each other, and the readout names which is winning.</p><p><strong>KL winning</strong> is *posterior collapse*: the encoder outputs the prior regardless of input, the clusters merge, and the decoder ignores the latent entirely. Raise sigma or lower the separation to see it.</p><p><strong>Reconstruction winning</strong> gives tight clusters with empty space between them &mdash; excellent reconstruction, and sampling lands in the gaps.</p><p>The usual control is <strong>beta-VAE</strong>, which weights the KL term explicitly. High beta pushes towards disentangled but blurry; low beta towards sharp but not samplable. Many implementations also *anneal* beta from zero, letting reconstruction establish itself before the KL pressure arrives.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-jensen-and-where-the-loss-comes-from">Jensen, and where the loss comes from</h3>
+                    <h3>Jensen, and where the loss comes from</h3>
                     <p>That loss is not arbitrary. The quantity you actually want to maximise is <code>log p(x)</code>, which contains an intractable integral over the latent.</p><p>[Jensen's inequality](../maths/jensens_inequality.html) converts it into a lower bound &mdash; the <strong>ELBO</strong> &mdash; which decomposes into exactly the two terms above. Maximising the bound cannot decrease the true likelihood, and the gap between them is a KL divergence.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-against-gans">Against GANs</h3>
+                    <h3>Against GANs</h3>
                     <p>VAEs give a principled objective, a meaningful latent space, stable training and a likelihood bound. Their samples are <strong>blurry</strong>, because the pixel-wise reconstruction term rewards hedging: when uncertain, the average of the possibilities scores better than any single one.</p><p>[GANs](generative_adversarial_networks.html) produce sharp samples and are far harder to train. Diffusion models have largely displaced both for image generation, and the VAE survives inside them &mdash; latent diffusion runs the diffusion process in a VAE's latent space rather than in pixels.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Posterior collapse</strong>, especially with a powerful decoder that can do well without the latent. Anneal the KL, or weaken the decoder.</p><p><strong>Expecting sharp samples.</strong> The blur is structural.</p><p><strong>Forgetting the reparameterisation trick.</strong> Without it there is no gradient.</p><p><strong>Reading latent dimensions as meaningful.</strong> A plain VAE is not disentangled; beta-VAE encourages it and does not guarantee it.</p>
                 </div>
             </div>
@@ -311,7 +314,7 @@
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

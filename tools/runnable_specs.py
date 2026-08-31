@@ -64,7 +64,47 @@ def _pandas_prelude():
     )
 
 
+def _sklearn_prelude():
+    """Pay scikit-learn's import cost during page load rather than on Run.
+
+    Measured in a Pyodide worker on this runner: the interpreter takes ~6s, the
+    wheels ~8s cold and almost nothing warm, and importing numpy and sklearn a
+    further ~12s. Fitting a model, once all of that has happened, takes 47
+    milliseconds - so the whole cost is startup, and the runner already shows a
+    loading state while a prelude runs, which makes the prelude the right place
+    for it.
+
+    Two things are deliberately left out. The estimators: `from
+    sklearn.linear_model import LinearRegression` belongs in the reader's editor
+    where they can see it, and costs ~1.5s once per page.
+
+    And pandas. It is in the packages list, so it is downloaded and importable,
+    but importing it here measured at another ~7s on every page in the track -
+    on top of 33s - when only the preprocessing modules use it. Left out, those
+    modules pay it on their own first Run and the rest of the track does not pay
+    it at all. The pyarrow filter still has to be installed here, before any
+    import of pandas anywhere, which is why it stays even though pandas does
+    not: warning filters are global and outlive this prelude.
+    """
+    return (
+        "import warnings\n\n"
+        "warnings.filterwarnings(\n"
+        "    \"ignore\", message=\"(?s).*Pyarrow will become a required.*\")\n\n"
+        "import numpy\n"
+        "import sklearn\n"
+    )
+
+
 SPECS = {
+    "sklearn": {
+        # scikit-learn ships with Pyodide, so this is a CDN fetch rather than a
+        # wheel - and scikit-learn brings numpy, scipy, joblib and openblas
+        # with it. See _sklearn_prelude for what that costs and why pandas is here.
+        "packages": "scikit-learn,pandas",
+        "label": "scikit-learn",
+        "filename": "example_%02d.py",
+        "prelude": _sklearn_prelude,
+    },
     "matplotlib": {
         # matplotlib ships with Pyodide, so this is a CDN fetch rather than a
         # wheel. numpy comes with it and is used throughout the track.

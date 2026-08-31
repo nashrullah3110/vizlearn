@@ -455,30 +455,33 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Set operators combine whole result sets vertically, stacking rows rather than widening them. That is the difference from a JOIN, and it is the point people miss most often.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-three-operators">The three operators</h3>
+                    <h3>Stacking, not joining</h3>
+                    <p>A JOIN combines tables <strong>horizontally</strong>: matching rows are linked and the result has the columns of both. A set operator combines result sets <strong>vertically</strong>: rows from the second query are stacked under rows from the first, and the column count does not change.</p><p>So the question a set operator answers is “which rows appear in these two result sets?”, not “what belongs together?”. If you want columns from two tables, you need a JOIN; if you want the rows from two similar queries treated as one collection, you need these.</p>
+                </div>
+                <div>
+                    <h3>The three operators</h3>
                     <p>Take two result sets, A = {1, 2, 3} and B = {2, 3, 4}:</p><p>A UNION B&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr; 1, 2, 3, 4&nbsp;&nbsp;&nbsp;in either, duplicates removed<br>A UNION ALL B&nbsp;&rarr; 1,2,3,2,3,4&nbsp;&nbsp;everything, duplicates kept<br>A INTERSECT B &rarr; 2, 3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in both<br>A EXCEPT B&nbsp;&nbsp;&nbsp;&nbsp;&rarr; 1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in A but not B</p><p>Two things are worth noting. <strong>EXCEPT is not symmetric</strong> &mdash; <span class="mono-font">B EXCEPT A</span> gives 4, a different answer. And UNION, INTERSECT and EXCEPT all remove duplicates by default, which is a genuine cost: the database must sort or hash the entire result to find them.</p><p>Some databases spell EXCEPT as MINUS (Oracle), and the semantics are the same.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-rules-every-set-operator-enforces">The rules every set operator enforces</h3>
+                    <h3>The rules every set operator enforces</h3>
                     <ul><li><strong>Same number of columns</strong> in both queries.</li><li><strong>Compatible types</strong>, position by position &mdash; the first column of one must be comparable with the first column of the other.</li><li><strong>Column names come from the first query.</strong> The second query’s aliases are ignored entirely.</li><li><strong>ORDER BY applies to the whole result</strong> and may appear only once, at the very end. It cannot be attached to an individual branch.</li></ul><p>Note that matching is <em>positional</em>, not by name. If the first query selects (id, name) and the second selects (name, id), and both are text-compatible, the query runs and silently returns nonsense.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-stacking-results-not-joining-them">Stacking results, not joining them</h3>
+                    <h3>Stacking results, not joining them</h3>
                     <p>Joins put tables side by side, matching rows on a condition. Set operators put results one on top of the other, matching them by column position.</p><pre><code class="language-sql">SELECT name, email FROM customers
 UNION
 SELECT name, email FROM suppliers;</code></pre><p>Three operators cover the whole topic:</p><ul><li><strong><code>UNION</code></strong> &mdash; everything from both, duplicates removed.</li><li><strong><code>INTERSECT</code></strong> &mdash; only rows appearing in both.</li><li><strong><code>EXCEPT</code></strong> (called <code>MINUS</code> in Oracle) &mdash; rows in the first result that are not in the second.</li></ul><p>Each has an <code>ALL</code> variant that keeps duplicates: <code>UNION ALL</code>, <code>INTERSECT ALL</code>, <code>EXCEPT ALL</code>.</p><p>The rules every set operator enforces:</p><ol><li>Both queries must return the <strong>same number of columns</strong>.</li><li>Corresponding columns must have <strong>compatible types</strong>.</li><li>Column names come from the <strong>first</strong> query; names in the second are ignored.</li><li><code>ORDER BY</code> applies to the combined result and goes at the very end, once.</li></ol><p>Matching is by <em>position</em>, not by name. <code>SELECT name, email</code> unioned with <code>SELECT email, name</code> compiles happily and produces nonsense &mdash; a real bug that type compatibility often fails to catch, since both columns are text.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-union-versus-union-all-and-why-the-default-is-th">UNION versus UNION ALL, and why the default is the slow one</h3>
+                    <h3>UNION versus UNION ALL, and why the default is the slow one</h3>
                     <p><code>UNION</code> removes duplicates, and removing duplicates means sorting or hashing the entire combined result. <code>UNION ALL</code> simply concatenates.</p><p>On a million rows, the difference is large &mdash; often several times the runtime, plus the memory for the sort. And most of the time the deduplication is unnecessary, because the two queries return inherently distinct rows: this year's orders and last year's orders cannot overlap.</p><p>The habit worth forming: <strong>write <code>UNION ALL</code> by default, and use <code>UNION</code> only when you specifically need duplicates removed and cannot rule them out.</strong> That is the reverse of what most people do, and it is the right way round.</p><pre><code class="language-sql">-- combining partitioned tables: overlap is impossible
 SELECT * FROM orders_2025
 UNION ALL
 SELECT * FROM orders_2026;</code></pre>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-intersect-and-except-are-actually-for">What INTERSECT and EXCEPT are actually for</h3>
+                    <h3>What INTERSECT and EXCEPT are actually for</h3>
                     <p>Both express set membership questions that would otherwise need subqueries.</p><pre><code class="language-sql">-- customers who are also suppliers
 SELECT email FROM customers
 INTERSECT
@@ -490,23 +493,23 @@ EXCEPT
 SELECT customer_id FROM orders;</code></pre><p>The <code>EXCEPT</code> form is the readable alternative to <code>NOT IN</code> &mdash; and unlike <code>NOT IN</code>, it handles NULLs correctly, treating them as comparable to each other. That alone is a reason to prefer it.</p><p>Two behavioural details worth knowing. Set operators treat two NULLs as duplicates of each other, which is the opposite of <code>=</code> semantics and consistent with <code>GROUP BY</code>. And <code>EXCEPT</code> removes <em>all</em> copies of a matching row, not one per occurrence, unless you use <code>EXCEPT ALL</code>.</p><p>Precedence: <code>INTERSECT</code> binds more tightly than <code>UNION</code> and <code>EXCEPT</code>, so mixed expressions need parentheses to mean what you intend.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-exploration-guide">Exploration guide</h3>
-                    <ol><li><strong>Compare UNION with UNION ALL.</strong> Switch <strong>Operator</strong> between them and count the rows. The difference is exactly the duplicates &mdash; and UNION paid to find them.<button class="vz-run" type="button" data-vz-run="0" aria-label="Run this experiment in the visualisation: Compare UNION with UNION ALL"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Look at INTERSECT.</strong> Only rows present in both sides survive. This is the set equivalent of an inner join on every column at once.<button class="vz-run" type="button" data-vz-run="1" aria-label="Run this experiment in the visualisation: Look at INTERSECT"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Reverse EXCEPT.</strong> Note which rows survive, then imagine swapping the two queries. The answer changes completely &mdash; order matters here and nowhere else among the three.<button class="vz-run" type="button" data-vz-run="2" aria-label="Run this experiment in the visualisation: Reverse EXCEPT"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Watch the duplicate handling.</strong> With duplicates present in the source, see which operators collapse them and which do not.</li></ol>
+                    <h3>Exploration guide</h3>
+                    <ol><li><strong>Compare UNION with UNION ALL.</strong> Switch <strong>Operator</strong> between them and count the rows. The difference is exactly the duplicates &mdash; and UNION paid to find them.</li><li><strong>Look at INTERSECT.</strong> Only rows present in both sides survive. This is the set equivalent of an inner join on every column at once.</li><li><strong>Reverse EXCEPT.</strong> Note which rows survive, then imagine swapping the two queries. The answer changes completely &mdash; order matters here and nowhere else among the three.</li><li><strong>Watch the duplicate handling.</strong> With duplicates present in the source, see which operators collapse them and which do not.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-union-all-is-usually-the-one-you-want">UNION ALL is usually the one you want</h3>
+                    <h3>UNION ALL is usually the one you want</h3>
                     <p>UNION performs a deduplication pass over the combined result, which means a sort or a hash of every row. When you know the two sets cannot overlap &mdash; last month’s orders and this month’s orders, or partitioned tables split by region &mdash; that work finds nothing and you have paid for it anyway.</p><p>UNION ALL simply concatenates and is frequently several times faster on large result sets. Use UNION only when duplicates are genuinely possible <em>and</em> you want them removed; reach for UNION ALL by default and add the deduplication deliberately.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-trips-people-up">What trips people up</h3>
+                    <h3>What trips people up</h3>
                     <ul><li><strong>Using UNION out of habit.</strong> The unnecessary deduplication is one of the more common avoidable costs in reporting queries.</li><li><strong>Mismatched column order.</strong> Positional matching means compatible-but-wrong orderings run happily and return garbage.</li><li><strong>Expecting EXCEPT to be symmetric.</strong> Swapping the operands gives a different result.</li><li><strong>Putting ORDER BY on a branch.</strong> It belongs once, at the end, and applies to the whole combined set.</li><li><strong>Reaching for a set operator when a JOIN is needed.</strong> If you want columns from both tables, no set operator will do it &mdash; they only ever stack rows.</li></ul>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-to-remember">What to remember</h3>
+                    <h3>What to remember</h3>
                     <p>UNION, INTERSECT and EXCEPT combine result sets vertically, requiring the same column count and compatible types matched by position rather than name. All three deduplicate by default, which costs a full sort or hash &mdash; so prefer UNION ALL unless you specifically need duplicates removed. EXCEPT is the only one where operand order changes the answer, and none of them is a substitute for a JOIN.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-practical-uses">Practical uses</h3>
+                    <h3>Practical uses</h3>
                     <ul><li><strong>Combining partitioned or archived tables</strong> into one result, which is the classic <code>UNION ALL</code> case.</li><li><strong>Comparing two datasets during a migration.</strong> Run <code>A EXCEPT B</code> and <code>B EXCEPT A</code>; if both return nothing, the datasets are identical. This is the fastest reconciliation check there is.</li><li><strong>Adding a total row</strong> to a report by unioning the detail with an aggregate.</li><li><strong>Merging results from different sources</strong> that happen to share a shape &mdash; internal customers and external ones, current staff and alumni.</li><li><strong>Expressing "in this list but not that one"</strong> without a correlated subquery.</li></ul><p>A worked reconciliation:</p><pre><code class="language-sql">-- rows in the old table missing from the new one
 SELECT id, amount FROM legacy_payments
 EXCEPT
@@ -520,15 +523,15 @@ EXCEPT
 SELECT id, amount FROM legacy_payments;</code></pre><p>An empty result means the migration is clean. Anything returned is a discrepancy with its side identifiable by which half produced it.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-performance-notes">Performance notes</h3>
+                    <h3>Performance notes</h3>
                     <ul><li>Every deduplicating variant costs a sort or hash. Prefer <code>ALL</code> unless you need otherwise.</li><li>Each branch is executed independently, so index each of them well &mdash; a set operator does not make a slow branch faster.</li><li><code>ORDER BY</code> at the end sorts the combined result, and cannot use an index from either branch.</li><li>With <code>LIMIT</code> after a <code>UNION</code>, the engine generally has to produce both branches fully before it can apply the limit. Pushing the limit into each branch first (each with its own <code>ORDER BY</code>) is often much faster.</li><li>For very large <code>UNION ALL</code> sets over the same shape of data, consider whether the tables should be genuine partitions of one table instead &mdash; the planner then handles the combination itself.</li></ul>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Do the column names have to match?</strong> No &mdash; only the count and the types. The first query's names are used for the result.</p><p><strong>Can I <code>ORDER BY</code> inside one branch?</strong> Not usefully; the combined result is what gets ordered. The exception is when a branch has its own <code>LIMIT</code>, where the inner ordering is meaningful &mdash; wrap that branch in a subquery.</p><p><strong>Is <code>UNION</code> the same as a <code>FULL OUTER JOIN</code>?</strong> No. <code>UNION</code> stacks rows vertically; a join widens rows horizontally by matching them.</p><p><strong>Does <code>INTERSECT</code> work with different column counts?</strong> No &mdash; the same rule applies to all set operators.</p><p><strong>Which engines support <code>INTERSECT</code> and <code>EXCEPT</code>?</strong> PostgreSQL, SQL Server, SQLite and Oracle (as <code>MINUS</code>). MySQL added them in 8.0.31; before that, <code>INNER JOIN</code> and <code>LEFT JOIN ... IS NULL</code> were the workarounds.</p><p><strong>How do NULLs behave?</strong> Two NULLs count as duplicates for deduplication and as matching rows for <code>INTERSECT</code> and <code>EXCEPT</code> &mdash; deliberately unlike <code>=</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Set operators stack results vertically; joins combine them horizontally.</li><li><code>UNION</code> deduplicates, <code>UNION ALL</code> does not &mdash; and <code>ALL</code> should be your default.</li><li><code>INTERSECT</code> keeps rows in both; <code>EXCEPT</code> keeps rows in the first only, and handles NULLs better than <code>NOT IN</code>.</li><li>Columns match by position, not name; the first query names the result.</li><li><code>A EXCEPT B</code> plus <code>B EXCEPT A</code> is the quickest way to prove two datasets are identical.</li></ul>
                 </div>
             </div>
@@ -638,7 +641,7 @@ SELECT id, amount FROM legacy_payments;</code></pre><p>An empty result means the
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

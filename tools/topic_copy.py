@@ -110,6 +110,39 @@ TOPIC_SECTIONS = {
             "guessable."
         ),
     },
+    "sklearn": {
+        "learn": [
+            "Reach for fit, predict and transform on any estimator in the "
+            "library, and swap one model for another without changing the code "
+            "around it.",
+            "Split data so that the score you report is one you can believe, and "
+            "recognise the shapes of leakage that quietly inflate it.",
+            "Put every preprocessing step inside a Pipeline, so that what is "
+            "fitted on the training fold stays fitted on the training fold.",
+            "Choose a metric that answers the question actually being asked, "
+            "rather than the one that reads highest.",
+            "Tune hyperparameters with a search that is itself cross-validated, "
+            "and know what the resulting number does and does not mean.",
+        ],
+        "order": "The estimator API comes first, because it is the part that "
+                 "transfers to every model in the library. Then data - shapes, "
+                 "loading, and the train/test split that everything after it "
+                 "depends on. Regression and classification arrive next as the "
+                 "two shapes of supervised problem, followed immediately by "
+                 "evaluation, because a model without an honest score is not "
+                 "worth having. Preprocessing, pipelines and column handling "
+                 "come after that, since they are where leakage creeps in. The "
+                 "later modules are the estimators worth knowing, tuning, and "
+                 "the unsupervised pair.",
+        "next": "The track ends where a real project begins: a pipeline you can "
+                "cross-validate, tune and save. What comes after is mostly not "
+                "scikit-learn - gradient boosting libraries, deep learning, and "
+                "the deployment and monitoring that decide whether a model is "
+                "any use in production.",
+        "more": "The NumPy and pandas tracks cover the arrays and frames that "
+                "feed every estimator here, and the Machine Learning track "
+                "covers the theory these modules apply.",
+    },
     "pydantic": {
         "learn": [
             "Describe the shape of incoming data as a model, and let the library reject what does not fit.",

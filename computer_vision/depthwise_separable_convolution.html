@@ -231,31 +231,34 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">One convolution split into two, and why almost every model that runs on a phone is built from them.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-doing-them-one-at-a-time">Doing them one at a time</h3>
+                    <h3>What a full convolution is doing</h3>
+                    <p>A 3&#215;3 convolution from 64 channels to 128 does two jobs at once. At every output position it looks at a 3&#215;3 spatial neighbourhood, and it combines all 64 input channels. Each of the 128 output channels needs its own set of weights for all of that, so the count is:</p><pre><code>k * k * Cin * Cout  =  3 * 3 * 64 * 128  =  73,728</code></pre><p>The question that leads to separable convolutions is whether those two jobs have to be done together.</p>
+                </div>
+                <div>
+                    <h3>Doing them one at a time</h3>
                     <p><strong>Depthwise.</strong> Run one <code>k</code>&#215;<code>k</code> filter per input channel, and keep the channels apart. Channel 7 is convolved with filter 7 and produces channel 7 of the output. Neighbours are mixed; channels are not. Cost: <code>k * k * Cin</code>, so <code>9 * 64 = 576</code>.</p><p><strong>Pointwise.</strong> Follow it with a [1&#215;1 convolution](one_by_one_convolutions.html), which combines all the channels at each position and has no spatial extent at all. Channels are mixed; neighbours are not. Cost: <code>Cin * Cout</code>, so <code>64 * 128 = 8,192</code>.</p><p>Together: <strong>8,768</strong> against 73,728 for the same input and output shape. Drag the controls and the ratio in the readout stays close to 8&ndash;9&#215; wherever you put them.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-the-ratio-comes-from">Where the ratio comes from</h3>
+                    <h3>Where the ratio comes from</h3>
                     <p>The saving is</p><pre><code>    k^2 * Cin * Cout
   ---------------------   =   1 / ( 1/Cout + 1/k^2 )
    k^2 * Cin + Cin * Cout</code></pre><p>When <code>Cout</code> is large the <code>1/Cout</code> term nearly vanishes and the ratio approaches <code>k^2</code> &mdash; nine for a 3&#215;3. Set the kernel control to 5 or 7 and the saving rises toward 25 and 49, which is why separable convolutions matter more the larger the kernel.</p><p>Set output channels to 8 while leaving input at 64 and the ratio falls, because with few output channels the pointwise step is no longer cheap relative to the whole. The technique earns its keep in wide layers, which is where the cost was.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-cost-of-the-saving">The cost of the saving</h3>
+                    <h3>The cost of the saving</h3>
                     <p>It is not free, and pretending otherwise is the usual mistake.</p><p>A full convolution can learn any function of a 3&#215;3&#215;<code>Cin</code> neighbourhood. The separable pair cannot: it is restricted to functions that factor into a spatial part and a channel part. That is a strictly smaller family, and on the same architecture a separable model usually reaches slightly lower accuracy per layer.</p><p>What makes it worth doing is that the saving is much larger than the loss. With eight times fewer parameters you can afford more layers, wider layers, or a model that fits on the device at all &mdash; and the resulting network usually beats the full-convolution one at equal cost.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-is-used">Where it is used</h3>
+                    <h3>Where it is used</h3>
                     <p><strong>MobileNet</strong> is built almost entirely from these pairs, and was the paper that made the technique standard for on-device vision.</p><p><strong>Xception</strong> applied the same argument to Inception, arguing that Inception modules were already approximating a separable convolution and that the extreme version worked better.</p><p><strong>EfficientNet</strong> uses inverted residual blocks that expand channels with a 1&#215;1, do the spatial work depthwise, and project back down &mdash; the same decomposition with an expansion around it.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-note-on-speed">A note on speed</h3>
+                    <h3>A note on speed</h3>
                     <p>Parameter count and wall-clock time are not the same thing. A depthwise convolution does very little arithmetic per byte of memory it touches, so it is <strong>memory-bound</strong>, and hardware optimised for dense matrix multiplication does not reach anything like its peak throughput on one.</p><p>An eight-times parameter reduction is therefore often two or three times faster in practice rather than eight. Still worth having, and worth measuring rather than assuming.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Expecting the speed-up to match the parameter count.</strong> Measure it.</p><p><strong>Using it in the first layer.</strong> With three input channels there is almost nothing to save, and the restriction costs accuracy where the model can least afford it.</p><p><strong>Forgetting the non-linearity.</strong> The depthwise and pointwise steps need an activation between them, or the pair is closer to a single linear map than the two-stage decomposition it is supposed to be.</p>
                 </div>
             </div>
@@ -313,7 +316,7 @@
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>

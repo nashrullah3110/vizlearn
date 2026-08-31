@@ -324,34 +324,38 @@ print("-> b still before a, because they tied and stability preserved it")</scri
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">sorted arranges items by comparing them. key= lets you say what to compare instead &mdash; a length, a field, a computed score &mdash; without touching the items themselves.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-sorted-versus-sort">sorted() versus .sort()</h3>
+                    <h3>key is a function of one item</h3>
+                    <p>sorted(words, key=len)</p><p><code>key</code> is called once per item and returns the value to sort on. Here <code>len</code> turns each word into its length, and the words come back shortest first. The items in the result are still the words; only the comparison changed.</p><p>Anything callable works: a builtin, a lambda, a named function.</p><pre><code class="language-python">sorted(people, key=lambda p: p[1])    # by the second element
+sorted(rows, key=lambda r: r[&quot;score&quot;])  # by a dict field</code></pre>
+                </div>
+                <div>
+                    <h3>sorted() versus .sort()</h3>
                     <pre><code class="language-python">new = sorted(nums)  # a new list, original untouched
 nums.sort()         # rearranges in place, returns None</code></pre><p>The trap is writing <code>nums = nums.sort()</code>, which assigns <code>None</code> and destroys the list. It is a common enough mistake that recognising it is worth more than the rule: if a sort produced <code>None</code>, this is why.</p><p><code>.sort()</code> exists only on lists. <code>sorted()</code> accepts any iterable &mdash; a tuple, a string, a set, a dict (giving its keys) &mdash; and always hands back a list.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-stability-and-why-it-matters">Stability, and why it matters</h3>
+                    <h3>Stability, and why it matters</h3>
                     <p>Python's sort is stable: items that compare equal keep their original relative order. That is what makes multi-pass sorting work. Sort by name, then sort the result by score, and entries with the same score are still in name order. The page shows this directly, sorting only by the number and pointing out that the tied items did not shuffle.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-performance-note">The performance note</h3>
+                    <h3>The performance note</h3>
                     <p><code>key</code> is called exactly once per item, not on every comparison, so an expensive key function is affordable. Doing the same work inside a comparison would cost far more.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-sorting-by-more-than-one-thing">Sorting by more than one thing</h3>
+                    <h3>Sorting by more than one thing</h3>
                     <p>Return a tuple, and the sort compares position by position:</p><pre><code class="language-python">sorted(people, key=lambda p: (p.surname, p.forename))</code></pre><p>Surname first, forename only where surnames match. This extends to as many levels as you need, and it is far easier to get right than sorting repeatedly.</p><p>Mixing directions is the awkward case, because <code>reverse=True</code> applies to the whole sort. For numbers, negating one component works: <code>key=lambda p: (-p.score, p.name)</code> gives highest score first, then name ascending. For strings there is no negation, and the usual answer is two stable sorts, applied least significant first.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-in-place-methods-return-none">Why in-place methods return None</h3>
+                    <h3>Why in-place methods return None</h3>
                     <p><code>nums.sort()</code> returning <code>None</code> looks like an oversight and is a deliberate convention that runs through the whole standard library. <code>list.reverse</code>, <code>list.append</code>, <code>list.extend</code>, <code>dict.update</code> and <code>set.add</code> all return <code>None</code> for the same reason: they changed the object rather than producing a new one, and returning the object would invite <code>x = x.sort()</code>, which reads as though a new list came back.</p><p>By returning nothing, the method makes that line obviously wrong the moment you try to use the result. The <code>None</code> is not a missing return value; it is the signal that the work happened somewhere else.</p><p>Once the convention is familiar it becomes a reading aid. A method that returns <code>None</code> mutated something. A function that returns a value left its inputs alone. <code>sorted</code>, <code>reversed</code>, <code>sorted</code>'s relatives in <code>itertools</code>, and every string method follow the second pattern, which is why none of them ever surprise you by changing what you passed in.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-same-key-everywhere">The same key everywhere</h3>
+                    <h3>The same key everywhere</h3>
                     <p><code>key</code> is not a sorting feature. <code>min</code>, <code>max</code> and <code>itertools.groupby</code> all take it and mean the same thing by it, so <code>max(people, key=lambda p: p.score)</code> finds the top scorer without sorting anything - which is both faster and clearer than sorting and taking the last element.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-worked-example-ranking-records">A worked example: ranking records</h3>
+                    <h3>A worked example: ranking records</h3>
                     <p>The shape that comes up constantly &mdash; sort records by one field, break ties with another, and print them aligned:</p><pre><code class="language-python">rows = [
     {&quot;name&quot;: &quot;ana&quot;, &quot;score&quot;: 91, &quot;team&quot;: &quot;red&quot;},
     {&quot;name&quot;: &quot;bo&quot;, &quot;score&quot;: 78, &quot;team&quot;: &quot;blue&quot;},
@@ -364,7 +368,7 @@ cy     91  blue
 bo     78  blue</code></pre><p>The key returns a tuple, so the sort compares scores first and names only where scores tie. The minus sign reverses the score alone, which <code>reverse=True</code> could not do &mdash; it would have reversed the names as well, putting <code>cy</code> before <code>ana</code>.</p><p>This is worth having in your fingers, because "highest first, then alphabetical" is what almost every leaderboard, report and ranking actually wants, and it is one expression rather than a comparison function.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-sorting-things-that-cannot-be-compared">Sorting things that cannot be compared</h3>
+                    <h3>Sorting things that cannot be compared</h3>
                     <p>Python refuses to guess an order between unrelated types:</p><pre><code class="language-python">try:
     sorted([3, &quot;1&quot;, 2])
 except TypeError as e:
@@ -372,15 +376,15 @@ except TypeError as e:
 print(sorted(rows, key=lambda r: (r[1] is None, r[1])))</code></pre><pre><code>[(&#x27;cy&#x27;, 78), (&#x27;ana&#x27;, 91), (&#x27;bo&#x27;, None)]</code></pre><p>The first element of the key is a boolean, and <code>False</code> sorts before <code>True</code>, so everything with a value comes first and the missing ones collect at the end. Swap it to <code>r[1] is not None</code> to put them first instead. The second element is only ever compared between rows that agree on the first, so <code>None</code> is never compared with a number.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-case-accents-and-numbers-inside-strings">Case, accents and numbers inside strings</h3>
+                    <h3>Case, accents and numbers inside strings</h3>
                     <p>Sorting text has three traps that only appear once the data stops being tidy.</p><p><strong>Case.</strong> The default sort is by code point, so every capital letter sorts before every lowercase one and <code>["banana", "Apple"]</code> comes back with <code>Apple</code> first. <code>key=str.lower</code> fixes it, and <code>key=str.casefold</code> is the stricter version for text that is not guaranteed to be English.</p><p><strong>Accents.</strong> <code>é</code> sorts after <code>z</code> by code point, which is wrong in every language that uses it. The standard library's <code>locale.strxfrm</code> sorts according to the user's locale, and for anything serious the <code>PyICU</code> library does it properly. For an internal report, <code>unicodedata.normalize</code> plus stripping the combining marks is often enough.</p><p><strong>Numbers inside names.</strong> <code>["file10", "file2"]</code> sorts with <code>file10</code> first, because <code>1</code> is before <code>2</code> as text. This is the "natural sort" problem, and the fix is a key that splits the string into text and numeric runs and converts the numeric ones, so the comparison happens between integers rather than digits.</p><p>All three have the same shape as everything else on this page: the data is not what you want to compare, so transform it in the key and leave it alone in the result.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-sorting-costs-and-when-not-to">What sorting costs, and when not to</h3>
+                    <h3>What sorting costs, and when not to</h3>
                     <p>Python's sort is Timsort, which is O(n log n) in general and considerably faster than that on data with existing order &mdash; already-sorted input is close to linear, and so is data made of sorted runs. That is not an accident; it was designed for real data, which is usually partly ordered.</p><p>The practical consequence is that sorting is cheap enough to stop thinking about at ordinary sizes. Where it is worth thinking about is when you do not actually need a sorted sequence:</p><p>If you want the single largest or smallest item, <code>max</code> and <code>min</code> take the same <code>key</code> and do it in one pass rather than n log n. If you want the top few, <code>heapq.nlargest(k, items, key=...)</code> beats sorting when k is small relative to n. If you want to know whether anything qualifies, <code>any</code> with a generator stops at the first hit. And if you are sorting the same list repeatedly inside a loop, sort it once outside the loop instead.</p><p>The one that catches people is sorting to find a maximum. <code>sorted(items)[-1]</code> is correct, does far more work than necessary, and reads less clearly than <code>max(items)</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-grouping-which-needs-sorting-first">Grouping, which needs sorting first</h3>
+                    <h3>Grouping, which needs sorting first</h3>
                     <p><code>itertools.groupby</code> collapses runs of equal items into groups, and it is the most common reason to sort something you did not otherwise need in order.</p><p>The important property is that it only groups *adjacent* items. It walks the sequence once and starts a new group whenever the key changes, which means unsorted input produces a group every time the value changes back and forth rather than one group per distinct value. Sorting by the same key first is what makes the grouping complete, and forgetting to is the single mistake everyone makes with it once.</p><pre><code class="language-python">from itertools import groupby
 
 rows = [(&quot;red&quot;, &quot;ana&quot;), (&quot;blue&quot;, &quot;bo&quot;), (&quot;red&quot;, &quot;cy&quot;)]
@@ -391,15 +395,15 @@ for team, members in groupby(rows, key=lambda r: r[0]):
 red [&#x27;ana&#x27;, &#x27;cy&#x27;]</code></pre><p>The same <code>key</code> appears twice, in the sort and in the group, and it has to be the same key for the result to make sense. The second thing to know is that the groups are iterators over the original sequence, not lists, and they become invalid once you move to the next group &mdash; which is why the example materialises each one inside the loop rather than collecting the groups and using them afterwards.</p><p>For grouping without sorting, a <code>defaultdict(list)</code> and a single loop is simpler, does not require order, and gives you real lists. <code>groupby</code> earns its place when the data is already sorted, when the sequence is too large to hold, or when you want the runs rather than the totals.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-making-your-own-objects-sortable">Making your own objects sortable</h3>
+                    <h3>Making your own objects sortable</h3>
                     <p><code>key=</code> handles most cases, and occasionally the ordering belongs to the object itself rather than to one call site. Then the object should carry it.</p><p>Defining <code>__lt__</code> is enough for <code>sorted</code>, <code>min</code> and <code>max</code>, because they need only "is this one less than that one". The other comparisons &mdash; <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code> &mdash; are separate methods and are not inferred, so an object with only <code>__lt__</code> sorts correctly and raises on <code>&gt;=</code>. <code>functools.total_ordering</code> fills the rest in from <code>__lt__</code> and <code>__eq__</code>, at a small runtime cost.</p><p>The shorter route is a dataclass. <code>@dataclass(order=True)</code> writes all six comparison methods, comparing the fields in the order they are declared, which is exactly the tuple-key behaviour with the tuple written for you. Fields you do not want in the comparison are excluded with <code>field(compare=False)</code>, which is how you keep a name or an id out of the ordering while leaving it on the object.</p><p>The judgement is about where the ordering belongs. If there is one natural order for the type &mdash; a version number, a date range, a playing card &mdash; put it on the class and every call site benefits. If different callers want different orders, <code>key=</code> at each call site is the honest answer, and building one in as "the" order will mislead the next reader.</p><p>One rule applies whichever you choose: the ordering must be consistent with equality, and it must be total. Objects that compare equal must not also compare less-than, and every pair must be comparable. A sort that receives an inconsistent ordering does not raise; it produces a result that is quietly wrong and changes with the input order.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Can <code>key</code> return anything?</strong> Anything comparable with itself. Numbers, strings and tuples of those are the usual choices.</p><p><strong>How do I sort descending by one field and ascending by another?</strong> Negate the descending one in a tuple key, or do two stable sorts, least significant first.</p><p><strong>Does <code>sorted</code> work on a dictionary?</strong> Yes, and it sorts the keys. Use <code>d.items()</code> when you want pairs.</p><p><strong>Is <code>reverse=True</code> the same as reversing afterwards?</strong> Not exactly. <code>reverse=True</code> keeps ties in their original order; sorting then reversing flips the ties too.</p><p><strong>What happened to <code>cmp</code>?</strong> Removed in Python 3. If you genuinely need a comparison function, <code>functools.cmp_to_key</code> converts one into a key.</p><p><strong>Can I sort a generator?</strong> Yes &mdash; <code>sorted</code> accepts any iterable and returns a list. It has to consume the whole thing to do it.</p><p><strong>Why is my sort not stable?</strong> It is. If tied items appear to move, the key is distinguishing them in a way you did not intend.</p><p><strong>Does sorting a list of dictionaries need a key?</strong> Yes. Dictionaries are not orderable, so without one you get a <code>TypeError</code>.</p><p><strong>How large can a list be before sorting is slow?</strong> Far larger than most programs handle. Sorting a million small items takes well under a second, and the cost is usually dominated by whatever built the list.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li><code>key</code> transforms each item once and sorts on the result; the items you get back are unchanged.</li><li>A tuple key gives tiebreaks; negate a number to reverse one field without reversing the rest.</li><li><code>sorted</code> returns a new list, <code>.sort()</code> returns <code>None</code> &mdash; that <code>None</code> is the convention for every in-place method.</li><li>The sort is stable, which is what makes two-pass sorting work.</li><li><code>max</code>, <code>min</code>, <code>heapq.nlargest</code> and <code>groupby</code> take the same <code>key</code>; reach for them when you do not need everything in order.</li></ul>
                 </div>
             </div>
@@ -457,7 +461,7 @@ red [&#x27;ana&#x27;, &#x27;cy&#x27;]</code></pre><p>The same <code>key</code> a
             </div>
             <nav class="vz-foot-col" aria-label="Tracks">
                 <h2 class="vz-foot-head">Tracks</h2>
-                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../maths/">Maths for Machine Learning</a></li><li><a href="../machine_learning/">Machine Learning</a></li><li><a href="../deep_learning/">Deep Learning</a></li><li><a href="../dsa/">Algorithms &amp; Data Structures</a></li><li><a href="../natural_language_processing/">Natural Language Processing</a></li><li><a href="../computer_vision/">Computer Vision</a></li><li><a href="../database/">Databases &amp; SQL</a></li><li><a href="../gen_ai/">Generative AI &amp; LLMs</a></li><li><a href="../python/">Python</a></li><li><a href="../pydantic/">Pydantic</a></li><li><a href="../fastapi/">FastAPI</a></li><li><a href="../numpy/">NumPy</a></li><li><a href="../pandas/">pandas</a></li><li><a href="../matplotlib/">matplotlib</a></li><li><a href="../sklearn/">scikit-learn</a></li><li><a href="../interview/">Interview Questions</a></li></ul>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
