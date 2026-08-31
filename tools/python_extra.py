@@ -6289,6 +6289,18 @@ possible and are standard style.
 <strong>How do I handle "at least one of these must be true"?</strong> `or`, or
 `any()` over a list of conditions when there are more than two or three.
 
+<strong>Does an early return make a function harder to debug?</strong> No. A
+breakpoint on each guard is as easy as one at the top, and the stack is
+shallower when it fires.
+
+<strong>What about conditions that are expensive to evaluate?</strong> Order
+them cheapest first. Short-circuiting means an expensive check is skipped
+whenever a cheaper one has already decided the answer.
+
+<strong>Is a dictionary lookup ever a replacement for the whole thing?</strong>
+Yes, when every branch is comparing one value against a constant. That is the
+dispatch table from the dictionary methods page.
+
 ## Recap in one screen
 
 - If the inner `if` is the entire body of the outer one, the two conditions are
@@ -6722,6 +6734,18 @@ guessing is where mojibake comes from.
 
 <strong>Can I convert a dictionary to a list of pairs?</strong>
 `list(d.items())`. Plain `list(d)` gives the keys.
+
+<strong>Should I annotate types instead of converting?</strong> They are
+different jobs. An annotation documents and is checked by tools; it does not
+convert anything at runtime.
+
+<strong>How do I convert a string to a date?</strong>
+`datetime.strptime(text, fmt)` with an explicit format, or
+`datetime.fromisoformat` for ISO-8601 text. Neither guesses.
+
+<strong>What does `int()` with no argument give?</strong> Zero. Every numeric
+constructor called with nothing returns its zero value, which is occasionally
+useful as a default factory.
 
 ## Recap in one screen
 
