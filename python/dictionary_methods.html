@@ -337,56 +337,51 @@ print("merge with |:", {"a": 1} | {"b": 2})</script>
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">A handful of dictionary methods replace the same few blocks of code people write by hand. Learning them is mostly learning to recognise the pattern they collapse.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>get, instead of checking first</h3>
-                    <pre><code class="language-python">prices[&quot;kiwi&quot;]        # KeyError
-prices.get(&quot;kiwi&quot;)    # None
-prices.get(&quot;kiwi&quot;, 0) # 0</code></pre><p><code>get</code> is for when a missing key is expected and has a sensible default. Square brackets are for when a missing key is a bug &mdash; and there the <code>KeyError</code> is doing you a favour by failing loudly.</p><p>Do not reach for <code>get</code> reflexively. <code>d.get(k)</code> returning <code>None</code> where you expected a value produces a <code>TypeError</code> several lines later, far from the cause.</p>
-                </div>
-                <div>
-                    <h3>items, keys, values</h3>
+                    <h3 id="vz-s-items-keys-values">items, keys, values</h3>
                     <p>for k, v in d.items():</p><p><code>items()</code> is what you want most of the time. Plain <code>for k in d</code> iterates keys, which is easy to forget and produces a confusing error when you then treat <code>k</code> as a value.</p><p>All three are views, not lists: they reflect later changes to the dict and are cheap to create. Wrap in <code>list()</code> if you need a snapshot &mdash; and you do need one if you intend to modify the dict while looping.</p>
                 </div>
                 <div>
-                    <h3>The counting pattern</h3>
+                    <h3 id="vz-s-the-counting-pattern">The counting pattern</h3>
                     <p>The block everyone writes first:</p><pre><code class="language-python">if w in counts:
     counts[w] += 1
 else:
     counts[w] = 1</code></pre><p>collapses to:</p><p>counts[w] = counts.get(w, 0) + 1</p><p>and, if counting is all you are doing, to <code>Counter(words)</code> from <code>collections</code>, which is faster and says what it means.</p>
                 </div>
                 <div>
-                    <h3>The grouping pattern</h3>
+                    <h3 id="vz-s-the-grouping-pattern">The grouping pattern</h3>
                     <p>teams.setdefault(team, []).append(name)</p><p><code>setdefault</code> returns the value at that key, inserting the default first if the key was absent. So this reads "get the list for this team, making an empty one if needed, and append to it" &mdash; three lines in one.</p><p><code>defaultdict(list)</code> does the same job when every access should create a default. <code>setdefault</code> is better when only some do.</p>
                 </div>
                 <div>
-                    <h3>pop and update</h3>
+                    <h3 id="vz-s-pop-and-update">pop and update</h3>
                     <pre><code class="language-python">d.pop(&quot;a&quot;)         # remove and return; raises if absent
 d.pop(&quot;a&quot;, None)   # ...unless given a default
 d.update(other)    # merge in place
 a | b            # a new merged dict (3.9+)</code></pre><p>With <code>|</code>, the right-hand side wins on conflicts, which makes <code>defaults | overrides</code> a clean way to layer configuration.</p>
                 </div>
                 <div>
-                    <h3>Views, and why they are not lists</h3>
+                    <h3 id="vz-s-views-and-why-they-are-not-lists">Views, and why they are not lists</h3>
                     <p><code>keys()</code>, <code>values()</code> and <code>items()</code> return views: live windows onto the dictionary rather than snapshots of it. Add a key and every existing view reflects it immediately, because a view holds no data of its own.</p><p>That is efficient and it has one consequence worth knowing. Modifying a dictionary while looping over one of its views raises <code>RuntimeError: dictionary changed size during iteration</code>. The fix is to iterate over a snapshot:</p><pre><code class="language-python">for key in list(d):
     if should_remove(key):
         del d[key]</code></pre><p><code>list(d)</code> copies the keys first, so the loop is walking its own list and the dictionary is free to change underneath.</p><p>Key and item views also behave like sets, which is occasionally very handy: <code>d1.keys() & d2.keys()</code> gives the keys both dictionaries share, without a loop.</p>
                 </div>
                 <div>
-                    <h3>Order is guaranteed now</h3>
+                    <h3 id="vz-s-order-is-guaranteed-now">Order is guaranteed now</h3>
                     <p>Since Python 3.7, dictionaries keep insertion order as a language guarantee rather than an implementation accident. That is why <code>dict.fromkeys(items)</code> is the standard order-preserving deduplication, and why iterating a dictionary produces a stable, predictable sequence.</p><p>It does not make a dictionary a substitute for a sorted structure - the order is insertion order, not sorted order - but it does mean you can rely on what you put in first coming out first.</p>
                 </div>
                 <div>
-                    <h3>Choosing between get, setdefault and defaultdict</h3>
+                    <h3 id="vz-s-choosing-between-get-setdefault-and-defaultdict">Choosing between get, setdefault and defaultdict</h3>
                     <p>Three tools that overlap, and the distinction is about what should happen when a key is missing.</p><p><code>get</code> reads and never writes. Use it when a missing key has a sensible fallback and you do not want to add anything to the dictionary.</p><p><code>setdefault</code> reads and writes: it inserts the default when the key is absent and returns whatever is now there. Use it for the grouping idiom, where you want the list to exist so you can append to it.</p><p><code>defaultdict(list)</code> moves that behaviour into the dictionary itself, so every missing key springs into existence on access. Use it when *every* access should create a default. Its downside is exactly that: a typo'd key lookup silently creates an empty entry instead of raising, which can mask a bug.</p>
                 </div>
                 <div>
-                    <h3>Merging</h3>
+                    <h3 id="vz-s-merging">Merging</h3>
                     <pre><code class="language-python">merged = {**defaults, **overrides}     # 3.5+
 merged = defaults | overrides          # 3.9+
 defaults |= overrides                  # in place</code></pre><p>Later keys win in all three. This is the clean way to layer configuration, and it beats a loop of <code>if key not in d</code> conditions because the precedence is stated by the order of the operands rather than buried in the logic.</p>
                 </div>
                 <div>
-                    <h3>Counter, and the four things it gives you</h3>
+                    <h3 id="vz-s-counter-and-the-four-things-it-gives-you">Counter, and the four things it gives you</h3>
                     <p>Counting is common enough that the standard library has a dictionary subclass for it, and knowing four of its behaviours removes a lot of hand-written code:</p><pre><code class="language-python">from collections import Counter
 
 text = &quot;the cat and the hat and the bat&quot;
@@ -399,11 +394,11 @@ print(sum(counts.values()))</code></pre><pre><code>[(&#x27;the&#x27;, 3), (&#x27
 8</code></pre><p>First, it counts anything iterable in one call, so the loop disappears. Second, <code>most_common(n)</code> sorts by count and gives the top n, which is the question people actually want answered and is otherwise a <code>sorted</code> with a <code>key</code>. Third, a missing key returns 0 rather than raising &mdash; and, unlike <code>defaultdict</code>, it does not insert the key on access, so reading does not quietly grow the dictionary. Fourth, counters support arithmetic: <code>a + b</code> merges counts and <code>a - b</code> subtracts them, which is a neat way to diff two collections.</p><p>It is still a dictionary, so everything else on this page applies to it.</p>
                 </div>
                 <div>
-                    <h3>What can be a key, and why</h3>
+                    <h3 id="vz-s-what-can-be-a-key-and-why">What can be a key, and why</h3>
                     <p>Any object can be a key if it is hashable, which in practice means immutable all the way down. Strings, numbers, booleans and tuples of those are fine. Lists, dictionaries and sets are not, and a tuple containing a list is not either, because hashing it has to hash its contents.</p><p>The reason is how a dictionary works. It computes a hash of the key, uses that to decide where to store the entry, and looks in the same place later. If a key could change after insertion, its hash would change, and the entry would be sitting somewhere the lookup will never search. Rather than allow that, Python refuses to hash mutable types at all.</p><p>Two consequences are worth knowing. <code>1</code>, <code>1.0</code> and <code>True</code> all hash the same and compare equal, so they are the *same key* &mdash; <code>{1: "a", True: "b"}</code> has one entry. And a tuple key is the standard way to index by more than one thing: <code>grid[(row, col)]</code> is a perfectly ordinary dictionary lookup, and the brackets around the tuple are optional.</p><p>Custom classes are hashable by default, using identity, which means two distinct instances with identical contents are different keys. If you want them to be the same key, define <code>__eq__</code> and <code>__hash__</code> together &mdash; or use a frozen dataclass, which writes both for you.</p>
                 </div>
                 <div>
-                    <h3>A dictionary instead of a chain of elif</h3>
+                    <h3 id="vz-s-a-dictionary-instead-of-a-chain-of-elif">A dictionary instead of a chain of elif</h3>
                     <p>Once functions can be values, a dictionary replaces a whole shape of code:</p><pre><code class="language-python">def add(a, b): return a + b
 def sub(a, b): return a - b
 
@@ -414,19 +409,19 @@ print(OPS.get(&quot;*&quot;, lambda a, b: None)(3, 4))</code></pre><pre><code>7
 None</code></pre><p>Compared with an <code>if</code>/<code>elif</code> chain, this separates the table of options from the code that uses it. Adding an operation is one dictionary entry rather than another branch, the set of valid options can be listed with <code>OPS.keys()</code>, and the same table can drive a help message or validate input.</p><p>The pattern generalises well beyond arithmetic: handlers keyed by message type, formatters keyed by file extension, validators keyed by field name. It is the same idea as the menu earlier in the track, and it is worth reaching for whenever a chain of <code>elif</code> is comparing one value against a list of constants.</p><p>Where an <code>if</code> chain is still better: when the conditions are not simple equality &mdash; ranges, combinations, anything needing <code>and</code> &mdash; a dictionary cannot express the question, and forcing it to is worse than the chain.</p>
                 </div>
                 <div>
-                    <h3>Getting the items out in a useful order</h3>
+                    <h3 id="vz-s-getting-the-items-out-in-a-useful-order">Getting the items out in a useful order</h3>
                     <p>A dictionary keeps insertion order, which is rarely the order you want to report in. <code>sorted</code> takes the same <code>key</code> argument here as everywhere else, and <code>d.items()</code> gives it pairs to work with.</p><p>Sorting by key is <code>sorted(d.items())</code>, which works because tuples compare element by element and the key is first. Sorting by value needs a key function that reaches for the second element &mdash; <code>key=lambda kv: kv[1]</code>, or <code>key=itemgetter(1)</code> &mdash; and adding <code>reverse=True</code> gives you largest first. For a top-n rather than a full sort, <code>heapq.nlargest(3, d.items(), key=...)</code> does less work, and <code>Counter.most_common(3)</code> does it for you when the values are counts.</p><p>The result is a list of tuples, not a dictionary. If you need a dictionary back in that order, wrap it: <code>dict(sorted(d.items()))</code> builds a new one, and since 3.7 the insertion order it gets is the sorted order you just produced. This is the standard way to produce a "sorted dictionary" in Python, and it is worth knowing that it is a snapshot &mdash; later insertions go on the end, not into their sorted position.</p><p>One detail that bites when sorting by value: ties come out in whatever order they were already in, because <code>sorted</code> is stable. That is usually what you want, and when it is not, the fix is a tuple key that names the tiebreak explicitly, such as <code>key=lambda kv: (-kv[1], kv[0])</code> for "highest count first, then alphabetical".</p>
                 </div>
                 <div>
-                    <h3>Comprehensions over dictionaries</h3>
+                    <h3 id="vz-s-comprehensions-over-dictionaries">Comprehensions over dictionaries</h3>
                     <p>The methods on this page and dictionary comprehensions cover the same ground from two directions, and knowing which reads better saves a lot of loops.</p><p>A comprehension is the right tool when you are building a new dictionary from an old one: filtering out entries below a threshold, transforming every value, swapping keys and values, or building a lookup table from a list of records. <code>{k: v for k, v in d.items() if v &gt; 0}</code> is one line, and the alternative is three lines with an accumulator.</p><p>The methods are the right tool when you are updating a dictionary in place, or when the operation has a name &mdash; <code>update</code>, <code>setdefault</code>, <code>pop</code>. Rebuilding a whole dictionary with a comprehension in order to change one entry is wasteful and reads as though something more complicated is happening.</p><p>The case where people reach for the wrong one is counting and grouping. A comprehension cannot accumulate, because each iteration produces an independent entry with no access to what came before. That is exactly why <code>Counter</code>, <code>setdefault</code> and <code>defaultdict</code> exist, and why a grouping loop stays a loop.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>Is <code>d.get(k)</code> the same as <code>d[k]</code> with a <code>try</code>?</strong> Effectively yes, and <code>get</code> is clearer. Use brackets when a missing key means a bug.</p><p><strong>Why did my loop raise "dictionary changed size during iteration"?</strong> Because you added or removed a key while iterating a live view. Iterate <code>list(d)</code> instead.</p><p><strong>What is the difference between <code>update</code> and <code>|</code>?</strong> <code>update</code> modifies in place and returns <code>None</code>; <code>|</code> returns a new dictionary and leaves both operands alone.</p><p><strong>Are dictionaries sorted?</strong> No. They keep insertion order, which is not the same thing. <code>sorted(d.items())</code> when you want sorted.</p><p><strong>How do I invert a dictionary?</strong> <code>{v: k for k, v in d.items()}</code>, remembering that duplicate values collapse &mdash; the last one wins.</p><p><strong>Is <code>defaultdict</code> always better than <code>setdefault</code>?</strong> No. <code>defaultdict</code> creates an entry on any missing lookup, including a typo, which can hide bugs. Use it when every access should create a default.</p><p><strong>How do I get the first key?</strong> <code>next(iter(d))</code>. There is no indexing, because a dictionary is not a sequence.</p><p><strong>Can I use <code>+</code> to merge two dictionaries?</strong> No. Use <code>|</code> on 3.9 and later, <code>{<strong>a, </strong>b}</code> before that, or <code>update</code> for in-place.</p><p><strong>Does <code>pop</code> work without a key?</strong> <code>popitem()</code> removes and returns the last inserted pair, which is useful for draining a dictionary in a loop.</p><p><strong>How do I count without importing Counter?</strong> <code>d[k] = d.get(k, 0) + 1</code> in a loop. <code>Counter</code> is faster and clearer, but the one-liner is worth knowing for when the import is not worth it.</p><p><strong>What happens if I use an unhashable key by mistake?</strong> You get <code>TypeError: unhashable type: 'list'</code> at the moment of insertion, which names the type and is one of the clearer error messages in the language.</p><p><strong>Is there a frozen dictionary?</strong> Not in the standard library. <code>types.MappingProxyType(d)</code> gives a read-only view of one, which covers most of the reasons people want it.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li><code>get</code> reads with a fallback, <code>setdefault</code> reads and inserts, <code>defaultdict</code> inserts on every miss &mdash; pick by what should happen to the dictionary.</li><li><code>items()</code> is the loop you usually want; <code>keys()</code>, <code>values()</code> and <code>items()</code> are live views, not snapshots.</li><li>Iterate <code>list(d)</code> whenever the loop body might change the dictionary.</li><li>Keys must be hashable, which means immutable all the way down; tuples are the standard multi-part key.</li><li>A dictionary of functions replaces a chain of <code>elif</code> that is testing one value against constants.</li></ul>
                 </div>
             </div>

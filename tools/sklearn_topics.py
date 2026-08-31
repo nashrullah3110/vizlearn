@@ -4957,10 +4957,10 @@ topic(
     "Models",
     "The one model you can read end to end - and the one whose answer changes "
     "when you resample the data.",
-    _svg(_box(64, 14, 32, 16, S, A) + _txt(80, 25, "x < 2?", A, 7) +
+    _svg(_box(64, 14, 32, 16, S, A) + _txt(80, 25, "x &lt; 2?", A, 7) +
          _arrow(72, 32, 46, 44) + _arrow(88, 32, 114, 44) +
          _box(30, 46, 32, 16, S, M) + _txt(46, 57, "class 0", M, 7) +
-         _box(98, 46, 32, 16, S, M) + _txt(114, 57, "x < 7?", M, 7) +
+         _box(98, 46, 32, 16, S, M) + _txt(114, 57, "x &lt; 7?", M, 7) +
          _arrow(106, 64, 92, 74) + _arrow(122, 64, 136, 74) +
          _box(76, 74, 32, 14, S, M) + _box(122, 74, 30, 14, S, M)),
     [

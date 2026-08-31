@@ -520,64 +520,61 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Both failures look like poor performance and need opposite fixes. Telling them apart is a question of whether the model can even represent the pattern, or whether it has memorised the noise around it.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>A concrete demonstration</h3>
-                    <p>Fit ten data points that follow a gentle curve with a little noise on top.</p><ul><li><strong>Degree 1</strong> (a straight line) cannot bend at all. It misses the shape everywhere &mdash; high error on training data <em>and</em> new data. Underfitting.</li><li><strong>Degree 9</strong> through ten points passes exactly through every one. Training error is zero, and between the points the curve swings wildly to values the real pattern never produces. Overfitting.</li><li><strong>Degree 3</strong> follows the trend and ignores the jitter. Slightly worse on the training set than degree 9, considerably better on anything new.</li></ul><p>The degree-9 model is not "more accurate". It has memorised the noise, and noise does not repeat.</p>
-                </div>
-                <div>
-                    <h3>The bias-variance decomposition</h3>
+                    <h3 id="vz-s-the-bias-variance-decomposition">The bias-variance decomposition</h3>
                     <p>Expected error on unseen data splits into three parts:</p><p>error = bias&sup2; + variance + irreducible noise</p><strong>Bias</strong> is error from wrong assumptions &mdash; a model too simple to represent the real relationship. High bias is underfitting, and it shows up as poor performance on training <em>and</em> validation data.<strong>Variance</strong> is sensitivity to the particular training sample &mdash; a model flexible enough to fit noise. High variance is overfitting: excellent training performance, poor validation performance.<strong>Irreducible noise</strong> is the part no model can remove. If the same inputs sometimes produce different outputs, no amount of capacity will fix it, and a validation loss that flattens above zero is often this rather than a failure.<p>Capacity trades the first two against each other: adding it lowers bias and raises variance. The best model sits where their sum is smallest, not where either is minimised.</p>
                 </div>
                 <div>
-                    <h3>Telling them apart from two numbers</h3>
+                    <h3 id="vz-s-telling-them-apart-from-two-numbers">Telling them apart from two numbers</h3>
                     <p>The diagnosis needs only the training and validation loss, compared against each other and against what is achievable:</p><ul><li><strong>Both high, close together</strong> &mdash; underfitting. The model cannot represent the pattern. Add capacity, train longer, or reduce regularisation.</li><li><strong>Training low, validation much higher</strong> &mdash; overfitting. The model has memorised. Add data, add regularisation, or reduce capacity.</li><li><strong>Both low, close together</strong> &mdash; this is what you want.</li><li><strong>Training loss above validation loss</strong> &mdash; usually not a paradox but an artefact: dropout and batch norm are active during training and disabled at validation, so the training number is measured on a handicapped model.</li></ul>
                 </div>
                 <div>
-                    <h3>Fixes, in the order worth trying</h3>
+                    <h3 id="vz-s-fixes-in-the-order-worth-trying">Fixes, in the order worth trying</h3>
                     <p>For <strong>overfitting</strong>, more data is the only fix with no downside, and augmentation is the cheap approximation to it. After that: early stopping, which costs nothing; then dropout or weight decay; and only then a smaller model, since shrinking capacity is the bluntest option.</p><p>For <strong>underfitting</strong>, first confirm the model is training at all &mdash; a learning rate that is too high or too low looks exactly like insufficient capacity. Then widen or deepen the network, remove regularisation, train for longer, or improve the features. A model that cannot overfit a small subset of the training data has a bug, not a capacity problem, and that is the fastest test to run.</p>
                 </div>
                 <div>
-                    <h3>Two ways to be wrong</h3>
+                    <h3 id="vz-s-two-ways-to-be-wrong">Two ways to be wrong</h3>
                     <p><strong>Underfitting</strong> is a model too simple to capture the pattern. Training error is high, validation error is high, and the two are similar. The model has not learned enough.</p><p><strong>Overfitting</strong> is a model that learned the training data including its noise. Training error is very low, validation error is much higher, and the gap is the symptom. The model learned too much of the wrong thing.</p><p>The diagnosis needs only two numbers:</p><div class="vz-table-wrap"><table><thead><tr><th>Training error</th><th>Validation error</th><th>Diagnosis</th></tr></thead><tbody><tr><td>High</td><td>High, similar</td><td>Underfitting</td></tr><tr><td>Low</td><td>Much higher</td><td>Overfitting</td></tr><tr><td>Low</td><td>Low, similar</td><td>A good fit</td></tr><tr><td>High</td><td>Lower than training</td><td>A bug or a leak</td></tr></tbody></table></div><p>That last row is worth naming: validation better than training usually means augmentation is applied only to training data, dropout is inflating training loss, or the split leaked.</p>
                 </div>
                 <div>
-                    <h3>Reading the training curve</h3>
+                    <h3 id="vz-s-reading-the-training-curve">Reading the training curve</h3>
                     <p>Plot both losses against epochs and the shape tells you what is happening.</p><p><strong>Both falling, still close:</strong> keep training.</p><p><strong>Both flat and high from early on:</strong> underfitting. The model, the features or the learning rate is the problem.</p><p><strong>Training falling, validation flattening then rising:</strong> the classic overfitting signature. The point where validation turns up is where the model stopped generalising and started memorising, and it is exactly where early stopping should trigger.</p><p><strong>Validation noisy but not trending:</strong> normal. Judge the trend over several epochs, not one.</p><p>A related check: if training accuracy reaches 100%, the model has memorised the training set. That is not automatically bad &mdash; large networks often do this and still generalise &mdash; but the validation curve is the only thing that tells you which case you are in.</p>
                 </div>
                 <div>
-                    <h3>Fixing underfitting</h3>
+                    <h3 id="vz-s-fixing-underfitting">Fixing underfitting</h3>
                     <p>The model needs more capacity or better inputs.</p><ul><li><strong>A bigger model</strong> &mdash; more layers, more units.</li><li><strong>Better features.</strong> On tabular data this usually matters more than the architecture.</li><li><strong>Train longer.</strong> Check the curve is genuinely flat and not still descending.</li><li><strong>Less regularisation</strong> &mdash; lower dropout, less weight decay.</li><li><strong>A better learning rate.</strong> A rate far too low looks exactly like underfitting.</li><li><strong>Check for bugs.</strong> Wrong labels, a broken loss, or gradients not reaching the parameters all present as underfitting.</li></ul><p>The sanity check that settles it: try to overfit a tiny subset &mdash; 20 examples &mdash; deliberately. A correct model and training loop should reach near-zero loss on 20 examples within a few hundred steps. If it cannot, the problem is a bug, not capacity, and no amount of tuning will help.</p>
                 </div>
                 <div>
-                    <h3>Try this above</h3>
-                    <ol><li>Set <strong>Model Complexity</strong> to its minimum. The fitted curve cannot follow the data no matter how many <strong>Target Epochs</strong> you allow &mdash; more training will never fix underfitting.</li><li>Push complexity to maximum and watch the curve thread every single point, including the ones that are clearly noise.</li><li>Now raise <strong>Data Noise</strong> and repeat both. The high-complexity model gets dramatically worse; the low-complexity one barely changes, because it was never paying attention to the noise.</li><li>Use <strong>Sim Speed</strong> to slow the fit and watch the moment the curve starts chasing individual points.</li></ol>
+                    <h3 id="vz-s-try-this-above">Try this above</h3>
+                    <ol><li>Set <strong>Model Complexity</strong> to its minimum. The fitted curve cannot follow the data no matter how many <strong>Target Epochs</strong> you allow &mdash; more training will never fix underfitting.<button class="vz-run" type="button" data-vz-run="0" aria-label="Run this experiment in the visualisation: Model Complexity"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li>Push complexity to maximum and watch the curve thread every single point, including the ones that are clearly noise.</li><li>Now raise <strong>Data Noise</strong> and repeat both. The high-complexity model gets dramatically worse; the low-complexity one barely changes, because it was never paying attention to the noise.</li><li>Use <strong>Sim Speed</strong> to slow the fit and watch the moment the curve starts chasing individual points.</li></ol>
                 </div>
                 <div>
-                    <h3>Which lever to pull</h3>
+                    <h3 id="vz-s-which-lever-to-pull">Which lever to pull</h3>
                     <p>They need opposite treatment, which is why diagnosing correctly matters more than any individual fix.</p><ul><li><strong>Underfitting</strong> &mdash; more capacity, better features, train longer, reduce regularisation.</li><li><strong>Overfitting</strong> &mdash; more data, less capacity, more regularisation (dropout, weight decay), early stopping.</li></ul>
                 </div>
                 <div>
-                    <h3>What usually goes wrong</h3>
+                    <h3 id="vz-s-what-usually-goes-wrong">What usually goes wrong</h3>
                     <p><strong>Treating overfitting by training less.</strong> Early stopping helps, but if a model overfits after two epochs the real problem is capacity against data volume, not epoch count.<strong>Adding data to fix underfitting.</strong> More data does not help a model that lacks the capacity to represent the pattern in the first place. It is the standard remedy for overfitting and close to useless for the opposite.</p>
                 </div>
                 <div>
-                    <h3>In one line</h3>
+                    <h3 id="vz-s-in-one-line">In one line</h3>
                     <p>Too little capacity misses the signal; too much memorises the noise &mdash; and the cures point in opposite directions.</p>
                 </div>
                 <div>
-                    <h3>Fixing overfitting</h3>
+                    <h3 id="vz-s-fixing-overfitting">Fixing overfitting</h3>
                     <p>In rough order of effectiveness:</p><p><strong>More data.</strong> The only fix that reduces variance without adding bias, and the reason "get more data" is such a reliable answer.</p><p><strong>Data augmentation.</strong> Effectively more data, and often the single biggest improvement on image tasks with a few thousand examples.</p><p><strong>Early stopping.</strong> Free, and it directly targets the moment overfitting begins. Keep the best checkpoint, not the last.</p><p><strong>Weight decay.</strong> Penalises large weights, pulling the model towards simpler solutions. Always worth having on.</p><p><strong>Dropout.</strong> Standard in dense layers and transformers, less used in modern convolutional networks.</p><p><strong>A smaller model.</strong> Effective and blunt; try the regularisers first, since a smaller model also lowers the achievable ceiling.</p><p><strong>Transfer learning.</strong> With a few hundred examples, fine-tuning a pretrained model beats training a smaller one from scratch by a wide margin.</p><p><strong>Label smoothing and mixup.</strong> Soften the targets so the model is not pushed towards absolute confidence.</p>
                 </div>
                 <div>
-                    <h3>The modern complication: double descent</h3>
+                    <h3 id="vz-s-the-modern-complication-double-descent">The modern complication: double descent</h3>
                     <p>The classical picture &mdash; a U-shaped test error, with a sweet spot of complexity in the middle &mdash; is incomplete for very large models.</p><p>As model size grows, test error falls, then rises around the point where the model can exactly interpolate the training data, and then <em>falls again</em> as the model grows larger still. Very large networks often generalise well despite fitting their training data perfectly, which classical theory did not predict.</p><p>Two practical implications. Training accuracy of 100% is not by itself evidence of a problem &mdash; look at validation. And with modern architectures, "make the model smaller" is a less automatic response than it used to be; more data, augmentation and regularisation usually beat shrinking the network.</p><p>The classical U-curve is still real. It is now understood as the first half of a longer story.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>How big a train/validation gap is acceptable?</strong> There is no universal number. What matters is whether validation performance is good enough and stable. A 2% gap on a hard task may be fine; a 30% gap rarely is.</p><p><strong>Can a model overfit and underfit at once?</strong> Yes &mdash; high bias and high variance together, usually from a badly chosen model plus insufficient data. Both errors are large and the gap is also large.</p><p><strong>Does more data always help?</strong> With overfitting, yes. With underfitting, no &mdash; a linear model fitted to a million points is still linear.</p><p><strong>Should I stop as soon as validation loss rises?</strong> Use patience &mdash; wait several epochs, since validation loss is noisy and can dip and recover.</p><p><strong>Is 100% training accuracy bad?</strong> Not necessarily, for large models. The validation curve is the evidence that matters.</p><p><strong>How do I know if it is a bug rather than underfitting?</strong> Try to overfit 20 examples. If you cannot, it is a bug.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>Underfitting: both errors high and similar. Overfitting: training low, validation much higher.</li><li>The gap measures variance; the level of the training error measures bias.</li><li>Fix underfitting with capacity, features, longer training and less regularisation.</li><li>Fix overfitting with more data, augmentation, early stopping, weight decay and dropout.</li><li>Always try to overfit a tiny subset first &mdash; failing that test means a bug, not a modelling problem.</li></ul>
                 </div>
             </div>

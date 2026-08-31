@@ -231,28 +231,25 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Manufacturing an orthonormal basis, and the factorisation that makes least squares numerically respectable.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The procedure</h3>
-                    <p>Start with vectors that span what you want but are not perpendicular. Gram- Schmidt makes them perpendicular without changing what they span.</p><p><strong>First vector</strong>: divide by its length. That is <code>q1</code> &mdash; same direction, length 1.</p><p><strong>Second vector</strong>: it points partly along <code>q1</code> and partly perpendicular to it. [Project](projections.html) it onto <code>q1</code>, subtract that projection, and what is left is perpendicular by construction. Normalise it to get <code>q2</code>.</p><p>The visualisation draws each step. The dashed grey lines are the originals. The solid orange segment is the projection being removed, and the short dashed line is the remainder that becomes <code>q2</code>. The readout gives <code>q1 . q2</code> &mdash; zero to six decimal places, because it cannot be anything else.</p><p>For more vectors the pattern repeats: subtract the components along everything already fixed, normalise what survives.</p>
-                </div>
-                <div>
-                    <h3>Where R comes from</h3>
+                    <h3 id="vz-s-where-r-comes-from">Where R comes from</h3>
                     <p>The projections you subtract are not discarded. Collect them and you have <code>R</code>, and together:</p><pre><code>A  =  Q R</code></pre><p><code>Q</code> has the orthonormal vectors as columns; <code>R</code> is upper triangular.</p><p><code>R</code> is triangular for a structural reason worth seeing: the first original vector is built from <code>q1</code> alone, the second from <code>q1</code> and <code>q2</code>, the third from the first three. Nothing is ever built from a <code>q</code> that comes later, so everything below the diagonal is zero.</p><p>Drag until the two input vectors nearly align. The remainder shrinks toward zero and <code>R</code> becomes nearly singular &mdash; which is the same near-dependence [the basis module](basis_span_and_orthogonality.html) warns about, showing up as a small number on the diagonal.</p>
                 </div>
                 <div>
-                    <h3>Why least squares uses it</h3>
+                    <h3 id="vz-s-why-least-squares-uses-it">Why least squares uses it</h3>
                     <p>The textbook solution to least squares is the normal equations:</p><pre><code>x  =  (A&#x27;A)^-1 A&#x27; b</code></pre><p>Correct, and numerically poor. Forming <code>A'A</code> <strong>squares the condition number</strong>. A matrix with condition number 10&#8310; &mdash; unremarkable for real data &mdash; becomes 10&#185;&#178;, and in double precision that has consumed most of the available accuracy before the solve begins.</p><p>QR avoids it. Substituting <code>A = QR</code> and using <code>Q'Q = I</code>:</p><pre><code>R x  =  Q&#x27; b</code></pre><p><code>R</code> is triangular, so this is solved by back-substitution in one pass, and the condition number is never squared. That is why <code>numpy.linalg.lstsq</code>, R's <code>lm</code> and essentially every serious least-squares routine uses QR or an [SVD](singular_value_decomposition.html) rather than the formula in the textbook.</p>
                 </div>
                 <div>
-                    <h3>Classical against modified Gram-Schmidt</h3>
+                    <h3 id="vz-s-classical-against-modified-gram-schmidt">Classical against modified Gram-Schmidt</h3>
                     <p>The version described above is *classical* Gram-Schmidt, and it is unstable in floating point: rounding errors mean the later vectors drift away from orthogonality.</p><p>*Modified* Gram-Schmidt subtracts each projection immediately rather than all at once at the end. Algebraically identical, numerically much better behaved.</p><p>Serious implementations use neither, preferring <strong>Householder reflections</strong>, which build <code>Q</code> from a sequence of reflections and are stable regardless of the input. Gram-Schmidt survives because it is the version you can see, which is why it is the version on this page.</p>
                 </div>
                 <div>
-                    <h3>Where else it turns up</h3>
+                    <h3 id="vz-s-where-else-it-turns-up">Where else it turns up</h3>
                     <p><strong>The QR algorithm</strong> for eigenvalues repeatedly factors and re-multiplies in the other order, and the result converges to a triangular matrix whose diagonal holds the eigenvalues. It is one of the most important numerical algorithms there is, and it is this decomposition in a loop.</p><p><strong>Orthogonalising features</strong> before regression, to remove collinearity.</p><p><strong>Kalman filters</strong> in square-root form, for the same conditioning reason as least squares.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>Classical Gram-Schmidt on ill-conditioned input.</strong> Use the modified version, or a library.</p><p><strong>Forming A'A because the formula is shorter.</strong> It squares the conditioning.</p><p><strong>Assuming Q is square.</strong> For a tall thin <code>A</code>, the economy QR gives a <code>Q</code> with the same shape as <code>A</code>, not a full orthogonal matrix.</p>
                 </div>
             </div>

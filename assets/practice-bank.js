@@ -20075,6 +20075,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "sklearn/decision_trees.html",
+  "title": "Decision Trees",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "Why do decision trees not need feature scaling?",
+    "o": [
+     "They scale internally",
+     "A split is a threshold on one column, so units cannot change which split is best",
+     "They only accept scaled input",
+     "They do need it"
+    ],
+    "a": 1,
+    "w": "Multiplying a column by a million left the cross-validated score identical to the fourth decimal."
+   },
+   {
+    "t": "What does an unconstrained decision tree do to the training data?",
+    "o": [
+     "Underfits",
+     "Splits until leaves are pure, reaching a training score of 1.0",
+     "Stops at depth 10",
+     "Selects features automatically"
+    ],
+    "a": 1,
+    "w": "The default stopping rule is purity, which on noisy data means roughly one leaf per row - a lookup table."
+   },
+   {
+    "t": "What happens when a tree regressor is asked about values beyond its training range?",
+    "o": [
+     "It extrapolates the trend",
+     "It returns the nearest leaf's average, flat forever",
+     "It raises an error",
+     "It returns NaN"
+    ],
+    "a": 1,
+    "w": "On a perfect straight line the tree predicted 54 for both x=25 and x=30, where the truth was 75 and 90."
+   },
+   {
+    "t": "Why is feature_importances_ unreliable for correlated features?",
+    "o": [
+     "It is computed on the test set",
+     "Whichever is split on first takes the credit and the other looks worthless",
+     "It does not sum to 1",
+     "It ignores categorical features"
+    ],
+    "a": 1,
+    "w": "The credit goes to whichever was chosen, and that choice is unstable. permutation_importance measures the question people actually mean."
+   }
+  ]
+ },
+ {
   "path": "sklearn/column_transformer.html",
   "title": "Different Columns, Different Treatment",
   "cat": "scikit-learn",
@@ -20428,6 +20479,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "It learns which side of each split the missing rows belong on, which uses the missingness rather than filling over it."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/overfitting_and_underfitting.html",
+  "title": "Overfitting and Underfitting",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "Training accuracy 1.00, test accuracy 0.72. What is happening?",
+    "o": [
+     "Underfitting",
+     "Overfitting",
+     "A bad metric",
+     "Data leakage"
+    ],
+    "a": 1,
+    "w": "A large gap with a perfect training score means the model learned the rows rather than the pattern. Both scores being low would be underfitting."
+   },
+   {
+    "t": "What does return_train_score=True buy you?",
+    "o": [
+     "A more accurate model",
+     "The gap, which distinguishes overfitting from underfitting",
+     "Faster cross-validation",
+     "Better hyperparameters"
+    ],
+    "a": 1,
+    "w": "The two failures look identical in a test score alone and need opposite remedies. The train column is what tells them apart."
+   },
+   {
+    "t": "The learning curve's train and test scores have converged. What does that mean?",
+    "o": [
+     "The model is overfitting",
+     "More data will not help much",
+     "The model needs more regularisation",
+     "The split is wrong"
+    ],
+    "a": 1,
+    "w": "Converged curves mean the model has extracted what it can from data of this kind. Improving needs a different model or better features."
+   },
+   {
+    "t": "Why does a random forest have lower variance than one deep tree?",
+    "o": [
+     "The trees are shallower",
+     "Averaging many partly independent models cancels their errors",
+     "It uses fewer features",
+     "It regularises each tree"
+    ],
+    "a": 1,
+    "w": "Measured in the editor: one tree's prediction moved by 270 across refits, the forest's by 48. That averaging is the point of bagging."
    }
   ]
  },

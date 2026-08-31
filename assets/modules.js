@@ -4476,6 +4476,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Decision Trees",
+  "path": "sklearn/decision_trees.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "Different Columns, Different Treatment",
   "path": "sklearn/column_transformer.html",
   "category": "scikit-learn",
@@ -4526,6 +4534,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Missing Values",
   "path": "sklearn/missing_values.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Overfitting and Underfitting",
+  "path": "sklearn/overfitting_and_underfitting.html",
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",

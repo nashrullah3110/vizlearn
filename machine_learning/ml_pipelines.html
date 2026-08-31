@@ -231,19 +231,16 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Not a convenience wrapper. The arrangement in which the order of operations cannot be got wrong.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The same demonstration, one level up</h3>
-                    <p>The chart is the one from the [leakage](data_leakage.html) module, relabelled: 300 rows of pure noise, five columns chosen by their correlation with the label, and a choice about *when* that choice is made.</p><p>By hand, before cross-validation, the reported accuracy sits well above the 50% the data deserves. Inside a pipeline, where every fold selects its own columns from its own training rows, it falls to the truth.</p><p>The model is identical in both. What changed is which object owns the fitting, and that is the entire argument for pipelines. It is not about tidiness.</p>
-                </div>
-                <div>
-                    <h3>What goes wrong by hand</h3>
+                    <h3 id="vz-s-what-goes-wrong-by-hand">What goes wrong by hand</h3>
                     <p>The by-hand workflow looks reasonable written out:</p><pre><code>X = impute(X)
 X = scale(X)
 X = select_features(X, y)
 scores = cross_val_score(model, X, y, cv=5)</code></pre><p>Every one of those three steps has been fitted on all the data, and <code>cross_val_score</code> then splits data that has already been contaminated. Each fold was scaled using a mean that included its own validation rows, imputed using a median that included them, and reduced to features chosen partly because they correlated with their labels.</p><p>Nothing errors. The score is simply too high, by an amount that depends on the data and cannot be estimated after the fact.</p>
                 </div>
                 <div>
-                    <h3>What a pipeline changes</h3>
+                    <h3 id="vz-s-what-a-pipeline-changes">What a pipeline changes</h3>
                     <pre><code>pipe = Pipeline([
     (&quot;impute&quot;, SimpleImputer(strategy=&quot;median&quot;)),
     (&quot;scale&quot;,  StandardScaler()),
@@ -253,17 +250,17 @@ scores = cross_val_score(model, X, y, cv=5)</code></pre><p>Every one of those th
 scores = cross_val_score(pipe, X, y, cv=5)</code></pre><p><code>cross_val_score</code> now receives one estimator. On each fold it calls <code>fit</code> on the pipeline with that fold's training rows, and the pipeline fits the imputer, then the scaler, then the feature selector, then the model &mdash; all on those rows only. Scoring calls <code>transform</code> on the validation rows using the parameters just learned.</p><p>The correct order is not something you remembered to do. It is the only thing the object can do.</p>
                 </div>
                 <div>
-                    <h3>The three other things it buys</h3>
+                    <h3 id="vz-s-the-three-other-things-it-buys">The three other things it buys</h3>
                     <p><strong>Hyperparameter search over preprocessing.</strong> Because the steps are part of one estimator, a grid can range over them:</p><pre><code>{&quot;impute__strategy&quot;: [&quot;mean&quot;, &quot;median&quot;],
  &quot;select__k&quot;: [10, 20, 40],
  &quot;model__n_neighbors&quot;: [3, 5, 11]}</code></pre><p>Whether the median beats the mean becomes a question the search answers, on the same footing as the model's own parameters. Doing this by hand correctly is possible and nobody does it.</p><p><strong>No train/serve gap.</strong> The fitted pipeline is one object. Save it, load it in the service, call <code>predict</code> on raw input. There is no second implementation of the preprocessing to drift out of step with the first &mdash; which is a real and common production failure, and a silent one.</p><p><strong>Different columns, different treatment.</strong> <code>ColumnTransformer</code> routes numeric columns to an imputer and scaler, categorical ones to a different imputer and a one-hot encoder, and text to a vectoriser, then hands the combined result to the model. That is what an actual table needs, and it stays one object.</p>
                 </div>
                 <div>
-                    <h3>Cross-validation still needs care</h3>
+                    <h3 id="vz-s-cross-validation-still-needs-care">Cross-validation still needs care</h3>
                     <p>A pipeline stops leakage between preprocessing and evaluation. It does not fix splits that were wrong to begin with.</p><p>If rows are grouped &mdash; several scans per patient &mdash; use <code>GroupKFold</code> so a patient cannot appear on both sides. If the data is a time series, use <code>TimeSeriesSplit</code> so training always precedes validation. And if you tune hyperparameters on the same folds you report, that number is optimistic too; nested cross-validation is the honest version.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>Calling <code>fit</code> on the test data.</strong> Use <code>transform</code>. <code>fit_transform</code> on the test set refits everything and undoes the whole point.</p><p><strong>Steps that are not fitted.</strong> A log transform has no parameters and cannot leak, so it does not have to be in the pipeline &mdash; but putting it there keeps the preprocessing in one place, which is worth more than the exemption.</p><p><strong>Resampling inside a plain pipeline.</strong> SMOTE and friends must run on the training fold only. <code>imblearn</code>'s pipeline handles this; scikit-learn's does not.</p><p><strong>Assuming a pipeline validates your splits.</strong> It fits each fold correctly. It cannot know that your folds mix one patient across both sides.</p>
                 </div>
             </div>

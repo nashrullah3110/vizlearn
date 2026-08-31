@@ -530,32 +530,29 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Why reinvent the wheel? Learn how to reuse powerful models trained by giant tech companies for your own custom tasks.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>What is Transfer Learning?</h3>
-                    <p>Training a Deep Convolutional Neural Network from scratch requires millions of images (like the ImageNet dataset), massive amounts of computing power (GPUs), and weeks of training time. Furthermore, early layers in a CNN generally learn the exact same things regardless of the dataset: generic edges, colors, and basic textures.</p><strong>Transfer Learning</strong> is the practice of taking a pre-trained model (whose weights have already been optimized on a massive dataset) and repurposing it for a new, related task. You are transferring the "knowledge" of visual features to a new domain.
-                </div>
-                <div>
-                    <h3>How it Works: Modifying the Architecture</h3>
+                    <h3 id="vz-s-how-it-works-modifying-the-architecture">How it Works: Modifying the Architecture</h3>
                     <p>A standard pre-trained model (like ResNet-50 or VGG-16) is split into two conceptual parts:</p><ul><li><strong>The Convolutional Base:</strong> Extracts features. We keep this part and its pre-trained weights.</li><li><strong>The Classification Head (Dense Layers):</strong> Outputs predictions for the original 1000 classes. We <strong>remove</strong> this part, because we want to predict our own classes (e.g., 2 classes for Medical X-Rays).</li></ul><p>After removing the original head, we attach a new, randomly initialized Dense layer matching our target class count. Now, we have to decide how to train this new hybrid model.</p>
                 </div>
                 <div>
-                    <h3>The Three Strategies</h3>
+                    <h3 id="vz-s-the-three-strategies">The Three Strategies</h3>
                     <ol><li><strong>Train from Scratch:</strong> <p class="font-light opacity-80 mt-1">We ignore pre-trained weights and initialize the entire network randomly. The network has no prior knowledge. The accuracy climbs very slowly, and on a small dataset, heavy models like VGG-16 will likely overfit and fail to reach high performance.</p></li><li><strong>Feature Extraction (Freeze the Base):</strong> <p class="font-light opacity-80 mt-1">We load the pre-trained weights into the Conv Base and <strong>freeze</strong> them (set them to untrainable). During training, only the weights of our newly added Dense Head are updated. The frozen base acts as a powerful feature extractor. Training is extremely fast, and accuracy jumps up quickly because the network already knows how to "see".</p></li><li><strong>Fine-Tuning (Selective Unfreezing):</strong> <p class="font-light opacity-80 mt-1">First, we perform Feature Extraction. Then, we <strong>unfreeze</strong> specific layers of the Convolutional Base (usually the top layers) and train them alongside the Dense Head using a very small learning rate. <em>(In the app, select Fine-Tune and click layers to unlock them)</em>. We keep early layers frozen (generic edges), but let later layers adapt their specific shape-detectors to our custom images. This pushes the accuracy to its absolute maximum limit.</p></li></ol>
                 </div>
                 <div>
-                    <h3>Catastrophic Forgetting</h3>
+                    <h3 id="vz-s-catastrophic-forgetting">Catastrophic Forgetting</h3>
                     <p>In Fine-Tuning mode, try unfreezing <strong>all</strong> the Convolutional layers. You will notice the accuracy curve might drop or cap lower than expected. If you unfreeze the entire network and train it on a small dataset, the massive gradients from the randomly initialized Dense Head propagate backward and wreck the delicate, pre-trained weights of the entire base. This is called Catastrophic Forgetting.</p>
                 </div>
                 <div>
-                    <h3>Reusing what another model already learned</h3>
+                    <h3 id="vz-s-reusing-what-another-model-already-learned">Reusing what another model already learned</h3>
                     <p>Training a vision model from scratch needs a great deal of data. ImageNet has 1.2 million labelled images; most projects have a few hundred.</p><p>Transfer learning closes that gap. Take a network already trained on a large dataset, keep the features it learned, and adapt only the parts that are specific to your task.</p><p>The reason it works is what the layers contain. Early layers learn edges, colours and textures &mdash; visual primitives that are useful for essentially any image task, whether the subject is animals, X-rays or circuit boards. Only the final layers are specific to the original classes.</p><p>So the recipe is: keep the general part, replace the specific part.</p><div class="vz-table-wrap"><table><thead><tr><th>Layer depth</th><th>What it learned</th><th>Reusable?</th></tr></thead><tbody><tr><td>First</td><td>Edges, colour transitions</td><td>Almost always</td></tr><tr><td>Early middle</td><td>Textures, corners, simple shapes</td><td>Usually</td></tr><tr><td>Late middle</td><td>Object parts</td><td>Often, with fine-tuning</td></tr><tr><td>Final</td><td>The original 1,000 classes</td><td>No &mdash; replace it</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3>Two strategies, and when to use each</h3>
+                    <h3 id="vz-s-two-strategies-and-when-to-use-each">Two strategies, and when to use each</h3>
                     <p><strong>Feature extraction.</strong> Freeze the entire pretrained network, replace the classifier head, and train only the head. Fast, needs little data, and very hard to overfit.</p><p><strong>Fine-tuning.</strong> Train the head first, then unfreeze some or all of the backbone and continue with a much lower learning rate. Slower, needs more data, and reaches higher accuracy when your images differ from the original dataset.</p><p>The choice depends on two things &mdash; how much data you have, and how similar it is to the pretraining data:</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>Similar to ImageNet</th><th>Very different (X-rays, satellite)</th></tr></thead><tbody><tr><td><strong>Little data</strong></td><td>Freeze everything, train the head</td><td>Freeze early layers, train the later ones</td></tr><tr><td><strong>Plenty of data</strong></td><td>Fine-tune the last few blocks</td><td>Fine-tune everything, or train from scratch</td></tr></tbody></table></div><p>The learning rate is what makes fine-tuning work or fail. Use something like 10&ndash;100&times; lower than you would for training from scratch &mdash; the pretrained weights are already good, and a large step destroys them in the first few batches. Discriminative learning rates, where earlier layers get smaller rates than later ones, are a standard refinement.</p>
                 </div>
                 <div>
-                    <h3>Doing it in code</h3>
+                    <h3 id="vz-s-doing-it-in-code">Doing it in code</h3>
                     <pre><code class="language-python">import torch
 import torch.nn as nn
 from torchvision import models
@@ -579,27 +576,27 @@ opt = torch.optim.AdamW([
 ])</code></pre><p>Two details that are easy to get wrong. Replacing <code>model.fc</code> creates a new layer with <code>requires_grad=True</code> by default, which is what you want &mdash; but check the trainable parameter count rather than assuming. And keep batch normalisation layers in evaluation mode while the backbone is frozen, or their running statistics will drift on your small dataset and quietly degrade the features.</p>
                 </div>
                 <div>
-                    <h3>The short of it</h3>
+                    <h3 id="vz-s-the-short-of-it">The short of it</h3>
                     <ul><li>Transfer Learning reuses Convolutional layers from models trained on huge datasets.</li><li><strong>Freezing</strong> a layer means its weights are locked and not updated during backpropagation.</li><li>Optimal Fine-Tuning usually involves unfreezing only the top 1 or 2 Convolutional blocks.</li><li>Different architectures (VGG vs ResNet) have vastly different parameter counts and training speeds.</li></ul>
                 </div>
                 <div>
-                    <h3>Preprocessing must match the original</h3>
+                    <h3 id="vz-s-preprocessing-must-match-the-original">Preprocessing must match the original</h3>
                     <p>A pretrained network expects its input to look statistically like what it was trained on. Three things have to match:</p><p><strong>Normalisation.</strong> ImageNet models expect per-channel standardisation with mean <code>[0.485, 0.456, 0.406]</code> and standard deviation <code>[0.229, 0.224, 0.225]</code>. Feeding 0&ndash;1 images without this shifts every activation and costs several points of accuracy for no obvious reason.</p><p><strong>Input size.</strong> Usually 224&times;224. Modern architectures tolerate other sizes thanks to global average pooling, but the features were learned at a particular scale and work best near it.</p><p><strong>Channel order.</strong> Torchvision expects RGB; OpenCV loads BGR. This mismatch produces a model that works but performs oddly, and it is a genuinely common bug.</p><p>The frameworks now ship the correct transforms alongside the weights &mdash; <code>weights.transforms()</code> in torchvision &mdash; and using that is safer than copying constants from a blog post.</p>
                 </div>
                 <div>
-                    <h3>Which backbone to start from</h3>
+                    <h3 id="vz-s-which-backbone-to-start-from">Which backbone to start from</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Backbone</th><th>Character</th></tr></thead><tbody><tr><td>ResNet-50</td><td>The reliable default; well understood, widely supported</td></tr><tr><td>EfficientNet</td><td>Better accuracy per FLOP; good on constrained hardware</td></tr><tr><td>MobileNetV3</td><td>Built for phones and edge devices</td></tr><tr><td>ConvNeXt</td><td>Modern convolutional design, transformer-inspired</td></tr><tr><td>ViT / Swin</td><td>Strong with large data and large pretraining</td></tr><tr><td>CLIP encoders</td><td>Excellent general-purpose features, and zero-shot capable</td></tr></tbody></table></div><p>For a first attempt, ResNet-50 fine-tuned from ImageNet weights is hard to beat as a baseline. CLIP-pretrained backbones have become a strong alternative because their features transfer unusually well to domains far from ImageNet.</p><p>Self-supervised pretraining (SimCLR, DINO, MAE) matters when you have a lot of <em>unlabelled</em> domain images: pretrain on those without labels, then fine-tune on your small labelled set. In specialised domains this often beats ImageNet initialisation outright.</p>
                 </div>
                 <div>
-                    <h3>When transfer learning does not help</h3>
+                    <h3 id="vz-s-when-transfer-learning-does-not-help">When transfer learning does not help</h3>
                     <p><strong>Very different data.</strong> Medical scans, satellite imagery, microscopy and audio spectrograms differ enough from natural photographs that the benefit shrinks &mdash; though it is usually still positive, and still worth trying first.</p><p><strong>Very small images.</strong> A network built for 224&times;224 downsamples 32&times;32 CIFAR images to nothing. Use an architecture designed for the resolution.</p><p><strong>Plenty of data.</strong> With millions of domain images, training from scratch can exceed a fine-tuned model. Below that, it rarely does.</p><p><strong>Catastrophic forgetting.</strong> Fine-tuning with too high a learning rate wipes out the pretrained features in a few hundred steps. If accuracy drops sharply at the start of fine-tuning, the learning rate is the first thing to check.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>How many images do I need?</strong> With a frozen backbone, a few dozen per class can work. For fine-tuning, a few hundred per class is a reasonable target.</p><p><strong>Should I freeze batch normalisation?</strong> Yes when the backbone is frozen &mdash; keep those layers in eval mode. When fine-tuning the whole network on a reasonable batch size, let them update.</p><p><strong>Which layers should I unfreeze first?</strong> The last block. Work backwards if accuracy is still improving and you have the data to support it.</p><p><strong>Can I transfer between very different tasks?</strong> Yes &mdash; ImageNet features are a good starting point for detection, segmentation and retrieval, not only classification.</p><p><strong>Is a bigger backbone always better?</strong> No. With a small dataset a large model overfits faster, and inference cost may matter more than the last point of accuracy.</p><p><strong>Why is my fine-tuned model worse than the frozen one?</strong> Almost always the learning rate is too high, or the dataset is too small to support updating that many parameters.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>Reuse a network trained on a large dataset: keep the general features, replace the task-specific head.</li><li>Freeze everything for small or similar datasets; fine-tune the later blocks when data allows.</li><li>Use a much lower learning rate for pretrained weights than you would from scratch.</li><li>Match the original preprocessing exactly &mdash; normalisation, size and channel order.</li><li>ImageNet weights transfer surprisingly far, and self-supervised pretraining on your own unlabelled images goes further still.</li></ul>
                 </div>
             </div>

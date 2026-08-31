@@ -289,28 +289,25 @@ SELECT * FROM orders WHERE customer_id = 42;
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The database will tell you what it plans to do. Very few people ask.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>SQL says what, not how</h3>
-                    <p>A query states the result you want. It says nothing about how to get it: which table to read first, whether to use an index, whether to sort or hash for a join. All of that is chosen by the <strong>query optimiser</strong>, at runtime, from the statistics it holds about your data.</p><p>Which means that two queries returning identical results can differ by orders of magnitude in cost, and nothing about the SQL text tells you which is which. <code>EXPLAIN</code> is how you find out, and it takes about ten seconds.</p>
-                </div>
-                <div>
-                    <h3>SCAN against SEARCH</h3>
+                    <h3 id="vz-s-scan-against-search">SCAN against SEARCH</h3>
                     <p>Run the first variant. The plan reads:</p><pre><code>SCAN orders</code></pre><p><code>SCAN</code> means the database intends to read <strong>every row</strong> and test each one. Five thousand rows here; five million in production, at which point the query is a problem.</p><p>Run the second variant to create an index on <code>customer_id</code>, then the third. The plan now reads:</p><pre><code>SEARCH orders USING INDEX idx_orders_customer (customer_id=?)</code></pre><p><code>SEARCH</code> means it can jump directly to the matching rows. The query text did not change. The result does not change. The work changed from thousands of row reads to a handful.</p><p>That contrast is the whole skill: <strong>look for SCAN on a large table where you expected a lookup.</strong> Other engines use different words &mdash; PostgreSQL says <code>Seq Scan</code> against <code>Index Scan</code>, MySQL fills in a <code>type</code> column with <code>ALL</code> against <code>ref</code> &mdash; but the distinction is the same everywhere.</p>
                 </div>
                 <div>
-                    <h3>The index it will not use</h3>
+                    <h3 id="vz-s-the-index-it-will-not-use">The index it will not use</h3>
                     <p>Run the fourth variant. The index still exists, the query means exactly the same thing, and the plan is back to <code>SCAN</code>.</p><p>The difference is <code>customer_id + 0</code> instead of <code>customer_id</code>. An index stores values of the column, in order. It does not store values of *expressions over* the column, so the moment the column is wrapped in anything, the ordering the index provides no longer corresponds to what the query is asking about.</p><p>This is the most common way a perfectly good index goes unused, and it hides inside ordinary-looking SQL:</p><div class="vz-table-wrap"><table><thead><tr><th>Written</th><th>Problem</th><th>Instead</th></tr></thead><tbody><tr><td><code>WHERE YEAR(created) = 2026</code></td><td>function on the column</td><td><code>WHERE created &gt;= '2026-01-01' AND created &lt; '2027-01-01'</code></td></tr><tr><td><code>WHERE LOWER(email) = ?</code></td><td>function on the column</td><td>index on <code>LOWER(email)</code>, or store it folded</td></tr><tr><td><code>WHERE id + 0 = 42</code></td><td>arithmetic on the column</td><td><code>WHERE id = 42</code></td></tr><tr><td><code>WHERE status LIKE '%paid'</code></td><td>leading wildcard</td><td>no index can help; a B-tree is ordered by prefix</td></tr></tbody></table></div><p>The rule: <strong>keep the indexed column bare on one side of the comparison.</strong></p>
                 </div>
                 <div>
-                    <h3>A scan is not always wrong</h3>
+                    <h3 id="vz-s-a-scan-is-not-always-wrong">A scan is not always wrong</h3>
                     <p>On a table of fifty rows, reading all fifty is cheaper than consulting an index and then fetching rows one at a time. Optimisers know this and will correctly ignore an index on a small table.</p><p>The same applies to selectivity. A query matching 60% of the rows is usually better served by a scan, because an index gives a list of row locations that then have to be fetched individually &mdash; and fetching most of the table one row at a time costs more than reading it in order.</p><p>This is why plans change as tables grow, and why a query that was fast in staging can be slow in production with the same schema and different statistics.</p>
                 </div>
                 <div>
-                    <h3>Estimated against actual</h3>
+                    <h3 id="vz-s-estimated-against-actual">Estimated against actual</h3>
                     <p><code>EXPLAIN</code> alone shows what the optimiser *intends*, using row-count estimates. Those estimates come from statistics that can be stale or simply wrong.</p><p>Most engines offer a form that runs the query and reports what really happened &mdash; <code>EXPLAIN ANALYZE</code> in PostgreSQL, <code>EXPLAIN ANALYZE</code> in MySQL 8.0.18 and later. Comparing estimated rows against actual rows is the fastest way to find out that the optimiser expected 10 rows and got 400,000, which is almost always the reason a plan is bad.</p><p>Two habits follow: run <code>ANALYZE</code> after a bulk load so the statistics reflect the data, and be suspicious of any plan step whose estimate is off by more than an order of magnitude.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>Guessing instead of asking.</strong> The plan is one command away and settles the argument.</p><p><strong>Reading a plan for a query with no data.</strong> Plans on an empty or tiny table tell you nothing about production.</p><p><strong>Adding indexes until it is fast.</strong> Every index costs write time and space, and an unused index costs both for nothing. Add the one the plan asks for, then check the plan again.</p><p><strong>Assuming the plan is stable.</strong> It is recomputed as statistics change. Today's plan is not a guarantee.</p>
                 </div>
             </div>

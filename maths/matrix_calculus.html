@@ -231,31 +231,28 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The short list of identities behind every gradient you will write, and the dimension check that makes them safe.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Why it needs its own name</h3>
-                    <p>Nothing here is new calculus. Differentiating <code>x'Ax</code> is the [product rule](the_chain_rule.html) and [partial derivatives](partial_derivatives_and_gradient.html) applied to a sum, and you could always expand into indices and grind it out.</p><p>What matrix calculus adds is <strong>notation that stays compact</strong> as the objects grow, plus a small collection of identities worth memorising so you never expand anything.</p><p>The demonstration on this page is deliberately one-dimensional. The calculus underneath is the same in any number of dimensions; it is only the shapes that change, and the shapes are the part you have to be careful about.</p>
-                </div>
-                <div>
-                    <h3>The shape rule</h3>
+                    <h3 id="vz-s-the-shape-rule">The shape rule</h3>
                     <p>The single most useful fact, and the one that catches almost every mistake:</p><p><strong>The gradient of a scalar with respect to something has the same shape as that something.</strong></p><p>A loss is a scalar. Differentiate it by a 784&times;128 weight matrix and the result is 784&times;128. By a length-128 bias vector, and it is length 128.</p><p>This is why gradient descent can write <code>W -= lr * dW</code> at all: the update has to have the same shape as the thing it updates. It is also the fastest debugging tool available. If a hand-derived gradient comes out the wrong shape, the derivation is wrong, and you know before running anything.</p><p>Two conventions exist for laying out derivatives &mdash; numerator layout and denominator layout &mdash; and they differ by a transpose. Papers rarely say which they use. The shape rule resolves it every time: whichever orientation matches the parameter is the one meant.</p>
                 </div>
                 <div>
-                    <h3>The identities</h3>
+                    <h3 id="vz-s-the-identities">The identities</h3>
                     <p>Almost everything reduces to these:</p><div class="vz-table-wrap"><table><thead><tr><th>Expression</th><th>Derivative with respect to x</th></tr></thead><tbody><tr><td><code>a'x</code></td><td><code>a</code></td></tr><tr><td><code>x'a</code></td><td><code>a</code></td></tr><tr><td><code>x'x</code></td><td><code>2x</code></td></tr><tr><td><code>x'Ax</code></td><td><code>(A + A')x</code>, which is <code>2Ax</code> when A is symmetric</td></tr><tr><td><code>Ax</code> (Jacobian)</td><td><code>A</code></td></tr></tbody></table></div><p>And two more, with respect to a matrix:</p><div class="vz-table-wrap"><table><thead><tr><th>Expression</th><th>Derivative with respect to W</th></tr></thead><tbody><tr><td><code>a'Wb</code></td><td><code>ab'</code></td></tr><tr><td><code>tr(W'A)</code></td><td><code>A</code></td></tr></tbody></table></div><p>The pattern in the first table is worth noticing: they are the matrix versions of <code>d(ax)/dx = a</code> and <code>d(ax^2)/dx = 2ax</code>. The <code>(A + A')</code> appears because both copies of <code>x</code> in <code>x'Ax</code> contribute, and when <code>A</code> is symmetric they contribute identically.</p>
                 </div>
                 <div>
-                    <h3>Working an example</h3>
+                    <h3 id="vz-s-working-an-example">Working an example</h3>
                     <p>Least squares, from the identities alone.</p><pre><code>L = ||Ax - b||^2 = (Ax - b)&#x27;(Ax - b)
   = x&#x27;A&#x27;Ax - 2b&#x27;Ax + b&#x27;b</code></pre><p>Differentiate term by term. The first is <code>x'Mx</code> with <code>M = A'A</code>, which is symmetric, giving <code>2A'Ax</code>. The second is linear in <code>x</code>, giving <code>-2A'b</code>. The third has no <code>x</code>.</p><pre><code>dL/dx = 2A&#x27;Ax - 2A&#x27;b</code></pre><p>Set it to zero and you have the normal equations, <code>A'Ax = A'b</code> &mdash; the formula [the QR module](qr_decomposition.html) then explains why you should not solve directly.</p>
                 </div>
                 <div>
-                    <h3>The layer everyone needs</h3>
+                    <h3 id="vz-s-the-layer-everyone-needs">The layer everyone needs</h3>
                     <p>For a linear layer <code>y = Wx + b</code> with loss <code>L</code>:</p><pre><code>dL/dW  =  (dL/dy) x&#x27;        an outer product
 dL/db  =  dL/dy
 dL/dx  =  W&#x27; (dL/dy)        passed back to the previous layer</code></pre><p>Three lines, and they are the whole of backpropagation through a dense layer.</p><p>Check them against the shape rule. If <code>dL/dy</code> is <code>m</code>-long and <code>x</code> is <code>n</code>-long, the outer product is <code>m</code>&times;<code>n</code> &mdash; the shape of <code>W</code>. And <code>W'</code> is <code>n</code>&times;<code>m</code>, so <code>W'(dL/dy)</code> is <code>n</code>-long, matching <code>x</code>. Every term lands where it should, and if it does not, something is transposed.</p><p>The transpose in that last line is why the backward pass is sometimes described as running the network in reverse: the same weights, applied the other way round.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>Mixing layout conventions mid-derivation.</strong> Pick one, and use the shape rule to check.</p><p><strong>Forgetting that <code>x'Ax</code> gives <code>(A + A')x</code>.</strong> The shortcut <code>2Ax</code> is only valid for symmetric <code>A</code>.</p><p><strong>Deriving without checking shapes.</strong> It costs seconds and catches most errors.</p><p><strong>Trusting a hand derivative without a numerical check.</strong> Compare against a finite difference on a small random input. Every framework ships a gradient checker for this, and it is worth using when writing a custom operation.</p>
                 </div>
             </div>
