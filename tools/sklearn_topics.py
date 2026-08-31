@@ -3240,6 +3240,12 @@ One-hot encoding multiplies the columns, and a fitted model reports one number p
 
 Two things to remember when reading them. The importance of a category is spread across its columns, so a feature with twenty categories has its influence divided twenty ways and will look weaker than a single numeric column carrying the same information &mdash; which is a known bias in tree-based feature importances, not a fact about the data. And with `drop="first"`, every remaining coefficient is relative to the dropped category, so a positive coefficient means "higher than the baseline", not "high".
 
+<strong>Do trees need one-hot encoding?</strong> scikit-learn's do, because they cannot take strings. `HistGradientBoostingClassifier` accepts declared categorical features natively, which is both faster and better than one-hot for high-cardinality columns.
+
+<strong>Should I one-hot encode before or after splitting?</strong> After, and inside a pipeline - otherwise the encoder learns the category list from the test rows too.
+
+<strong>What about missing values in a categorical column?</strong> `OneHotEncoder` treats `NaN` as its own category by default, which is often the right behaviour: "not stated" is frequently informative rather than merely absent.
+
 ## Things to try
 
 1. <strong>Read the alphabetical disaster.</strong> The third editor encodes small as 2 and large as 0. Look at the numbers before reading the fix.
