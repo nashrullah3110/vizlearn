@@ -261,9 +261,12 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Parsing them, the .dt accessor, and why a text date breaks everything downstream.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-dates-arrive-as-text">Dates arrive as text</h3>
+                    <h3>They arrive as text</h3>
+                    <p><code>read_csv</code> does not parse dates unless you tell it to. A date column comes in as <code>object</code>, and everything you do with it is then string behaviour wearing a date's clothes.</p><p>Sorting is lexical. For ISO format &mdash; <code>YYYY-MM-DD</code> &mdash; that happens to give the right answer, which is why the problem often goes unnoticed until the data arrives in another format. <code>"15/01/2024"</code> sorts before <code>"01/03/2024"</code> as text, and there is no error.</p><p>Comparison has the same problem, as does anything asking for a month, a weekday or a difference in days.</p><p>The fix is <code>pd.to_datetime</code>, or <code>parse_dates=["col"]</code> at read time, which is faster because it happens during the read.</p><p>Checking <code>df.dtypes</code> after loading catches this, which is why it is in the inspection routine.</p>
+                </div>
+                <div>
+                    <h3>Dates arrive as text</h3>
                     <p>And text sorts and compares the wrong way, silently.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pandas" data-vz-label="pandas"><script type="text/plain" class="py-prelude">import warnings
 
 warnings.filterwarnings(
@@ -285,7 +288,7 @@ print("after to_datetime:", d.dtype)
 print("   ", list(d.sort_values().dt.strftime("%Y-%m-%d")))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">pandas</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-parsing-and-being-explicit-about-format">Parsing, and being explicit about format</h3>
+                    <h3>Parsing, and being explicit about format</h3>
                     <p>Ambiguous formats are guessed, and the guess is not always yours.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pandas" data-vz-label="pandas"><script type="text/plain" class="py-prelude">import warnings
 
 warnings.filterwarnings(
@@ -310,7 +313,7 @@ except Exception as e:
 print("   errors='coerce':", list(pd.to_datetime(mixed, errors="coerce")))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">pandas</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-dt-accessor">The .dt accessor</h3>
+                    <h3>The .dt accessor</h3>
                     <p>The same idea as .str, for the parts of a timestamp.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pandas" data-vz-label="pandas"><script type="text/plain" class="py-prelude">import warnings
 
 warnings.filterwarnings(
@@ -336,7 +339,7 @@ print("format for output with strftime:")
 print("   ", list(s.dt.strftime("%d %b %Y")))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">pandas</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><p>Exactly parallel to <code>.str</code>.</p><p><code>s.dt.year</code>, <code>.month</code>, <code>.day</code>, <code>.hour</code>, <code>.minute</code> pull out components as integers.</p><p><code>s.dt.day_name()</code> and <code>s.dt.month_name()</code> give text.</p><p><code>s.dt.quarter</code>, <code>.dayofweek</code>, <code>.dayofyear</code>, <code>.is_month_end</code> cover the derived questions that would otherwise need arithmetic.</p><p><code>s.dt.date</code> drops the time and returns Python <code>date</code> objects &mdash; note that this gives an <code>object</code> column, which is usually not what you want. <code>s.dt.normalize()</code> keeps it a proper datetime column set to midnight, and is the better choice for grouping by day.</p><p><code>s.dt.strftime(fmt)</code> formats for output, returning text. That is the last step before display, not something to do in the middle of a pipeline.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-arithmetic-gives-durations">Arithmetic gives durations</h3>
+                    <h3>Arithmetic gives durations</h3>
                     <p>Subtracting timestamps produces a Timedelta, which has its own accessor.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pandas" data-vz-label="pandas"><script type="text/plain" class="py-prelude">import warnings
 
 warnings.filterwarnings(
@@ -362,7 +365,7 @@ print("offsets understand calendars in a way timedeltas do not:")
 print("   +1 month:", list((start + pd.DateOffset(months=1)).dt.strftime("%Y-%m-%d")))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">pandas</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-datetimeindex-unlocks-time-selection">A DatetimeIndex unlocks time selection</h3>
+                    <h3>A DatetimeIndex unlocks time selection</h3>
                     <p>Put the dates in the index and you can slice by period.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pandas" data-vz-label="pandas"><script type="text/plain" class="py-prelude">import warnings
 
 warnings.filterwarnings(
@@ -385,7 +388,7 @@ print("   ", list(pd.date_range("2024-01-01", periods=3, freq="ME").strftime("%Y
 print("   ", list(pd.date_range("2024-01-01", periods=3, freq="W").strftime("%Y-%m-%d")))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">pandas</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-time-zones-briefly">Time zones, briefly</h3>
+                    <h3>Time zones, briefly</h3>
                     <p>Naive and aware timestamps do not mix, and the error is worth meeting once.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="pandas" data-vz-label="pandas"><script type="text/plain" class="py-prelude">import warnings
 
 warnings.filterwarnings(
@@ -412,60 +415,60 @@ print("Pick one and stay there. Storing UTC and converting only for")
 print("display is the convention that causes the fewest surprises.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">pandas</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-parsing">Parsing</h3>
+                    <h3>Parsing</h3>
                     <p><code>pd.to_datetime</code> is good at guessing, and guessing is the problem.</p><p><code>05/04/2024</code> is 5 April in most of the world and 4 May in the United States. pandas has to pick one, and it will not necessarily pick yours.</p><p><code>dayfirst=True</code> states the convention. Better still, <code>format="%d/%m/%Y"</code> states the whole shape. That removes the ambiguity <strong>and</strong> is substantially faster, because pandas can skip inference entirely &mdash; on a large column the difference is large enough to notice.</p><p>For messy input, <code>errors="coerce"</code> turns unparseable values into <code>NaT</code> (the datetime equivalent of NaN) rather than raising on the first bad row. Then <code>df[df["date"].isna()]</code> shows you exactly what failed, which is far more useful than a traceback naming one value.</p><p><code>NaT</code> behaves like NaN: it fails every comparison and is caught by <code>isna()</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-arithmetic">Arithmetic</h3>
+                    <h3>Arithmetic</h3>
                     <p>Subtracting two datetime columns gives a <code>timedelta64</code> column.</p><p><code>gap.dt.days</code> gives whole days; <code>gap.dt.total_seconds()</code> gives the full duration as a float, which is what you want for anything sub-day or for converting to arbitrary units.</p><p>Adding a fixed duration uses <code>pd.Timedelta(days=30)</code>.</p><p>Adding a <strong>calendar</strong> period uses <code>pd.DateOffset(months=1)</code>. The distinction matters: a month is not a fixed number of days, so "one month after 31 January" is a calendar question, not an arithmetic one. <code>DateOffset</code> handles month ends and leap years; <code>Timedelta</code> cannot, because it does not know what month it is in.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-datetimeindex">DatetimeIndex</h3>
+                    <h3>DatetimeIndex</h3>
                     <p>Putting the dates in the index unlocks the time-aware selection that makes pandas pleasant for time series.</p><p><code>s["2024-02"]</code> selects the whole of February. <code>s["2024"]</code> selects the year. This is <strong>partial string indexing</strong>, and it works because pandas understands the index is a timeline.</p><p><code>s["2024-01-10":"2024-01-20"]</code> slices a range, inclusive of both endpoints as label slicing always is.</p><p><code>pd.date_range(start, periods=n, freq=...)</code> builds such an index. The frequency aliases are worth knowing: <code>D</code> daily, <code>W</code> weekly, <code>ME</code> month end, <code>MS</code> month start, <code>h</code> hourly. Note that pandas 2.2 renamed several of these &mdash; <code>M</code> became <code>ME</code> and <code>H</code> became <code>h</code> &mdash; so older code raises a deprecation warning or an error depending on version.</p><p>A DatetimeIndex is also what <code>resample</code> requires, which is the subject of a later module.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-time-zones">Time zones</h3>
+                    <h3>Time zones</h3>
                     <p>A timestamp is either <strong>naive</strong> (no zone) or <strong>aware</strong> (a zone attached). The two cannot be compared or subtracted, and the error when you try is clear.</p><p><code>s.dt.tz_localize("UTC")</code> attaches a zone to naive timestamps, asserting what they always meant. <code>s.dt.tz_convert("Asia/Kolkata")</code> converts an aware timestamp to another zone.</p><p>Getting these backwards is the usual mistake: <code>tz_localize</code> on data that is already aware raises, and <code>tz_convert</code> on naive data raises too.</p><p>The convention that causes the fewest problems is to store everything in UTC and convert only for display. Mixed-zone data in one column is not representable as a proper datetime dtype at all &mdash; it falls back to <code>object</code> &mdash; which is a strong hint that normalising early is the right move.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-parsing-performance">Parsing performance</h3>
+                    <h3>Parsing performance</h3>
                     <p>Date parsing is one of the slowest parts of loading a large file, and it is almost entirely avoidable.</p><p><code>pd.to_datetime</code> without a format tries to infer one, per value in the worst case. With <code>format=</code> it uses a single known pattern and runs far faster &mdash; often by an order of magnitude on a large column.</p><p><code>format="ISO8601"</code> handles the common ISO variants without full inference.</p><p><code>cache=True</code> (the default for large inputs) helps enormously when the same date string repeats, as it does in any dataset with many rows per day.</p><p>Parsing at read time with <code>parse_dates=</code> is faster than parsing afterwards, because pandas can do it while it already has the strings in hand.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-periods-and-offsets">Periods and offsets</h3>
+                    <h3>Periods and offsets</h3>
                     <p><code>Timestamp</code> is a point in time. <code>Period</code> is a span &mdash; a whole month, a quarter, a year.</p><p><code>s.dt.to_period("M")</code> converts timestamps to monthly periods. Grouping by that is often more natural than grouping by year and month separately, and it sorts correctly.</p><p><code>PeriodIndex</code> supports arithmetic in period units: adding 1 to a monthly period gives the next month, without the day-of-month ambiguity that plagues timestamp arithmetic.</p><p>Offsets sit between the two. <code>pd.offsets.MonthEnd(1)</code>, <code>BusinessDay(3)</code>, <code>Week(weekday=0)</code> describe calendar movements. <code>df["date"] + pd.offsets.MonthEnd(0)</code> snaps each date to the end of its month, which is a common alignment step before joining monthly data.</p><p>Business-day offsets understand weekends, and can take a holiday calendar, which is the sort of thing that is tedious to write by hand and easy to get subtly wrong.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-components-and-the-leap-year-trap">Components, and the leap-year trap</h3>
+                    <h3>Components, and the leap-year trap</h3>
                     <p><code>.dt.year</code>, <code>.month</code>, <code>.day</code> are obvious. Two are not.</p><p><code>.dt.isocalendar()</code> returns ISO year, week and day, which is what you want for week-based reporting. The ISO year is <strong>not</strong> always the calendar year &mdash; the first days of January can belong to the previous ISO year &mdash; so grouping by <code>.dt.year</code> and ISO week together produces wrong groups at the boundary.</p><p><code>.dt.dayofweek</code> is 0 for Monday; <code>.dt.day_name()</code> gives the name and respects locale settings.</p><p>Computing an age or a duration in years by dividing days by 365 is wrong by a day every four years and accumulates. For exact calendar differences, subtract periods or use <code>dateutil.relativedelta</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-time-zones-in-more-depth">Time zones, in more depth</h3>
+                    <h3>Time zones, in more depth</h3>
                     <p>The rule that avoids nearly all trouble: <strong>store UTC, convert for display</strong>.</p><p><code>tz_localize</code> attaches a zone to naive timestamps, asserting what they always meant. It raises on data that is already aware.</p><p><code>tz_convert</code> moves an aware timestamp to another zone. It raises on naive data.</p><p>Getting these the wrong way round is the usual error, and the messages are clear about which you needed.</p><p>Two edge cases are worth knowing because they are real and they raise:</p><p><strong>Ambiguous times</strong> &mdash; when clocks go back, an hour occurs twice. <code>ambiguous="infer"</code>, <code>True</code>, <code>False</code>, or <code>NaT</code> decides.</p><p><strong>Nonexistent times</strong> &mdash; when clocks go forward, an hour does not exist. <code>nonexistent="shift_forward"</code> or <code>NaT</code> decides.</p><p>Both only appear on real local-time data crossing a DST boundary, which is exactly when you least want a surprise.</p><p>A column mixing time zones cannot be a proper datetime dtype and falls back to <code>object</code>, losing <code>.dt</code> entirely. Normalising on the way in prevents that.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-checklist-for-date-columns">A checklist for date columns</h3>
+                    <h3>A checklist for date columns</h3>
                     <p>Parse them at read time, with an explicit format.</p><p>Check <code>dtype</code> afterwards &mdash; <code>datetime64[ns]</code> means it worked, <code>object</code> means it did not.</p><p>Check the range with <code>min()</code> and <code>max()</code>. Dates in 1970 usually mean a zero timestamp; dates in 2099 usually mean a sentinel.</p><p>Decide on a time zone and apply it once.</p><p>Set the index if you will resample or select by period.</p><p>Sort, if anything downstream will <code>diff</code>, <code>shift</code> or <code>rolling</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-common-date-mistakes">Common date mistakes</h3>
+                    <h3>Common date mistakes</h3>
                     <p><strong>Not parsing at all.</strong> The column stays <code>object</code>, sorts lexically, and <code>.dt</code> raises. Check <code>dtypes</code>.</p><p><strong>Letting the format be inferred</strong> on ambiguous data. <code>05/04</code> is two different dates depending on convention.</p><p><strong>Dividing days by 365</strong> to get years. Wrong by a day every four years, and it accumulates.</p><p><strong>Grouping by <code>.dt.year</code> and ISO week together.</strong> The ISO year differs from the calendar year at the start of January, so the boundary weeks land in the wrong group.</p><p><strong>Mixing naive and aware timestamps.</strong> Raises, which is the good case; the bad case is a column that falls back to <code>object</code> and loses <code>.dt</code>.</p><p><strong>Using <code>.dt.date</code></strong> and getting an <code>object</code> column. <code>.dt.normalize()</code> keeps it a datetime.</p><p><strong>Assuming rows are sorted.</strong> <code>diff</code> and <code>rolling</code> produce numbers regardless.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-working-with-durations">Working with durations</h3>
+                    <h3>Working with durations</h3>
                     <p>A <code>timedelta64</code> column comes from subtracting two datetime columns.</p><p><code>gap.dt.days</code> truncates toward zero and discards the remainder; <code>gap.dt.total_seconds()</code> keeps everything and is the safer basis for converting to arbitrary units.</p><p><code>gap.dt.components</code> breaks a duration into days, hours, minutes and so on as separate columns.</p><p>Durations aggregate: <code>mean</code>, <code>sum</code> and <code>describe</code> all work, and print in a readable form.</p><p>For business durations &mdash; elapsed working days rather than calendar days &mdash; <code>np.busday_count</code> is the tool, and it takes a holiday list.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-generating-date-ranges">Generating date ranges</h3>
+                    <h3>Generating date ranges</h3>
                     <p><code>pd.date_range(start, end)</code> or <code>pd.date_range(start, periods=n, freq=...)</code> builds an axis.</p><p>Three uses worth knowing:</p><p><strong>Reindexing onto a complete calendar</strong>, so missing days become explicit <code>NaN</code> rows rather than being absent.</p><p><strong>Building test data</strong> with a known shape.</p><p><strong>Checking for gaps</strong> &mdash; comparing the actual index against a complete range shows exactly which periods are missing:</p><pre><code class="language-python">full = pd.date_range(s.index.min(), s.index.max(), freq=&quot;D&quot;)
 missing = full.difference(s.index)</code></pre><p>That is a better answer than counting rows, because it names the gaps.</p><p><code>pd.bdate_range</code> does the same for business days.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-summary">A summary</h3>
+                    <h3>A summary</h3>
                     <p>Parse at read time with an explicit format.</p><p>Check the dtype is <code>datetime64[ns]</code> afterwards, and check the min and max for sentinel dates.</p><p><code>.dt</code> for components, <code>strftime</code> only for display.</p><p><code>Timedelta</code> for fixed durations, <code>DateOffset</code> for calendar ones.</p><p>Store UTC; convert for display.</p><p>Set a <code>DatetimeIndex</code> when you need period selection or <code>resample</code>.</p><p>Sort before anything that compares a row with its neighbour.</p><p>And remember pandas 2.2 renamed the frequency aliases &mdash; <code>M</code> to <code>ME</code>, <code>H</code> to <code>h</code> &mdash; which is the usual reason a copied example no longer runs.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-closing-note">A closing note</h3>
+                    <h3>A closing note</h3>
                     <p>Dates arrive as text, and everything that follows depends on noticing that.</p><p>An unparsed date column sorts lexically, cannot do arithmetic, and has no <code>.dt</code>. For ISO-formatted dates the lexical sort happens to be correct, which is precisely why the problem often survives until the data arrives in a different format.</p><p>Parsing with an explicit <code>format=</code> removes both the ambiguity between day-first and month-first and most of the parsing cost, which on a large column is substantial.</p><p>After that, the two things worth being deliberate about are time zones and calendar arithmetic. Store UTC and convert for display, because mixed-zone columns cannot be a proper datetime dtype at all. And use <code>DateOffset</code> rather than <code>Timedelta</code> when you mean a calendar month, since a month is not a fixed number of days and only one of the two knows that.</p><p>Finally, pandas 2.2 renamed the frequency aliases. When a copied example stops working, that is usually why.</p>
                 </div>
             </div>

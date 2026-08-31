@@ -1,0 +1,231 @@
+title: Scaling Features: A Practical Guide
+intro: Half the models in the library are seriously damaged by unscaled features and half are completely indifferent. Knowing which is which saves both wasted work and silently bad results.
+
+## What scaling does
+
+`StandardScaler` learns two numbers per column &mdash; the mean and the standard deviation &mdash; and transforms by subtracting the first and dividing by the second. The result has mean 0 and standard deviation 1 in every column.
+
+That is the entire operation. The shape of the distribution is unchanged: a skewed column stays skewed, outliers stay outliers, and the relative positions of every value are preserved exactly. Scaling moves and stretches; it does not reshape.
+
+The learned numbers live in `mean_` and `scale_`, which is worth knowing because those two arrays are the entire fitted state and the thing that must not be learned from the test data.
+
+
+## What StandardScaler learns
+
+Two numbers per column, and the transform is a subtraction and a division.
+
+```python-run
+from sklearn.preprocessing import StandardScaler
+import numpy as np
+
+X = np.array([[1.0, 2000.0], [2.0, 4000.0], [3.0, 6000.0], [4.0, 8000.0]])
+
+scaler = StandardScaler().fit(X)
+Xs = scaler.transform(X)
+
+print("before - column means:", X.mean(axis=0), " stds:", X.std(axis=0))
+print("after  - column means:", np.round(Xs.mean(axis=0), 10),
+      " stds:", Xs.std(axis=0))
+print()
+print("learned mean_ :", scaler.mean_)
+print("learned scale_:", scaler.scale_)
+```
+
+## What it is worth on a distance-based model
+
+Same data, same model, one line of difference.
+
+```python-run
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import cross_val_score
+from sklearn.datasets import load_wine
+
+X, y = load_wine(return_X_y=True)
+print("largest feature range is %d times the smallest"
+      % int(X.max(axis=0).max() / X.max(axis=0).min()))
+print()
+raw = cross_val_score(KNeighborsClassifier(), X, y, cv=5)
+scaled = cross_val_score(make_pipeline(StandardScaler(), KNeighborsClassifier()),
+                         X, y, cv=5)
+print("k-NN unscaled:", round(raw.mean(), 4))
+print("k-NN scaled  :", round(scaled.mean(), 4))
+```
+
+## Three scalers, one outlier
+
+The choice between them is a choice about what to do with extreme values.
+
+```python-run
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+import numpy as np
+
+X = np.array([[1.0], [2.0], [3.0], [4.0], [100.0]])   # one outlier
+
+for scaler in (StandardScaler(), MinMaxScaler(), RobustScaler()):
+    out = scaler.fit_transform(X).ravel()
+    print("%-16s %s" % (type(scaler).__name__, np.round(out, 3)))
+print()
+print("MinMax squashes the four ordinary values into a hundredth of the range.")
+print("RobustScaler uses the median and IQR, so they keep a sensible spread")
+print("and the outlier is simply far away.")
+```
+
+## Fit on train, transform on both
+
+The test set does not end up centred on zero, and that is the point.
+
+```python-run
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.datasets import load_wine
+
+X, y = load_wine(return_X_y=True)
+X_tr, X_te, _, _ = train_test_split(X, y, test_size=0.3, random_state=0)
+
+scaler = StandardScaler().fit(X_tr)          # training data only
+
+print("train mean after scaling:", round(scaler.transform(X_tr).mean(), 10))
+print("test  mean after scaling:", round(scaler.transform(X_te).mean(), 4))
+print()
+print("the test set is NOT centred on zero, and should not be -")
+print("it is transformed with the training set's numbers, not its own.")
+```
+
+## The pipeline does that for you
+
+Which is why scaling and pipelines are taught together and used together.
+
+```python-run
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.linear_model import LogisticRegression
+
+pipe = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+
+print("a pipeline is one estimator:")
+print("  steps:", [name for name, _ in pipe.steps])
+print()
+print("calling pipe.fit(X, y) runs:")
+print("  scaler.fit_transform(X)  then  model.fit(scaled, y)")
+print("calling pipe.predict(X) runs:")
+print("  scaler.transform(X)      then  model.predict(scaled)")
+print()
+print("which is why the scaler never sees the data it is tested on.")
+```
+
+## Trees do not care at all
+
+One of these two models moves. The other does not move by any amount at all.
+
+```python-run
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import cross_val_score
+from sklearn.datasets import load_wine
+
+X, y = load_wine(return_X_y=True)
+
+for name, model in [("LogisticRegression", LogisticRegression(max_iter=5000)),
+                    ("RandomForest", RandomForestClassifier(random_state=0))]:
+    raw = cross_val_score(model, X, y, cv=5).mean()
+    sca = cross_val_score(make_pipeline(StandardScaler(), model), X, y, cv=5).mean()
+    print("%-20s unscaled %.4f   scaled %.4f   change %+.4f"
+          % (name, raw, sca, sca - raw))
+print()
+print("trees split one column at a time, so a monotonic rescaling")
+print("cannot change which split they choose.")
+```
+## Why some models need it
+
+Two families of algorithm are affected, for two different reasons.
+
+**Anything that measures distance.** k-nearest neighbours, SVMs with an RBF kernel, k-means, PCA. These compute how far apart two samples are, usually by summing squared differences across features. A column measured in thousands contributes thousands of times more to that sum than a column measured in single digits, so the distance is effectively decided by whichever feature happens to have the largest units. The model is not weighing the features by importance; it is weighing them by unit.
+
+The editor above shows the cost: k-NN on the wine dataset scores 0.69 unscaled and 0.95 scaled. That is not a tuning improvement, it is the difference between a model that works and one that does not, and it comes from one column being measured in hundreds while others are measured in fractions.
+
+**Anything that penalises coefficient size.** Ridge, Lasso, ElasticNet, and `LogisticRegression`, which is regularised by default. The penalty is on the magnitude of the coefficients, and a coefficient's magnitude depends on its feature's units. Without scaling, the penalty falls unevenly across features for reasons that have nothing to do with the data.
+
+There is also a practical third reason: gradient-based solvers converge faster and more reliably on scaled features, which is why unscaled logistic regression produces `ConvergenceWarning`.
+
+## Why some models do not
+
+Tree-based models &mdash; decision trees, random forests, gradient boosting &mdash; are completely unaffected, and the reason is structural rather than approximate.
+
+A tree splits on one feature at a time, asking whether a value is above or below a threshold. Rescaling a column monotonically moves the threshold by the same transformation and leaves the ordering of every sample identical, so exactly the same split is chosen. The tree that results is the same tree.
+
+The editor above measures it: the random forest changes by `+0.0000`. Not "a little"; not at all.
+
+This matters practically because scaling a tree model is harmless but pointless, and adding a scaler to a pipeline that ends in a forest is a step that costs time and clarity for no benefit. It matters more because people who have learned "always scale" sometimes conclude that trees must therefore be doing something odd, when in fact this is one of the reasons trees are so convenient on messy tabular data: they need no preparation at all.
+
+## Choosing between the scalers
+
+`StandardScaler` is the default and the right answer most of the time. It assumes nothing about the range and handles roughly symmetric data well.
+
+`MinMaxScaler` maps each column onto a fixed range, usually 0 to 1. It is the choice when an algorithm requires bounded input, and its weakness is severe: a single outlier defines the range and compresses everything else against the opposite end. The editor above shows four ordinary values landing in the first hundredth of the range because one value is 100.
+
+`RobustScaler` centres on the median and divides by the interquartile range. Because both statistics ignore the tails, extreme values do not distort the transformation of the ordinary ones &mdash; in the same demonstration, the four normal values keep a sensible spread and the outlier simply sits far away. It is the right default when the data has outliers you do not want to remove.
+
+`MaxAbsScaler` divides by the largest absolute value and preserves zeros, which makes it the one to use on sparse data where centring would destroy the sparsity.
+
+`Normalizer` is the odd one out and a frequent source of confusion: it scales each **row** to unit length rather than each column. It is for making samples comparable in direction rather than magnitude &mdash; text vectors, mostly &mdash; and is not a substitute for the column scalers.
+
+## The rule that makes it honest
+
+The scaler must be fitted on the training data only, and then used to transform both halves.
+
+The reason is the same as everywhere else in this track: `mean_` and `scale_` are learned from data, so a scaler fitted on everything has seen the test set, and the score afterwards is not a score on unseen data.
+
+The consequence surprises people the first time. After scaling correctly, the **test set is not centred on zero** &mdash; its mean is whatever it happens to be relative to the training distribution. The editor above shows 0.0184 rather than 0. That is correct and it is the whole point: the test data is being put through exactly the transformation that new data would go through in production, where you do not get to recompute the mean using the future.
+
+A test set that comes out perfectly centred is evidence that the scaler was fitted on it, which means the evaluation is compromised.
+
+The same logic extends to deployment. The scaler is part of the model and has to be saved with it. A model deployed without its scaler, receiving raw features, will produce confident nonsense &mdash; which is one more argument for the pipeline, since saving the pipeline saves both.
+
+## Just use a pipeline
+
+Every rule above is enforced automatically by putting the scaler in a `Pipeline`.
+
+A pipeline is a single estimator. Its `fit` runs `fit_transform` on each transformer and then `fit` on the final model; its `predict` runs `transform` and then `predict`. So inside a cross-validation loop, the scaler is refitted on each training fold and the held-out fold is only ever transformed &mdash; which is exactly the correct behaviour, achieved without you having to remember it.
+
+`make_pipeline(StandardScaler(), LogisticRegression())` is two words longer than fitting the scaler by hand and removes an entire category of mistake. There is essentially no situation in which scaling outside a pipeline is preferable, and the habit is worth forming before the mistakes are.
+
+## Scaling is not the only transformation a column might want
+
+Standardising fixes the *scale* of a feature and leaves its *shape* alone. Sometimes the shape is the problem.
+
+A heavily skewed column &mdash; incomes, populations, response times, anything where a few values are orders of magnitude above the rest &mdash; stays heavily skewed after standardising. The mean and standard deviation are themselves distorted by the tail, so most of the data ends up squeezed just below zero with a few enormous values above it, which is exactly the situation that harmed the distance-based models in the first place.
+
+Three responses. A **log transform**, via `FunctionTransformer(np.log1p)`, compresses the tail and often turns a multiplicative relationship into an additive one that a linear model can fit. `log1p` rather than `log` because it handles zeros without producing negative infinity.
+
+`PowerTransformer` finds a transformation that makes the column as close to normal as it can, and standardises as it goes. It handles the choice for you and is the reasonable default when you know a column is skewed and do not want to think about which transformation.
+
+`QuantileTransformer` maps the column onto a uniform or normal distribution by rank. It is the most aggressive of the three: it will normalise anything, at the cost of discarding the actual spacing between values and of behaving unpredictably on values outside the training range.
+
+All three are transformers with the usual `fit`/`transform`, so they go in a pipeline in the same place a scaler would, and they are subject to exactly the same training-data-only rule.
+
+## The order of the steps
+
+When several transformations apply to the same column, the order is not arbitrary.
+
+Imputation comes before scaling, because a scaler cannot compute a mean over missing values &mdash; it raises. Encoding comes before scaling for the same reason, since a scaler cannot subtract a mean from a string.
+
+Skew correction comes before standardising, since the point is to fix the shape and then fix the location and spread of the fixed shape.
+
+Feature selection is usually last among the transformers and before the model, so that the selection sees the features in the form the model will.
+
+A `Pipeline` executes its steps in the order given, so writing them in the wrong order produces either an error or a silently worse model. The sequence that covers most cases is: impute, encode, transform skew, scale, select, fit.
+
+## Things to try
+
+1. <strong>Run the second editor.</strong> 0.69 against 0.95, from one line. That is the argument in a single number.
+2. <strong>Watch a tree ignore it.</strong> The last editor reports a change of exactly zero for the forest. Try `MinMaxScaler` instead and confirm it is still zero.
+3. <strong>Break the range.</strong> In the third editor, change the outlier to 10000 and see how much further MinMax compresses the ordinary values.
+4. <strong>Cheat deliberately.</strong> In the fourth editor, fit the scaler on all of `X` and note that the test mean becomes 0 - the signature of a compromised evaluation.
+
+## Where this leaves you
+
+Scale for distance-based and regularised models, do not bother for trees, prefer `StandardScaler` unless outliers argue for `RobustScaler`, and fit it inside a pipeline so that the training-data-only rule holds without anyone having to remember it.

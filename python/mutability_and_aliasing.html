@@ -343,48 +343,54 @@ print("with a comprehension:", grid)</script>
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">A name in Python is a label attached to an object, not a box holding a value. Once that clicks, a whole family of confusing behaviour becomes obvious.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-rebinding-versus-mutating">Rebinding versus mutating</h3>
+                    <h3>Assignment does not copy</h3>
+                    <pre><code class="language-python">a = [1, 2, 3]
+b = a
+b.append(4)
+print(a)  # [1, 2, 3, 4]</code></pre><p><code>b = a</code> attaches a second label to the same list. There is one list and two names for it, so a change through either name is visible through both. <code>a is b</code> is <code>True</code>, which is the test for "the same object" as opposed to <code>==</code>, which asks about contents.</p><p>To get a second list, ask for one: <code>a[:]</code>, <code>list(a)</code> or <code>a.copy()</code>.</p>
+                </div>
+                <div>
+                    <h3>Rebinding versus mutating</h3>
                     <p>This is the distinction that explains the rest:</p><pre><code class="language-python">y = [9, 9]    # rebinding: point y at a different object
 y.append(3)  # mutating: change the object y points at</code></pre><p>Rebinding affects only that name. Mutating affects every name pointing at that object. Both use <code>y</code>, which is why they look similar and behave nothing alike.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-inside-functions">Inside functions</h3>
+                    <h3>Inside functions</h3>
                     <pre><code class="language-python">def add_zero(items):
     items.append(0)  # caller sees this</code></pre><pre><code class="language-python">def replace(items):
     items = [9, 9]    # caller sees nothing</code></pre><p>The parameter is another name for the caller's object. Mutate it and the caller's list changes. Rebind it and you have only pointed the local name elsewhere.</p><p>This is not "pass by reference" or "pass by value" &mdash; it is simply the same naming rule as everywhere else in the language.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-immutable-types-dodge-the-question">Immutable types dodge the question</h3>
+                    <h3>Immutable types dodge the question</h3>
                     <p>Numbers, strings and tuples cannot be mutated, so there is no way for one name to change what another sees. <code>n += 1</code> inside a function must rebind, because there is no other option. That is why the whole issue only ever comes up with lists, dicts and sets.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-multiplication-trap">The multiplication trap</h3>
+                    <h3>The multiplication trap</h3>
                     <pre><code class="language-python">grid = [[0] * 3] * 3
 grid[0][0] = 1  # every row changes</code></pre><p><code>[0] * 3</code> builds one row. Multiplying the outer list by 3 does not build three rows &mdash; it stores three references to the same row. Setting one cell appears to set three.</p><p>grid = [[0] * 3 for _ in range(3)]</p><p>The comprehension evaluates <code>[0] * 3</code> afresh each pass, so there really are three lists. This is the same rule as the mutable default argument: one object created once, shared everywhere.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-which-types-are-which">Which types are which</h3>
+                    <h3>Which types are which</h3>
                     <p>The distinction is worth memorising as a list, because it explains behaviour across the whole language.</p><p>Immutable: <code>int</code>, <code>float</code>, <code>bool</code>, <code>str</code>, <code>bytes</code>, <code>tuple</code>, <code>frozenset</code>, <code>None</code>. Mutable: <code>list</code>, <code>dict</code>, <code>set</code>, <code>bytearray</code>, and nearly every class you write yourself.</p><p>Every rule about aliasing, dictionary keys, default arguments and copying falls out of that split. Immutable objects can be shared without risk, which is why they can be dictionary keys and set members and safe defaults. Mutable objects cannot.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-equality-and-identity">Equality and identity</h3>
+                    <h3>Equality and identity</h3>
                     <p>Two separate questions, and Python has an operator for each:</p><pre><code class="language-python">a == b      # do they hold the same value?
 a is b      # are they the same object?</code></pre><p>Two lists with identical contents are equal and are not identical. Confusing the two produces code that works by accident, particularly with small integers and short strings, which Python caches: <code>x = 256; y = 256; x is y</code> is often <code>True</code>, and the same test with <code>257</code> is often <code>False</code>. That is an implementation detail and precisely why <code>is</code> should be reserved for <code>None</code> and for genuine identity questions.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-passing-to-functions-stated-precisely">Passing to functions, stated precisely</h3>
+                    <h3>Passing to functions, stated precisely</h3>
                     <p>Python is neither pass-by-value nor pass-by-reference in the C sense. What is passed is a reference to the object, by value - the function gets its own name pointing at the caller's object.</p><p>So the function can mutate the object and the caller sees it, and the function can rebind its own name and the caller does not. Both facts come from the same mechanism, and once you hold "names point at objects" in your head, no further rule is needed.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-defensive-copies">Defensive copies</h3>
+                    <h3>Defensive copies</h3>
                     <p>When a function stores something it was given, it is worth thinking about who else holds it:</p><pre><code class="language-python">class Basket:
     def __init__(self, items):
         self.items = list(items)     # our own copy</code></pre><p>Without the copy, the caller's list and the object's list are the same list, and a later change on either side surprises the other. Copying at the boundary costs one call and removes an entire category of bug where two parts of a program share state neither of them knows about.</p><p>The same reasoning applies on the way out: returning <code>self.items</code> directly hands callers a handle on your internals. Returning <code>list(self.items)</code> or a tuple keeps the boundary intact.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-watching-it-happen-with-id">Watching it happen with id()</h3>
+                    <h3>Watching it happen with id()</h3>
                     <p><code>id()</code> returns a number identifying an object for as long as it exists, which turns the whole topic from an assertion into something you can check:</p><pre><code class="language-python">a = [1, 2]
 b = a
 before = id(a)
@@ -397,7 +403,7 @@ print(&quot;after rebind :&quot;, id(a) == before, b)</code></pre><pre><code>aft
 after rebind : False [1, 2, 3]</code></pre><p>The first line mutated the object, so the id is unchanged and <code>b</code> &mdash; the other name for that same object &mdash; sees the new item. The second line built a different list and pointed <code>a</code> at it, so the id changed and <code>b</code> still refers to the original, which now has three items rather than four.</p><p>Every confusing aliasing bug is one of those two lines in disguise.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-augmented-assignment-asymmetry">The augmented assignment asymmetry</h3>
+                    <h3>The augmented assignment asymmetry</h3>
                     <p><code>a += [3]</code> and <code>a = a + [3]</code> look like the same statement written two ways. For lists they are not:</p><pre><code class="language-python">a = [1, 2]
 b = a
 a += [3]
@@ -410,7 +416,7 @@ print(a, b)</code></pre><pre><code>[1, 2, 3] [1, 2, 3]
 [1, 2, 3] [1, 2]</code></pre><p><code>+=</code> on a list calls <code>__iadd__</code>, which extends the existing list in place and then rebinds the name to that same object &mdash; so every other name sees the change. <code>a + [3]</code> builds a new list and only then rebinds, leaving <code>b</code> alone.</p><p>For numbers, strings and tuples there is no in-place option, so <code>+=</code> always behaves like the second form. This is why <code>+=</code> feels consistent right up until the first time it is used on a list that someone else is also holding.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-tuple-is-immutable-its-contents-are-not">A tuple is immutable, its contents are not</h3>
+                    <h3>A tuple is immutable, its contents are not</h3>
                     <pre><code class="language-python">t = ([1, 2], &quot;fixed&quot;)
 
 t[0].append(3)
@@ -429,23 +435,23 @@ print(t)</code></pre><pre><code>TypeError: &#x27;tuple&#x27; object does not sup
 ([1, 2],)</code></pre><p>It raised <strong>and</strong> it worked. <code>t[0] += [2]</code> extends the list in place, and then tries to assign the result back into the tuple slot, which fails. The mutation has already happened by then. Nothing about this is worth relying on; it is worth recognising, because the error message points at the tuple while the damage is in the list.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-this-actually-bites">Where this actually bites</h3>
+                    <h3>Where this actually bites</h3>
                     <p>The rule is simple and the bugs are not, because in real code the two names for one object are usually far apart. Four shapes account for most of them.</p><p><strong>A shared default.</strong> A function with <code>def add(item, target=[])</code> creates that list once, when the function is defined, and every call that does not pass one uses the same list. Items accumulate across calls that look independent. The fix is <code>target=None</code> and <code>if target is None: target = []</code> in the body.</p><p><strong>A configuration dictionary passed around.</strong> One module reads a settings dict, tweaks a value "just for its own use", and every other module sees the change. This is the hardest version to find, because the code that made the change and the code that misbehaves may be in different files with nothing linking them.</p><p><strong>A cached object handed to callers.</strong> A function that builds a list once and returns the same list every time is fast and dangerous: the first caller to mutate the result has changed what every later caller receives. Returning a copy, or a tuple, closes it.</p><p><strong>A class attribute holding a list.</strong> Written on the class rather than in <code>__init__</code>, it belongs to the class, so every instance appends to the same one. Instances that were meant to be independent quietly share state.</p><p>What the four have in common is that nobody wrote <code>b = a</code>. The second name arrived through an argument, a return value, a default or a class body. That is why "assignment does not copy" is worth internalising rather than memorising: the aliasing is rarely visible on the line where the bug appears.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-model-that-fits-in-your-head">A model that fits in your head</h3>
+                    <h3>A model that fits in your head</h3>
                     <p>Two sentences cover everything on this page.</p><p><strong>Names point at objects.</strong> A name is not storage; it is a label. Assignment moves a label. Several labels can point at one object, and the object has no idea how many.</p><p><strong>Some objects can change, and some cannot.</strong> If an object can change, then every label pointing at it sees the change, because there is only one object. If it cannot, the question never arises.</p><p>Everything else follows. Why does mutating a list argument affect the caller? The parameter is another label on the same object. Why does <code>n += 1</code> inside a function not affect the caller? Integers cannot change, so <code>+=</code> must build a new one and move the local label to it. Why is a tuple of lists not frozen? The tuple's labels cannot be moved; the objects they point at can still change.</p><p>When something surprising happens, the productive question is not "was this passed by value or by reference" but "how many names point at this object, and did that line move a label or change an object". <code>id()</code> answers the first half and the code in front of you answers the second.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-choosing-immutability-in-your-own-code">Choosing immutability in your own code</h3>
+                    <h3>Choosing immutability in your own code</h3>
                     <p>Once the distinction is clear, it becomes a design decision rather than a fact about builtins. Making your own objects immutable removes the entire class of bugs above, and Python gives you a few ways to do it.</p><p>A <code>NamedTuple</code> or a dataclass declared with <code>@dataclass(frozen=True)</code> produces a class whose attributes cannot be reassigned after construction. Attempting it raises rather than silently succeeding, which turns a subtle shared-state bug into an immediate error at the line that caused it. Both are hashable, so they can be dictionary keys and set members, and both give you a readable <code>repr</code> for free.</p><p>The pattern that follows is to build a new object rather than edit an existing one. A method that would have changed <code>self.total</code> instead returns a new instance with the new total, and callers rebind. This costs an allocation and buys the guarantee that nothing you handed to another part of the program can change underneath it.</p><p>It is not the right default for everything. A large object that changes often &mdash; a buffer being filled, a cache, anything performance-sensitive &mdash; is better mutable, and Python's builtins reflect that. The useful habit is to reach for immutability for the things that travel: configuration, coordinates, records read from a file, anything passed between modules or stored in a dictionary. Keep mutability local, where you can see every name that points at the object.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>How do I copy a list properly?</strong> <code>list(a)</code>, <code>a[:]</code> or <code>a.copy()</code> for one level. <code>copy.deepcopy(a)</code> when the items are themselves mutable and need copying too.</p><p><strong>Is <code>is</code> ever right for comparing values?</strong> Only for <code>None</code>, <code>True</code> and <code>False</code>. Everything else should use <code>==</code>.</p><p><strong>Why did my dictionary change when I only edited a copy?</strong> Because the copy was shallow and the value you edited is shared between both dictionaries.</p><p><strong>Are function arguments copied?</strong> No. The function gets another name for the same object, which is why mutating a list argument is visible to the caller.</p><p><strong>Why can a tuple be a dictionary key but not a list?</strong> Keys must hash to a stable value, and a list's contents can change, which would leave it filed in the wrong place.</p><p><strong>Does <code>sorted(x)</code> change <code>x</code>?</strong> No, it returns a new list. <code>x.sort()</code> is the in-place one, and it returns <code>None</code> &mdash; assigning its result is a common way to lose a list.</p><p><strong>What about strings, do I need to copy them?</strong> Never. They cannot be changed, so sharing one is always safe.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>A name is a label on an object; assignment moves the label and never copies.</li><li>Mutating changes the object every name can see; rebinding changes one name.</li><li><code>+=</code> mutates in place for lists and rebinds for immutables &mdash; the same syntax, two behaviours.</li><li>Immutable contents can hold mutable objects, so a tuple is only as frozen as what is in it.</li><li>Copy at the boundary when you store or return a caller's container.</li></ul>
                 </div>
             </div>

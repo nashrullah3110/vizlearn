@@ -676,17 +676,20 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Python's dict is a hash table with O(1) average lookup and, since 3.7, a guaranteed insertion order. Knowing which operations are cheap and which quietly are not is most of using it well.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-operations-and-what-they-cost">The operations, and what they cost</h3>
+                    <h3>What a dict actually is</h3>
+                    <p>A dictionary maps keys to values. Internally it is a <strong>hash table</strong>: Python calls <span class="mono-font">hash(key)</span>, reduces the result to an index into an array of slots, and stores the entry there. Looking a key up repeats the computation and goes straight to the slot &mdash; no scanning.</p><p>That is why lookup is O(1) on average rather than O(n): the cost does not depend on how many items the dict holds. A dict with ten entries and a dict with ten million take about the same time to answer <span class="mono-font">d[k]</span>.</p>
+                </div>
+                <div>
+                    <h3>The operations, and what they cost</h3>
                     <p>d[k] = v&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# insert or overwrite &mdash; O(1)</p><p>d[k]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# lookup, KeyError if absent &mdash; O(1)</p><p>d.get(k, default) # lookup, default if absent &mdash; O(1)</p><p>k in d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# membership &mdash; O(1)</p><p>d.pop(k)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# remove and return &mdash; O(1)</p><p>d.keys() / .values() / .items()&nbsp;# views &mdash; O(1) to create</p><p>The last one catches people out. <span class="mono-font">d.keys()</span> does not build a list; it returns a lightweight <strong>view</strong> that stays live as the dict changes. Iterating it is O(n), but creating it is free.</p><p>The important contrast is with values. <span class="mono-font">k in d</span> checks keys and is O(1); <span class="mono-font">v in d.values()</span> scans and is O(n). They look symmetric and are not.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-hash-table-with-guaranteed-order">A hash table with guaranteed order</h3>
+                    <h3>A hash table with guaranteed order</h3>
                     <p>A Python dictionary maps keys to values with roughly constant-time lookup. Since Python 3.7 it also <strong>preserves insertion order</strong>, which is a language guarantee rather than an implementation detail.</p><div class="vz-table-wrap"><table><thead><tr><th>Operation</th><th>Complexity</th></tr></thead><tbody><tr><td><code>d[key]</code></td><td>O(1) average</td></tr><tr><td><code>d[key] = value</code></td><td>O(1) average</td></tr><tr><td><code>del d[key]</code></td><td>O(1) average</td></tr><tr><td><code>key in d</code></td><td>O(1) average</td></tr><tr><td><code>len(d)</code></td><td>O(1)</td></tr><tr><td>Iteration</td><td>O(n), in insertion order</td></tr></tbody></table></div><p>"Average" is doing work in those rows: the worst case is O(n) when every key collides, which requires a pathological hash function or adversarially chosen keys. Python randomises string hashes per process specifically to prevent the latter as a denial-of-service vector.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-accessing-keys-that-might-not-exist">Accessing keys that might not exist</h3>
+                    <h3>Accessing keys that might not exist</h3>
                     <p>Four ways, each right in a different situation:</p><pre><code class="language-python">d = {&quot;a&quot;: 1}
 
 d[&quot;b&quot;]                       # KeyError
@@ -703,7 +706,7 @@ for user in users:
     groups[user.country].append(user)   # no &quot;if key not in dict&quot; needed</code></pre><p><code>defaultdict(list)</code> creates an empty list on first access to a key, turning a four-line grouping pattern into one line. Note that it also creates the key on a mere <em>read</em>, so use <code>.get()</code> when only inspecting.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-can-be-a-key">What can be a key</h3>
+                    <h3>What can be a key</h3>
                     <p>A key must be <strong>hashable</strong>: it must have a hash that never changes, and support equality comparison.</p><pre><code class="language-python">d[(1, 2)] = &quot;ok&quot;         # tuple - immutable, hashable
 d[[1, 2]] = &quot;error&quot;      # TypeError: unhashable type: &#x27;list&#x27;
 d[frozenset({1,2})] = &quot;ok&quot;</code></pre><p>If a list could be a key, mutating it after insertion would change its hash and the entry would become unreachable &mdash; stored in a slot the new hash does not point to.</p><p>For a custom class, <code>__eq__</code> and <code>__hash__</code> must agree:</p><pre><code class="language-python">class Point:
@@ -715,23 +718,23 @@ d[frozenset({1,2})] = &quot;ok&quot;</code></pre><p>If a list could be a key, mu
         return hash((self.x, self.y))      # hash the same fields as __eq__</code></pre><p>Defining <code>__eq__</code> without <code>__hash__</code> makes the class unhashable in Python 3 &mdash; a deliberate safeguard, because equal objects with different hashes would land in different slots and both exist in the dictionary.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-try-it-yourself">Try it yourself</h3>
-                    <ol><li><strong>Compare get with direct indexing.</strong> Choose <strong>Method</strong> for a lookup on a missing key and press <strong>Execute</strong>. Direct indexing raises KeyError; <span class="mono-font">get</span> returns None instead. That difference decides which one belongs in your code.<button class="vz-run" type="button" data-vz-run="0" aria-label="Run this experiment in the visualisation: Compare get with direct indexing"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Overwrite an existing key.</strong> Run an insert with a key that is already present. The dict does not grow &mdash; assignment on an existing key replaces the value in place, which is why dicts cannot hold duplicate keys.</li><li><strong>Watch insertion order hold.</strong> Insert several keys in a deliberate order and then iterate. They come back in the order added, not sorted and not hashed &mdash; a language guarantee since Python 3.7.</li><li><strong>Delete and re-add.</strong> Remove a key with <strong>Method</strong> set to a pop or delete, then add it back. It reappears at the <em>end</em> of the iteration order, because insertion order means the order of the most recent insertion.<button class="vz-run" type="button" data-vz-run="1" aria-label="Run this experiment in the visualisation: Delete and re-add"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li></ol>
+                    <h3>Try it yourself</h3>
+                    <ol><li><strong>Compare get with direct indexing.</strong> Choose <strong>Method</strong> for a lookup on a missing key and press <strong>Execute</strong>. Direct indexing raises KeyError; <span class="mono-font">get</span> returns None instead. That difference decides which one belongs in your code.</li><li><strong>Overwrite an existing key.</strong> Run an insert with a key that is already present. The dict does not grow &mdash; assignment on an existing key replaces the value in place, which is why dicts cannot hold duplicate keys.</li><li><strong>Watch insertion order hold.</strong> Insert several keys in a deliberate order and then iterate. They come back in the order added, not sorted and not hashed &mdash; a language guarantee since Python 3.7.</li><li><strong>Delete and re-add.</strong> Remove a key with <strong>Method</strong> set to a pop or delete, then add it back. It reappears at the <em>end</em> of the iteration order, because insertion order means the order of the most recent insertion.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-keys-must-be-hashable">Why keys must be hashable</h3>
+                    <h3>Why keys must be hashable</h3>
                     <p>A key must be hashable, which in practice means immutable. Strings, numbers and tuples work; lists, dicts and sets do not, and <span class="mono-font">d[[1,2]] = x</span> raises <span class="mono-font">TypeError: unhashable type: 'list'</span>.</p><p>The reason is that the hash determines the storage slot. If a key could change after insertion, its hash would change, and the entry would be sitting in a slot the lookup no longer computes &mdash; the value would become unreachable while still occupying memory. Forbidding mutable keys makes that impossible.</p><p>A tuple is hashable only if everything inside it is, so <span class="mono-font">(1, 2)</span> works as a key and <span class="mono-font">(1, [2])</span> does not.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-this-goes-wrong">Where this goes wrong</h3>
+                    <h3>Where this goes wrong</h3>
                     <ul><li><strong>Using try/except KeyError where get belongs.</strong> When a missing key is expected rather than exceptional, <span class="mono-font">d.get(k, default)</span> is clearer and faster than catching.</li><li><strong>Mutating a dict while iterating it.</strong> Adding or deleting during a <span class="mono-font">for k in d</span> loop raises RuntimeError. Iterate over <span class="mono-font">list(d)</span> if the dict must change inside the loop.</li><li><strong>Searching values in a loop.</strong> <span class="mono-font">if v in d.values()</span> inside a loop over n items is O(n&sup2;). If you need lookup by value, build the inverted dict once.</li><li><strong>Reinventing defaultdict and Counter.</strong> Checking whether a key exists before appending is what <span class="mono-font">collections.defaultdict</span> is for, and counting occurrences is what <span class="mono-font">collections.Counter</span> is for.</li></ul>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-to-remember">What to remember</h3>
+                    <h3>What to remember</h3>
                     <p>A Python dict is a hash table giving O(1) average insert, lookup, and delete, with keys required to be hashable so their storage slot cannot move. Since 3.7 it also preserves insertion order. The traps are the asymmetries: keys are O(1) but values are O(n), views are live rather than snapshots, and mutating during iteration is an error rather than undefined behaviour.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-dictionary-as-an-index-the-key-optimisation">The dictionary as an index: the key optimisation</h3>
+                    <h3>The dictionary as an index: the key optimisation</h3>
                     <p>The single most valuable use of dictionaries in practical code is replacing a repeated scan.</p><pre><code class="language-python"># O(n*m) - for each order, scan every customer
 for order in orders:
     for c in customers:
@@ -744,7 +747,7 @@ for order in orders:
     c = by_id[order.customer_id]</code></pre><p>With 10,000 orders and 10,000 customers that is 100 million comparisons against 20,000 operations &mdash; and the second version is shorter.</p><p>The pattern generalises: whenever a loop contains a search, a dictionary built beforehand usually eliminates it. Recognising it is worth more than most algorithmic knowledge in everyday work.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-comprehensions-merging-and-views">Comprehensions, merging and views</h3>
+                    <h3>Comprehensions, merging and views</h3>
                     <pre><code class="language-python">lengths = {word: len(word) for word in words}
 inverted = {v: k for k, v in original.items()}
 filtered = {k: v for k, v in prices.items() if v &gt; 1.00}
@@ -755,15 +758,15 @@ for key, value in d.items(): ...       # the usual choice
 for value in d.values(): ...</code></pre><p>Views are live, which is why modifying a dictionary while iterating it raises <code>RuntimeError: dictionary changed size during iteration</code>. To delete while looping, iterate over a snapshot: <code>for k in list(d):</code>.</p><p>Sorting a dictionary produces a new one, since dictionaries have no sort method:</p><pre><code class="language-python">by_value = dict(sorted(prices.items(), key=lambda kv: kv[1]))</code></pre>
                 </div>
                 <div>
-                    <h3 id="vz-s-when-a-dictionary-is-not-the-answer">When a dictionary is not the answer</h3>
+                    <h3>When a dictionary is not the answer</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Need</th><th>Better structure</th></tr></thead><tbody><tr><td>Membership only, no values</td><td><code>set</code></td></tr><tr><td>Sorted iteration or range queries</td><td>A sorted list plus <code>bisect</code>, or <code>sortedcontainers</code></td></tr><tr><td>Fixed known fields</td><td>A <code>dataclass</code> or <code>NamedTuple</code></td></tr><tr><td>Counting</td><td><code>Counter</code></td></tr><tr><td>Bidirectional lookup</td><td>Two dictionaries, or a <code>bidict</code></td></tr><tr><td>Memory-critical, many similar objects</td><td><code>__slots__</code> on a class</td></tr></tbody></table></div><p>The <code>dataclass</code> row is worth emphasising. A dictionary with fixed keys &mdash; <code>{"name": ..., "email": ..., "age": ...}</code> &mdash; is better as a dataclass: attribute access, type hints, autocompletion, and a typo becomes an error rather than a silent <code>KeyError</code> at runtime.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Are dictionaries ordered?</strong> Yes, by insertion, guaranteed since Python 3.7. That is not sorted order.</p><p><strong>Why can a list not be a key?</strong> Mutating it would change its hash and orphan the entry. Use a tuple.</p><p><strong>How much memory does a dictionary use?</strong> More than a list of the same values &mdash; it stores hashes and spare capacity. Lookup speed is what you are buying.</p><p><strong>Is <code>dict.get()</code> slower than <code>d[key]</code>?</strong> Marginally, because it is a method call. Both are O(1).</p><p><strong>How do I merge dictionaries?</strong> <code>a | b</code> in Python 3.9+, or <code>{<strong>a, </strong>b}</code> in earlier versions.</p><p><strong>Why do my string hashes change between runs?</strong> Deliberate per-process randomisation, to prevent collision-based denial-of-service attacks. Set <code>PYTHONHASHSEED</code> to fix it.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>A hash table with O(1) average lookup, and insertion order preserved as a language guarantee.</li><li><code>.get()</code> for a safe read, <code>defaultdict</code> and <code>Counter</code> for grouping and counting.</li><li>Keys must be immutable, and <code>__eq__</code> and <code>__hash__</code> must agree for custom classes.</li><li>Building a dictionary to replace a repeated scan is the highest-value optimisation in ordinary Python.</li><li>Iteration yields live views, so modify a snapshot rather than the dictionary you are looping over.</li></ul>
                 </div>
             </div>

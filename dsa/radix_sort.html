@@ -498,27 +498,27 @@
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <div>
-                    <h3 id="vz-s-the-idea-in-brief">The idea in brief</h3>
+                    <h3>The idea in brief</h3>
                     <p><strong>Radix sort</strong> processes numbers one digit at a time, distributing them into buckets by that digit and collecting them back. Repeat for every digit position &mdash; least significant first &mdash; and the array emerges sorted, with <strong>zero comparisons</strong>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-stability-is-non-negotiable">Why Stability Is Non-Negotiable</h3>
+                    <h3>Why Stability Is Non-Negotiable</h3>
                     <p>This is the crux. When sorting by the tens digit, two numbers with the same tens digit must retain the order they got from the units pass &mdash; otherwise that earlier work is destroyed.</p><p>A <strong>stable</strong> bucketing preserves relative order of equal keys, so each pass refines the previous one instead of undoing it. Watch numbers entering a bucket: they always append to the end, never jump the queue. Swap in an unstable bucketing and radix sort simply stops working.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-least-significant-digit-first">Least Significant Digit First</h3>
+                    <h3>Least Significant Digit First</h3>
                     <p>It feels backwards to start with the last digit, but it is what makes stability sufficient. After the units pass, the array is sorted by units. After the tens pass, it is sorted by tens with units breaking ties &mdash; because stability preserved them. After the hundreds pass, fully sorted.</p><p>Step through and check the array after each pass: it is correctly sorted by all digits processed <em>so far</em>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-beating-the-o-n-log-n-barrier">Beating the O(n log n) Barrier</h3>
+                    <h3>Beating the O(n log n) Barrier</h3>
                     <p>Any sort that works by <em>comparing</em> elements needs at least O(n log n) comparisons &mdash; that is a proven lower bound, not an engineering limitation. Merge sort and heap sort sit exactly on it.</p><p>Radix sort escapes because it never compares. Its cost is <strong>O(d &middot; n)</strong> for d digits, which is linear in n when d is fixed. There is no contradiction: the lower bound only constrains comparison sorts.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-catch">The Catch</h3>
+                    <h3>The Catch</h3>
                     <ul><li>It needs <strong>O(n + k)</strong> extra space for buckets &mdash; it does not sort in place.</li><li>It only works on keys decomposable into digits: integers, fixed-length strings, dates. Arbitrary objects with a custom comparator are out.</li><li>The <span class="mono-font">d</span> factor matters. For 64-bit integers d can be large enough that O(n log n) wins in practice.</li><li>Cache behaviour is poor &mdash; scattering into buckets jumps around memory.</li></ul><p>Its sweet spot is large volumes of fixed-width keys, which is why it appears in database index construction and older card-sorting machinery &mdash; literally where the algorithm came from.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-sorting-digit-by-digit">Sorting digit by digit</h3>
+                    <h3>Sorting digit by digit</h3>
                     <p>Radix sort avoids comparisons entirely. It sorts numbers by processing one digit at a time, using a stable counting sort for each pass.</p><p>Sorting [170, 45, 75, 90, 802, 24, 2, 66] by units, then tens, then hundreds:</p><div class="vz-table-wrap"><table><thead><tr><th>Pass</th><th>Result</th></tr></thead><tbody><tr><td>By units</td><td>[17<strong>0</strong>, 9<strong>0</strong>, 80<strong>2</strong>, <strong>2</strong>, 2<strong>4</strong>, 4<strong>5</strong>, 7<strong>5</strong>, 6<strong>6</strong>]</td></tr><tr><td>By tens</td><td>[80<strong>2</strong>, <strong>2</strong>, 2<strong>4</strong>, 4<strong>5</strong>, 6<strong>6</strong>, 1<strong>7</strong>0, 7<strong>5</strong>, <strong>9</strong>0]</td></tr><tr><td>By hundreds</td><td>[2, 24, 45, 66, 75, 90, <strong>1</strong>70, <strong>8</strong>02]</td></tr></tbody></table></div><p>Three passes, and the array is sorted. No two elements were ever compared with each other.</p><pre><code class="language-python">def radix_sort(arr):
     if not arr:
         return arr
@@ -543,39 +543,39 @@ def counting_sort_by_digit(arr, exp):
     return out</code></pre>
                 </div>
                 <div>
-                    <h3 id="vz-s-stability-is-not-optional">Stability is not optional</h3>
+                    <h3>Stability is not optional</h3>
                     <p>The <code>reversed(arr)</code> on the second-to-last line is what makes the whole algorithm work.</p><p>Each pass must preserve the relative order established by the previous passes. If sorting by tens reordered two numbers that were already correctly ordered by units, the units pass would be wasted.</p><p>So <strong>radix sort requires a stable inner sort</strong>, and that is why counting sort's cumulative-position form &mdash; iterating the input backwards &mdash; is the version used. Using an unstable inner sort produces a wrong answer that looks nearly sorted, which is a confusing failure.</p><p>This is the clearest practical demonstration of why stability is a property worth caring about rather than a technicality.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-complexity-and-the-choice-of-base">Complexity, and the choice of base</h3>
+                    <h3>Complexity, and the choice of base</h3>
                     <p class="mono-font">O(d &times; (n + k))&nbsp;&nbsp;where d = digits, k = base</p><p>The base is a tuning parameter, and the trade is direct: a larger base means fewer passes and a bigger count array.</p><div class="vz-table-wrap"><table><thead><tr><th>Base</th><th>Passes for 32-bit integers</th><th>Count array</th></tr></thead><tbody><tr><td>10</td><td>10</td><td>10</td></tr><tr><td>16</td><td>8</td><td>16</td></tr><tr><td>256</td><td>4</td><td>256</td></tr><tr><td>65,536</td><td>2</td><td>65,536</td></tr></tbody></table></div><p>Base 256 &mdash; one byte per pass &mdash; is the usual choice for integers. Four passes, a 256-entry array, and the digit extraction is a bit shift and mask rather than division, which is considerably faster.</p><p>The complexity is <strong>linear in n</strong> for fixed-width keys, which beats the O(n log n) comparison lower bound. That is not a contradiction: the bound applies only to comparison-based sorts, and radix sort never compares.</p><div class="vz-table-wrap"><table><thead><tr><th>Sort</th><th>Complexity</th><th>Requires</th></tr></thead><tbody><tr><td>Radix</td><td>O(d(n+k))</td><td>Fixed-width integer-like keys</td></tr><tr><td>Counting</td><td>O(n+k)</td><td>Small integer range</td></tr><tr><td>Comparison sorts</td><td>&Omega;(n log n)</td><td>Only a comparison function</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-guided-experiments">Guided experiments</h3>
+                    <h3>Guided experiments</h3>
                     <ol><li><strong>Step through pass 1 (units).</strong> Values scatter into buckets by their last digit and are collected back in bucket order.</li><li><strong>Check the array after pass 1.</strong> It is sorted by units only &mdash; the tens are still scrambled.</li><li><strong>Watch pass 2.</strong> Numbers sharing a tens digit stay in their pass-1 order. That is stability doing the real work.</li><li><strong>Note the comparison counter: zero.</strong> No two values are ever compared, which is exactly how the O(n log n) bound is sidestepped.</li><li><strong>Count the passes.</strong> Three-digit numbers need three passes, regardless of how many values there are.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-short-of-it">The short of it</h3>
+                    <h3>The short of it</h3>
                     <p>Radix sort distributes by digit rather than comparing, achieving O(d·n) — linear when digit count is fixed. It depends entirely on stable bucketing, since each pass must preserve the ordering established by the last. Only usable on digit-decomposable keys, and it costs extra memory.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-lsd-and-msd">LSD and MSD</h3>
+                    <h3>LSD and MSD</h3>
                     <p><strong>Least significant digit first</strong> is the version above: start with the rightmost digit and work left. It requires a stable inner sort and processes every digit of every element, and it is the standard choice for fixed-width numeric keys.</p><p><strong>Most significant digit first</strong> starts from the left, partitions into buckets by the leading digit, and recurses into each bucket. It can stop early &mdash; once a bucket holds one element, that element's position is settled &mdash; which makes it better for <strong>variable-length keys</strong> such as strings.</p><p>MSD radix sort on strings is genuinely fast and is used for sorting large string collections. It is essentially a trie traversal, which is the connection worth noticing: MSD radix sort and tries organise data the same way.</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>LSD</th><th>MSD</th></tr></thead><tbody><tr><td>Direction</td><td>Right to left</td><td>Left to right</td></tr><tr><td>Needs stability</td><td>Yes</td><td>No</td></tr><tr><td>Early termination</td><td>No</td><td>Yes</td></tr><tr><td>Suits</td><td>Fixed-width numbers</td><td>Variable-length strings</td></tr><tr><td>Recursion</td><td>None</td><td>Per bucket</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-handling-the-awkward-cases">Handling the awkward cases</h3>
+                    <h3>Handling the awkward cases</h3>
                     <p><strong>Negative numbers.</strong> The straightforward version breaks, because digit extraction treats sign as absent. Two fixes: offset every value by the minimum so all are non-negative, or partition into negatives and non-negatives, sort each, and reverse the negative part.</p><p><strong>Floating-point numbers.</strong> IEEE 754 floats can be radix-sorted by reinterpreting their bits as integers, with a transformation to handle the sign bit and negative ordering. Correct, fiddly, and used in high-performance libraries.</p><p><strong>Strings of unequal length.</strong> Pad conceptually with a character that sorts before everything, or use MSD radix sort, which handles it naturally.</p><p><strong>Very large keys.</strong> The number of passes grows with key width, so a 512-bit key means many passes. Comparison sorts become competitive.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-is-used">Where it is used</h3>
+                    <h3>Where it is used</h3>
                     <ul><li><strong>GPU sorting libraries.</strong> Radix sort is the dominant GPU sorting algorithm, because its work is regular and highly parallel &mdash; no branching on comparisons.</li><li><strong>Database sorting</strong> of integer keys at scale.</li><li><strong>Suffix array construction,</strong> which uses radix sort internally and underlies compressed text indexes.</li><li><strong>Histogram-based image processing,</strong> where the count array is the histogram.</li><li><strong>Sorting fixed-width identifiers</strong> &mdash; timestamps, IDs, IP addresses.</li><li><strong>Bioinformatics,</strong> for sorting DNA k-mers over a four-letter alphabet.</li></ul><p>The GPU case is the most consequential today: when sorting billions of keys on a GPU, radix sort's predictable memory access and absence of branching matter far more than its theoretical complexity.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>How does it beat O(n log n)?</strong> That bound applies to comparison-based sorts. Radix sort never compares two elements, so the bound does not apply.</p><p><strong>Is it always faster than quick sort?</strong> No. It wins for fixed-width integer keys at large n; comparison sorts win for arbitrary objects, small n, or very wide keys.</p><p><strong>Does the inner sort have to be counting sort?</strong> It has to be stable. Counting sort is the natural choice because it is O(n+k) and stable.</p><p><strong>Can it sort strings?</strong> Yes &mdash; MSD radix sort handles variable-length strings well and is effectively a trie traversal.</p><p><strong>What base should I use?</strong> 256 for integers: four passes for 32-bit keys, and digit extraction is a shift and mask.</p><p><strong>Is it stable?</strong> LSD radix sort is, provided the inner sort is. That is a requirement, not a bonus.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Sort by one digit at a time with a stable counting sort; after all digits, the array is sorted.</li><li>Stability is mandatory &mdash; each pass must preserve the previous passes' ordering.</li><li>O(d(n+k)), linear for fixed-width keys, which is possible because nothing is ever compared.</li><li>Base 256 is the practical choice: four passes for 32-bit integers, with shift-and-mask digit extraction.</li><li>LSD suits fixed-width numbers; MSD suits variable-length strings and is essentially a trie traversal.</li></ul>
                 </div>
             </div>

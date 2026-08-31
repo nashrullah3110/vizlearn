@@ -231,25 +231,28 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Three smoothing filters, one noisy image, and a clear demonstration of why the choice matters.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-gaussian-a-weighted-average">Gaussian: a weighted average</h3>
+                    <h3>The same job, three different assumptions</h3>
+                    <p>All three filters answer the same question &mdash; what should this pixel be, given its neighbours? &mdash; and they differ in what they assume about how the pixel got corrupted. That assumption is the whole story, and it is why one filter can be excellent on one kind of noise and useless on another.</p><p>The image in the visualisation carries <strong>salt-and-pepper noise</strong>: isolated pixels flipped to pure black or pure white. Switch between the three filters and the difference is not subtle.</p>
+                </div>
+                <div>
+                    <h3>Gaussian: a weighted average</h3>
                     <p>A Gaussian blur replaces each pixel with a weighted mean of its neighbourhood, where the weights fall off with distance according to a Gaussian curve. The centre counts most, the corners least.</p><p>It is the right filter when the noise is <strong>additive and roughly symmetric</strong> &mdash; every pixel nudged up or down by a small random amount. Averaging several such pixels cancels the nudges, because they are as often positive as negative. Sensor noise in reasonable light behaves like this, and a Gaussian handles it well.</p><p>On salt-and-pepper it fails, and the reason is structural: a mean includes every value it is given. A single pixel at 255 sitting among neighbours at 40 drags the average up. The filter does not remove the outlier &mdash; it *spreads* it over the neighbourhood, converting one bright dot into a larger, dimmer smudge. Increase the radius and the smudges grow rather than vanishing.</p><p>The other cost is edges. An edge is a place where neighbouring pixels are genuinely different, and averaging across it mixes the two sides together. Any filter based on a plain average must blur edges, because it has no way to know that an edge is there.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-median-sorting-instead-of-averaging">Median: sorting instead of averaging</h3>
+                    <h3>Median: sorting instead of averaging</h3>
                     <p>The median filter takes the neighbourhood, sorts the values, and outputs the middle one.</p><p>This one change fixes salt-and-pepper completely. To be selected as the median, a value has to sit in the middle of the sorted list &mdash; and an extreme value, by definition, sorts to one end. It is never chosen. It is not reduced or spread; it is simply not selected, and the output takes a value that some genuine neighbouring pixel actually had.</p><p>Set the filter to Median with radius 2 above. The speckles do not fade; they are gone, and the shapes underneath keep their edges. That edge preservation is the second benefit: at a boundary, most of the neighbourhood belongs to one side or the other, so the median comes from the majority side rather than from a blend of both.</p><p>The median is a <strong>non-linear</strong> filter, which means it cannot be expressed as a convolution kernel and cannot be decomposed into separate horizontal and vertical passes. It is correspondingly slower, since a sort is required at every pixel.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-bilateral-averaging-only-within-a-region">Bilateral: averaging only within a region</h3>
+                    <h3>Bilateral: averaging only within a region</h3>
                     <p>The bilateral filter keeps the weighted average but multiplies each weight by a second factor based on how similar the neighbour's *value* is to the centre pixel's.</p><pre><code>weight = spatial(distance) * range(|neighbour - centre|)</code></pre><p>A neighbour that is nearby and similar gets a large weight. A neighbour that is nearby but very different &mdash; because it is on the other side of an edge &mdash; gets a weight close to zero and is effectively excluded.</p><p>The result smooths within a region and refuses to smooth across a boundary. It is what produces the slightly plastic look of smartphone portrait modes: skin is smoothed heavily while the outline of the face stays sharp.</p><p>The edge sigma control sets how different a neighbour has to be before it is ignored. Turn it low and the filter barely does anything, because almost everything counts as an edge. Turn it high and the range term stops discriminating, and you have an ordinary Gaussian blur back.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-choosing">Choosing</h3>
+                    <h3>Choosing</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Noise</th><th>Use</th><th>Because</th></tr></thead><tbody><tr><td>Small random variation</td><td>Gaussian</td><td>averaging cancels symmetric errors</td></tr><tr><td>Isolated extreme pixels</td><td>Median</td><td>outliers never sort to the middle</td></tr><tr><td>Any, with edges to protect</td><td>Bilateral</td><td>dissimilar neighbours are excluded</td></tr><tr><td>Impulse noise before thresholding</td><td>Median</td><td>extremes survive every threshold otherwise</td></tr></tbody></table></div><p>A practical note: these compose. Median first to remove impulses, then a gentle Gaussian to handle what remains, is a common and effective pipeline.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Blurring before edge detection without thinking.</strong> Some blur helps, since edge detectors amplify noise. Too much removes the edges you were looking for. The Canny detector builds a Gaussian in for exactly this reason, with a parameter to control it.</p><p><strong>Using a large median radius on fine detail.</strong> Thin lines narrower than half the window are a minority in every neighbourhood they appear in, so the median removes them along with the noise.</p><p><strong>Reaching for bilateral by default.</strong> It is far more expensive than the other two and has two parameters instead of one. If the edges do not need protecting, it is a slow Gaussian.</p>
                 </div>
             </div>
