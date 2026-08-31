@@ -39,8 +39,6 @@ deep = copy.deepcopy(original)
 
 `deepcopy` walks the whole structure and rebuilds every mutable object it finds. Nested config dictionaries, lists of records, anything parsed from JSON &mdash; these are the cases.
 
-It is slower, and for large structures noticeably so. It also handles the hard cases correctly: shared references stay shared in the copy, and cycles do not cause infinite recursion. Writing your own recursive copy usually gets both of those wrong.
-
 ## The dict version of the trap
 
 
@@ -111,3 +109,180 @@ should be documented as doing so, or it should deepcopy first. Silently editing 
 nested value in a structure the caller still holds is the sort of bug that gets
 diagnosed as "the settings randomly change", which is a long way from where the
 mutation actually happened.
+
+## Watching the difference with is
+
+The rule is one line of output away from being obvious:
+
+```python
+import copy
+
+original = {"a": [1, 2]}
+shallow = original.copy()
+deep = copy.deepcopy(original)
+
+print(original["a"] is shallow["a"])
+print(original["a"] is deep["a"])
+
+shallow["a"].append(3)
+print(original, deep)
+```
+
+```
+True
+False
+{'a': [1, 2, 3]} {'a': [1, 2]}
+```
+
+The first two lines are the whole distinction. After a shallow copy, the inner
+list is *the same object*; after a deep copy it is a new one. The last line is
+the consequence: appending through the shallow copy changed the original, and
+the deep copy was untouched.
+
+Note that the outer dictionaries are different objects in both cases. A shallow
+copy is a real copy &mdash; adding a new key to `shallow` does not affect
+`original`. It is only one level deep, and every problem on this page comes
+from the level below.
+
+## Where this actually comes up
+
+The trap is rarely met head-on. It arrives through four ordinary situations.
+
+**Configuration loaded from JSON or YAML.** These are nested dictionaries by
+nature, `.copy()` looks like it did the job, and a function that adjusts one
+value has quietly adjusted it for everybody.
+
+**A default that is a nested structure.** A module-level `DEFAULTS` dict copied
+shallowly into each new object means every object shares the same inner
+dictionaries. The objects look independent and are not.
+
+**A list of records.** `rows[:]` gives a new list of the same dictionaries, so
+sorting or filtering the copy is safe and editing a record through it is not.
+This is a common one because the copy was made specifically to be safe.
+
+**Undo, or "keep the original for comparison".** Snapshotting state before a
+change is the exact case where a shallow copy fails: the snapshot shares the
+mutable parts with the thing that is about to change, so by the time you
+compare, both have moved.
+
+The pattern across all four is that the copy was made for safety, and shallow
+copying provides that safety only for the top level. If the reason for copying
+is "so that changes over here do not affect over there", the question to ask is
+how deep the changes go.
+
+## Equality survives copying; identity does not
+
+After any copy, shallow or deep, `copy == original` is `True` and
+`copy is original` is `False`. That is the intended behaviour and it is worth
+being explicit about, because it is how you check that a copy did what you
+meant.
+
+For your own classes it holds only if you defined `__eq__`. Without one,
+Python compares by identity, so a copy of your object is *not* equal to the
+original &mdash; which surprises people who have just written a careful
+`__deepcopy__` and find their tests failing on the comparison rather than the
+copy. Defining `__eq__` on a class whose instances get copied around is
+effectively required, and a dataclass writes it for you.
+
+`deepcopy` also preserves structure that a naive copy would flatten. If two
+entries in a dictionary point at the same list, the deep copy has two entries
+pointing at one *new* list &mdash; the sharing is reproduced rather than
+duplicated. That is usually what you want, and it is one more thing a
+hand-written recursive copy gets wrong.
+
+## Immutability removes the question
+
+The most reliable fix for a copying bug is to not need the copy.
+
+If the structure is built from tuples, frozensets, strings and numbers, then
+nothing inside it can change, so sharing it is safe and a shallow copy is a
+complete one. The distinction that this whole page is about simply does not
+arise. That is why nobody worries about copying a tuple of strings, and why
+`deepcopy` on such a structure is wasted work.
+
+The practical version is to make the things that travel immutable. A record
+passed between functions is better as a frozen dataclass or a `NamedTuple` than
+as a dictionary: it cannot be edited by a function that received it, so no
+defensive copy is needed at any boundary. Where a modified version is required,
+`_replace` or `dataclasses.replace` builds a new one and leaves the original
+alone.
+
+Keep the mutable structures local, where every name pointing at them is visible
+in the same function. Then copying becomes a decision you make occasionally
+rather than a defence you have to remember everywhere.
+
+## Deciding, in four questions
+
+When you are about to copy something and are not sure which kind you need, the
+answer follows from four questions asked in order.
+
+**Does anything inside it change?** If every item is a number, a string or a
+tuple of those, any shallow copy is a complete one. Stop here; this covers most
+copying.
+
+**Am I copying so that changes over here do not affect over there?** If the
+answer is no &mdash; you are copying to get a list you can sort, or to add one
+key &mdash; then a shallow copy of the outer container is exactly what you
+want and nothing more is needed.
+
+**How deep do the changes go?** If the code that follows only touches the top
+level, shallow is enough regardless of what is nested underneath. If it reaches
+into nested structures, every level it reaches has to have been copied.
+
+**Is the structure large or does it hold something uncopyable?** `deepcopy` on
+a big object graph costs real time, and on an object holding a connection, a
+file or a lock it either fails or duplicates something that should be unique.
+Both are signals to restructure rather than to copy harder &mdash; usually by
+making the shared parts immutable, or by rebuilding the small part you need to
+change rather than duplicating the whole.
+
+Most real answers land on shallow, and the ones that do not are usually nested
+configuration or a snapshot taken for comparison. Knowing which of those you
+are in is more useful than a rule about which function to call.
+
+## Questions people ask
+
+<strong>Is `list(x)` a deep copy?</strong> No. It is one of the shallow ones,
+along with `x[:]` and `x.copy()`.
+
+<strong>Does `deepcopy` handle cycles?</strong> Yes. It remembers what it has
+already copied, so a structure that refers to itself does not cause infinite
+recursion.
+
+<strong>Is `deepcopy` slow?</strong> Relative to a shallow copy, considerably.
+It walks the whole structure and keeps a record as it goes. For small
+structures it does not matter.
+
+<strong>How do I copy only two levels?</strong> There is no built-in for that.
+A comprehension that shallow-copies each item &mdash;
+`{k: v.copy() for k, v in d.items()}` &mdash; is the usual answer.
+
+<strong>Can I stop an attribute being deep-copied?</strong> Yes, by defining
+`__deepcopy__` on the class, which is how objects holding a connection or a
+lock avoid duplicating it.
+
+<strong>Does copying a string do anything?</strong> No. Strings are immutable,
+so `copy` returns the same object.
+
+<strong>What about `copy.copy` versus `.copy()`?</strong> The same thing for
+builtins. `copy.copy` also works on objects that have no `.copy()` method.
+
+<strong>Does `deepcopy` copy class definitions too?</strong> No. Classes,
+functions and modules are treated as atomic and shared rather than duplicated,
+which is what you want.
+
+<strong>Is pickling and unpickling a valid deep copy?</strong> It usually
+produces one, and it is slower and fails on anything unpicklable. Use
+`deepcopy`, which is what it is for.
+
+## Recap in one screen
+
+- A shallow copy duplicates the outer container and shares everything inside
+  it; `original[0] is shallow[0]` is the test.
+- Shallow is a complete copy when the contents are immutable, which is why the
+  problem stays hidden for so long.
+- `copy.deepcopy` rebuilds the whole structure, preserves shared references and
+  survives cycles &mdash; and costs proportionally.
+- The bugs arrive through config dicts, shared defaults, lists of records and
+  snapshots, not through code that obviously copies.
+- Making the data immutable removes the question entirely.

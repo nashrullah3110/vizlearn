@@ -11,33 +11,6 @@ It takes any number of iterables:
 
 for name, score, grade in zip(names, scores, grades):
 
-## Building a dict
-
-dict(zip(keys, values))
-
-This is the standard idiom for turning two parallel lists into a mapping, and it is worth recognising on sight because it appears everywhere.
-
-## It truncates, and it does not tell you
-
-This is the part that costs people an afternoon:
-
-zip(["ana", "bo", "cy", "dee"], [91, 78])
-
-gives two pairs. `cy` and `dee` are gone. No error, no warning &mdash; `zip` stops when the shortest input runs out, by design.
-
-When the lists come from the same source that is usually harmless. When one is data and the other is a lookup that quietly returned fewer rows, you get a silently shortened result, which is the worst kind of wrong.
-
-Two ways to be explicit:
-
-
-```python
-zip(a, b, strict=True)  # raises ValueError on mismatch (3.10+)
-zip_longest(a, b, fillvalue=0)  # pads instead, from itertools
-```
-
-
-If the lists are supposed to be the same length, `strict=True` turns a silent bug into an immediate error. That is nearly always the better trade.
-
 ## Walking two things at once
 
 The job `zip` does is small and comes up constantly: you have two or more
@@ -99,3 +72,209 @@ Like `map` and `filter`, `zip` returns an iterator rather than a list. Printing
 it shows an object, and consuming it twice gives nothing the second time. In a
 `for` loop that is invisible and ideal; the moment you want to keep the result,
 wrap it in `list()`.
+
+## A worked example: comparing two lists
+
+The job `zip` was made for, with `enumerate` supplying the position so the
+report can say where the difference is:
+
+```python
+expected = [1, 2, 3]
+actual = [1, 5, 3]
+
+for i, (e, a) in enumerate(zip(expected, actual)):
+    if e != a:
+        print(f"row {i}: expected {e}, got {a}")
+```
+
+```
+row 1: expected 2, got 5
+```
+
+The double unpacking in `for i, (e, a) in` is worth reading slowly.
+`enumerate` yields `(index, item)`, and here the item is itself the pair
+`zip` produced, so the brackets take it apart in the same statement. Written
+without them you would get `i` and a tuple, and would have to index into it on
+the next line.
+
+This is the shape behind most comparison code: diffing two versions of a
+record, checking a result against a fixture, lining up a header row with a data
+row. Note what it does *not* do &mdash; if the lists are different lengths, the
+extra rows are never examined, and the report is silently incomplete. That is
+the argument for `strict=True` in one sentence.
+
+## Transposing with a star
+
+Combining the star and `zip` turns rows into columns:
+
+```python
+matrix = [[1, 2, 3], [4, 5, 6]]
+print(list(zip(*matrix)))
+```
+
+```
+[(1, 4), (2, 5), (3, 6)]
+```
+
+`*matrix` passes each row as a separate argument, so `zip` receives two
+iterables and takes one item from each in turn &mdash; which is exactly a
+transpose. The result is a list of tuples rather than lists, and the rows must
+be the same length or the short one truncates everything, both of which are
+the ordinary `zip` rules applied in an unusual place.
+
+This is the same operation as unzipping a list of pairs, which is why both are
+written `zip(*something)`. A list of pairs *is* a two-column matrix, and
+transposing it gives you the two columns.
+
+## Where zip removes an index
+
+The value of `zip` is easiest to see by looking at what it replaces. The
+index-based version of walking two lists together has to create a counter,
+bound it correctly, and reach back into both lists on every line that uses a
+value.
+
+Each of those is a place to be wrong. The counter can start at one. The bound
+can use the wrong list's length, which is fine until the lists differ. The
+lookups can be transposed, so that names are read from the scores list. None of
+these produce an error; they produce wrong output, which is worse.
+
+`zip` removes all three at once by handing you the values directly. There is no
+counter to get wrong, no bound to compute, and no lookup to transpose, because
+the names arrive already bound to the right variables. This is the same
+argument as `for item in items` over `for i in range(len(items))`, applied to
+more than one sequence.
+
+The index is still available when you want it &mdash; that is what `enumerate`
+around a `zip` is for &mdash; but now it is there because you asked, rather
+than because iteration required it.
+
+## The other things that produce pairs
+
+`zip` is one of several things in Python that yield tuples, and they all pair
+with the same unpacking syntax. Recognising the family makes a lot of loops
+read the same way.
+
+`enumerate(items)` yields `(index, item)`. `dict.items()` yields
+`(key, value)`. `zip(a, b)` yields `(a_item, b_item)`. `itertools.pairwise`
+yields consecutive overlapping pairs from one sequence, which is what you want
+for comparing each item with the next.
+
+All four are consumed identically: `for x, y in thing`. The unpacking is not a
+feature of any of them; it is the ordinary tuple unpacking from elsewhere in
+the track, applied to whatever the loop happened to produce. That is why
+`for k, v in d.items()` works, and why forgetting `.items()` gives you keys and
+a confusing error rather than a helpful one.
+
+They also combine. `zip(a, b, c)` for three sequences, `enumerate(zip(a, b))`
+for a position alongside a pair, `zip(d.keys(), d.values())` for the long way
+of writing `d.items()`.
+
+## Parallel lists, and when zip is patching a design problem
+
+`zip` is the right tool for sequences that genuinely correspond, and it is also
+what lets a questionable data model keep working, so it is worth knowing which
+situation you are in.
+
+Two lists are parallel when item *i* of one describes the same thing as item
+*i* of the other. Nothing in the language enforces that. It is an invariant
+living entirely in the programmer's head, and every operation has to preserve
+it: sorting one list without the other breaks it, filtering one breaks it,
+appending to one and forgetting the other breaks it, and none of those raise.
+
+The failure is quiet and it compounds. A sort applied to `names` but not to
+`scores` produces output where every name has somebody else's score, and the
+program reports it confidently. There is no assertion that could have caught it
+without comparing against a source of truth that no longer exists.
+
+When the lists are built together and consumed together in one function, that
+risk is contained and `zip` is exactly right. When they are stored on an
+object, passed between functions or returned from an API, the invariant has to
+survive code that nobody has written yet, and the better structure is one list
+of records &mdash; tuples, dictionaries, dataclasses &mdash; where the name and
+the score are in the same object and cannot be separated.
+
+The tell is a sort. If you find yourself sorting two lists in step, or writing
+`zip`, sorting the pairs, and unzipping them again, the data wanted to be pairs
+all along.
+
+## Deciding what unequal lengths mean
+
+Three behaviours are available and the choice is about what a mismatch would
+signify in your program. It is worth deciding deliberately rather than taking
+the default.
+
+**Truncating is right when one side is genuinely open-ended.** Pairing a finite
+list against an infinite counter, taking as many rows as you have templates,
+reading until the shorter source is exhausted &mdash; here stopping at the
+shortest is the whole point, and the default does what you want.
+
+**Raising is right when equal lengths are an invariant.** Two lists built from
+the same source, a header row and a data row, expected and actual results: if
+they differ, something upstream is broken and every line of output after that
+point is suspect. `strict=True` converts a wrong answer into an exception,
+which is almost always the better outcome.
+
+**Padding is right when the missing items have a meaning.** Filling absent
+values with `None`, zero or a default, so that the shorter list is treated as
+incomplete rather than as terminating the whole operation.
+`itertools.zip_longest` does this, and choosing the fill value is choosing what
+"missing" means in the result.
+
+The default is the truncating one, which means it is the choice you make by not
+choosing. On anything where a mismatch would be a bug, that is the wrong
+default, and one keyword argument fixes it.
+
+## Comparing each item with the next
+
+A close relative of zipping two lists is zipping one list against itself, offset
+by one, which pairs every item with its successor.
+
+`zip(items, items[1:])` does it directly: the second argument starts one
+position later, so the first pair is items 0 and 1, the second is 1 and 2, and
+the whole thing stops one short of the end because the offset list is one
+shorter. That truncation is the default behaviour doing exactly the right
+thing for once.
+
+This is the shape for any question about consecutive items: are the values
+increasing, where are the gaps in a sequence of dates, what is the difference
+between each reading and the last. Written with indices it needs a loop from 1
+to `len(items)` and two lookups per pass; written this way it is one line and
+has no index at all.
+
+Since Python 3.10 `itertools.pairwise(items)` does the same thing without the
+slice, which matters when the input is a generator and cannot be sliced.
+
+## Questions people ask
+
+<strong>What does `zip` return?</strong> An iterator of tuples. Wrap it in
+`list()` to see it or to keep it.
+
+<strong>Can I zip more than two things?</strong> Yes, any number. Each pass
+yields a tuple with one item from each.
+
+<strong>What if the lists are different lengths?</strong> It stops at the
+shortest, silently. `strict=True` raises instead, from Python 3.10.
+
+<strong>How do I pad the shorter one?</strong> `itertools.zip_longest`, which
+fills with `None` or a value you choose.
+
+<strong>Can I zip a dictionary?</strong> Yes, and you get its keys, because
+that is what iterating a dictionary gives. Use `.items()` for pairs.
+
+<strong>Why did my second loop over a zip do nothing?</strong> Because it is an
+iterator and the first loop consumed it. Build a list if you need it twice.
+
+<strong>Does `zip` copy the data?</strong> No. It holds references and produces
+tuples on demand, so it works on generators and infinite sequences.
+
+## Recap in one screen
+
+- `zip` walks several iterables in step and yields one tuple per position,
+  which removes the index and everything that can go wrong with it.
+- It stops at the shortest input without a word; use `strict=True` when equal
+  lengths are an assumption rather than a coincidence.
+- `zip(*pairs)` unzips, and `zip(*matrix)` transposes &mdash; the same
+  operation seen from two angles.
+- `dict(zip(keys, values))` is the standard way to build a mapping from two
+  parallel lists.
+- It is lazy, so it works on generators and can only be walked once.

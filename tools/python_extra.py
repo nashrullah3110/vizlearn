@@ -1336,17 +1336,6 @@ Filtering keeps part of a mapping:
 That is the standard way to drop unset options before merging configuration,
 and it reads better than building an empty dict and assigning into it.
 
-## Dict comprehensions and duplicate keys
-
-A dict comprehension has no duplicate protection. If the key expression produces
-the same key twice, the later value overwrites the earlier one and nothing is
-reported. This is the same behaviour as a dict literal with a repeated key, and
-it is worth remembering whenever the key is computed rather than taken directly
-from a unique field.
-
-If you need to know about collisions, build with a loop and check, or count with
-`collections.Counter` first.
-
 ## Set comprehensions, and what they are for
 
 A set comprehension is a comprehension whose result must be unique, and the two
@@ -1361,21 +1350,6 @@ value:
 Both could be written as `set([...])` around a list comprehension. The direct
 form avoids building the intermediate list, and says up front that uniqueness is
 the point rather than an afterthought.
-
-## Telling the three apart
-
-The bracket decides everything, and the difference between a dict and a set
-comprehension is one colon:
-
-```python
-[x for x in it]        # list
-{x for x in it}        # set
-{x: f(x) for x in it}  # dict
-(x for x in it)        # generator
-```
-
-This is also why `{}` is an empty dict and not an empty set - the dict form
-claimed the braces first, and an empty one has no colon to distinguish it.
 
 ## When a loop is still better
 
@@ -4903,4 +4877,592 @@ still only asking for one item.
   the consumer does not ask for.
 - `for` works by calling `next()` until `StopIteration`; a generator simply
   implements that protocol.
+""")
+
+
+extend("zip_function", """
+## A worked example: comparing two lists
+
+The job `zip` was made for, with `enumerate` supplying the position so the
+report can say where the difference is:
+
+```python
+expected = [1, 2, 3]
+actual = [1, 5, 3]
+
+for i, (e, a) in enumerate(zip(expected, actual)):
+    if e != a:
+        print(f"row {i}: expected {e}, got {a}")
+```
+
+```
+row 1: expected 2, got 5
+```
+
+The double unpacking in `for i, (e, a) in` is worth reading slowly.
+`enumerate` yields `(index, item)`, and here the item is itself the pair
+`zip` produced, so the brackets take it apart in the same statement. Written
+without them you would get `i` and a tuple, and would have to index into it on
+the next line.
+
+This is the shape behind most comparison code: diffing two versions of a
+record, checking a result against a fixture, lining up a header row with a data
+row. Note what it does *not* do &mdash; if the lists are different lengths, the
+extra rows are never examined, and the report is silently incomplete. That is
+the argument for `strict=True` in one sentence.
+
+## Transposing with a star
+
+Combining the star and `zip` turns rows into columns:
+
+```python
+matrix = [[1, 2, 3], [4, 5, 6]]
+print(list(zip(*matrix)))
+```
+
+```
+[(1, 4), (2, 5), (3, 6)]
+```
+
+`*matrix` passes each row as a separate argument, so `zip` receives two
+iterables and takes one item from each in turn &mdash; which is exactly a
+transpose. The result is a list of tuples rather than lists, and the rows must
+be the same length or the short one truncates everything, both of which are
+the ordinary `zip` rules applied in an unusual place.
+
+This is the same operation as unzipping a list of pairs, which is why both are
+written `zip(*something)`. A list of pairs *is* a two-column matrix, and
+transposing it gives you the two columns.
+
+## Where zip removes an index
+
+The value of `zip` is easiest to see by looking at what it replaces. The
+index-based version of walking two lists together has to create a counter,
+bound it correctly, and reach back into both lists on every line that uses a
+value.
+
+Each of those is a place to be wrong. The counter can start at one. The bound
+can use the wrong list's length, which is fine until the lists differ. The
+lookups can be transposed, so that names are read from the scores list. None of
+these produce an error; they produce wrong output, which is worse.
+
+`zip` removes all three at once by handing you the values directly. There is no
+counter to get wrong, no bound to compute, and no lookup to transpose, because
+the names arrive already bound to the right variables. This is the same
+argument as `for item in items` over `for i in range(len(items))`, applied to
+more than one sequence.
+
+The index is still available when you want it &mdash; that is what `enumerate`
+around a `zip` is for &mdash; but now it is there because you asked, rather
+than because iteration required it.
+
+## The other things that produce pairs
+
+`zip` is one of several things in Python that yield tuples, and they all pair
+with the same unpacking syntax. Recognising the family makes a lot of loops
+read the same way.
+
+`enumerate(items)` yields `(index, item)`. `dict.items()` yields
+`(key, value)`. `zip(a, b)` yields `(a_item, b_item)`. `itertools.pairwise`
+yields consecutive overlapping pairs from one sequence, which is what you want
+for comparing each item with the next.
+
+All four are consumed identically: `for x, y in thing`. The unpacking is not a
+feature of any of them; it is the ordinary tuple unpacking from elsewhere in
+the track, applied to whatever the loop happened to produce. That is why
+`for k, v in d.items()` works, and why forgetting `.items()` gives you keys and
+a confusing error rather than a helpful one.
+
+They also combine. `zip(a, b, c)` for three sequences, `enumerate(zip(a, b))`
+for a position alongside a pair, `zip(d.keys(), d.values())` for the long way
+of writing `d.items()`.
+
+## Parallel lists, and when zip is patching a design problem
+
+`zip` is the right tool for sequences that genuinely correspond, and it is also
+what lets a questionable data model keep working, so it is worth knowing which
+situation you are in.
+
+Two lists are parallel when item *i* of one describes the same thing as item
+*i* of the other. Nothing in the language enforces that. It is an invariant
+living entirely in the programmer's head, and every operation has to preserve
+it: sorting one list without the other breaks it, filtering one breaks it,
+appending to one and forgetting the other breaks it, and none of those raise.
+
+The failure is quiet and it compounds. A sort applied to `names` but not to
+`scores` produces output where every name has somebody else's score, and the
+program reports it confidently. There is no assertion that could have caught it
+without comparing against a source of truth that no longer exists.
+
+When the lists are built together and consumed together in one function, that
+risk is contained and `zip` is exactly right. When they are stored on an
+object, passed between functions or returned from an API, the invariant has to
+survive code that nobody has written yet, and the better structure is one list
+of records &mdash; tuples, dictionaries, dataclasses &mdash; where the name and
+the score are in the same object and cannot be separated.
+
+The tell is a sort. If you find yourself sorting two lists in step, or writing
+`zip`, sorting the pairs, and unzipping them again, the data wanted to be pairs
+all along.
+
+## Deciding what unequal lengths mean
+
+Three behaviours are available and the choice is about what a mismatch would
+signify in your program. It is worth deciding deliberately rather than taking
+the default.
+
+**Truncating is right when one side is genuinely open-ended.** Pairing a finite
+list against an infinite counter, taking as many rows as you have templates,
+reading until the shorter source is exhausted &mdash; here stopping at the
+shortest is the whole point, and the default does what you want.
+
+**Raising is right when equal lengths are an invariant.** Two lists built from
+the same source, a header row and a data row, expected and actual results: if
+they differ, something upstream is broken and every line of output after that
+point is suspect. `strict=True` converts a wrong answer into an exception,
+which is almost always the better outcome.
+
+**Padding is right when the missing items have a meaning.** Filling absent
+values with `None`, zero or a default, so that the shorter list is treated as
+incomplete rather than as terminating the whole operation.
+`itertools.zip_longest` does this, and choosing the fill value is choosing what
+"missing" means in the result.
+
+The default is the truncating one, which means it is the choice you make by not
+choosing. On anything where a mismatch would be a bug, that is the wrong
+default, and one keyword argument fixes it.
+
+## Comparing each item with the next
+
+A close relative of zipping two lists is zipping one list against itself, offset
+by one, which pairs every item with its successor.
+
+`zip(items, items[1:])` does it directly: the second argument starts one
+position later, so the first pair is items 0 and 1, the second is 1 and 2, and
+the whole thing stops one short of the end because the offset list is one
+shorter. That truncation is the default behaviour doing exactly the right
+thing for once.
+
+This is the shape for any question about consecutive items: are the values
+increasing, where are the gaps in a sequence of dates, what is the difference
+between each reading and the last. Written with indices it needs a loop from 1
+to `len(items)` and two lookups per pass; written this way it is one line and
+has no index at all.
+
+Since Python 3.10 `itertools.pairwise(items)` does the same thing without the
+slice, which matters when the input is a generator and cannot be sliced.
+
+## Questions people ask
+
+<strong>What does `zip` return?</strong> An iterator of tuples. Wrap it in
+`list()` to see it or to keep it.
+
+<strong>Can I zip more than two things?</strong> Yes, any number. Each pass
+yields a tuple with one item from each.
+
+<strong>What if the lists are different lengths?</strong> It stops at the
+shortest, silently. `strict=True` raises instead, from Python 3.10.
+
+<strong>How do I pad the shorter one?</strong> `itertools.zip_longest`, which
+fills with `None` or a value you choose.
+
+<strong>Can I zip a dictionary?</strong> Yes, and you get its keys, because
+that is what iterating a dictionary gives. Use `.items()` for pairs.
+
+<strong>Why did my second loop over a zip do nothing?</strong> Because it is an
+iterator and the first loop consumed it. Build a list if you need it twice.
+
+<strong>Does `zip` copy the data?</strong> No. It holds references and produces
+tuples on demand, so it works on generators and infinite sequences.
+
+## Recap in one screen
+
+- `zip` walks several iterables in step and yields one tuple per position,
+  which removes the index and everything that can go wrong with it.
+- It stops at the shortest input without a word; use `strict=True` when equal
+  lengths are an assumption rather than a coincidence.
+- `zip(*pairs)` unzips, and `zip(*matrix)` transposes &mdash; the same
+  operation seen from two angles.
+- `dict(zip(keys, values))` is the standard way to build a mapping from two
+  parallel lists.
+- It is lazy, so it works on generators and can only be walked once.
+""")
+
+
+extend("dict_and_set_comprehensions", """
+## A worked example: a lookup table and a grouping
+
+The two jobs that send people to a dict comprehension, side by side &mdash;
+because only one of them is actually a comprehension:
+
+```python
+rows = [("ana", "red"), ("bo", "blue"), ("cy", "red")]
+
+team_of = {name: team for name, team in rows}
+print(team_of["cy"])
+
+by_team = {}
+for name, team in rows:
+    by_team.setdefault(team, []).append(name)
+print(by_team)
+```
+
+```
+red
+{'red': ['ana', 'cy'], 'blue': ['bo']}
+```
+
+The first is a comprehension because each row produces exactly one entry, and
+later rows are allowed to overwrite earlier ones. The second is a loop because
+each row *adds to* an entry, and a comprehension cannot do that &mdash; every
+iteration produces an independent key and value, with no access to what the
+dictionary already holds.
+
+That is the dividing line, and it is worth stating as a test: if the value for
+a key depends only on the current item, a comprehension works. If it depends on
+the other items too &mdash; a count, a list, a running total &mdash; you need a
+loop, a `defaultdict`, or a `Counter`.
+
+## Scope, and the variable that does not leak
+
+A comprehension has its own scope, which is why the loop variable does not
+survive it:
+
+```python
+n = "outer"
+squares = [n * 2 for n in range(3)]
+print(n, squares)
+```
+
+```
+outer [0, 2, 4]
+```
+
+In Python 2 this printed `2`, because the comprehension shared the enclosing
+scope and clobbered `n`. Python 3 gave comprehensions their own, which removed
+a whole class of accidental overwrites and is the behaviour to rely on.
+
+Two consequences follow. The variable is unavailable afterwards, so a
+comprehension cannot be used to compute something you then want to inspect
+&mdash; that needs a loop. And the comprehension can still *read* names from
+the enclosing scope, which is what makes `[x for x in items if x > threshold]`
+work.
+
+The one place this surprises people is inside a class body, where the
+comprehension's scope cannot see the class's other names. A comprehension in a
+class body that refers to another class attribute raises `NameError`, and the
+fix is to compute it outside the class or pass it in through the iterable.
+
+## Sets, and the operations that follow
+
+Building a set with a comprehension is usually the first half of a job whose
+second half is set algebra, and the two together replace a surprising amount of
+loop-and-flag code.
+
+`{r["city"] for r in rows}` gives the distinct cities. Once you have two such
+sets, `a - b` is "in the first and not the second", `a & b` is "in both", and
+`a ^ b` is "in one but not both". Those three answer most of the questions
+people write nested loops for: which records are new, which have disappeared,
+which are shared.
+
+The comprehension form matters here because it does the deduplication as it
+goes. Writing `set([r["city"] for r in rows])` builds the whole list first and
+then discards the duplicates, which is more memory for the same answer. For a
+large input the difference is real, and the direct form also states the intent
+&mdash; uniqueness is the point, not a cleanup step afterwards.
+
+What you give up is order and indexing. A set has neither, so if the result
+feeds something that cares about sequence, sort it on the way out:
+`sorted({...})` gives a list back in a defined order.
+
+## Nesting, and the two conditionals
+
+Comprehensions have two places a condition can appear, and they do different
+things.
+
+A trailing `if` filters &mdash; items that fail it produce nothing at all:
+`{k: v for k, v in d.items() if v}` drops falsy values. A conditional
+expression in the value slot chooses &mdash; every item produces an entry, and
+the condition picks what goes in it:
+`{k: v or 0 for k, v in d.items()}` keeps every key and substitutes a default.
+Reaching for the wrong one gives you either missing keys or unwanted ones, and
+the symptom is a dictionary of the wrong size.
+
+Nesting a second `for` is legal and reads in the order written, outermost
+first: `{c for row in grid for c in row}` collects every cell of a grid of
+rows. The rule is that the clauses appear in the same order as the equivalent
+nested loops, which is the opposite of the order people guess when they meet it
+in someone else's code.
+
+Both features are worth knowing and neither is worth combining. A comprehension
+with two `for` clauses, a filter and a conditional value is a line that has to
+be decoded rather than read, and the loop it replaces would have been four
+clear lines.
+
+## What is built, and when it matters
+
+The four bracket forms differ in more than the type of the result: they differ
+in what exists in memory while they run, and occasionally that is the deciding
+factor.
+
+A list, set or dict comprehension builds the whole result before anything else
+happens. For a thousand items that is irrelevant. For ten million it is the
+difference between a program that runs and one that does not, and the
+generator expression &mdash; round brackets &mdash; is the version that holds
+one item at a time.
+
+The rule of thumb is what happens to the result. If it is consumed once, by a
+`sum`, a `max`, a `for`, or an `any`, a generator expression does the same job
+without materialising anything: `sum(x * 2 for x in items)` never builds a
+list. If it is indexed, iterated twice, measured with `len`, or returned to a
+caller who will do any of those, it has to be a real collection.
+
+There is one case where building the intermediate is a genuine waste and easy
+to miss: wrapping a list comprehension in a converter.
+`set([f(x) for x in items])` and `dict([(k, f(k)) for k in keys])` both build a
+list and immediately throw it away. Writing the set or dict comprehension
+directly skips that entirely, which is one reason those forms exist at all.
+
+The reverse mistake is reaching for a generator expression where a list is
+wanted, and then calling `list()` on it. That builds the same list through more
+machinery, and the comprehension says it more directly.
+
+## Readability, stated as a limit
+
+Every section here has hinted at a boundary, and it is worth making explicit,
+because "use a comprehension when it is clear" is advice that gives no help at
+the moment of writing.
+
+A practical limit: one `for`, at most one `if`, and an expression short enough
+that the whole thing fits on one line without wrapping. That covers the large
+majority of genuine uses and produces something a reader takes in at a glance.
+
+Past that, the questions to ask are whether a reader could say what the result
+contains without tracing it, and whether it can be changed without being
+rewritten. A comprehension that needs a comment above it to explain what it
+produces has already answered both.
+
+The escape hatch is usually a named function. Pulling the expression out into a
+function with a meaningful name leaves a comprehension that is one `for` and a
+call &mdash; readable again, and the complicated part now has a name, a place
+to put a docstring, and somewhere to test it.
+
+## Questions people ask
+
+<strong>Why does `{}` give a dict and not a set?</strong> Dictionaries had the
+braces first. `set()` is the only way to write an empty set.
+
+<strong>Can I build a frozenset with a comprehension?</strong> Not directly.
+`frozenset(x for x in items)` wraps a generator expression.
+
+<strong>What happens to duplicate keys?</strong> The last one wins, silently.
+Nothing warns you.
+
+<strong>Is a dict comprehension faster than a loop?</strong> Slightly, because
+the whole thing runs in one bytecode loop without repeated attribute lookups.
+Not enough to be the reason to choose it.
+
+<strong>Can I use `zip` inside one?</strong> Yes, and
+`{k: v for k, v in zip(keys, values)}` is common &mdash; though
+`dict(zip(keys, values))` is shorter when nothing is transformed.
+
+<strong>Does the order of a dict comprehension matter?</strong> Yes. The result
+keeps insertion order, so the order of the input decides the order of the
+output.
+
+<strong>Can I have an `else` without an `if` filter?</strong> Only in the value
+slot, as part of a conditional expression. The trailing filter has no `else`.
+
+## Recap in one screen
+
+- The brackets choose the type: `[]` list, `{}` set, `{k: v}` dict, `()`
+  generator. Everything else about the syntax is identical.
+- A comprehension works when each item produces one independent entry; counting
+  and grouping need a loop, `setdefault` or `Counter`.
+- Duplicate keys collapse silently, and so do duplicate set members &mdash;
+  that is the point of a set and a hazard in a dict.
+- The loop variable has its own scope and does not leak, except that it cannot
+  see a class body's other names.
+- A trailing `if` filters items out; a conditional expression in the value slot
+  keeps them and changes the value.
+""")
+
+
+extend("shallow_and_deep_copy", """
+## Watching the difference with is
+
+The rule is one line of output away from being obvious:
+
+```python
+import copy
+
+original = {"a": [1, 2]}
+shallow = original.copy()
+deep = copy.deepcopy(original)
+
+print(original["a"] is shallow["a"])
+print(original["a"] is deep["a"])
+
+shallow["a"].append(3)
+print(original, deep)
+```
+
+```
+True
+False
+{'a': [1, 2, 3]} {'a': [1, 2]}
+```
+
+The first two lines are the whole distinction. After a shallow copy, the inner
+list is *the same object*; after a deep copy it is a new one. The last line is
+the consequence: appending through the shallow copy changed the original, and
+the deep copy was untouched.
+
+Note that the outer dictionaries are different objects in both cases. A shallow
+copy is a real copy &mdash; adding a new key to `shallow` does not affect
+`original`. It is only one level deep, and every problem on this page comes
+from the level below.
+
+## Where this actually comes up
+
+The trap is rarely met head-on. It arrives through four ordinary situations.
+
+**Configuration loaded from JSON or YAML.** These are nested dictionaries by
+nature, `.copy()` looks like it did the job, and a function that adjusts one
+value has quietly adjusted it for everybody.
+
+**A default that is a nested structure.** A module-level `DEFAULTS` dict copied
+shallowly into each new object means every object shares the same inner
+dictionaries. The objects look independent and are not.
+
+**A list of records.** `rows[:]` gives a new list of the same dictionaries, so
+sorting or filtering the copy is safe and editing a record through it is not.
+This is a common one because the copy was made specifically to be safe.
+
+**Undo, or "keep the original for comparison".** Snapshotting state before a
+change is the exact case where a shallow copy fails: the snapshot shares the
+mutable parts with the thing that is about to change, so by the time you
+compare, both have moved.
+
+The pattern across all four is that the copy was made for safety, and shallow
+copying provides that safety only for the top level. If the reason for copying
+is "so that changes over here do not affect over there", the question to ask is
+how deep the changes go.
+
+## Equality survives copying; identity does not
+
+After any copy, shallow or deep, `copy == original` is `True` and
+`copy is original` is `False`. That is the intended behaviour and it is worth
+being explicit about, because it is how you check that a copy did what you
+meant.
+
+For your own classes it holds only if you defined `__eq__`. Without one,
+Python compares by identity, so a copy of your object is *not* equal to the
+original &mdash; which surprises people who have just written a careful
+`__deepcopy__` and find their tests failing on the comparison rather than the
+copy. Defining `__eq__` on a class whose instances get copied around is
+effectively required, and a dataclass writes it for you.
+
+`deepcopy` also preserves structure that a naive copy would flatten. If two
+entries in a dictionary point at the same list, the deep copy has two entries
+pointing at one *new* list &mdash; the sharing is reproduced rather than
+duplicated. That is usually what you want, and it is one more thing a
+hand-written recursive copy gets wrong.
+
+## Immutability removes the question
+
+The most reliable fix for a copying bug is to not need the copy.
+
+If the structure is built from tuples, frozensets, strings and numbers, then
+nothing inside it can change, so sharing it is safe and a shallow copy is a
+complete one. The distinction that this whole page is about simply does not
+arise. That is why nobody worries about copying a tuple of strings, and why
+`deepcopy` on such a structure is wasted work.
+
+The practical version is to make the things that travel immutable. A record
+passed between functions is better as a frozen dataclass or a `NamedTuple` than
+as a dictionary: it cannot be edited by a function that received it, so no
+defensive copy is needed at any boundary. Where a modified version is required,
+`_replace` or `dataclasses.replace` builds a new one and leaves the original
+alone.
+
+Keep the mutable structures local, where every name pointing at them is visible
+in the same function. Then copying becomes a decision you make occasionally
+rather than a defence you have to remember everywhere.
+
+## Deciding, in four questions
+
+When you are about to copy something and are not sure which kind you need, the
+answer follows from four questions asked in order.
+
+**Does anything inside it change?** If every item is a number, a string or a
+tuple of those, any shallow copy is a complete one. Stop here; this covers most
+copying.
+
+**Am I copying so that changes over here do not affect over there?** If the
+answer is no &mdash; you are copying to get a list you can sort, or to add one
+key &mdash; then a shallow copy of the outer container is exactly what you
+want and nothing more is needed.
+
+**How deep do the changes go?** If the code that follows only touches the top
+level, shallow is enough regardless of what is nested underneath. If it reaches
+into nested structures, every level it reaches has to have been copied.
+
+**Is the structure large or does it hold something uncopyable?** `deepcopy` on
+a big object graph costs real time, and on an object holding a connection, a
+file or a lock it either fails or duplicates something that should be unique.
+Both are signals to restructure rather than to copy harder &mdash; usually by
+making the shared parts immutable, or by rebuilding the small part you need to
+change rather than duplicating the whole.
+
+Most real answers land on shallow, and the ones that do not are usually nested
+configuration or a snapshot taken for comparison. Knowing which of those you
+are in is more useful than a rule about which function to call.
+
+## Questions people ask
+
+<strong>Is `list(x)` a deep copy?</strong> No. It is one of the shallow ones,
+along with `x[:]` and `x.copy()`.
+
+<strong>Does `deepcopy` handle cycles?</strong> Yes. It remembers what it has
+already copied, so a structure that refers to itself does not cause infinite
+recursion.
+
+<strong>Is `deepcopy` slow?</strong> Relative to a shallow copy, considerably.
+It walks the whole structure and keeps a record as it goes. For small
+structures it does not matter.
+
+<strong>How do I copy only two levels?</strong> There is no built-in for that.
+A comprehension that shallow-copies each item &mdash;
+`{k: v.copy() for k, v in d.items()}` &mdash; is the usual answer.
+
+<strong>Can I stop an attribute being deep-copied?</strong> Yes, by defining
+`__deepcopy__` on the class, which is how objects holding a connection or a
+lock avoid duplicating it.
+
+<strong>Does copying a string do anything?</strong> No. Strings are immutable,
+so `copy` returns the same object.
+
+<strong>What about `copy.copy` versus `.copy()`?</strong> The same thing for
+builtins. `copy.copy` also works on objects that have no `.copy()` method.
+
+<strong>Does `deepcopy` copy class definitions too?</strong> No. Classes,
+functions and modules are treated as atomic and shared rather than duplicated,
+which is what you want.
+
+<strong>Is pickling and unpickling a valid deep copy?</strong> It usually
+produces one, and it is slower and fails on anything unpicklable. Use
+`deepcopy`, which is what it is for.
+
+## Recap in one screen
+
+- A shallow copy duplicates the outer container and shares everything inside
+  it; `original[0] is shallow[0]` is the test.
+- Shallow is a complete copy when the contents are immutable, which is why the
+  problem stays hidden for so long.
+- `copy.deepcopy` rebuilds the whole structure, preserves shared references and
+  survives cycles &mdash; and costs proportionally.
+- The bugs arrive through config dicts, shared defaults, lists of records and
+  snapshots, not through code that obviously copies.
+- Making the data immutable removes the question entirely.
 """)

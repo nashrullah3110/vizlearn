@@ -29,14 +29,6 @@ though `dict(zip(keys, values))` is shorter when there is no transformation to d
 
 gives `{"a": 3}`. The later value overwrites the earlier one, with no error and no warning. If the input might contain duplicates and you care, that is something to check for, not something Python will tell you about.
 
-## Set comprehensions
-
-{w[0] for w in words}
-
-Braces without a colon. It deduplicates as it builds, which is the point: "the distinct first letters" is one expression rather than a loop plus a `set()` call.
-
-Remember that a set has no order, so the printed result may not match the input order and should not be relied on.
-
 ## The empty-braces trap, again
 
 `{}` is an empty dict &mdash; dictionaries claimed the braces long before sets existed. There is no empty-set literal at all; `set()` is the only way. This is worth repeating because it is the one inconsistency in an otherwise tidy family.
@@ -69,17 +61,6 @@ Filtering keeps part of a mapping:
 That is the standard way to drop unset options before merging configuration,
 and it reads better than building an empty dict and assigning into it.
 
-## Dict comprehensions and duplicate keys
-
-A dict comprehension has no duplicate protection. If the key expression produces
-the same key twice, the later value overwrites the earlier one and nothing is
-reported. This is the same behaviour as a dict literal with a repeated key, and
-it is worth remembering whenever the key is computed rather than taken directly
-from a unique field.
-
-If you need to know about collisions, build with a loop and check, or count with
-`collections.Counter` first.
-
 ## Set comprehensions, and what they are for
 
 A set comprehension is a comprehension whose result must be unique, and the two
@@ -95,24 +76,205 @@ Both could be written as `set([...])` around a list comprehension. The direct
 form avoids building the intermediate list, and says up front that uniqueness is
 the point rather than an afterthought.
 
-## Telling the three apart
-
-The bracket decides everything, and the difference between a dict and a set
-comprehension is one colon:
-
-```python
-[x for x in it]        # list
-{x for x in it}        # set
-{x: f(x) for x in it}  # dict
-(x for x in it)        # generator
-```
-
-This is also why `{}` is an empty dict and not an empty set - the dict form
-claimed the braces first, and an empty one has no colon to distinguish it.
-
 ## When a loop is still better
 
 The same limit applies as to list comprehensions. One transformation, one
 optional filter, one line: use the comprehension. As soon as the value needs
 several steps, a `try`, or a condition on the key as well as the value, the loop
 version is easier to read and much easier to change later.
+
+## A worked example: a lookup table and a grouping
+
+The two jobs that send people to a dict comprehension, side by side &mdash;
+because only one of them is actually a comprehension:
+
+```python
+rows = [("ana", "red"), ("bo", "blue"), ("cy", "red")]
+
+team_of = {name: team for name, team in rows}
+print(team_of["cy"])
+
+by_team = {}
+for name, team in rows:
+    by_team.setdefault(team, []).append(name)
+print(by_team)
+```
+
+```
+red
+{'red': ['ana', 'cy'], 'blue': ['bo']}
+```
+
+The first is a comprehension because each row produces exactly one entry, and
+later rows are allowed to overwrite earlier ones. The second is a loop because
+each row *adds to* an entry, and a comprehension cannot do that &mdash; every
+iteration produces an independent key and value, with no access to what the
+dictionary already holds.
+
+That is the dividing line, and it is worth stating as a test: if the value for
+a key depends only on the current item, a comprehension works. If it depends on
+the other items too &mdash; a count, a list, a running total &mdash; you need a
+loop, a `defaultdict`, or a `Counter`.
+
+## Scope, and the variable that does not leak
+
+A comprehension has its own scope, which is why the loop variable does not
+survive it:
+
+```python
+n = "outer"
+squares = [n * 2 for n in range(3)]
+print(n, squares)
+```
+
+```
+outer [0, 2, 4]
+```
+
+In Python 2 this printed `2`, because the comprehension shared the enclosing
+scope and clobbered `n`. Python 3 gave comprehensions their own, which removed
+a whole class of accidental overwrites and is the behaviour to rely on.
+
+Two consequences follow. The variable is unavailable afterwards, so a
+comprehension cannot be used to compute something you then want to inspect
+&mdash; that needs a loop. And the comprehension can still *read* names from
+the enclosing scope, which is what makes `[x for x in items if x > threshold]`
+work.
+
+The one place this surprises people is inside a class body, where the
+comprehension's scope cannot see the class's other names. A comprehension in a
+class body that refers to another class attribute raises `NameError`, and the
+fix is to compute it outside the class or pass it in through the iterable.
+
+## Sets, and the operations that follow
+
+Building a set with a comprehension is usually the first half of a job whose
+second half is set algebra, and the two together replace a surprising amount of
+loop-and-flag code.
+
+`{r["city"] for r in rows}` gives the distinct cities. Once you have two such
+sets, `a - b` is "in the first and not the second", `a & b` is "in both", and
+`a ^ b` is "in one but not both". Those three answer most of the questions
+people write nested loops for: which records are new, which have disappeared,
+which are shared.
+
+The comprehension form matters here because it does the deduplication as it
+goes. Writing `set([r["city"] for r in rows])` builds the whole list first and
+then discards the duplicates, which is more memory for the same answer. For a
+large input the difference is real, and the direct form also states the intent
+&mdash; uniqueness is the point, not a cleanup step afterwards.
+
+What you give up is order and indexing. A set has neither, so if the result
+feeds something that cares about sequence, sort it on the way out:
+`sorted({...})` gives a list back in a defined order.
+
+## Nesting, and the two conditionals
+
+Comprehensions have two places a condition can appear, and they do different
+things.
+
+A trailing `if` filters &mdash; items that fail it produce nothing at all:
+`{k: v for k, v in d.items() if v}` drops falsy values. A conditional
+expression in the value slot chooses &mdash; every item produces an entry, and
+the condition picks what goes in it:
+`{k: v or 0 for k, v in d.items()}` keeps every key and substitutes a default.
+Reaching for the wrong one gives you either missing keys or unwanted ones, and
+the symptom is a dictionary of the wrong size.
+
+Nesting a second `for` is legal and reads in the order written, outermost
+first: `{c for row in grid for c in row}` collects every cell of a grid of
+rows. The rule is that the clauses appear in the same order as the equivalent
+nested loops, which is the opposite of the order people guess when they meet it
+in someone else's code.
+
+Both features are worth knowing and neither is worth combining. A comprehension
+with two `for` clauses, a filter and a conditional value is a line that has to
+be decoded rather than read, and the loop it replaces would have been four
+clear lines.
+
+## What is built, and when it matters
+
+The four bracket forms differ in more than the type of the result: they differ
+in what exists in memory while they run, and occasionally that is the deciding
+factor.
+
+A list, set or dict comprehension builds the whole result before anything else
+happens. For a thousand items that is irrelevant. For ten million it is the
+difference between a program that runs and one that does not, and the
+generator expression &mdash; round brackets &mdash; is the version that holds
+one item at a time.
+
+The rule of thumb is what happens to the result. If it is consumed once, by a
+`sum`, a `max`, a `for`, or an `any`, a generator expression does the same job
+without materialising anything: `sum(x * 2 for x in items)` never builds a
+list. If it is indexed, iterated twice, measured with `len`, or returned to a
+caller who will do any of those, it has to be a real collection.
+
+There is one case where building the intermediate is a genuine waste and easy
+to miss: wrapping a list comprehension in a converter.
+`set([f(x) for x in items])` and `dict([(k, f(k)) for k in keys])` both build a
+list and immediately throw it away. Writing the set or dict comprehension
+directly skips that entirely, which is one reason those forms exist at all.
+
+The reverse mistake is reaching for a generator expression where a list is
+wanted, and then calling `list()` on it. That builds the same list through more
+machinery, and the comprehension says it more directly.
+
+## Readability, stated as a limit
+
+Every section here has hinted at a boundary, and it is worth making explicit,
+because "use a comprehension when it is clear" is advice that gives no help at
+the moment of writing.
+
+A practical limit: one `for`, at most one `if`, and an expression short enough
+that the whole thing fits on one line without wrapping. That covers the large
+majority of genuine uses and produces something a reader takes in at a glance.
+
+Past that, the questions to ask are whether a reader could say what the result
+contains without tracing it, and whether it can be changed without being
+rewritten. A comprehension that needs a comment above it to explain what it
+produces has already answered both.
+
+The escape hatch is usually a named function. Pulling the expression out into a
+function with a meaningful name leaves a comprehension that is one `for` and a
+call &mdash; readable again, and the complicated part now has a name, a place
+to put a docstring, and somewhere to test it.
+
+## Questions people ask
+
+<strong>Why does `{}` give a dict and not a set?</strong> Dictionaries had the
+braces first. `set()` is the only way to write an empty set.
+
+<strong>Can I build a frozenset with a comprehension?</strong> Not directly.
+`frozenset(x for x in items)` wraps a generator expression.
+
+<strong>What happens to duplicate keys?</strong> The last one wins, silently.
+Nothing warns you.
+
+<strong>Is a dict comprehension faster than a loop?</strong> Slightly, because
+the whole thing runs in one bytecode loop without repeated attribute lookups.
+Not enough to be the reason to choose it.
+
+<strong>Can I use `zip` inside one?</strong> Yes, and
+`{k: v for k, v in zip(keys, values)}` is common &mdash; though
+`dict(zip(keys, values))` is shorter when nothing is transformed.
+
+<strong>Does the order of a dict comprehension matter?</strong> Yes. The result
+keeps insertion order, so the order of the input decides the order of the
+output.
+
+<strong>Can I have an `else` without an `if` filter?</strong> Only in the value
+slot, as part of a conditional expression. The trailing filter has no `else`.
+
+## Recap in one screen
+
+- The brackets choose the type: `[]` list, `{}` set, `{k: v}` dict, `()`
+  generator. Everything else about the syntax is identical.
+- A comprehension works when each item produces one independent entry; counting
+  and grouping need a loop, `setdefault` or `Counter`.
+- Duplicate keys collapse silently, and so do duplicate set members &mdash;
+  that is the point of a set and a hazard in a dict.
+- The loop variable has its own scope and does not leak, except that it cannot
+  see a class body's other names.
+- A trailing `if` filters items out; a conditional expression in the value slot
+  keeps them and changes the value.

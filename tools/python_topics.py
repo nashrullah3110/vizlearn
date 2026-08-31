@@ -2428,32 +2428,6 @@ It takes any number of iterables:
 
 for name, score, grade in zip(names, scores, grades):
 
-## Building a dict
-
-dict(zip(keys, values))
-
-This is the standard idiom for turning two parallel lists into a mapping, and it is worth recognising on sight because it appears everywhere.
-
-## It truncates, and it does not tell you
-
-This is the part that costs people an afternoon:
-
-zip(["ana", "bo", "cy", "dee"], [91, 78])
-
-gives two pairs. `cy` and `dee` are gone. No error, no warning &mdash; `zip` stops when the shortest input runs out, by design.
-
-When the lists come from the same source that is usually harmless. When one is data and the other is a lookup that quietly returned fewer rows, you get a silently shortened result, which is the worst kind of wrong.
-
-Two ways to be explicit:
-
-
-```python
-zip(a, b, strict=True)  # raises ValueError on mismatch (3.10+)
-zip_longest(a, b, fillvalue=0)  # pads instead, from itertools
-```
-
-
-If the lists are supposed to be the same length, `strict=True` turns a silent bug into an immediate error. That is nearly always the better trade.
 """,
     [{"q": "`zip(['a','b','c'], [1,2])` produces how many pairs?",
       "options": ["3", "2", "An error", "5"],
@@ -2840,14 +2814,6 @@ though `dict(zip(keys, values))` is shorter when there is no transformation to d
 {k: v for k, v in [("a", 1), ("a", 3)]}
 
 gives `{"a": 3}`. The later value overwrites the earlier one, with no error and no warning. If the input might contain duplicates and you care, that is something to check for, not something Python will tell you about.
-
-## Set comprehensions
-
-{w[0] for w in words}
-
-Braces without a colon. It deduplicates as it builds, which is the point: "the distinct first letters" is one expression rather than a loop plus a `set()` call.
-
-Remember that a set has no order, so the printed result may not match the input order and should not be relied on.
 
 ## The empty-braces trap, again
 
@@ -4069,8 +4035,6 @@ deep = copy.deepcopy(original)
 
 
 `deepcopy` walks the whole structure and rebuilds every mutable object it finds. Nested config dictionaries, lists of records, anything parsed from JSON &mdash; these are the cases.
-
-It is slower, and for large structures noticeably so. It also handles the hard cases correctly: shared references stay shared in the copy, and cycles do not cause infinite recursion. Writing your own recursive copy usually gets both of those wrong.
 
 ## The dict version of the trap
 
