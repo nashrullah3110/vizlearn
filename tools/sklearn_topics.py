@@ -5596,3 +5596,322 @@ Many deliberately different trees, averaged. More trees never hurt, `max_feature
          "why": "It predicted 55.3 for both x=25 and x=40 on a perfect straight line. Averaging does not fix what every member shares."},
     ],
 )
+
+
+# ---------------------------------------------------------------------------
+# 19. Hyperparameter search
+# ---------------------------------------------------------------------------
+topic(
+    "hyperparameter_search",
+    "Hyperparameter Search",
+    "Honest Numbers",
+    "Letting cross-validation choose the settings - and understanding why the "
+    "number it reports for the winner is too high.",
+    _svg(_grid(34, 22, 4, 4, 14, S) +
+         _box(62, 50, 14, 14, S, A, 2, 0) +
+         _txt(80, 84, "every combination, cross-validated", M, 7)),
+    [
+        ("The search, and what it leaves you with",
+         "Four settings, five folds, twenty fits - and a model already refitted "
+         "on everything.",
+         '''from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.datasets import load_wine
+
+X, y = load_wine(return_X_y=True)
+pipe = Pipeline([("scale", StandardScaler()),
+                 ("clf", LogisticRegression(max_iter=2000))])
+
+search = GridSearchCV(pipe, {"clf__C": [0.01, 0.1, 1, 10]}, cv=5).fit(X, y)
+
+print("best parameters:", search.best_params_)
+print("best cv score  :", round(search.best_score_, 4))
+print("fits performed :", 4 * 5, "(4 settings x 5 folds)")
+print()
+print("best_estimator_ has already been refitted on all the data:")
+print(" ", type(search.best_estimator_).__name__,
+      "->", search.best_estimator_.predict(X[:5]))
+'''),
+
+        ("Read the whole table, not just the winner",
+         "The top two differ in the fourth decimal, and the standard deviation "
+         "is two hundred times that.",
+         '''from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.datasets import load_wine
+
+X, y = load_wine(return_X_y=True)
+pipe = Pipeline([("scale", StandardScaler()),
+                 ("clf", LogisticRegression(max_iter=2000))])
+search = GridSearchCV(pipe, {"clf__C": [0.01, 0.1, 1, 10]}, cv=5).fit(X, y)
+
+r = search.cv_results_
+print("%10s %10s %8s %6s" % ("C", "mean", "std", "rank"))
+for c, m, s, k in zip(r["param_clf__C"], r["mean_test_score"],
+                      r["std_test_score"], r["rank_test_score"]):
+    print("%10s %10.4f %8.4f %6d" % (c, m, s, k))
+print()
+print("the top two are within one standard deviation of each other,")
+print("which means the ranking between them is not evidence.")
+'''),
+
+        ("Random search finds nearly the same thing, faster",
+         "Six samples against sixteen combinations.",
+         '''from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import make_classification
+from scipy.stats import randint
+import time
+
+X, y = make_classification(n_samples=300, n_features=10, n_informative=4,
+                           random_state=0)
+rf = RandomForestClassifier(n_estimators=20, random_state=0)
+
+grid = {"max_depth": [2, 4, 6, 8], "min_samples_leaf": [1, 3, 5, 7]}
+t = time.time()
+g = GridSearchCV(rf, grid, cv=3).fit(X, y)
+grid_time = time.time() - t
+
+dist = {"max_depth": randint(2, 9), "min_samples_leaf": randint(1, 8)}
+t = time.time()
+r = RandomizedSearchCV(rf, dist, n_iter=6, cv=3, random_state=0).fit(X, y)
+rand_time = time.time() - t
+
+print("grid       : %2d combinations, %.2fs, best %.4f"
+      % (16, grid_time, g.best_score_))
+print("randomized :  6 samples,      %.2fs, best %.4f"
+      % (rand_time, r.best_score_))
+'''),
+
+        ("Tuning the preprocessing too",
+         "Including whether a step happens at all.",
+         '''from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import load_wine
+
+X, y = load_wine(return_X_y=True)
+
+pipe = Pipeline([("scale", StandardScaler()),
+                 ("pca", PCA()),
+                 ("clf", LogisticRegression(max_iter=2000))])
+
+# The preprocessing is tuned alongside the model - including whether
+# the PCA step happens at all.
+grid = {"pca": ["passthrough", PCA(n_components=4), PCA(n_components=8)],
+        "clf__C": [0.1, 1.0]}
+
+search = GridSearchCV(pipe, grid, cv=5).fit(X, y)
+print("best:", {k: str(v) for k, v in search.best_params_.items()})
+print("score:", round(search.best_score_, 4))
+'''),
+
+        ("best_score_ is optimistic",
+         "Random labels, so the truth is 0.5. The search reports considerably "
+         "more than that.",
+         '''from sklearn.model_selection import GridSearchCV, cross_val_score
+from sklearn.ensemble import RandomForestClassifier
+import numpy as np
+
+# Random labels: the honest score is 0.5, whatever the search reports.
+rng = np.random.RandomState(0)
+X = rng.normal(size=(120, 20))
+y = rng.randint(0, 2, size=120)
+
+grid = {"max_depth": [1, 2, 3, 5, 8]}
+search = GridSearchCV(RandomForestClassifier(n_estimators=20, random_state=0),
+                      grid, cv=5)
+
+inner = search.fit(X, y).best_score_
+outer = cross_val_score(search, X, y, cv=5).mean()
+
+print("best_score_ from the search      :", round(inner, 3))
+print("nested cross-validation          :", round(outer, 3))
+print("the truth (the labels are random):  0.5")
+print()
+print("best_score_ is the best of five tries on the same folds,")
+print("so it is optimistic by construction.")
+'''),
+
+        ("The metric decides the winner",
+         "One grid, three metrics, and they do not all choose the same setting.",
+         '''from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import make_classification
+
+X, y = make_classification(n_samples=800, n_features=10, weights=[0.93],
+                           random_state=0)
+
+grid = {"class_weight": [None, "balanced"]}
+for metric in ("accuracy", "f1", "balanced_accuracy"):
+    s = GridSearchCV(LogisticRegression(max_iter=2000), grid, cv=5,
+                     scoring=metric).fit(X, y)
+    print("%-19s picks class_weight=%-9s (%.4f)"
+          % (metric, str(s.best_params_["class_weight"]), s.best_score_))
+print()
+print("two of the three keep the default and the third does not.")
+print("scoring= is a decision about the problem, not a formality.")
+'''),
+    ],
+    [
+        "<code class='mono-font'>GridSearchCV</code> tries every combination; "
+        "the number of fits is the product of the grid times the folds.",
+        "<code class='mono-font'>RandomizedSearchCV</code> samples "
+        "<code class='mono-font'>n_iter</code> combinations, which scales to "
+        "large spaces and usually finds nearly as good a setting.",
+        "The search refits the winner on all the data - "
+        "<code class='mono-font'>best_estimator_</code> is ready to use.",
+        "<code class='mono-font'>best_score_</code> is the best of many tries "
+        "on the same folds, so it is <strong>optimistic</strong>; a held-out "
+        "test set or nested CV gives the honest number.",
+        "Read <code class='mono-font'>cv_results_</code>, not just the winner - "
+        "settings within one standard deviation of each other are tied.",
+        "<code class='mono-font'>scoring=</code> defaults to accuracy, and "
+        "changing it can change which setting wins.",
+    ],
+    """title: Hyperparameter Search: A Practical Guide
+intro: Hyperparameters have to be chosen by measurement rather than by taste. The tools that do it are simple; the number they report is the part that needs care.
+
+## What is being searched
+
+Hyperparameters are the settings you pass to the constructor: `C`, `max_depth`, `n_neighbors`, `alpha`. They are not learned from the data during `fit`, so something outside the fit has to choose them.
+
+Choosing by hand means changing one, re-running, and keeping what scored better &mdash; which is a search, done slowly and without a record. The search tools do the same thing systematically, with cross-validation at each setting so the comparison is not decided by one lucky split.
+
+`GridSearchCV` takes a dictionary of parameters to lists of values and tries every combination. The number of fits is the product of the list lengths times the number of folds, and it grows alarmingly: three parameters with five values each and five folds is 375 fits.
+
+Both search objects are themselves estimators. They have `fit`, `predict` and `score`, so a search can go inside a pipeline, inside `cross_val_score`, or anywhere else an estimator goes &mdash; which is what makes nested cross-validation a one-liner.
+
+## Grid or random
+
+`RandomizedSearchCV` samples `n_iter` combinations rather than trying all of them, drawing from lists or from distributions such as `scipy.stats.randint` and `loguniform`.
+
+It is usually the better choice, for a reason that is not obvious. In a typical search most parameters barely matter and one or two dominate. A grid spends its budget evenly, so with two parameters and sixteen combinations it tries only four distinct values of the one that matters. Random search with sixteen samples tries sixteen distinct values of it, because every sample varies everything.
+
+The editor above shows six random samples getting within 0.003 of a sixteen-combination grid in 40% of the time, which is the usual shape of the result.
+
+Grid search remains right when the space is genuinely small and you want every combination on record &mdash; two or three parameters with a handful of sensible values each.
+
+`HalvingGridSearchCV` and `HalvingRandomSearchCV` are the middle path: they evaluate many candidates on a small subset of the data, discard the worst, and give the survivors more resources. On a large dataset the saving is substantial.
+
+## The number it reports is too high
+
+This is the part that matters most, and it is easy to miss because everything about the procedure looks careful.
+
+`best_score_` is the cross-validated score of the winning setting. It is the **maximum** of many cross-validated scores computed on the same folds. Taking a maximum over noisy estimates selects for luck as well as quality: the winner is partly the setting that happened to suit those particular folds.
+
+The fifth editor makes the size of the effect visible. The labels are random, so the honest accuracy is 0.5. The search reports **0.642**, having picked the best of five depths on the same five folds. Nested cross-validation &mdash; where the whole search is repeated inside each outer fold &mdash; reports 0.575, and even that is not quite 0.5 with only 120 rows.
+
+So `best_score_` is a selection artefact, and the more settings you try the worse it gets. The remedies are a test set held out before the search and touched once afterwards, or nested cross-validation when you need the estimate itself to be trustworthy. Reporting `best_score_` as the model's performance is one of the most common ways published numbers turn out to be optimistic.
+
+## Read the table
+
+`cv_results_` holds every setting with its mean score, standard deviation and rank. Reading it rather than only `best_params_` changes what you conclude surprisingly often.
+
+The second editor is a clean example: `C=0.1` scores 0.9833 and `C=1` scores 0.9832, with standard deviations around 0.02. The winner beat the runner-up by one ten-thousandth, against noise two hundred times larger. Declaring `C=0.1` the best value is reading a coin flip.
+
+Two habits follow. **Compare the gap against the standard deviation** &mdash; anything inside one is a tie. And **prefer the simpler setting among ties**: more regularisation, shallower trees, fewer components. When two settings are indistinguishable on the evidence, the one less likely to have fitted noise is the better bet.
+
+`std_test_score` also flags an unreliable search: large standard deviations mean the folds disagree, and no ranking computed from them deserves confidence.
+
+## Searching the whole pipeline
+
+Because a pipeline is an estimator, a search can tune anything inside it using the double-underscore path &mdash; `clf__C`, `pre__num__imputer__strategy`.
+
+That makes preprocessing choices measurable rather than assumed. Mean or median imputation, scaled or not, how many PCA components, whether to drop the first one-hot column: all of them can go in the grid, and the cross-validation that evaluates them is the same honest one that evaluates the model.
+
+A step can be tuned in or out entirely by including `"passthrough"` among its values, which the fourth editor uses to discover that PCA does not help on that data. The same trick swaps whole models: `{"clf": [LogisticRegression(), RandomForestClassifier()]}` puts the model choice itself in the grid.
+
+The important property is that all of this happens **inside** the folds. A search over preprocessing done by hand, outside cross-validation, is the leak the earlier modules measured.
+
+## The metric decides the answer
+
+`scoring` defaults to accuracy for classifiers and R&sup2; for regressors, and leaving it there means optimising accuracy whether or not accuracy is what you care about.
+
+The last editor searches `class_weight` on imbalanced data under three metrics. Accuracy and F1 keep the default; balanced accuracy chooses `"balanced"`. Same data, same grid, different winner &mdash; because the metrics disagree about what a good model is, which is exactly what the metrics modules said they would do.
+
+So `scoring=` is where the decision about which mistakes matter enters the tuning process. Choosing it deliberately is not optional if the classes are imbalanced or the costs are asymmetric.
+
+`refit` can name one metric to refit on when several are being computed, which is how you report a panel of metrics while selecting on one.
+
+## Keeping it affordable
+
+`n_jobs=-1` parallelises across cores, and search is close to perfectly parallel.
+
+Search coarsely first &mdash; powers of ten &mdash; then refine around whatever region wins. A logarithmic grid over `C` from 0.001 to 1000 in one pass tells you more than a fine linear grid in the wrong place.
+
+Reduce the folds to 3 while exploring and raise them for the final comparison. And remember that the parameters worth searching are few: `C` or `alpha` for linear models, `max_depth` and `min_samples_leaf` for trees, `learning_rate` and `n_estimators` for boosting. Searching everything a model exposes wastes budget on parameters that do not move the score.
+
+## Which parameters are worth the budget
+
+Searching everything an estimator exposes wastes most of the fits on settings that do not move the score. A short list of what actually matters, per model family.
+
+**Linear models.** `C` or `alpha`, over a logarithmic range, and that is very nearly all. The penalty type (`l1` against `l2`) is worth one comparison when feature selection is desirable.
+
+**Trees.** `max_depth` and `min_samples_leaf`, or `ccp_alpha` instead of both. The criterion is not worth searching &mdash; the decision-trees module measured the three within half a point of each other.
+
+**Random forests.** `max_features` first, then `min_samples_leaf` on noisy data. `n_estimators` is not a search parameter: set it as high as you can afford, since it cannot overfit.
+
+**Gradient boosting.** `learning_rate` and `n_estimators` together, since they trade against each other, plus `max_depth` in a narrow range of about 3 to 8. This family repays tuning more than any other on this list, and is the reason to keep budget in reserve.
+
+**k-NN.** `n_neighbors`, and `weights` as a two-value comparison.
+
+**SVM.** `C` and `gamma`, both logarithmic, and this pair genuinely needs a two-dimensional search because they interact strongly.
+
+The general shape: one or two parameters carry nearly all the improvement, and they are usually the ones controlling regularisation. Finding them for a new estimator is a matter of reading which parameter the documentation discusses at length.
+
+## What a search cannot fix
+
+Worth stating, because tuning is where effort goes when a model disappoints, and it is often the wrong place to spend it.
+
+A search moves a model within its family. It cannot make a linear model represent a curve, cannot make a tree extrapolate, and cannot compensate for features that do not carry the signal. If the learning curve has converged and the model is underfitting, no combination of hyperparameters closes the gap &mdash; the answer is different features or a different family.
+
+Nor can it fix a metric that measures the wrong thing, a split that leaks, or labels that are wrong. A search will optimise whatever it is pointed at, including a leak, and report a confident number for it.
+
+The order that wastes least effort: get the split and the metric right, get the features right, pick a model family that can represent the structure, and tune last. Tuning first is the most common way to spend a week moving a score by half a point.
+
+## Things to try
+
+1. <strong>Read the table.</strong> The second editor's top two settings are separated by 0.0001. Decide for yourself whether that is a result.
+2. <strong>Watch the optimism.</strong> The fifth editor searches random labels and reports 0.642 for something whose truth is 0.5.
+3. <strong>Tune a step away.</strong> In the fourth editor, note that `passthrough` won &mdash; the PCA step was not helping.
+4. <strong>Change the metric.</strong> In the last editor, add `"recall"` and see which setting it prefers.
+
+## Where this leaves you
+
+Random search over a sensible range, with a pipeline so the preprocessing is tuned honestly, a `scoring` chosen for the problem, `cv_results_` read rather than skimmed, and the winner's score treated as optimistic until a held-out set says otherwise.
+""",
+    [
+        {"q": "Why is best_score_ optimistic?",
+         "options": ["It is computed on the training data",
+                     "It is the maximum of many noisy estimates on the same folds",
+                     "It ignores the standard deviation",
+                     "It refits on all the data first"],
+         "answer": 1,
+         "why": "Taking a maximum selects for luck as well as quality. On random labels a search reported 0.642 where the truth was 0.5."},
+        {"q": "When is RandomizedSearchCV usually better than GridSearchCV?",
+         "options": ["Never - grid is exhaustive",
+                     "When the space is large, since it tries more distinct values of the parameters that matter",
+                     "Only for trees",
+                     "When there is one parameter"],
+         "answer": 1,
+         "why": "A grid spends its budget evenly across parameters that mostly do not matter. Random sampling varies everything at once."},
+        {"q": "Two settings differ by 0.0001 with a standard deviation of 0.02. What should you conclude?",
+         "options": ["The higher one is better",
+                     "They are tied - prefer the simpler setting",
+                     "The search failed",
+                     "Increase the folds until one wins"],
+         "answer": 1,
+         "why": "A gap far inside one standard deviation is noise. Among ties, the more regularised or simpler setting is the safer bet."},
+        {"q": "What does scoring= default to for a classifier?",
+         "options": ["f1", "roc_auc", "accuracy", "balanced_accuracy"],
+         "answer": 2,
+         "why": "Which means an unset scoring silently optimises accuracy - and on imbalanced data that can pick a different winner than the metric you care about."},
+    ],
+)
