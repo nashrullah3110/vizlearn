@@ -6855,6 +6855,14 @@ Three uses, of which only one is what people usually mean by clustering.
 
 The use to be careful with is treating clusters as though they were discovered categories. The algorithm partitions whatever it is given; whether the partition corresponds to anything real is a separate question that the output cannot answer.
 
+<strong>Can I use k-means on categorical data?</strong> Not sensibly - the mean of one-hot columns is not a category. `KModes` outside scikit-learn, or a distance-based method with a categorical metric.
+
+<strong>What about many rows?</strong> `MiniBatchKMeans` fits on small random batches and is dramatically faster on large data, at a small cost in quality.
+
+<strong>Why does my clustering change between runs?</strong> Either `n_init=1` or no `random_state`. The defaults handle the first; set the second for reproducibility.
+
+<strong>Should the clustering go in a pipeline?</strong> Yes, if its output feeds a supervised model - otherwise the cluster labels are learned from the test rows too.
+
 ## Things to try
 
 1. <strong>Watch inertia fail.</strong> The second editor's numbers fall forever. Compute the differences and find the bend yourself.
