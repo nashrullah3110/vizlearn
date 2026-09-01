@@ -6540,6 +6540,14 @@ For ranking and for thresholding that does not matter, since both are invariant 
 
 If you do resample and need honest probabilities, recalibrate afterwards on data with the real class balance, which is what `CalibratedClassifierCV` on an unresampled validation set does.
 
+<strong>How imbalanced is too imbalanced?</strong> There is no threshold. A 1% problem with a strong signal is easy and a 30% problem with a weak one is hard. Measure recall on the minority rather than counting the ratio.
+
+<strong>Is SMOTE worth installing imbalanced-learn for?</strong> Its pipeline is, because it can resample inside cross-validation folds, which the scikit-learn one cannot. SMOTE itself is often no better than threshold tuning.
+
+<strong>Does class_weight work for regression?</strong> No - there are no classes. The equivalent is `sample_weight` at fit time, which most estimators accept.
+
+<strong>Should I resample the test set to make the metrics readable?</strong> No. The test set must reflect the real distribution, or the numbers describe a world that does not exist.
+
 ## Things to try
 
 1. <strong>Read the confusion matrix.</strong> The first editor's model misses 46 of 49 positives and reports 96% accuracy.
