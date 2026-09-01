@@ -5542,6 +5542,18 @@ The lever for all three is the same: fewer, shallower trees. Measuring how much 
 
 <strong>Can it handle missing values?</strong> Not in scikit-learn - impute first, or use `HistGradientBoosting`, which handles them natively.
 
+## Why averaging works at all
+
+The mechanism is worth one paragraph of arithmetic, because it explains exactly when the technique helps and when it does nothing.
+
+Averaging `n` estimates whose errors are entirely independent divides the variance by `n`. Averaging `n` estimates whose errors are identical divides it by nothing at all &mdash; the average is the same as any one of them. Real ensembles sit between: the variance falls towards a floor set by how much the members share, and no number of additional members goes below that floor.
+
+That single fact explains every design decision in a random forest. Bootstrap sampling and feature subsetting exist to push the correlation between trees down, because the correlation is what sets the floor. It explains why `max_features=None` performs worse &mdash; the trees become too alike and the floor rises. It explains why more trees stop helping: you approach the floor and then sit on it.
+
+It also explains what bagging cannot do. Averaging removes variance and leaves **bias** untouched: if every tree is systematically wrong in the same direction, so is the average. That is why a forest cannot extrapolate &mdash; every tree is flat past the training range, that flatness is bias rather than variance, and averaging identical flatness gives flatness.
+
+Boosting attacks the other half of the problem, fitting each new model to what the previous ones got wrong, which reduces bias and is why it needs more careful tuning to avoid the variance coming back.
+
 ## Things to try
 
 1. <strong>Watch the stability.</strong> The first editor's last two lines are the point: 14 rows against 6.
