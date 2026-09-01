@@ -6562,6 +6562,10 @@ Imbalance does not affect every estimator equally, and knowing the pattern saves
 
 The general rule: the more a model averages across all rows at once, the more the rare class is drowned out, and the more a weight helps.
 
+<strong>Can I combine the remedies?</strong> Yes, and it is easy to overshoot. `class_weight="balanced"` plus oversampling plus a lowered threshold corrects three times for the same thing and floods you with false positives. Apply one, measure, then decide.
+
+<strong>What about multi-class imbalance?</strong> The same ideas: stratify, use macro averaging so small classes count, and pass `class_weight="balanced"`, which handles any number of classes.
+
 ## Things to try
 
 1. <strong>Read the confusion matrix.</strong> The first editor's model misses 46 of 49 positives and reports 96% accuracy.
