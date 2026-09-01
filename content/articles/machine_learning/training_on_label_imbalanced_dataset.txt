@@ -72,6 +72,85 @@ scores = cross_val_score(pipe, X, y, cv=cv, scoring="average_precision")
 
 `StratifiedKFold` matters here too: without it a fold can end up with almost no positives, and its score becomes meaningless noise that drags the average around.
 
+## Four fixes, measured against each other
+
+Class weights, oversampling, undersampling and threshold tuning, all applied to the same imbalanced problem so you can see what each one actually costs.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (confusion_matrix, average_precision_score,
+                             precision_score, recall_score, f1_score)
+
+X, y = make_classification(n_samples=12000, n_features=15, n_informative=6,
+                           weights=[0.97], flip_y=0.02, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0,
+                                      stratify=y)
+print("train: %d rows, %d positive (%.2f%%)" % (len(ytr), ytr.sum(), 100 * ytr.mean()))
+print("test : %d rows, %d positive" % (len(yte), yte.sum()))
+print()
+
+def score(name, pred, prob=None):
+    tn, fp, fn, tp = confusion_matrix(yte, pred).ravel()
+    print("%-28s TP %4d  FP %5d  FN %4d | prec %.4f  rec %.4f  F1 %.4f"
+          % (name, tp, fp, fn, precision_score(yte, pred, zero_division=0),
+             recall_score(yte, pred, zero_division=0),
+             f1_score(yte, pred, zero_division=0)))
+
+base = LogisticRegression(max_iter=3000).fit(Xtr, ytr)
+score("1. nothing (baseline)", base.predict(Xte))
+
+w = LogisticRegression(max_iter=3000, class_weight="balanced").fit(Xtr, ytr)
+score("2. class_weight='balanced'", w.predict(Xte))
+print("   that reweights each class by n / (2 * count), so one positive row")
+print("   counts as much as %.1f negative ones. no data was copied or deleted."
+      % ((ytr == 0).sum() / (ytr == 1).sum()))
+print()
+
+rng = np.random.default_rng(0)
+pos = np.where(ytr == 1)[0]
+extra = rng.choice(pos, (ytr == 0).sum() - len(pos), replace=True)
+idx = np.concatenate([np.arange(len(ytr)), extra])
+over = LogisticRegression(max_iter=3000).fit(Xtr[idx], ytr[idx])
+score("3. oversample the minority", over.predict(Xte))
+print("   %d rows became %d, and every added row is a duplicate. a flexible"
+      % (len(ytr), len(idx)))
+print("   model will happily memorise those copies -- this is where synthetic")
+print("   methods like SMOTE try to help, by interpolating instead of copying.")
+print()
+
+neg = rng.choice(np.where(ytr == 0)[0], len(pos), replace=False)
+idx2 = np.concatenate([neg, pos])
+under = LogisticRegression(max_iter=3000).fit(Xtr[idx2], ytr[idx2])
+score("4. undersample the majority", under.predict(Xte))
+print("   balanced by throwing away %d rows -- %.1f%% of the training data."
+      % (len(ytr) - len(idx2), 100 * (1 - len(idx2) / len(ytr))))
+print()
+
+prob = base.predict_proba(Xte)[:, 1]
+for t in (0.20, 0.10, 0.05):
+    score("5. baseline, threshold %.2f" % t, (prob >= t).astype(int))
+print("   the same untouched model. no retraining, no resampling.")
+print()
+
+print("what the ranking itself is worth, which is what all of this is fighting over:")
+for name, m in (("baseline", base), ("class weights", w),
+                ("oversampled", over), ("undersampled", under)):
+    p = m.predict_proba(Xte)[:, 1]
+    print("  %-16s PR AUC %.4f" % (name, average_precision_score(yte, p)))
+print()
+print("the PR AUCs are close, and that is the lesson. none of these fixes")
+print("taught the model anything new -- they moved where it draws the line.")
+print("Threshold tuning does the same thing for free, and it is reversible.")
+print()
+print("start there. reach for class weights when your model has no threshold")
+print("to tune, and for resampling only when you have measured that it beats")
+print("both -- it usually does not, and it always costs you data or honesty.")
+```
+
 ## Experiments to try
 
 1. <strong>Start balanced.</strong> Set <strong>Class 0 Ratio</strong> to 50 and press <strong>Retrain Both Models</strong>. Both classes are learned and the boundary sits sensibly between them.

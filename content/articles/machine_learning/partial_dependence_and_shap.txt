@@ -102,3 +102,135 @@ that is a fact about the model.
 **Averaging SHAP values into a global importance and stopping there.** The mean
 absolute SHAP value is a reasonable global summary, and it discards the direction
 and the interactions that made SHAP worth computing.
+
+## One chart for the model, one number per row
+
+Partial dependence describes the model's average behaviour; a Shapley value explains a single prediction. Both are computed from scratch here, so neither is a black box.
+
+```python-run
+import numpy as np
+from itertools import combinations
+from math import factorial
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.inspection import partial_dependence
+
+rng = np.random.default_rng(0)
+n = 1500
+X = rng.normal(size=(n, 4))
+names = ["x0", "x1", "x2", "x3"]
+# x0 matters a lot and non-linearly, x1 linearly, x2 only via x0, x3 not at all
+y = (3.0 * np.tanh(2 * X[:, 0]) + 1.5 * X[:, 1] + 2.0 * X[:, 0] * X[:, 2]
+     + rng.normal(0, 0.4, n))
+model = GradientBoostingRegressor(random_state=0).fit(X, y)
+print("model R2 on its own training data: %.4f" % model.score(X, y))
+print()
+
+print("PARTIAL DEPENDENCE -- vary one feature, average over everything else.")
+print("done by hand: overwrite the column, predict all %d rows, take the mean." % n)
+grid = np.linspace(-2, 2, 9)
+print("%8s %12s %12s %12s"
+      % ("value", "PD on x0", "PD on x1", "PD on x3"))
+for v in grid:
+    row = []
+    for c in (0, 1, 3):
+        Xc = X.copy(); Xc[:, c] = v
+        row.append(model.predict(Xc).mean())
+    print("%8.2f %12.4f %12.4f %12.4f" % (v, row[0], row[1], row[2]))
+print()
+pd0 = partial_dependence(model, X, [0], grid_resolution=9, method="brute")
+mine = []
+for v in pd0["grid_values"][0]:
+    Xc = X.copy(); Xc[:, 0] = v
+    mine.append(model.predict(Xc).mean())
+print("scikit-learn, on its own grid:", np.round(pd0["average"][0][:5], 4))
+print("the same loop, same grid     :", np.round(mine[:5], 4))
+print("  identical, because that loop IS the definition.")
+print()
+print("note method='brute' above. the default for a gradient booster is")
+print("method='recursion', which walks the trees instead of re-predicting.")
+print("it is much faster and gives slightly different numbers, because it")
+print("ignores how the other features are actually distributed:")
+rec = partial_dependence(model, X, [0], grid_resolution=9, method="recursion")
+print("  recursion:", np.round(rec["average"][0][:5], 4))
+print()
+print("read the columns: x0 rises then flattens -- that is the tanh. x1 is a")
+print("straight line. x3 is flat, because the model never used it.")
+print()
+print("the trap: partial dependence AVERAGES, so opposite effects cancel.")
+print("x2 only matters through its interaction with x0:")
+for v in (-2.0, 0.0, 2.0):
+    Xc = X.copy(); Xc[:, 2] = v
+    lo = X[:, 0] < 0
+    print("  x2=%+.0f -> overall PD %7.4f | rows with x0<0 %7.4f, x0>0 %7.4f"
+          % (v, model.predict(Xc).mean(), model.predict(Xc)[lo].mean(),
+             model.predict(Xc)[~lo].mean()))
+print("  the overall column barely moves while the two halves move in opposite")
+print("  directions. a flat PD line does not mean a feature does not matter.")
+print()
+
+print("SHAPLEY VALUES -- explain ONE prediction, exactly.")
+print("with 4 features there are only 16 coalitions, so we can do it properly.")
+row = X[7]
+base = model.predict(X).mean()
+
+def value(subset):
+    # model output when only `subset` is known: average over the rest
+    Xc = X.copy()
+    for c in subset:
+        Xc[:, c] = row[c]
+    return model.predict(Xc).mean()
+
+shap = np.zeros(4)
+for c in range(4):
+    others = [j for j in range(4) if j != c]
+    for size in range(4):
+        for sub in combinations(others, size):
+            w = factorial(size) * factorial(3 - size) / factorial(4)
+            shap[c] += w * (value(list(sub) + [c]) - value(list(sub)))
+
+print("  the row:", np.round(row, 3))
+print("  average prediction over the dataset : %8.4f" % base)
+for c in range(4):
+    print("  %s contributes %+8.4f" % (names[c], shap[c]))
+print("  ------------------------------------------------")
+print("  base + contributions                : %8.4f" % (base + shap.sum()))
+print("  the model's actual prediction       : %8.4f" % model.predict([row])[0])
+print()
+print("those two match, and that is the defining property: the contributions")
+print("add up to exactly the gap between this prediction and the average one.")
+print("no other attribution method guarantees that.")
+print()
+
+print("the same three rows explained separately:")
+print("%8s %10s %10s %10s %10s %12s" % ("row", *names, "prediction"))
+for i in (7, 100, 900):
+    r = X[i]
+    sv = np.zeros(4)
+    for c in range(4):
+        others = [j for j in range(4) if j != c]
+        for size in range(4):
+            for sub in combinations(others, size):
+                w = factorial(size) * factorial(3 - size) / factorial(4)
+                Xa, Xb = X.copy(), X.copy()
+                for j in list(sub) + [c]:
+                    Xa[:, j] = r[j]
+                for j in sub:
+                    Xb[:, j] = r[j]
+                sv[c] += w * (model.predict(Xa).mean() - model.predict(Xb).mean())
+    print("%8d %10.3f %10.3f %10.3f %10.3f %12.4f"
+          % (i, *sv, model.predict([r])[0]))
+print()
+print("x0's contribution changes sign between rows. that is the difference")
+print("from partial dependence: PD gives you one curve for the whole model,")
+print("Shapley gives you a different set of numbers for every row.")
+print()
+print("the cost is the reason the `shap` library exists. exact Shapley values")
+print("need 2^k coalitions -- 16 here, over a million at k=20, and each one is")
+print("a full pass over the data. TreeSHAP computes them exactly for tree")
+print("models in polynomial time; KernelSHAP approximates them for anything")
+print("else by sampling coalitions instead of enumerating them.")
+print()
+print("both tools answer 'what did the MODEL do', not 'what causes what'. a")
+print("feature can carry a large Shapley value because it proxies for")
+print("something the model was never shown.")
+```

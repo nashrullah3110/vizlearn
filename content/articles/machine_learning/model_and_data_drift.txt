@@ -60,6 +60,94 @@ The awkward reality is that ground-truth labels usually arrive late &mdash; you 
 
 Set thresholds and alerts on these before launch, not after the first incident. And log every prediction with its inputs and a timestamp, or you will have nothing to compare against later.
 
+## Three ways a model goes stale, told apart
+
+The inputs change, the relationship changes, or the class balance changes. Each one has a different signature, and only one of them is visible without labels.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, roc_auc_score
+from scipy.stats import ks_2samp
+
+rng = np.random.default_rng(0)
+X, y = make_classification(n_samples=6000, n_features=6, n_informative=4,
+                           n_redundant=0, flip_y=0.08, shuffle=False,
+                           random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.4, random_state=0)
+model = LogisticRegression(max_iter=3000).fit(Xtr, ytr)
+print("day one: accuracy %.4f, AUC %.4f"
+      % (accuracy_score(yte, model.predict(Xte)), roc_auc_score(yte, model.predict_proba(Xte)[:, 1])))
+print()
+
+def check(name, Xn, yn):
+    acc = accuracy_score(yn, model.predict(Xn))
+    auc = roc_auc_score(yn, model.predict_proba(Xn)[:, 1])
+    # what you can see WITHOUT labels
+    ks = max(ks_2samp(Xtr[:, c], Xn[:, c]).statistic for c in range(Xn.shape[1]))
+    rate = model.predict(Xn).mean()
+    print("%-26s acc %.4f  AUC %.4f | max feature KS %.4f  predicted-positive %.4f"
+          % (name, acc, auc, ks, rate))
+
+check("no drift (held-out)", Xte, yte)
+
+# 1. covariate shift: the inputs move, the rule does not
+Xc = Xte.copy(); Xc[:, 0] += 2.5
+check("1. covariate shift", Xc, yte)
+
+# 2. concept drift: the inputs look the same, the rule flips
+flip = rng.random(len(yte)) < 0.35
+yc = np.where(flip, 1 - yte, yte)
+check("2. concept drift", Xte, yc)
+
+# 3. prior shift: the class balance moves
+keep = np.where((yte == 0) | (rng.random(len(yte)) < 0.2))[0]
+check("3. prior/label shift", Xte[keep], yte[keep])
+print()
+
+print("read the last two columns -- they are the ones you have in production,")
+print("because labels arrive late or never:")
+print("  covariate shift shows up as a large feature KS statistic.")
+print("  prior shift shows up as a change in the predicted-positive rate.")
+print("  concept drift shows up in NEITHER. the inputs are identical and the")
+print("  prediction rate barely moves. only the labels reveal it.")
+print()
+
+print("that is the uncomfortable part, so here is the KS detail:")
+Xc = Xte.copy(); Xc[:, 0] += 2.5
+print("%10s %14s %14s" % ("feature", "KS vs train", "verdict"))
+for c in range(6):
+    stat = ks_2samp(Xtr[:, c], Xc[:, c]).statistic
+    print("%10d %14.4f %14s" % (c, stat, "DRIFTED" if stat > 0.1 else "ok"))
+print("  one column moved and the test names it. this is cheap to run daily.")
+print()
+
+print("but detecting input drift is not the same as detecting damage:")
+weakest = int(np.argmin(np.abs(model.coef_[0])))
+Xh = Xte.copy(); Xh[:, weakest] += 6.0
+print("  shift feature %d by 6.0 -- the column with the smallest coefficient:"
+      % weakest)
+print("    max KS %.4f -- alarming"
+      % max(ks_2samp(Xtr[:, c], Xh[:, c]).statistic for c in range(6)))
+print("    accuracy %.4f -- against %.4f before, so essentially untouched"
+      % (accuracy_score(yte, model.predict(Xh)),
+         accuracy_score(yte, model.predict(Xte))))
+print("    coefficients: %s" % np.round(model.coef_[0], 3))
+print("  a drift alarm on an unimportant column is noise. weight your")
+print("  monitoring by feature importance, or you will train your team to")
+print("  ignore the alerts.")
+print()
+print("what to actually watch, in order of how early it warns you:")
+print("  prediction distribution -- free, immediate, catches prior shift")
+print("  input distributions     -- free, immediate, catches covariate shift")
+print("  performance on labels   -- delayed, and the only thing that catches")
+print("                             concept drift. get labels on a sample")
+print("                             deliberately, even if it costs money.")
+```
+
 ## Experiments to try
 
 Use the interactive panel to see how drift destroys a model's performance and how retraining can fix it.

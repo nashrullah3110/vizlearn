@@ -98,3 +98,80 @@ is what the slider here makes you do.
 **Trusting `contamination`.** It is a guess presented as a parameter.
 
 **Expecting it to find local anomalies.** Use LOF for those.
+
+## Finding outliers by how easy they are to separate
+
+Isolation Forest splits at random and counts how few cuts it takes to isolate a point. Anomalies fall out early, and that path length is the entire score.
+
+```python-run
+import numpy as np
+from sklearn.ensemble import IsolationForest
+from sklearn.svm import OneClassSVM
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.covariance import EllipticEnvelope
+
+rng = np.random.default_rng(0)
+normal = rng.normal(0, 1, (960, 2))
+weird = rng.uniform(-6, 6, (40, 2))
+X = np.vstack([normal, weird])
+truth = np.r_[np.ones(960), -np.ones(40)]       # 1 = normal, -1 = anomaly
+print("960 normal points and %d scattered ones. no labels are used to fit."
+      % len(weird))
+print()
+
+iso = IsolationForest(contamination=0.04, random_state=0).fit(X)
+pred = iso.predict(X)
+print("caught %d of the %d planted anomalies"
+      % (((pred == -1) & (truth == -1)).sum(), (truth == -1).sum()))
+print("false alarms on normal points: %d" % ((pred == -1) & (truth == 1)).sum())
+print()
+
+print("the score IS the average path length, rescaled. shorter = weirder:")
+s = iso.score_samples(X)
+order = np.argsort(s)
+print("  five most anomalous points:")
+for i in order[:5]:
+    print("    %s  score %.4f  %s"
+          % (np.round(X[i], 3), s[i], "planted" if truth[i] < 0 else "normal"))
+print("  five most normal points:")
+for i in order[-5:]:
+    print("    %s  score %.4f  %s"
+          % (np.round(X[i], 3), s[i], "planted" if truth[i] < 0 else "normal"))
+print()
+
+print("distance from the centre, against the score:")
+dist = np.linalg.norm(X, axis=1)
+for lo, hi in ((0, 1), (1, 2), (2, 3), (3, 8)):
+    m = (dist >= lo) & (dist < hi)
+    if m.any():
+        print("  %d-%d sd from centre: %4d points, mean score %.4f, flagged %d"
+              % (lo, hi, m.sum(), s[m].mean(), (pred[m] == -1).sum()))
+print("  no distance was ever computed. random splits isolate far-out points")
+print("  in fewer cuts, and that is all the algorithm knows.")
+print()
+
+print("contamination is not a threshold on weirdness -- it is a quota:")
+for c in (0.01, 0.04, 0.10, 0.25):
+    p = IsolationForest(contamination=c, random_state=0).fit_predict(X)
+    print("  contamination=%.2f -> flagged %3d (%.1f%% of %d), caught %2d real"
+          % (c, (p == -1).sum(), 100 * (p == -1).mean(), len(X),
+             ((p == -1) & (truth == -1)).sum()))
+print("  it always flags that fraction, whether or not anything is wrong.")
+print()
+
+print("against the other unsupervised detectors, same data:")
+for name, m in (("Isolation Forest", IsolationForest(contamination=0.04, random_state=0)),
+                ("One-Class SVM", OneClassSVM(nu=0.04, gamma="scale")),
+                ("Elliptic Envelope", EllipticEnvelope(contamination=0.04, random_state=0)),
+                ("Local Outlier Factor", LocalOutlierFactor(contamination=0.04))):
+    p = m.fit_predict(X)
+    print("  %-22s caught %2d of %d, %3d false alarms"
+          % (name, ((p == -1) & (truth == -1)).sum(), (truth == -1).sum(),
+             ((p == -1) & (truth == 1)).sum()))
+print()
+print("Isolation Forest is the usual first choice because it is linear in the")
+print("number of rows, needs no distance metric, and survives high dimensions")
+print("better than anything that measures distance. Elliptic Envelope assumes")
+print("your normal data is one gaussian blob -- fast and exact when that is")
+print("true, useless when it is not.")
+```

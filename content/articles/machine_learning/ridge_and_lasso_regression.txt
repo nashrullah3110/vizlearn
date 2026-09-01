@@ -67,6 +67,98 @@ The correlated-features row is the one that decides most real cases. Ridge split
 
 <strong>Elastic Net</strong> uses both penalties with a mixing ratio, and it is the standard answer when you want lasso's sparsity without its instability on correlated groups.
 
+## Two penalties, two very different results
+
+Ridge shrinks every coefficient toward zero; lasso sends most of them exactly to zero. Watching both on the same correlated data shows why that difference matters.
+
+```python-run
+import numpy as np
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+from sklearn.model_selection import cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+
+rng = np.random.default_rng(0)
+n, p = 120, 60
+X = rng.normal(size=(n, p))
+X[:, 1] = X[:, 0] + rng.normal(0, 0.05, n)     # a near-duplicate column
+true = np.zeros(p); true[[0, 5, 12, 30]] = [4.0, -3.0, 2.5, 1.5]
+y = X @ true + rng.normal(0, 1.5, n)
+print("%d rows, %d columns, and only 4 of those columns matter." % (n, p))
+print()
+
+def report(name, model):
+    m = make_pipeline(StandardScaler(), model)
+    cv = cross_val_score(m, X, y, cv=5).mean()
+    m.fit(X, y)
+    coef = m[-1].coef_
+    nz = (np.abs(coef) > 1e-6).sum()
+    print("%-22s cv R2 %7.4f   nonzero %3d/%d   largest |coef| %7.3f"
+          % (name, cv, nz, p, np.abs(coef).max()))
+    return coef
+
+c_ols   = report("plain least squares", LinearRegression())
+c_ridge = report("ridge, alpha=10",     Ridge(alpha=10.0))
+c_lasso = report("lasso, alpha=0.3",    Lasso(alpha=0.3, max_iter=10000))
+c_en    = report("elastic net",         ElasticNet(alpha=0.3, l1_ratio=0.5,
+                                                   max_iter=10000))
+print()
+print("what each one did to the four real coefficients and one noise column:")
+print("%8s %10s %10s %10s %10s" % ("column", "OLS", "ridge", "lasso", "truth"))
+for i in (0, 5, 12, 30, 7):
+    label = "col %d" % i + (" *" if true[i] else "")
+    print("%8s %10.3f %10.3f %10.3f %10.3f"
+          % (label, c_ols[i], c_ridge[i], c_lasso[i], true[i]))
+print("  (* marks a column that genuinely matters. col 7 is pure noise.)")
+print()
+
+print("columns 0 and 1 are 99 percent the same variable, and only column 0")
+print("is real. watch what each does with that pair as the penalty tightens:")
+print("%-24s %9s %9s %9s" % ("", "col 0", "col 1", "col0+col1"))
+for name, c in (("OLS (no penalty)", c_ols),):
+    print("%-24s %9.3f %9.3f %9.3f" % (name, c[0], c[1], c[0] + c[1]))
+for a in (0.3, 1.0):
+    for kind, mk in (("ridge",
+                      lambda: Ridge(alpha=a)),
+                     ("lasso",
+                      lambda: Lasso(alpha=a, max_iter=10000))):
+        c = make_pipeline(StandardScaler(), mk()).fit(X, y)[-1].coef_
+        print("%-24s %9.3f %9.3f %9.3f"
+              % ("%s, alpha=%.1f" % (kind, a), c[0], c[1], c[0] + c[1]))
+print()
+print("ridge keeps both and splits the credit evenly -- that is what squaring")
+print("the coefficients rewards. lasso keeps the total roughly right too, but")
+print("as alpha rises it stops hedging and puts everything on one column.")
+print("neither total is far off. only ridge gives you the same SPLIT if you")
+print("refit on slightly different rows, which is why lasso coefficients are")
+print("a poor thing to interpret when your columns are correlated.")
+print()
+
+print("the alpha sweep, which is the only hyperparameter either has:")
+print("%10s %10s %8s %10s %8s" % ("alpha", "ridge cv", "|w|max", "lasso cv", "nonzero"))
+for a in (0.01, 0.1, 1.0, 10.0, 100.0):
+    r = make_pipeline(StandardScaler(), Ridge(alpha=a)).fit(X, y)
+    l = make_pipeline(StandardScaler(), Lasso(alpha=a, max_iter=10000)).fit(X, y)
+    print("%10.2f %10.4f %8.3f %10.4f %8d"
+          % (a,
+             cross_val_score(make_pipeline(StandardScaler(), Ridge(alpha=a)),
+                             X, y, cv=5).mean(),
+             np.abs(r[-1].coef_).max(),
+             cross_val_score(make_pipeline(StandardScaler(),
+                                           Lasso(alpha=a, max_iter=10000)),
+                             X, y, cv=5).mean(),
+             (np.abs(l[-1].coef_) > 1e-6).sum()))
+print()
+print("alpha=0 is plain OLS. alpha to infinity sends everything to zero and")
+print("predicts the mean. everything useful happens in between, and the only")
+print("way to find it is to cross-validate -- RidgeCV and LassoCV do exactly")
+print("that loop for you.")
+print()
+print("and both need scaling. the penalty charges by coefficient size, so a")
+print("column measured in millimetres gets a smaller coefficient and a smaller")
+print("penalty than the same column in metres.")
+```
+
 ## Guided tour
 
 1. <strong>See the problem first.</strong> Set the <strong>Penalty Type</strong> to None (plain OLS) and set the <strong>Polynomial Degree</strong> slider to 12. The curve whips between the training points, train MSE is almost zero, and test MSE is enormous. That gap is overfitting, made visible.

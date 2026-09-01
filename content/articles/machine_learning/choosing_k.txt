@@ -97,3 +97,85 @@ of scale on the axis.
 inherits the same assumption k-means makes.
 
 **Forgetting to scale.** Both metrics are distances.
+
+## Four ways to pick k, on data where you know the answer
+
+The same four selection scores run twice: once on clean, well-separated blobs where they all agree, and once on overlapping ones where they do not. The disagreement is the useful part.
+
+```python-run
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+from sklearn.metrics import (silhouette_score, calinski_harabasz_score,
+                             davies_bouldin_score)
+from sklearn.mixture import GaussianMixture
+
+TRUE_K = 5
+KS = range(2, 11)
+
+def survey(X, label):
+    rows = []
+    for k in KS:
+        km = KMeans(n_clusters=k, n_init=10, random_state=0).fit(X)
+        gm = GaussianMixture(n_components=k, random_state=0).fit(X)
+        rows.append((k, km.inertia_, silhouette_score(X, km.labels_),
+                     calinski_harabasz_score(X, km.labels_),
+                     davies_bouldin_score(X, km.labels_), gm.bic(X)))
+    print(label)
+    print("%4s %12s %11s %12s %11s %12s"
+          % ("k", "inertia", "silhouette", "calinski", "davies", "GMM BIC"))
+    for r in rows:
+        print("%4d %12.1f %11.4f %12.1f %11.4f %12.1f" % r)
+    picks = {
+        "silhouette": max(rows, key=lambda r: r[2])[0],
+        "calinski":   max(rows, key=lambda r: r[3])[0],
+        "davies":     min(rows, key=lambda r: r[4])[0],
+        "GMM BIC":    min(rows, key=lambda r: r[5])[0],
+    }
+    print("  picks: " + ",  ".join("%s k=%d" % (n, v) for n, v in picks.items()))
+    print("  the truth is k=%d. agreed: %d of 4."
+          % (TRUE_K, sum(v == TRUE_K for v in picks.values())))
+    print()
+    return rows
+
+clean, _ = make_blobs(n_samples=900, centers=TRUE_K, cluster_std=0.55,
+                      random_state=0)
+rows = survey(clean, "WELL SEPARATED blobs (cluster_std 0.55)")
+
+messy, _ = make_blobs(n_samples=900, centers=TRUE_K, cluster_std=1.6,
+                      random_state=0)
+survey(messy, "OVERLAPPING blobs (cluster_std 1.6), same 5 centres")
+
+print("that is the honest picture. when the structure is obvious the scores")
+print("agree and you did not need them. when it is not, they disagree -- and")
+print("that disagreement is information: it means there is no single k that")
+print("is clearly right, because the clusters genuinely bleed into each other.")
+print()
+
+print("why inertia is not on the picks list -- it falls no matter what:")
+print("%6s %14s %14s" % ("k", "inertia", "drop"))
+for i, r in enumerate(rows):
+    d = "%14.1f" % (rows[i - 1][1] - r[1]) if i else "%14s" % "-"
+    print("%6d %14.1f %s" % (r[0], r[1], d))
+print("  at k = n every point is its own cluster and inertia is exactly 0.")
+print("  'lowest inertia' would always answer n. the elbow method is really")
+print("  asking where the DROPS stop being dramatic, by eye.")
+print()
+
+print("and the check nobody runs -- on data with no clusters at all:")
+Xr = np.random.default_rng(0).uniform(size=(900, 2))
+scores = {k: silhouette_score(Xr, KMeans(n_clusters=k, n_init=10,
+                                         random_state=0).fit(Xr).labels_)
+          for k in KS}
+bk = max(scores, key=scores.get)
+print("  900 uniform random points: best silhouette is k=%d at %.4f"
+      % (bk, scores[bk]))
+print("  the clean blobs scored %.4f. every one of these methods returns an"
+      % max(r[2] for r in rows))
+print("  answer whether or not there is anything there. the SIZE of the score")
+print("  is what tells you it was worth asking.")
+print()
+print("so: run several, check they agree, check the winner is meaningfully")
+print("better than what noise scores -- and if you have a downstream task,")
+print("score k on that instead. it is the only measure that certainly matters.")
+```

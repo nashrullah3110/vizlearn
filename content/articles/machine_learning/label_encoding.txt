@@ -77,6 +77,82 @@ Three defences, in increasing order of robustness:
 
 The related trap is fitting the encoder separately on train and test. Fit once, on training data, then apply the same fitted object to everything else &mdash; refitting produces a different mapping, and your test set silently means something different from your training set.
 
+## Three encoders, and when each one is correct
+
+Ordinal, label and one-hot encoding do similar-looking things for different purposes. Using the wrong one is a common and quiet mistake.
+
+```python-run
+import numpy as np
+from sklearn.preprocessing import LabelEncoder, OrdinalEncoder, OneHotEncoder
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import cross_val_score
+
+sizes = np.array(["small", "medium", "large", "x-large"])
+colours = np.array(["red", "green", "blue"])
+
+print("LabelEncoder is for the TARGET, and takes a 1-D array:")
+le = LabelEncoder().fit(["cat", "dog", "bird", "dog"])
+print("  classes:", list(le.classes_))
+print("  transform:", le.transform(["dog", "bird", "cat"]))
+print("  inverse:  ", list(le.inverse_transform([0, 1, 2])))
+print("  it will happily encode a feature too, and that is the mistake -- it")
+print("  has no handle_unknown, so one new category at predict time crashes.")
+print()
+
+print("OrdinalEncoder is for FEATURES, takes 2-D, and lets you set the order:")
+X = np.array([["small"], ["x-large"], ["medium"], ["large"]])
+auto = OrdinalEncoder().fit(X)
+told = OrdinalEncoder(categories=[list(sizes)]).fit(X)
+print("  alphabetical (the default):")
+for c, n in zip(auto.categories_[0], range(4)):
+    print("     %-8s -> %.0f" % (c, n))
+print("  the order you meant:")
+for c, n in zip(told.categories_[0], range(4)):
+    print("     %-8s -> %.0f" % (c, n))
+print("  alphabetically, x-large sorts last and large sorts second. the model")
+print("  is told large < medium < small < x-large, which is nonsense.")
+print()
+
+rng = np.random.default_rng(0)
+idx = rng.integers(0, 4, 1500)
+size_col = sizes[idx]
+price = np.array([10.0, 20.0, 30.0, 40.0])[idx] + rng.normal(0, 2, 1500)
+
+Xa = OrdinalEncoder().fit_transform(size_col.reshape(-1, 1))
+Xt = OrdinalEncoder(categories=[list(sizes)]).fit_transform(size_col.reshape(-1, 1))
+Xh = OneHotEncoder(sparse_output=False).fit_transform(size_col.reshape(-1, 1))
+print("price really does rise with size. one column, three encodings:")
+for name, Xe in (("ordinal, alphabetical", Xa), ("ordinal, correct order", Xt),
+                 ("one-hot", Xh)):
+    print("  %-24s linear R2 %.4f   forest R2 %.4f"
+          % (name, cross_val_score(LinearRegression(), Xe, price, cv=5).mean(),
+             cross_val_score(RandomForestRegressor(n_estimators=100, random_state=0),
+                             Xe, price, cv=5).mean()))
+print()
+print("the correct ordinal encoding wins for the linear model, because the")
+print("order is real and one number captures it. the alphabetical one loses")
+print("badly. the forest does not care -- it can split its way to the right")
+print("answer from any encoding, it just needs more depth to do it.")
+print()
+
+print("now a column with NO order -- colour:")
+col = colours[rng.integers(0, 3, 1500)]
+worth = {"red": 50.0, "green": 12.0, "blue": 31.0}
+value = np.array([worth[c] for c in col]) + rng.normal(0, 2, 1500)
+Xo = OrdinalEncoder().fit_transform(col.reshape(-1, 1))
+Xoh = OneHotEncoder(sparse_output=False).fit_transform(col.reshape(-1, 1))
+print("  ordinal  linear R2 %.4f" % cross_val_score(LinearRegression(), Xo, value, cv=5).mean())
+print("  one-hot  linear R2 %.4f" % cross_val_score(LinearRegression(), Xoh, value, cv=5).mean())
+print("  there is no order to find, so forcing one costs you most of the signal.")
+print()
+print("the rule, in one line each:")
+print("  ordered categories, linear model   -> OrdinalEncoder, categories= set")
+print("  unordered categories, linear model -> OneHotEncoder")
+print("  any categories, tree model         -> ordinal is fine and much cheaper")
+print("  the target column                  -> LabelEncoder")
+```
+
 ## Things to try
 
 Use the interactive panel to understand the nuances of this technique.

@@ -105,3 +105,98 @@ reduction inside a pipeline, PCA is the safe default.
 
 **Feeding t-SNE coordinates into a classifier.** No stable mapping; no way to
 transform new data.
+
+## A map you can look at, and must not measure
+
+t-SNE turns high-dimensional data into a picture. The picture is useful and several things about it are not true, which this makes concrete.
+
+```python-run
+import numpy as np
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
+from sklearn.datasets import make_blobs
+from sklearn.metrics import pairwise_distances
+
+rng = np.random.default_rng(0)
+X, y = make_blobs(n_samples=600, n_features=30, centers=4, cluster_std=2.0,
+                  random_state=0)
+# push two of the four groups very far apart
+X[y == 3] += 40.0
+
+print("600 points in 30 dimensions, 4 groups, one of them pushed far away.")
+print()
+print("true distances between group centres, in the original 30-D space:")
+cent = np.array([X[y == c].mean(axis=0) for c in range(4)])
+D = pairwise_distances(cent)
+for i in range(4):
+    print("   group %d: %s" % (i, np.round(D[i], 1)))
+print()
+
+emb = TSNE(n_components=2, perplexity=30, random_state=0, init="pca").fit_transform(X)
+cent2 = np.array([emb[y == c].mean(axis=0) for c in range(4)])
+D2 = pairwise_distances(cent2)
+print("the same distances in the t-SNE picture:")
+for i in range(4):
+    print("   group %d: %s" % (i, np.round(D2[i], 1)))
+print()
+print("ratio of largest to smallest between-group distance:")
+off = ~np.eye(4, dtype=bool)
+print("   in 30-D    : %.2f" % (D[off].max() / D[off].min()))
+print("   in t-SNE   : %.2f" % (D2[off].max() / D2[off].min()))
+near = D[:3, :3][~np.eye(3, dtype=bool)].mean()      # among groups 0,1,2
+far = D[3, :3].mean()                                # group 3 to the rest
+near2 = D2[:3, :3][~np.eye(3, dtype=bool)].mean()
+far2 = D2[3, :3].mean()
+print("  in 30-D, group 3 sits %.1fx further from the others than they sit"
+      % (far / near))
+print("  from each other. in the picture that ratio is %.1fx." % (far2 / near2))
+print("  the outlying group is drawn as just another blob.")
+print()
+
+print("cluster SIZES are not preserved either:")
+for c in range(4):
+    print("   group %d: spread %6.2f in 30-D, %6.2f in the picture"
+          % (c, X[y == c].std(), emb[y == c].std()))
+print("  t-SNE inflates sparse clusters and compresses dense ones, because it")
+print("  is matching neighbour probabilities, not distances.")
+print()
+
+print("what IS preserved -- who your neighbours are:")
+def knn_overlap(A, B, k=15):
+    da = pairwise_distances(A); db = pairwise_distances(B)
+    np.fill_diagonal(da, np.inf); np.fill_diagonal(db, np.inf)
+    na = np.argsort(da, axis=1)[:, :k]
+    nb = np.argsort(db, axis=1)[:, :k]
+    return np.mean([len(set(a) & set(b)) / k for a, b in zip(na, nb)])
+pca2 = PCA(n_components=2).fit_transform(X)
+print("   fraction of each point's 15 nearest neighbours that survive:")
+print("     t-SNE %.4f" % knn_overlap(X, emb))
+print("     PCA   %.4f" % knn_overlap(X, pca2))
+print("  that is the trade: t-SNE keeps local neighbourhoods far better and")
+print("  throws away global geometry to do it. PCA does the opposite.")
+print()
+
+print("perplexity changes the picture, not just its appearance:")
+for perp in (5, 30, 100):
+    e = TSNE(n_components=2, perplexity=perp, random_state=0,
+             init="pca").fit_transform(X)
+    print("   perplexity %3d: neighbour overlap %.4f" % (perp, knn_overlap(X, e)))
+print("  it is roughly 'how many neighbours count'. run two or three values")
+print("  before believing any structure you see.")
+print()
+
+print("and the test that matters -- t-SNE on pure noise:")
+Xn = rng.normal(size=(600, 30))
+en = TSNE(n_components=2, perplexity=30, random_state=0, init="pca").fit_transform(Xn)
+print("   neighbour overlap with the real 30-D noise: %.4f" % knn_overlap(Xn, en))
+print("   it still produces a picture with apparent blobs in it. t-SNE always")
+print("   does. a shape in a t-SNE plot is a hypothesis, not a finding.")
+print()
+print("so: use it to look, never to measure. do not read distances between")
+print("clusters, do not read their sizes, and do not cluster on the 2-D")
+print("output -- cluster in the original space and colour the picture by it.")
+print()
+print("UMAP is the usual alternative: much faster, preserves more of the")
+print("global layout, and has the same caveats about not measuring the result.")
+print("It is not in scikit-learn -- it ships as the separate umap-learn package.")
+```

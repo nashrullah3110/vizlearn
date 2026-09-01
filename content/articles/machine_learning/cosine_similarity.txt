@@ -119,6 +119,79 @@ This measures how much the vectors "agree." You calculate it by multiplying the 
 
 This is the length of each vector, calculated using the Pythagorean theorem. By dividing by the magnitudes, we "normalize" the vectors, effectively ignoring their lengths and focusing only on their direction.
 
+## The metric that ignores how long a vector is
+
+Cosine similarity measures angle, not distance. That single property is why it is the default for text and embeddings, and where it goes wrong.
+
+```python-run
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
+
+a = np.array([[1.0, 2.0, 3.0]])
+b = np.array([[2.0, 4.0, 6.0]])       # exactly 2x a
+c = np.array([[3.0, 2.0, 1.0]])       # same length as a, different direction
+
+print("a =", a[0], " b = 2a =", b[0], " c =", c[0])
+print()
+print("%-28s %12s %12s" % ("", "cosine sim", "euclidean"))
+for name, v in (("a vs b (same direction)", b), ("a vs c (same length)", c)):
+    print("%-28s %12.6f %12.6f"
+          % (name, cosine_similarity(a, v)[0, 0], euclidean_distances(a, v)[0, 0]))
+print()
+print("cosine calls a and b identical. they point the same way; one is just")
+print("longer. euclidean distance calls them 3.74 apart, because it measures")
+print("exactly that length difference.")
+print()
+
+print("computed by hand, so there is nothing hidden:")
+print("  dot(a, b)     = %.4f" % a[0].dot(b[0]))
+print("  |a| = %.6f, |b| = %.6f" % (np.linalg.norm(a), np.linalg.norm(b)))
+print("  dot / (|a||b|) = %.6f"
+      % (a[0].dot(b[0]) / (np.linalg.norm(a) * np.linalg.norm(b))))
+print()
+
+print("the range, and what each end means:")
+for name, u, v in (("identical direction", [1, 1], [3, 3]),
+                   ("perpendicular",       [1, 0], [0, 5]),
+                   ("opposite",            [1, 2], [-2, -4]),
+                   ("partly aligned",      [1, 0], [1, 1])):
+    print("  %-22s %+.4f" % (name, cosine_similarity([u], [v])[0, 0]))
+print("  -1 to +1 for arbitrary vectors. for counts and TF-IDF, which are")
+print("  never negative, it is 0 to 1 -- there is no way to be 'opposite'.")
+print()
+
+print("why text uses it. two documents on the same subject, different lengths:")
+vocab = ["model", "train", "data", "loss", "cat"]
+short = np.array([2.0, 1.0, 2.0, 1.0, 0.0])
+long_ = short * 20
+other = np.array([0.0, 0.0, 1.0, 0.0, 9.0])
+for name, v in (("the same doc, 20x longer", long_), ("a doc about cats", other)):
+    print("  %-26s cosine %.6f   euclidean %8.4f"
+          % (name, cosine_similarity([short], [v])[0, 0],
+             euclidean_distances([short], [v])[0, 0]))
+print("  euclidean would rank the cat document as the closer match, purely")
+print("  because it is a similar length. cosine is not fooled.")
+print()
+
+print("the connection worth knowing: on unit-length vectors the two are the")
+print("same ranking. euclidean^2 = 2 - 2*cosine, exactly.")
+rng = np.random.default_rng(0)
+v = rng.normal(size=(5, 8))
+v = v / np.linalg.norm(v, axis=1, keepdims=True)
+d2 = euclidean_distances(v[:1], v[1:])[0] ** 2
+cs = cosine_similarity(v[:1], v[1:])[0]
+print("  euclidean^2 :", np.round(d2, 6))
+print("  2 - 2*cosine:", np.round(2 - 2 * cs, 6))
+print()
+print("so if your vectors are normalised -- and most embedding models return")
+print("them normalised -- cosine and euclidean give identical neighbours, and")
+print("a vector database can use whichever is faster.")
+print()
+print("where it fails: when magnitude is the signal. two users who rated the")
+print("same films the same way but one rated 4 films and one rated 400 look")
+print("identical to cosine, and they are not the same kind of user.")
+```
+
 ## Try it yourself
 
 Use the controls and presets to explore the concept.

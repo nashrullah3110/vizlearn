@@ -59,6 +59,92 @@ Distinguishing the two is diagnostic. If the model does well on the training min
 
 Two warnings that cost people weeks. <strong>Resample only the training set</strong> &mdash; a balanced test set measures a world that does not exist. And apply SMOTE <em>inside</em> the cross-validation fold, never before splitting, or synthetic points derived from test rows leak straight into training.
 
+## What 99% accuracy is actually worth
+
+On a 1% positive rate, a model that predicts "no" every time scores 99%. This measures what that model is worth, and what the useful metrics say instead.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.dummy import DummyClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (accuracy_score, balanced_accuracy_score, f1_score,
+                             roc_auc_score, average_precision_score,
+                             confusion_matrix, matthews_corrcoef)
+
+X, y = make_classification(n_samples=20000, n_features=15, n_informative=6,
+                           weights=[0.99], flip_y=0.01, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0,
+                                      stratify=y)
+print("%d training rows, %d of them positive (%.2f%%)"
+      % (len(ytr), ytr.sum(), 100 * ytr.mean()))
+print()
+
+models = {
+    "always predicts 0": DummyClassifier(strategy="constant", constant=0),
+    "logistic regression": LogisticRegression(max_iter=3000),
+}
+print("%-22s %9s %9s %8s %8s %8s %8s"
+      % ("", "accuracy", "balanced", "F1", "MCC", "ROC AUC", "PR AUC"))
+for name, m in models.items():
+    m.fit(Xtr, ytr)
+    pred = m.predict(Xte)
+    try:
+        prob = m.predict_proba(Xte)[:, 1]
+    except Exception:
+        prob = pred.astype(float)
+    print("%-22s %9.4f %9.4f %8.4f %8.4f %8.4f %8.4f"
+          % (name, accuracy_score(yte, pred), balanced_accuracy_score(yte, pred),
+             f1_score(yte, pred, zero_division=0), matthews_corrcoef(yte, pred),
+             roc_auc_score(yte, prob), average_precision_score(yte, prob)))
+print()
+print("the do-nothing model scores %.4f on accuracy and 0.0000 on every metric"
+      % accuracy_score(yte, np.zeros_like(yte)))
+print("that asks whether it found anything. that is the whole problem, in one row.")
+print()
+
+tn, fp, fn, tp = confusion_matrix(yte, models["logistic regression"].predict(Xte)).ravel()
+print("even the real model, at the default threshold:")
+print("  caught %d of the %d positives, missed %d" % (tp, tp + fn, fn))
+print("  it is not broken -- it is optimising log loss over %d negatives and"
+      % (tn + fp))
+print("  %d positives, so the negatives win every argument it has." % (tp + fn))
+print()
+
+print("the baseline you must beat is the base rate, not 0.5:")
+print("  a random scorer gets ROC AUC 0.5000 and PR AUC ~%.4f (the base rate)"
+      % yte.mean())
+print("  so the logistic model's PR AUC of %.4f is %.0fx the base rate and a"
+      % (average_precision_score(yte, models["logistic regression"].predict_proba(Xte)[:, 1]),
+         average_precision_score(yte, models["logistic regression"].predict_proba(Xte)[:, 1]) / yte.mean()))
+print("  genuine result, while its accuracy of %.4f says nothing at all."
+      % accuracy_score(yte, models["logistic regression"].predict(Xte)))
+print()
+
+print("how the metrics behave as the imbalance deepens:")
+print("%12s %12s %12s %12s" % ("positive %", "acc of 'no'", "ROC AUC", "PR AUC"))
+for w in (0.50, 0.90, 0.99, 0.999):
+    Xi, yi = make_classification(n_samples=20000, n_features=15, n_informative=6,
+                                 weights=[w], flip_y=0.01, random_state=0)
+    a, b, c, d = train_test_split(Xi, yi, test_size=0.3, random_state=0, stratify=yi)
+    p = LogisticRegression(max_iter=3000).fit(a, c).predict_proba(b)[:, 1]
+    print("%12.2f %12.4f %12.4f %12.4f"
+          % (100 * d.mean(), 1 - d.mean(), roc_auc_score(d, p),
+             average_precision_score(d, p)))
+print()
+print("PR AUC falls off a cliff while ROC AUC is still reporting good news.")
+print("at 1.5 percent positives ROC AUC reads 0.83, which sounds like a")
+print("working model -- and PR AUC says 0.27, closer to the truth. ROC AUC")
+print("is slower to notice because the false positive rate has an enormous")
+print("denominator, so even thousands of false alarms barely move it.")
+print()
+print("so: report balanced accuracy or PR AUC, always quote the base rate")
+print("next to any score, and check the confusion matrix before believing")
+print("anything. the fixes -- class weights, resampling, thresholds -- come")
+print("after you can see the problem.")
+```
+
 ## Guided tour
 
 Use the interactive panel to build a strong intuition for this problem.

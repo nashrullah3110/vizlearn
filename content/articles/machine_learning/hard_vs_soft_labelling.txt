@@ -50,6 +50,79 @@ The fourth row is the honest cost. Label smoothing usually lowers training accur
 
 One caveat worth knowing: label smoothing tightens the clusters a network forms for each class, which is good for classification but has been shown to hurt when you later want to distil <em>from</em> that network, or use its embeddings for retrieval. Smooth the student, think twice about smoothing the teacher.
 
+## What you throw away when you take argmax
+
+A hard label is a probability with the uncertainty deleted. Keeping the probability lets you abstain, rank, and pass calibrated confidence downstream.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, log_loss
+
+X, y = make_classification(n_samples=6000, n_features=12, n_informative=5,
+                           flip_y=0.15, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.35, random_state=0)
+model = LogisticRegression(max_iter=3000).fit(Xtr, ytr)
+prob = model.predict_proba(Xte)[:, 1]
+hard = model.predict(Xte)
+
+print("overall accuracy %.4f -- one number for %d very different rows."
+      % (accuracy_score(yte, hard), len(yte)))
+print()
+
+conf = np.maximum(prob, 1 - prob)
+print("accuracy, broken down by how confident the model was:")
+print("%18s %8s %10s" % ("confidence band", "rows", "accuracy"))
+for lo, hi in ((0.5, 0.6), (0.6, 0.7), (0.7, 0.8), (0.8, 0.9), (0.9, 1.01)):
+    m = (conf >= lo) & (conf < hi)
+    if m.sum():
+        print("%18s %8d %10.4f"
+              % ("%.1f - %.1f" % (lo, hi), m.sum(), accuracy_score(yte[m], hard[m])))
+print()
+print("the hard label looks the same in every one of those rows. it is not.")
+print()
+
+print("so you can abstain. send the uncertain rows to a human:")
+print("%14s %10s %14s %12s" % ("send to human", "rows kept", "auto accuracy", "human load"))
+for band in (0.00, 0.05, 0.10, 0.20, 0.30):
+    keep = conf >= 0.5 + band
+    print("%14s %10d %14.4f %11.1f%%"
+          % ("conf < %.2f" % (0.5 + band), keep.sum(),
+             accuracy_score(yte[keep], hard[keep]) if keep.sum() else float("nan"),
+             100 * (~keep).mean()))
+print("  handing over the least confident %.0f%% of rows lifts the automated"
+      % (100 * (conf < 0.7).mean()))
+print("  accuracy from %.4f to %.4f. argmax cannot offer you that trade."
+      % (accuracy_score(yte, hard), accuracy_score(yte[conf >= 0.7], hard[conf >= 0.7])))
+print()
+
+print("and you can rank. take the 100 rows the model is most sure are positive:")
+top = np.argsort(-prob)[:100]
+print("  precision in that top 100: %.4f  (base rate %.4f)"
+      % (yte[top].mean(), yte.mean()))
+print("  hard labels carry no order: all %d rows predicted positive are"
+      % (hard == 1).sum())
+print("  indistinguishable from each other, so there is no 'top 100' to take.")
+print()
+
+print("soft labels as TARGETS are a separate idea. two annotators disagreeing")
+print("60/40 is real information, and a hard label discards it:")
+for soft_target, name in ((1.0, "confident yes"), (0.6, "3 of 5 said yes")):
+    for pred in (0.95, 0.60, 0.30):
+        print("  target %.1f (%s), model said %.2f -> loss %.4f"
+              % (soft_target, name, pred,
+                 -(soft_target * np.log(pred) + (1 - soft_target) * np.log(1 - pred))))
+print("  against a soft target of 0.6, predicting 0.60 is the MINIMUM loss.")
+print("  against a hard 1.0, the model is pushed toward 1.0 regardless, which")
+print("  is how a model learns to be more confident than its data supports.")
+print()
+print("this is also what label smoothing and knowledge distillation are doing:")
+print("replacing a 1.0 with a 0.9, or with a bigger model's actual output, so")
+print("the target carries some of the uncertainty the hard label deleted.")
+```
+
 ## Things to try
 
 Select different tweets from the list to see how these labelling strategies handle different scenarios.

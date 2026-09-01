@@ -94,3 +94,87 @@ most overfitted base model.
 
 **Assuming diversity.** Two gradient-boosted models with different seeds are not
 diverse; check whether their errors actually differ.
+
+## Ensembling models that make different mistakes
+
+Combining models only helps when they are wrong about different rows. This measures that disagreement first, then shows what voting and stacking do with it.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.ensemble import VotingClassifier, StackingClassifier
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+X, y = make_classification(n_samples=4000, n_features=15, n_informative=6,
+                           n_clusters_per_class=2, flip_y=0.12, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
+
+base = [
+    ("logistic", make_pipeline(StandardScaler(), LogisticRegression(max_iter=3000))),
+    ("tree",     DecisionTreeClassifier(max_depth=8, random_state=0)),
+    ("knn",      make_pipeline(StandardScaler(), KNeighborsClassifier(15))),
+    ("bayes",    GaussianNB()),
+]
+preds = {}
+for name, m in base:
+    preds[name] = m.fit(Xtr, ytr).predict(Xte)
+    print("%-10s accuracy %.4f" % (name, (preds[name] == yte).mean()))
+print()
+
+print("how often each PAIR gets a row wrong at the same time:")
+names = list(preds)
+wrong = {n: preds[n] != yte for n in names}
+print("%-10s %s" % ("", "".join("%10s" % n for n in names)))
+for a in names:
+    row = ""
+    for b in names:
+        both = (wrong[a] & wrong[b]).sum() / max(wrong[a].sum(), 1)
+        row += "%10.3f" % both
+    print("%-10s %s" % (a, row))
+print("  (read: of the rows THIS model got wrong, what fraction did that one")
+print("   also get wrong. 1.000 on the diagonal, by definition.)")
+print()
+any_right = (~np.all([wrong[n] for n in names], axis=0)).mean()
+all_wrong = np.all([wrong[n] for n in names], axis=0).mean()
+print("  at least one model is right on %.4f of rows." % any_right)
+print("  all four are wrong together on %.4f." % all_wrong)
+print("  that first number is the ceiling any combiner can reach. the gap")
+print("  between it and the best single model is what there is to win.")
+print()
+
+hard = VotingClassifier(base, voting="hard")
+soft = VotingClassifier(base, voting="soft")
+stack = StackingClassifier(base, final_estimator=LogisticRegression(max_iter=3000), cv=5)
+for name, m in (("hard voting (majority)", hard),
+                ("soft voting (average probability)", soft),
+                ("stacking (a model on the outputs)", stack)):
+    print("%-36s cv %.4f" % (name, cross_val_score(m, X, y, cv=5).mean()))
+print("%-36s cv %.4f"
+      % ("best single model",
+         max(cross_val_score(m, X, y, cv=5).mean() for _, m in base)))
+print()
+
+stack.fit(Xtr, ytr)
+print("what stacking learned about which model to trust:")
+for name, w in zip(names, stack.final_estimator_.coef_[0]):
+    print("   %-10s weight %+7.4f" % (name, w))
+print("  a negative weight is not a bug -- it means that model's mistakes are")
+print("  informative, so the combiner leans against it in some regions.")
+print()
+print("soft voting usually beats hard voting because a 0.51 and a 0.99 are")
+print("different amounts of evidence, and hard voting throws that away.")
+print()
+print("stacking needs cross-validated predictions to train its combiner, or")
+print("the base models' training-set optimism leaks straight into it. that is")
+print("what the cv=5 above is doing, and it is not optional.")
+print()
+print("the honest caveat: ensembles buy small gains for a large cost in")
+print("latency and explainability. four models to serve, four to monitor. use")
+print("one when the gain is worth that, and not because it sounds thorough.")
+```

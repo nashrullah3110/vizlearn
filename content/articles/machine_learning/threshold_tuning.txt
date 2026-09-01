@@ -97,3 +97,70 @@ folds. Tune once on a held-out validation set.
 
 **Forgetting it drifts.** The optimal threshold depends on the class balance,
 and that moves in production. It needs rechecking, not setting once.
+
+## 0.5 is a default, not a decision
+
+The threshold is the one hyperparameter you can change after training, in production, in a config file. Here is what it costs and what it buys.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (precision_recall_curve, f1_score, confusion_matrix,
+                             roc_auc_score)
+
+X, y = make_classification(n_samples=8000, n_features=15, n_informative=6,
+                           weights=[0.93, 0.07], flip_y=0.06, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.35, random_state=0,
+                                      stratify=y)
+prob = LogisticRegression(max_iter=3000).fit(Xtr, ytr).predict_proba(Xte)[:, 1]
+pos = (yte == 1).sum()
+print("%d test rows, %d of them positive (%.1f%%). AUC %.4f -- the model is"
+      % (len(yte), pos, 100 * pos / len(yte), roc_auc_score(yte, prob)))
+print("fine. the threshold is what is broken.")
+print()
+
+print("%10s %8s %8s %10s %9s %9s"
+      % ("threshold", "TP", "FP", "FN", "precision", "recall"))
+for t in (0.50, 0.30, 0.20, 0.10, 0.07, 0.03):
+    tn, fp, fn, tp = confusion_matrix(yte, (prob >= t).astype(int)).ravel()
+    print("%10.2f %8d %8d %10d %9.4f %9.4f"
+          % (t, tp, fp, fn, tp / max(tp + fp, 1), tp / max(tp + fn, 1)))
+print()
+print("at the default 0.50 the model catches %d of %d positives. it is not"
+      % (confusion_matrix(yte, (prob >= 0.5).astype(int)).ravel()[3], pos))
+print("being cautious -- 0.50 simply is not the right cut when only %.1f percent"
+      % (100 * pos / len(yte)))
+print("of the rows are positive.")
+print()
+
+prec, rec, thr = precision_recall_curve(yte, prob)
+f1 = 2 * prec * rec / np.clip(prec + rec, 1e-12, None)
+best = thr[np.nanargmax(f1[:-1])]
+print("threshold that maximises F1: %.4f  (F1 %.4f, vs %.4f at 0.50)"
+      % (best, f1_score(yte, (prob >= best).astype(int)),
+         f1_score(yte, (prob >= 0.5).astype(int))))
+print()
+
+print("but F1 is a stand-in for a decision you should make explicitly.")
+print("put money on the two mistakes and the answer changes:")
+for fp_cost, fn_cost, label in ((1, 1, "equal cost"),
+                                (1, 20, "a miss costs 20x a false alarm"),
+                                (20, 1, "a false alarm costs 20x a miss")):
+    costs = [(t, fp_cost * ((prob >= t) & (yte == 0)).sum()
+                 + fn_cost * ((prob < t) & (yte == 1)).sum())
+             for t in np.linspace(0.01, 0.95, 300)]
+    t_best, c_best = min(costs, key=lambda kv: kv[1])
+    c_default = next(c for t, c in costs if abs(t - 0.5) < 0.006)
+    print("  %-32s best threshold %.3f, cost %6d (at 0.50: %6d)"
+          % (label, t_best, c_best, c_default))
+print()
+print("same model, same probabilities, three different right answers. the")
+print("threshold is where your business constraints enter the system, and it")
+print("is the only place they can enter without retraining.")
+print()
+print("two warnings. pick the threshold on a validation split, not on the test")
+print("set -- it is a fitted parameter like any other. and re-check it when the")
+print("base rate moves, because that is exactly what invalidates it.")
+```

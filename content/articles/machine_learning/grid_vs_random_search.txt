@@ -92,3 +92,91 @@ does, widen it and search again.
 
 **Not searching preprocessing.** Put the whole [pipeline](ml_pipelines.html) in
 the search, so imputation and scaling choices are tuned alongside the model.
+
+## Why random search finds more with fewer fits
+
+Grid search spends its budget evenly across every parameter, including the ones that do not matter. Random search does not, and on the same budget it usually wins.
+
+```python-run
+import numpy as np
+import time
+from sklearn.datasets import make_classification
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.model_selection import (GridSearchCV, RandomizedSearchCV,
+                                     StratifiedKFold, cross_val_score)
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from scipy.stats import loguniform, randint
+
+X, y = make_classification(n_samples=700, n_features=12, n_informative=5,
+                           flip_y=0.10, random_state=0)
+cv = StratifiedKFold(3, shuffle=True, random_state=0)
+
+print("baseline, all defaults: cv %.4f"
+      % cross_val_score(RandomForestClassifier(random_state=0), X, y, cv=cv).mean())
+print()
+
+grid = {"n_estimators": [40, 120],
+        "max_depth":    [3, 6, 12, None],
+        "max_features": [2, 4, 8]}
+total = 2 * 4 * 3
+print("grid search over %d combinations x 3 folds = %d fits" % (total, total * 3))
+t0 = time.time()
+gs = GridSearchCV(RandomForestClassifier(random_state=0), grid, cv=cv).fit(X, y)
+print("  best %.4f in %.1fs with %s" % (gs.best_score_, time.time() - t0, gs.best_params_))
+print()
+
+dist = {"n_estimators": randint(40, 120),
+        "max_depth":    randint(2, 20),
+        "max_features": randint(1, 12)}
+t0 = time.time()
+rs = RandomizedSearchCV(RandomForestClassifier(random_state=0), dist,
+                        n_iter=total, cv=cv, random_state=0).fit(X, y)
+print("random search, the SAME %d fits" % total)
+print("  best %.4f in %.1fs with %s" % (rs.best_score_, time.time() - t0, rs.best_params_))
+print()
+
+print("  (the fit counts match; wall time will not, because the two searches")
+print("   draw different forest sizes.)")
+print()
+print("here is the reason it tends to win. in a 2x4x3 grid, how many DISTINCT")
+print("values does each parameter actually get tried at?")
+print("  grid   : n_estimators 2, max_depth 4, max_features 3")
+print("  random : n_estimators %d, max_depth %d, max_features %d"
+      % tuple(len(set(r[k] for r in rs.cv_results_["params"]))
+              for k in ("n_estimators", "max_depth", "max_features")))
+print()
+print("the grid tried max_depth at four values and spent 6 fits on each. if")
+print("max_depth is the parameter that matters and the other two do not, the")
+print("grid spent 20 of its 24 fits re-confirming what it already knew.")
+print("random search gets 24 distinct values of every parameter for the same")
+print("number of fits, so it is never wasting budget on a parameter that")
+print("turns out not to matter.")
+print()
+
+print("and grids explode. adding one parameter with 4 values multiplies:")
+for extra in range(5):
+    print("  %d parameters at 4 values each -> %5d combinations"
+          % (extra + 1, 4 ** (extra + 1)))
+print()
+
+print("scales matter too -- C and gamma live on a log scale, not a linear one:")
+print("  linear range 0.1 to 100 in 5 steps:", np.round(np.linspace(0.1, 100, 5), 3))
+print("  log range,   same endpoints      :", np.round(np.logspace(-1, 2, 5), 3))
+print("  the linear one puts 4 of its 5 samples above 25, which is almost")
+print("  never where the interesting values are.")
+print()
+svm_rs = RandomizedSearchCV(make_pipeline(StandardScaler(), SVC()),
+                            {"svc__C": loguniform(1e-2, 1e3),
+                             "svc__gamma": loguniform(1e-4, 1e0)},
+                            n_iter=15, cv=cv, random_state=0).fit(X, y)
+print("SVM tuned over log-uniform ranges, 15 draws: cv %.4f" % svm_rs.best_score_)
+print("  C %.4f, gamma %.5f"
+      % (svm_rs.best_params_["svc__C"], svm_rs.best_params_["svc__gamma"]))
+print()
+print("the rule of thumb: grid when you have 2 parameters and know the ranges,")
+print("random when you have more than 2 or are still exploring. and always")
+print("check whether your best value landed on the edge of the range -- if it")
+print("did, the range was wrong, not the model.")
+```

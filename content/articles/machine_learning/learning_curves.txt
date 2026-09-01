@@ -99,3 +99,67 @@ uninformative. Plot the metric you actually care about.
 
 **Concluding 'more data' from a gap alone.** Check the validation curve is still
 falling. A converged gap means variance you cannot fix with volume.
+
+## The chart that tells you whether more data will help
+
+Two models on the same problem, scored as the training set grows. One curve says collect more data; the other says do not bother. Reading the difference is the whole skill.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.model_selection import learning_curve, StratifiedKFold
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+
+X, y = make_classification(n_samples=4000, n_features=12, n_informative=6,
+                           n_clusters_per_class=2, flip_y=0.08, random_state=0)
+cv = StratifiedKFold(5, shuffle=True, random_state=0)
+sizes = np.array([50, 100, 250, 600, 1500, 3200])
+
+def curve(name, model, verdict):
+    n, tr, te = learning_curve(model, X, y, train_sizes=sizes, cv=cv,
+                               scoring="accuracy")
+    print(name)
+    print("%10s %10s %10s %8s" % ("rows", "train", "validation", "gap"))
+    for i in range(len(n)):
+        print("%10d %10.4f %10.4f %8.4f"
+              % (n[i], tr[i].mean(), te[i].mean(), tr[i].mean() - te[i].mean()))
+    print("   last 3 validation scores moved by %+.4f"
+          % (te[-1].mean() - te[-3].mean()))
+    print("   %s" % verdict)
+    print()
+
+curve("UNDERFITTING -- a straight line on a problem that is not straight",
+      make_pipeline(StandardScaler(), LogisticRegression(max_iter=2000)),
+      "both curves are low and have already met. more rows change nothing;
+"
+      "   the model is not capable enough. this is the one case where more
+   data is a waste of money.")
+
+curve("OVERFITTING -- a tree with no depth limit",
+      DecisionTreeClassifier(random_state=0),
+      "training is pinned near 1.0 while validation trails far behind, and
+"
+      "   the gap is still closing as rows arrive. more data WILL help here,
+   and so would a depth limit.")
+
+curve("a reasonable middle -- degree-2 features on a linear model",
+      make_pipeline(StandardScaler(), PolynomialFeatures(2),
+                    LogisticRegression(max_iter=5000)),
+      "a small gap and a validation curve that is close to flat. this is
+"
+      "   what 'you have enough data' looks like.")
+
+print("the three shapes, and what each one means:")
+print("  both curves low, together        -> underfitting. get a better model.")
+print("  big gap, validation still rising -> overfitting. get more data, or")
+print("                                      regularise harder.")
+print("  small gap, both flat             -> you are done. the remaining error")
+print("                                      is noise in the labels.")
+print()
+print("this is worth plotting BEFORE you spend a quarter collecting data. the")
+print("curve answers the question 'would another 10,000 rows help' directly,")
+print("and it answers it using data you already have.")
+```

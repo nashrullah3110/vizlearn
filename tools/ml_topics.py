@@ -918,6 +918,104 @@ selection, not the phenomenon.
 
 **Checking only y.** High-leverage points can be unremarkable in y and still
 dominate the fit.
+
+## An outlier and an influential point are not the same thing
+
+One far-out row can leave a fit untouched while another moves it completely. The difference is leverage, and it is computable.
+
+```python-run
+import numpy as np
+from sklearn.linear_model import LinearRegression, HuberRegressor, RANSACRegressor
+from sklearn.metrics import r2_score
+
+rng = np.random.default_rng(0)
+x = np.linspace(0, 10, 60)
+y = 2.0 * x + 5.0 + rng.normal(0, 1.5, 60)
+X = x.reshape(-1, 1)
+
+def fit(Xa, ya, label):
+    m = LinearRegression().fit(Xa, ya)
+    print("  %-34s slope %7.4f  intercept %7.4f" % (label, m.coef_[0], m.intercept_))
+    return m
+
+print("the true relationship is y = 2x + 5.")
+base = fit(X, y, "clean data")
+print()
+
+# an outlier in the MIDDLE of the x range: unusual y, ordinary x
+xm, ym = 5.0, 60.0
+Xa = np.vstack([X, [[xm]]]); ya = np.r_[y, ym]
+mid = fit(Xa, ya, "one wild point at x=5 (middle)")
+
+# an outlier at the EDGE of the x range: same distance off the line
+xe, ye = 10.0, 65.0
+Xb = np.vstack([X, [[xe]]]); yb = np.r_[y, ye]
+edge = fit(Xb, yb, "one wild point at x=10 (edge)")
+print()
+print("the added points sit %.0f and %.0f above the true line -- comparable"
+      % (ym - (2 * xm + 5), ye - (2 * xe + 5)))
+print("misses. but look at what each did:")
+print("  the one at x=5  moved the slope by %.4f and the intercept by %+.4f"
+      % (abs(mid.coef_[0] - base.coef_[0]), mid.intercept_ - base.intercept_))
+print("  the one at x=10 moved the slope by %.4f and the intercept by %+.4f"
+      % (abs(edge.coef_[0] - base.coef_[0]), edge.intercept_ - base.intercept_))
+print("x=5 is the mean of x, so that point has no lever at all: it pushed the")
+print("whole line up without tilting it. the edge point tilted it.")
+print()
+
+print("leverage explains it. it depends only on x, never on y:")
+def leverage(Xa):
+    Z = np.column_stack([np.ones(len(Xa)), Xa])
+    H = Z @ np.linalg.solve(Z.T @ Z, Z.T)
+    return np.diag(H)
+
+for label, Xa in (("point at x=5 ", Xa), ("point at x=10", Xb)):
+    h = leverage(Xa)
+    print("  %s  leverage %.4f   (average is %.4f)"
+          % (label, h[-1], h.mean()))
+print("  a point far from the mean of x has a long lever. it does not have to")
+print("  be unusual in y to move the fit -- it just has to be far out in x.")
+print()
+
+print("Cook's distance combines both: how far off the line, times leverage.")
+def cooks(Xa, ya):
+    m = LinearRegression().fit(Xa, ya)
+    resid = ya - m.predict(Xa)
+    h = leverage(Xa)
+    mse = (resid ** 2).sum() / (len(ya) - 2)
+    return resid ** 2 * h / (2 * mse * (1 - h) ** 2)
+
+for label, Xa, ya in (("added at x=5 ", Xa, ya), ("added at x=10", Xb, yb)):
+    d = cooks(Xa, ya)
+    print("  %s  Cook's D %.4f  (rule of thumb: investigate above %.4f)"
+          % (label, d[-1], 4 / len(ya)))
+print()
+print("so the vocabulary is worth getting right:")
+print("  outlier     -- an unusual y for its x. may cost you nothing.")
+print("  high leverage -- an unusual x. dangerous whether or not y is odd.")
+print("  influential -- actually moved the fit. Cook's distance measures this,")
+print("                 and note it flagged BOTH of our points: shifting every")
+print("                 prediction up is influence too. leverage is what tells")
+print("                 you which one can TILT the line rather than raise it.")
+print()
+
+print("robust fits, on the edge-outlier data:")
+print("  ordinary least squares  slope %7.4f" % edge.coef_[0])
+print("  Huber                   slope %7.4f"
+      % HuberRegressor().fit(Xb, yb).coef_[0])
+print("  RANSAC                  slope %7.4f"
+      % RANSACRegressor(random_state=0).fit(Xb, yb).estimator_.coef_[0])
+print("  true                    slope  2.0000")
+print()
+print("Huber switches from squared to absolute error past a threshold, so a")
+print("far-out point stops getting quadratically more say. RANSAC fits on")
+print("random subsets and keeps the fit that most points agree with.")
+print()
+print("and the part that is not statistics: deleting the point is a decision")
+print("about what your data means. a sensor glitch, delete it. a genuine")
+print("extreme customer, deleting it means your model no longer covers them.")
+```
+
 """,
     [
         {"q": "Why does least squares react so strongly to a single distant point?",
@@ -1531,6 +1629,80 @@ different, so the numbers are not comparable.
 **Forgetting that both curves span all thresholds.** Neither tells you which
 threshold to deploy &mdash; that is a separate decision, made with
 [costs](threshold_tuning.html).
+
+## The same model, two curves, two different stories
+
+ROC and precision-recall are computed from the same predictions. On balanced data they agree; on imbalanced data one of them is misleading, and it is always the same one.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (roc_curve, precision_recall_curve, roc_auc_score,
+                             average_precision_score, confusion_matrix)
+
+def build(weight, seed=0):
+    X, y = make_classification(n_samples=20000, n_features=18, n_informative=10,
+                               weights=[weight], flip_y=0.005, class_sep=2.5,
+                               random_state=seed)
+    a, b, c, d = train_test_split(X, y, test_size=0.4, random_state=0, stratify=y)
+    return d, LogisticRegression(max_iter=3000).fit(a, c).predict_proba(b)[:, 1]
+
+print("%14s %10s %12s %12s" % ("positive rate", "ROC AUC", "PR AUC", "PR baseline"))
+for w in (0.50, 0.80, 0.95, 0.985):
+    yte, p = build(w)
+    print("%13.2f%% %10.4f %12.4f %12.4f"
+          % (100 * yte.mean(), roc_auc_score(yte, p),
+             average_precision_score(yte, p), yte.mean()))
+print()
+print("ROC AUC drifts. PR AUC falls through the floor -- and its baseline")
+print("falls with it, because a random scorer's PR AUC IS the positive rate.")
+print("ROC AUC's baseline is 0.5 no matter what, which is exactly the problem:")
+print("a number that does not move cannot warn you.")
+print()
+
+yte, p = build(0.985)
+rate = yte.mean()
+print("now take ONE point on each curve, on the %.1f percent data." % (100 * rate))
+fpr, tpr, rthr = roc_curve(yte, p)
+i = int(np.argmin(np.abs(tpr - 0.80)))
+t = rthr[i]
+tn, fp, fn, tp = confusion_matrix(yte, (p >= t).astype(int)).ravel()
+print("at the threshold that catches 80 percent of the positives (%.4f):" % t)
+print()
+print("  false positive rate  %.4f   <- the ROC curve's x-axis" % (fp / (fp + tn)))
+print("  precision            %.4f   <- the PR curve's y-axis" % (tp / (tp + fp)))
+print()
+print("both of those describe the SAME %d false positives." % fp)
+print("  FPR divides them by the %d negatives in the data      -> %.4f"
+      % (fp + tn, fp / (fp + tn)))
+print("  precision divides them by the %d rows you flagged     -> %.4f wrong"
+      % (tp + fp, fp / (tp + fp)))
+print()
+print("an AUC of %.4f and a false positive rate of %.1f percent both read like"
+      % (roc_auc_score(yte, p), 100 * fp / (fp + tn)))
+print("a model that is working, and by those measures it is.")
+print("but a human working the alert queue sees %d items, of which %d are"
+      % (tp + fp, tp))
+print("real. %.0f%% of their day is wasted, and the ROC curve never said so."
+      % (100 * fp / (tp + fp)))
+print()
+print("the denominator is the whole disagreement. one of them is the number of")
+print("negatives in the world, which is enormous and not your problem. the")
+print("other is the size of the pile you just handed someone.")
+print()
+print("the rule:")
+print("  balanced classes, and both errors matter    -> ROC is fine")
+print("  rare positives, and you care about the      -> use precision-recall")
+print("  alerts you raise")
+print("  comparing models across datasets with       -> ROC, since PR AUC's")
+print("  different base rates                           baseline moves")
+print()
+print("and always print the base rate beside either one. an AUC without it is")
+print("half a sentence.")
+```
+
 """,
     [
         {"q": "Why does ROC stay flattering as positives become rare?",
@@ -1688,6 +1860,74 @@ folds. Tune once on a held-out validation set.
 
 **Forgetting it drifts.** The optimal threshold depends on the class balance,
 and that moves in production. It needs rechecking, not setting once.
+
+## 0.5 is a default, not a decision
+
+The threshold is the one hyperparameter you can change after training, in production, in a config file. Here is what it costs and what it buys.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (precision_recall_curve, f1_score, confusion_matrix,
+                             roc_auc_score)
+
+X, y = make_classification(n_samples=8000, n_features=15, n_informative=6,
+                           weights=[0.93, 0.07], flip_y=0.06, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.35, random_state=0,
+                                      stratify=y)
+prob = LogisticRegression(max_iter=3000).fit(Xtr, ytr).predict_proba(Xte)[:, 1]
+pos = (yte == 1).sum()
+print("%d test rows, %d of them positive (%.1f%%). AUC %.4f -- the model is"
+      % (len(yte), pos, 100 * pos / len(yte), roc_auc_score(yte, prob)))
+print("fine. the threshold is what is broken.")
+print()
+
+print("%10s %8s %8s %10s %9s %9s"
+      % ("threshold", "TP", "FP", "FN", "precision", "recall"))
+for t in (0.50, 0.30, 0.20, 0.10, 0.07, 0.03):
+    tn, fp, fn, tp = confusion_matrix(yte, (prob >= t).astype(int)).ravel()
+    print("%10.2f %8d %8d %10d %9.4f %9.4f"
+          % (t, tp, fp, fn, tp / max(tp + fp, 1), tp / max(tp + fn, 1)))
+print()
+print("at the default 0.50 the model catches %d of %d positives. it is not"
+      % (confusion_matrix(yte, (prob >= 0.5).astype(int)).ravel()[3], pos))
+print("being cautious -- 0.50 simply is not the right cut when only %.1f percent"
+      % (100 * pos / len(yte)))
+print("of the rows are positive.")
+print()
+
+prec, rec, thr = precision_recall_curve(yte, prob)
+f1 = 2 * prec * rec / np.clip(prec + rec, 1e-12, None)
+best = thr[np.nanargmax(f1[:-1])]
+print("threshold that maximises F1: %.4f  (F1 %.4f, vs %.4f at 0.50)"
+      % (best, f1_score(yte, (prob >= best).astype(int)),
+         f1_score(yte, (prob >= 0.5).astype(int))))
+print()
+
+print("but F1 is a stand-in for a decision you should make explicitly.")
+print("put money on the two mistakes and the answer changes:")
+for fp_cost, fn_cost, label in ((1, 1, "equal cost"),
+                                (1, 20, "a miss costs 20x a false alarm"),
+                                (20, 1, "a false alarm costs 20x a miss")):
+    costs = [(t, fp_cost * ((prob >= t) & (yte == 0)).sum()
+                 + fn_cost * ((prob < t) & (yte == 1)).sum())
+             for t in np.linspace(0.01, 0.95, 300)]
+    t_best, c_best = min(costs, key=lambda kv: kv[1])
+    c_default = next(c for t, c in costs if abs(t - 0.5) < 0.006)
+    print("  %-32s best threshold %.3f, cost %6d (at 0.50: %6d)"
+          % (label, t_best, c_best, c_default))
+print()
+print("same model, same probabilities, three different right answers. the")
+print("threshold is where your business constraints enter the system, and it")
+print("is the only place they can enter without retraining.")
+print()
+print("two warnings. pick the threshold on a validation split, not on the test")
+print("set -- it is a fitted parameter like any other. and re-check it when the")
+print("base rate moves, because that is exactly what invalidates it.")
+```
+
 """,
     [
         {"q": "Where does the 0.5 default threshold come from?",
@@ -1841,6 +2081,95 @@ does, widen it and search again.
 
 **Not searching preprocessing.** Put the whole [pipeline](ml_pipelines.html) in
 the search, so imputation and scaling choices are tuned alongside the model.
+
+## Why random search finds more with fewer fits
+
+Grid search spends its budget evenly across every parameter, including the ones that do not matter. Random search does not, and on the same budget it usually wins.
+
+```python-run
+import numpy as np
+import time
+from sklearn.datasets import make_classification
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.model_selection import (GridSearchCV, RandomizedSearchCV,
+                                     StratifiedKFold, cross_val_score)
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from scipy.stats import loguniform, randint
+
+X, y = make_classification(n_samples=700, n_features=12, n_informative=5,
+                           flip_y=0.10, random_state=0)
+cv = StratifiedKFold(3, shuffle=True, random_state=0)
+
+print("baseline, all defaults: cv %.4f"
+      % cross_val_score(RandomForestClassifier(random_state=0), X, y, cv=cv).mean())
+print()
+
+grid = {"n_estimators": [40, 120],
+        "max_depth":    [3, 6, 12, None],
+        "max_features": [2, 4, 8]}
+total = 2 * 4 * 3
+print("grid search over %d combinations x 3 folds = %d fits" % (total, total * 3))
+t0 = time.time()
+gs = GridSearchCV(RandomForestClassifier(random_state=0), grid, cv=cv).fit(X, y)
+print("  best %.4f in %.1fs with %s" % (gs.best_score_, time.time() - t0, gs.best_params_))
+print()
+
+dist = {"n_estimators": randint(40, 120),
+        "max_depth":    randint(2, 20),
+        "max_features": randint(1, 12)}
+t0 = time.time()
+rs = RandomizedSearchCV(RandomForestClassifier(random_state=0), dist,
+                        n_iter=total, cv=cv, random_state=0).fit(X, y)
+print("random search, the SAME %d fits" % total)
+print("  best %.4f in %.1fs with %s" % (rs.best_score_, time.time() - t0, rs.best_params_))
+print()
+
+print("  (the fit counts match; wall time will not, because the two searches")
+print("   draw different forest sizes.)")
+print()
+print("here is the reason it tends to win. in a 2x4x3 grid, how many DISTINCT")
+print("values does each parameter actually get tried at?")
+print("  grid   : n_estimators 2, max_depth 4, max_features 3")
+print("  random : n_estimators %d, max_depth %d, max_features %d"
+      % tuple(len(set(r[k] for r in rs.cv_results_["params"]))
+              for k in ("n_estimators", "max_depth", "max_features")))
+print()
+print("the grid tried max_depth at four values and spent 6 fits on each. if")
+print("max_depth is the parameter that matters and the other two do not, the")
+print("grid spent 20 of its 24 fits re-confirming what it already knew.")
+print("random search gets 24 distinct values of every parameter for the same")
+print("number of fits, so it is never wasting budget on a parameter that")
+print("turns out not to matter.")
+print()
+
+print("and grids explode. adding one parameter with 4 values multiplies:")
+for extra in range(5):
+    print("  %d parameters at 4 values each -> %5d combinations"
+          % (extra + 1, 4 ** (extra + 1)))
+print()
+
+print("scales matter too -- C and gamma live on a log scale, not a linear one:")
+print("  linear range 0.1 to 100 in 5 steps:", np.round(np.linspace(0.1, 100, 5), 3))
+print("  log range,   same endpoints      :", np.round(np.logspace(-1, 2, 5), 3))
+print("  the linear one puts 4 of its 5 samples above 25, which is almost")
+print("  never where the interesting values are.")
+print()
+svm_rs = RandomizedSearchCV(make_pipeline(StandardScaler(), SVC()),
+                            {"svc__C": loguniform(1e-2, 1e3),
+                             "svc__gamma": loguniform(1e-4, 1e0)},
+                            n_iter=15, cv=cv, random_state=0).fit(X, y)
+print("SVM tuned over log-uniform ranges, 15 draws: cv %.4f" % svm_rs.best_score_)
+print("  C %.4f, gamma %.5f"
+      % (svm_rs.best_params_["svc__C"], svm_rs.best_params_["svc__gamma"]))
+print()
+print("the rule of thumb: grid when you have 2 parameters and know the ranges,")
+print("random when you have more than 2 or are still exploring. and always")
+print("check whether your best value landed on the edge of the range -- if it")
+print("did, the range was wrong, not the model.")
+```
+
 """,
     [
         {"q": "Why does a 4x4 grid of 16 trials explore an important hyperparameter poorly?",
@@ -2001,6 +2330,66 @@ uninformative. Plot the metric you actually care about.
 
 **Concluding 'more data' from a gap alone.** Check the validation curve is still
 falling. A converged gap means variance you cannot fix with volume.
+
+## The chart that tells you whether more data will help
+
+Two models on the same problem, scored as the training set grows. One curve says collect more data; the other says do not bother. Reading the difference is the whole skill.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.model_selection import learning_curve, StratifiedKFold
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+
+X, y = make_classification(n_samples=4000, n_features=12, n_informative=6,
+                           n_clusters_per_class=2, flip_y=0.08, random_state=0)
+cv = StratifiedKFold(5, shuffle=True, random_state=0)
+sizes = np.array([50, 100, 250, 600, 1500, 3200])
+
+def curve(name, model, verdict):
+    n, tr, te = learning_curve(model, X, y, train_sizes=sizes, cv=cv,
+                               scoring="accuracy")
+    print(name)
+    print("%10s %10s %10s %8s" % ("rows", "train", "validation", "gap"))
+    for i in range(len(n)):
+        print("%10d %10.4f %10.4f %8.4f"
+              % (n[i], tr[i].mean(), te[i].mean(), tr[i].mean() - te[i].mean()))
+    print("   last 3 validation scores moved by %+.4f"
+          % (te[-1].mean() - te[-3].mean()))
+    print("   %s" % verdict)
+    print()
+
+curve("UNDERFITTING -- a straight line on a problem that is not straight",
+      make_pipeline(StandardScaler(), LogisticRegression(max_iter=2000)),
+      "both curves are low and have already met. more rows change nothing;\n"
+      "   the model is not capable enough. this is the one case where more\n   data is a waste of money.")
+
+curve("OVERFITTING -- a tree with no depth limit",
+      DecisionTreeClassifier(random_state=0),
+      "training is pinned near 1.0 while validation trails far behind, and\n"
+      "   the gap is still closing as rows arrive. more data WILL help here,\n   and so would a depth limit.")
+
+curve("a reasonable middle -- degree-2 features on a linear model",
+      make_pipeline(StandardScaler(), PolynomialFeatures(2),
+                    LogisticRegression(max_iter=5000)),
+      "a small gap and a validation curve that is close to flat. this is\n"
+      "   what 'you have enough data' looks like.")
+
+print("the three shapes, and what each one means:")
+print("  both curves low, together        -> underfitting. get a better model.")
+print("  big gap, validation still rising -> overfitting. get more data, or")
+print("                                      regularise harder.")
+print("  small gap, both flat             -> you are done. the remaining error")
+print("                                      is noise in the labels.")
+print()
+print("this is worth plotting BEFORE you spend a quarter collecting data. the")
+print("curve answers the question 'would another 10,000 rows help' directly,")
+print("and it answers it using data you already have.")
+```
+
 """,
     [
         {"q": "Training error is high and the two curves have converged. What does that mean?",
@@ -2389,6 +2778,82 @@ merge them.
 **Reading meaning into leaf order.** It is a drawing convention.
 
 **Trying it on a large dataset.** The distance matrix will not fit.
+
+## Cluster without choosing k first
+
+Agglomerative clustering merges the two closest groups over and over, so you get every k at once. The linkage rule decides what "closest" means, and it changes the answer completely.
+
+```python-run
+import numpy as np
+from sklearn.cluster import AgglomerativeClustering, KMeans
+from sklearn.datasets import make_blobs, make_moons
+from sklearn.metrics import adjusted_rand_score, silhouette_score
+from scipy.cluster.hierarchy import linkage, fcluster
+
+X, y = make_blobs(n_samples=300, centers=4, cluster_std=1.0, random_state=0)
+
+Z = linkage(X, method="ward")
+print("the merge log -- 299 merges, each joining two groups into one.")
+print("%8s %8s %8s %12s %10s" % ("step", "group A", "group B", "distance", "size"))
+for i in list(range(3)) + list(range(len(Z) - 5, len(Z))):
+    a, b, d, n = Z[i]
+    print("%8d %8d %8d %12.4f %10d" % (i, a, b, d, n))
+print("  the first merges join single points at almost no distance. the last")
+print("  few join whole clusters across large gaps.")
+print()
+
+print("the last few merge distances, and the jump before each:")
+for i in range(len(Z) - 6, len(Z) - 1):
+    print("  cut here -> %d clusters   next merge costs %8.3f (%.2fx the last)"
+          % (len(X) - i - 1, Z[i, 2], Z[i, 2] / Z[i - 1, 2]))
+print("  cut here -> 1 cluster    the root, %8.3f" % Z[-1, 2])
+print()
+print("  note that the jumps keep growing all the way to k=2, so 'find the")
+print("  biggest jump' always answers 2. the useful reading is where the")
+print("  RATIO stops being dramatic, and even that is a judgement call --")
+print("  which is why the silhouette column below is worth having.")
+print()
+
+print("one tree, every k, no refitting:")
+print("%6s %14s %14s" % ("k", "agreement", "silhouette"))
+for k in (2, 3, 4, 5, 6):
+    labels = fcluster(Z, k, criterion="maxclust")
+    print("%6d %14.4f %14.4f"
+          % (k, adjusted_rand_score(y, labels), silhouette_score(X, labels)))
+print("  k-means has to be rerun from scratch for each k. this is one fit.")
+print()
+
+print("linkage is the whole personality of the algorithm:")
+for method in ("ward", "complete", "average", "single"):
+    m = AgglomerativeClustering(n_clusters=4, linkage=method).fit(X)
+    print("  %-10s agreement %.4f, cluster sizes %s"
+          % (method, adjusted_rand_score(y, m.labels_),
+             sorted(np.bincount(m.labels_), reverse=True)))
+print()
+print("  average linkage won here, and ward is still the usual default -- it")
+print("  is the one that behaves predictably when clusters really are blobs.")
+print()
+print("  ward     -- merge whatever raises total variance least. compact, even")
+print("              sizes. the sensible default, and the only one restricted")
+print("              to euclidean distance.")
+print("  complete -- distance between the two FURTHEST members. compact too,")
+print("              and very sensitive to a single outlier.")
+print("  average  -- the mean pairwise distance. a middle ground.")
+print("  single   -- distance between the two CLOSEST members. it will chain")
+print("              through a thin bridge of points and merge everything.")
+print()
+
+Xm, ym = make_moons(n_samples=300, noise=0.06, random_state=0)
+print("that chaining is a weakness and a feature. on two crescents:")
+for method in ("ward", "single"):
+    m = AgglomerativeClustering(n_clusters=2, linkage=method).fit(Xm)
+    print("  %-10s agreement %.4f" % (method, adjusted_rand_score(ym, m.labels_)))
+print("  single linkage follows the shape. ward cuts straight across it.")
+print()
+print("the cost is that it is O(n^2) in memory -- a full distance matrix. at")
+print("100,000 rows that is 40GB, which is why k-means still exists.")
+```
+
 """,
     [
         {"q": "What is the advantage of building the whole tree?",
@@ -2550,6 +3015,89 @@ of scale on the axis.
 inherits the same assumption k-means makes.
 
 **Forgetting to scale.** Both metrics are distances.
+
+## Four ways to pick k, on data where you know the answer
+
+The same four selection scores run twice: once on clean, well-separated blobs where they all agree, and once on overlapping ones where they do not. The disagreement is the useful part.
+
+```python-run
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+from sklearn.metrics import (silhouette_score, calinski_harabasz_score,
+                             davies_bouldin_score)
+from sklearn.mixture import GaussianMixture
+
+TRUE_K = 5
+KS = range(2, 11)
+
+def survey(X, label):
+    rows = []
+    for k in KS:
+        km = KMeans(n_clusters=k, n_init=10, random_state=0).fit(X)
+        gm = GaussianMixture(n_components=k, random_state=0).fit(X)
+        rows.append((k, km.inertia_, silhouette_score(X, km.labels_),
+                     calinski_harabasz_score(X, km.labels_),
+                     davies_bouldin_score(X, km.labels_), gm.bic(X)))
+    print(label)
+    print("%4s %12s %11s %12s %11s %12s"
+          % ("k", "inertia", "silhouette", "calinski", "davies", "GMM BIC"))
+    for r in rows:
+        print("%4d %12.1f %11.4f %12.1f %11.4f %12.1f" % r)
+    picks = {
+        "silhouette": max(rows, key=lambda r: r[2])[0],
+        "calinski":   max(rows, key=lambda r: r[3])[0],
+        "davies":     min(rows, key=lambda r: r[4])[0],
+        "GMM BIC":    min(rows, key=lambda r: r[5])[0],
+    }
+    print("  picks: " + ",  ".join("%s k=%d" % (n, v) for n, v in picks.items()))
+    print("  the truth is k=%d. agreed: %d of 4."
+          % (TRUE_K, sum(v == TRUE_K for v in picks.values())))
+    print()
+    return rows
+
+clean, _ = make_blobs(n_samples=900, centers=TRUE_K, cluster_std=0.55,
+                      random_state=0)
+rows = survey(clean, "WELL SEPARATED blobs (cluster_std 0.55)")
+
+messy, _ = make_blobs(n_samples=900, centers=TRUE_K, cluster_std=1.6,
+                      random_state=0)
+survey(messy, "OVERLAPPING blobs (cluster_std 1.6), same 5 centres")
+
+print("that is the honest picture. when the structure is obvious the scores")
+print("agree and you did not need them. when it is not, they disagree -- and")
+print("that disagreement is information: it means there is no single k that")
+print("is clearly right, because the clusters genuinely bleed into each other.")
+print()
+
+print("why inertia is not on the picks list -- it falls no matter what:")
+print("%6s %14s %14s" % ("k", "inertia", "drop"))
+for i, r in enumerate(rows):
+    d = "%14.1f" % (rows[i - 1][1] - r[1]) if i else "%14s" % "-"
+    print("%6d %14.1f %s" % (r[0], r[1], d))
+print("  at k = n every point is its own cluster and inertia is exactly 0.")
+print("  'lowest inertia' would always answer n. the elbow method is really")
+print("  asking where the DROPS stop being dramatic, by eye.")
+print()
+
+print("and the check nobody runs -- on data with no clusters at all:")
+Xr = np.random.default_rng(0).uniform(size=(900, 2))
+scores = {k: silhouette_score(Xr, KMeans(n_clusters=k, n_init=10,
+                                         random_state=0).fit(Xr).labels_)
+          for k in KS}
+bk = max(scores, key=scores.get)
+print("  900 uniform random points: best silhouette is k=%d at %.4f"
+      % (bk, scores[bk]))
+print("  the clean blobs scored %.4f. every one of these methods returns an"
+      % max(r[2] for r in rows))
+print("  answer whether or not there is anything there. the SIZE of the score")
+print("  is what tells you it was worth asking.")
+print()
+print("so: run several, check they agree, check the winner is meaningfully")
+print("better than what noise scores -- and if you have a downstream task,")
+print("score k on that instead. it is the only measure that certainly matters.")
+```
+
 """,
     [
         {"q": "Why can inertia alone never choose k?",
@@ -2695,6 +3243,95 @@ most libraries.
 
 **Too many components.** With enough Gaussians you can fit anything, including
 the noise. BIC penalises parameter count for this reason.
+
+## Soft clusters, and shapes k-means cannot fit
+
+A GMM gives every point a probability of belonging to each cluster, and fits ellipses rather than spheres. Both differences show up on the same data.
+
+```python-run
+import numpy as np
+from sklearn.mixture import GaussianMixture
+from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+from sklearn.metrics import adjusted_rand_score
+
+rng = np.random.default_rng(0)
+X, y = make_blobs(n_samples=600, centers=3, cluster_std=0.8,
+                  center_box=(-14.0, 14.0), random_state=0)
+# stretch the space so the round blobs become long, tilted ellipses
+X = X @ np.array([[1.0, 0.0], [1.2, 0.35]])
+
+gm = GaussianMixture(n_components=3, random_state=0).fit(X)
+km = KMeans(n_clusters=3, n_init=10, random_state=0).fit(X)
+print("three well-separated blobs, sheared into long tilted ellipses:")
+print("  k-means agreement %.4f" % adjusted_rand_score(y, km.labels_))
+print("  GMM     agreement %.4f" % adjusted_rand_score(y, gm.predict(X)))
+print("  the groups are still perfectly separable -- they are just not round")
+print("  any more. k-means can only draw spheres, so it cuts across the grain")
+print("  of the ellipses and splits them in the wrong places.")
+print()
+
+print("what a GMM stores per cluster -- a weight, a centre, and a full")
+print("covariance matrix. that last one is what buys the shape:")
+for c in range(3):
+    print("  cluster %d  weight %.4f  centre %s" % (c, gm.weights_[c],
+                                                    np.round(gm.means_[c], 3)))
+    print("             covariance %s" % np.round(gm.covariances_[c], 3).tolist())
+print()
+
+p = gm.predict_proba(X)
+conf = p.max(axis=1)
+print("every point gets a probability per cluster, not just a label:")
+order = np.argsort(conf)
+print("  the least certain points sit on the borders:")
+for i in order[:4]:
+    print("    %s  ->  %s" % (np.round(X[i], 2), np.round(p[i], 4)))
+print("  the most certain sit in the middle of a component:")
+for i in order[-3:]:
+    print("    %s  ->  %s" % (np.round(X[i], 2), np.round(p[i], 4)))
+print()
+print("  only %d of %d points are less than 90%% sure of their cluster -- these"
+      % ((conf < 0.9).sum(), len(X)))
+print("  groups barely touch, so almost everything is unambiguous. the few")
+print("  that are not are exactly the ones sitting between two components,")
+print("  and k-means would have assigned them with the same flat confidence")
+print("  as everything else. on overlapping data that difference is the")
+print("  whole reason to reach for a mixture model.")
+print()
+
+print("covariance_type is the knob that trades flexibility for parameters:")
+for ct in ("spherical", "diag", "tied", "full"):
+    m = GaussianMixture(n_components=3, covariance_type=ct, random_state=0).fit(X)
+    print("  %-10s agreement %.4f   BIC %9.1f   parameters %d"
+          % (ct, adjusted_rand_score(y, m.predict(X)), m.bic(X),
+             m._n_parameters()))
+print("  'spherical' is essentially soft k-means. 'full' fits any ellipse.")
+print("  'tied' wins on BIC here because all three ellipses genuinely DO share")
+print("  one shape -- the same shear was applied to all of them -- so it gets")
+print("  full's accuracy for spherical's parameter count. that is BIC working")
+print("  properly: it charges for parameters and rewards the model that does")
+print("  not need them.")
+print()
+
+print("BIC picks the number of components for you, which k-means cannot do:")
+print("%6s %12s %12s" % ("k", "BIC", "AIC"))
+for k in range(1, 7):
+    m = GaussianMixture(n_components=k, random_state=0).fit(X)
+    print("%6d %12.1f %12.1f" % (k, m.bic(X), m.aic(X)))
+best = min(range(1, 7), key=lambda k: GaussianMixture(n_components=k,
+                                                      random_state=0).fit(X).bic(X))
+print("  lowest BIC at k=%d, and the data really has 3 components." % best)
+print("  (BIC is not infallible -- on overlapping components it will happily")
+print("   under-count. it is a guide, not an oracle.)")
+print("  it works because a GMM is a probability model: BIC compares how well")
+print("  each k explains the data against how many parameters it spent.")
+print()
+print("the catch: with enough components a GMM will happily put one tiny")
+print("component on a handful of points and drive its variance toward zero,")
+print("which sends the likelihood to infinity. reg_covar exists to stop that,")
+print("and it is why you should not simply minimise BIC over a huge range.")
+```
+
 """,
     [
         {"q": "What does a GMM report for each point?",
@@ -2864,6 +3501,102 @@ reduction inside a pipeline, PCA is the safe default.
 
 **Feeding t-SNE coordinates into a classifier.** No stable mapping; no way to
 transform new data.
+
+## A map you can look at, and must not measure
+
+t-SNE turns high-dimensional data into a picture. The picture is useful and several things about it are not true, which this makes concrete.
+
+```python-run
+import numpy as np
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
+from sklearn.datasets import make_blobs
+from sklearn.metrics import pairwise_distances
+
+rng = np.random.default_rng(0)
+X, y = make_blobs(n_samples=600, n_features=30, centers=4, cluster_std=2.0,
+                  random_state=0)
+# push two of the four groups very far apart
+X[y == 3] += 40.0
+
+print("600 points in 30 dimensions, 4 groups, one of them pushed far away.")
+print()
+print("true distances between group centres, in the original 30-D space:")
+cent = np.array([X[y == c].mean(axis=0) for c in range(4)])
+D = pairwise_distances(cent)
+for i in range(4):
+    print("   group %d: %s" % (i, np.round(D[i], 1)))
+print()
+
+emb = TSNE(n_components=2, perplexity=30, random_state=0, init="pca").fit_transform(X)
+cent2 = np.array([emb[y == c].mean(axis=0) for c in range(4)])
+D2 = pairwise_distances(cent2)
+print("the same distances in the t-SNE picture:")
+for i in range(4):
+    print("   group %d: %s" % (i, np.round(D2[i], 1)))
+print()
+print("ratio of largest to smallest between-group distance:")
+off = ~np.eye(4, dtype=bool)
+print("   in 30-D    : %.2f" % (D[off].max() / D[off].min()))
+print("   in t-SNE   : %.2f" % (D2[off].max() / D2[off].min()))
+near = D[:3, :3][~np.eye(3, dtype=bool)].mean()      # among groups 0,1,2
+far = D[3, :3].mean()                                # group 3 to the rest
+near2 = D2[:3, :3][~np.eye(3, dtype=bool)].mean()
+far2 = D2[3, :3].mean()
+print("  in 30-D, group 3 sits %.1fx further from the others than they sit"
+      % (far / near))
+print("  from each other. in the picture that ratio is %.1fx." % (far2 / near2))
+print("  the outlying group is drawn as just another blob.")
+print()
+
+print("cluster SIZES are not preserved either:")
+for c in range(4):
+    print("   group %d: spread %6.2f in 30-D, %6.2f in the picture"
+          % (c, X[y == c].std(), emb[y == c].std()))
+print("  t-SNE inflates sparse clusters and compresses dense ones, because it")
+print("  is matching neighbour probabilities, not distances.")
+print()
+
+print("what IS preserved -- who your neighbours are:")
+def knn_overlap(A, B, k=15):
+    da = pairwise_distances(A); db = pairwise_distances(B)
+    np.fill_diagonal(da, np.inf); np.fill_diagonal(db, np.inf)
+    na = np.argsort(da, axis=1)[:, :k]
+    nb = np.argsort(db, axis=1)[:, :k]
+    return np.mean([len(set(a) & set(b)) / k for a, b in zip(na, nb)])
+pca2 = PCA(n_components=2).fit_transform(X)
+print("   fraction of each point's 15 nearest neighbours that survive:")
+print("     t-SNE %.4f" % knn_overlap(X, emb))
+print("     PCA   %.4f" % knn_overlap(X, pca2))
+print("  that is the trade: t-SNE keeps local neighbourhoods far better and")
+print("  throws away global geometry to do it. PCA does the opposite.")
+print()
+
+print("perplexity changes the picture, not just its appearance:")
+for perp in (5, 30, 100):
+    e = TSNE(n_components=2, perplexity=perp, random_state=0,
+             init="pca").fit_transform(X)
+    print("   perplexity %3d: neighbour overlap %.4f" % (perp, knn_overlap(X, e)))
+print("  it is roughly 'how many neighbours count'. run two or three values")
+print("  before believing any structure you see.")
+print()
+
+print("and the test that matters -- t-SNE on pure noise:")
+Xn = rng.normal(size=(600, 30))
+en = TSNE(n_components=2, perplexity=30, random_state=0, init="pca").fit_transform(Xn)
+print("   neighbour overlap with the real 30-D noise: %.4f" % knn_overlap(Xn, en))
+print("   it still produces a picture with apparent blobs in it. t-SNE always")
+print("   does. a shape in a t-SNE plot is a hypothesis, not a finding.")
+print()
+print("so: use it to look, never to measure. do not read distances between")
+print("clusters, do not read their sizes, and do not cluster on the 2-D")
+print("output -- cluster in the original space and colour the picture by it.")
+print()
+print("UMAP is the usual alternative: much faster, preserves more of the")
+print("global layout, and has the same caveats about not measuring the result.")
+print("It is not in scikit-learn -- it ships as the separate umap-learn package.")
+```
+
 """,
     [
         {"q": "Why can you not read the distance between two clusters in a t-SNE plot?",
@@ -3036,6 +3769,91 @@ causes the outcome.
 **Comparing across models.** Importance is relative to one fitted model. A
 different model can rank the same features differently and both be right about
 themselves.
+
+## Break one column and see what it costs
+
+Permutation importance shuffles a column and measures the damage. It works on any fitted model, and it disagrees with a tree's built-in importances in ways worth understanding.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.inspection import permutation_importance
+from sklearn.model_selection import train_test_split
+
+rng = np.random.default_rng(0)
+X, y = make_classification(n_samples=3000, n_features=6, n_informative=3,
+                           n_redundant=0, flip_y=0.08, shuffle=False,
+                           random_state=0)
+# shuffle=False keeps the informative columns first, so these names are real.
+# then add a column of pure noise and an exact copy of an informative one.
+X = np.column_stack([X, rng.normal(size=len(X)), X[:, 0]])
+names = ["real_0", "real_1", "real_2", "filler_3", "filler_4", "filler_5",
+         "pure_noise", "copy_of_real_0"]
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
+rf = RandomForestClassifier(n_estimators=250, random_state=0).fit(Xtr, ytr)
+print("baseline test accuracy %.4f" % rf.score(Xte, yte))
+print()
+
+print("do it by hand on one column -- shuffle it and re-score:")
+col = 0
+scores = []
+for rep in range(10):
+    Xs = Xte.copy()
+    rng.shuffle(Xs[:, col])
+    scores.append(rf.score(Xs, yte))
+print("  shuffling %s ten times: accuracy %.4f +/- %.4f"
+      % (names[col], np.mean(scores), np.std(scores)))
+print("  the drop is %.4f. that is its permutation importance."
+      % (rf.score(Xte, yte) - np.mean(scores)))
+print()
+
+r = permutation_importance(rf, Xte, yte, n_repeats=10, random_state=0)
+print("%-16s %12s %10s %14s" % ("feature", "permutation", "sd", "tree built-in"))
+order = np.argsort(-r.importances_mean)
+for i in order:
+    print("%-16s %12.4f %10.4f %14.4f"
+          % (names[i], r.importances_mean[i], r.importances_std[i],
+             rf.feature_importances_[i]))
+print()
+print("filler_3 through filler_5 and pure_noise carry nothing. the tree's")
+print("built-in importance still hands them non-zero scores, because a")
+print("continuous column offers many places to split and some of those")
+print("splits help by luck on the training rows. permutation importance,")
+print("measured on held-out rows, puts them at zero where they belong.")
+print()
+
+print("now the trap. real_0 and copy_of_real_0 are the same column:")
+for i in (0, 7):
+    print("  %-16s permutation %.4f" % (names[i], r.importances_mean[i]))
+print("  each scores about 0.09 -- third and fourth on the list. neither looks")
+print("  like a headline feature, because shuffling one leaves the other")
+print("  standing and the forest reads that instead.")
+print()
+print("drop the copy and refit:")
+keep = [i for i in range(8) if i != 7]
+rf2 = RandomForestClassifier(n_estimators=250, random_state=0).fit(Xtr[:, keep], ytr)
+r2 = permutation_importance(rf2, Xte[:, keep], yte, n_repeats=10, random_state=0)
+print("  real_0 permutation importance is now %.4f, up from %.4f."
+      % (r2.importances_mean[0], r.importances_mean[0]))
+print("  the column did not become more useful. it stopped sharing the credit.")
+print("  the pair was worth ~%.2f all along, split roughly in half."
+      % r2.importances_mean[0])
+print()
+print("so: correlated features SPLIT their importance, and a zero here means")
+print("'the model can get by without it', not 'this column is useless'. that")
+print("distinction is the difference between dropping a redundant column and")
+print("dropping a predictive one.")
+print()
+print("two practical notes. measure it on held-out data -- on training rows it")
+print("rewards memorisation. and use the metric you actually care about:")
+r3 = permutation_importance(rf, Xte, yte, n_repeats=10, random_state=0,
+                            scoring="roc_auc")
+print("  scored by ROC AUC instead of accuracy:")
+for i in order[:4]:
+    print("    %-16s %.4f" % (names[i], r3.importances_mean[i]))
+```
+
 """,
     [
         {"q": "Why shuffle a column rather than delete it?",
@@ -3204,6 +4022,139 @@ that is a fact about the model.
 **Averaging SHAP values into a global importance and stopping there.** The mean
 absolute SHAP value is a reasonable global summary, and it discards the direction
 and the interactions that made SHAP worth computing.
+
+## One chart for the model, one number per row
+
+Partial dependence describes the model's average behaviour; a Shapley value explains a single prediction. Both are computed from scratch here, so neither is a black box.
+
+```python-run
+import numpy as np
+from itertools import combinations
+from math import factorial
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.inspection import partial_dependence
+
+rng = np.random.default_rng(0)
+n = 1500
+X = rng.normal(size=(n, 4))
+names = ["x0", "x1", "x2", "x3"]
+# x0 matters a lot and non-linearly, x1 linearly, x2 only via x0, x3 not at all
+y = (3.0 * np.tanh(2 * X[:, 0]) + 1.5 * X[:, 1] + 2.0 * X[:, 0] * X[:, 2]
+     + rng.normal(0, 0.4, n))
+model = GradientBoostingRegressor(random_state=0).fit(X, y)
+print("model R2 on its own training data: %.4f" % model.score(X, y))
+print()
+
+print("PARTIAL DEPENDENCE -- vary one feature, average over everything else.")
+print("done by hand: overwrite the column, predict all %d rows, take the mean." % n)
+grid = np.linspace(-2, 2, 9)
+print("%8s %12s %12s %12s"
+      % ("value", "PD on x0", "PD on x1", "PD on x3"))
+for v in grid:
+    row = []
+    for c in (0, 1, 3):
+        Xc = X.copy(); Xc[:, c] = v
+        row.append(model.predict(Xc).mean())
+    print("%8.2f %12.4f %12.4f %12.4f" % (v, row[0], row[1], row[2]))
+print()
+pd0 = partial_dependence(model, X, [0], grid_resolution=9, method="brute")
+mine = []
+for v in pd0["grid_values"][0]:
+    Xc = X.copy(); Xc[:, 0] = v
+    mine.append(model.predict(Xc).mean())
+print("scikit-learn, on its own grid:", np.round(pd0["average"][0][:5], 4))
+print("the same loop, same grid     :", np.round(mine[:5], 4))
+print("  identical, because that loop IS the definition.")
+print()
+print("note method='brute' above. the default for a gradient booster is")
+print("method='recursion', which walks the trees instead of re-predicting.")
+print("it is much faster and gives slightly different numbers, because it")
+print("ignores how the other features are actually distributed:")
+rec = partial_dependence(model, X, [0], grid_resolution=9, method="recursion")
+print("  recursion:", np.round(rec["average"][0][:5], 4))
+print()
+print("read the columns: x0 rises then flattens -- that is the tanh. x1 is a")
+print("straight line. x3 is flat, because the model never used it.")
+print()
+print("the trap: partial dependence AVERAGES, so opposite effects cancel.")
+print("x2 only matters through its interaction with x0:")
+for v in (-2.0, 0.0, 2.0):
+    Xc = X.copy(); Xc[:, 2] = v
+    lo = X[:, 0] < 0
+    print("  x2=%+.0f -> overall PD %7.4f | rows with x0<0 %7.4f, x0>0 %7.4f"
+          % (v, model.predict(Xc).mean(), model.predict(Xc)[lo].mean(),
+             model.predict(Xc)[~lo].mean()))
+print("  the overall column barely moves while the two halves move in opposite")
+print("  directions. a flat PD line does not mean a feature does not matter.")
+print()
+
+print("SHAPLEY VALUES -- explain ONE prediction, exactly.")
+print("with 4 features there are only 16 coalitions, so we can do it properly.")
+row = X[7]
+base = model.predict(X).mean()
+
+def value(subset):
+    # model output when only `subset` is known: average over the rest
+    Xc = X.copy()
+    for c in subset:
+        Xc[:, c] = row[c]
+    return model.predict(Xc).mean()
+
+shap = np.zeros(4)
+for c in range(4):
+    others = [j for j in range(4) if j != c]
+    for size in range(4):
+        for sub in combinations(others, size):
+            w = factorial(size) * factorial(3 - size) / factorial(4)
+            shap[c] += w * (value(list(sub) + [c]) - value(list(sub)))
+
+print("  the row:", np.round(row, 3))
+print("  average prediction over the dataset : %8.4f" % base)
+for c in range(4):
+    print("  %s contributes %+8.4f" % (names[c], shap[c]))
+print("  ------------------------------------------------")
+print("  base + contributions                : %8.4f" % (base + shap.sum()))
+print("  the model's actual prediction       : %8.4f" % model.predict([row])[0])
+print()
+print("those two match, and that is the defining property: the contributions")
+print("add up to exactly the gap between this prediction and the average one.")
+print("no other attribution method guarantees that.")
+print()
+
+print("the same three rows explained separately:")
+print("%8s %10s %10s %10s %10s %12s" % ("row", *names, "prediction"))
+for i in (7, 100, 900):
+    r = X[i]
+    sv = np.zeros(4)
+    for c in range(4):
+        others = [j for j in range(4) if j != c]
+        for size in range(4):
+            for sub in combinations(others, size):
+                w = factorial(size) * factorial(3 - size) / factorial(4)
+                Xa, Xb = X.copy(), X.copy()
+                for j in list(sub) + [c]:
+                    Xa[:, j] = r[j]
+                for j in sub:
+                    Xb[:, j] = r[j]
+                sv[c] += w * (model.predict(Xa).mean() - model.predict(Xb).mean())
+    print("%8d %10.3f %10.3f %10.3f %10.3f %12.4f"
+          % (i, *sv, model.predict([r])[0]))
+print()
+print("x0's contribution changes sign between rows. that is the difference")
+print("from partial dependence: PD gives you one curve for the whole model,")
+print("Shapley gives you a different set of numbers for every row.")
+print()
+print("the cost is the reason the `shap` library exists. exact Shapley values")
+print("need 2^k coalitions -- 16 here, over a million at k=20, and each one is")
+print("a full pass over the data. TreeSHAP computes them exactly for tree")
+print("models in polynomial time; KernelSHAP approximates them for anything")
+print("else by sampling coalitions instead of enumerating them.")
+print()
+print("both tools answer 'what did the MODEL do', not 'what causes what'. a")
+print("feature can carry a large Shapley value because it proxies for")
+print("something the model was never shown.")
+```
+
 """,
     [
         {"q": "A partial dependence curve is flat. What can you conclude?",
@@ -3373,6 +4324,102 @@ exists to disprove exactly that.
 
 **Recalibrating without re-checking after data drift.** A calibration fitted last
 year describes last year's distribution.
+
+## When 0.9 does not mean 90%
+
+A model can rank perfectly and still lie about its confidence. This measures the gap, then closes it two different ways.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.svm import SVC
+from sklearn.calibration import CalibratedClassifierCV, calibration_curve
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score, brier_score_loss, log_loss
+
+X, y = make_classification(n_samples=12000, n_features=15, n_informative=6,
+                           flip_y=0.12, random_state=0)
+Xtr, Xrest, ytr, yrest = train_test_split(X, y, test_size=0.5, random_state=0)
+Xcal, Xte, ycal, yte = train_test_split(Xrest, yrest, test_size=0.5, random_state=0)
+
+models = {
+    "logistic regression": LogisticRegression(max_iter=3000),
+    "random forest":       RandomForestClassifier(n_estimators=200, random_state=0),
+    "naive bayes":         GaussianNB(),
+    "SVM (rbf)":           SVC(probability=True, random_state=0),
+}
+print("%-22s %9s %9s %10s" % ("", "ROC AUC", "Brier", "log loss"))
+probs = {}
+for name, m in models.items():
+    probs[name] = m.fit(Xtr, ytr).predict_proba(Xte)[:, 1]
+    print("%-22s %9.4f %9.4f %10.4f"
+          % (name, roc_auc_score(yte, probs[name]),
+             brier_score_loss(yte, probs[name]), log_loss(yte, probs[name])))
+print()
+print("ROC AUC only cares about the ORDER. Brier and log loss care about the")
+print("numbers themselves, and that is where these models separate.")
+print()
+
+print("the reliability table -- group predictions by confidence, then check:")
+for name in ("logistic regression", "naive bayes"):
+    print("  %s" % name)
+    frac, mean_pred = calibration_curve(yte, probs[name], n_bins=8, strategy="quantile")
+    print("     %12s %14s %10s" % ("said", "actually was", "error"))
+    for mp, fp in zip(mean_pred, frac):
+        print("     %12.4f %14.4f %+10.4f" % (mp, fp, fp - mp))
+    print()
+
+print("a perfectly calibrated model has zeros in that last column: of the rows")
+print("where it said 0.30, exactly 30 in every 100 turned out positive.")
+print("naive bayes is off by up to %.4f -- it says 0.70 for groups that come"
+      % max(abs(calibration_curve(yte, probs["naive bayes"], n_bins=8,
+                                  strategy="quantile")[0]
+                - calibration_curve(yte, probs["naive bayes"], n_bins=8,
+                                    strategy="quantile")[1])))
+print("in at 0.59. that is the multiplied-independence assumption showing.")
+print()
+
+print("two ways to fix it, both fitted on a held-out calibration split:")
+raw = GaussianNB().fit(Xtr, ytr)
+print("  %-26s Brier %.4f" % ("naive bayes, raw", brier_score_loss(yte, probs["naive bayes"])))
+for method in ("sigmoid", "isotonic"):
+    cal = CalibratedClassifierCV(raw, method=method, cv="prefit")
+    cal.fit(Xcal, ycal)
+    p = cal.predict_proba(Xte)[:, 1]
+    print("  %-26s Brier %.4f   AUC %.4f"
+          % ("naive bayes + " + method, brier_score_loss(yte, p), roc_auc_score(yte, p)))
+print()
+print("and the reliability table after sigmoid calibration:")
+cal = CalibratedClassifierCV(raw, method="sigmoid", cv="prefit").fit(Xcal, ycal)
+pc = cal.predict_proba(Xte)[:, 1]
+frac, mean_pred = calibration_curve(yte, pc, n_bins=8, strategy="quantile")
+print("     %12s %14s %10s" % ("said", "actually was", "error"))
+for mp, fp in zip(mean_pred, frac):
+    print("     %12.4f %14.4f %+10.4f" % (mp, fp, fp - mp))
+f0, m0 = calibration_curve(yte, probs["naive bayes"], n_bins=8, strategy="quantile")
+print("  worst error: %.4f before, %.4f after"
+      % (np.abs(f0 - m0).max(), np.abs(frac - mean_pred).max()))
+print()
+print("the Brier score moved only a little because most of it is irreducible")
+print("-- the data is genuinely noisy. the reliability table is the thing that")
+print("moved, and it is the thing you were trying to fix.")
+print()
+print("sigmoid (Platt scaling) fits a one-parameter squash -- it needs little")
+print("data and assumes the distortion has a particular shape. isotonic fits")
+print("any increasing function, which is more flexible and more prone to")
+print("overfitting on a small calibration set.")
+print()
+print("notice the AUC barely moves. calibration is a monotone transform, so it")
+print("cannot change the ranking -- it only relabels the confidence.")
+print()
+print("this matters whenever the number leaves the model: a threshold chosen")
+print("on 'p > 0.8', an expected-value calculation, a risk score shown to a")
+print("human. if you only ever take argmax, calibration is free to ignore.")
+```
+
 """,
     [
         {"q": "Why is AUC unchanged as the temperature slider moves?",
@@ -3535,6 +4582,84 @@ is what the slider here makes you do.
 **Trusting `contamination`.** It is a guess presented as a parameter.
 
 **Expecting it to find local anomalies.** Use LOF for those.
+
+## Finding outliers by how easy they are to separate
+
+Isolation Forest splits at random and counts how few cuts it takes to isolate a point. Anomalies fall out early, and that path length is the entire score.
+
+```python-run
+import numpy as np
+from sklearn.ensemble import IsolationForest
+from sklearn.svm import OneClassSVM
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.covariance import EllipticEnvelope
+
+rng = np.random.default_rng(0)
+normal = rng.normal(0, 1, (960, 2))
+weird = rng.uniform(-6, 6, (40, 2))
+X = np.vstack([normal, weird])
+truth = np.r_[np.ones(960), -np.ones(40)]       # 1 = normal, -1 = anomaly
+print("960 normal points and %d scattered ones. no labels are used to fit."
+      % len(weird))
+print()
+
+iso = IsolationForest(contamination=0.04, random_state=0).fit(X)
+pred = iso.predict(X)
+print("caught %d of the %d planted anomalies"
+      % (((pred == -1) & (truth == -1)).sum(), (truth == -1).sum()))
+print("false alarms on normal points: %d" % ((pred == -1) & (truth == 1)).sum())
+print()
+
+print("the score IS the average path length, rescaled. shorter = weirder:")
+s = iso.score_samples(X)
+order = np.argsort(s)
+print("  five most anomalous points:")
+for i in order[:5]:
+    print("    %s  score %.4f  %s"
+          % (np.round(X[i], 3), s[i], "planted" if truth[i] < 0 else "normal"))
+print("  five most normal points:")
+for i in order[-5:]:
+    print("    %s  score %.4f  %s"
+          % (np.round(X[i], 3), s[i], "planted" if truth[i] < 0 else "normal"))
+print()
+
+print("distance from the centre, against the score:")
+dist = np.linalg.norm(X, axis=1)
+for lo, hi in ((0, 1), (1, 2), (2, 3), (3, 8)):
+    m = (dist >= lo) & (dist < hi)
+    if m.any():
+        print("  %d-%d sd from centre: %4d points, mean score %.4f, flagged %d"
+              % (lo, hi, m.sum(), s[m].mean(), (pred[m] == -1).sum()))
+print("  no distance was ever computed. random splits isolate far-out points")
+print("  in fewer cuts, and that is all the algorithm knows.")
+print()
+
+print("contamination is not a threshold on weirdness -- it is a quota:")
+for c in (0.01, 0.04, 0.10, 0.25):
+    p = IsolationForest(contamination=c, random_state=0).fit_predict(X)
+    print("  contamination=%.2f -> flagged %3d (%.1f%% of %d), caught %2d real"
+          % (c, (p == -1).sum(), 100 * (p == -1).mean(), len(X),
+             ((p == -1) & (truth == -1)).sum()))
+print("  it always flags that fraction, whether or not anything is wrong.")
+print()
+
+print("against the other unsupervised detectors, same data:")
+for name, m in (("Isolation Forest", IsolationForest(contamination=0.04, random_state=0)),
+                ("One-Class SVM", OneClassSVM(nu=0.04, gamma="scale")),
+                ("Elliptic Envelope", EllipticEnvelope(contamination=0.04, random_state=0)),
+                ("Local Outlier Factor", LocalOutlierFactor(contamination=0.04))):
+    p = m.fit_predict(X)
+    print("  %-22s caught %2d of %d, %3d false alarms"
+          % (name, ((p == -1) & (truth == -1)).sum(), (truth == -1).sum(),
+             ((p == -1) & (truth == 1)).sum()))
+print()
+print("Isolation Forest is the usual first choice because it is linear in the")
+print("number of rows, needs no distance metric, and survives high dimensions")
+print("better than anything that measures distance. Elliptic Envelope assumes")
+print("your normal data is one gaussian blob -- fast and exact when that is")
+print("true, useless when it is not.")
+```
+
 """,
     [
         {"q": "Why does a short average path length mean a point is anomalous?",
@@ -3695,6 +4820,91 @@ most overfitted base model.
 
 **Assuming diversity.** Two gradient-boosted models with different seeds are not
 diverse; check whether their errors actually differ.
+
+## Ensembling models that make different mistakes
+
+Combining models only helps when they are wrong about different rows. This measures that disagreement first, then shows what voting and stacking do with it.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.ensemble import VotingClassifier, StackingClassifier
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+X, y = make_classification(n_samples=4000, n_features=15, n_informative=6,
+                           n_clusters_per_class=2, flip_y=0.12, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
+
+base = [
+    ("logistic", make_pipeline(StandardScaler(), LogisticRegression(max_iter=3000))),
+    ("tree",     DecisionTreeClassifier(max_depth=8, random_state=0)),
+    ("knn",      make_pipeline(StandardScaler(), KNeighborsClassifier(15))),
+    ("bayes",    GaussianNB()),
+]
+preds = {}
+for name, m in base:
+    preds[name] = m.fit(Xtr, ytr).predict(Xte)
+    print("%-10s accuracy %.4f" % (name, (preds[name] == yte).mean()))
+print()
+
+print("how often each PAIR gets a row wrong at the same time:")
+names = list(preds)
+wrong = {n: preds[n] != yte for n in names}
+print("%-10s %s" % ("", "".join("%10s" % n for n in names)))
+for a in names:
+    row = ""
+    for b in names:
+        both = (wrong[a] & wrong[b]).sum() / max(wrong[a].sum(), 1)
+        row += "%10.3f" % both
+    print("%-10s %s" % (a, row))
+print("  (read: of the rows THIS model got wrong, what fraction did that one")
+print("   also get wrong. 1.000 on the diagonal, by definition.)")
+print()
+any_right = (~np.all([wrong[n] for n in names], axis=0)).mean()
+all_wrong = np.all([wrong[n] for n in names], axis=0).mean()
+print("  at least one model is right on %.4f of rows." % any_right)
+print("  all four are wrong together on %.4f." % all_wrong)
+print("  that first number is the ceiling any combiner can reach. the gap")
+print("  between it and the best single model is what there is to win.")
+print()
+
+hard = VotingClassifier(base, voting="hard")
+soft = VotingClassifier(base, voting="soft")
+stack = StackingClassifier(base, final_estimator=LogisticRegression(max_iter=3000), cv=5)
+for name, m in (("hard voting (majority)", hard),
+                ("soft voting (average probability)", soft),
+                ("stacking (a model on the outputs)", stack)):
+    print("%-36s cv %.4f" % (name, cross_val_score(m, X, y, cv=5).mean()))
+print("%-36s cv %.4f"
+      % ("best single model",
+         max(cross_val_score(m, X, y, cv=5).mean() for _, m in base)))
+print()
+
+stack.fit(Xtr, ytr)
+print("what stacking learned about which model to trust:")
+for name, w in zip(names, stack.final_estimator_.coef_[0]):
+    print("   %-10s weight %+7.4f" % (name, w))
+print("  a negative weight is not a bug -- it means that model's mistakes are")
+print("  informative, so the combiner leans against it in some regions.")
+print()
+print("soft voting usually beats hard voting because a 0.51 and a 0.99 are")
+print("different amounts of evidence, and hard voting throws that away.")
+print()
+print("stacking needs cross-validated predictions to train its combiner, or")
+print("the base models' training-set optimism leaks straight into it. that is")
+print("what the cv=5 above is doing, and it is not optional.")
+print()
+print("the honest caveat: ensembles buy small gains for a large cost in")
+print("latency and explainability. four models to serve, four to monitor. use")
+print("one when the gain is worth that, and not because it sounds thorough.")
+```
+
 """,
     [
         {"q": "Why can a majority vote score worse than its best member?",

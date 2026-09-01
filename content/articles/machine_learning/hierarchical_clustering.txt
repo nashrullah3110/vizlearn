@@ -92,3 +92,78 @@ merge them.
 **Reading meaning into leaf order.** It is a drawing convention.
 
 **Trying it on a large dataset.** The distance matrix will not fit.
+
+## Cluster without choosing k first
+
+Agglomerative clustering merges the two closest groups over and over, so you get every k at once. The linkage rule decides what "closest" means, and it changes the answer completely.
+
+```python-run
+import numpy as np
+from sklearn.cluster import AgglomerativeClustering, KMeans
+from sklearn.datasets import make_blobs, make_moons
+from sklearn.metrics import adjusted_rand_score, silhouette_score
+from scipy.cluster.hierarchy import linkage, fcluster
+
+X, y = make_blobs(n_samples=300, centers=4, cluster_std=1.0, random_state=0)
+
+Z = linkage(X, method="ward")
+print("the merge log -- 299 merges, each joining two groups into one.")
+print("%8s %8s %8s %12s %10s" % ("step", "group A", "group B", "distance", "size"))
+for i in list(range(3)) + list(range(len(Z) - 5, len(Z))):
+    a, b, d, n = Z[i]
+    print("%8d %8d %8d %12.4f %10d" % (i, a, b, d, n))
+print("  the first merges join single points at almost no distance. the last")
+print("  few join whole clusters across large gaps.")
+print()
+
+print("the last few merge distances, and the jump before each:")
+for i in range(len(Z) - 6, len(Z) - 1):
+    print("  cut here -> %d clusters   next merge costs %8.3f (%.2fx the last)"
+          % (len(X) - i - 1, Z[i, 2], Z[i, 2] / Z[i - 1, 2]))
+print("  cut here -> 1 cluster    the root, %8.3f" % Z[-1, 2])
+print()
+print("  note that the jumps keep growing all the way to k=2, so 'find the")
+print("  biggest jump' always answers 2. the useful reading is where the")
+print("  RATIO stops being dramatic, and even that is a judgement call --")
+print("  which is why the silhouette column below is worth having.")
+print()
+
+print("one tree, every k, no refitting:")
+print("%6s %14s %14s" % ("k", "agreement", "silhouette"))
+for k in (2, 3, 4, 5, 6):
+    labels = fcluster(Z, k, criterion="maxclust")
+    print("%6d %14.4f %14.4f"
+          % (k, adjusted_rand_score(y, labels), silhouette_score(X, labels)))
+print("  k-means has to be rerun from scratch for each k. this is one fit.")
+print()
+
+print("linkage is the whole personality of the algorithm:")
+for method in ("ward", "complete", "average", "single"):
+    m = AgglomerativeClustering(n_clusters=4, linkage=method).fit(X)
+    print("  %-10s agreement %.4f, cluster sizes %s"
+          % (method, adjusted_rand_score(y, m.labels_),
+             sorted(np.bincount(m.labels_), reverse=True)))
+print()
+print("  average linkage won here, and ward is still the usual default -- it")
+print("  is the one that behaves predictably when clusters really are blobs.")
+print()
+print("  ward     -- merge whatever raises total variance least. compact, even")
+print("              sizes. the sensible default, and the only one restricted")
+print("              to euclidean distance.")
+print("  complete -- distance between the two FURTHEST members. compact too,")
+print("              and very sensitive to a single outlier.")
+print("  average  -- the mean pairwise distance. a middle ground.")
+print("  single   -- distance between the two CLOSEST members. it will chain")
+print("              through a thin bridge of points and merge everything.")
+print()
+
+Xm, ym = make_moons(n_samples=300, noise=0.06, random_state=0)
+print("that chaining is a weakness and a feature. on two crescents:")
+for method in ("ward", "single"):
+    m = AgglomerativeClustering(n_clusters=2, linkage=method).fit(Xm)
+    print("  %-10s agreement %.4f" % (method, adjusted_rand_score(ym, m.labels_)))
+print("  single linkage follows the shape. ward cuts straight across it.")
+print()
+print("the cost is that it is O(n^2) in memory -- a full distance matrix. at")
+print("100,000 rows that is 40GB, which is why k-means still exists.")
+```

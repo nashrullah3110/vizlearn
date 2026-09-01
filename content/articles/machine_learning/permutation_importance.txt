@@ -109,3 +109,87 @@ causes the outcome.
 **Comparing across models.** Importance is relative to one fitted model. A
 different model can rank the same features differently and both be right about
 themselves.
+
+## Break one column and see what it costs
+
+Permutation importance shuffles a column and measures the damage. It works on any fitted model, and it disagrees with a tree's built-in importances in ways worth understanding.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.inspection import permutation_importance
+from sklearn.model_selection import train_test_split
+
+rng = np.random.default_rng(0)
+X, y = make_classification(n_samples=3000, n_features=6, n_informative=3,
+                           n_redundant=0, flip_y=0.08, shuffle=False,
+                           random_state=0)
+# shuffle=False keeps the informative columns first, so these names are real.
+# then add a column of pure noise and an exact copy of an informative one.
+X = np.column_stack([X, rng.normal(size=len(X)), X[:, 0]])
+names = ["real_0", "real_1", "real_2", "filler_3", "filler_4", "filler_5",
+         "pure_noise", "copy_of_real_0"]
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
+rf = RandomForestClassifier(n_estimators=250, random_state=0).fit(Xtr, ytr)
+print("baseline test accuracy %.4f" % rf.score(Xte, yte))
+print()
+
+print("do it by hand on one column -- shuffle it and re-score:")
+col = 0
+scores = []
+for rep in range(10):
+    Xs = Xte.copy()
+    rng.shuffle(Xs[:, col])
+    scores.append(rf.score(Xs, yte))
+print("  shuffling %s ten times: accuracy %.4f +/- %.4f"
+      % (names[col], np.mean(scores), np.std(scores)))
+print("  the drop is %.4f. that is its permutation importance."
+      % (rf.score(Xte, yte) - np.mean(scores)))
+print()
+
+r = permutation_importance(rf, Xte, yte, n_repeats=10, random_state=0)
+print("%-16s %12s %10s %14s" % ("feature", "permutation", "sd", "tree built-in"))
+order = np.argsort(-r.importances_mean)
+for i in order:
+    print("%-16s %12.4f %10.4f %14.4f"
+          % (names[i], r.importances_mean[i], r.importances_std[i],
+             rf.feature_importances_[i]))
+print()
+print("filler_3 through filler_5 and pure_noise carry nothing. the tree's")
+print("built-in importance still hands them non-zero scores, because a")
+print("continuous column offers many places to split and some of those")
+print("splits help by luck on the training rows. permutation importance,")
+print("measured on held-out rows, puts them at zero where they belong.")
+print()
+
+print("now the trap. real_0 and copy_of_real_0 are the same column:")
+for i in (0, 7):
+    print("  %-16s permutation %.4f" % (names[i], r.importances_mean[i]))
+print("  each scores about 0.09 -- third and fourth on the list. neither looks")
+print("  like a headline feature, because shuffling one leaves the other")
+print("  standing and the forest reads that instead.")
+print()
+print("drop the copy and refit:")
+keep = [i for i in range(8) if i != 7]
+rf2 = RandomForestClassifier(n_estimators=250, random_state=0).fit(Xtr[:, keep], ytr)
+r2 = permutation_importance(rf2, Xte[:, keep], yte, n_repeats=10, random_state=0)
+print("  real_0 permutation importance is now %.4f, up from %.4f."
+      % (r2.importances_mean[0], r.importances_mean[0]))
+print("  the column did not become more useful. it stopped sharing the credit.")
+print("  the pair was worth ~%.2f all along, split roughly in half."
+      % r2.importances_mean[0])
+print()
+print("so: correlated features SPLIT their importance, and a zero here means")
+print("'the model can get by without it', not 'this column is useless'. that")
+print("distinction is the difference between dropping a redundant column and")
+print("dropping a predictive one.")
+print()
+print("two practical notes. measure it on held-out data -- on training rows it")
+print("rewards memorisation. and use the metric you actually care about:")
+r3 = permutation_importance(rf, Xte, yte, n_repeats=10, random_state=0,
+                            scoring="roc_auc")
+print("  scored by ROC AUC instead of accuracy:")
+for i in order[:4]:
+    print("    %-16s %.4f" % (names[i], r3.importances_mean[i]))
+```

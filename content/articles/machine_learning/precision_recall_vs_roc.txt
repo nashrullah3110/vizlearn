@@ -94,3 +94,76 @@ different, so the numbers are not comparable.
 **Forgetting that both curves span all thresholds.** Neither tells you which
 threshold to deploy &mdash; that is a separate decision, made with
 [costs](threshold_tuning.html).
+
+## The same model, two curves, two different stories
+
+ROC and precision-recall are computed from the same predictions. On balanced data they agree; on imbalanced data one of them is misleading, and it is always the same one.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (roc_curve, precision_recall_curve, roc_auc_score,
+                             average_precision_score, confusion_matrix)
+
+def build(weight, seed=0):
+    X, y = make_classification(n_samples=20000, n_features=18, n_informative=10,
+                               weights=[weight], flip_y=0.005, class_sep=2.5,
+                               random_state=seed)
+    a, b, c, d = train_test_split(X, y, test_size=0.4, random_state=0, stratify=y)
+    return d, LogisticRegression(max_iter=3000).fit(a, c).predict_proba(b)[:, 1]
+
+print("%14s %10s %12s %12s" % ("positive rate", "ROC AUC", "PR AUC", "PR baseline"))
+for w in (0.50, 0.80, 0.95, 0.985):
+    yte, p = build(w)
+    print("%13.2f%% %10.4f %12.4f %12.4f"
+          % (100 * yte.mean(), roc_auc_score(yte, p),
+             average_precision_score(yte, p), yte.mean()))
+print()
+print("ROC AUC drifts. PR AUC falls through the floor -- and its baseline")
+print("falls with it, because a random scorer's PR AUC IS the positive rate.")
+print("ROC AUC's baseline is 0.5 no matter what, which is exactly the problem:")
+print("a number that does not move cannot warn you.")
+print()
+
+yte, p = build(0.985)
+rate = yte.mean()
+print("now take ONE point on each curve, on the %.1f percent data." % (100 * rate))
+fpr, tpr, rthr = roc_curve(yte, p)
+i = int(np.argmin(np.abs(tpr - 0.80)))
+t = rthr[i]
+tn, fp, fn, tp = confusion_matrix(yte, (p >= t).astype(int)).ravel()
+print("at the threshold that catches 80 percent of the positives (%.4f):" % t)
+print()
+print("  false positive rate  %.4f   <- the ROC curve's x-axis" % (fp / (fp + tn)))
+print("  precision            %.4f   <- the PR curve's y-axis" % (tp / (tp + fp)))
+print()
+print("both of those describe the SAME %d false positives." % fp)
+print("  FPR divides them by the %d negatives in the data      -> %.4f"
+      % (fp + tn, fp / (fp + tn)))
+print("  precision divides them by the %d rows you flagged     -> %.4f wrong"
+      % (tp + fp, fp / (tp + fp)))
+print()
+print("an AUC of %.4f and a false positive rate of %.1f percent both read like"
+      % (roc_auc_score(yte, p), 100 * fp / (fp + tn)))
+print("a model that is working, and by those measures it is.")
+print("but a human working the alert queue sees %d items, of which %d are"
+      % (tp + fp, tp))
+print("real. %.0f%% of their day is wasted, and the ROC curve never said so."
+      % (100 * fp / (tp + fp)))
+print()
+print("the denominator is the whole disagreement. one of them is the number of")
+print("negatives in the world, which is enormous and not your problem. the")
+print("other is the size of the pile you just handed someone.")
+print()
+print("the rule:")
+print("  balanced classes, and both errors matter    -> ROC is fine")
+print("  rare positives, and you care about the      -> use precision-recall")
+print("  alerts you raise")
+print("  comparing models across datasets with       -> ROC, since PR AUC's")
+print("  different base rates                           baseline moves")
+print()
+print("and always print the base rate beside either one. an AUC without it is")
+print("half a sentence.")
+```

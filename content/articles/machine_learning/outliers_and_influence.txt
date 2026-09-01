@@ -101,3 +101,100 @@ selection, not the phenomenon.
 
 **Checking only y.** High-leverage points can be unremarkable in y and still
 dominate the fit.
+
+## An outlier and an influential point are not the same thing
+
+One far-out row can leave a fit untouched while another moves it completely. The difference is leverage, and it is computable.
+
+```python-run
+import numpy as np
+from sklearn.linear_model import LinearRegression, HuberRegressor, RANSACRegressor
+from sklearn.metrics import r2_score
+
+rng = np.random.default_rng(0)
+x = np.linspace(0, 10, 60)
+y = 2.0 * x + 5.0 + rng.normal(0, 1.5, 60)
+X = x.reshape(-1, 1)
+
+def fit(Xa, ya, label):
+    m = LinearRegression().fit(Xa, ya)
+    print("  %-34s slope %7.4f  intercept %7.4f" % (label, m.coef_[0], m.intercept_))
+    return m
+
+print("the true relationship is y = 2x + 5.")
+base = fit(X, y, "clean data")
+print()
+
+# an outlier in the MIDDLE of the x range: unusual y, ordinary x
+xm, ym = 5.0, 60.0
+Xa = np.vstack([X, [[xm]]]); ya = np.r_[y, ym]
+mid = fit(Xa, ya, "one wild point at x=5 (middle)")
+
+# an outlier at the EDGE of the x range: same distance off the line
+xe, ye = 10.0, 65.0
+Xb = np.vstack([X, [[xe]]]); yb = np.r_[y, ye]
+edge = fit(Xb, yb, "one wild point at x=10 (edge)")
+print()
+print("the added points sit %.0f and %.0f above the true line -- comparable"
+      % (ym - (2 * xm + 5), ye - (2 * xe + 5)))
+print("misses. but look at what each did:")
+print("  the one at x=5  moved the slope by %.4f and the intercept by %+.4f"
+      % (abs(mid.coef_[0] - base.coef_[0]), mid.intercept_ - base.intercept_))
+print("  the one at x=10 moved the slope by %.4f and the intercept by %+.4f"
+      % (abs(edge.coef_[0] - base.coef_[0]), edge.intercept_ - base.intercept_))
+print("x=5 is the mean of x, so that point has no lever at all: it pushed the")
+print("whole line up without tilting it. the edge point tilted it.")
+print()
+
+print("leverage explains it. it depends only on x, never on y:")
+def leverage(Xa):
+    Z = np.column_stack([np.ones(len(Xa)), Xa])
+    H = Z @ np.linalg.solve(Z.T @ Z, Z.T)
+    return np.diag(H)
+
+for label, Xa in (("point at x=5 ", Xa), ("point at x=10", Xb)):
+    h = leverage(Xa)
+    print("  %s  leverage %.4f   (average is %.4f)"
+          % (label, h[-1], h.mean()))
+print("  a point far from the mean of x has a long lever. it does not have to")
+print("  be unusual in y to move the fit -- it just has to be far out in x.")
+print()
+
+print("Cook's distance combines both: how far off the line, times leverage.")
+def cooks(Xa, ya):
+    m = LinearRegression().fit(Xa, ya)
+    resid = ya - m.predict(Xa)
+    h = leverage(Xa)
+    mse = (resid ** 2).sum() / (len(ya) - 2)
+    return resid ** 2 * h / (2 * mse * (1 - h) ** 2)
+
+for label, Xa, ya in (("added at x=5 ", Xa, ya), ("added at x=10", Xb, yb)):
+    d = cooks(Xa, ya)
+    print("  %s  Cook's D %.4f  (rule of thumb: investigate above %.4f)"
+          % (label, d[-1], 4 / len(ya)))
+print()
+print("so the vocabulary is worth getting right:")
+print("  outlier     -- an unusual y for its x. may cost you nothing.")
+print("  high leverage -- an unusual x. dangerous whether or not y is odd.")
+print("  influential -- actually moved the fit. Cook's distance measures this,")
+print("                 and note it flagged BOTH of our points: shifting every")
+print("                 prediction up is influence too. leverage is what tells")
+print("                 you which one can TILT the line rather than raise it.")
+print()
+
+print("robust fits, on the edge-outlier data:")
+print("  ordinary least squares  slope %7.4f" % edge.coef_[0])
+print("  Huber                   slope %7.4f"
+      % HuberRegressor().fit(Xb, yb).coef_[0])
+print("  RANSAC                  slope %7.4f"
+      % RANSACRegressor(random_state=0).fit(Xb, yb).estimator_.coef_[0])
+print("  true                    slope  2.0000")
+print()
+print("Huber switches from squared to absolute error past a threshold, so a")
+print("far-out point stops getting quadratically more say. RANSAC fits on")
+print("random subsets and keeps the fit that most points agree with.")
+print()
+print("and the part that is not statistics: deleting the point is a decision")
+print("about what your data means. a sensor glitch, delete it. a genuine")
+print("extreme customer, deleting it means your model no longer covers them.")
+```

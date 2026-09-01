@@ -131,6 +131,112 @@ It is the right tool for demand and sales forecasting, sensor and IoT prediction
 
 It is the wrong tool when the sequence is very long and the dependencies are distant &mdash; a fixed window simply cannot see beyond its own length, which is where recurrent networks and transformers earn their keep. It also handles irregular sampling poorly: windows assume evenly spaced observations, so resample first if your timestamps are ragged.
 
+## Turning a series into rows, without cheating
+
+A series is cut into overlapping windows so a supervised model can eat it. Those windows overlap, and that overlap is how a shuffled split quietly hands the model its own answers.
+
+```python-run
+import numpy as np
+from sklearn.linear_model import Ridge
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import TimeSeriesSplit, KFold, cross_val_score
+from sklearn.metrics import mean_absolute_error
+
+rng = np.random.default_rng(0)
+n = 900
+# a random walk with a cycle on top -- non-stationary, like most real series
+series = 50 + np.cumsum(rng.normal(0, 0.8, n)) + 6 * np.sin(np.arange(n) / 11.0)
+print("a series of %d points: a random walk with a cycle on top." % n)
+print("first eight values:", np.round(series[:8], 2))
+print()
+
+def windows(s, lookback, horizon=1):
+    X = np.array([s[i:i + lookback] for i in range(len(s) - lookback - horizon + 1)])
+    y = np.array([s[i + lookback + horizon - 1] for i in range(len(X))])
+    return X, y
+
+X, y = windows(series, lookback=10)
+print("with lookback=10, horizon=1:")
+print("  row 0 features:", np.round(X[0], 2))
+print("  row 0 target  :", round(y[0], 2), " (that is series[10])")
+print("  row 1 features:", np.round(X[1], 2))
+print("  %d points became %d rows of %d columns." % (n, len(X), X.shape[1]))
+print("  consecutive rows share 9 of their 10 values. they are near-duplicates,")
+print("  and that is where every mistake below comes from.")
+print()
+
+split = int(0.8 * len(X))
+print("%-34s %12s %12s" % ("", "ridge MAE", "forest MAE"))
+
+def evaluate(label, Xa, ya):
+    out = []
+    for mk in (lambda: Ridge(),
+               lambda: RandomForestRegressor(n_estimators=80, random_state=0)):
+        m = mk().fit(Xa[:split], ya[:split])
+        out.append(mean_absolute_error(ya[split:], m.predict(Xa[split:])))
+    print("%-34s %12.4f %12.4f" % (label, out[0], out[1]))
+    return out
+
+honest = evaluate("chronological split (correct)", X, y)
+idx = rng.permutation(len(X))
+cheat = evaluate("shuffled split (cheating)", X[idx], y[idx])
+print()
+print("the forest went from %.4f to %.4f -- it looks %.1fx better purely from"
+      % (honest[1], cheat[1], honest[1] / cheat[1]))
+print("the shuffle. a shuffled test row shares 9 of its 10 values with training")
+print("rows either side of it in time, and a forest is flexible enough to look")
+print("that neighbour up rather than learn anything.")
+print()
+print("note that ridge barely moved (%.4f to %.4f). the leak is real either"
+      % (honest[0], cheat[0]))
+print("way; a linear model just is not able to exploit it. so 'my score did")
+print("not change when I shuffled' is not evidence that the split was safe.")
+print()
+
+print("the same trap in cross-validation:")
+for label, cv in (("KFold(5, shuffled)", KFold(5, shuffle=True, random_state=0)),
+                  ("TimeSeriesSplit(5)", TimeSeriesSplit(5))):
+    s = -cross_val_score(RandomForestRegressor(n_estimators=80, random_state=0),
+                         X, y, cv=cv, scoring="neg_mean_absolute_error").mean()
+    print("  %-22s forest MAE %.4f" % (label, s))
+print("  TimeSeriesSplit only trains on rows that come BEFORE the fold it")
+print("  tests on, and the training window grows:")
+for i, (a, b) in enumerate(TimeSeriesSplit(5).split(X)):
+    print("     fold %d: train rows 0-%d, test rows %d-%d" % (i, a[-1], b[0], b[-1]))
+print()
+
+print("the baseline you have to beat -- just predict the last value you saw:")
+print("  naive           MAE %.4f" % mean_absolute_error(y[split:], X[split:, -1]))
+print("  ridge, honest   MAE %.4f" % honest[0])
+print("  forest, honest  MAE %.4f" % honest[1])
+print("  on a random walk the naive forecast is genuinely hard to beat, which")
+print("  is exactly why quoting it is not optional.")
+print()
+
+print("lookback is a real hyperparameter. tune it on time-ordered folds:")
+print("%10s %14s" % ("lookback", "ridge MAE"))
+for lb in (1, 3, 10, 30, 60):
+    Xl, yl = windows(series, lookback=lb)
+    print("%10d %14.4f"
+          % (lb, -cross_val_score(Ridge(), Xl, yl, cv=TimeSeriesSplit(4),
+                                  scoring="neg_mean_absolute_error").mean()))
+print()
+
+print("and the horizon changes the problem completely:")
+for h in (1, 5, 20):
+    Xh, yh = windows(series, lookback=20, horizon=h)
+    sp = int(0.8 * len(Xh))
+    m = Ridge().fit(Xh[:sp], yh[:sp])
+    print("  %2d step(s) ahead: ridge MAE %.4f   naive MAE %.4f"
+          % (h, mean_absolute_error(yh[sp:], m.predict(Xh[sp:])),
+             mean_absolute_error(yh[sp:], Xh[sp:, -1])))
+print("  a model trained for horizon 1 is not a model for horizon 20.")
+print()
+print("one more leak with no code to show for it: scaling. fitting a scaler on")
+print("the whole series puts the future's mean and standard deviation into")
+print("your training rows. fit it on the training rows only, inside a pipeline.")
+```
+
 ## Questions people ask
 
 <strong>How do I choose the window size?</strong> Start from the known seasonality, check an autocorrelation plot, then tune it as a hyperparameter with time-series cross-validation.

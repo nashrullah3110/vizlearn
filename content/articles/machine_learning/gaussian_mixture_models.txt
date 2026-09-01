@@ -83,3 +83,91 @@ most libraries.
 
 **Too many components.** With enough Gaussians you can fit anything, including
 the noise. BIC penalises parameter count for this reason.
+
+## Soft clusters, and shapes k-means cannot fit
+
+A GMM gives every point a probability of belonging to each cluster, and fits ellipses rather than spheres. Both differences show up on the same data.
+
+```python-run
+import numpy as np
+from sklearn.mixture import GaussianMixture
+from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+from sklearn.metrics import adjusted_rand_score
+
+rng = np.random.default_rng(0)
+X, y = make_blobs(n_samples=600, centers=3, cluster_std=0.8,
+                  center_box=(-14.0, 14.0), random_state=0)
+# stretch the space so the round blobs become long, tilted ellipses
+X = X @ np.array([[1.0, 0.0], [1.2, 0.35]])
+
+gm = GaussianMixture(n_components=3, random_state=0).fit(X)
+km = KMeans(n_clusters=3, n_init=10, random_state=0).fit(X)
+print("three well-separated blobs, sheared into long tilted ellipses:")
+print("  k-means agreement %.4f" % adjusted_rand_score(y, km.labels_))
+print("  GMM     agreement %.4f" % adjusted_rand_score(y, gm.predict(X)))
+print("  the groups are still perfectly separable -- they are just not round")
+print("  any more. k-means can only draw spheres, so it cuts across the grain")
+print("  of the ellipses and splits them in the wrong places.")
+print()
+
+print("what a GMM stores per cluster -- a weight, a centre, and a full")
+print("covariance matrix. that last one is what buys the shape:")
+for c in range(3):
+    print("  cluster %d  weight %.4f  centre %s" % (c, gm.weights_[c],
+                                                    np.round(gm.means_[c], 3)))
+    print("             covariance %s" % np.round(gm.covariances_[c], 3).tolist())
+print()
+
+p = gm.predict_proba(X)
+conf = p.max(axis=1)
+print("every point gets a probability per cluster, not just a label:")
+order = np.argsort(conf)
+print("  the least certain points sit on the borders:")
+for i in order[:4]:
+    print("    %s  ->  %s" % (np.round(X[i], 2), np.round(p[i], 4)))
+print("  the most certain sit in the middle of a component:")
+for i in order[-3:]:
+    print("    %s  ->  %s" % (np.round(X[i], 2), np.round(p[i], 4)))
+print()
+print("  only %d of %d points are less than 90%% sure of their cluster -- these"
+      % ((conf < 0.9).sum(), len(X)))
+print("  groups barely touch, so almost everything is unambiguous. the few")
+print("  that are not are exactly the ones sitting between two components,")
+print("  and k-means would have assigned them with the same flat confidence")
+print("  as everything else. on overlapping data that difference is the")
+print("  whole reason to reach for a mixture model.")
+print()
+
+print("covariance_type is the knob that trades flexibility for parameters:")
+for ct in ("spherical", "diag", "tied", "full"):
+    m = GaussianMixture(n_components=3, covariance_type=ct, random_state=0).fit(X)
+    print("  %-10s agreement %.4f   BIC %9.1f   parameters %d"
+          % (ct, adjusted_rand_score(y, m.predict(X)), m.bic(X),
+             m._n_parameters()))
+print("  'spherical' is essentially soft k-means. 'full' fits any ellipse.")
+print("  'tied' wins on BIC here because all three ellipses genuinely DO share")
+print("  one shape -- the same shear was applied to all of them -- so it gets")
+print("  full's accuracy for spherical's parameter count. that is BIC working")
+print("  properly: it charges for parameters and rewards the model that does")
+print("  not need them.")
+print()
+
+print("BIC picks the number of components for you, which k-means cannot do:")
+print("%6s %12s %12s" % ("k", "BIC", "AIC"))
+for k in range(1, 7):
+    m = GaussianMixture(n_components=k, random_state=0).fit(X)
+    print("%6d %12.1f %12.1f" % (k, m.bic(X), m.aic(X)))
+best = min(range(1, 7), key=lambda k: GaussianMixture(n_components=k,
+                                                      random_state=0).fit(X).bic(X))
+print("  lowest BIC at k=%d, and the data really has 3 components." % best)
+print("  (BIC is not infallible -- on overlapping components it will happily")
+print("   under-count. it is a guide, not an oracle.)")
+print("  it works because a GMM is a probability model: BIC compares how well")
+print("  each k explains the data against how many parameters it spent.")
+print()
+print("the catch: with enough components a GMM will happily put one tiny")
+print("component on a handful of points and drive its variance toward zero,")
+print("which sends the likelihood to infinity. reg_covar exists to stop that,")
+print("and it is why you should not simply minimise BIC over a huge range.")
+```
