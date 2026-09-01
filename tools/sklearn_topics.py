@@ -5876,6 +5876,14 @@ Nor can it fix a metric that measures the wrong thing, a split that leaks, or la
 
 The order that wastes least effort: get the split and the metric right, get the features right, pick a model family that can represent the structure, and tune last. Tuning first is the most common way to spend a week moving a score by half a point.
 
+<strong>How many combinations is reasonable?</strong> Whatever finishes in the time you have. Twenty random samples over a sensible range beats an exhaustive grid over the wrong one.
+
+<strong>Can I search two models at once?</strong> Yes - put the estimator itself in the grid: `{"clf": [LogisticRegression(), RandomForestClassifier()]}`, with each model's own parameters guarded by the step name.
+
+<strong>Does refit cost much?</strong> One extra fit on the full data, which is negligible next to the search itself. `refit=False` skips it if you only want the table.
+
+<strong>What is `error_score` for?</strong> Some combinations are invalid and raise. The default propagates the error; `error_score=np.nan` records the failure and lets the search continue.
+
 ## Things to try
 
 1. <strong>Read the table.</strong> The second editor's top two settings are separated by 0.0001. Decide for yourself whether that is a result.
