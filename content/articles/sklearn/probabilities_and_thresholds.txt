@@ -1,0 +1,241 @@
+title: Probabilities and Thresholds: A Practical Guide
+intro: Every classifier in this track has been making a decision on your behalf at 0.5. Taking that decision back costs nothing and often improves the model more than tuning does.
+
+## The hidden default
+
+`predict()` calls `predict_proba()` and applies a threshold of 0.5. That is the whole of it, and the first editor confirms the two are identical.
+
+There is nothing principled about 0.5. It is the point where the two classes are equally likely, which would be the right cut only if the classes were equally frequent *and* the two kinds of mistake cost the same. Neither is usually true.
+
+The consequence on imbalanced data can be severe. The second editor fits a model on data with 15% positives and reports what happens at each threshold: at 0.5 the model flags 5 cases out of 900 and catches **2.2%** of the positives. It is not a broken model &mdash; at a threshold of 0.1 the same fitted model catches 91.6% &mdash; it is a model being asked the wrong question.
+
+
+## predict is proba plus a hidden decision
+
+The two agree exactly, because one is defined as the other.
+
+```python-run
+from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import make_classification
+
+X, y = make_classification(n_samples=400, n_features=6, random_state=0)
+model = LogisticRegression().fit(X, y)
+
+proba = model.predict_proba(X)[:, 1]
+manual = (proba >= 0.5).astype(int)
+
+print("predict() equals proba >= 0.5 :", (manual == model.predict(X)).all())
+print()
+print("the 0.5 is a default, not a law - nothing about the problem")
+print("said the boundary belonged there.")
+```
+
+## One model, five classifiers
+
+Look at what the default threshold does to recall on this data.
+
+```python-run
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import precision_score, recall_score
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+
+# A harder problem, so both numbers actually move.
+X, y = make_classification(n_samples=3000, n_features=10, n_informative=3,
+                           weights=[0.85], flip_y=0.15, random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+model = LogisticRegression(max_iter=1000).fit(X_tr, y_tr)
+proba = model.predict_proba(X_te)[:, 1]
+
+print("threshold  precision  recall  flagged")
+for t in (0.1, 0.2, 0.3, 0.5, 0.7):
+    pred = (proba >= t).astype(int)
+    print("%9.1f %10.3f %7.3f %8d"
+          % (t, precision_score(y_te, pred, zero_division=0),
+             recall_score(y_te, pred), int(pred.sum())))
+print()
+print("one fitted model, five different classifiers - and predict()")
+print("silently chose the middle row for you.")
+```
+
+## The curve is every threshold at once
+
+Which is how you pick one to hit a requirement rather than by trying numbers.
+
+```python-run
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import precision_recall_curve
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+X, y = make_classification(n_samples=3000, n_features=10, n_informative=3,
+                           weights=[0.85], flip_y=0.15, random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+proba = LogisticRegression(max_iter=1000).fit(X_tr, y_tr).predict_proba(X_te)[:, 1]
+
+precision, recall, thresholds = precision_recall_curve(y_te, proba)
+
+for target in (0.70, 0.90):
+    ok = np.flatnonzero(recall[:-1] >= target)
+    i = ok[-1]
+    print("for %d%% recall: threshold <= %.3f, precision %.3f"
+          % (target * 100, thresholds[i], precision[i]))
+print()
+print("the curve is every threshold at once, which is what you read")
+print("to pick one deliberately.")
+```
+
+## ROC AUC flatters an imbalanced problem
+
+The same model quality, two class balances, and only one of the two metrics notices.
+
+```python-run
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score, average_precision_score
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+
+for weight in (0.5, 0.99):
+    X, y = make_classification(n_samples=4000, n_features=10,
+                               weights=[weight], random_state=0)
+    X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                              random_state=0, stratify=y)
+    m = LogisticRegression(max_iter=1000).fit(X_tr, y_tr)
+    p = m.predict_proba(X_te)[:, 1]
+    print("positives %5.1f%%   ROC AUC %.3f   average precision %.3f"
+          % (100 * (1 - weight), roc_auc_score(y_te, p),
+             average_precision_score(y_te, p)))
+print()
+print("ROC AUC stays high when positives are rare, because the huge")
+print("number of true negatives keeps the false positive rate low.")
+```
+
+## Are the probabilities honest?
+
+A calibrated model's 0.7 means seventy per cent of those cases turn out positive.
+
+```python-run
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.calibration import calibration_curve
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+X, y = make_classification(n_samples=3000, n_features=10, random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.4, random_state=0)
+
+for name, m in [("LogisticRegression", LogisticRegression(max_iter=1000)),
+                ("RandomForest", RandomForestClassifier(n_estimators=50,
+                                                        random_state=0))]:
+    p = m.fit(X_tr, y_tr).predict_proba(X_te)[:, 1]
+    true, pred = calibration_curve(y_te, p, n_bins=5)
+    gap = np.abs(true - pred).mean()
+    print("%-20s mean |predicted - observed| = %.4f" % (name, gap))
+print()
+print("a calibrated model's predicted 0.7 means 70% of those cases")
+print("are positive. one of these two is closer to that than the other.")
+```
+
+## Choosing the threshold by cost
+
+When a miss costs ten times a false alarm, the default is not close to optimal.
+
+```python-run
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+X, y = make_classification(n_samples=2000, n_features=10, weights=[0.9],
+                           random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+proba = LogisticRegression(max_iter=1000).fit(X_tr, y_tr).predict_proba(X_te)[:, 1]
+
+# A miss costs 10, a false alarm costs 1.
+best = None
+for t in np.arange(0.05, 0.96, 0.05):
+    tn, fp, fn, tp = confusion_matrix(y_te, (proba >= t).astype(int)).ravel()
+    cost = 10 * fn + 1 * fp
+    if best is None or cost < best[1]:
+        best = (t, cost, fn, fp)
+print("cheapest threshold: %.2f  (cost %d = %d misses x10 + %d false alarms)"
+      % best)
+tn, fp, fn, tp = confusion_matrix(y_te, (proba >= 0.5).astype(int)).ravel()
+print("the default 0.5 would cost:", 10 * fn + fp)
+```
+## Moving it costs nothing
+
+The threshold is applied *after* fitting, so changing it requires no refitting, no search, and no additional data. Get the probabilities once and every operating point is available.
+
+That makes it the cheapest lever in the whole workflow, and it is routinely left untouched while considerable effort goes into tuning hyperparameters that move the score far less.
+
+The mechanics are one line: `(proba >= t).astype(int)` instead of `predict(X)`, having taken `proba = model.predict_proba(X)[:, 1]`. Column 1 is the positive class &mdash; the columns follow `classes_`, so with labels `[0, 1]` the second column is the probability of 1.
+
+## Choosing one deliberately
+
+Three ways, in increasing order of rigour.
+
+**To meet a requirement.** "We must catch 90% of cases" is a recall target, and `precision_recall_curve` says what threshold achieves it and what precision you pay. The third editor answers it directly: 90% recall needs a threshold of 0.105 and gives precision 0.207 &mdash; roughly five false alarms per real case, which the business either accepts or does not.
+
+**To balance the metric you chose.** Sweep the threshold, compute F1 or balanced accuracy at each, take the best. Simple, and it optimises a proxy rather than the thing you care about.
+
+**To minimise cost.** The honest version. Attach a price to a false negative and a false positive, compute the total at each threshold, take the minimum. The last editor does exactly this with a miss costing ten times a false alarm: the cheapest threshold is 0.15 with a cost of 50, against 90 at the default. Nearly half the cost, from changing one number.
+
+Whichever you use, choose it on a **validation** set. The threshold is a parameter fitted to data, and choosing it on the test set is the same mistake as tuning on the test set &mdash; the resulting precision and recall are optimistic.
+
+## The curve, and its summary
+
+`precision_recall_curve` returns arrays of precision, recall and the thresholds that produce them. The trailing element of precision and recall has no corresponding threshold, which is why indexing them together needs the `[:-1]` the editor uses.
+
+`average_precision_score` summarises the whole curve as one number. `roc_curve` and `roc_auc_score` are the alternative pair, plotting the true positive rate against the false positive rate.
+
+The choice between them matters on imbalanced data, and the fourth editor shows why. The same kind of model on data with 50% positives scores ROC AUC 0.935 and average precision 0.919 &mdash; close together. At 1% positives it scores ROC AUC 0.825 and average precision **0.134**.
+
+ROC AUC barely moved because its false-positive rate divides by the number of true negatives, and with 99% negatives that denominator is enormous, so even many false alarms barely register. Average precision ignores true negatives entirely and reports what actually happens to the rare class.
+
+The rule: ROC AUC for roughly balanced problems, average precision when positives are rare. A high ROC AUC on a 1% problem is close to meaningless.
+
+## Whether the probabilities mean anything
+
+A model outputting 0.7 is making a claim: among cases it scores 0.7, about 70% should be positive. A model whose output satisfies that is **calibrated**.
+
+Logistic regression is usually well calibrated, because maximising the likelihood of the observed labels is close to what calibration asks for. Tree ensembles usually are not: a random forest's output is the proportion of trees voting positive, which ranks correctly and is pushed towards the middle &mdash; it rarely says 0.01 or 0.99 because rarely do all the trees agree. The fifth editor measures the gap and finds the forest roughly twice as far off as the linear model.
+
+This matters whenever the probability is used as a number rather than as a ranking: expected-value calculations, risk scores shown to people, thresholds chosen by cost. It does not matter if you only ever rank and cut.
+
+`calibration_curve` measures it by bucketing predictions and comparing the average predicted probability against the observed rate in each bucket. `CalibratedClassifierCV` fixes it by fitting a correction on held-out data, using either a sigmoid or an isotonic fit.
+
+## The threshold is part of the model
+
+A subtle point that causes real problems in deployment: once you choose a threshold, it belongs to the model and has to travel with it.
+
+A pipeline pickled without its threshold will be loaded somewhere else and used through `predict()`, which silently reverts to 0.5 &mdash; and on the imbalanced problem above that is the difference between catching 91% of cases and catching 2%. Nothing raises; the service simply flags almost nothing and everyone assumes the model is weak.
+
+Three ways to keep them together. Record the threshold alongside the model file and apply it explicitly in the serving code, which is the most common and relies on discipline. Wrap the model in a small class whose `predict` applies your threshold, so the object carries it. Or, from recent scikit-learn versions, use `FixedThresholdClassifier` and `TunedThresholdClassifierCV`, which are estimators that hold a threshold and expose the ordinary interface &mdash; the second finds it by cross-validation against a metric or a cost function you supply.
+
+The last of those is the tidiest answer, because the threshold is then chosen inside the folds like any other parameter and stored on the fitted object like any other learned value.
+
+## Multi-class is a different question
+
+Everything on this page assumes two classes. With more, `predict()` takes the highest probability rather than comparing against a threshold, so there is no single number to move.
+
+The equivalent adjustments are different. `class_weight` shifts the model's own preferences during fitting. Post-processing the probability matrix &mdash; multiplying each column by a factor and taking the argmax &mdash; is the closest analogue and has to be tuned per class. And a genuinely cost-sensitive multi-class decision means writing the expected cost of each prediction explicitly and choosing the minimum, which is a few lines and rarely done.
+
+Where a binary threshold *does* reappear is one-versus-rest arrangements, where each class has its own binary decision and each can carry its own threshold &mdash; which is how multi-label problems are usually handled.
+
+## Things to try
+
+1. <strong>Read the second editor properly.</strong> At the default threshold the model catches 2.2% of positives. It is a good model being asked a bad question.
+2. <strong>Set a target.</strong> In the third editor, change the targets to 0.95 and 0.99 and watch the precision collapse.
+3. <strong>Change the cost ratio.</strong> In the last editor, make a miss cost 100 and see where the threshold moves.
+4. <strong>Calibrate the forest.</strong> Wrap it in `CalibratedClassifierCV` and re-measure the gap.
+
+## Where this leaves you
+
+`predict()` hides a decision; `predict_proba()` gives it back. Choose the threshold from the cost of each mistake, on a validation set, using the precision-recall curve to see the options &mdash; and check that the probabilities are calibrated before treating any of them as a number.
