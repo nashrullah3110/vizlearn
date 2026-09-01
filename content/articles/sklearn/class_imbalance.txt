@@ -267,6 +267,20 @@ If you do resample and need honest probabilities, recalibrate afterwards on data
 
 <strong>Should I resample the test set to make the metrics readable?</strong> No. The test set must reflect the real distribution, or the numbers describe a world that does not exist.
 
+## Which models suffer most
+
+Imbalance does not affect every estimator equally, and knowing the pattern saves some experimentation.
+
+**Anything minimising an average loss** feels it most directly: logistic regression, SVMs, neural networks, gradient boosting. Every row contributes equally to the objective, so the rare class contributes almost nothing and the fit ignores it. All of them accept `class_weight` or `sample_weight`, which is the direct fix.
+
+**Trees and forests** are affected through the split criterion. A split that isolates a handful of minority rows barely reduces impurity, so it is rarely chosen, and `min_samples_leaf` can prevent it entirely &mdash; a leaf size of 20 on a class with 40 members is a severe constraint nobody intended. Forests also suffer at the bootstrap stage, where a rare class can be almost absent from some samples; `class_weight="balanced_subsample"` reweights per bootstrap rather than globally, which is the version to use there.
+
+**k-NN** is affected geometrically: with 98% negatives, the nearest neighbours of almost any point are negative, so a minority point has to be in a very pure pocket to be found. Lowering `n_neighbors` helps, and `weights="distance"` helps more.
+
+**Naive Bayes** is relatively robust, because it models each class separately and the prior can simply be adjusted.
+
+The general rule: the more a model averages across all rows at once, the more the rare class is drowned out, and the more a weight helps.
+
 ## Things to try
 
 1. <strong>Read the confusion matrix.</strong> The first editor's model misses 46 of 49 positives and reports 96% accuracy.
