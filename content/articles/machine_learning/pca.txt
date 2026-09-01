@@ -80,6 +80,105 @@ The only time to skip it is when all your features are genuinely in the same uni
 
 One more ordering rule: fit the scaler and the PCA on training data only, then apply both to test data. Fitting PCA on the whole dataset lets the test rows influence the directions, which is a subtle and very common leak.
 
+## Where the variance actually went
+
+PCA rotates the data so the first axis carries the most spread. Here is the rotation, the variance it captured, and the reconstruction you get by throwing the rest away.
+
+```python-run
+import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.datasets import make_classification
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+
+rng = np.random.default_rng(0)
+# three real directions, dressed up as twelve columns
+latent = rng.normal(size=(800, 3)) * [4.0, 2.0, 0.5]
+mix = rng.normal(size=(3, 12))
+X = latent @ mix + rng.normal(0, 0.15, (800, 12))
+
+pca = PCA().fit(X)
+print("twelve columns, but only three real directions underneath.")
+print()
+print("%6s %14s %14s" % ("comp", "variance %", "cumulative %"))
+cum = 0
+for i, r in enumerate(pca.explained_variance_ratio_[:8]):
+    cum += r
+    print("%6d %13.4f%% %13.4f%%" % (i + 1, 100 * r, 100 * cum))
+print("  components 4 onward carry %.4f%% between them."
+      % (100 * pca.explained_variance_ratio_[3:].sum()))
+print()
+
+print("reconstruct from the first k components and measure what was lost:")
+for k in (1, 2, 3, 4, 8, 12):
+    p = PCA(n_components=k).fit(X)
+    back = p.inverse_transform(p.transform(X))
+    err = np.linalg.norm(X - back) / np.linalg.norm(X)
+    print("  k=%2d  kept %7.4f%%  reconstruction error %.6f"
+          % (k, 100 * p.explained_variance_ratio_.sum(), err))
+print()
+
+print("the components are orthogonal, by construction:")
+C = pca.components_[:3]
+print(np.round(C @ C.T, 10) + 0.0)
+print()
+print("and the transformed columns are uncorrelated:")
+Z = PCA(n_components=3).fit_transform(X)
+print(np.round(np.corrcoef(Z.T), 10) + 0.0)
+print()
+
+print("PCA is not feature selection -- every component uses every column:")
+print("  component 1 loadings:", np.round(pca.components_[0][:6], 4), "...")
+print("  you cannot point at a column and say it was dropped.")
+print()
+
+print("and it must be scaled first, or it just finds the biggest units:")
+Xu = X.copy(); Xu[:, 0] *= 1000
+print("  unscaled, component 1 variance share: %.4f"
+      % PCA().fit(Xu).explained_variance_ratio_[0])
+print("  scaled,   component 1 variance share: %.4f"
+      % PCA().fit(StandardScaler().fit_transform(Xu)).explained_variance_ratio_[0])
+print()
+
+Xc, yc = make_classification(n_samples=1500, n_features=40, n_informative=6,
+                             flip_y=0.10, random_state=0)
+print("as a preprocessing step, on 1500 rows and 40 columns:")
+for k in (2, 5, 10, 40):
+    s = cross_val_score(make_pipeline(StandardScaler(), PCA(n_components=k),
+                                      LogisticRegression(max_iter=2000)),
+                        Xc, yc, cv=5).mean()
+    print("  %2d components -> cv %.4f" % (k, s))
+print("  no PCA at all  -> cv %.4f"
+      % cross_val_score(make_pipeline(StandardScaler(),
+                                      LogisticRegression(max_iter=2000)),
+                        Xc, yc, cv=5).mean())
+print()
+print("PCA never helped here, and it is worth being clear about why. it keeps")
+print("the directions with the most VARIANCE. nothing guarantees those are the")
+print("directions that predict your label -- it never looked at the label.")
+print()
+
+Xw, yw = make_classification(n_samples=120, n_features=400, n_informative=8,
+                             flip_y=0.05, random_state=0)
+print("now the case it is built for -- 120 rows and 400 columns:")
+print("  no PCA         -> cv %.4f"
+      % cross_val_score(make_pipeline(StandardScaler(),
+                                      LogisticRegression(max_iter=5000)),
+                        Xw, yw, cv=5).mean())
+for k in (5, 20, 60):
+    print("  %2d components -> cv %.4f"
+          % (k, cross_val_score(make_pipeline(StandardScaler(),
+                                              PCA(n_components=k),
+                                              LogisticRegression(max_iter=5000)),
+                                Xw, yw, cv=5).mean()))
+print()
+print("with more columns than rows there is enough room to fit noise exactly,")
+print("and cutting the space down is the thing that stops it. that is when")
+print("PCA earns its place: as compression that happens to regularise.")
+```
+
 ## Guided tour
 
 1. <strong>Start off-axis.</strong> The projection line opens flat at 0&deg; while the cloud is tilted at 30&deg;, so the line is capturing far less than it could. Read <strong>Kept</strong>.

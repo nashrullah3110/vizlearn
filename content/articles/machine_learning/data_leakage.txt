@@ -130,3 +130,51 @@ order of operations cannot be got wrong by accident.
 
 **Believing a suspiciously good result.** It is nearly always leakage, and
 finding out later is much more expensive than checking now.
+
+## A model that scores well and knows nothing
+
+Select features using the whole dataset, then cross-validate. The score is excellent and completely fake, because the data is pure noise.
+
+```python-run
+import numpy as np
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+rng = np.random.default_rng(0)
+# 3000 columns of noise, a coin-flip label. there is nothing to learn here.
+X = rng.normal(size=(180, 3000))
+y = rng.integers(0, 2, 180)
+print("data: %d rows, %d columns, all noise. the label is a coin flip." % X.shape)
+print("an honest model cannot beat 0.5.")
+print()
+
+# the wrong way: choose the 20 best columns using every row, then score
+picked = SelectKBest(f_classif, k=20).fit(X, y).get_support()
+leaked = cross_val_score(LogisticRegression(max_iter=2000), X[:, picked], y,
+                         cv=StratifiedKFold(5, shuffle=True, random_state=0))
+print("selecting features on the full dataset, then cross-validating:")
+print("  fold scores", np.round(leaked, 4))
+print("  mean %.4f   <- from noise" % leaked.mean())
+print()
+
+# the right way: selection happens inside each fold, on training rows only
+pipe = make_pipeline(SelectKBest(f_classif, k=20), LogisticRegression(max_iter=2000))
+honest = cross_val_score(pipe, X, y, cv=StratifiedKFold(5, shuffle=True,
+                                                        random_state=0))
+print("selecting inside the pipeline, so each fold only sees its own training rows:")
+print("  fold scores", np.round(honest, 4))
+print("  mean %.4f   <- the truth" % honest.mean())
+print()
+print("the gap is %.3f of pure illusion." % (leaked.mean() - honest.mean()))
+print()
+print("the leak: the selector looked at test-fold labels when choosing columns,")
+print("so the 20 'best' columns were the ones that happened to correlate with")
+print("the very rows the model was about to be scored on.")
+print()
+print("this is why every fit-like step belongs inside the pipeline. scalers,")
+print("imputers, encoders and selectors all learn from data, and all of them")
+print("leak if they learn from rows that are supposed to be unseen.")
+```

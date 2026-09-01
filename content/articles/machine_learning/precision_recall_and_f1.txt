@@ -102,3 +102,47 @@ only in calibration. Compare across thresholds, or tune each one.
 
 **Accuracy on imbalanced data.** It measures the class balance more than the
 model.
+
+## The trade you cannot avoid
+
+Precision and recall pull in opposite directions. Sweeping the decision threshold shows exactly how much of one each unit of the other costs.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import precision_score, recall_score, f1_score
+
+X, y = make_classification(n_samples=6000, n_features=15, n_informative=5,
+                           weights=[0.9, 0.1], flip_y=0.08, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.35, random_state=0,
+                                      stratify=y)
+prob = LogisticRegression(max_iter=2000).fit(Xtr, ytr).predict_proba(Xte)[:, 1]
+
+print("%10s %11s %9s %9s %9s %9s"
+      % ("threshold", "flagged", "precision", "recall", "F1", "missed"))
+for t in (0.05, 0.10, 0.20, 0.35, 0.50, 0.70, 0.90):
+    pred = (prob >= t).astype(int)
+    print("%10.2f %11d %9.4f %9.4f %9.4f %9d"
+          % (t, pred.sum(),
+             precision_score(yte, pred, zero_division=0),
+             recall_score(yte, pred, zero_division=0),
+             f1_score(yte, pred, zero_division=0),
+             ((pred == 0) & (yte == 1)).sum()))
+print()
+print("there are %d real positives in this test set." % (yte == 1).sum())
+print()
+print("precision: of everything you flagged, how much was right.")
+print("recall:    of everything that was right, how much you flagged.")
+print("lowering the threshold flags more, so recall rises and precision falls.")
+print()
+print("F1 is their harmonic mean, which is harsh on imbalance between them:")
+for p, r in ((0.9, 0.9), (0.95, 0.85), (1.0, 0.5), (0.5, 1.0)):
+    print("  precision %.2f, recall %.2f -> arithmetic %.3f, F1 %.3f"
+          % (p, r, (p + r) / 2, 2 * p * r / (p + r)))
+print()
+print("which one you optimise is a business decision, not a modelling one:")
+print("  a spam filter wants precision -- a false alarm loses real mail.")
+print("  a cancer screen wants recall  -- a miss is far worse than a recheck.")
+```

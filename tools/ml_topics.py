@@ -198,6 +198,81 @@ range.
 
 **Scaling one-hot columns.** They are already 0 and 1. StandardScaler turns them
 into two arbitrary values and makes the model harder to read for no gain.
+
+## Which models care, and which do not
+
+One dataset, one column rescaled by 10,000, five models. Two collapse, two do not move at all, and the fifth is the interesting case.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.model_selection import cross_val_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+
+X, y = make_classification(n_samples=1500, n_features=8, n_informative=4,
+                           random_state=0)
+X_big = X.copy()
+X_big[:, 0] *= 10_000          # one column measured in a different unit
+
+print("column 0 now has sd %.0f; the rest are near 1.0" % X_big[:, 0].std())
+print()
+print("%-24s %12s %12s %10s" % ("model", "raw", "scaled", "change"))
+for name, mk in (("k-nearest neighbours", lambda: KNeighborsClassifier()),
+                 ("SVM (rbf)",            lambda: SVC()),
+                 ("logistic regression",  lambda: LogisticRegression(max_iter=5000)),
+                 ("decision tree",        lambda: DecisionTreeClassifier(random_state=0)),
+                 ("random forest",        lambda: RandomForestClassifier(n_estimators=100,
+                                                                         random_state=0))):
+    raw = cross_val_score(mk(), X_big, y, cv=5).mean()
+    scaled = cross_val_score(make_pipeline(StandardScaler(), mk()),
+                             X_big, y, cv=5).mean()
+    print("%-24s %12.4f %12.4f %+10.4f" % (name, raw, scaled, scaled - raw))
+print()
+print("distance-based models collapse. KNN and the rbf SVM both compute")
+print("||a - b||, and one column that is 10,000x larger IS the distance --")
+print("the other seven columns stop counting.")
+print()
+print("trees split one column at a time and never compare across columns,")
+print("so a change of unit is invisible to them. that is exact, not approximate.")
+print()
+print("logistic regression is the subtle one -- the accuracy barely moved,")
+print("but look at what it had to do to the coefficients:")
+raw_c = LogisticRegression(max_iter=5000).fit(X_big, y).coef_[0]
+sc_c = LogisticRegression(max_iter=5000).fit(StandardScaler().fit_transform(X_big), y).coef_[0]
+print("  unscaled coefficients:", np.round(raw_c[:4], 6), "...")
+print("  scaled coefficients:  ", np.round(sc_c[:4], 6), "...")
+print()
+print("the first coefficient is %.0fx smaller than the others just to undo the"
+      % (abs(sc_c[0]) / abs(raw_c[0])))
+print("unit. the L2 penalty charges by coefficient size, so it is now charging")
+print("that column almost nothing and the rest full price. the fit survived; the")
+print("regularisation stopped meaning what you think it means.")
+print()
+
+print("the three scalers, on a column with one outlier:")
+col = np.concatenate([np.random.default_rng(0).normal(50, 5, 200),
+                      [400.0]]).reshape(-1, 1)
+for name, sc in (("StandardScaler", StandardScaler()),
+                 ("MinMaxScaler",   MinMaxScaler()),
+                 ("RobustScaler",   RobustScaler())):
+    out = sc.fit_transform(col).ravel()
+    print("  %-15s the 200 normal rows land in [%7.3f, %7.3f], the outlier at %8.3f"
+          % (name, out[:200].min(), out[:200].max(), out[-1]))
+print()
+print("MinMaxScaler squeezes every real row into 6% of its range because one")
+print("point defines the other end. that is the argument for RobustScaler when")
+print("outliers are part of the data rather than a mistake.")
+print()
+print("and always fit the scaler inside a pipeline -- fitting it on all the data")
+print("before splitting leaks the test set's mean and sd into training.")
+```
+
 """,
     [
         {"q": "Why is k-NN affected by feature scaling but a decision tree is not?",
@@ -391,6 +466,55 @@ order of operations cannot be got wrong by accident.
 
 **Believing a suspiciously good result.** It is nearly always leakage, and
 finding out later is much more expensive than checking now.
+
+## A model that scores well and knows nothing
+
+Select features using the whole dataset, then cross-validate. The score is excellent and completely fake, because the data is pure noise.
+
+```python-run
+import numpy as np
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+rng = np.random.default_rng(0)
+# 3000 columns of noise, a coin-flip label. there is nothing to learn here.
+X = rng.normal(size=(180, 3000))
+y = rng.integers(0, 2, 180)
+print("data: %d rows, %d columns, all noise. the label is a coin flip." % X.shape)
+print("an honest model cannot beat 0.5.")
+print()
+
+# the wrong way: choose the 20 best columns using every row, then score
+picked = SelectKBest(f_classif, k=20).fit(X, y).get_support()
+leaked = cross_val_score(LogisticRegression(max_iter=2000), X[:, picked], y,
+                         cv=StratifiedKFold(5, shuffle=True, random_state=0))
+print("selecting features on the full dataset, then cross-validating:")
+print("  fold scores", np.round(leaked, 4))
+print("  mean %.4f   <- from noise" % leaked.mean())
+print()
+
+# the right way: selection happens inside each fold, on training rows only
+pipe = make_pipeline(SelectKBest(f_classif, k=20), LogisticRegression(max_iter=2000))
+honest = cross_val_score(pipe, X, y, cv=StratifiedKFold(5, shuffle=True,
+                                                        random_state=0))
+print("selecting inside the pipeline, so each fold only sees its own training rows:")
+print("  fold scores", np.round(honest, 4))
+print("  mean %.4f   <- the truth" % honest.mean())
+print()
+print("the gap is %.3f of pure illusion." % (leaked.mean() - honest.mean()))
+print()
+print("the leak: the selector looked at test-fold labels when choosing columns,")
+print("so the 20 'best' columns were the ones that happened to correlate with")
+print("the very rows the model was about to be scored on.")
+print()
+print("this is why every fit-like step belongs inside the pipeline. scalers,")
+print("imputers, encoders and selectors all learn from data, and all of them")
+print("leak if they learn from rows that are supposed to be unseen.")
+```
+
 """,
     [
         {"q": "Why does fitting a StandardScaler before the train/test split count as leakage?",
@@ -560,6 +684,78 @@ removes a lot of data.
 
 **Never checking why.** Ten minutes finding out what caused the gap is worth
 more than any choice of strategy.
+
+## Dropping, filling, and the flag that saves you
+
+Whether a gap can be safely filled depends entirely on WHY it is missing. Two datasets with the same 30% hole rate, and only one of them is fixable by imputation.
+
+```python-run
+import numpy as np
+from sklearn.linear_model import Ridge
+from sklearn.impute import SimpleImputer, KNNImputer
+from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.model_selection import cross_val_score
+from sklearn.pipeline import make_pipeline
+
+rng = np.random.default_rng(0)
+n = 700
+X = rng.normal(size=(n, 6))
+y = 5 * X[:, 0] + 2 * X[:, 1] - X[:, 2] + rng.normal(0, 2.0, n)
+print("feature 0 is the dominant predictor. with no gaps at all: R2 %.4f"
+      % cross_val_score(Ridge(), X, y, cv=5).mean())
+print()
+
+print("CASE 1 -- missing completely at random (a sensor dropped packets).")
+Xa = X.copy()
+Xa[rng.random(Xa.shape) < 0.30] = np.nan
+keep = ~np.isnan(Xa).any(axis=1)
+print("  30%% of cells gone, which costs %d of the %d rows entirely."
+      % (n - keep.sum(), n))
+print("  drop incomplete rows : R2 %7.4f  (on %d rows)"
+      % (cross_val_score(Ridge(), Xa[keep], y[keep], cv=5).mean(), keep.sum()))
+for name, imp in (("fill with mean  ", SimpleImputer(strategy="mean")),
+                  ("fill with median", SimpleImputer(strategy="median")),
+                  ("k-NN imputer    ", KNNImputer(n_neighbors=5))):
+    print("  %s : R2 %7.4f"
+          % (name, cross_val_score(make_pipeline(imp, Ridge()), Xa, y, cv=5).mean()))
+print("  HistGradientBoosting : R2 %7.4f   <- takes NaN directly"
+      % cross_val_score(HistGradientBoostingRegressor(random_state=0),
+                        Xa, y, cv=5).mean())
+print()
+print("  dropping rows is not WRONG here -- the surviving rows are a fair")
+print("  sample. it is just wasteful, and it gets worse as columns multiply:")
+for cols in (6, 12, 25, 50):
+    print("     %2d columns at 30%% missing -> %.1f%% of rows survive intact"
+          % (cols, 100 * 0.7 ** cols))
+print()
+
+print("CASE 2 -- missing for a reason (high earners skip the income question).")
+Xb = X.copy()
+hide = X[:, 0] > np.percentile(X[:, 0], 65)
+Xb[hide, 0] = np.nan
+print("  feature 0 is missing on exactly the %d rows where it is high." % hide.sum())
+print("  mean of the values that survived: %7.4f" % np.nanmean(Xb[:, 0]))
+print("  mean of the values that vanished: %7.4f" % X[hide, 0].mean())
+print("  imputation fills the first number into rows that deserve the second.")
+print()
+print("  drop incomplete rows  : R2 %7.4f  (on %d rows, all low earners)"
+      % (cross_val_score(Ridge(), X[~hide], y[~hide], cv=5).mean(), (~hide).sum()))
+print("  mean imputation       : R2 %7.4f"
+      % cross_val_score(make_pipeline(SimpleImputer(), Ridge()), Xb, y, cv=5).mean())
+flag = np.column_stack([Xb, np.isnan(Xb[:, 0]).astype(float)])
+print("  plus a was-missing flag: R2 %7.4f"
+      % cross_val_score(make_pipeline(SimpleImputer(), Ridge()), flag, y, cv=5).mean())
+print()
+print("  the flag is the only thing that lets the model say 'this row is one")
+print("  of the hidden ones'. the gap itself carried information, and filling")
+print("  it in without a flag throws that information away.")
+print("  SimpleImputer(add_indicator=True) adds those columns for you.")
+print()
+print("so the order of operations is: ask why it is missing, then choose. and")
+print("whatever you choose, put it inside the pipeline -- an imputer fitted on")
+print("the full dataset has already read the test rows.")
+```
+
 """,
     [
         {"q": "What does 'missing not at random' mean?",
@@ -895,6 +1091,82 @@ training fold only. `imblearn`'s pipeline handles this; scikit-learn's does not.
 
 **Assuming a pipeline validates your splits.** It fits each fold correctly. It
 cannot know that your folds mix one patient across both sides.
+
+## The same workflow, wrong then right
+
+Preprocessing outside the pipeline scores higher and is a lie. Here are both versions side by side, on identical data.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline, make_pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import cross_val_score, StratifiedKFold, GridSearchCV
+
+rng = np.random.default_rng(0)
+X = rng.normal(size=(200, 800))         # 800 columns of noise
+y = rng.integers(0, 2, 200)             # a coin-flip label
+cv = StratifiedKFold(5, shuffle=True, random_state=0)
+print("200 rows, 800 noise columns, a random label. nothing is learnable.")
+print()
+
+# the wrong way -- every step fitted on all the data before scoring
+Xs = StandardScaler().fit_transform(X)
+Xk = SelectKBest(f_classif, k=25).fit_transform(Xs, y)
+print("preprocessing first, then cross-validating the model:")
+print("  cv %.4f" % cross_val_score(LogisticRegression(max_iter=2000),
+                                    Xk, y, cv=cv).mean())
+
+pipe = make_pipeline(StandardScaler(), SelectKBest(f_classif, k=25),
+                     LogisticRegression(max_iter=2000))
+print("the same three steps, inside a Pipeline:")
+print("  cv %.4f" % cross_val_score(pipe, X, y, cv=cv).mean())
+print()
+print("identical code, identical data. the first number is a lie because the")
+print("selector saw the test rows' labels. cross_val_score refits every step")
+print("of a Pipeline inside each fold, which is the whole reason it exists.")
+print()
+
+print("a Pipeline is just a list of (name, step) pairs:")
+for name, step in pipe.steps:
+    print("   %-16s %s" % (name, type(step).__name__))
+print("  every step but the last needs fit_transform. the last needs fit.")
+print()
+
+print("you can reach into it to tune any step's parameters:")
+grid = GridSearchCV(pipe, {"selectkbest__k": [5, 25, 100],
+                           "logisticregression__C": [0.01, 1.0]},
+                    cv=cv, n_jobs=1)
+grid.fit(X, y)
+print("  best params:", grid.best_params_)
+print("  best cv score: %.4f  <- still noise, as it should be" % grid.best_score_)
+print("  the double underscore is 'step name, then parameter name'.")
+print()
+
+print("ColumnTransformer handles the realistic case of mixed column types.")
+print("columns 0-2 are numeric with holes; column 3 is a category code:")
+data = np.column_stack([rng.normal(size=(300, 3)),
+                        rng.integers(0, 3, 300).astype(float)])
+data[rng.random(300) < 0.08, 0] = np.nan            # holes in column 0 only
+
+pre = ColumnTransformer([
+    ("numbers", make_pipeline(SimpleImputer(), StandardScaler()), [0, 1, 2]),
+    ("category", OneHotEncoder(handle_unknown="ignore"), [3]),
+])
+out = pre.fit_transform(data)
+print("  %d input columns -> %d output columns" % (data.shape[1], out.shape[1]))
+print("  the numeric three were imputed and scaled; the category became three")
+print("  indicator columns. each transformer only ever touches its own columns.")
+print("  and all of it is refit inside every fold, because it is still a step.")
+print()
+print("one object holds the whole recipe, so the thing you cross-validate is")
+print("the thing you deploy. that is the argument -- not tidiness.")
+```
+
 """,
     [
         {"q": "What does cross-validating a pipeline do that cross-validating a model does not?",
@@ -1059,6 +1331,51 @@ only in calibration. Compare across thresholds, or tune each one.
 
 **Accuracy on imbalanced data.** It measures the class balance more than the
 model.
+
+## The trade you cannot avoid
+
+Precision and recall pull in opposite directions. Sweeping the decision threshold shows exactly how much of one each unit of the other costs.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import precision_score, recall_score, f1_score
+
+X, y = make_classification(n_samples=6000, n_features=15, n_informative=5,
+                           weights=[0.9, 0.1], flip_y=0.08, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.35, random_state=0,
+                                      stratify=y)
+prob = LogisticRegression(max_iter=2000).fit(Xtr, ytr).predict_proba(Xte)[:, 1]
+
+print("%10s %11s %9s %9s %9s %9s"
+      % ("threshold", "flagged", "precision", "recall", "F1", "missed"))
+for t in (0.05, 0.10, 0.20, 0.35, 0.50, 0.70, 0.90):
+    pred = (prob >= t).astype(int)
+    print("%10.2f %11d %9.4f %9.4f %9.4f %9d"
+          % (t, pred.sum(),
+             precision_score(yte, pred, zero_division=0),
+             recall_score(yte, pred, zero_division=0),
+             f1_score(yte, pred, zero_division=0),
+             ((pred == 0) & (yte == 1)).sum()))
+print()
+print("there are %d real positives in this test set." % (yte == 1).sum())
+print()
+print("precision: of everything you flagged, how much was right.")
+print("recall:    of everything that was right, how much you flagged.")
+print("lowering the threshold flags more, so recall rises and precision falls.")
+print()
+print("F1 is their harmonic mean, which is harsh on imbalance between them:")
+for p, r in ((0.9, 0.9), (0.95, 0.85), (1.0, 0.5), (0.5, 1.0)):
+    print("  precision %.2f, recall %.2f -> arithmetic %.3f, F1 %.3f"
+          % (p, r, (p + r) / 2, 2 * p * r / (p + r)))
+print()
+print("which one you optimise is a business decision, not a modelling one:")
+print("  a spam filter wants precision -- a false alarm loses real mail.")
+print("  a cancer screen wants recall  -- a miss is far worse than a recheck.")
+```
+
 """,
     [
         {"q": "What happens to precision and recall as the threshold falls?",
@@ -1842,6 +2159,78 @@ gives a defensible value.
 **Expecting it to work on varying density.** Reach for HDBSCAN instead.
 
 **Reading noise as failure.** Labelling outliers as noise is the feature.
+
+## Clusters by density, and the points left over
+
+DBSCAN finds shapes k-means cannot, decides the number of clusters itself, and labels outliers as noise instead of forcing them somewhere.
+
+```python-run
+import numpy as np
+from sklearn.cluster import DBSCAN, KMeans
+from sklearn.datasets import make_moons, make_blobs
+from sklearn.metrics import adjusted_rand_score
+from sklearn.neighbors import NearestNeighbors
+
+X, y = make_moons(n_samples=600, noise=0.07, random_state=0)
+
+db = DBSCAN(eps=0.2, min_samples=5).fit(X)
+km = KMeans(n_clusters=2, n_init=10, random_state=0).fit(X)
+print("two interleaving crescents -- not round, not separable by a line:")
+print("  DBSCAN  found %d clusters, agreement %.4f"
+      % (len(set(db.labels_)) - (1 if -1 in db.labels_ else 0),
+         adjusted_rand_score(y, db.labels_)))
+print("  k-means told to find 2, agreement %.4f" % adjusted_rand_score(y, km.labels_))
+print("  k-means cuts them in half down the middle, because it can only draw")
+print("  straight boundaries between centres.")
+print()
+
+Xn = np.vstack([X, np.random.default_rng(0).uniform(-2, 3, (40, 2))])
+db2 = DBSCAN(eps=0.2, min_samples=5).fit(Xn)
+print("add 40 scattered junk points:")
+print("  DBSCAN labelled %d of them noise (label -1)" % (db2.labels_ == -1).sum())
+print("  k-means has no such label. every point joins a cluster, wanted or not.")
+print()
+
+print("eps is the radius that defines 'nearby'. it decides everything:")
+print("%8s %12s %10s" % ("eps", "clusters", "noise"))
+for eps in (0.05, 0.10, 0.20, 0.40, 1.00):
+    d = DBSCAN(eps=eps, min_samples=5).fit(X)
+    n_clusters = len(set(d.labels_)) - (1 if -1 in d.labels_ else 0)
+    print("%8.2f %12d %10d" % (eps, n_clusters, (d.labels_ == -1).sum()))
+print("  too small and everything is noise. too large and it is all one blob.")
+print()
+
+print("the usual way to choose eps -- distance to the 5th nearest neighbour:")
+d, _ = NearestNeighbors(n_neighbors=5).fit(X).kneighbors(X)
+k_dist = np.sort(d[:, -1])
+for q in (50, 75, 90, 95, 99):
+    print("  %2dth percentile: %.4f" % (q, np.percentile(k_dist, q)))
+print("  the elbow in that sorted curve is the conventional choice. here it")
+print("  points at roughly 0.10, and eps=0.10 does recover both crescents.")
+print("  0.20 also works -- there is a whole range of values that do, which")
+print("  is the useful thing to know. you are looking for a plateau, not a")
+print("  single correct number.")
+print()
+
+print("min_samples sets how crowded a neighbourhood must be to count as dense:")
+for ms in (3, 5, 10, 30, 60, 120):
+    d2 = DBSCAN(eps=0.2, min_samples=ms).fit(X)
+    print("  min_samples=%2d -> %d clusters, %d noise"
+          % (ms, len(set(d2.labels_)) - (1 if -1 in d2.labels_ else 0),
+             (d2.labels_ == -1).sum()))
+print("  raise it far enough and even the crescents stop counting as dense.")
+print()
+print("where it struggles: clusters of very different density. one eps has to")
+print("serve all of them, and there may not be a value that works for both.")
+Xa, _ = make_blobs(n_samples=[300, 300], centers=[[0, 0], [6, 6]],
+                   cluster_std=[0.3, 2.0], random_state=0)
+for eps in (0.3, 0.8, 1.5):
+    d3 = DBSCAN(eps=eps, min_samples=5).fit(Xa)
+    print("  eps=%.1f -> %d clusters, %d noise"
+          % (eps, len(set(d3.labels_)) - (1 if -1 in d3.labels_ else 0),
+             (d3.labels_ == -1).sum()))
+```
+
 """,
     [
         {"q": "Why can DBSCAN separate two interleaved crescents when k-means cannot?",

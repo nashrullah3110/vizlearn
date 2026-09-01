@@ -49,6 +49,75 @@ Standardise both columns &mdash; subtract the mean, divide by the standard devia
 
 The same logic applies to the <strong>curse of dimensionality</strong>, which hits KNN harder than most models. In high dimensions, distances between all pairs of points converge towards each other: the nearest neighbour is barely nearer than the furthest. With 100 mostly-irrelevant features, "nearest" becomes meaningless and KNN degrades to guessing. Feature selection or PCA before KNN is often the difference between a working model and a coin flip.
 
+## The model that does nothing until you ask
+
+k-NN has no training step worth the name -- it stores the data and does all its work at prediction time. That single fact explains every one of its trade-offs.
+
+```python-run
+import numpy as np
+import time
+from sklearn.datasets import make_classification
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+X, y = make_classification(n_samples=4000, n_features=10, n_informative=5,
+                           flip_y=0.10, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
+
+knn = KNeighborsClassifier(5)
+t0 = time.time(); knn.fit(Xtr, ytr); fit_s = time.time() - t0
+t0 = time.time(); knn.predict(Xte);  pred_s = time.time() - t0
+print("fit took %.4f s, predicting %d rows took %.4f s" % (fit_s, len(Xte), pred_s))
+print("that ratio is backwards from every other model, and it is the point:")
+print("'fitting' is just storing the array.")
+print()
+
+print("one prediction, by hand:")
+row = Xte[0]
+d = np.linalg.norm(Xtr - row, axis=1)
+near = np.argsort(d)[:5]
+print("  the five nearest training rows:")
+for i in near:
+    print("    distance %.4f, label %d" % (d[i], ytr[i]))
+print("  majority vote -> %d" % np.bincount(ytr[near]).argmax())
+print("  sklearn says  -> %d" % knn.predict([row])[0])
+print()
+
+print("k is a smoothing knob:")
+print("%6s %10s %10s" % ("k", "train", "test"))
+for k in (1, 3, 5, 15, 50, 200):
+    m = KNeighborsClassifier(k).fit(Xtr, ytr)
+    print("%6d %10.4f %10.4f" % (k, m.score(Xtr, ytr), m.score(Xte, yte)))
+print("  k=1 scores 1.0000 on training data by definition -- the nearest")
+print("  neighbour of a training point is itself. it means nothing.")
+print()
+
+print("scaling is not optional here, it is the algorithm:")
+Xs = X.copy(); Xs[:, 0] *= 500
+print("  one column x500, raw   : %.4f"
+      % cross_val_score(KNeighborsClassifier(5), Xs, y, cv=5).mean())
+print("  same data, scaled      : %.4f"
+      % cross_val_score(make_pipeline(StandardScaler(), KNeighborsClassifier(5)),
+                        Xs, y, cv=5).mean())
+print()
+
+print("and it degrades as dimensions grow, because distances stop separating:")
+for dim in (2, 5, 20, 100, 400):
+    Xd, yd = make_classification(n_samples=1200, n_features=dim,
+                                 n_informative=2, n_redundant=0,
+                                 flip_y=0.05, random_state=0)
+    s = cross_val_score(make_pipeline(StandardScaler(), KNeighborsClassifier(5)),
+                        Xd, yd, cv=5).mean()
+    print("  %3d features (still only 2 informative): %.4f" % (dim, s))
+print()
+print("the informative signal never changed. the noise dimensions drowned it,")
+print("because every extra dimension adds to the distance whether it means")
+print("anything or not. that is the curse of dimensionality, and k-NN feels it")
+print("harder than almost anything else.")
+```
+
 ## Guided tour
 
 The most crucial parameter in KNN is 'K'. Let's see how it affects the outcome.

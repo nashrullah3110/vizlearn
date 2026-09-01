@@ -87,6 +87,51 @@ Per-class precision and recall are computed by treating each class as the positi
 
 If a heatmap of the matrix shows one bright off-diagonal square, you have found a pair of classes the model cannot tell apart. That is a labelling or feature problem, and no amount of extra training rounds fixes it.
 
+## Read the four cells
+
+Accuracy hides which mistakes a model makes. The confusion matrix does not, and on imbalanced data the difference is the whole story.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, accuracy_score
+
+X, y = make_classification(n_samples=4000, n_features=12, n_informative=4,
+                           weights=[0.94, 0.06], flip_y=0.03, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0,
+                                      stratify=y)
+print("test set: %d negatives, %d positives" % ((yte == 0).sum(), (yte == 1).sum()))
+print()
+
+pred_all_zero = np.zeros_like(yte)
+model = LogisticRegression(max_iter=2000).fit(Xtr, ytr)
+pred_model = model.predict(Xte)
+
+for name, pred in (("predict 0 always", pred_all_zero),
+                   ("logistic regression", pred_model)):
+    tn, fp, fn, tp = confusion_matrix(yte, pred).ravel()
+    print("%s" % name)
+    print("  accuracy %.4f" % accuracy_score(yte, pred))
+    print("                 predicted 0   predicted 1")
+    print("     actual 0  %12d  %12d" % (tn, fp))
+    print("     actual 1  %12d  %12d" % (fn, tp))
+    print("  true positives %d, false negatives %d" % (tp, fn))
+    print()
+
+print("the do-nothing model scores well on accuracy and catches zero positives.")
+print("that is why accuracy alone is not a report -- the matrix is.")
+print()
+print("the four cells, named:")
+print("  TN  correctly said no")
+print("  FP  false alarm        (said yes, was no)")
+print("  FN  miss               (said no,  was yes)")
+print("  TP  correctly said yes")
+print()
+print("every other metric is built from these four numbers.")
+```
+
 ## Experiments to try
 
 1. <strong>Build the paradox.</strong> Set <strong>True Positives (TP)</strong> to 0, <strong>False Negatives (FN)</strong> to 10, <strong>False Positives (FP)</strong> to 0 and <strong>True Negatives (TN)</strong> to 990. Accuracy reads 99% while precision and recall are zero.

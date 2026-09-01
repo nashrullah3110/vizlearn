@@ -60,6 +60,76 @@ The <strong>trick</strong> part is that you never actually compute the mapping. 
 
 For the RBF kernel, `gamma` controls how far each training point's influence reaches. Low gamma means broad influence and smooth boundaries; high gamma means each point only influences its immediate neighbourhood, which produces islands around individual points and overfits enthusiastically. Tuning an RBF SVM means searching over `C` and `gamma` together &mdash; a small grid over powers of ten is the standard approach.
 
+## Only a few rows matter
+
+An SVM's boundary is decided by the handful of points nearest to it. Delete every other row and refit -- the boundary does not move.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification, make_circles
+from sklearn.svm import SVC, LinearSVC
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+X, y = make_classification(n_samples=800, n_features=2, n_informative=2,
+                           n_redundant=0, n_clusters_per_class=1,
+                           class_sep=1.2, random_state=0)
+svm = SVC(kernel="linear", C=1.0).fit(X, y)
+print("trained on %d rows; %d of them are support vectors."
+      % (len(X), len(svm.support_)))
+print()
+
+# refit using ONLY the support vectors
+svm2 = SVC(kernel="linear", C=1.0).fit(X[svm.support_], y[svm.support_])
+print("refit on those %d rows alone:" % len(svm.support_))
+print("  original coefficients", np.round(svm.coef_[0], 6), "b %.6f" % svm.intercept_[0])
+print("  refit coefficients   ", np.round(svm2.coef_[0], 6), "b %.6f" % svm2.intercept_[0])
+print("  identical predictions on all %d rows: %s"
+      % (len(X), (svm.predict(X) == svm2.predict(X)).all()))
+print()
+print("the other %d rows contributed nothing. no other common model has this"
+      % (len(X) - len(svm.support_)))
+print("property -- move a far-away point in logistic regression and the fit shifts.")
+print()
+
+print("C is how much you are willing to pay to avoid a mistake:")
+print("%8s %10s %14s %12s" % ("C", "support", "margin width", "train acc"))
+for C in (0.01, 0.1, 1.0, 100.0):
+    m = SVC(kernel="linear", C=C).fit(X, y)
+    width = 2 / np.linalg.norm(m.coef_[0])
+    print("%8.2f %10d %14.4f %12.4f"
+          % (C, len(m.support_), width, m.score(X, y)))
+print("  small C: a wide margin, more points inside it, more tolerance.")
+print("  large C: a narrow margin that bends to fit awkward points -- overfitting.")
+print()
+
+Xc, yc = make_circles(n_samples=800, noise=0.22, factor=0.5, random_state=0)
+print("the kernel trick, on data no line can split (one ring inside another):")
+for name, m in (("linear kernel", SVC(kernel="linear")),
+                ("polynomial d=3", SVC(kernel="poly", degree=3)),
+                ("rbf kernel", SVC(kernel="rbf"))):
+    print("  %-16s cv accuracy %.4f"
+          % (name, cross_val_score(m, Xc, yc, cv=5).mean()))
+print()
+print("the rbf kernel never builds the higher-dimensional space it implies --")
+print("it only computes distances in it. that is what makes it affordable.")
+print()
+
+print("gamma controls how far one point's influence reaches:")
+print("%10s %10s %10s %10s" % ("gamma", "train", "cv", "gap"))
+for g in (0.01, 0.1, 1.0, 10.0, 100.0, 1000.0):
+    tr = SVC(kernel="rbf", gamma=g).fit(Xc, yc).score(Xc, yc)
+    cv = cross_val_score(SVC(kernel="rbf", gamma=g), Xc, yc, cv=5).mean()
+    print("%10.2f %10.4f %10.4f %10.4f" % (g, tr, cv, tr - cv))
+print()
+print("at gamma 0.01 the influence of each point is so wide that the two rings")
+print("blur into one -- it is barely better than guessing, both ways.")
+print("as gamma climbs, each point gets its own small island: training accuracy")
+print("keeps rising while the honest score turns and falls. the gap column is")
+print("the overfitting, and it is doing exactly what a gap should do.")
+```
+
 ## Guided experiments
 
 Use the canvas above to build your intuition:

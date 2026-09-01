@@ -105,3 +105,78 @@ training fold only. `imblearn`'s pipeline handles this; scikit-learn's does not.
 
 **Assuming a pipeline validates your splits.** It fits each fold correctly. It
 cannot know that your folds mix one patient across both sides.
+
+## The same workflow, wrong then right
+
+Preprocessing outside the pipeline scores higher and is a lie. Here are both versions side by side, on identical data.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline, make_pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import cross_val_score, StratifiedKFold, GridSearchCV
+
+rng = np.random.default_rng(0)
+X = rng.normal(size=(200, 800))         # 800 columns of noise
+y = rng.integers(0, 2, 200)             # a coin-flip label
+cv = StratifiedKFold(5, shuffle=True, random_state=0)
+print("200 rows, 800 noise columns, a random label. nothing is learnable.")
+print()
+
+# the wrong way -- every step fitted on all the data before scoring
+Xs = StandardScaler().fit_transform(X)
+Xk = SelectKBest(f_classif, k=25).fit_transform(Xs, y)
+print("preprocessing first, then cross-validating the model:")
+print("  cv %.4f" % cross_val_score(LogisticRegression(max_iter=2000),
+                                    Xk, y, cv=cv).mean())
+
+pipe = make_pipeline(StandardScaler(), SelectKBest(f_classif, k=25),
+                     LogisticRegression(max_iter=2000))
+print("the same three steps, inside a Pipeline:")
+print("  cv %.4f" % cross_val_score(pipe, X, y, cv=cv).mean())
+print()
+print("identical code, identical data. the first number is a lie because the")
+print("selector saw the test rows' labels. cross_val_score refits every step")
+print("of a Pipeline inside each fold, which is the whole reason it exists.")
+print()
+
+print("a Pipeline is just a list of (name, step) pairs:")
+for name, step in pipe.steps:
+    print("   %-16s %s" % (name, type(step).__name__))
+print("  every step but the last needs fit_transform. the last needs fit.")
+print()
+
+print("you can reach into it to tune any step's parameters:")
+grid = GridSearchCV(pipe, {"selectkbest__k": [5, 25, 100],
+                           "logisticregression__C": [0.01, 1.0]},
+                    cv=cv, n_jobs=1)
+grid.fit(X, y)
+print("  best params:", grid.best_params_)
+print("  best cv score: %.4f  <- still noise, as it should be" % grid.best_score_)
+print("  the double underscore is 'step name, then parameter name'.")
+print()
+
+print("ColumnTransformer handles the realistic case of mixed column types.")
+print("columns 0-2 are numeric with holes; column 3 is a category code:")
+data = np.column_stack([rng.normal(size=(300, 3)),
+                        rng.integers(0, 3, 300).astype(float)])
+data[rng.random(300) < 0.08, 0] = np.nan            # holes in column 0 only
+
+pre = ColumnTransformer([
+    ("numbers", make_pipeline(SimpleImputer(), StandardScaler()), [0, 1, 2]),
+    ("category", OneHotEncoder(handle_unknown="ignore"), [3]),
+])
+out = pre.fit_transform(data)
+print("  %d input columns -> %d output columns" % (data.shape[1], out.shape[1]))
+print("  the numeric three were imputed and scaled; the category became three")
+print("  indicator columns. each transformer only ever touches its own columns.")
+print("  and all of it is refit inside every fold, because it is still a step.")
+print()
+print("one object holds the whole recipe, so the thing you cross-validate is")
+print("the thing you deploy. that is the argument -- not tidiness.")
+```

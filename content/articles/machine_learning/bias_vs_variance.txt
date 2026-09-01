@@ -75,6 +75,67 @@ This lab gives you direct control over a model's bias and variance to see how th
 - <strong>The Goal:</strong> Your goal is to find a balance that minimizes the <strong>Total Error (Val MSE)</strong>. This is the ultimate measure of your model's performance on unseen data.
 - <strong>The "Resample Data" Button:</strong> This is the most important button! Clicking it simulates getting a completely new dataset from the same underlying source. It powerfully demonstrates the concept of variance: a high-variance model will change drastically with each new sample, while a low-variance model will remain stable.
 
+## Decompose the error into its two halves
+
+Train the same model on 250 different samples of the same problem, then measure how wrong it is on average and how much it moves between samples. Those are bias and variance, measured rather than described.
+
+```python-run
+import numpy as np
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import make_pipeline
+
+TRUTH = lambda x: np.sin(1.5 * x) + 0.3 * x
+x_test = np.linspace(0.2, 5.8, 120).reshape(-1, 1)
+truth_test = TRUTH(x_test.ravel())
+
+def decompose(make_model, runs=250, n=40, noise=0.6):
+    rng = np.random.default_rng(0)
+    preds = np.empty((runs, len(x_test)))
+    for r in range(runs):
+        x = rng.uniform(0, 6, n).reshape(-1, 1)
+        y = TRUTH(x.ravel()) + rng.normal(0, noise, n)
+        preds[r] = make_model().fit(x, y).predict(x_test)
+    bias2 = ((preds.mean(axis=0) - truth_test) ** 2).mean()
+    return bias2, preds.var(axis=0).mean()
+
+def poly(d):
+    return lambda: make_pipeline(PolynomialFeatures(d), LinearRegression())
+
+print("truth: sin(1.5x) + 0.3x.  each sample is 40 noisy points from it.")
+print("250 samples, one model refit on every one of them.")
+print()
+print("%-24s %10s %10s %10s" % ("model", "bias^2", "variance", "total"))
+rows = []
+for name, mk in ([("polynomial deg %d" % d, poly(d)) for d in (1, 3, 5, 7, 9)]
+                 + [("tree, depth 2",   lambda: DecisionTreeRegressor(max_depth=2)),
+                    ("tree, depth 5",   lambda: DecisionTreeRegressor(max_depth=5)),
+                    ("tree, unlimited", lambda: DecisionTreeRegressor())]):
+    b, v = decompose(mk)
+    rows.append((name, b + v))
+    print("%-24s %10.4f %10.4f %10.4f" % (name, b, v, b + v))
+print()
+print("lowest total error: %s (%.4f)" % min(rows, key=lambda r: r[1]))
+print()
+print("read the two columns against each other:")
+print("  bias^2 falls as the model gets more flexible -- it can finally reach")
+print("         the shape of the truth. deg 1 cannot bend at all, so it is stuck.")
+print("  variance rises as it gets more flexible -- it starts fitting the noise,")
+print("         and the noise is different in every sample.")
+print("  the total is a U. finding the bottom of it is most of what tuning is.")
+print()
+print("bias^2 is how far the AVERAGE prediction sits from the truth. more data")
+print("will not fix it, because the model cannot express the shape it needs.")
+print("variance is how much one prediction moves when the training sample")
+print("changes. that error does shrink with more data, or with less capacity.")
+print()
+print("the trees show the same arc: depth 2 is biased, unlimited depth has")
+print("almost none and pays for it in variance. averaging many deep trees is")
+print("exactly what a random forest does,")
+print("and it is why bagging helps trees far more than it helps a straight line.")
+```
+
 ## Try it yourself
 
 Try these experiments to build a strong intuition.

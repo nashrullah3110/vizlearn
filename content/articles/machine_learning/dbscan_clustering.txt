@@ -93,3 +93,74 @@ gives a defensible value.
 **Expecting it to work on varying density.** Reach for HDBSCAN instead.
 
 **Reading noise as failure.** Labelling outliers as noise is the feature.
+
+## Clusters by density, and the points left over
+
+DBSCAN finds shapes k-means cannot, decides the number of clusters itself, and labels outliers as noise instead of forcing them somewhere.
+
+```python-run
+import numpy as np
+from sklearn.cluster import DBSCAN, KMeans
+from sklearn.datasets import make_moons, make_blobs
+from sklearn.metrics import adjusted_rand_score
+from sklearn.neighbors import NearestNeighbors
+
+X, y = make_moons(n_samples=600, noise=0.07, random_state=0)
+
+db = DBSCAN(eps=0.2, min_samples=5).fit(X)
+km = KMeans(n_clusters=2, n_init=10, random_state=0).fit(X)
+print("two interleaving crescents -- not round, not separable by a line:")
+print("  DBSCAN  found %d clusters, agreement %.4f"
+      % (len(set(db.labels_)) - (1 if -1 in db.labels_ else 0),
+         adjusted_rand_score(y, db.labels_)))
+print("  k-means told to find 2, agreement %.4f" % adjusted_rand_score(y, km.labels_))
+print("  k-means cuts them in half down the middle, because it can only draw")
+print("  straight boundaries between centres.")
+print()
+
+Xn = np.vstack([X, np.random.default_rng(0).uniform(-2, 3, (40, 2))])
+db2 = DBSCAN(eps=0.2, min_samples=5).fit(Xn)
+print("add 40 scattered junk points:")
+print("  DBSCAN labelled %d of them noise (label -1)" % (db2.labels_ == -1).sum())
+print("  k-means has no such label. every point joins a cluster, wanted or not.")
+print()
+
+print("eps is the radius that defines 'nearby'. it decides everything:")
+print("%8s %12s %10s" % ("eps", "clusters", "noise"))
+for eps in (0.05, 0.10, 0.20, 0.40, 1.00):
+    d = DBSCAN(eps=eps, min_samples=5).fit(X)
+    n_clusters = len(set(d.labels_)) - (1 if -1 in d.labels_ else 0)
+    print("%8.2f %12d %10d" % (eps, n_clusters, (d.labels_ == -1).sum()))
+print("  too small and everything is noise. too large and it is all one blob.")
+print()
+
+print("the usual way to choose eps -- distance to the 5th nearest neighbour:")
+d, _ = NearestNeighbors(n_neighbors=5).fit(X).kneighbors(X)
+k_dist = np.sort(d[:, -1])
+for q in (50, 75, 90, 95, 99):
+    print("  %2dth percentile: %.4f" % (q, np.percentile(k_dist, q)))
+print("  the elbow in that sorted curve is the conventional choice. here it")
+print("  points at roughly 0.10, and eps=0.10 does recover both crescents.")
+print("  0.20 also works -- there is a whole range of values that do, which")
+print("  is the useful thing to know. you are looking for a plateau, not a")
+print("  single correct number.")
+print()
+
+print("min_samples sets how crowded a neighbourhood must be to count as dense:")
+for ms in (3, 5, 10, 30, 60, 120):
+    d2 = DBSCAN(eps=0.2, min_samples=ms).fit(X)
+    print("  min_samples=%2d -> %d clusters, %d noise"
+          % (ms, len(set(d2.labels_)) - (1 if -1 in d2.labels_ else 0),
+             (d2.labels_ == -1).sum()))
+print("  raise it far enough and even the crescents stop counting as dense.")
+print()
+print("where it struggles: clusters of very different density. one eps has to")
+print("serve all of them, and there may not be a value that works for both.")
+Xa, _ = make_blobs(n_samples=[300, 300], centers=[[0, 0], [6, 6]],
+                   cluster_std=[0.3, 2.0], random_state=0)
+for eps in (0.3, 0.8, 1.5):
+    d3 = DBSCAN(eps=eps, min_samples=5).fit(Xa)
+    print("  eps=%.1f -> %d clusters, %d noise"
+          % (eps, len(set(d3.labels_)) - (1 if -1 in d3.labels_ else 0),
+             (d3.labels_ == -1).sum()))
+```

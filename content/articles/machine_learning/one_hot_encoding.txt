@@ -141,6 +141,87 @@ model.predict(X_new)             # unseen categories become all-zero rows
 
 `handle_unknown="ignore"` is what stops an unfamiliar city from crashing the service: the row simply gets zeros across all the city columns, which the model reads as "none of the known cities". Not ideal, but far better than an exception at request time.
 
+## Why not just number the categories
+
+Label-encoding a category invents an order that is not there. This shows the damage, the one-hot fix, and the column explosion that follows.
+
+```python-run
+import numpy as np
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import cross_val_score
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import make_pipeline
+
+rng = np.random.default_rng(0)
+cities = np.array(["london", "paris", "tokyo", "lagos", "lima"])
+# rent depends on the city, in no particular order
+base = {"london": 40, "paris": 32, "tokyo": 45, "lagos": 12, "lima": 15}
+idx = rng.integers(0, 5, 1200)
+city = cities[idx]
+rent = np.array([base[c] for c in city]) + rng.normal(0, 3, 1200)
+X_cat = city.reshape(-1, 1)
+
+ordinal = OrdinalEncoder().fit(X_cat)
+print("ordinal encoding assigns numbers alphabetically:")
+for c, n in zip(ordinal.categories_[0], range(5)):
+    print("   %-8s -> %d   (real average rent %.1f)" % (c, n, rent[city == c].mean()))
+print()
+print("that ordering says lagos < lima < london < paris < tokyo, and that")
+print("the gap from lagos to lima equals the gap from paris to tokyo. neither")
+print("is true. a linear model believes both:")
+Xo = ordinal.transform(X_cat)
+print("  linear regression on ordinal codes : R2 %.4f"
+      % cross_val_score(LinearRegression(), Xo, rent, cv=5).mean())
+
+onehot = OneHotEncoder(sparse_output=False).fit(X_cat)
+Xh = onehot.transform(X_cat)
+print("  linear regression on one-hot       : R2 %.4f"
+      % cross_val_score(LinearRegression(), Xh, rent, cv=5).mean())
+print()
+print("one-hot gives each city its own column and its own free coefficient:")
+print("  columns:", list(onehot.get_feature_names_out(["city"])))
+print("  first three rows:")
+for i in range(3):
+    print("    %-8s %s" % (city[i], Xh[i].astype(int)))
+print()
+lin = LinearRegression(fit_intercept=False).fit(Xh, rent)
+for name, c in zip(onehot.get_feature_names_out(["city"]), lin.coef_):
+    print("   %-14s coefficient %8.3f" % (name, c))
+print("  with no intercept, each coefficient IS that city's average rent.")
+print("  no ordering was assumed, so none was imposed.")
+print()
+print("note the fit_intercept=False. keep the intercept and all five columns")
+print("and they sum to 1 in every row, which makes the system singular -- the")
+print("coefficients come back as astronomical numbers that cancel out. that is")
+print("the dummy variable trap, and drop='first' is the usual answer to it.")
+print()
+
+print("trees are less bothered, because a split is a set membership test:")
+print("  random forest on ordinal codes : R2 %.4f"
+      % cross_val_score(RandomForestRegressor(n_estimators=100, random_state=0),
+                        Xo, rent, cv=5).mean())
+print("  random forest on one-hot       : R2 %.4f"
+      % cross_val_score(RandomForestRegressor(n_estimators=100, random_state=0),
+                        Xh, rent, cv=5).mean())
+print("  it can carve out one code with two splits. it just costs depth.")
+print()
+
+print("the cost of one-hot is width. with high-cardinality columns:")
+for n_cat in (5, 50, 500, 5000):
+    print("   %5d categories -> %5d columns" % (n_cat, n_cat))
+print("  at that point you want target encoding, hashing, or an embedding.")
+print()
+print("two practical notes:")
+print("  handle_unknown='ignore' stops an unseen category crashing predict().")
+print("  drop='first' removes one column to avoid perfect collinearity, which")
+print("  matters for linear models and not at all for trees.")
+enc = OneHotEncoder(sparse_output=False, drop="first").fit(X_cat)
+print("  with drop='first': %d columns instead of %d"
+      % (enc.transform(X_cat).shape[1], Xh.shape[1]))
+```
+
 ## Questions people ask
 
 <strong>Should I one-hot encode the target?</strong> For multi-class classification with a neural network and categorical cross-entropy, yes. With scikit-learn classifiers and sparse categorical loss, no &mdash; integer labels are what they expect.

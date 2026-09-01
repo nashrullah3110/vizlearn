@@ -104,3 +104,74 @@ removes a lot of data.
 
 **Never checking why.** Ten minutes finding out what caused the gap is worth
 more than any choice of strategy.
+
+## Dropping, filling, and the flag that saves you
+
+Whether a gap can be safely filled depends entirely on WHY it is missing. Two datasets with the same 30% hole rate, and only one of them is fixable by imputation.
+
+```python-run
+import numpy as np
+from sklearn.linear_model import Ridge
+from sklearn.impute import SimpleImputer, KNNImputer
+from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.model_selection import cross_val_score
+from sklearn.pipeline import make_pipeline
+
+rng = np.random.default_rng(0)
+n = 700
+X = rng.normal(size=(n, 6))
+y = 5 * X[:, 0] + 2 * X[:, 1] - X[:, 2] + rng.normal(0, 2.0, n)
+print("feature 0 is the dominant predictor. with no gaps at all: R2 %.4f"
+      % cross_val_score(Ridge(), X, y, cv=5).mean())
+print()
+
+print("CASE 1 -- missing completely at random (a sensor dropped packets).")
+Xa = X.copy()
+Xa[rng.random(Xa.shape) < 0.30] = np.nan
+keep = ~np.isnan(Xa).any(axis=1)
+print("  30%% of cells gone, which costs %d of the %d rows entirely."
+      % (n - keep.sum(), n))
+print("  drop incomplete rows : R2 %7.4f  (on %d rows)"
+      % (cross_val_score(Ridge(), Xa[keep], y[keep], cv=5).mean(), keep.sum()))
+for name, imp in (("fill with mean  ", SimpleImputer(strategy="mean")),
+                  ("fill with median", SimpleImputer(strategy="median")),
+                  ("k-NN imputer    ", KNNImputer(n_neighbors=5))):
+    print("  %s : R2 %7.4f"
+          % (name, cross_val_score(make_pipeline(imp, Ridge()), Xa, y, cv=5).mean()))
+print("  HistGradientBoosting : R2 %7.4f   <- takes NaN directly"
+      % cross_val_score(HistGradientBoostingRegressor(random_state=0),
+                        Xa, y, cv=5).mean())
+print()
+print("  dropping rows is not WRONG here -- the surviving rows are a fair")
+print("  sample. it is just wasteful, and it gets worse as columns multiply:")
+for cols in (6, 12, 25, 50):
+    print("     %2d columns at 30%% missing -> %.1f%% of rows survive intact"
+          % (cols, 100 * 0.7 ** cols))
+print()
+
+print("CASE 2 -- missing for a reason (high earners skip the income question).")
+Xb = X.copy()
+hide = X[:, 0] > np.percentile(X[:, 0], 65)
+Xb[hide, 0] = np.nan
+print("  feature 0 is missing on exactly the %d rows where it is high." % hide.sum())
+print("  mean of the values that survived: %7.4f" % np.nanmean(Xb[:, 0]))
+print("  mean of the values that vanished: %7.4f" % X[hide, 0].mean())
+print("  imputation fills the first number into rows that deserve the second.")
+print()
+print("  drop incomplete rows  : R2 %7.4f  (on %d rows, all low earners)"
+      % (cross_val_score(Ridge(), X[~hide], y[~hide], cv=5).mean(), (~hide).sum()))
+print("  mean imputation       : R2 %7.4f"
+      % cross_val_score(make_pipeline(SimpleImputer(), Ridge()), Xb, y, cv=5).mean())
+flag = np.column_stack([Xb, np.isnan(Xb[:, 0]).astype(float)])
+print("  plus a was-missing flag: R2 %7.4f"
+      % cross_val_score(make_pipeline(SimpleImputer(), Ridge()), flag, y, cv=5).mean())
+print()
+print("  the flag is the only thing that lets the model say 'this row is one")
+print("  of the hidden ones'. the gap itself carried information, and filling")
+print("  it in without a flag throws that information away.")
+print("  SimpleImputer(add_indicator=True) adds those columns for you.")
+print()
+print("so the order of operations is: ask why it is missing, then choose. and")
+print("whatever you choose, put it inside the pipeline -- an imputer fitted on")
+print("the full dataset has already read the test rows.")
+```

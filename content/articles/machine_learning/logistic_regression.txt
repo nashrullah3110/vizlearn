@@ -106,6 +106,70 @@ And a short honest comparison of when to reach elsewhere:
 
 That last row is underrated. Add squared terms, interactions or splines and a logistic model handles curved boundaries perfectly well &mdash; it is linear in its parameters, not in your data.
 
+## A line, then a squash
+
+Logistic regression is linear regression's output pushed through a sigmoid. Computing the probability by hand from the coefficients shows there is nothing else in the box.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, log_loss
+
+X, y = make_classification(n_samples=3000, n_features=4, n_informative=3,
+                           n_redundant=0, n_clusters_per_class=1,
+                           flip_y=0.05, class_sep=1.4, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
+model = LogisticRegression().fit(Xtr, ytr)
+
+print("coefficients", np.round(model.coef_[0], 4))
+print("intercept   %.4f" % model.intercept_[0])
+print()
+
+sigmoid = lambda z: 1 / (1 + np.exp(-z))
+row = Xte[0]
+z = row @ model.coef_[0] + model.intercept_[0]
+print("one row, done by hand:")
+print("  features     ", np.round(row, 4))
+print("  w . x + b  = %.6f     <- this is just linear regression" % z)
+print("  sigmoid(z) = %.6f     <- squashed into (0, 1)" % sigmoid(z))
+print("  sklearn says %.6f" % model.predict_proba([row])[0, 1])
+print()
+
+print("the sigmoid, at a few points:")
+for zz in (-6, -2, -0.5, 0, 0.5, 2, 6):
+    print("   z=%5.1f -> %.6f" % (zz, sigmoid(zz)))
+print("  z=0 is the decision boundary, where the model is exactly undecided.")
+print()
+
+print("what the coefficients mean -- multiply the ODDS, not the probability:")
+for i, c in enumerate(model.coef_[0]):
+    print("   feature %d: +1 unit multiplies the odds by %.4f" % (i, np.exp(c)))
+print()
+p = model.predict_proba(Xte)[:, 1]
+big = int(np.argmax(np.abs(model.coef_[0])))
+print("   take feature %d, the strongest one (odds x %.4f):"
+      % (big, np.exp(model.coef_[0][big])))
+for base in (0.10, 0.50, 0.90):
+    odds = base / (1 - base)
+    new = odds * np.exp(model.coef_[0][big])
+    print("     a row at p=%.2f moves to p=%.4f, a change of %+.4f"
+          % (base, new / (1 + new), new / (1 + new) - base))
+print("   one coefficient, three different-sized changes. that is why you")
+print("   cannot read a logistic coefficient as 'adds N% to the chance' --")
+print("   it adds a constant amount to the LOG ODDS, not to the probability.")
+print()
+
+print("it is trained on log loss, not accuracy:")
+print("  accuracy %.4f, log loss %.4f" % (accuracy_score(yte, model.predict(Xte)),
+                                          log_loss(yte, p)))
+print("  log loss punishes confident mistakes specifically:")
+for prob, truth in ((0.99, 1), (0.60, 1), (0.40, 1), (0.01, 1)):
+    print("    said %.2f, answer was %d -> loss %.4f"
+          % (prob, truth, -np.log(prob if truth else 1 - prob)))
+```
+
 ## Things to try
 
 1. <strong>Let it find the answer.</strong> Click <strong>Fit with Gradient Descent</strong> and watch the boundary swing into position while log loss falls. The weights that arrive are the ones that make the observed labels most likely.

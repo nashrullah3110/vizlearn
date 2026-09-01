@@ -68,6 +68,58 @@ A <strong>precision&ndash;recall curve</strong> does not have this problem, beca
 
 The rule of thumb: report ROC-AUC when classes are roughly balanced or when both classes matter equally, and PR-AUC when positives are rare and the cost of a false alarm is borne by a human.
 
+## One number that ignores your threshold
+
+AUC is the probability that a random positive scores above a random negative. That is not a metaphor -- here it is, counted directly.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_curve, roc_auc_score
+
+X, y = make_classification(n_samples=5000, n_features=15, n_informative=5,
+                           weights=[0.8, 0.2], flip_y=0.10, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.35, random_state=0,
+                                      stratify=y)
+
+models = {
+    "logistic regression": LogisticRegression(max_iter=2000),
+    "random forest":       RandomForestClassifier(n_estimators=200, random_state=0),
+}
+probs = {}
+for name, m in models.items():
+    probs[name] = m.fit(Xtr, ytr).predict_proba(Xte)[:, 1]
+    print("%-22s AUC %.4f" % (name, roc_auc_score(yte, probs[name])))
+
+rng = np.random.default_rng(0)
+print("%-22s AUC %.4f  <- coin flip" % ("random scores", roc_auc_score(yte, rng.random(len(yte)))))
+print()
+
+p = probs["random forest"]
+pos, neg = p[yte == 1], p[yte == 0]
+pairs = 200_000
+a = pos[rng.integers(0, len(pos), pairs)]
+b = neg[rng.integers(0, len(neg), pairs)]
+print("what AUC literally means -- draw one positive and one negative at random:")
+print("  the positive scored higher in %.4f of %d draws"
+      % (((a > b) + 0.5 * (a == b)).mean(), pairs))
+print("  roc_auc_score says              %.4f" % roc_auc_score(yte, p))
+print()
+
+fpr, tpr, thr = roc_curve(yte, p)
+print("the curve is just every threshold at once:")
+print("%12s %10s %10s" % ("threshold", "FPR", "TPR"))
+for i in np.linspace(1, len(thr) - 2, 8).astype(int):
+    print("%12.4f %10.4f %10.4f" % (thr[i], fpr[i], tpr[i]))
+print()
+print("AUC is the area under that curve. it never looks at a threshold, which")
+print("is its strength when comparing models and its weakness when you have to")
+print("ship one -- shipping means choosing a point on the curve.")
+```
+
 ## Guided tour
 
 1. <strong>Watch the point travel.</strong> Set the <strong>Threshold</strong> slider to 0.9. Very few things are predicted positive: FPR is near zero, but so is recall, and the operating point sits in the bottom-left of the curve. Now set the <strong>Threshold</strong> slider to 0.1 and it swings to the top-right &mdash; you catch nearly every positive, at the cost of flagging most negatives.

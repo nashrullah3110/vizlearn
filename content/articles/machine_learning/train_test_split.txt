@@ -89,6 +89,52 @@ The classic mistakes:
 
 The structural fix for the first four is a `Pipeline`, which forces every preprocessing step to be fitted inside the training fold. It is not a style preference; it is the mechanism that makes the split mean something.
 
+## Why the split has to happen first
+
+The same model scored on data it has seen and data it has not. The gap is the entire reason the split exists.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+
+X, y = make_classification(n_samples=2000, n_features=20, n_informative=6,
+                           flip_y=0.15, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
+print("train %d rows, test %d rows" % (len(Xtr), len(Xte)))
+print()
+
+tree = DecisionTreeClassifier(random_state=0).fit(Xtr, ytr)
+print("a tree grown to full depth:")
+print("  accuracy on data it trained on : %.4f" % accuracy_score(ytr, tree.predict(Xtr)))
+print("  accuracy on data it never saw  : %.4f" % accuracy_score(yte, tree.predict(Xte)))
+print("  it memorised the training set. the second number is the real one.")
+print()
+
+print("depth-limited, the gap closes and the honest score goes up:")
+print("%8s %12s %12s" % ("depth", "train", "test"))
+for d in (2, 3, 5, 8, 12, None):
+    t = DecisionTreeClassifier(max_depth=d, random_state=0).fit(Xtr, ytr)
+    print("%8s %12.4f %12.4f"
+          % (d, accuracy_score(ytr, t.predict(Xtr)), accuracy_score(yte, t.predict(Xte))))
+print()
+
+print("the split size is a trade, and small test sets are noisy:")
+for frac in (0.1, 0.2, 0.3, 0.5):
+    scores = []
+    for seed in range(30):
+        a, b, c, d2 = train_test_split(X, y, test_size=frac, random_state=seed)
+        m = DecisionTreeClassifier(max_depth=5, random_state=0).fit(a, c)
+        scores.append(accuracy_score(d2, m.predict(b)))
+    print("  test_size=%.1f (%4d rows): mean %.4f, spread across seeds %.4f"
+          % (frac, int(frac * len(X)), np.mean(scores), np.std(scores)))
+print()
+print("a 10% test set moves around nearly twice as much as a 50% one. that")
+print("spread is why one split is a weak estimate, and why cross-validation exists.")
+```
+
 ## Questions people ask
 
 <strong>What split ratio should I use?</strong> 80/20 for small datasets, 70/15/15 when you need a validation set, and much smaller test fractions when you have millions of rows. Absolute size matters more than the percentage.

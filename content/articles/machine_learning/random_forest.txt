@@ -69,6 +69,68 @@ What <em>can</em> overfit is each individual tree, which is why `min_samples_lea
 
 The practical implication: pick `n_estimators` from your compute budget, not from a validation curve. 100 for iteration, 500 or more for a final model.
 
+## Where the improvement actually comes from
+
+A forest beats one tree by averaging away variance, not bias. This measures both halves so you can see which one it fixed.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, BaggingClassifier
+from sklearn.model_selection import train_test_split, cross_val_score
+
+X, y = make_classification(n_samples=2500, n_features=20, n_informative=6,
+                           flip_y=0.12, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
+
+print("one tree, refit on six different bootstrap resamples of the same data:")
+rng = np.random.default_rng(0)
+preds = []
+for i in range(6):
+    idx = rng.integers(0, len(Xtr), len(Xtr))
+    t = DecisionTreeClassifier(random_state=0).fit(Xtr[idx], ytr[idx])
+    preds.append(t.predict(Xte))
+    print("   resample %d: accuracy %.4f" % (i, (preds[-1] == yte).mean()))
+preds = np.array(preds)
+disagree = (preds != preds[0]).any(axis=0).sum()
+print("  the six trees disagree with each other on %d of %d test rows."
+      % (disagree, len(yte)))
+print("  that instability IS the variance a forest removes.")
+print()
+
+for name, model in (
+    ("one tree",                DecisionTreeClassifier(random_state=0)),
+    ("bagging, 200 trees",      BaggingClassifier(DecisionTreeClassifier(),
+                                                  n_estimators=200, random_state=0)),
+    ("random forest, 200",      RandomForestClassifier(n_estimators=200, random_state=0)),
+):
+    s = cross_val_score(model, X, y, cv=5)
+    print("%-24s cv %.4f  (folds sd %.4f)" % (name, s.mean(), s.std()))
+print()
+print("bagging alone gets most of it. the extra step a forest adds is picking")
+print("a random subset of features at each split, which makes the trees less")
+print("similar to each other -- and averaging helps more the less they agree.")
+print()
+
+print("max_features is that knob:")
+for mf in (1, 2, 4, 8, 20):
+    s = cross_val_score(RandomForestClassifier(n_estimators=200, max_features=mf,
+                                               random_state=0), X, y, cv=5)
+    print("  max_features=%2d  cv %.4f" % (mf, s.mean()))
+print("  max_features=20 is every feature, which is plain bagging.")
+print()
+
+print("more trees never hurts, it just stops helping:")
+for k in (5, 25, 100, 400):
+    s = cross_val_score(RandomForestClassifier(n_estimators=k, random_state=0),
+                        X, y, cv=5)
+    print("  %3d trees  cv %.4f" % (k, s.mean()))
+print()
+print("that is the useful property: n_estimators is not a thing you tune for")
+print("overfitting. you raise it until the score flattens, then stop paying.")
+```
+
 ## Experiments to try
 
 1. <strong>Start with the problem.</strong> Set the <strong>Number of Trees</strong> slider to 1. The boundary is a jagged staircase with isolated islands carved around individual mislabelled points. Train accuracy is near perfect and test accuracy is not &mdash; and pressing <strong>Regrow Forest</strong> four or five times swings test accuracy by several points. Watch Accuracy Spread: that swing is the variance bagging exists to remove.

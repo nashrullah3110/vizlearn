@@ -107,6 +107,78 @@ A typical curve on data with three real groups reads something like 5400, 1900, 
 
 When the curve is a smooth slide with no bend, that is information too: your data probably has no clean group structure, and any k you pick is a slice through a continuum rather than a discovery.
 
+## Run the algorithm by hand, then check it
+
+k-means is two steps repeated until nothing moves. Both steps are five lines each, and watching the inertia fall makes the stopping rule obvious.
+
+```python-run
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+from sklearn.metrics import adjusted_rand_score, silhouette_score
+
+X, true_labels = make_blobs(n_samples=600, centers=4, cluster_std=1.1,
+                            random_state=0)
+
+rng = np.random.default_rng(0)
+centres = X[rng.choice(len(X), 4, replace=False)]
+print("k-means by hand, from four random starting centres:")
+for step in range(8):
+    d = np.linalg.norm(X[:, None, :] - centres[None, :, :], axis=2)
+    labels = d.argmin(axis=1)                       # step 1: assign
+    inertia = (d.min(axis=1) ** 2).sum()
+    moved = 0.0
+    for c in range(4):                              # step 2: move centres
+        if (labels == c).any():
+            new = X[labels == c].mean(axis=0)
+            moved += np.linalg.norm(new - centres[c])
+            centres[c] = new
+    print("  step %d: inertia %10.2f   centres moved %8.4f" % (step, inertia, moved))
+print("  once the centres stop moving, the assignment cannot change either.")
+print("  that is the whole convergence argument.")
+print()
+
+km = KMeans(n_clusters=4, n_init=10, random_state=0).fit(X)
+print("scikit-learn inertia %.2f (ours %.2f)" % (km.inertia_, inertia))
+print("agreement with the true blobs: %.4f"
+      % adjusted_rand_score(true_labels, km.labels_))
+print()
+
+print("it always finds k clusters, whether or not there are k:")
+print("%5s %12s %14s" % ("k", "inertia", "silhouette"))
+for k in (2, 3, 4, 5, 6, 8, 12):
+    m = KMeans(n_clusters=k, n_init=10, random_state=0).fit(X)
+    print("%5d %12.2f %14.4f"
+          % (k, m.inertia_, silhouette_score(X, m.labels_)))
+print("  inertia falls forever -- at k = n it reaches zero. it cannot pick k.")
+print("  silhouette peaks at the real answer, which is why it is the better guide.")
+print()
+
+print("the starting point matters. on a harder set of 9 overlapping blobs:")
+Xh, _ = make_blobs(n_samples=900, centers=9, cluster_std=1.6, random_state=3)
+runs = [KMeans(n_clusters=9, n_init=1, init="random",
+               random_state=s).fit(Xh).inertia_ for s in range(8)]
+for s_, v in enumerate(runs):
+    print("  single random start, seed %d: inertia %10.2f" % (s_, v))
+print("  best %.2f, worst %.2f -- a %.1f%% difference from the same data"
+      % (min(runs), max(runs), 100 * (max(runs) / min(runs) - 1)))
+print("  k-means++ start, n_init=10 : inertia %10.2f"
+      % KMeans(n_clusters=9, n_init=10, random_state=0).fit(Xh).inertia_)
+print()
+print("  every one of those runs converged. they just converged to different")
+print("  local minima. n_init runs it repeatedly and keeps the best, and")
+print("  k-means++ spreads the initial centres out so fewer runs are wasted.")
+print()
+
+print("and it assumes round, similar-sized clusters. stretch one and watch:")
+Xs = X.copy()
+Xs[:, 0] *= 6
+m = KMeans(n_clusters=4, n_init=10, random_state=0).fit(Xs)
+print("  agreement after stretching one axis 6x: %.4f"
+      % adjusted_rand_score(true_labels, m.labels_))
+print("  the blobs are the same points. only the units changed.")
+```
+
 ## Guided experiments
 
 1. <strong>Watch the two steps alternate.</strong> Press <strong>Step Algorithm</strong> repeatedly. Assignments change, then centroids move, then assignments change again &mdash; and the movements shrink each round.
