@@ -6217,6 +6217,10 @@ Split off a validation set, or use cross-validation, keeping the test set untouc
 
 The whole thing is about fifteen lines and it is the difference between a model whose reported performance is achievable and one whose numbers came from a decision nobody made.
 
+<strong>Can the threshold be above 0.5?</strong> Yes, and it should be whenever false alarms are the expensive mistake - a spam filter that deletes mail, say. Nothing restricts it to the lower half.
+
+<strong>Why does my precision-recall curve have one more point than thresholds?</strong> The curve includes the endpoint where everything is predicted negative, which has no threshold. Index with `[:-1]` when pairing them.
+
 ## Things to try
 
 1. <strong>Read the second editor properly.</strong> At the default threshold the model catches 2.2% of positives. It is a good model being asked a bad question.
