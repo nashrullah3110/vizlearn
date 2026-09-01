@@ -231,6 +231,20 @@ The use to be careful with is treating clusters as though they were discovered c
 
 <strong>Should the clustering go in a pipeline?</strong> Yes, if its output feeds a supervised model - otherwise the cluster labels are learned from the test rows too.
 
+## Reading the clusters once you have them
+
+Fitting takes one line; understanding the result takes rather more, and skipping it is how clustering projects end with a column of integers nobody uses.
+
+**Look at the centres in the original units.** `cluster_centers_` is in whatever space the model was fitted in, which after scaling is standard deviations rather than pounds or minutes. `scaler.inverse_transform(km.cluster_centers_)` puts them back, and reading the result column by column is what turns cluster 2 into "high spend, low frequency, recent".
+
+**Check the sizes.** `np.bincount(km.labels_)` in one line. A cluster with four members is usually not a segment; it is an outlier group that k-means was forced to place somewhere because you asked for that many centres.
+
+**Compare each cluster against the overall average.** Which features are most different from the global mean is a faster route to a description than reading the raw centres, especially with many columns.
+
+**Check stability.** Refit on a random 80% and see whether the same groups appear. Clusters that dissolve when a fifth of the data changes are artefacts of the partition rather than structure in the data, and this test costs one loop.
+
+The output of that work is a name and a description per group. That is the deliverable; the labels are an intermediate.
+
 ## Things to try
 
 1. <strong>Watch inertia fail.</strong> The second editor's numbers fall forever. Compute the differences and find the bend yourself.
