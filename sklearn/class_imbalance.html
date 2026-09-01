@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Class Imbalance | VizLearn</title>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-ZT6JM33V5J');
+    </script>
+    <!-- The font stylesheet is render-blocking and lives on another origin, so
+         the browser cannot paint until it has done DNS, TCP and TLS for two
+         hosts it has not met. Warming both connections while the HTML is still
+         parsing takes that off the critical path. gstatic serves the font
+         files themselves and is fetched anonymously, hence crossorigin. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'light';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+                .py-note {
+            border-left: 2px solid var(--border-subtle);
+            padding-left: 0.9rem;
+            line-height: 1.7;
+        }
+        .py-note code { color: var(--accent-primary); }
+        .vz-pt-lead { margin-top: 0.5rem; max-width: 60ch; color: var(--text-muted); }
+
+        /* A step is numbered so the sequence reads as a sequence rather than
+           as six unrelated demos. */
+        .vz-step-head { display: flex; align-items: baseline; gap: 0.6rem; }
+        .vz-step-n {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+            font-weight: 700; color: var(--accent-primary);
+            border: 1px solid var(--border-subtle); border-radius: 5px;
+            padding: 0.1rem 0.4rem; flex: none;
+        }
+        .vz-step-blurb {
+            margin: 0.55rem 0 0.9rem; line-height: 1.7;
+            color: var(--text-muted); max-width: 68ch;
+        }
+        .vz-step-blurb code {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.85em;
+            color: var(--accent-primary);
+        }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen light-mode">
+<!-- Light is the default, so it ships on the tag: the theme script runs at the
+     bottom of the body, and waiting for it would flash dark on every load.
+     This removes the class before any content is parsed for readers who chose
+     dark, so neither theme flashes the other. -->
+<script>if(localStorage.getItem("theme")==="dark")document.body.classList.remove("light-mode");</script>
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-3 md:gap-4">
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <svg class="vz-icon text-sm" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/></svg>
+                    <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)" aria-label="Back to Home">
+                        <svg class="vz-icon text-xs" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.2 288 416 288c17.7 0 32-14.3 32-32s-14.3-32-32-32l-306.7 0L214.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <svg class="vz-icon hidden dark-icon" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M361.5 1.2c5 2.1 8.6 6.6 9.6 11.9L391 121l107.9 19.8c5.3 1 9.8 4.6 11.9 9.6s1.5 10.7-1.6 15.2L446.9 256l62.3 90.3c3.1 4.5 3.7 10.2 1.6 15.2s-6.6 8.6-11.9 9.6L391 391 371.1 498.9c-1 5.3-4.6 9.8-9.6 11.9s-10.7 1.5-15.2-1.6L256 446.9l-90.3 62.3c-4.5 3.1-10.2 3.7-15.2 1.6s-8.6-6.6-9.6-11.9L121 391 13.1 371.1c-5.3-1-9.8-4.6-11.9-9.6s-1.5-10.7 1.6-15.2L65.1 256 2.8 165.7c-3.1-4.5-3.7-10.2-1.6-15.2s6.6-8.6 11.9-9.6L121 121 140.9 13.1c1-5.3 4.6-9.8 9.6-11.9s10.7-1.5 15.2 1.6L256 65.1 346.3 2.8c4.5-3.1 10.2-3.7 15.2-1.6zM160 256a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zm224 0a128 128 0 1 0 -256 0 128 128 0 1 0 256 0z"/></svg>
+                        <svg class="vz-icon hidden light-icon" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M223.5 32C100 32 0 132.3 0 256S100 480 223.5 480c60.6 0 115.5-24.2 155.8-63.4c5-4.9 6.3-12.5 3.1-18.7s-10.1-9.7-17-8.5c-9.8 1.7-19.8 2.6-30.1 2.6c-96.9 0-175.5-78.8-175.5-176c0-65.8 36-123.1 89.3-153.3c6.1-3.5 9.2-10.5 7.7-17.3s-7.3-11.9-14.3-12.5c-6.3-.5-12.6-.8-19-.8z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+        <div class="mb-8 animate-fade-in">
+            <nav class="flex flex-wrap items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)" aria-label="Breadcrumb"><a href="../index.html" class="hover:text-green-400 transition-colors">Home</a><span aria-hidden="true">/</span><a href="../sklearn/" class="hover:text-green-400 transition-colors">scikit-learn</a><span aria-hidden="true">/</span><span aria-current="page">Classification</span></nav>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Class Imbalance</h1>
+            <p class="vz-pt-lead">When the interesting class is 2% of the data, the default model ignores it and reports 96% accuracy. Four remedies, and the cheapest is usually the best.</p>
+        </div>
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
+                <div class="card-container">
+                    <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
+                    <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
+                        <div class="py-note">Accuracy is meaningless here - always <code class='mono-font'>stratify</code> the split and report per-class metrics.</div>
+                        <div class="py-note"><code class='mono-font'>class_weight="balanced"</code> reweights the loss so minority errors count more; it raises recall and costs precision.</div>
+                        <div class="py-note"><strong>Tuning the threshold</strong> needs no refitting and often beats every other remedy - try it first.</div>
+                        <div class="py-note">Resampling must happen <strong>inside</strong> the folds, on the training part only; doing it first puts copies on both sides.</div>
+                        <div class="py-note">Oversampling duplicates rows and can overfit them; undersampling throws away real data. Both are blunter than reweighting.</div>
+                        <div class="py-note">Imbalance only hurts when the classes are also hard to separate - check before reaching for a remedy.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <!-- auto-article-vizlearn -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full" data-vz-prose>
+        <div class="card-container animate-fade-in">
+<!-- VIZLEARN:ARTICLE:BEGIN (generated by tools/build_articles.py) -->
+            <div class="card-header">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Class Imbalance: A Practical Guide</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">The interesting class is usually the rare one. Four remedies exist, they are not equally good, and the first thing to check is whether you need one at all.</p>
+            </div>
+            <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <div>
+                    <h3>What goes wrong</h3>
+                    <p>When one class is rare, the model has almost no incentive to find it. Predicting the majority for everything is right 98% of the time, and the loss function &mdash; which counts every row equally &mdash; says that is excellent.</p><p>The first editor shows the result: 96% accuracy, and 3 of 49 positives found. The confusion matrix makes it concrete, with 46 misses and zero false alarms. That is not a broken fit; it is a correct optimisation of the wrong objective.</p><p>The problems compound. Accuracy is uninformative, as the classification-metrics module showed. A random split can leave almost no positives in the test set, so the metrics computed from them are noise. And the default 0.5 threshold, chosen for balanced classes, is far from where it should be.</p>
+                </div>
+                <div>
+                    <h3>What the default model does</h3>
+                    <p>It finds three of the forty-nine positives, and reports 96% accuracy for it.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix, recall_score
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+
+X, y = make_classification(n_samples=4000, n_features=10, n_informative=4,
+                           weights=[0.98], flip_y=0.05, random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+
+m = LogisticRegression(max_iter=1000).fit(X_tr, y_tr)
+print("positives in the test set:", int(y_te.sum()), "of", len(y_te))
+print("accuracy:", round(m.score(X_te, y_te), 4))
+print("recall  :", round(recall_score(y_te, m.predict(X_te)), 4))
+print()
+print("confusion matrix (rows = actual):")
+print(confusion_matrix(y_te, m.predict(X_te)))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>class_weight, and what it costs</h3>
+                    <p>Recall goes up nine-fold. Precision collapses, and accuracy with it.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import recall_score, precision_score
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+
+X, y = make_classification(n_samples=4000, n_features=10, n_informative=4,
+                           weights=[0.98], flip_y=0.05, random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+
+print("%-22s %9s %9s %9s" % ("", "accuracy", "precision", "recall"))
+for label, cw in [("default", None), ("class_weight=balanced", "balanced")]:
+    m = LogisticRegression(max_iter=1000, class_weight=cw).fit(X_tr, y_tr)
+    p = m.predict(X_te)
+    print("%-22s %9.4f %9.4f %9.4f"
+          % (label, m.score(X_te, y_te),
+             precision_score(y_te, p, zero_division=0), recall_score(y_te, p)))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>The same model, thresholded</h3>
+                    <p>No refitting, no reweighting - the model already knew, and predict() was throwing it away.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import recall_score, precision_score
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+
+X, y = make_classification(n_samples=4000, n_features=10, n_informative=4,
+                           weights=[0.98], flip_y=0.05, random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+
+m = LogisticRegression(max_iter=1000).fit(X_tr, y_tr)
+proba = m.predict_proba(X_te)[:, 1]
+
+print("the same default model, thresholded differently:")
+print("%10s %10s %8s" % ("threshold", "precision", "recall"))
+for t in (0.5, 0.2, 0.1, 0.05):
+    p = (proba >= t).astype(int)
+    print("%10.2f %10.4f %8.4f"
+          % (t, precision_score(y_te, p, zero_division=0), recall_score(y_te, p)))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Resampling before the split is a leak</h3>
+                    <p>Random labels, so nothing is learnable. One of these two numbers says otherwise.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import recall_score
+
+rng = np.random.RandomState(0)
+X = rng.normal(size=(600, 8))
+y = (rng.rand(600) < 0.08).astype(int)      # rare, and unrelated to X
+
+def oversample(Xa, ya, seed):
+    r = np.random.RandomState(seed)
+    minority = np.flatnonzero(ya == 1)
+    extra = r.choice(minority, (ya == 0).sum() - len(minority), replace=True)
+    idx = np.concatenate([np.arange(len(ya)), extra])
+    return Xa[idx], ya[idx]
+
+# WRONG: duplicate first, then split - copies land on both sides.
+Xo, yo = oversample(X, y, 0)
+wrong = []
+for tr, te in StratifiedKFold(5, shuffle=True, random_state=0).split(Xo, yo):
+    m = LogisticRegression(max_iter=1000).fit(Xo[tr], yo[tr])
+    wrong.append(recall_score(yo[te], m.predict(Xo[te])))
+
+# RIGHT: split first, oversample only the training part.
+right = []
+for tr, te in StratifiedKFold(5, shuffle=True, random_state=0).split(X, y):
+    Xr, yr = oversample(X[tr], y[tr], 0)
+    m = LogisticRegression(max_iter=1000).fit(Xr, yr)
+    right.append(recall_score(y[te], m.predict(X[te])))
+
+print("labels are random, so honest recall is about 0.5 at best")
+print("oversample then split :", round(np.mean(wrong), 3))
+print("split then oversample :", round(np.mean(right), 3))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Three remedies, one table</h3>
+                    <p>On F1, the cheapest of the three wins by a wide margin.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score, precision_score, recall_score
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+X, y = make_classification(n_samples=4000, n_features=10, n_informative=4,
+                           weights=[0.98], flip_y=0.05, random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+
+def report(label, y_pred):
+    print("%-24s %9.4f %8.4f %8.4f"
+          % (label, precision_score(y_te, y_pred, zero_division=0),
+             recall_score(y_te, y_pred), f1_score(y_te, y_pred, zero_division=0)))
+
+print("%-24s %9s %8s %8s" % ("", "precision", "recall", "f1"))
+base = LogisticRegression(max_iter=1000).fit(X_tr, y_tr)
+report("default", base.predict(X_te))
+
+bal = LogisticRegression(max_iter=1000, class_weight="balanced").fit(X_tr, y_tr)
+report("class_weight=balanced", bal.predict(X_te))
+
+proba = base.predict_proba(X_te)[:, 1]
+best_t = max(np.arange(0.02, 0.6, 0.02),
+             key=lambda t: f1_score(y_te, (proba >= t).astype(int),
+                                    zero_division=0))
+report("threshold %.2f" % best_t, (proba >= best_t).astype(int))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Imbalance alone is not the problem</h3>
+                    <p>The same 2% positives, but classes the features can actually separate - and no remedy needed.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import recall_score
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+
+# Same 2% imbalance, but the classes are genuinely separable.
+X, y = make_classification(n_samples=4000, n_features=10, n_informative=6,
+                           weights=[0.98], flip_y=0.0, class_sep=2.0,
+                           random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+
+m = LogisticRegression(max_iter=1000).fit(X_tr, y_tr)
+print("positives:", int(y_te.sum()), "of", len(y_te))
+print("recall with no remedy at all:", round(recall_score(y_te, m.predict(X_te)), 4))
+print()
+print("imbalance is not the problem by itself. the problem is imbalance")
+print("plus classes the features cannot separate.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Check whether you have a problem</h3>
+                    <p>Before reaching for a remedy, find out whether imbalance is actually hurting.</p><p>The last editor keeps the same 2% positives but makes the classes genuinely separable, and the default model &mdash; no weighting, no resampling, no threshold change &mdash; recalls 70.8%. Nothing needed fixing.</p><p>Imbalance by itself is not the difficulty. The difficulty is imbalance *plus* classes the features cannot distinguish. When the signal is strong, a rare class is found easily; when it is weak, the rarity means there is little evidence to learn from and the majority answer is genuinely hard to beat.</p><p>So the first step is a stratified split, a <code>classification_report</code>, and a <code>DummyClassifier</code> for comparison. If recall on the minority is already acceptable, stop.</p>
+                </div>
+                <div>
+                    <h3>The remedies, cheapest first</h3>
+                    <p><strong>Tune the threshold.</strong> No refitting, no new data, no risk of overfitting duplicates. The third editor takes the *same fitted model* from 6% recall to 41% by moving one number. The fifth editor compares the remedies on F1 and the threshold wins clearly: 0.38 against 0.12 for the default and 0.11 for class weighting.</p><p>This should almost always be tried first, and it frequently makes the others unnecessary. It is also the most controllable: you pick the operating point rather than accepting whatever a reweighting produces.</p><p><strong>class_weight="balanced".</strong> Weights each class inversely to its frequency, so a minority error costs more during fitting. Supported by most classifiers as a constructor argument, and it is one word.</p><p>The second editor shows what it does: recall rises from 0.06 to 0.55, precision falls from 1.00 to 0.06, and accuracy from 0.96 to 0.65. That is a genuine trade rather than an improvement, and whether it is worth it depends entirely on the costs. Note that on F1 it did not beat the default at all.</p><p><code>class_weight</code> can also take a dictionary, which is how you express a specific cost ratio rather than accepting the inverse-frequency default.</p><p><strong>Resample.</strong> Oversample the minority by duplicating rows, or undersample the majority by discarding them, until the classes are balanced.</p><p>Both are blunter than the alternatives. Oversampling shows the model the same rows repeatedly, which encourages memorising them. Undersampling throws away real data, which is wasteful when the majority is not enormous. SMOTE and its relatives, from the <code>imbalanced-learn</code> package, generate synthetic minority points between existing ones instead of duplicating &mdash; better in principle, and it invents data, which on a genuinely rare class can invent structure that is not there.</p><p><strong>Collect more of the minority.</strong> Rarely available and by far the best when it is.</p>
+                </div>
+                <div>
+                    <h3>Resampling has to be inside the folds</h3>
+                    <p>This is the mistake that produces the impressive result, and it is worth its own section.</p><p>Resampling before splitting means duplicated rows land on both sides. The model then sees, in training, exact copies of rows it will be tested on &mdash; the duplicate-row leak from the leakage module, introduced deliberately.</p><p>The fourth editor measures it on data where the labels are random and nothing is learnable. Oversampling before the split reports recall 0.632; splitting first and oversampling only the training part reports 0.324. Neither is impressive, and the first is a fabrication.</p><p>The same rule applies to cross-validation, where the resampling must happen inside each fold. A plain <code>Pipeline</code> cannot do this, because pipeline steps may not change the number of rows &mdash; which is why <code>imbalanced-learn</code> provides its own <code>Pipeline</code> that can. That is the main practical reason to install it.</p><p>And whatever you do to the training data, <strong>never resample the test data</strong>. The test set must reflect the real distribution, or the metrics describe a world that does not exist.</p>
+                </div>
+                <div>
+                    <h3>What to measure</h3>
+                    <p>Accuracy is out. Beyond that, the choice follows the costs, as the metrics modules argued.</p><p><strong>Recall</strong> when missing a case is expensive: disease, fraud, safety. <strong>Precision</strong> when a false alarm is expensive. <strong>F1</strong> or <strong>balanced accuracy</strong> for a single summary. <strong>Average precision</strong> rather than ROC AUC for the curve summary, because ROC AUC stays flatteringly high when negatives dominate &mdash; 0.825 against an average precision of 0.134 in the thresholds module.</p><p>Whichever you pick, pass it as <code>scoring=</code> to any cross-validation or search. Leaving it at the default tunes for accuracy, which on this data means tuning towards ignoring the minority.</p><p>And report counts alongside rates. "Recall 0.55" is abstract; "we catch 27 of 49 cases and raise 400 false alarms" is something a person can judge.</p>
+                </div>
+                <div>
+                    <h3>Where the rare class actually comes from</h3>
+                    <p>The remedies above treat imbalance as a property of the dataset. Often it is a property of how the dataset was built, and that is worth checking before treating it.</p><p><strong>The window is too short.</strong> Events that are rare per day are common per year. Widening the period sometimes turns a 0.5% problem into a 5% one with no other change.</p><p><strong>The unit of analysis is wrong.</strong> Predicting whether a *transaction* is fraudulent may be a 0.1% problem while predicting whether an *account* has ever been fraudulent is a 5% one. Aggregating to the entity often makes both the imbalance and the prediction problem easier &mdash; and sometimes it is the question the business actually wanted.</p><p><strong>The negatives were over-collected.</strong> Some datasets include every negative available and only the positives someone bothered to label. Sampling the negatives down is then not undersampling in the statistical sense; it is undoing an artefact of collection.</p><p><strong>The definition is too narrow.</strong> A stricter positive label means fewer positives. Loosening it &mdash; "escalated" rather than "escalated and confirmed" &mdash; can produce a learnable problem whose output is still useful.</p><p>None of these is always available. All of them are worth ten minutes before spending a week on SMOTE variants, because a reframing that changes the base rate helps more than any resampling scheme.</p>
+                </div>
+                <div>
+                    <h3>What resampling does to the probabilities</h3>
+                    <p>A consequence that catches people after the model is working: resampling changes the base rate the model believes in, and therefore its output probabilities.</p><p>Train on data balanced from 2% to 50% and the model learns a world where positives are half of everything. Its predicted probabilities are calibrated to that world, not to yours, so a "0.6" from it does not mean a 60% chance in production &mdash; it is systematically far too high.</p><p>For ranking and for thresholding that does not matter, since both are invariant to a monotonic shift. It matters a great deal if the probability is used as a number: expected value, risk scores shown to people, cost calculations.</p><p><code>class_weight</code> has a milder version of the same effect. Threshold tuning has none at all, because it leaves the fitted model untouched &mdash; one more reason it is the remedy to try first.</p><p>If you do resample and need honest probabilities, recalibrate afterwards on data with the real class balance, which is what <code>CalibratedClassifierCV</code> on an unresampled validation set does.</p>
+                </div>
+                <div>
+                    <h3>Things to try</h3>
+                    <ol><li><strong>Read the confusion matrix.</strong> The first editor's model misses 46 of 49 positives and reports 96% accuracy.</li><li><strong>Compare the remedies.</strong> The fifth editor's threshold row beats both others on F1 by a factor of three.</li><li><strong>Watch the leak.</strong> In the fourth editor, the labels are random. The first number is not a result.</li><li><strong>Make it separable.</strong> In the last editor, lower <code>class_sep</code> to 0.5 and watch the need for a remedy return.</li></ol>
+                </div>
+                <div>
+                    <h3>Where this leaves you</h3>
+                    <p>Stratify the split, drop accuracy, and check whether the model is actually struggling before doing anything. If it is, move the threshold first, reach for <code>class_weight</code> second, and resample only inside the folds &mdash; never before the split, and never on the test set.</p>
+                </div>
+            </div>
+<!-- VIZLEARN:ARTICLE:END -->
+        </div>
+    </section>
+
+    <script>
+        (function () {
+            var btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            var sun = btn.querySelector('.dark-icon');
+            var moon = btn.querySelector('.light-icon');
+
+            function paint(theme) {
+                if (theme === 'light') {
+                    document.body.classList.add('light-mode');
+                    moon.classList.remove('hidden');
+                    sun.classList.add('hidden');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    sun.classList.remove('hidden');
+                    moon.classList.add('hidden');
+                }
+            }
+
+            paint(localStorage.getItem('theme') || 'light');
+
+            btn.addEventListener('click', function () {
+                var next = document.body.classList.contains('light-mode') ? 'dark' : 'light';
+                localStorage.setItem('theme', next);
+                paint(next);
+            });
+        })();
+    </script>
+
+</body>
+</html>

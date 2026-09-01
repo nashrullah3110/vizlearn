@@ -1,0 +1,271 @@
+title: Class Imbalance: A Practical Guide
+intro: The interesting class is usually the rare one. Four remedies exist, they are not equally good, and the first thing to check is whether you need one at all.
+
+## What goes wrong
+
+When one class is rare, the model has almost no incentive to find it. Predicting the majority for everything is right 98% of the time, and the loss function &mdash; which counts every row equally &mdash; says that is excellent.
+
+The first editor shows the result: 96% accuracy, and 3 of 49 positives found. The confusion matrix makes it concrete, with 46 misses and zero false alarms. That is not a broken fit; it is a correct optimisation of the wrong objective.
+
+The problems compound. Accuracy is uninformative, as the classification-metrics module showed. A random split can leave almost no positives in the test set, so the metrics computed from them are noise. And the default 0.5 threshold, chosen for balanced classes, is far from where it should be.
+
+
+## What the default model does
+
+It finds three of the forty-nine positives, and reports 96% accuracy for it.
+
+```python-run
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix, recall_score
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+
+X, y = make_classification(n_samples=4000, n_features=10, n_informative=4,
+                           weights=[0.98], flip_y=0.05, random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+
+m = LogisticRegression(max_iter=1000).fit(X_tr, y_tr)
+print("positives in the test set:", int(y_te.sum()), "of", len(y_te))
+print("accuracy:", round(m.score(X_te, y_te), 4))
+print("recall  :", round(recall_score(y_te, m.predict(X_te)), 4))
+print()
+print("confusion matrix (rows = actual):")
+print(confusion_matrix(y_te, m.predict(X_te)))
+```
+
+## class_weight, and what it costs
+
+Recall goes up nine-fold. Precision collapses, and accuracy with it.
+
+```python-run
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import recall_score, precision_score
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+
+X, y = make_classification(n_samples=4000, n_features=10, n_informative=4,
+                           weights=[0.98], flip_y=0.05, random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+
+print("%-22s %9s %9s %9s" % ("", "accuracy", "precision", "recall"))
+for label, cw in [("default", None), ("class_weight=balanced", "balanced")]:
+    m = LogisticRegression(max_iter=1000, class_weight=cw).fit(X_tr, y_tr)
+    p = m.predict(X_te)
+    print("%-22s %9.4f %9.4f %9.4f"
+          % (label, m.score(X_te, y_te),
+             precision_score(y_te, p, zero_division=0), recall_score(y_te, p)))
+```
+
+## The same model, thresholded
+
+No refitting, no reweighting - the model already knew, and predict() was throwing it away.
+
+```python-run
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import recall_score, precision_score
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+
+X, y = make_classification(n_samples=4000, n_features=10, n_informative=4,
+                           weights=[0.98], flip_y=0.05, random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+
+m = LogisticRegression(max_iter=1000).fit(X_tr, y_tr)
+proba = m.predict_proba(X_te)[:, 1]
+
+print("the same default model, thresholded differently:")
+print("%10s %10s %8s" % ("threshold", "precision", "recall"))
+for t in (0.5, 0.2, 0.1, 0.05):
+    p = (proba >= t).astype(int)
+    print("%10.2f %10.4f %8.4f"
+          % (t, precision_score(y_te, p, zero_division=0), recall_score(y_te, p)))
+```
+
+## Resampling before the split is a leak
+
+Random labels, so nothing is learnable. One of these two numbers says otherwise.
+
+```python-run
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import recall_score
+
+rng = np.random.RandomState(0)
+X = rng.normal(size=(600, 8))
+y = (rng.rand(600) < 0.08).astype(int)      # rare, and unrelated to X
+
+def oversample(Xa, ya, seed):
+    r = np.random.RandomState(seed)
+    minority = np.flatnonzero(ya == 1)
+    extra = r.choice(minority, (ya == 0).sum() - len(minority), replace=True)
+    idx = np.concatenate([np.arange(len(ya)), extra])
+    return Xa[idx], ya[idx]
+
+# WRONG: duplicate first, then split - copies land on both sides.
+Xo, yo = oversample(X, y, 0)
+wrong = []
+for tr, te in StratifiedKFold(5, shuffle=True, random_state=0).split(Xo, yo):
+    m = LogisticRegression(max_iter=1000).fit(Xo[tr], yo[tr])
+    wrong.append(recall_score(yo[te], m.predict(Xo[te])))
+
+# RIGHT: split first, oversample only the training part.
+right = []
+for tr, te in StratifiedKFold(5, shuffle=True, random_state=0).split(X, y):
+    Xr, yr = oversample(X[tr], y[tr], 0)
+    m = LogisticRegression(max_iter=1000).fit(Xr, yr)
+    right.append(recall_score(y[te], m.predict(X[te])))
+
+print("labels are random, so honest recall is about 0.5 at best")
+print("oversample then split :", round(np.mean(wrong), 3))
+print("split then oversample :", round(np.mean(right), 3))
+```
+
+## Three remedies, one table
+
+On F1, the cheapest of the three wins by a wide margin.
+
+```python-run
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score, precision_score, recall_score
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+X, y = make_classification(n_samples=4000, n_features=10, n_informative=4,
+                           weights=[0.98], flip_y=0.05, random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+
+def report(label, y_pred):
+    print("%-24s %9.4f %8.4f %8.4f"
+          % (label, precision_score(y_te, y_pred, zero_division=0),
+             recall_score(y_te, y_pred), f1_score(y_te, y_pred, zero_division=0)))
+
+print("%-24s %9s %8s %8s" % ("", "precision", "recall", "f1"))
+base = LogisticRegression(max_iter=1000).fit(X_tr, y_tr)
+report("default", base.predict(X_te))
+
+bal = LogisticRegression(max_iter=1000, class_weight="balanced").fit(X_tr, y_tr)
+report("class_weight=balanced", bal.predict(X_te))
+
+proba = base.predict_proba(X_te)[:, 1]
+best_t = max(np.arange(0.02, 0.6, 0.02),
+             key=lambda t: f1_score(y_te, (proba >= t).astype(int),
+                                    zero_division=0))
+report("threshold %.2f" % best_t, (proba >= best_t).astype(int))
+```
+
+## Imbalance alone is not the problem
+
+The same 2% positives, but classes the features can actually separate - and no remedy needed.
+
+```python-run
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import recall_score
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+
+# Same 2% imbalance, but the classes are genuinely separable.
+X, y = make_classification(n_samples=4000, n_features=10, n_informative=6,
+                           weights=[0.98], flip_y=0.0, class_sep=2.0,
+                           random_state=0)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          random_state=0, stratify=y)
+
+m = LogisticRegression(max_iter=1000).fit(X_tr, y_tr)
+print("positives:", int(y_te.sum()), "of", len(y_te))
+print("recall with no remedy at all:", round(recall_score(y_te, m.predict(X_te)), 4))
+print()
+print("imbalance is not the problem by itself. the problem is imbalance")
+print("plus classes the features cannot separate.")
+```
+## Check whether you have a problem
+
+Before reaching for a remedy, find out whether imbalance is actually hurting.
+
+The last editor keeps the same 2% positives but makes the classes genuinely separable, and the default model &mdash; no weighting, no resampling, no threshold change &mdash; recalls 70.8%. Nothing needed fixing.
+
+Imbalance by itself is not the difficulty. The difficulty is imbalance *plus* classes the features cannot distinguish. When the signal is strong, a rare class is found easily; when it is weak, the rarity means there is little evidence to learn from and the majority answer is genuinely hard to beat.
+
+So the first step is a stratified split, a `classification_report`, and a `DummyClassifier` for comparison. If recall on the minority is already acceptable, stop.
+
+## The remedies, cheapest first
+
+**Tune the threshold.** No refitting, no new data, no risk of overfitting duplicates. The third editor takes the *same fitted model* from 6% recall to 41% by moving one number. The fifth editor compares the remedies on F1 and the threshold wins clearly: 0.38 against 0.12 for the default and 0.11 for class weighting.
+
+This should almost always be tried first, and it frequently makes the others unnecessary. It is also the most controllable: you pick the operating point rather than accepting whatever a reweighting produces.
+
+**class_weight="balanced".** Weights each class inversely to its frequency, so a minority error costs more during fitting. Supported by most classifiers as a constructor argument, and it is one word.
+
+The second editor shows what it does: recall rises from 0.06 to 0.55, precision falls from 1.00 to 0.06, and accuracy from 0.96 to 0.65. That is a genuine trade rather than an improvement, and whether it is worth it depends entirely on the costs. Note that on F1 it did not beat the default at all.
+
+`class_weight` can also take a dictionary, which is how you express a specific cost ratio rather than accepting the inverse-frequency default.
+
+**Resample.** Oversample the minority by duplicating rows, or undersample the majority by discarding them, until the classes are balanced.
+
+Both are blunter than the alternatives. Oversampling shows the model the same rows repeatedly, which encourages memorising them. Undersampling throws away real data, which is wasteful when the majority is not enormous. SMOTE and its relatives, from the `imbalanced-learn` package, generate synthetic minority points between existing ones instead of duplicating &mdash; better in principle, and it invents data, which on a genuinely rare class can invent structure that is not there.
+
+**Collect more of the minority.** Rarely available and by far the best when it is.
+
+## Resampling has to be inside the folds
+
+This is the mistake that produces the impressive result, and it is worth its own section.
+
+Resampling before splitting means duplicated rows land on both sides. The model then sees, in training, exact copies of rows it will be tested on &mdash; the duplicate-row leak from the leakage module, introduced deliberately.
+
+The fourth editor measures it on data where the labels are random and nothing is learnable. Oversampling before the split reports recall 0.632; splitting first and oversampling only the training part reports 0.324. Neither is impressive, and the first is a fabrication.
+
+The same rule applies to cross-validation, where the resampling must happen inside each fold. A plain `Pipeline` cannot do this, because pipeline steps may not change the number of rows &mdash; which is why `imbalanced-learn` provides its own `Pipeline` that can. That is the main practical reason to install it.
+
+And whatever you do to the training data, **never resample the test data**. The test set must reflect the real distribution, or the metrics describe a world that does not exist.
+
+## What to measure
+
+Accuracy is out. Beyond that, the choice follows the costs, as the metrics modules argued.
+
+**Recall** when missing a case is expensive: disease, fraud, safety. **Precision** when a false alarm is expensive. **F1** or **balanced accuracy** for a single summary. **Average precision** rather than ROC AUC for the curve summary, because ROC AUC stays flatteringly high when negatives dominate &mdash; 0.825 against an average precision of 0.134 in the thresholds module.
+
+Whichever you pick, pass it as `scoring=` to any cross-validation or search. Leaving it at the default tunes for accuracy, which on this data means tuning towards ignoring the minority.
+
+And report counts alongside rates. "Recall 0.55" is abstract; "we catch 27 of 49 cases and raise 400 false alarms" is something a person can judge.
+
+## Where the rare class actually comes from
+
+The remedies above treat imbalance as a property of the dataset. Often it is a property of how the dataset was built, and that is worth checking before treating it.
+
+**The window is too short.** Events that are rare per day are common per year. Widening the period sometimes turns a 0.5% problem into a 5% one with no other change.
+
+**The unit of analysis is wrong.** Predicting whether a *transaction* is fraudulent may be a 0.1% problem while predicting whether an *account* has ever been fraudulent is a 5% one. Aggregating to the entity often makes both the imbalance and the prediction problem easier &mdash; and sometimes it is the question the business actually wanted.
+
+**The negatives were over-collected.** Some datasets include every negative available and only the positives someone bothered to label. Sampling the negatives down is then not undersampling in the statistical sense; it is undoing an artefact of collection.
+
+**The definition is too narrow.** A stricter positive label means fewer positives. Loosening it &mdash; "escalated" rather than "escalated and confirmed" &mdash; can produce a learnable problem whose output is still useful.
+
+None of these is always available. All of them are worth ten minutes before spending a week on SMOTE variants, because a reframing that changes the base rate helps more than any resampling scheme.
+
+## What resampling does to the probabilities
+
+A consequence that catches people after the model is working: resampling changes the base rate the model believes in, and therefore its output probabilities.
+
+Train on data balanced from 2% to 50% and the model learns a world where positives are half of everything. Its predicted probabilities are calibrated to that world, not to yours, so a "0.6" from it does not mean a 60% chance in production &mdash; it is systematically far too high.
+
+For ranking and for thresholding that does not matter, since both are invariant to a monotonic shift. It matters a great deal if the probability is used as a number: expected value, risk scores shown to people, cost calculations.
+
+`class_weight` has a milder version of the same effect. Threshold tuning has none at all, because it leaves the fitted model untouched &mdash; one more reason it is the remedy to try first.
+
+If you do resample and need honest probabilities, recalibrate afterwards on data with the real class balance, which is what `CalibratedClassifierCV` on an unresampled validation set does.
+
+## Things to try
+
+1. <strong>Read the confusion matrix.</strong> The first editor's model misses 46 of 49 positives and reports 96% accuracy.
+2. <strong>Compare the remedies.</strong> The fifth editor's threshold row beats both others on F1 by a factor of three.
+3. <strong>Watch the leak.</strong> In the fourth editor, the labels are random. The first number is not a result.
+4. <strong>Make it separable.</strong> In the last editor, lower `class_sep` to 0.5 and watch the need for a remedy return.
+
+## Where this leaves you
+
+Stratify the split, drop accuracy, and check whether the model is actually struggling before doing anything. If it is, move the threshold first, reach for `class_weight` second, and resample only inside the folds &mdash; never before the split, and never on the test set.
