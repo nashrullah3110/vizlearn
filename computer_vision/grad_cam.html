@@ -231,32 +231,29 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">A heatmap of which regions a network used, built from gradients it already computes.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The question</h3>
-                    <p>A network says "cat". Which part of the image made it say that?</p><p>Grad-CAM answers with a heatmap, and it does so using quantities the network produces anyway during backpropagation, which is why it works on any convolutional architecture without retraining or modification.</p>
-                </div>
-                <div>
-                    <h3>The recipe</h3>
+                    <h3 id="vz-s-the-recipe">The recipe</h3>
                     <p>Take the feature maps from the last convolutional layer &mdash; typically 512 or 2048 of them, each perhaps 7&#215;7. Then:</p><ol><li>Compute the gradient of the class score with respect to each feature map.</li><li>Average each gradient over its spatial positions. That number is the map's <strong>weight</strong>.</li><li>Sum the feature maps, weighted by those numbers.</li><li>Apply a ReLU.</li><li>Upsample the result to the image size.</li></ol><p>Steps 3 and 4 are what the visualisation shows. Three synthetic feature maps sit on the left, each with its own weight slider, and the combined heatmap is on the right. The maps are made up; the weighting arithmetic is exactly Grad-CAM's.</p>
                 </div>
                 <div>
-                    <h3>What a weight means</h3>
+                    <h3 id="vz-s-what-a-weight-means">What a weight means</h3>
                     <p>The gradient of the score with respect to a feature map answers: if this map's activations rose slightly, how much would the class score rise?</p><p>A <strong>large positive weight</strong> means the class depends heavily on that map, so wherever it is active is evidence for the class.</p><p>A <strong>negative weight</strong> means the opposite &mdash; that feature argues *against* this class. Set one of the sliders negative and watch what happens to the heatmap: the region belonging to that map does not go dark, it simply stops contributing, because of the ReLU.</p>
                 </div>
                 <div>
-                    <h3>Why the ReLU is there</h3>
+                    <h3 id="vz-s-why-the-relu-is-there">Why the ReLU is there</h3>
                     <p>This is the step people skip and then misread the output.</p><p>Without the ReLU the heatmap would contain negative regions, meaning "this area argued against the class". Grad-CAM discards them deliberately, because the question being asked is *what supported this prediction* &mdash; and a visualisation mixing support and opposition in one colour scale is very easy to misread.</p><p>The consequence is that <strong>Grad-CAM never shows you evidence against a class</strong>. Drag all three sliders negative: the heatmap is empty, not inverted. If you want to know what argued against a prediction, this is the wrong tool, and running it on the competing class is usually the practical answer.</p>
                 </div>
                 <div>
-                    <h3>Its limits</h3>
+                    <h3 id="vz-s-its-limits">Its limits</h3>
                     <p><strong>Resolution.</strong> The heatmap has the spatial size of the last convolutional layer, often 7&#215;7. Upsampling to 224&#215;224 produces a smooth blob, and that smoothness is interpolation rather than evidence. Grad-CAM cannot tell you which pixel mattered, only which seventh of the image.</p><p><strong>One layer.</strong> It explains the last convolutional layer. Earlier layers see different things, and the choice of layer changes the answer.</p><p><strong>Plausibility is not correctness.</strong> A heatmap over the animal's face looks convincing whether or not the model used the face. Grad-CAM shows what the gradients say, and there is published work on saliency methods that produce sensible-looking maps for randomly initialised networks &mdash; so a reasonable-looking heatmap is not evidence the model is reasoning well.</p><p><strong>It does not survive every architecture unchanged.</strong> Transformers have no final convolutional layer, so attention rollout or a variant is used instead.</p>
                 </div>
                 <div>
-                    <h3>Relatives</h3>
+                    <h3 id="vz-s-relatives">Relatives</h3>
                     <p><strong>CAM</strong>, the predecessor, required the architecture to end in [global average pooling](global_average_pooling.html) followed by one dense layer, and read the weights straight from that layer. Grad-CAM's contribution was getting the same weights from gradients instead, which removed the architectural requirement.</p><p><strong>Grad-CAM++</strong> handles several instances of the same class better. <strong>Score-CAM</strong> drops gradients entirely, measuring each map's importance by occluding with it and seeing what the score does &mdash; slower, and immune to gradient saturation.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>Reading the smooth blob as pixel-level evidence.</strong> It is 7&#215;7, interpolated.</p><p><strong>Explaining the wrong class.</strong> Run it on the predicted class *and* on the class you expected; the difference is usually the informative part.</p><p><strong>Treating it as proof.</strong> A plausible heatmap is a hypothesis about the model, not a verification of it.</p><p><strong>Choosing a layer without saying so.</strong> The layer is a parameter, and the answer depends on it.</p>
                 </div>
             </div>

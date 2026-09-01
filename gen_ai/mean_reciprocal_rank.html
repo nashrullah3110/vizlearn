@@ -290,44 +290,41 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">What does MRR measure, and when is the position of the first correct result the thing that matters?</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The definition, and the shape of the curve</h3>
-                    <p>Reciprocal rank for a query is 1/(rank of the first relevant result). MRR is the mean of that over an evaluation set. The name is worth reading literally: it is a <em>mean</em> of <em>reciprocal</em> <em>ranks</em>, and each word matters.</p><p>The reciprocal makes the curve steep at the top and flat at the bottom. Moving a result from rank 2 to rank 1 gains 0.5. Moving one from rank 10 to rank 9 gains about 0.011 &mdash; forty-five times less. That shape encodes an assumption: users and models care enormously about the top of the list and barely at all about the bottom.</p><p>Because it is a mean of per-query scores, a single query can move it noticeably on a small evaluation set. Report the number of queries alongside it, and be suspicious of MRR differences on fewer than a hundred.</p>
-                </div>
-                <div>
-                    <h3>When position is the whole question</h3>
+                    <h3 id="vz-s-when-position-is-the-whole-question">When position is the whole question</h3>
                     <p>MRR is the right metric when the consumer stops at the first good result. Question answering with a single correct answer, "I'm feeling lucky" search, entity lookup, a code assistant jumping to a definition &mdash; in all of these the second correct result is worth nothing.</p><p>It also matters inside RAG more than it first appears. Attention over a long context is uneven, and evidence placed first is more likely to be used than evidence placed eighth. Two retrievers with identical recall@5 can produce measurably different answers if one puts the key chunk at the top and the other buries it. Recall cannot see that difference; MRR can.</p><p>The practical use: track recall@k to know whether the evidence arrives, and MRR to know whether it arrives somewhere the model will actually look. A reranker that leaves recall unchanged while lifting MRR is doing real work.</p>
                 </div>
                 <div>
-                    <h3>What it ignores, and when that is wrong</h3>
+                    <h3 id="vz-s-what-it-ignores-and-when-that-is-wrong">What it ignores, and when that is wrong</h3>
                     <p><strong>Every relevant result after the first.</strong> A query with one relevant document at rank 1 and a query with ten relevant documents at ranks 1 to 10 both score 1.0. If your questions need multiple sources &mdash; comparisons, summaries, anything aggregative &mdash; MRR is close to blind to what you care about, and <a href="recall_at_k.html">Recall@k</a> is the metric to use.</p><p><strong>Degrees of relevance.</strong> A marginally useful document at rank 1 outscores a perfect one at rank 2. MAP averages precision over every relevant position and nDCG additionally uses graded judgements; both are strictly more informative and both cost more to label.</p><p><strong>The zero.</strong> Queries with no relevant result contribute 0, which is correct and worth watching: a system with excellent MRR on the queries it answers and a large silent tail of zeros has a coverage problem that the average partially conceals. Report the proportion of zero-score queries next to it.</p>
                 </div>
                 <div>
-                    <h3>Reading MRR against the alternatives</h3>
+                    <h3 id="vz-s-reading-mrr-against-the-alternatives">Reading MRR against the alternatives</h3>
                     <p>The family is easiest to keep straight by what each one uses:</p><p><strong>Hit Rate@k</strong> &mdash; is there anything relevant in the top k? Binary, ignores position entirely.</p><p><strong>MRR</strong> &mdash; where is the <em>first</em> relevant result? Uses position, ignores everything after it.</p><p><strong>MAP</strong> &mdash; where is <em>every</em> relevant result? Uses all positions, still binary relevance.</p><p><strong>nDCG</strong> &mdash; where is every relevant result, and how relevant is each? Uses positions and grades, and is the most informative and most expensive.</p><p>They are a ladder of increasing information and increasing labelling cost. Climb it only as far as your judgements can honestly support: nDCG computed from binary labels guessed by a weak model is not better than a hit rate from careful human ones.</p>
                 </div>
                 <div>
-                    <h3>How high was the first right answer?</h3>
+                    <h3 id="vz-s-how-high-was-the-first-right-answer">How high was the first right answer?</h3>
                     <p>MRR measures where the first relevant result appeared, averaged over queries.</p><p class="mono-font">MRR = (1/|Q|) &Sigma; 1 / rank of the first relevant result</p><p>The reciprocal is what gives the metric its character:</p><div class="vz-table-wrap"><table><thead><tr><th>First relevant at rank</th><th>Reciprocal rank</th></tr></thead><tbody><tr><td>1</td><td>1.00</td></tr><tr><td>2</td><td>0.50</td></tr><tr><td>3</td><td>0.33</td></tr><tr><td>5</td><td>0.20</td></tr><tr><td>10</td><td>0.10</td></tr><tr><td>Not found in top k</td><td>0</td></tr></tbody></table></div><p>Worked example over four queries, with the first relevant result at ranks 1, 3, 2 and not-found:</p><p class="mono-font">MRR = (1.00 + 0.33 + 0.50 + 0) / 4 = <strong>0.46</strong></p><p>Note how harsh the drop from rank 1 to rank 2 is &mdash; half the credit for one position. That is deliberate, and it matches two realities: users scan from the top, and language models attend most strongly to the earliest context.</p>
                 </div>
                 <div>
-                    <h3>What it is and is not good for</h3>
+                    <h3 id="vz-s-what-it-is-and-is-not-good-for">What it is and is not good for</h3>
                     <p><strong>MRR suits questions with essentially one right answer.</strong> Factoid question answering, entity lookup, "which document covers X" &mdash; cases where finding the answer once is what matters and there is nothing to gain from finding it twice.</p><p><strong>MRR ignores everything after the first hit.</strong> A system that puts one relevant document at rank 1 and nine irrelevant ones below scores the same as one that puts ten relevant documents in the top ten. If coverage matters, MRR is the wrong metric.</p><p>That makes it complementary rather than competing:</p><div class="vz-table-wrap"><table><thead><tr><th>Metric</th><th>Answers</th></tr></thead><tbody><tr><td>Recall@k</td><td>Was the answer retrieved at all?</td></tr><tr><td>MRR</td><td>How high was it?</td></tr><tr><td>Precision@k</td><td>How much of what we returned was useful?</td></tr><tr><td>nDCG@k</td><td>How good is the whole ranking, with graded relevance?</td></tr></tbody></table></div><p>The pair worth reporting together for RAG is <strong>recall@k and MRR</strong>. Recall says whether the ceiling is high enough; MRR says whether the ordering is putting the answer where the model will attend to it.</p>
                 </div>
                 <div>
-                    <h3>Reading the two together</h3>
+                    <h3 id="vz-s-reading-the-two-together">Reading the two together</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th>Recall@10</th><th>MRR</th><th>Diagnosis</th></tr></thead><tbody><tr><td>0.95</td><td>0.85</td><td>Healthy &mdash; found and ranked well</td></tr><tr><td>0.95</td><td>0.40</td><td>Found, but buried &mdash; add a reranker</td></tr><tr><td>0.60</td><td>0.55</td><td>Ranking is fine; retrieval is missing documents</td></tr><tr><td>0.60</td><td>0.20</td><td>Both stages need work</td></tr></tbody></table></div><p>The second row is the common and fixable one. High recall with low MRR means the candidate set is good and the ordering is not, which is exactly what a cross-encoder reranker addresses &mdash; and it typically moves MRR substantially while leaving recall unchanged.</p><p>The third row points the other way: no reranker can help, and the work is in chunking, the embedding model, or adding keyword search.</p>
                 </div>
                 <div>
-                    <h3>Things to try</h3>
+                    <h3 id="vz-s-things-to-try">Things to try</h3>
                     <ol><li>Click result #1 on and off. MRR swings between 1.0 and 0.33 on a single change, while recall moves a fraction &mdash; MRR is by far the most position-sensitive of the four.</li><li>Mark only the last result relevant. RR is 0.1, and no amount of additional relevant documents further down would improve it.</li><li>Mark results 1 and 2 both relevant, then mark only result 1. MRR is identical either way &mdash; everything after the first hit is invisible to it.</li></ol>
                 </div>
                 <div>
-                    <h3>What to remember</h3>
+                    <h3 id="vz-s-what-to-remember">What to remember</h3>
                     <p>MRR averages 1/rank of the first relevant result. It is the metric for systems where the consumer stops at the first good answer, and it is far more sensitive to the top of the ranking than recall or precision. It ignores every relevant result after the first, so it is the wrong choice for questions needing several sources. Inside RAG it is a useful companion to recall: recall says the evidence arrived, MRR says whether it arrived where the model will actually attend to it.</p><p>All four of these read the same object: an ordered list of retrieved results, with each one labelled relevant or not by a human or a strong model. They differ only in what they choose to notice about it &mdash; which is why quoting one without saying which is close to meaningless, and why the visualisation above shows all four at once.</p><p>The labels are the expensive part. A relevance judgement per query-document pair is human work, and an evaluation set of fifty queries with judged results is worth more than any amount of metric sophistication on top of unjudged data. Build the set first.</p>
                 </div>
                 <div>
-                    <h3>Measuring it</h3>
+                    <h3 id="vz-s-measuring-it">Measuring it</h3>
                     <pre><code class="language-python">def reciprocal_rank(retrieved_ids, relevant_ids):
     relevant = set(relevant_ids)
     for i, doc_id in enumerate(retrieved_ids, start=1):
@@ -342,19 +339,19 @@ def mrr(eval_set, retriever, k=10):
     ) / len(eval_set)</code></pre><p>Two details that affect the number:</p><p><strong>The cutoff matters.</strong> MRR@10 treats a relevant document at rank 15 as not found, scoring 0. Report the cutoff you used, and keep it consistent when comparing.</p><p><strong>Zeros dominate.</strong> A query where nothing relevant was retrieved contributes 0, and with 20% such queries the maximum achievable MRR is 0.8. Low MRR can therefore be a recall problem in disguise &mdash; which is why the two are read together.</p><p>For per-query debugging, the reciprocal ranks are more useful than the mean. Sort queries by reciprocal rank and look at the zeros first: those are the outright failures, and they usually cluster around a recognisable cause.</p>
                 </div>
                 <div>
-                    <h3>MRR and RRF are not the same thing</h3>
+                    <h3 id="vz-s-mrr-and-rrf-are-not-the-same-thing">MRR and RRF are not the same thing</h3>
                     <p>The similarity in name and formula causes confusion, so it is worth separating them.</p><p><strong>MRR</strong> is an <em>evaluation metric</em> &mdash; <code>1/rank</code>, averaged over queries, measuring how well a system ranks.</p><p><strong>Reciprocal rank fusion</strong> is a <em>combination method</em> &mdash; <code>Σ 1/(k + rank)</code> summed across several ranked lists, producing a merged ranking.</p><p>They share the reciprocal-of-rank idea and do entirely different jobs: one scores a system, the other builds one. The <code>+k</code> in RRF (usually 60) is a smoothing constant that flattens the difference between top ranks; MRR has no such constant, which is why it is so harsh on rank 2.</p>
                 </div>
                 <div>
-                    <h3>Related rank-sensitive metrics</h3>
+                    <h3 id="vz-s-related-rank-sensitive-metrics">Related rank-sensitive metrics</h3>
                     <p><strong>MAP (mean average precision)</strong> averages the precision at each rank where a relevant document appears, then averages over queries. Unlike MRR it accounts for <em>all</em> relevant documents, which makes it the better choice when several exist.</p><p><strong>nDCG@k</strong> discounts gains logarithmically by position and supports graded relevance &mdash; highly relevant, somewhat relevant, irrelevant. The most complete measure, and it needs graded judgements, which are more expensive to collect.</p><p><strong>Hit rate@k</strong> is the crude version: did any relevant document appear in the top k, yes or no. Useful as a headline, and blind to position.</p><p>For most RAG work, recall@k plus MRR is enough. Move to nDCG when comparing closely-matched configurations and you have graded labels.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>What is a good MRR?</strong> Corpus-dependent. Track it against your own baseline over time rather than an absolute target.</p><p><strong>Should I use MRR or MAP?</strong> MRR when there is one right answer; MAP when several relevant documents exist and all of them matter.</p><p><strong>Why is MRR so harsh on rank 2?</strong> Because <code>1/2</code> is half of <code>1/1</code>. It reflects that being first matters disproportionately, for users and for model attention.</p><p><strong>Does MRR need graded relevance?</strong> No &mdash; binary judgements are sufficient, which is part of its appeal.</p><p><strong>How does a reranker affect it?</strong> Substantially, and that is precisely what a reranker is for: reordering a fixed candidate set.</p><p><strong>Is MRR the same as reciprocal rank fusion?</strong> No &mdash; one evaluates a ranking, the other combines several rankings.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>MRR averages <code>1/rank</code> of the first relevant result, so being first is worth twice being second.</li><li>It suits single-answer questions and ignores everything after the first hit.</li><li>Report it with recall@k: high recall and low MRR means add a reranker; low recall means fix retrieval first.</li><li>Queries with nothing relevant contribute 0, so low MRR can be a recall problem in disguise.</li><li>MRR evaluates a ranking; reciprocal rank fusion combines rankings &mdash; similar formula, different job.</li></ul>
                 </div>
             </div>

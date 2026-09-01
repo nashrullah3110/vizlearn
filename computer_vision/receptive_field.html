@@ -231,33 +231,30 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">How much of the original image a single deep unit can actually see, and why the answer shapes architecture.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The question</h3>
-                    <p>Take one number in the output of a convolutional network's third layer. Change a pixel in the input image. Does that number change?</p><p>For most pixels, no. A convolution is local &mdash; each output depends only on a small window of its input &mdash; and stacking local operations gives an output that depends on a larger, but still bounded, region of the original image. That region is the unit's <strong>receptive field</strong>, and it is the honest answer to "what can this feature possibly be detecting".</p><p>A unit with a 7&#215;7 receptive field cannot detect a face in a 224&#215;224 photograph. It has never seen a face. It has seen a 7&#215;7 patch, and whatever it responds to has to be visible in one.</p>
-                </div>
-                <div>
-                    <h3>Counting it, one layer at a time</h3>
+                    <h3 id="vz-s-counting-it-one-layer-at-a-time">Counting it, one layer at a time</h3>
                     <p>Drag the layers control above and watch the highlighted band widen as it moves down the diagram. Each row shows how many input pixels the layer above can be influenced by.</p><p>With stride 1 the rule is simple. A single unit sees 1 pixel of its own input. One <code>k</code>&#215;<code>k</code> convolution makes that <code>k</code>. Another adds <code>k - 1</code> more, because the window's centre already covers what the previous layer covered and each side extends by <code>(k-1)/2</code>. So:</p><pre><code>r = 1
 for each layer:
     r = r + (k - 1)</code></pre><p>Three 3&#215;3 layers: 1 → 3 → 5 → 7. The growth is <strong>linear in depth</strong>, and that is slow. A network of twenty 3&#215;3 layers at stride 1 has a receptive field of 41 pixels &mdash; less than a fifth of a 224-pixel image.</p>
                 </div>
                 <div>
-                    <h3>Stride changes the arithmetic</h3>
+                    <h3 id="vz-s-stride-changes-the-arithmetic">Stride changes the arithmetic</h3>
                     <p>Set the stride control to 2 and the widening accelerates sharply.</p><p>The reason is that stride changes the *spacing* between the positions a layer looks at, measured in original pixels. Call that spacing the jump. At stride 1 the jump stays 1 forever. At stride 2 it doubles every layer, so a step of one unit in layer three corresponds to a step of four pixels in the input.</p><pre><code>r = 1; jump = 1
 for each layer:
     r = r + (k - 1) * jump
     jump = jump * stride</code></pre><p>Now the additions themselves grow, and the receptive field expands geometrically rather than linearly. This is the real reason architectures downsample. Pooling and strided convolutions are usually explained as reducing computation, which they do &mdash; but the more important effect is that they are the only affordable way to get a deep unit to see the whole image.</p>
                 </div>
                 <div>
-                    <h3>Why 3&#215;3 won everything</h3>
+                    <h3 id="vz-s-why-3-3-won-everything">Why 3&#215;3 won everything</h3>
                     <p>Two stacked 3&#215;3 convolutions have the same 5&#215;5 receptive field as one 5&#215;5 convolution. Three stacked have the same 7&#215;7 as one 7&#215;7. So why not just use the big kernel?</p><p>Count the weights, per input/output channel pair:</p><div class="vz-table-wrap"><table><thead><tr><th>Arrangement</th><th>Receptive field</th><th>Weights</th></tr></thead><tbody><tr><td>One 5&#215;5</td><td>5&#215;5</td><td>25</td></tr><tr><td>Two 3&#215;3</td><td>5&#215;5</td><td>18</td></tr><tr><td>One 7&#215;7</td><td>7&#215;7</td><td>49</td></tr><tr><td>Three 3&#215;3</td><td>7&#215;7</td><td>27</td></tr></tbody></table></div><p>The stack is cheaper, and it has a second advantage that matters more: there is a non-linearity between the layers. One 7&#215;7 convolution is a single linear function of its 49 inputs. Three 3&#215;3 convolutions with ReLUs between them is a composition of three linear functions separated by non-linearities, which can represent things a single linear map cannot.</p><p>VGG made this argument explicitly in 2014 and effectively ended large kernels in general-purpose vision architectures. Everything since is 3&#215;3 stacks, with the occasional [1&#215;1](one_by_one_convolutions.html) for channel work.</p>
                 </div>
                 <div>
-                    <h3>Effective versus theoretical</h3>
+                    <h3 id="vz-s-effective-versus-theoretical">Effective versus theoretical</h3>
                     <p>The number the formula gives is the *theoretical* receptive field: the set of pixels that could in principle affect the output.</p><p>The <strong>effective</strong> receptive field is smaller and softer. Contributions from the edge of the theoretical field pass through fewer paths than contributions from the centre, and the number of paths falls off roughly like a Gaussian. In practice a unit is strongly influenced by the middle of its field and barely influenced by the rim.</p><p>The practical consequence is that a network usually needs a theoretical receptive field noticeably larger than the objects it has to recognise, not merely equal to them. Dilated convolutions exist largely as a way to buy receptive field without buying downsampling, which matters when the output has to stay at full resolution &mdash; segmentation, most obviously.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>Assuming depth alone is enough.</strong> Twenty stride-1 layers of 3&#215;3 still only see 41 pixels. Without downsampling or dilation, a deep network can be blind to anything large.</p><p><strong>Forgetting the input resolution.</strong> A receptive field of 100 pixels covers half a 224-pixel image and a twentieth of a 2000-pixel one. Resizing the input silently changes what the architecture can see.</p><p><strong>Reading detection failures as a data problem.</strong> If the model consistently misses large objects, check the receptive field before collecting more images.</p>
                 </div>
             </div>

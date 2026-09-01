@@ -19973,6 +19973,108 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "sklearn/a_complete_workflow.html",
+  "title": "A Complete Workflow",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "When should the test set be split off?",
+    "o": [
+     "After preprocessing, so both halves are prepared the same way",
+     "Immediately, before anything that learns from data",
+     "After tuning",
+     "It does not matter with cross-validation"
+    ],
+    "a": 1,
+    "w": "Anything fitted before the split - a median, a scaler, a category list - has seen the test rows, and the final number is no longer honest."
+   },
+   {
+    "t": "Why fit a DummyClassifier at all?",
+    "o": [
+     "It is required by cross_validate",
+     "Its score is the floor that makes the model's score interpretable",
+     "It initialises the pipeline",
+     "It handles the class imbalance"
+    ],
+    "a": 1,
+    "w": "The dummy scored 0.082 average precision, exactly the base rate. Without it, 0.478 is a number with no scale."
+   },
+   {
+    "t": "Why pass scoring=\"average_precision\" to the search?",
+    "o": [
+     "It is faster",
+     "The default optimises accuracy, which on 8% positives prefers predicting nothing",
+     "It is required for pipelines",
+     "It avoids a warning"
+    ],
+    "a": 1,
+    "w": "The metric decides which candidate wins. Leaving it at the default tunes towards ignoring the rare class."
+   },
+   {
+    "t": "Why save the threshold alongside the model?",
+    "o": [
+     "To document the experiment",
+     "Because predict() reverts to 0.5, which may catch almost nothing",
+     "Pickle requires it",
+     "So the model can be refitted"
+    ],
+    "a": 1,
+    "w": "The threshold is part of the decision the model makes. Loaded without it, the served model silently uses a default nobody chose."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/class_imbalance.html",
+  "title": "Class Imbalance",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "A model reports 96% accuracy on data with 2% positives. What should you check first?",
+    "o": [
+     "Whether it is overfitting",
+     "The confusion matrix - it may be finding almost none of the positives",
+     "The learning rate",
+     "Whether the features are scaled"
+    ],
+    "a": 1,
+    "w": "In the first editor that model found 3 of 49. Accuracy cannot distinguish it from a model that ignores the class entirely."
+   },
+   {
+    "t": "Which remedy needs no refitting?",
+    "o": [
+     "class_weight=\"balanced\"",
+     "Moving the decision threshold",
+     "SMOTE",
+     "Undersampling"
+    ],
+    "a": 1,
+    "w": "The probabilities are already there. In the editor it took the same fitted model from 6% recall to 41%, and it beat the other remedies on F1."
+   },
+   {
+    "t": "Where must oversampling happen?",
+    "o": [
+     "Before the split, so both halves are balanced",
+     "Inside the folds, on the training part only",
+     "After fitting",
+     "On the test set as well"
+    ],
+    "a": 1,
+    "w": "Resampling first puts duplicate rows on both sides of the split. On random labels that reported recall of 0.632 against an honest 0.324."
+   },
+   {
+    "t": "Is imbalance always a problem?",
+    "o": [
+     "Yes, always",
+     "No - it hurts when the classes are also hard to separate",
+     "Only below 1%",
+     "Only for linear models"
+    ],
+    "a": 1,
+    "w": "With the same 2% positives but separable classes, the untreated default model recalled 70.8%. Check before reaching for a remedy."
+   }
+  ]
+ },
+ {
   "path": "sklearn/classification_metrics.html",
   "title": "Classification Metrics",
   "cat": "scikit-learn",
@@ -20224,6 +20326,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "It takes only 1-D input and has no handle_unknown, so applying it to features gives an ordinal encoding that raises on any new category."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/hyperparameter_search.html",
+  "title": "Hyperparameter Search",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "Why is best_score_ optimistic?",
+    "o": [
+     "It is computed on the training data",
+     "It is the maximum of many noisy estimates on the same folds",
+     "It ignores the standard deviation",
+     "It refits on all the data first"
+    ],
+    "a": 1,
+    "w": "Taking a maximum selects for luck as well as quality. On random labels a search reported 0.642 where the truth was 0.5."
+   },
+   {
+    "t": "When is RandomizedSearchCV usually better than GridSearchCV?",
+    "o": [
+     "Never - grid is exhaustive",
+     "When the space is large, since it tries more distinct values of the parameters that matter",
+     "Only for trees",
+     "When there is one parameter"
+    ],
+    "a": 1,
+    "w": "A grid spends its budget evenly across parameters that mostly do not matter. Random sampling varies everything at once."
+   },
+   {
+    "t": "Two settings differ by 0.0001 with a standard deviation of 0.02. What should you conclude?",
+    "o": [
+     "The higher one is better",
+     "They are tied - prefer the simpler setting",
+     "The search failed",
+     "Increase the folds until one wins"
+    ],
+    "a": 1,
+    "w": "A gap far inside one standard deviation is noise. Among ties, the more regularised or simpler setting is the safer bet."
+   },
+   {
+    "t": "What does scoring= default to for a classifier?",
+    "o": [
+     "f1",
+     "roc_auc",
+     "accuracy",
+     "balanced_accuracy"
+    ],
+    "a": 2,
+    "w": "Which means an unset scoring silently optimises accuracy - and on imbalanced data that can pick a different winner than the metric you care about."
    }
   ]
  },
@@ -20585,6 +20738,108 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "sklearn/probabilities_and_thresholds.html",
+  "title": "Probabilities and Thresholds",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "What does predict() do that predict_proba() does not?",
+    "o": [
+     "Refit the model",
+     "Apply a 0.5 threshold, discarding the confidence",
+     "Scale the output",
+     "Average across classes"
+    ],
+    "a": 1,
+    "w": "The two are identical by definition: predict is proba >= 0.5. The 0.5 is a library default, not a property of your problem."
+   },
+   {
+    "t": "Does changing the threshold require refitting?",
+    "o": [
+     "Yes, the model must be retrained",
+     "No - it is applied after fitting, so every operating point is already available",
+     "Only for tree models",
+     "Only if the classes are imbalanced"
+    ],
+    "a": 1,
+    "w": "That is what makes it the cheapest adjustment available, and why it is worth doing before tuning hyperparameters."
+   },
+   {
+    "t": "Positives are 1% of the data. Which summary should you trust?",
+    "o": [
+     "ROC AUC",
+     "Average precision",
+     "Accuracy",
+     "Either equally"
+    ],
+    "a": 1,
+    "w": "ROC AUC read 0.825 where average precision read 0.134 on the same predictions. The false positive rate divides by an enormous number of true negatives."
+   },
+   {
+    "t": "What does it mean for a model to be calibrated?",
+    "o": [
+     "Its accuracy is high",
+     "Among cases it scores 0.7, about 70% are actually positive",
+     "Its threshold is 0.5",
+     "Its features are scaled"
+    ],
+    "a": 1,
+    "w": "It matters whenever the probability is used as a number. Tree ensembles rank well and are usually poorly calibrated; logistic regression usually is not."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/random_forests.html",
+  "title": "Random Forests",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "What are the two sources of randomness in a random forest?",
+    "o": [
+     "Random initial weights and random splits",
+     "Bootstrap row samples and a random feature subset at each split",
+     "Random depth and random criterion",
+     "Random test sets"
+    ],
+    "a": 1,
+    "w": "Bootstrapping alone leaves the trees too similar when one feature dominates; restricting the features at each split is what forces genuine diversity."
+   },
+   {
+    "t": "Can raising n_estimators cause overfitting?",
+    "o": [
+     "Yes, past a few hundred",
+     "No - more trees only improve the estimate of the average",
+     "Only without max_depth",
+     "Only on small datasets"
+    ],
+    "a": 1,
+    "w": "It is the one complexity-shaped parameter with no trade-off. The cost is time and memory, not generalisation."
+   },
+   {
+    "t": "Why is feature_importances_ misleading?",
+    "o": [
+     "It does not sum to 1",
+     "It is computed on training data and favours columns with many distinct values",
+     "It ignores the first feature",
+     "It only works for regression"
+    ],
+    "a": 1,
+    "w": "In the editor a pure-noise column with 400 distinct values scored higher than another noise column. Permutation importance gave both exactly zero."
+   },
+   {
+    "t": "What does a random forest predict beyond its training range?",
+    "o": [
+     "It extrapolates the trend",
+     "A flat value - every tree is flat there, so the average is too",
+     "The overall mean",
+     "It raises an error"
+    ],
+    "a": 1,
+    "w": "It predicted 55.3 for both x=25 and x=40 on a perfect straight line. Averaging does not fix what every member shares."
+   }
+  ]
+ },
+ {
   "path": "sklearn/regression_metrics.html",
   "title": "Regression Metrics",
   "cat": "scikit-learn",
@@ -20836,6 +21091,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Every fit returns self, which is what makes the constructor-and-fit one-liner work."
+   }
+  ]
+ },
+ {
+  "path": "sklearn/kmeans_clustering.html",
+  "title": "k-Means Clustering",
+  "cat": "scikit-learn",
+  "q": [
+   {
+    "t": "Why can inertia_ not be used to choose k?",
+    "o": [
+     "It is not computed by default",
+     "It falls monotonically as k rises, reaching zero at k = n",
+     "It only works for two clusters",
+     "It requires labels"
+    ],
+    "a": 1,
+    "w": "Its minimum is always the largest k you tried. The elbow is a heuristic on the curve; silhouette has an actual maximum."
+   },
+   {
+    "t": "What happens if you run k-means on unscaled features?",
+    "o": [
+     "It scales them internally",
+     "The column with the largest units dominates the distance and decides the clustering",
+     "It raises an error",
+     "Nothing - it is scale-invariant"
+    ],
+    "a": 1,
+    "w": "In the editor, a pure-noise column with a 500x larger unit took the agreement with the true grouping to -0.0032, which is chance."
+   },
+   {
+    "t": "Why does k-means fail on two interleaving crescents?",
+    "o": [
+     "Too few iterations",
+     "Its boundaries are straight, so every cluster is a convex region",
+     "The data is not scaled",
+     "n_init is too low"
+    ],
+    "a": 1,
+    "w": "Assigning each point to the nearest centre gives straight boundaries. DBSCAN scored 1.00 where k-means scored 0.27."
+   },
+   {
+    "t": "What does n_init do?",
+    "o": [
+     "Sets the number of clusters",
+     "Repeats the whole fit from different starts and keeps the lowest inertia",
+     "Sets the iteration limit",
+     "Initialises the random seed"
+    ],
+    "a": 1,
+    "w": "k-means converges to a local minimum, and eight single starts in the editor ranged from 1034.9 to 1188.6."
    }
   ]
  }

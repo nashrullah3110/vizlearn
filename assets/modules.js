@@ -4460,6 +4460,22 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "A Complete Workflow",
+  "path": "sklearn/a_complete_workflow.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Class Imbalance",
+  "path": "sklearn/class_imbalance.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "Classification Metrics",
   "path": "sklearn/classification_metrics.html",
   "category": "scikit-learn",
@@ -4494,6 +4510,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Encoding Categories",
   "path": "sklearn/encoding_categoricals.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Hyperparameter Search",
+  "path": "sklearn/hyperparameter_search.html",
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
@@ -4556,6 +4580,22 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Probabilities and Thresholds",
+  "path": "sklearn/probabilities_and_thresholds.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "Random Forests",
+  "path": "sklearn/random_forests.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
   "title": "Regression Metrics",
   "path": "sklearn/regression_metrics.html",
   "category": "scikit-learn",
@@ -4590,6 +4630,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "fit, predict, transform",
   "path": "sklearn/what_is_scikit_learn.html",
+  "category": "scikit-learn",
+  "topic": "sklearn",
+  "icon": "sigma",
+  "desc": ""
+ },
+ {
+  "title": "k-Means Clustering",
+  "path": "sklearn/kmeans_clustering.html",
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",

@@ -346,30 +346,24 @@ print("lookup order :", [c.__name__ for c in LoudBase.__mro__][:4])</script>
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">A class can be built on another one, taking its attributes and methods and changing only what differs. Used carefully it removes real duplication; used loosely it produces hierarchies nobody can follow.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The basic move</h3>
-                    <pre><code class="language-python">class Dog(Animal):
-    def speak(self):
-        return &quot;woof&quot;</code></pre><p><code>Dog</code> gets everything <code>Animal</code> has. Where it defines a method of the same name, that version wins &mdash; that is overriding.</p><p>The payoff shows up in methods the parent already wrote:</p><pre><code class="language-python">def describe(self):
-    return f&quot;{self.name} says {self.speak()}&quot;</code></pre><p><code>describe</code> was written once on <code>Animal</code> and calls whichever <code>speak</code> the actual object has. Add a tenth animal and <code>describe</code> needs no change. That is the whole argument for inheritance in one method.</p>
-                </div>
-                <div>
-                    <h3>super()</h3>
+                    <h3 id="vz-s-super">super()</h3>
                     <pre><code class="language-python">class Dog(Animal):
     def __init__(self, name, breed):
         super().__init__(name)
         self.breed = breed</code></pre><p>A subclass <code>__init__</code> replaces the parent's, so the parent's setup does not happen unless you ask for it. Forget <code>super().__init__(name)</code> and <code>self.name</code> never gets set &mdash; the failure arrives later as an <code>AttributeError</code> from some unrelated method, which the page demonstrates.</p><p><code>super()</code> also works for extending rather than replacing:</p><p>return super().speak().upper() + "!!!"</p><p>Take the parent's answer, then modify it.</p>
                 </div>
                 <div>
-                    <h3>The lookup order</h3>
+                    <h3 id="vz-s-the-lookup-order">The lookup order</h3>
                     <p>With several parents, Python walks a defined order &mdash; the MRO, visible as <code>Cls.__mro__</code> &mdash; taking the first match. Reading it is how you answer "which version actually ran".</p><p>Multiple inheritance is a sharp tool. Mixins with distinct responsibilities are fine; deep diamond hierarchies are how codebases become unreadable.</p>
                 </div>
                 <div>
-                    <h3>is-a, not has-a</h3>
+                    <h3 id="vz-s-is-a-not-has-a">is-a, not has-a</h3>
                     <p>Inherit when the subclass genuinely <em>is</em> a kind of the parent and can be used wherever the parent is expected. A <code>Dog</code> is an <code>Animal</code>, so <code>describe</code> works on both.</p><p>When the relationship is "has a" &mdash; a <code>Car</code> has an <code>Engine</code> &mdash; hold the other object as an attribute instead. Composition is easier to change later, because it does not tie two classes together permanently to share a couple of methods.</p><p>The common failure is inheriting to reuse a method. If that is the only reason, a function or a held object is nearly always the better answer.</p>
                 </div>
                 <div>
-                    <h3>Composition, concretely</h3>
+                    <h3 id="vz-s-composition-concretely">Composition, concretely</h3>
                     <p>"Prefer composition" is common advice and rarely shown. The difference is whether the other object is *what you are* or *what you have*:</p><pre><code class="language-python">class Car(Engine):            # inheritance: a Car IS an Engine - wrong
     ...
 
@@ -381,7 +375,7 @@ class Car:                    # composition: a Car HAS an Engine
         return self.engine.start()</code></pre><p>The composed version costs one line of delegation and gains a great deal: the engine can be swapped, tested on its own, or shared, and <code>Car</code> exposes only the methods it chose to expose rather than everything <code>Engine</code> happens to define.</p><p>The test is substitutability. If code that expects the parent can be handed the child and keep working, inheritance is honest. If not - if the child overrides methods to raise, or ignores half of what it inherited - the relationship is not "is a".</p>
                 </div>
                 <div>
-                    <h3>Abstract base classes</h3>
+                    <h3 id="vz-s-abstract-base-classes">Abstract base classes</h3>
                     <p>When a parent exists to define an interface rather than to be instantiated, <code>abc</code> makes that explicit:</p><pre><code class="language-python">from abc import ABC, abstractmethod
 
 class Shape(ABC):
@@ -389,16 +383,16 @@ class Shape(ABC):
     def area(self): ...</code></pre><p>Subclasses that forget <code>area</code> fail at construction with a clear message, rather than at some later call site with <code>AttributeError</code>. That turns a runtime surprise into an immediate, located error.</p>
                 </div>
                 <div>
-                    <h3>Duck typing means you often need neither</h3>
+                    <h3 id="vz-s-duck-typing-means-you-often-need-neither">Duck typing means you often need neither</h3>
                     <p>Python does not require a shared base class for polymorphism. Anything with the right method works:</p><pre><code class="language-python">def describe(thing):
     return thing.speak()</code></pre><p>This accepts any object with a <code>speak</code> method, related or not. A great deal of Python code that would need an interface in another language needs nothing here, which is worth remembering before building a hierarchy to enable something that already works.</p>
                 </div>
                 <div>
-                    <h3>Multiple inheritance and mixins</h3>
+                    <h3 id="vz-s-multiple-inheritance-and-mixins">Multiple inheritance and mixins</h3>
                     <p>Multiple parents are legal, and the reasonable use is a mixin: a small class providing one capability, with no state of its own and no expectation of being instantiated - <code>JSONSerialisableMixin</code>, <code>TimestampMixin</code>.</p><p>Deep diamond hierarchies are the unreasonable use. When two parents both define the same method and both call <code>super()</code>, the order of execution depends on the MRO, and reasoning about it stops being possible for anyone who did not write it. If you need <code>__mro__</code> to work out which code runs, the design has already cost more than it saved.</p>
                 </div>
                 <div>
-                    <h3>A hierarchy that earns itself</h3>
+                    <h3 id="vz-s-a-hierarchy-that-earns-itself">A hierarchy that earns itself</h3>
                     <p>Two classes, where the second genuinely is a kind of the first and changes one calculation:</p><pre><code class="language-python">class Employee:
     def __init__(self, name, salary):
         self.name = name
@@ -426,7 +420,7 @@ for person in staff:
 Manager(&#x27;bo&#x27;) 8500.0</code></pre><p>Three things in that are worth copying. <code>Manager.pay</code> calls <code>super().pay()</code> rather than repeating <code>self.salary / 12</code>, so a change to how base pay is computed reaches both classes. <code>__repr__</code> uses <code>type(self).__name__</code> rather than the literal string <code>"Employee"</code>, so the subclass prints its own name for free. And the loop does not ask what kind of object it has &mdash; it calls <code>pay()</code> and lets each class answer. That last one is the point of the whole exercise; a loop full of <code>isinstance</code> checks has inheritance without the benefit.</p>
                 </div>
                 <div>
-                    <h3>What super() actually does</h3>
+                    <h3 id="vz-s-what-super-actually-does">What super() actually does</h3>
                     <p><code>super()</code> is usually described as "call the parent", which is close enough until it isn't. What it really means is *the next class along in the MRO of the object's actual type* &mdash; and with one parent those are the same thing, so the shortcut survives a long time before it breaks.</p><p>Here is where it stops being the same thing:</p><pre><code class="language-python">class Base:
     def greet(self):
         return &quot;base&quot;
@@ -447,20 +441,20 @@ print([c.__name__ for c in Both.__mro__])</code></pre><p>The output surprises mo
 [&#x27;Both&#x27;, &#x27;Left&#x27;, &#x27;Right&#x27;, &#x27;Base&#x27;, &#x27;object&#x27;]</code></pre><p><code>Left.greet</code> calls <code>super().greet()</code> and gets <strong><code>Right</code></strong>, not <code>Base</code> &mdash; even though <code>Right</code> is nowhere in <code>Left</code>'s definition. The MRO is computed from the type of the object, and <code>Both</code> puts <code>Right</code> after <code>Left</code>. This is what makes cooperative multiple inheritance possible: each class does its bit and delegates onward without knowing who is next.</p><p>It is also why <code>super().__init__(...)</code> matters even when the parent's <code>__init__</code> looks empty. In a hierarchy someone else may extend later, breaking the chain breaks classes that do not exist yet.</p>
                 </div>
                 <div>
-                    <h3>Overriding without breaking the parent's promise</h3>
+                    <h3 id="vz-s-overriding-without-breaking-the-parent-s-promise">Overriding without breaking the parent's promise</h3>
                     <p>An override replaces a method, and anything holding the parent type keeps calling it expecting the parent's behaviour. Two rules keep that honest.</p><p><strong>Accept at least what the parent accepted.</strong> If <code>Animal.feed(self, amount)</code> takes an amount, a subclass whose <code>feed(self)</code> takes none will fail whenever it is used through the parent's interface.</p><p><strong>Return the same kind of thing.</strong> A parent whose <code>area()</code> returns a number and a child whose <code>area()</code> returns a string will break the first caller that does arithmetic with it.</p><p>The override that breaks both is the one that refuses:</p><pre><code class="language-python">class ReadOnlyList(list):
     def append(self, item):
         raise TypeError(&quot;read only&quot;)</code></pre><p>This looks like a reasonable restriction and is a trap. Everything that accepts a <code>list</code> is entitled to append to one, so <code>ReadOnlyList</code> is not a list in any useful sense &mdash; it just passes <code>isinstance</code> checks. If you want something that cannot be appended to, do not inherit from something that can; hold a list and expose only the methods you intend to support.</p>
                 </div>
                 <div>
-                    <h3>isinstance, and when checking the type is the wrong move</h3>
+                    <h3 id="vz-s-isinstance-and-when-checking-the-type-is-the-wro">isinstance, and when checking the type is the wrong move</h3>
                     <p><code>isinstance(x, Animal)</code> is true for <code>Animal</code> and for every subclass, which is what you almost always want. <code>type(x) is Animal</code> is true only for exact matches, and using it deliberately excludes subclasses &mdash; which is rarely what anyone means.</p><p>Both are worth reaching for less often than people do. A chain like this:</p><pre><code class="language-python">if isinstance(thing, Dog):
     sound = &quot;woof&quot;
 elif isinstance(thing, Cat):
     sound = &quot;meow&quot;</code></pre><p>is inheritance being used for storage while the branching is still done by hand. The version that scales is a <code>speak()</code> method on each class and <code>thing.speak()</code> at the call site: adding a tenth animal then touches one new class rather than every chain in the codebase.</p><p>The honest uses are narrow: validating an argument at a public boundary, handling genuinely unrelated types such as "a string or a list of strings", and writing <code>__eq__</code>, which has to decide what it can be compared against.</p>
                 </div>
                 <div>
-                    <h3>Where attributes are found</h3>
+                    <h3 id="vz-s-where-attributes-are-found">Where attributes are found</h3>
                     <p>Overriding is one case of a more general rule, and knowing the rule removes a whole category of confusion. When you write <code>obj.thing</code>, Python looks in the instance's own dictionary first, then the class, then each class along the MRO in order, and raises <code>AttributeError</code> if none of them has it.</p><p>That ordering explains why assigning to an attribute on one instance does not affect the others, and why assigning on the class affects every instance that has not set its own:</p><pre><code class="language-python">class Counter:
     total = 0                      # on the class, shared
 
@@ -474,7 +468,7 @@ print(a.total, b.total, Counter.total)</code></pre><pre><code>1 0 0</code></pre>
         Counter.total += 1         # or type(self).total</code></pre><p>And the version that catches people badly is a mutable class attribute, because appending to a list is a read followed by a mutation, not an assignment &mdash; so every instance really does share it. If each instance needs its own, create it in <code>__init__</code>.</p>
                 </div>
                 <div>
-                    <h3>Extending a built-in, and why it disappoints</h3>
+                    <h3 id="vz-s-extending-a-built-in-and-why-it-disappoints">Extending a built-in, and why it disappoints</h3>
                     <p>Subclassing <code>dict</code> or <code>list</code> looks like the obvious way to get a container with one extra behaviour, and it works less well than expected:</p><pre><code class="language-python">class LoudDict(dict):
     def __setitem__(self, key, value):
         print(&quot;setting&quot;, key)
@@ -488,7 +482,7 @@ print(dict(d))</code></pre><pre><code>setting a
 {&#x27;a&#x27;: 1, &#x27;b&#x27;: 2}</code></pre><p><code>update</code> is implemented in C and does not route through <code>__setitem__</code>, so the override is bypassed. The same applies to <code>dict(**d)</code>, <code>setdefault</code>, and the equivalents on <code>list</code>. The built-ins are not written as cooperating Python methods, and nothing promises they will call each other.</p><p>Two ways out. <code>collections.UserDict</code> and <code>UserList</code> are pure-Python wrappers written so that every operation does go through the methods you can override. Or hold a plain <code>dict</code> as an attribute and expose only the operations you mean to support &mdash; composition again, and usually the better answer, because a container with one unusual rule is rarely a good substitute for the real thing everywhere a <code>dict</code> is accepted.</p>
                 </div>
                 <div>
-                    <h3>Alternative constructors, and why they take cls</h3>
+                    <h3 id="vz-s-alternative-constructors-and-why-they-take-cls">Alternative constructors, and why they take cls</h3>
                     <p>A class often needs more than one way to be built &mdash; from a string, from a row of a file, from a dictionary. Adding parameters to <code>__init__</code> for each one gets ugly quickly. A <code>classmethod</code> is the usual answer:</p><pre><code class="language-python">class Point:
     def __init__(self, x, y):
         self.x, self.y = x, y
@@ -511,11 +505,11 @@ print(Point3D.from_text(&quot;3,4&quot;))</code></pre><pre><code>Point(3, 4)
 Point3D(3, 4)</code></pre><p>The important detail is <code>cls</code>, not <code>Point</code>. A classmethod receives the class it was called on, so <code>Point3D.from_text</code> builds a <code>Point3D</code> without <code>Point3D</code> writing a line of code. Hard-coding <code>return Point(...)</code> would have given a <code>Point</code> from both calls, and the subclass would have silently lost its own type &mdash; the same failure as hard-coding a name in <code>__repr__</code>, from the same cause.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>Do I have to call <code>super().__init__()</code>?</strong> Only if the parent's <code>__init__</code> does something you need &mdash; but it usually does, and skipping it fails later and further away, so call it unless you have a specific reason not to.</p><p><strong>Can a subclass add attributes the parent knows nothing about?</strong> Yes, and that is normal. <code>Manager</code> adding <code>bonus</code> is exactly the intended use.</p><p><strong>What is the difference between overriding and overloading?</strong> Overriding is replacing an inherited method, which Python does. Overloading is several versions of one function distinguished by argument types, which Python does not have &mdash; default arguments and <code>*args</code> cover the same ground.</p><p><strong>Should everything inherit from a common base?</strong> No. That is a habit from languages where it is required. Unrelated classes should be unrelated.</p><p><strong>How deep is too deep?</strong> Three levels is usually already a warning. The cost is not the depth itself but that finding which class defines a given method becomes a search.</p><p><strong>Why does my subclass print the parent's name?</strong> Because <code>__repr__</code> hard-codes a string. Use <code>type(self).__name__</code> and it follows the actual class.</p><p><strong>Why does <code>super()</code> need no arguments?</strong> Inside a class body Python supplies the class and the instance for you. The explicit <code>super(Dog, self)</code> form is the Python 2 spelling and still works, which is why you will see it in older code.</p><p><strong>Can I inherit from a class in another module?</strong> Yes, and it is normal &mdash; but remember that you are now coupled to that class's internals, so a library's undocumented base class is a risky parent.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>Inherit when the child genuinely is a kind of the parent and can be used anywhere the parent is expected; otherwise hold the other object instead.</li><li><code>super()</code> means the next class in the MRO of the object's real type, not literally the parent &mdash; which is what makes mixins work.</li><li>Overrides must accept what the parent accepted and return what it returned; an override that raises is a sign the relationship is wrong.</li><li>Prefer a method call over a chain of <code>isinstance</code> checks; that is the benefit you inherited for.</li><li><code>type(self).__name__</code> in <code>__repr__</code> gives every subclass a correct one.</li></ul>
                 </div>
             </div>
