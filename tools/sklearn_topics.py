@@ -6881,6 +6881,12 @@ The output of that work is a name and a description per group. That is the deliv
 
 <strong>Does predict() work on new data?</strong> Yes - it assigns each new point to the nearest existing centre without refitting, which is what makes a clustering usable as a feature in production.
 
+<strong>Why is my silhouette score low even though the clusters look right?</strong> Silhouette rewards compact, well-separated, roughly spherical groups. A correct clustering of elongated or touching groups scores poorly on it, which is a limitation of the metric rather than of the clustering.
+
+<strong>Does k-means work in high dimensions?</strong> Less well. Distances between points become more similar as dimensions grow, so "nearest centre" carries less information. Reducing dimensions first - with PCA, say - is common practice and usually helps.
+
+<strong>Can two clusters end up empty?</strong> With random initialisation, yes; scikit-learn relocates empty clusters rather than leaving them, which is one more thing `k-means++` makes unlikely.
+
 ## Things to try
 
 1. <strong>Watch inertia fail.</strong> The second editor's numbers fall forever. Compute the differences and find the bend yourself.
