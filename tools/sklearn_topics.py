@@ -6197,6 +6197,26 @@ Where a binary threshold *does* reappear is one-versus-rest arrangements, where 
 
 <strong>Does a better threshold improve AUC?</strong> No. AUC summarises every threshold, so it is unchanged by picking one. That is exactly why it cannot tell you which to pick.
 
+## Why the default is 0.5 at all
+
+It is worth understanding rather than resenting, because the reasoning tells you exactly when it is right.
+
+Under two assumptions, 0.5 is optimal. The first is that the two classes are equally frequent, so a probability above a half genuinely means "more likely than not". The second is that a false positive and a false negative cost the same, so the decision should go to whichever is more probable.
+
+Both assumptions are defaults in the same sense the threshold is: they are what you get when nobody has said otherwise. And both are wrong on most real problems. Fraud, disease, churn, defects and failures are all rare, and in every one of them a miss and a false alarm have quite different prices.
+
+So the library's choice is not a mistake &mdash; it is the only neutral answer available to something that knows nothing about your problem. What it cannot do is warn you, because from inside the estimator there is no way to tell a balanced problem from an imbalanced one that you happen to care about differently.
+
+The practical version: on any problem where the classes are uneven or the mistakes cost differently, treat the threshold as unset rather than as set to 0.5. It is a parameter with a default, and the default was chosen in the absence of the information only you have.
+
+## A short procedure
+
+Five steps that turn all of this into something routine.
+
+Split off a validation set, or use cross-validation, keeping the test set untouched. Fit the model and take `predict_proba` on the validation part. Sweep thresholds from 0.01 to 0.99 and compute, at each, the quantity you actually care about &mdash; a cost, a metric, or the precision at a required recall. Choose the threshold that optimises it, and record it with the model. Then measure once on the test set, using that fixed threshold, and report those numbers.
+
+The whole thing is about fifteen lines and it is the difference between a model whose reported performance is achievable and one whose numbers came from a decision nobody made.
+
 ## Things to try
 
 1. <strong>Read the second editor properly.</strong> At the default threshold the model catches 2.2% of positives. It is a good model being asked a bad question.
