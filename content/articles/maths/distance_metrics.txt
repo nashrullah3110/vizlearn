@@ -108,6 +108,53 @@ This is also why embeddings work despite having hundreds of dimensions: they are
 - <strong>Treating cosine as a proper metric.</strong> Cosine distance does not satisfy the triangle inequality, so algorithms that rely on that property for correctness or for pruning cannot use it directly.
 - <strong>Mixing categorical and numeric features in one Euclidean distance.</strong> The gap between two one-hot categories is not comparable to a gap in a continuous variable. Use a mixed metric such as Gower.
 
+## Four metrics, three different winners
+
+The same query point against the same three candidates. Which one counts as "nearest" is decided by the metric, not by the data.
+
+```python-run
+import numpy as np
+
+query = np.array([1.0, 1.0, 1.0, 1.0])
+cands = {
+    "A  spread over all dims": np.array([1.5, 1.4, 1.4, 1.3]),
+    "B  one big difference":   np.array([1.0, 1.0, 1.0, 2.4]),
+    "C  same direction, 4x":   np.array([4.0, 4.0, 4.0, 4.0]),
+}
+
+def cosine(u, v):
+    return 1 - u.dot(v) / (np.linalg.norm(u) * np.linalg.norm(v))
+
+metrics = {
+    "euclidean": lambda c: np.linalg.norm(c - query),
+    "manhattan": lambda c: np.abs(c - query).sum(),
+    "chebyshev": lambda c: np.abs(c - query).max(),
+    "cosine":    lambda c: cosine(query, c),
+}
+
+print("%-24s %10s %10s %10s %10s" % ("candidate", *metrics))
+for name, c in cands.items():
+    print("%-24s %10.4f %10.4f %10.4f %10.4f"
+          % (name, *[f(c) for f in metrics.values()]))
+print()
+print("nearest neighbour, according to each:")
+for mname, f in metrics.items():
+    winner = min(cands, key=lambda k: f(cands[k]))
+    print("  %-10s -> %s" % (mname, winner))
+print()
+print("manhattan forgives one big error and punishes many small ones;")
+print("euclidean does the reverse; cosine ignores length entirely, so it")
+print("calls a point four times further away a perfect match.")
+print()
+print("in high dimensions everything drifts equally far away:")
+rng = np.random.default_rng(0)
+for dim in (2, 10, 100, 1000):
+    pts = rng.random((500, dim))
+    d = np.linalg.norm(pts - pts[0], axis=1)[1:]
+    print("  %4dd: nearest %.3f, farthest %.3f, ratio %.3f"
+          % (dim, d.min(), d.max(), d.max() / d.min()))
+```
+
 ## Worth remembering
 
 Euclidean, Manhattan and Chebyshev are the L2, L1 and L&infin; norms of the difference between two points, always ordered Chebyshev &le; Euclidean &le; Manhattan and agreeing only when a single coordinate differs; their equal-distance rings are a circle, a diamond and a square, which is what makes them disagree. Cosine is a different kind of measure entirely &mdash; it compares direction from the origin and ignores magnitude, which is why stretching a vector leaves it unchanged and why it is the standard for text and embeddings. Whichever you choose, scale the features first, because an unscaled metric measures units rather than similarity.

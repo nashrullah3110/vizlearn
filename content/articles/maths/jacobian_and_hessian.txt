@@ -105,3 +105,61 @@ this reason.
 **Expecting second-order methods to be a drop-in win.** They shine on small,
 well-conditioned problems and on batch objectives, not on stochastic
 mini-batch training where the curvature estimate is noise.
+
+## First derivatives in a grid, second derivatives in another
+
+The Jacobian collects every first partial derivative of a vector function; the Hessian collects every second partial of a scalar one. Both are built here numerically and checked against the closed form.
+
+```python-run
+import numpy as np
+
+# f: R^2 -> R^3
+def f(v):
+    x, y = v
+    return np.array([x ** 2 * y, 5 * x + np.sin(y), x * y ** 3])
+
+def jacobian(fn, v, h=1e-6):
+    base = fn(v)
+    cols = []
+    for i in range(len(v)):
+        step = np.zeros_like(v); step[i] = h
+        cols.append((fn(v + step) - base) / h)
+    return np.column_stack(cols)
+
+p = np.array([2.0, 1.0])
+print("Jacobian of f at (2, 1) -- 3 outputs by 2 inputs")
+print(np.round(jacobian(f, p), 4))
+print()
+x, y = p
+print("by hand:")
+print(np.round(np.array([[2 * x * y, x ** 2],
+                         [5.0,       np.cos(y)],
+                         [y ** 3,    3 * x * y ** 2]]), 4))
+print()
+
+# g: R^2 -> R
+def g(v):
+    x, y = v
+    return x ** 3 + 2 * x * y ** 2 + y ** 3
+
+def hessian(fn, v, h=1e-4):
+    n = len(v)
+    H = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            a, b = np.zeros(n), np.zeros(n)
+            a[i] = h; b[j] = h
+            H[i, j] = (fn(v + a + b) - fn(v + a) - fn(v + b) + fn(v)) / (h * h)
+    return H
+
+H = hessian(g, p)
+print("Hessian of g at (2, 1)")
+print(np.round(H, 3))
+print("it is symmetric:", np.allclose(H, H.T, atol=1e-3))
+print()
+print("its eigenvalues say what kind of point this is:")
+print("  eigenvalues", np.round(np.linalg.eigvalsh(H), 4))
+print("  all positive -> a bowl (local minimum)")
+print("  all negative -> a dome (local maximum)")
+print("  mixed signs  -> a saddle, which is what most 'stuck' training is")
+```

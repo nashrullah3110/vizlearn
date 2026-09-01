@@ -199,6 +199,45 @@ people assume.
 
 **Forgetting to normalise.** Orthogonal gives you the easy inverse only when
 the vectors also have length 1.
+
+## Same vector, three different bases
+
+Coordinates only mean something relative to a basis. Here one fixed vector is written in three of them, and an orthonormal basis makes the arithmetic trivial.
+
+```python-run
+import numpy as np
+
+v = np.array([5.0, 3.0])
+
+bases = {
+    "standard  e1,e2":     np.array([[1.0, 0.0], [0.0, 1.0]]),
+    "sheared (non-orth.)": np.array([[1.0, 0.0], [1.0, 1.0]]),
+    "rotated 45 (orthon.)": np.array([[1, 1], [-1, 1]]) / np.sqrt(2),
+}
+
+for name, B in bases.items():
+    # columns of B are the basis vectors; solve B @ coords = v
+    coords = np.linalg.solve(B, v)
+    print("%-22s coords %s   rebuilt %s"
+          % (name, np.round(coords, 4), np.round(B @ coords, 4)))
+print()
+
+B = bases["rotated 45 (orthon.)"]
+print("orthonormal means B.T @ B is the identity:")
+print(np.round(B.T @ B, 10))
+print()
+print("so the coordinates are just dot products -- no solve needed:")
+print("  solve      ", np.round(np.linalg.solve(B, v), 6))
+print("  B.T @ v    ", np.round(B.T @ v, 6))
+print()
+print("span: two vectors that point the same way span only a line.")
+for pair, label in (([[1, 0], [0, 1]], "independent"),
+                    ([[1, 2], [2, 4]], "one is twice the other")):
+    M = np.array(pair, dtype=float)
+    print("  %-24s rank %d -> spans %dD"
+          % (label, np.linalg.matrix_rank(M), np.linalg.matrix_rank(M)))
+```
+
 """,
     [
         {"q": "Two vectors in the plane have determinant zero. What do they span?",
@@ -373,6 +412,45 @@ square-rooted. Not the same object, and not equal except in special cases.
 
 **Computing the full SVD when you want the top few.** For a large sparse matrix
 a truncated solver is orders of magnitude cheaper.
+
+## Rebuild a matrix from its biggest pieces
+
+SVD splits any matrix into a stack of rank-one layers ordered by importance. Keeping only the first few is what compression and PCA actually do.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+# a matrix that is really rank 2, with a little noise on top
+A = np.outer(rng.normal(size=40), rng.normal(size=25)) * 5.0
+A += np.outer(rng.normal(size=40), rng.normal(size=25)) * 2.0
+A += rng.normal(size=(40, 25)) * 0.05
+
+U, s, Vt = np.linalg.svd(A, full_matrices=False)
+
+print("A is %d x %d" % A.shape)
+print("first 8 singular values:", np.round(s[:8], 4))
+print()
+print("each is the 'size' of one rank-one layer. two are large, the rest are noise.")
+print()
+total = (s ** 2).sum()
+print("%5s %14s %14s %12s" % ("k", "kept variance", "reconstr. err", "numbers stored"))
+for k in (1, 2, 3, 5, 10, 25):
+    Ak = (U[:, :k] * s[:k]) @ Vt[:k]
+    kept = (s[:k] ** 2).sum() / total
+    err = np.linalg.norm(A - Ak) / np.linalg.norm(A)
+    stored = k * (A.shape[0] + A.shape[1] + 1)
+    print("%5d %13.4f%% %14.6f %12d" % (k, 100 * kept, err, stored))
+print("%5s %13s %14s %12d" % ("full", "100%", "0", A.size))
+print()
+print("k=2 stores %d numbers instead of %d and loses almost nothing."
+      % (2 * (40 + 25 + 1), A.size))
+print()
+print("singular values are never negative, and U and V are orthonormal:")
+print("  U.T @ U close to I:", np.allclose(U.T @ U, np.eye(U.shape[1])))
+print("  V.T @ V close to I:", np.allclose(Vt @ Vt.T, np.eye(Vt.shape[0])))
+```
+
 """,
     [
         {"q": "What shape does the unit circle become under any 2x2 matrix?",
@@ -539,6 +617,65 @@ this reason.
 **Expecting second-order methods to be a drop-in win.** They shine on small,
 well-conditioned problems and on batch objectives, not on stochastic
 mini-batch training where the curvature estimate is noise.
+
+## First derivatives in a grid, second derivatives in another
+
+The Jacobian collects every first partial derivative of a vector function; the Hessian collects every second partial of a scalar one. Both are built here numerically and checked against the closed form.
+
+```python-run
+import numpy as np
+
+# f: R^2 -> R^3
+def f(v):
+    x, y = v
+    return np.array([x ** 2 * y, 5 * x + np.sin(y), x * y ** 3])
+
+def jacobian(fn, v, h=1e-6):
+    base = fn(v)
+    cols = []
+    for i in range(len(v)):
+        step = np.zeros_like(v); step[i] = h
+        cols.append((fn(v + step) - base) / h)
+    return np.column_stack(cols)
+
+p = np.array([2.0, 1.0])
+print("Jacobian of f at (2, 1) -- 3 outputs by 2 inputs")
+print(np.round(jacobian(f, p), 4))
+print()
+x, y = p
+print("by hand:")
+print(np.round(np.array([[2 * x * y, x ** 2],
+                         [5.0,       np.cos(y)],
+                         [y ** 3,    3 * x * y ** 2]]), 4))
+print()
+
+# g: R^2 -> R
+def g(v):
+    x, y = v
+    return x ** 3 + 2 * x * y ** 2 + y ** 3
+
+def hessian(fn, v, h=1e-4):
+    n = len(v)
+    H = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            a, b = np.zeros(n), np.zeros(n)
+            a[i] = h; b[j] = h
+            H[i, j] = (fn(v + a + b) - fn(v + a) - fn(v + b) + fn(v)) / (h * h)
+    return H
+
+H = hessian(g, p)
+print("Hessian of g at (2, 1)")
+print(np.round(H, 3))
+print("it is symmetric:", np.allclose(H, H.T, atol=1e-3))
+print()
+print("its eigenvalues say what kind of point this is:")
+print("  eigenvalues", np.round(np.linalg.eigvalsh(H), 4))
+print("  all positive -> a bowl (local minimum)")
+print("  all negative -> a dome (local maximum)")
+print("  mixed signs  -> a saddle, which is what most 'stuck' training is")
+```
+
 """,
     [
         {"q": "What does the Hessian tell you that the gradient does not?",
@@ -696,6 +833,64 @@ starts, or a schedule with restarts, is the minimum diligence.
 
 **Expecting convex theory to transfer.** Convergence rates for convex problems
 say nothing about a deep network.
+
+## One function gradient descent cannot fail on, and one it can
+
+The same optimiser, the same settings, run from many starting points on a convex function and then on a bumpy one. Convexity is the property that makes the starting point irrelevant.
+
+```python-run
+import numpy as np
+
+def descend(f, grad, x0, lr=0.05, steps=2000):
+    x = float(x0)
+    for _ in range(steps):
+        x -= lr * grad(x)
+    return x
+
+# convex: one bowl
+f1    = lambda x: (x - 3.0) ** 2 + 2.0
+grad1 = lambda x: 2 * (x - 3.0)
+
+# non-convex: a bowl with ripples
+f2    = lambda x: 0.15 * (x - 3.0) ** 2 + 3.0 * np.sin(2.0 * x)
+grad2 = lambda x: 0.30 * (x - 3.0) + 6.0 * np.cos(2.0 * x)
+
+starts = [-10.0, -5.0, -1.0, 0.0, 2.0, 6.0, 11.0]
+
+print("convex  f(x) = (x-3)^2 + 2")
+for s in starts:
+    x = descend(f1, grad1, s)
+    print("  start %6.1f -> x %8.4f   f %9.4f" % (s, x, f1(x)))
+print("  every start lands in the same place.")
+print()
+
+print("non-convex  f(x) = 0.15(x-3)^2 + 3 sin(2x)")
+found = []
+for s in starts:
+    x = descend(f2, grad2, s)
+    found.append(round(x, 3))
+    print("  start %6.1f -> x %8.4f   f %9.4f" % (s, x, f2(x)))
+print("  %d different minima from %d starts." % (len(set(found)), len(starts)))
+best = min(found, key=lambda x: f2(x))
+print("  best found f = %.4f at x = %.3f; the worst was f = %.4f"
+      % (f2(best), best, max(f2(x) for x in found)))
+print()
+print("a convex function has one minimum and every downhill path finds it.")
+print("that is why linear and logistic regression train reproducibly, and")
+print("why a neural network gives you a different answer every restart.")
+print()
+print("the test: a function is convex if the line between any two points on")
+print("it never dips below the function.")
+for f, name in ((f1, "convex"), (f2, "non-convex")):
+    a, b = -2.0, 8.0
+    mids = np.linspace(0.05, 0.95, 19)
+    chord = [(1 - t) * f(a) + t * f(b) for t in mids]
+    curve = [f((1 - t) * a + t * b) for t in mids]
+    viol = sum(c < v - 1e-9 for c, v in zip(chord, curve))
+    print("  %-11s chord dips below the curve at %d of %d points"
+          % (name, viol, len(mids)))
+```
+
 """,
     [
         {"q": "What is the defining consequence of convexity for optimisation?",
@@ -845,6 +1040,39 @@ series about 0 is the wrong tool for estimating at x = 5.
 
 **Forgetting smoothness is required.** The function needs derivatives of every
 order at the expansion point. `|x|` has none at 0, so there is no series there.
+
+## Rebuild a function from its derivatives
+
+Terms added one at a time, with the error after each. The approximation is excellent near the expansion point and hopeless far from it.
+
+```python-run
+import numpy as np
+import math
+
+def taylor_exp(x, terms):
+    return sum(x ** k / math.factorial(k) for k in range(terms))
+
+print("e^x built term by term, at x = 0.5")
+true = np.exp(0.5)
+for t in range(1, 7):
+    approx = taylor_exp(0.5, t)
+    print("  %d term(s): %.10f   error %.2e" % (t, approx, abs(approx - true)))
+print("  exact    : %.10f" % true)
+print()
+print("the same 6 terms, further from x = 0:")
+for x in (0.5, 1.0, 2.0, 5.0, 10.0):
+    approx, true = taylor_exp(x, 6), np.exp(x)
+    print("  x=%5.1f  approx %14.4f  true %14.4f  relative error %8.2f%%"
+          % (x, approx, true, 100 * abs(approx - true) / true))
+print()
+print("first-order approximations you have already used:")
+for x in (0.01, 0.1, 0.5):
+    print("  sin(%.2f) = %.6f, and x = %.6f      (error %.2e)"
+          % (x, np.sin(x), x, abs(np.sin(x) - x)))
+    print("  ln(1+%.2f) = %.6f, and x = %.6f     (error %.2e)"
+          % (x, np.log(1 + x), x, abs(np.log(1 + x) - x)))
+```
+
 """,
     [
         {"q": "What does the second term of a Taylor series give you?",
@@ -1024,6 +1252,38 @@ its variance.
 **Assuming a variance exists.** Some distributions have none &mdash; the Cauchy
 has neither a finite variance nor a finite mean, and sample averages of Cauchy
 draws never settle.
+
+## A bet worth taking that usually loses
+
+Expectation and variance computed from the definition, then measured over 400,000 plays. The two numbers say different things, and both matter.
+
+```python-run
+import numpy as np
+
+# a bet: 1/6 chance to win 80, else lose 12
+outcomes = np.array([80.0, -12.0])
+probs    = np.array([1 / 6, 5 / 6])
+
+ev = (outcomes * probs).sum()
+var = (probs * (outcomes - ev) ** 2).sum()
+
+print("E[X]   = %.4f" % ev)
+print("Var[X] = %.4f   sd = %.4f" % (var, np.sqrt(var)))
+print()
+
+rng = np.random.default_rng(1)
+draws = rng.choice(outcomes, size=400_000, p=probs)
+print("400,000 plays: average %.4f, variance %.4f" % (draws.mean(), draws.var()))
+print("               total won: %.0f" % draws.sum())
+print()
+print("a bet worth taking that still loses most of the time:")
+print("  fraction of plays that lost money: %.3f" % (draws < 0).mean())
+print()
+print("the sd is %.1f -- far bigger than the edge of %.2f."
+      % (np.sqrt(var), ev))
+print("expectation says play; variance says do not bet the rent on one round.")
+```
+
 """,
     [
         {"q": "A fair die has E[X] = 3.5. What does that tell you?",
@@ -1199,6 +1459,40 @@ there; the approximation is not.
 
 **Forgetting the fixed window.** A Poisson rate is per unit of something. Double
 the window and lambda doubles.
+
+## The three, side by side
+
+One trial, n trials, and counts with no fixed n. The last block shows a binomial with large n and small p turning into a Poisson.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(7)
+
+print("Bernoulli(p=0.3): one trial, 0 or 1")
+b = (rng.random(200_000) < 0.3).astype(int)
+print("  mean %.4f (should be p)   var %.4f (should be p(1-p)=%.4f)"
+      % (b.mean(), b.var(), 0.3 * 0.7))
+print()
+
+print("Binomial(n=10, p=0.3): how many successes in 10 trials")
+k = rng.binomial(10, 0.3, size=200_000)
+print("  mean %.4f (np = %.1f)   var %.4f (np(1-p) = %.2f)"
+      % (k.mean(), 10 * 0.3, k.var(), 10 * 0.3 * 0.7))
+for i in range(0, 8):
+    print("   P(k=%d) = %.4f" % (i, (k == i).mean()))
+print()
+
+print("Poisson(lam=3): counts in a window, no fixed n")
+p = rng.poisson(3.0, size=200_000)
+print("  mean %.4f  var %.4f   <- Poisson has mean == variance" % (p.mean(), p.var()))
+print()
+print("Binomial(n=1000, p=0.003) looks like Poisson(3):")
+big = rng.binomial(1000, 0.003, size=200_000)
+for i in range(0, 7):
+    print("   k=%d  binomial %.4f   poisson %.4f" % (i, (big == i).mean(), (p == i).mean()))
+```
+
 """,
     [
         {"q": "Why is a Bernoulli variance largest at p = 0.5?",
@@ -1544,6 +1838,31 @@ flagged points, mechanically.
 
 **Assuming your language's default matches another's.** State the method when it
 matters.
+
+## Nobody experiences the mean
+
+Ten thousand response times with a long tail. The mean and the median tell one story; p95 and p99 tell the one your users live in.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(2)
+# response times in ms: mostly fast, a long tail
+ms = np.concatenate([rng.normal(90, 15, 9500), rng.normal(700, 200, 500)])
+ms = np.clip(ms, 1, None)
+
+print("10,000 requests")
+print("  mean   %7.1f ms" % ms.mean())
+print("  median %7.1f ms" % np.median(ms))
+print()
+for q in (50, 75, 90, 95, 99, 99.9):
+    print("  p%-5s %7.1f ms" % (q, np.percentile(ms, q)))
+print()
+print("the mean sits at %.1f, which %.1f%% of requests are faster than."
+      % (ms.mean(), (ms < ms.mean()).mean() * 100))
+print("nobody experiences the mean. they experience p95.")
+```
+
 """,
     [
         {"q": "Why is the median unaffected by adding one enormous value?",
@@ -1717,6 +2036,38 @@ time-series data has a smaller effective `n`.
 question, and bias does not shrink with `n`.
 
 **Using the formula for statistics that do not have one.** Bootstrap instead.
+
+## The distribution of a statistic, not of the data
+
+Draw a sample, compute its mean, write it down, repeat ten thousand times. What you get is a different distribution from the one you sampled.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# the population: heavily skewed, nothing like a bell curve
+population = rng.exponential(scale=10.0, size=1_000_000)
+print("population: mean %.3f, sd %.3f, median %.3f"
+      % (population.mean(), population.std(), np.median(population)))
+print("  it is skewed -- 90th percentile is %.1f, max is %.1f"
+      % (np.percentile(population, 90), population.max()))
+print()
+
+for n in (2, 10, 50, 200):
+    means = population[rng.integers(0, len(population), size=(10_000, n))].mean(axis=1)
+    predicted_se = population.std() / np.sqrt(n)
+    print("samples of %3d: mean of means %6.3f   sd of means %6.3f "
+          "(predicted %6.3f)" % (n, means.mean(), means.std(), predicted_se))
+print()
+print("two separate facts here:")
+print("  the sampling distribution centres on the population mean;")
+print("  its spread shrinks like 1/sqrt(n), so 4x the data halves the error.")
+print()
+print("that sd of the means is what 'standard error' means. it is not the")
+print("spread of your data -- it is the spread of the answer you computed.")
+```
+
 """,
     [
         {"q": "What is a sampling distribution?",
@@ -1871,6 +2222,61 @@ sample size, and the interval will be too narrow.
 **Reporting an interval for a biased estimator.** Coverage is about sampling
 variability. A systematically wrong measurement produces a tight interval around
 the wrong answer.
+
+## What "95% confident" actually counts
+
+Build a confidence interval a thousand times from a known population and count how often it contains the true mean. The number the interval describes is the procedure, not your one result.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+TRUE_MEAN, TRUE_SD, N = 100.0, 15.0, 40
+
+def interval(sample):
+    se = sample.std(ddof=1) / np.sqrt(len(sample))
+    half = 1.96 * se
+    return sample.mean() - half, sample.mean() + half
+
+print("one sample of %d from a population with mean %.0f:" % (N, TRUE_MEAN))
+s = rng.normal(TRUE_MEAN, TRUE_SD, N)
+lo, hi = interval(s)
+print("  sample mean %.2f, 95%% interval (%.2f, %.2f)" % (s.mean(), lo, hi))
+print("  contains the true mean:", lo <= TRUE_MEAN <= hi)
+print()
+
+hits = 0
+trials = 10_000
+widths = []
+for _ in range(trials):
+    s = rng.normal(TRUE_MEAN, TRUE_SD, N)
+    lo, hi = interval(s)
+    hits += (lo <= TRUE_MEAN <= hi)
+    widths.append(hi - lo)
+print("%d intervals built the same way:" % trials)
+print("  %.2f%% of them contained the true mean" % (100 * hits / trials))
+print("  average width %.2f" % np.mean(widths))
+print()
+print("that is the whole claim. any single interval either contains the mean")
+print("or it does not -- there is no 95 percent about it once computed.")
+print()
+print("it came out a little under 95%. the 1.96 multiplier assumes you know")
+print("the population sd; estimating it from 40 points costs you some coverage.")
+print("the t distribution corrects exactly that:")
+t39 = 2.0227                                   # t multiplier, 39 degrees of freedom
+hits_t = 0
+for _ in range(trials):
+    s2 = rng.normal(TRUE_MEAN, TRUE_SD, N)
+    half = t39 * s2.std(ddof=1) / np.sqrt(N)
+    hits_t += abs(s2.mean() - TRUE_MEAN) <= half
+print("  with t instead of 1.96: %.2f%% coverage" % (100 * hits_t / trials))
+print()
+print("more data makes the interval narrower, at the usual 1/sqrt(n) rate:")
+for n in (10, 40, 160, 640):
+    ws = [np.diff(interval(rng.normal(TRUE_MEAN, TRUE_SD, n)))[0] for _ in range(400)]
+    print("  n=%4d  average width %.2f" % (n, np.mean(ws)))
+```
+
 """,
     [
         {"q": "What does the 95% in a 95% confidence interval describe?",
@@ -2020,6 +2426,64 @@ others argue for abandoning the dichotomy entirely.
 
 **Running many tests without correction.** Bonferroni is crude and better than
 nothing; false discovery rate control is usually the better tool.
+
+## Where p-values come from, and what breaks them
+
+A p-value computed by simulation rather than looked up in a table, then the same test run two hundred times on data with no effect in it at all.
+
+```python-run
+import numpy as np
+import math
+
+rng = np.random.default_rng(0)
+
+control = rng.normal(0.1000, 0.02, 300)
+variant = rng.normal(0.1045, 0.02, 300)
+observed = variant.mean() - control.mean()
+print("A/B test: control %.4f, variant %.4f, difference %+.4f"
+      % (control.mean(), variant.mean(), observed))
+print()
+
+# the null hypothesis says the labels do not matter. so shuffle them.
+pool = np.concatenate([control, variant])
+null_diffs = np.empty(20_000)
+for i in range(20_000):
+    rng.shuffle(pool)
+    null_diffs[i] = pool[300:].mean() - pool[:300].mean()
+
+p = (np.abs(null_diffs) >= abs(observed)).mean()
+print("shuffling the labels 20,000 times, so no real effect can survive:")
+print("  the shuffled differences spread out to sd %.5f" % null_diffs.std())
+print("  %.2f%% of them were at least as big as the one we measured" % (100 * p))
+print("  that fraction is the p-value: %.4f" % p)
+print()
+print("it is NOT the probability the null is true. it is the probability of")
+print("data at least this extreme IF the null were true.")
+print()
+
+def p_value(a, b):
+    d = b.mean() - a.mean()
+    se = np.sqrt(a.var(ddof=1) / len(a) + b.var(ddof=1) / len(b))
+    return 2 * (1 - 0.5 * (1 + math.erf(abs(d / se) / np.sqrt(2))))
+
+print("now the failure mode. 1000 tests, no effect in any of them:")
+ps = np.array([p_value(rng.normal(0.1, 0.02, 300), rng.normal(0.1, 0.02, 300))
+               for _ in range(1000)])
+hits = (ps < 0.05).sum()
+print("  %d of 1000 came out under 0.05, from pure noise." % hits)
+print("  expected: 1000 * 0.05 = 50.0")
+print()
+print("the smallest few p-values in that batch of nothing:")
+for v in np.sort(ps)[:5]:
+    print("    %.4f" % v)
+print()
+print("a 5 percent threshold lets one test in twenty clear it by chance. run")
+print("enough metrics and you will always find a winner. that is why the")
+print("threshold has to be tightened when you test many things at once:")
+print("  Bonferroni for 1000 tests: %.7f" % (0.05 / 1000))
+print("  tests still under it: %d" % (ps < 0.05 / 1000).sum())
+```
+
 """,
     [
         {"q": "A p-value is the probability of:",
@@ -2177,6 +2641,51 @@ observed effect is a restatement of the p-value and carries no new information.
 **Peeking at results and stopping when significant.** This inflates the true
 Type I rate far above the nominal one. Sequential testing methods exist and
 correct for it.
+
+## Both errors, counted
+
+Lower your threshold and you catch more real effects while raising more false alarms. Here both rates are measured across a sweep, so the trade is visible rather than described.
+
+```python-run
+import numpy as np
+import math
+
+rng = np.random.default_rng(0)
+N = 200
+TRIALS = 4000
+
+def p_value(effect):
+    a = rng.normal(0.0, 1.0, N)
+    b = rng.normal(effect, 1.0, N)
+    d = b.mean() - a.mean()
+    se = np.sqrt(a.var(ddof=1) / N + b.var(ddof=1) / N)
+    z = abs(d / se)
+    return 2 * (1 - 0.5 * (1 + math.erf(z / np.sqrt(2))))
+
+null_ps = np.array([p_value(0.00) for _ in range(TRIALS)])   # no effect exists
+real_ps = np.array([p_value(0.25) for _ in range(TRIALS)])   # a real effect
+
+print("%10s %18s %18s %10s" % ("threshold", "type I (false alarm)",
+                               "type II (missed)", "power"))
+for alpha in (0.20, 0.10, 0.05, 0.01, 0.001):
+    type1 = (null_ps < alpha).mean()
+    type2 = (real_ps >= alpha).mean()
+    print("%10.3f %17.3f  %17.3f  %9.3f" % (alpha, type1, type2, 1 - type2))
+print()
+print("the type I rate tracks the threshold you chose -- that is what alpha is.")
+print("tightening it from 0.05 to 0.001 cuts false alarms by 50x and misses")
+print("far more real effects. there is no setting that fixes both.")
+print()
+print("the other lever is sample size:")
+for n in (50, 200, 800, 3200):
+    N = n
+    ps = np.array([p_value(0.25) for _ in range(1500)])
+    print("  n=%5d  power at alpha=0.05: %.3f" % (n, (ps < 0.05).mean()))
+print()
+print("more data lowers the miss rate without touching the false alarm rate.")
+print("that is the only way to improve both at once.")
+```
+
 """,
     [
         {"q": "You tighten alpha from 0.05 to 0.01. What happens to power?",
@@ -2340,6 +2849,46 @@ or a library.
 
 **Assuming Q is square.** For a tall thin `A`, the economy QR gives a `Q` with
 the same shape as `A`, not a full orthogonal matrix.
+
+## Orthogonalise a basis, then solve with it
+
+QR turns any set of columns into an orthonormal set plus the bookkeeping needed to get back. It is how least squares is solved in practice.
+
+```python-run
+import numpy as np
+
+A = np.array([[1.0, 1.0, 1.0],
+              [1.0, 2.0, 4.0],
+              [1.0, 3.0, 9.0],
+              [1.0, 4.0, 16.0],
+              [1.0, 5.0, 25.0]])
+
+Q, R = np.linalg.qr(A)
+print("A is %d x %d, Q is %s, R is %s" % (A.shape + (Q.shape, R.shape)))
+print()
+print("Q has orthonormal columns -- Q.T @ Q is the identity:")
+print(np.round(Q.T @ Q, 10) + 0.0)
+print()
+print("R is upper triangular (zeros below the diagonal):")
+print(np.round(R, 4) + 0.0)
+print()
+print("and they multiply back to A:", np.allclose(Q @ R, A))
+print()
+
+b = np.array([2.1, 3.9, 8.2, 14.1, 22.0])
+print("least squares fit of a quadratic to 5 points")
+via_qr = np.linalg.solve(R, Q.T @ b)
+via_normal = np.linalg.solve(A.T @ A, A.T @ b)
+print("  via QR            ", np.round(via_qr, 6))
+print("  via normal eqns   ", np.round(via_normal, 6))
+print("  numpy's lstsq     ", np.round(np.linalg.lstsq(A, b, rcond=None)[0], 6))
+print()
+print("all three agree here. QR is preferred because it never forms A.T @ A,")
+print("which squares the condition number and throws away precision:")
+print("  condition number of A      %.3e" % np.linalg.cond(A))
+print("  condition number of A.T@A  %.3e" % np.linalg.cond(A.T @ A))
+```
+
 """,
     [
         {"q": "Why is R upper triangular?",
@@ -2516,6 +3065,54 @@ much.
 
 **Using it on a matrix that is only positive semi-definite.** A zero eigenvalue
 gives a zero on `L`'s diagonal, and anything that then divides by it fails.
+
+## Half a matrix, and what it costs to have one
+
+Cholesky finds a triangular L with L @ L.T equal to your matrix -- but only if the matrix is positive definite. Here is what that condition rules out.
+
+```python-run
+import numpy as np
+
+A = np.array([[ 4.0,  2.0,  1.0],
+              [ 2.0,  5.0,  3.0],
+              [ 1.0,  3.0,  6.0]])
+
+print("A is symmetric:", np.allclose(A, A.T))
+print("eigenvalues:", np.round(np.linalg.eigvalsh(A), 4), " <- all positive")
+print()
+L = np.linalg.cholesky(A)
+print("L (lower triangular):")
+print(np.round(L, 4))
+print()
+print("L @ L.T rebuilds A:", np.allclose(L @ L.T, A))
+print()
+print("positive definite means x.T @ A @ x > 0 for every non-zero x:")
+rng = np.random.default_rng(0)
+vals = [x @ A @ x for x in rng.normal(size=(2000, 3))]
+print("  2000 random x: smallest quadratic form %.6f" % min(vals))
+print()
+
+B = np.array([[1.0, 2.0],
+              [2.0, 1.0]])
+print("B = [[1,2],[2,1]] is symmetric but its eigenvalues are",
+      np.round(np.linalg.eigvalsh(B), 4))
+x = np.array([1.0, -1.0])
+print("  x = [1,-1] makes the quadratic form negative: %.1f" % (x @ B @ x))
+print("  so no real L can exist -- L @ L.T is always positive semi-definite.")
+LB = np.linalg.cholesky(B)
+print("  cholesky(B) returns:", LB.ravel())
+print("  usable:", not np.isnan(LB).any())
+print()
+print("  (CPython's numpy raises LinAlgError here; this WASM build hands back")
+print("   NaN instead, so check the result rather than relying on an exception.)")
+print()
+print("this is why covariance matrices are always positive semi-definite:")
+print("x.T @ Cov @ x is the variance of a projection, and variance cannot be")
+print("negative. it is also how correlated samples are generated:")
+z = rng.normal(size=(5, 3))
+print(np.round(z @ L.T, 3))
+```
+
 """,
     [
         {"q": "When does a Cholesky factorisation exist?",
@@ -2675,6 +3272,65 @@ written, and the sign convention differs between texts.
 **Skipping the constraint qualification.** The method assumes the constraint
 gradients are well behaved at the solution; at a cusp or where constraints are
 degenerate it can fail.
+
+## Optimise with a rule you are not allowed to break
+
+The closest point on a line to the origin, found three ways: by brute force, by substitution, and by the multiplier condition. All three agree, and the multiplier turns out to mean something.
+
+```python-run
+import numpy as np
+
+# minimise x^2 + y^2  subject to  3x + 4y = 25
+def f(x, y):     return x ** 2 + y ** 2
+def g(x, y):     return 3 * x + 4 * y - 25
+
+print("brute force along the constraint line:")
+xs = np.linspace(-5, 12, 400_001)
+ys = (25 - 3 * xs) / 4
+vals = f(xs, ys)
+i = vals.argmin()
+print("  best point (%.4f, %.4f)   f = %.4f" % (xs[i], ys[i], vals[i]))
+print()
+
+print("by substitution, then calculus:")
+# f(x) = x^2 + ((25-3x)/4)^2
+#   df/dx = 2x - 3(25-3x)/8 = 0  ->  16x = 75 - 9x  ->  25x = 75
+x_star = 75.0 / 25.0
+y_star = (25 - 3 * x_star) / 4
+print("  x = %.4f, y = %.4f   f = %.4f" % (x_star, y_star, f(x_star, y_star)))
+print()
+
+print("by Lagrange: grad f = lam * grad g, plus the constraint.")
+# grad f = (2x, 2y);  grad g = (3, 4)
+#   2x = 3 lam ,  2y = 4 lam ,  3x + 4y = 25
+A = np.array([[2.0, 0.0, -3.0],
+              [0.0, 2.0, -4.0],
+              [3.0, 4.0,  0.0]])
+b = np.array([0.0, 0.0, 25.0])
+x_l, y_l, lam = np.linalg.solve(A, b)
+print("  x = %.4f, y = %.4f, lambda = %.4f" % (x_l, y_l, lam))
+print("  constraint satisfied: g = %.10f" % g(x_l, y_l))
+print()
+print("at the solution the two gradients are parallel:")
+print("  grad f = %s" % np.round([2 * x_l, 2 * y_l], 4))
+print("  grad g = %s   ratio %.4f, %.4f"
+      % ([3, 4], 2 * x_l / 3, 2 * y_l / 4))
+print()
+print("lambda is the price of the constraint -- move the line by one unit")
+print("and the optimum value changes by about lambda:")
+mins = []
+for c in (24.0, 25.0, 26.0):
+    xs2 = np.linspace(-5, 12, 200_001)
+    best = f(xs2, (c - 3 * xs2) / 4).min()
+    mins.append(best)
+    print("  3x + 4y = %.0f  ->  minimum f = %.4f" % (c, best))
+print("  it went up by %.4f then %.4f; lambda is %.4f"
+      % (mins[1] - mins[0], mins[2] - mins[1], lam))
+print()
+print("that is what a multiplier is for: it tells you how much a constraint")
+print("is costing you, which is often more useful than the optimum itself.")
+```
+
 """,
     [
         {"q": "At a constrained optimum, what is true of the level line and the constraint?",
@@ -2831,6 +3487,47 @@ and a rising ELBO does not prove the likelihood rose by as much.
 
 **Forgetting that equality needs linearity or a constant.** Nothing else gives
 it.
+
+## The average of the function is not the function of the average
+
+Three concrete cases where swapping those two operations changes the answer, including the one that quietly costs money.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+x = rng.normal(5.0, 2.0, 200_000)
+
+print("for a convex function, E[f(x)] >= f(E[x]):")
+for name, f in (("x^2", lambda v: v ** 2),
+                ("e^x/50", lambda v: np.exp(v) / 50),
+                ("|x-5|", lambda v: np.abs(v - 5.0))):
+    print("  f = %-7s E[f(x)] = %10.4f   f(E[x]) = %10.4f   gap %+9.4f"
+          % (name, f(x).mean(), f(x.mean()), f(x).mean() - f(x.mean())))
+print()
+print("for a concave function it flips the other way:")
+for name, f in (("log(x) ", lambda v: np.log(np.clip(v, 0.01, None))),
+                ("sqrt(x)", lambda v: np.sqrt(np.clip(v, 0.0, None)))):
+    print("  f = %-7s E[f(x)] = %10.4f   f(E[x]) = %10.4f   gap %+9.4f"
+          % (name, f(x).mean(), f(x.mean()), f(x).mean() - f(x.mean())))
+print()
+print("the gap is zero only for straight lines:")
+f = lambda v: 3 * v + 7
+print("  f = %-7s E[f(x)] = %10.4f   f(E[x]) = %10.4f   gap %+9.4f"
+      % ("3x+7", f(x).mean(), f(x.mean()), f(x).mean() - f(x.mean())))
+print()
+
+print("the expensive version -- returns compound, so they multiply:")
+returns = np.array([1.50, 0.60] * 10)          # +50%, then -40%, ten times
+print("  arithmetic mean return: %.4f  (looks like a %.0f%% gain per period)"
+      % (returns.mean(), 100 * (returns.mean() - 1)))
+print("  actually multiplied out: %.4f of your starting money" % returns.prod())
+print("  geometric mean:         %.4f" % returns.prod() ** (1 / len(returns)))
+print()
+print("log is concave, so the average of the logs sits below the log of the")
+print("average -- which is exactly the gap between the two 'mean returns'.")
+```
+
 """,
     [
         {"q": "For a convex f, which is larger?",
@@ -2979,6 +3676,45 @@ diagnostics exist.
 **Confusing the stationary distribution with the most likely state.** It is the
 long-run fraction of time spent in each state, not a prediction of where the
 chain is now.
+
+## Walk the chain to its steady state
+
+A three-state weather chain, stepped forward until the distribution stops moving, then checked against the eigenvector that predicts it.
+
+```python-run
+import numpy as np
+
+states = ["sunny", "cloudy", "rainy"]
+#  rows: from        to:  sunny cloudy rainy
+P = np.array([[0.80, 0.15, 0.05],     # from sunny
+              [0.30, 0.45, 0.25],     # from cloudy
+              [0.20, 0.35, 0.45]])    # from rainy
+
+print("each row sums to 1:", P.sum(axis=1))
+print()
+
+p = np.array([1.0, 0.0, 0.0])         # start certain it is sunny
+print("%5s  %8s %8s %8s" % ("step", *states))
+for step in range(9):
+    print("%5d  %8.4f %8.4f %8.4f" % (step, *p))
+    p = p @ P
+print()
+print("keep going and it stops moving:")
+for _ in range(200):
+    p = p @ P
+print("  steady state %s" % np.round(p, 6))
+print()
+print("the chain forgets where it started:")
+q = np.array([0.0, 0.0, 1.0])          # start certain it is rainy
+for _ in range(200):
+    q = q @ P
+print("  from rainy   %s" % np.round(q, 6))
+print()
+vals, vecs = np.linalg.eig(P.T)
+v = np.real(vecs[:, np.argmin(np.abs(vals - 1))])
+print("  left eigenvector for eigenvalue 1: %s" % np.round(v / v.sum(), 6))
+```
+
 """,
     [
         {"q": "What does the Markov property say?",
@@ -3161,6 +3897,65 @@ for symmetric `A`.
 **Trusting a hand derivative without a numerical check.** Compare against a
 finite difference on a small random input. Every framework ships a gradient
 checker for this, and it is worth using when writing a custom operation.
+
+## The four gradients you keep meeting
+
+Every rule here is checked numerically rather than quoted. These four cover most of what a backward pass computes.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def num_grad(fn, x, h=1e-6):
+    g = np.zeros_like(x)
+    it = np.nditer(x, flags=["multi_index"])
+    while not it.finished:
+        i = it.multi_index
+        up, dn = x.copy(), x.copy()
+        up[i] += h; dn[i] -= h
+        g[i] = (fn(up) - fn(dn)) / (2 * h)
+        it.iternext()
+    return g
+
+x = rng.normal(size=4)
+a = rng.normal(size=4)
+A = rng.normal(size=(4, 4))
+A = A + A.T                      # symmetric, so the quadratic rule is clean
+
+checks = [
+    ("d(a.T x)/dx = a",
+     lambda v: a @ v,            lambda v: a),
+    ("d(x.T x)/dx = 2x",
+     lambda v: v @ v,            lambda v: 2 * v),
+    ("d(x.T A x)/dx = 2Ax  (A symmetric)",
+     lambda v: v @ A @ v,        lambda v: 2 * A @ v),
+    ("d(||x||)/dx = x/||x||",
+     lambda v: np.linalg.norm(v), lambda v: v / np.linalg.norm(v)),
+]
+
+for name, fn, closed in checks:
+    n, c = num_grad(fn, x), closed(x)
+    print("%-38s max diff %.2e" % (name, np.abs(n - c).max()))
+print()
+
+print("the one that matters most: a linear layer's weight gradient.")
+W = rng.normal(size=(3, 4))
+inp = rng.normal(size=4)
+target = rng.normal(size=3)
+
+def loss(Wm):
+    return ((Wm @ inp - target) ** 2).sum()
+
+err = W @ inp - target
+closed = 2 * np.outer(err, inp)        # dL/dW
+print("  numeric vs outer(2*error, input): max diff %.2e"
+      % np.abs(num_grad(loss, W) - closed).max())
+print()
+print("that outer product is why the weight gradient has the same shape as W,")
+print("and why a layer needs both its input and its incoming error to update.")
+```
+
 """,
     [
         {"q": "What shape is the gradient of a scalar loss with respect to a 784x128 weight matrix?",
@@ -3312,6 +4107,36 @@ replacement all permit it.
 
 **Double counting.** When the objects are not all distinguishable the plain
 formulas over-count, and the multiset versions are needed instead.
+
+## List them, then count them
+
+Small enough to print every arrangement, so the formulas are checkable rather than memorised.
+
+```python-run
+import math
+from itertools import permutations, combinations
+
+items = "ABCD"
+
+print("permutations of ABCD taken 2 at a time (order matters):")
+perm = list(permutations(items, 2))
+print(" ", ["".join(p) for p in perm])
+print("  count %d = 4!/(4-2)! = %d" % (len(perm), math.perm(4, 2)))
+print()
+print("combinations of ABCD taken 2 at a time (order does not):")
+comb = list(combinations(items, 2))
+print(" ", ["".join(c) for c in comb])
+print("  count %d = 4!/(2!*2!) = %d" % (len(comb), math.comb(4, 2)))
+print()
+print("every combination collapses 2! = 2 permutations:")
+print("  %d / %d = %d" % (len(perm), math.factorial(2), len(comb)))
+print()
+print("this is why the numbers explode:")
+for n in (5, 10, 20, 52):
+    print("  %2d items: %d orderings, %d hands of 3"
+          % (n, math.factorial(n), math.comb(n, 3)))
+```
+
 """,
     [
         {"q": "What separates a permutation count from a combination count?",

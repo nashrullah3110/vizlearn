@@ -234,43 +234,40 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">A safety valve for the one bad gradient in a thousand.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Context first</h3>
-                    <p>Most gradients during training are reasonably sized. Occasionally — a badly scaled batch, a long <a href="../natural_language_processing/how_rnn_process_text.html" style="color: var(--accent-primary)">recurrent</a> chain, a numerically unstable loss — one gradient is enormous. Applied directly, <span class="mono-font">w &minus; lr &middot; g</span> can throw a weight far outside the region the optimiser was making sane progress in, and the next few steps are spent recovering rather than learning.</p>
-                </div>
-                <div>
-                    <h3>What clipping does</h3>
+                    <h3 id="vz-s-what-clipping-does">What clipping does</h3>
                     <p>if ||g|| &gt; threshold: g &larr; g &middot; (threshold / ||g||)</p><p>The gradient's <em>direction</em> is unchanged — it still points the way steepest descent says to go — only its length is capped. This is norm clipping, the common form; value clipping (capping each component independently) is cruder and used less often.</p>
                 </div>
                 <div>
-                    <h3>Capping the size of a step</h3>
+                    <h3 id="vz-s-capping-the-size-of-a-step">Capping the size of a step</h3>
                     <p>Gradient clipping is a single guard rail: if the gradient is larger than a threshold, scale it down before applying the update.</p><p class="mono-font">if &#8214;g&#8214; &gt; c:&nbsp;&nbsp;g &larr; g &times; c / &#8214;g&#8214;</p><p>Note what that does and does not change. The <em>direction</em> is preserved exactly &mdash; every component is scaled by the same factor. Only the length is limited. That is why clipping by norm is the standard, and clipping each value independently is not: per-value clipping distorts the direction, so the update no longer points downhill.</p><pre><code class="language-python">loss.backward()
 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 optimizer.step()</code></pre><p>The call must come after <code>backward()</code> and before <code>step()</code>. Placing it anywhere else does nothing, silently.</p>
                 </div>
                 <div>
-                    <h3>The failure it prevents</h3>
+                    <h3 id="vz-s-the-failure-it-prevents">The failure it prevents</h3>
                     <p>A single unusually large gradient can destroy a model in one step. Suppose the gradient norm is normally around 0.5 and one batch produces 4,000 &mdash; a rare example, an outlier, an unlucky interaction. With a learning rate of 1e-3 that is a weight change of 4.0 in one step, which pushes the weights far outside the region where the loss is meaningful. The next forward pass produces <code>inf</code>, the loss becomes <code>NaN</code>, and every subsequent update propagates the <code>NaN</code> through the whole model.</p><p>Nothing recovers from that. The run is over, and if it happened at hour six of an eight-hour job, the checkpoint is what saves you.</p><p>Clipping makes that impossible. The worst case becomes a step of size <code>learning_rate × threshold</code>, whatever the gradient was.</p><div class="vz-table-wrap"><table><thead><tr><th>Situation</th><th>Clipping</th></tr></thead><tbody><tr><td>Recurrent networks</td><td>Essential &mdash; the classic use case</td></tr><tr><td>Transformers</td><td>Standard, usually max_norm 1.0</td></tr><tr><td>Reinforcement learning</td><td>Standard &mdash; rewards are high-variance</td></tr><tr><td>GANs</td><td>Common, alongside spectral normalisation</td></tr><tr><td>Feed-forward CNNs</td><td>Often unnecessary, harmless to include</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3>Choosing the threshold</h3>
+                    <h3 id="vz-s-choosing-the-threshold">Choosing the threshold</h3>
                     <p>The useful way to pick it is to measure rather than guess. Log the gradient norm for a few hundred steps without clipping, look at the distribution, and set the threshold somewhere above the typical value but below the outliers.</p><pre><code class="language-python">total = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1e9)
 # returns the norm BEFORE clipping, so this logs without actually clipping</code></pre><p>Then watch how often it triggers. Occasional clipping &mdash; a few percent of steps &mdash; is exactly right: the rare spike is caught and normal steps pass through untouched. Clipping on every step means the threshold is too low and you are throttling all learning, which shows up as slow, stalled convergence.</p><p>Common values: 1.0 for transformers and most language models, 5.0 for recurrent networks, 0.5 when training is particularly unstable. These are conventions rather than derived numbers.</p>
                 </div>
                 <div>
-                    <h3>Guided experiments</h3>
+                    <h3 id="vz-s-guided-experiments">Guided experiments</h3>
                     <ol><li><strong>Step twice normally.</strong> The weight descends the parabola exactly as gradient descent should.</li><li><strong>Step through the spike, unclipped.</strong> Uncheck Clip Gradients first. Step 3's gradient is 50x normal, and the update sends w far past the minimum — sometimes far enough that the next raw gradient is even larger, a genuine divergence.</li><li><strong>Reset, turn clipping back on, step through again.</strong> The spike is capped at the clip norm before it is applied, and the weight takes a bounded step instead of an unbounded one.</li><li><strong>Lower the clip norm.</strong> Smaller thresholds cap harder — including, if set low enough, ordinary gradients that were never a problem. It is a trade between safety and full-speed learning.</li></ol>
                 </div>
                 <div>
-                    <h3>Worth remembering</h3>
+                    <h3 id="vz-s-worth-remembering">Worth remembering</h3>
                     <p>Gradient clipping rescales an oversized gradient down to a maximum norm before the optimiser applies it, preserving direction while bounding step size. It is cheap insurance against the rare exploding gradient that would otherwise throw training off course, and it is standard practice in <a href="../natural_language_processing/how_rnn_process_text.html" style="color: var(--accent-primary)">RNNs</a> and very deep networks, where long chains of multiplication make the occasional huge gradient close to inevitable.</p>
                 </div>
                 <div>
-                    <h3>Where the spikes come from</h3>
+                    <h3 id="vz-s-where-the-spikes-come-from">Where the spikes come from</h3>
                     <p>Clipping treats a symptom, and it is worth knowing the causes, because sometimes the cause is fixable.</p><p><strong>Recurrent depth.</strong> Backpropagating through 100 time steps multiplies 100 Jacobian factors. If their product exceeds 1, it compounds &mdash; the original motivation for clipping.</p><p><strong>A learning rate that is too high</strong> makes weights large, which makes activations large, which makes gradients large. If clipping fires constantly, lower the learning rate before raising the threshold.</p><p><strong>An unlucky batch.</strong> One example with an extreme feature value or a mislabelled target produces a genuinely enormous gradient. Scaling the inputs and checking the labels both reduce this.</p><p><strong>Missing normalisation.</strong> Without batch or layer normalisation, activations can drift into ranges where gradients explode.</p><p><strong>A loss that can spike.</strong> Cross-entropy on a confidently wrong prediction, or a division by something near zero, produces a large loss and a large gradient.</p><p>So the sensible order is: scale the inputs, normalise the activations, set the learning rate correctly, add warm-up &mdash; and clip as the final safety net rather than the first response.</p>
                 </div>
                 <div>
-                    <h3>Clipping and mixed precision</h3>
+                    <h3 id="vz-s-clipping-and-mixed-precision">Clipping and mixed precision</h3>
                     <p>One interaction worth knowing. Mixed-precision training scales the loss up before the backward pass, to stop small gradients underflowing in 16-bit. That means the gradients you see are also scaled.</p><p>Clipping must therefore happen <em>after</em> unscaling, or the threshold means something different from what you intended:</p><pre><code class="language-python">scaler.scale(loss).backward()
 scaler.unscale_(optimizer)                                  # remove the loss scale
 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)     # now clip
@@ -278,11 +275,11 @@ scaler.step(optimizer)
 scaler.update()</code></pre><p>Getting this order wrong is a real bug: with a loss scale of 65,536, a threshold of 1.0 applied before unscaling effectively clips at 1/65,536 and training stops learning entirely.</p>
                 </div>
                 <div>
-                    <h3>Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
                     <p><strong>Does clipping slow training?</strong> Only if the threshold is too low, in which case you are discarding real gradient signal on most steps. Log the trigger rate.</p><p><strong>Norm or value clipping?</strong> Norm, almost always &mdash; it preserves direction. Value clipping is occasionally used in reinforcement learning.</p><p><strong>Is clipping the same as gradient normalisation?</strong> No. Clipping only intervenes above a threshold; normalisation would rescale every gradient to a fixed length, which discards magnitude information the optimiser uses.</p><p><strong>Can clipping hide a real problem?</strong> Yes &mdash; a model that only trains with aggressive clipping usually has a learning rate, initialisation or data problem underneath.</p><p><strong>Do I need it with Adam?</strong> Adam's per-parameter scaling already limits step sizes somewhat, but it does not prevent a single enormous gradient from dominating the moving averages. Clipping is still standard with Adam in transformers.</p><p><strong>What threshold for a new model?</strong> Start at 1.0, measure the trigger rate, and adjust.</p>
                 </div>
                 <div>
-                    <h3>Recap in one screen</h3>
+                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
                     <ul><li>If the gradient's norm exceeds a threshold, scale it down &mdash; direction preserved, length capped.</li><li>One enormous gradient can produce <code>NaN</code> weights and end a run; clipping makes that impossible.</li><li>Call it between <code>backward()</code> and <code>step()</code>, and after unscaling under mixed precision.</li><li>Occasional triggering is healthy; constant triggering means the threshold is too low or the learning rate too high.</li><li>Essential for recurrent models, standard in transformers, usually unnecessary in plain CNNs.</li></ul>
                 </div>
             </div>

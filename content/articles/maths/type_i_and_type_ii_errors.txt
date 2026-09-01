@@ -91,3 +91,47 @@ observed effect is a restatement of the p-value and carries no new information.
 **Peeking at results and stopping when significant.** This inflates the true
 Type I rate far above the nominal one. Sequential testing methods exist and
 correct for it.
+
+## Both errors, counted
+
+Lower your threshold and you catch more real effects while raising more false alarms. Here both rates are measured across a sweep, so the trade is visible rather than described.
+
+```python-run
+import numpy as np
+import math
+
+rng = np.random.default_rng(0)
+N = 200
+TRIALS = 4000
+
+def p_value(effect):
+    a = rng.normal(0.0, 1.0, N)
+    b = rng.normal(effect, 1.0, N)
+    d = b.mean() - a.mean()
+    se = np.sqrt(a.var(ddof=1) / N + b.var(ddof=1) / N)
+    z = abs(d / se)
+    return 2 * (1 - 0.5 * (1 + math.erf(z / np.sqrt(2))))
+
+null_ps = np.array([p_value(0.00) for _ in range(TRIALS)])   # no effect exists
+real_ps = np.array([p_value(0.25) for _ in range(TRIALS)])   # a real effect
+
+print("%10s %18s %18s %10s" % ("threshold", "type I (false alarm)",
+                               "type II (missed)", "power"))
+for alpha in (0.20, 0.10, 0.05, 0.01, 0.001):
+    type1 = (null_ps < alpha).mean()
+    type2 = (real_ps >= alpha).mean()
+    print("%10.3f %17.3f  %17.3f  %9.3f" % (alpha, type1, type2, 1 - type2))
+print()
+print("the type I rate tracks the threshold you chose -- that is what alpha is.")
+print("tightening it from 0.05 to 0.001 cuts false alarms by 50x and misses")
+print("far more real effects. there is no setting that fixes both.")
+print()
+print("the other lever is sample size:")
+for n in (50, 200, 800, 3200):
+    N = n
+    ps = np.array([p_value(0.25) for _ in range(1500)])
+    print("  n=%5d  power at alpha=0.05: %.3f" % (n, (ps < 0.05).mean()))
+print()
+print("more data lowers the miss rate without touching the false alarm rate.")
+print("that is the only way to improve both at once.")
+```

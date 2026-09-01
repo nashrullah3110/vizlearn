@@ -106,6 +106,16 @@ SPECS = {
         "label": "NumPy",
         "filename": "example_%02d.py",
     },
+    "machine_learning": {
+        # The concept track, so the code demonstrates an idea rather than an
+        # API: bias/variance, leakage, class imbalance, gradient descent by
+        # hand. scikit-learn is here because half of those are only honest
+        # when a real estimator produces the numbers.
+        "packages": "scikit-learn",
+        "label": "scikit-learn",
+        "filename": "example_%02d.py",
+        "prelude": _sklearn_prelude,
+    },
     "sklearn": {
         # scikit-learn ships with Pyodide, so this is a CDN fetch rather than a
         # wheel - and scikit-learn brings numpy, scipy, joblib and openblas

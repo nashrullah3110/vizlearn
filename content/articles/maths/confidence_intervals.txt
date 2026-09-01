@@ -88,3 +88,57 @@ sample size, and the interval will be too narrow.
 **Reporting an interval for a biased estimator.** Coverage is about sampling
 variability. A systematically wrong measurement produces a tight interval around
 the wrong answer.
+
+## What "95% confident" actually counts
+
+Build a confidence interval a thousand times from a known population and count how often it contains the true mean. The number the interval describes is the procedure, not your one result.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+TRUE_MEAN, TRUE_SD, N = 100.0, 15.0, 40
+
+def interval(sample):
+    se = sample.std(ddof=1) / np.sqrt(len(sample))
+    half = 1.96 * se
+    return sample.mean() - half, sample.mean() + half
+
+print("one sample of %d from a population with mean %.0f:" % (N, TRUE_MEAN))
+s = rng.normal(TRUE_MEAN, TRUE_SD, N)
+lo, hi = interval(s)
+print("  sample mean %.2f, 95%% interval (%.2f, %.2f)" % (s.mean(), lo, hi))
+print("  contains the true mean:", lo <= TRUE_MEAN <= hi)
+print()
+
+hits = 0
+trials = 10_000
+widths = []
+for _ in range(trials):
+    s = rng.normal(TRUE_MEAN, TRUE_SD, N)
+    lo, hi = interval(s)
+    hits += (lo <= TRUE_MEAN <= hi)
+    widths.append(hi - lo)
+print("%d intervals built the same way:" % trials)
+print("  %.2f%% of them contained the true mean" % (100 * hits / trials))
+print("  average width %.2f" % np.mean(widths))
+print()
+print("that is the whole claim. any single interval either contains the mean")
+print("or it does not -- there is no 95 percent about it once computed.")
+print()
+print("it came out a little under 95%. the 1.96 multiplier assumes you know")
+print("the population sd; estimating it from 40 points costs you some coverage.")
+print("the t distribution corrects exactly that:")
+t39 = 2.0227                                   # t multiplier, 39 degrees of freedom
+hits_t = 0
+for _ in range(trials):
+    s2 = rng.normal(TRUE_MEAN, TRUE_SD, N)
+    half = t39 * s2.std(ddof=1) / np.sqrt(N)
+    hits_t += abs(s2.mean() - TRUE_MEAN) <= half
+print("  with t instead of 1.96: %.2f%% coverage" % (100 * hits_t / trials))
+print()
+print("more data makes the interval narrower, at the usual 1/sqrt(n) rate:")
+for n in (10, 40, 160, 640):
+    ws = [np.diff(interval(rng.normal(TRUE_MEAN, TRUE_SD, n)))[0] for _ in range(400)]
+    print("  n=%4d  average width %.2f" % (n, np.mean(ws)))
+```

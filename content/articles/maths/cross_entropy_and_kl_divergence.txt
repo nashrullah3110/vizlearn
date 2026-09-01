@@ -70,6 +70,45 @@ Variational autoencoders minimise reverse KL, which is part of why their samples
 
 When a symmetric measure is genuinely needed, Jensen-Shannon divergence &mdash; the average of both directions against their mixture &mdash; is the standard choice, and its square root is a true metric.
 
+## The loss your classifier actually pays
+
+Cross-entropy is entropy plus the penalty for using the wrong distribution. This separates the two, and shows why KL is not symmetric.
+
+```python-run
+import numpy as np
+
+def H(p):
+    p = np.asarray(p, float); p = p[p > 0]
+    return -(p * np.log2(p)).sum()
+
+def cross_H(p, q):
+    p, q = np.asarray(p, float), np.asarray(q, float)
+    return -(p * np.log2(q)).sum()
+
+def KL(p, q):
+    return cross_H(p, q) - H(p)
+
+p = np.array([0.7, 0.2, 0.1])          # the truth
+for label, q in (("q = p (perfect)",  [0.70, 0.20, 0.10]),
+                 ("q close",          [0.60, 0.25, 0.15]),
+                 ("q wrong",          [0.10, 0.20, 0.70])):
+    print("%-16s H(p)=%.4f  H(p,q)=%.4f  KL=%.4f"
+          % (label, H(p), cross_H(p, q), KL(p, q)))
+print()
+print("cross-entropy = entropy + KL. the entropy part is fixed by the data,")
+print("so minimising cross-entropy is minimising KL.")
+print()
+a, b = [0.9, 0.1], [0.5, 0.5]
+print("KL is not symmetric:")
+print("  KL(a||b) = %.4f" % KL(a, b))
+print("  KL(b||a) = %.4f" % KL(b, a))
+print()
+print("one training example, in nats, the way a framework reports it:")
+for true_class_prob in (0.99, 0.9, 0.5, 0.1, 0.01):
+    print("  model gave the right class %.2f -> loss %.4f"
+          % (true_class_prob, -np.log(true_class_prob)))
+```
+
 ## Things to try
 
 1. <strong>Read the default.</strong> p is 60/20/15/5 with an entropy of 1.533 bits. q is 40/30/20/10, so the cross-entropy is 1.655 and 0.122 bits per symbol are being wasted.

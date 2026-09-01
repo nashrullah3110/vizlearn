@@ -86,3 +86,60 @@ others argue for abandoning the dichotomy entirely.
 
 **Running many tests without correction.** Bonferroni is crude and better than
 nothing; false discovery rate control is usually the better tool.
+
+## Where p-values come from, and what breaks them
+
+A p-value computed by simulation rather than looked up in a table, then the same test run two hundred times on data with no effect in it at all.
+
+```python-run
+import numpy as np
+import math
+
+rng = np.random.default_rng(0)
+
+control = rng.normal(0.1000, 0.02, 300)
+variant = rng.normal(0.1045, 0.02, 300)
+observed = variant.mean() - control.mean()
+print("A/B test: control %.4f, variant %.4f, difference %+.4f"
+      % (control.mean(), variant.mean(), observed))
+print()
+
+# the null hypothesis says the labels do not matter. so shuffle them.
+pool = np.concatenate([control, variant])
+null_diffs = np.empty(20_000)
+for i in range(20_000):
+    rng.shuffle(pool)
+    null_diffs[i] = pool[300:].mean() - pool[:300].mean()
+
+p = (np.abs(null_diffs) >= abs(observed)).mean()
+print("shuffling the labels 20,000 times, so no real effect can survive:")
+print("  the shuffled differences spread out to sd %.5f" % null_diffs.std())
+print("  %.2f%% of them were at least as big as the one we measured" % (100 * p))
+print("  that fraction is the p-value: %.4f" % p)
+print()
+print("it is NOT the probability the null is true. it is the probability of")
+print("data at least this extreme IF the null were true.")
+print()
+
+def p_value(a, b):
+    d = b.mean() - a.mean()
+    se = np.sqrt(a.var(ddof=1) / len(a) + b.var(ddof=1) / len(b))
+    return 2 * (1 - 0.5 * (1 + math.erf(abs(d / se) / np.sqrt(2))))
+
+print("now the failure mode. 1000 tests, no effect in any of them:")
+ps = np.array([p_value(rng.normal(0.1, 0.02, 300), rng.normal(0.1, 0.02, 300))
+               for _ in range(1000)])
+hits = (ps < 0.05).sum()
+print("  %d of 1000 came out under 0.05, from pure noise." % hits)
+print("  expected: 1000 * 0.05 = 50.0")
+print()
+print("the smallest few p-values in that batch of nothing:")
+for v in np.sort(ps)[:5]:
+    print("    %.4f" % v)
+print()
+print("a 5 percent threshold lets one test in twenty clear it by chance. run")
+print("enough metrics and you will always find a winner. that is why the")
+print("threshold has to be tightened when you test many things at once:")
+print("  Bonferroni for 1000 tests: %.7f" % (0.05 / 1000))
+print("  tests still under it: %d" % (ps < 0.05 / 1000).sum())
+```

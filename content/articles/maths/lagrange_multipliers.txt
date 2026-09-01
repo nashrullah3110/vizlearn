@@ -95,3 +95,61 @@ written, and the sign convention differs between texts.
 **Skipping the constraint qualification.** The method assumes the constraint
 gradients are well behaved at the solution; at a cusp or where constraints are
 degenerate it can fail.
+
+## Optimise with a rule you are not allowed to break
+
+The closest point on a line to the origin, found three ways: by brute force, by substitution, and by the multiplier condition. All three agree, and the multiplier turns out to mean something.
+
+```python-run
+import numpy as np
+
+# minimise x^2 + y^2  subject to  3x + 4y = 25
+def f(x, y):     return x ** 2 + y ** 2
+def g(x, y):     return 3 * x + 4 * y - 25
+
+print("brute force along the constraint line:")
+xs = np.linspace(-5, 12, 400_001)
+ys = (25 - 3 * xs) / 4
+vals = f(xs, ys)
+i = vals.argmin()
+print("  best point (%.4f, %.4f)   f = %.4f" % (xs[i], ys[i], vals[i]))
+print()
+
+print("by substitution, then calculus:")
+# f(x) = x^2 + ((25-3x)/4)^2
+#   df/dx = 2x - 3(25-3x)/8 = 0  ->  16x = 75 - 9x  ->  25x = 75
+x_star = 75.0 / 25.0
+y_star = (25 - 3 * x_star) / 4
+print("  x = %.4f, y = %.4f   f = %.4f" % (x_star, y_star, f(x_star, y_star)))
+print()
+
+print("by Lagrange: grad f = lam * grad g, plus the constraint.")
+# grad f = (2x, 2y);  grad g = (3, 4)
+#   2x = 3 lam ,  2y = 4 lam ,  3x + 4y = 25
+A = np.array([[2.0, 0.0, -3.0],
+              [0.0, 2.0, -4.0],
+              [3.0, 4.0,  0.0]])
+b = np.array([0.0, 0.0, 25.0])
+x_l, y_l, lam = np.linalg.solve(A, b)
+print("  x = %.4f, y = %.4f, lambda = %.4f" % (x_l, y_l, lam))
+print("  constraint satisfied: g = %.10f" % g(x_l, y_l))
+print()
+print("at the solution the two gradients are parallel:")
+print("  grad f = %s" % np.round([2 * x_l, 2 * y_l], 4))
+print("  grad g = %s   ratio %.4f, %.4f"
+      % ([3, 4], 2 * x_l / 3, 2 * y_l / 4))
+print()
+print("lambda is the price of the constraint -- move the line by one unit")
+print("and the optimum value changes by about lambda:")
+mins = []
+for c in (24.0, 25.0, 26.0):
+    xs2 = np.linspace(-5, 12, 200_001)
+    best = f(xs2, (c - 3 * xs2) / 4).min()
+    mins.append(best)
+    print("  3x + 4y = %.0f  ->  minimum f = %.4f" % (c, best))
+print("  it went up by %.4f then %.4f; lambda is %.4f"
+      % (mins[1] - mins[0], mins[2] - mins[1], lam))
+print()
+print("that is what a multiplier is for: it tells you how much a constraint")
+print("is costing you, which is often more useful than the optimum itself.")
+```

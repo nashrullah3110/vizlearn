@@ -115,3 +115,61 @@ for symmetric `A`.
 **Trusting a hand derivative without a numerical check.** Compare against a
 finite difference on a small random input. Every framework ships a gradient
 checker for this, and it is worth using when writing a custom operation.
+
+## The four gradients you keep meeting
+
+Every rule here is checked numerically rather than quoted. These four cover most of what a backward pass computes.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def num_grad(fn, x, h=1e-6):
+    g = np.zeros_like(x)
+    it = np.nditer(x, flags=["multi_index"])
+    while not it.finished:
+        i = it.multi_index
+        up, dn = x.copy(), x.copy()
+        up[i] += h; dn[i] -= h
+        g[i] = (fn(up) - fn(dn)) / (2 * h)
+        it.iternext()
+    return g
+
+x = rng.normal(size=4)
+a = rng.normal(size=4)
+A = rng.normal(size=(4, 4))
+A = A + A.T                      # symmetric, so the quadratic rule is clean
+
+checks = [
+    ("d(a.T x)/dx = a",
+     lambda v: a @ v,            lambda v: a),
+    ("d(x.T x)/dx = 2x",
+     lambda v: v @ v,            lambda v: 2 * v),
+    ("d(x.T A x)/dx = 2Ax  (A symmetric)",
+     lambda v: v @ A @ v,        lambda v: 2 * A @ v),
+    ("d(||x||)/dx = x/||x||",
+     lambda v: np.linalg.norm(v), lambda v: v / np.linalg.norm(v)),
+]
+
+for name, fn, closed in checks:
+    n, c = num_grad(fn, x), closed(x)
+    print("%-38s max diff %.2e" % (name, np.abs(n - c).max()))
+print()
+
+print("the one that matters most: a linear layer's weight gradient.")
+W = rng.normal(size=(3, 4))
+inp = rng.normal(size=4)
+target = rng.normal(size=3)
+
+def loss(Wm):
+    return ((Wm @ inp - target) ** 2).sum()
+
+err = W @ inp - target
+closed = 2 * np.outer(err, inp)        # dL/dW
+print("  numeric vs outer(2*error, input): max diff %.2e"
+      % np.abs(num_grad(loss, W) - closed).max())
+print()
+print("that outer product is why the weight gradient has the same shape as W,")
+print("and why a layer needs both its input and its incoming error to update.")
+```

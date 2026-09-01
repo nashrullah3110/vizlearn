@@ -81,3 +81,41 @@ diagnostics exist.
 **Confusing the stationary distribution with the most likely state.** It is the
 long-run fraction of time spent in each state, not a prediction of where the
 chain is now.
+
+## Walk the chain to its steady state
+
+A three-state weather chain, stepped forward until the distribution stops moving, then checked against the eigenvector that predicts it.
+
+```python-run
+import numpy as np
+
+states = ["sunny", "cloudy", "rainy"]
+#  rows: from        to:  sunny cloudy rainy
+P = np.array([[0.80, 0.15, 0.05],     # from sunny
+              [0.30, 0.45, 0.25],     # from cloudy
+              [0.20, 0.35, 0.45]])    # from rainy
+
+print("each row sums to 1:", P.sum(axis=1))
+print()
+
+p = np.array([1.0, 0.0, 0.0])         # start certain it is sunny
+print("%5s  %8s %8s %8s" % ("step", *states))
+for step in range(9):
+    print("%5d  %8.4f %8.4f %8.4f" % (step, *p))
+    p = p @ P
+print()
+print("keep going and it stops moving:")
+for _ in range(200):
+    p = p @ P
+print("  steady state %s" % np.round(p, 6))
+print()
+print("the chain forgets where it started:")
+q = np.array([0.0, 0.0, 1.0])          # start certain it is rainy
+for _ in range(200):
+    q = q @ P
+print("  from rainy   %s" % np.round(q, 6))
+print()
+vals, vecs = np.linalg.eig(P.T)
+v = np.real(vecs[:, np.argmin(np.abs(vals - 1))])
+print("  left eigenvector for eigenvalue 1: %s" % np.round(v / v.sum(), 6))
+```

@@ -304,28 +304,25 @@ ORDER  BY name;
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Three ways to ask whether a related row exists, and the one that is quietly wrong.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>The same question</h3>
-                    <p>"Which customers have placed an order?" can be written with <code>EXISTS</code>, with <code>IN</code>, or as a <code>JOIN</code>. Run the first three variants above and all three return Ada and Grace &mdash; except that the JOIN returns Ada twice.</p><p>That difference is the first thing to understand, and the NULL behaviour of the fourth is the second.</p>
-                </div>
-                <div>
-                    <h3>JOIN multiplies rows</h3>
+                    <h3 id="vz-s-join-multiplies-rows">JOIN multiplies rows</h3>
                     <p>A join does not filter the left table. It pairs every row on the left with every matching row on the right, so a customer with three orders produces three result rows.</p><p>When you want the orders, that is exactly right. When you want the customers, it is a bug, and the usual patch is <code>DISTINCT</code>. That works, but it is worth knowing what it costs: the database produced the duplicate rows and then sorted or hashed them away. <code>EXISTS</code> never produces them in the first place.</p><p>The rule of thumb: <strong>join when you want columns from the other table, use EXISTS when you only want to know whether it is there</strong>.</p>
                 </div>
                 <div>
-                    <h3>EXISTS stops early</h3>
+                    <h3 id="vz-s-exists-stops-early">EXISTS stops early</h3>
                     <p><code>EXISTS (subquery)</code> is true if the subquery returns at least one row. Not how many, not which &mdash; just whether. That is why <code>SELECT 1</code> is the conventional body: nothing in the select list is ever read, so there is no reason to name a column.</p><p>Because only existence matters, the engine can stop scanning the moment it finds one match. For a customer with ten thousand orders, <code>EXISTS</code> looks at one.</p><p><code>EXISTS</code> is also *correlated*: the subquery references <code>c.id</code> from the outer query, so it is conceptually re-evaluated per outer row. Planners rarely execute it that literally, but writing it that way is what makes the early exit available.</p>
                 </div>
                 <div>
-                    <h3>Where NOT IN breaks</h3>
+                    <h3 id="vz-s-where-not-in-breaks">Where NOT IN breaks</h3>
                     <p>Run the fourth variant. <code>NOT IN</code> returns <strong>no rows at all</strong>, and <code>NOT EXISTS</code> returns Alan and Edsger, which is the correct answer.</p><p>Nothing is wrong with the data. Order 4 is anonymous, so its <code>customer_id</code> is NULL, and the subquery returns the list <code>(1, 1, 2, NULL)</code>.</p><p><code>c.id NOT IN (1, 1, 2, NULL)</code> expands to:</p><pre><code>c.id &lt;&gt; 1  AND  c.id &lt;&gt; 1  AND  c.id &lt;&gt; 2  AND  c.id &lt;&gt; NULL</code></pre><p>The final comparison is not false &mdash; it is <strong>unknown</strong>. Alan's id is 3, and whether 3 differs from an unknown value cannot be determined. <code>AND</code> with unknown gives unknown, <code>WHERE</code> keeps only rows that are definitely true, and so nothing survives. Every row is filtered out, for every customer, silently and without an error.</p><p><code>NOT EXISTS</code> is unaffected because it never compares anything to NULL. It asks whether a matching row was found, and the answer to that is always yes or no.</p><p>This is the practical rule, and it is worth committing to memory:</p><p>> <strong><code>NOT IN</code> with a nullable subquery column is a bug.</strong> Use <code>NOT EXISTS</code>, or > add <code>WHERE customer_id IS NOT NULL</code> to the subquery.</p><p>The positive forms do not have this problem. <code>IN</code> returns true as soon as it finds a real match, and an unknown among the remaining comparisons cannot take that away.</p>
                 </div>
                 <div>
-                    <h3>What about performance</h3>
+                    <h3 id="vz-s-what-about-performance">What about performance</h3>
                     <p>Twenty years ago these three had genuinely different costs and the advice was elaborate. Modern planners in PostgreSQL, SQL Server and Oracle recognise all three shapes and frequently compile them to the same physical plan &mdash; usually a semi-join, which is precisely "find whether a match exists, do not duplicate rows".</p><p>So performance is rarely the reason to choose. The reasons that survive are:</p><div class="vz-table-wrap"><table><thead><tr><th>Want</th><th>Use</th><th>Because</th></tr></thead><tbody><tr><td>Columns from the other table</td><td><code>JOIN</code></td><td>it is the only one that gives them</td></tr><tr><td>Just to know it exists</td><td><code>EXISTS</code></td><td>no duplicates, early exit</td></tr><tr><td>Absence, nullable column</td><td><code>NOT EXISTS</code></td><td><code>NOT IN</code> returns nothing</td></tr><tr><td>A short literal list</td><td><code>IN</code></td><td><code>IN (1, 2, 3)</code> reads better than anything else</td></tr></tbody></table></div><p>Check the plan when it matters. [EXPLAIN](explain_and_query_plans.html) settles in ten seconds what a rule of thumb argues about indefinitely.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong><code>NOT IN</code> on anything nullable.</strong> The query returns zero rows and looks like a data problem.</p><p><strong><code>SELECT *</code> inside <code>EXISTS</code>.</strong> Harmless but misleading &mdash; it suggests the columns are read, and they never are.</p><p><strong><code>DISTINCT</code> as a reflex.</strong> If a join is producing duplicates, ask whether you wanted the join at all. <code>DISTINCT</code> hides the symptom and pays for the rows twice.</p>
                 </div>
             </div>

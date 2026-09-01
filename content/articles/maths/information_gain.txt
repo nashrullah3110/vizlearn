@@ -69,6 +69,39 @@ Two corrections:
 
 The same bias affects the feature importances a tree reports. Impurity-based importance inflates high-cardinality columns, which is why permutation importance &mdash; measured on held-out data &mdash; is the more trustworthy ranking.
 
+## Score every split
+
+A small dataset, every candidate split scored by information gain. The winning split is the one that leaves the least uncertainty behind.
+
+```python-run
+import numpy as np
+
+# five features, one label; only feature 0 is genuinely informative
+rng = np.random.default_rng(0)
+n = 400
+X = rng.integers(0, 2, size=(n, 5))
+y = np.where(rng.random(n) < np.where(X[:, 0] == 1, 0.9, 0.15), 1, 0)
+
+def entropy(labels):
+    if len(labels) == 0:
+        return 0.0
+    p = np.bincount(labels, minlength=2) / len(labels)
+    p = p[p > 0]
+    return -(p * np.log2(p)).sum()
+
+before = entropy(y)
+print("entropy before any split: %.4f bits" % before)
+print()
+for col in range(5):
+    left, right = y[X[:, col] == 0], y[X[:, col] == 1]
+    after = (len(left) * entropy(left) + len(right) * entropy(right)) / n
+    print("  split on feature %d: entropy after %.4f  ->  gain %.4f"
+          % (col, after, before - after))
+print()
+print("gain is never negative and is near zero for a feature that tells you")
+print("nothing. a decision tree tries every column like this and keeps the best.")
+```
+
 ## Guided tour
 
 1. <strong>Look at the parent.</strong> Twenty students, 11 passed and 9 failed, so entropy before any split is 0.993 bits &mdash; almost a full bit, because the classes are nearly balanced and knowing nothing else you would be nearly guessing.

@@ -11283,8 +11283,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Covariance has a fatal flaw for reporting: it carries the units of both variables multiplied together. Measure height in metres and weight in kilograms and you get one number; switch height to centimetres and the same data gives a number a hundred times larger. Nothing about the relationship changed."
    },
    {
-    "t": "What does this module say about “Correlation matrices, and multicollinearity”?",
-    "ans": "With several features, the correlation matrix shows every pair at once, and it is one of the first things worth plotting on a new dataset."
+    "t": "What does this module say about “Change the units, watch one move”?",
+    "ans": "The same two variables, with height measured in metres and then in centimetres. One number survives the change and one does not."
    }
   ]
  },
@@ -11302,8 +11302,8 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Three quantities that are constantly confused, and one equation that separates them:"
    },
    {
-    "t": "What does this module say about “Things to try”?",
-    "ans": "For a single labelled example, p is one-hot: probability 1 on the true class and 0 elsewhere. Every term of the cross-entropy sum vanishes except one, leaving"
+    "t": "What does this module say about “The loss your classifier actually pays”?",
+    "ans": "Cross-entropy is entropy plus the penalty for using the wrong distribution. This separates the two, and shows why KL is not symmetric."
    }
   ]
  },

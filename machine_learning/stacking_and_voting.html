@@ -231,28 +231,25 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Combining unlike models, when it helps, and a live demonstration of it hurting.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3>Different from bagging and boosting</h3>
-                    <p>[Bagging](random_forest.html) and [boosting](gradient_boosting.html) build many copies of one kind of model &mdash; hundreds of trees &mdash; and combine them.</p><p>Voting and stacking combine models of *different* kinds: a logistic regression, a gradient-boosted tree and a neural network, say. The hope is that models with different inductive biases fail on different rows, so their errors partly cancel.</p><p>That hope is a condition, not a guarantee, and this page is largely about the condition failing.</p>
-                </div>
-                <div>
-                    <h3>Voting</h3>
+                    <h3 id="vz-s-voting">Voting</h3>
                     <p><strong>Hard voting</strong> takes the majority label. <strong>Soft voting</strong> averages predicted probabilities and thresholds the mean, which is generally better because it uses confidence rather than discarding it &mdash; and which requires [calibrated](probability_calibration.html) probabilities to be meaningful.</p><p>Every member counts equally. That is the strength when the members are comparable and the weakness when they are not.</p><p>Look at the readout with the default settings. Three learners score roughly 62%, 66% and 90%, and the <strong>majority vote scores about 77% &mdash; worse than the best member alone.</strong> Two weak learners outvote a strong one whenever they agree, and they agree often enough to drag the result down.</p><p>This is not a contrived arrangement. It is what happens whenever an ensemble is assembled without checking whether the members are of comparable quality, and it is the reason "just ensemble it" is bad advice.</p>
                 </div>
                 <div>
-                    <h3>Stacking</h3>
+                    <h3 id="vz-s-stacking">Stacking</h3>
                     <p>Stacking replaces the fixed rule with a learned one. Train the base models, take their predictions as features, and fit a second model &mdash; the <strong>meta-learner</strong> &mdash; on those.</p><p>The meta-learner discovers what a vote cannot: which model to trust, and when. The learned weights are in the readout, and the strong learner attracts most of the weight while a weak one can go slightly negative &mdash; meaning the meta-learner has found that model to be worse than uninformative in some regions.</p><p>With the defaults, stacking matches the best single learner rather than beating it. That is an honest and common outcome, and it is still a gain over the vote: stacking recovered the best model automatically, where voting destroyed it.</p><p>Move the thresholds so that the three learners are closer in quality, and the picture changes &mdash; the vote catches up, because its assumption is finally true.</p>
                 </div>
                 <div>
-                    <h3>Getting stacking right</h3>
+                    <h3 id="vz-s-getting-stacking-right">Getting stacking right</h3>
                     <p>The essential detail is how the meta-learner's training data is produced.</p><p>Training the base models and then feeding their predictions <strong>on the same data</strong> to the meta-learner leaks badly. A model that overfits its training set produces suspiciously good predictions there, so the meta-learner learns to trust the most overfitted member.</p><p>The fix is <strong>cross-validated predictions</strong>: split the data into folds, and for each fold predict with base models trained on the other folds. Every prediction the meta-learner sees is then out-of-sample. This is what scikit-learn's <code>StackingClassifier</code> does, and it is why stacking costs roughly *k* times the training of its members.</p><p>A second convention: keep the meta-learner <strong>simple</strong>. Logistic regression is the standard choice. It has few base predictions to work with, and a flexible meta-learner overfits them readily.</p>
                 </div>
                 <div>
-                    <h3>When an ensemble is worth it</h3>
+                    <h3 id="vz-s-when-an-ensemble-is-worth-it">When an ensemble is worth it</h3>
                     <p><strong>Members must be comparable in quality.</strong> Otherwise voting hurts, as above.</p><p><strong>Members must make different mistakes.</strong> Three models that fail on the same rows combine into one model that fails on those rows. Checking the correlation of their errors is the diagnostic, and it is worth doing before building anything.</p><p><strong>The gain must justify the cost.</strong> An ensemble multiplies training time, inference time, memory and the number of things that can break in production. A one-point gain on a leaderboard is worth it; a one-point gain in a service usually is not.</p>
                 </div>
                 <div>
-                    <h3>Where it goes wrong</h3>
+                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
                     <p><strong>Ensembling a strong model with weak ones by vote.</strong> Demonstrated above.</p><p><strong>Fitting the meta-learner on in-sample predictions.</strong> It learns to trust the most overfitted base model.</p><p><strong>A complex meta-learner.</strong> Few features, plenty of opportunity to overfit.</p><p><strong>Assuming diversity.</strong> Two gradient-boosted models with different seeds are not diverse; check whether their errors actually differ.</p>
                 </div>
             </div>

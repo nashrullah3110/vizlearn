@@ -109,3 +109,50 @@ much.
 
 **Using it on a matrix that is only positive semi-definite.** A zero eigenvalue
 gives a zero on `L`'s diagonal, and anything that then divides by it fails.
+
+## Half a matrix, and what it costs to have one
+
+Cholesky finds a triangular L with L @ L.T equal to your matrix -- but only if the matrix is positive definite. Here is what that condition rules out.
+
+```python-run
+import numpy as np
+
+A = np.array([[ 4.0,  2.0,  1.0],
+              [ 2.0,  5.0,  3.0],
+              [ 1.0,  3.0,  6.0]])
+
+print("A is symmetric:", np.allclose(A, A.T))
+print("eigenvalues:", np.round(np.linalg.eigvalsh(A), 4), " <- all positive")
+print()
+L = np.linalg.cholesky(A)
+print("L (lower triangular):")
+print(np.round(L, 4))
+print()
+print("L @ L.T rebuilds A:", np.allclose(L @ L.T, A))
+print()
+print("positive definite means x.T @ A @ x > 0 for every non-zero x:")
+rng = np.random.default_rng(0)
+vals = [x @ A @ x for x in rng.normal(size=(2000, 3))]
+print("  2000 random x: smallest quadratic form %.6f" % min(vals))
+print()
+
+B = np.array([[1.0, 2.0],
+              [2.0, 1.0]])
+print("B = [[1,2],[2,1]] is symmetric but its eigenvalues are",
+      np.round(np.linalg.eigvalsh(B), 4))
+x = np.array([1.0, -1.0])
+print("  x = [1,-1] makes the quadratic form negative: %.1f" % (x @ B @ x))
+print("  so no real L can exist -- L @ L.T is always positive semi-definite.")
+LB = np.linalg.cholesky(B)
+print("  cholesky(B) returns:", LB.ravel())
+print("  usable:", not np.isnan(LB).any())
+print()
+print("  (CPython's numpy raises LinAlgError here; this WASM build hands back")
+print("   NaN instead, so check the result rather than relying on an exception.)")
+print()
+print("this is why covariance matrices are always positive semi-definite:")
+print("x.T @ Cov @ x is the variance of a projection, and variance cannot be")
+print("negative. it is also how correlated samples are generated:")
+z = rng.normal(size=(5, 3))
+print(np.round(z @ L.T, 3))
+```

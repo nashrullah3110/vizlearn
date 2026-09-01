@@ -106,3 +106,41 @@ square-rooted. Not the same object, and not equal except in special cases.
 
 **Computing the full SVD when you want the top few.** For a large sparse matrix
 a truncated solver is orders of magnitude cheaper.
+
+## Rebuild a matrix from its biggest pieces
+
+SVD splits any matrix into a stack of rank-one layers ordered by importance. Keeping only the first few is what compression and PCA actually do.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+# a matrix that is really rank 2, with a little noise on top
+A = np.outer(rng.normal(size=40), rng.normal(size=25)) * 5.0
+A += np.outer(rng.normal(size=40), rng.normal(size=25)) * 2.0
+A += rng.normal(size=(40, 25)) * 0.05
+
+U, s, Vt = np.linalg.svd(A, full_matrices=False)
+
+print("A is %d x %d" % A.shape)
+print("first 8 singular values:", np.round(s[:8], 4))
+print()
+print("each is the 'size' of one rank-one layer. two are large, the rest are noise.")
+print()
+total = (s ** 2).sum()
+print("%5s %14s %14s %12s" % ("k", "kept variance", "reconstr. err", "numbers stored"))
+for k in (1, 2, 3, 5, 10, 25):
+    Ak = (U[:, :k] * s[:k]) @ Vt[:k]
+    kept = (s[:k] ** 2).sum() / total
+    err = np.linalg.norm(A - Ak) / np.linalg.norm(A)
+    stored = k * (A.shape[0] + A.shape[1] + 1)
+    print("%5d %13.4f%% %14.6f %12d" % (k, 100 * kept, err, stored))
+print("%5s %13s %14s %12d" % ("full", "100%", "0", A.size))
+print()
+print("k=2 stores %d numbers instead of %d and loses almost nothing."
+      % (2 * (40 + 25 + 1), A.size))
+print()
+print("singular values are never negative, and U and V are orthonormal:")
+print("  U.T @ U close to I:", np.allclose(U.T @ U, np.eye(U.shape[1])))
+print("  V.T @ V close to I:", np.allclose(Vt @ Vt.T, np.eye(Vt.shape[0])))
+```

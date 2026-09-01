@@ -94,3 +94,43 @@ and a rising ELBO does not prove the likelihood rose by as much.
 
 **Forgetting that equality needs linearity or a constant.** Nothing else gives
 it.
+
+## The average of the function is not the function of the average
+
+Three concrete cases where swapping those two operations changes the answer, including the one that quietly costs money.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+x = rng.normal(5.0, 2.0, 200_000)
+
+print("for a convex function, E[f(x)] >= f(E[x]):")
+for name, f in (("x^2", lambda v: v ** 2),
+                ("e^x/50", lambda v: np.exp(v) / 50),
+                ("|x-5|", lambda v: np.abs(v - 5.0))):
+    print("  f = %-7s E[f(x)] = %10.4f   f(E[x]) = %10.4f   gap %+9.4f"
+          % (name, f(x).mean(), f(x.mean()), f(x).mean() - f(x.mean())))
+print()
+print("for a concave function it flips the other way:")
+for name, f in (("log(x) ", lambda v: np.log(np.clip(v, 0.01, None))),
+                ("sqrt(x)", lambda v: np.sqrt(np.clip(v, 0.0, None)))):
+    print("  f = %-7s E[f(x)] = %10.4f   f(E[x]) = %10.4f   gap %+9.4f"
+          % (name, f(x).mean(), f(x.mean()), f(x).mean() - f(x.mean())))
+print()
+print("the gap is zero only for straight lines:")
+f = lambda v: 3 * v + 7
+print("  f = %-7s E[f(x)] = %10.4f   f(E[x]) = %10.4f   gap %+9.4f"
+      % ("3x+7", f(x).mean(), f(x.mean()), f(x).mean() - f(x.mean())))
+print()
+
+print("the expensive version -- returns compound, so they multiply:")
+returns = np.array([1.50, 0.60] * 10)          # +50%, then -40%, ten times
+print("  arithmetic mean return: %.4f  (looks like a %.0f%% gain per period)"
+      % (returns.mean(), 100 * (returns.mean() - 1)))
+print("  actually multiplied out: %.4f of your starting money" % returns.prod())
+print("  geometric mean:         %.4f" % returns.prod() ** (1 / len(returns)))
+print()
+print("log is concave, so the average of the logs sits below the log of the")
+print("average -- which is exactly the gap between the two 'mean returns'.")
+```

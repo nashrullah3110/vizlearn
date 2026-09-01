@@ -94,3 +94,60 @@ starts, or a schedule with restarts, is the minimum diligence.
 
 **Expecting convex theory to transfer.** Convergence rates for convex problems
 say nothing about a deep network.
+
+## One function gradient descent cannot fail on, and one it can
+
+The same optimiser, the same settings, run from many starting points on a convex function and then on a bumpy one. Convexity is the property that makes the starting point irrelevant.
+
+```python-run
+import numpy as np
+
+def descend(f, grad, x0, lr=0.05, steps=2000):
+    x = float(x0)
+    for _ in range(steps):
+        x -= lr * grad(x)
+    return x
+
+# convex: one bowl
+f1    = lambda x: (x - 3.0) ** 2 + 2.0
+grad1 = lambda x: 2 * (x - 3.0)
+
+# non-convex: a bowl with ripples
+f2    = lambda x: 0.15 * (x - 3.0) ** 2 + 3.0 * np.sin(2.0 * x)
+grad2 = lambda x: 0.30 * (x - 3.0) + 6.0 * np.cos(2.0 * x)
+
+starts = [-10.0, -5.0, -1.0, 0.0, 2.0, 6.0, 11.0]
+
+print("convex  f(x) = (x-3)^2 + 2")
+for s in starts:
+    x = descend(f1, grad1, s)
+    print("  start %6.1f -> x %8.4f   f %9.4f" % (s, x, f1(x)))
+print("  every start lands in the same place.")
+print()
+
+print("non-convex  f(x) = 0.15(x-3)^2 + 3 sin(2x)")
+found = []
+for s in starts:
+    x = descend(f2, grad2, s)
+    found.append(round(x, 3))
+    print("  start %6.1f -> x %8.4f   f %9.4f" % (s, x, f2(x)))
+print("  %d different minima from %d starts." % (len(set(found)), len(starts)))
+best = min(found, key=lambda x: f2(x))
+print("  best found f = %.4f at x = %.3f; the worst was f = %.4f"
+      % (f2(best), best, max(f2(x) for x in found)))
+print()
+print("a convex function has one minimum and every downhill path finds it.")
+print("that is why linear and logistic regression train reproducibly, and")
+print("why a neural network gives you a different answer every restart.")
+print()
+print("the test: a function is convex if the line between any two points on")
+print("it never dips below the function.")
+for f, name in ((f1, "convex"), (f2, "non-convex")):
+    a, b = -2.0, 8.0
+    mids = np.linspace(0.05, 0.95, 19)
+    chord = [(1 - t) * f(a) + t * f(b) for t in mids]
+    curve = [f((1 - t) * a + t * b) for t in mids]
+    viol = sum(c < v - 1e-9 for c, v in zip(chord, curve))
+    print("  %-11s chord dips below the curve at %d of %d points"
+          % (name, viol, len(mids)))
+```
