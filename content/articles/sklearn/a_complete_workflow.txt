@@ -1,0 +1,278 @@
+title: A Complete Workflow: A Practical Guide
+intro: Twenty-two modules, applied to one small dataset in the order you would actually do it. Nothing here is new; the sequence is the point.
+
+## The order
+
+**Look. Split. Build. Check. Tune. Report.**
+
+Most of what goes wrong in applied machine learning is this sequence performed in a different order &mdash; tuning before checking a baseline, splitting after preprocessing, choosing a metric after seeing the scores. Each of those produces a number that cannot be trusted, and none of them produces an error.
+
+The dataset here is small and synthetic: four columns of mixed type, 8% missing values in one of them, and an 8% positive rate. That combination is deliberately ordinary, because the point is the procedure rather than the result.
+
+
+## Look at the data first
+
+Four counts, before any modelling decision is made.
+
+```python-run
+import numpy as np
+import pandas as pd
+
+def make_customers(n=2000, seed=0):
+    """A small churn-shaped dataset: mixed types, gaps, imbalance."""
+    rng = np.random.RandomState(seed)
+    tenure = rng.randint(1, 72, n)
+    monthly = rng.normal(65, 25, n).clip(20, 140)
+    plan = rng.choice(["basic", "plus", "premium"], n, p=[0.5, 0.3, 0.2])
+    region = rng.choice(["north", "south", "east", "west"], n)
+    risk = (-0.04 * tenure + 0.02 * monthly
+            + np.where(plan == "basic", 1.2, 0.0) + rng.normal(0, 1.0, n))
+    churn = (risk > 2.6).astype(int)
+    df = pd.DataFrame({"tenure": tenure, "monthly": monthly.round(2),
+                       "plan": plan, "region": region})
+    df.loc[rng.rand(n) < 0.08, "monthly"] = np.nan
+    return df, pd.Series(churn, name="churn")
+
+X, y = make_customers()
+print("shape:", X.shape)
+print("dtypes:", dict(X.dtypes.astype(str)))
+print("missing:", dict(X.isna().sum()))
+print("churn rate: %.3f (%d of %d)" % (y.mean(), y.sum(), len(y)))
+```
+
+## Split, and put the test set away
+
+Stratified, because 8% is not enough to leave to chance.
+
+```python-run
+from sklearn.model_selection import train_test_split
+
+X_dev, X_test, y_dev, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=0, stratify=y)
+
+print("development set:", X_dev.shape, " churn %.3f" % y_dev.mean())
+print("test set       :", X_test.shape, " churn %.3f" % y_test.mean())
+print()
+print("the test set is now put away. everything that follows uses")
+print("only the development set, until the very last step.")
+```
+
+## Build the pipeline
+
+Two branches, four learned transformations, one estimator - and nothing fitted outside it.
+
+```python-run
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline, make_pipeline
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
+
+numeric = ["tenure", "monthly"]
+categorical = ["plan", "region"]
+
+pre = ColumnTransformer([
+    ("num", make_pipeline(SimpleImputer(strategy="median", add_indicator=True),
+                          StandardScaler()), numeric),
+    ("cat", OneHotEncoder(handle_unknown="ignore"), categorical),
+])
+
+pipe = Pipeline([("pre", pre),
+                 ("clf", LogisticRegression(max_iter=1000,
+                                            class_weight="balanced"))])
+
+pipe.fit(X_dev, y_dev)
+print("features after preprocessing:", pipe[:-1].transform(X_dev).shape[1])
+print("names:", list(pipe.named_steps["pre"].get_feature_names_out()))
+```
+
+## Compare against doing nothing
+
+The baseline first, and a metric chosen for an 8% positive rate.
+
+```python-run
+from sklearn.dummy import DummyClassifier
+from sklearn.model_selection import cross_validate
+from sklearn.metrics import make_scorer, precision_score
+
+# precision is undefined when nothing is predicted positive, which the
+# dummy never does - make_scorer says what to return instead of warning.
+scoring = {"AP": "average_precision",
+           "recall": "recall",
+           "precision": make_scorer(precision_score, zero_division=0)}
+
+for label, model in [("dummy", DummyClassifier(strategy="most_frequent")),
+                     ("pipeline", pipe)]:
+    out = cross_validate(model, X_dev, y_dev, cv=5, scoring=scoring)
+    print("%-10s" % label, "  ".join("%s %.3f" % (s, out["test_" + s].mean())
+                                     for s in scoring))
+print()
+print("average precision is the summary to watch here - positives are 8%,")
+print("so the dummy scores the base rate and ROC AUC would flatter both.")
+```
+
+## Tune the model and the preprocessing together
+
+Eight random samples, cross-validated, optimising the metric that matters.
+
+```python-run
+from sklearn.model_selection import RandomizedSearchCV
+from scipy.stats import loguniform
+
+grid = {"clf__C": loguniform(1e-2, 1e2),
+        "pre__num__simpleimputer__strategy": ["mean", "median"]}
+
+search = RandomizedSearchCV(pipe, grid, n_iter=8, cv=5,
+                            scoring="average_precision",
+                            random_state=0).fit(X_dev, y_dev)
+
+print("best parameters:")
+for k, v in sorted(search.best_params_.items()):
+    print("   %-38s %s" % (k, round(v, 4) if isinstance(v, float) else v))
+print("best cross-validated AP: %.4f" % search.best_score_)
+print()
+print("this number is optimistic - it is the best of eight tries.")
+```
+
+## Choose the threshold, then open the test set
+
+Once. The numbers this prints are the ones you are entitled to report.
+
+```python-run
+from sklearn.metrics import (average_precision_score, precision_recall_curve,
+                             classification_report)
+import numpy as np, pickle
+
+model = search.best_estimator_          # already refitted on all of X_dev
+
+# Choose the threshold on the development set, never on the test set.
+dev_proba = model.predict_proba(X_dev)[:, 1]
+p, r, t = precision_recall_curve(y_dev, dev_proba)
+f1 = 2 * p[:-1] * r[:-1] / np.clip(p[:-1] + r[:-1], 1e-12, None)
+threshold = float(t[int(np.argmax(f1))])
+print("threshold chosen on the development set: %.3f" % threshold)
+
+# The test set, opened once.
+test_proba = model.predict_proba(X_test)[:, 1]
+print()
+print("average precision on the untouched test set: %.4f"
+      % average_precision_score(y_test, test_proba))
+print()
+print(classification_report(y_test, (test_proba >= threshold).astype(int),
+                            digits=3, zero_division=0))
+
+blob = pickle.dumps({"model": model, "threshold": threshold})
+print("saved %d bytes - the pipeline and its threshold together" % len(blob))
+```
+## 1. Look
+
+Four counts, before any decision: the shape, the dtypes, the missing values per column, and the class balance.
+
+Each one determines a later choice. The dtypes say which columns need encoding and which need scaling. The missing count says whether an imputer is needed and in which branch. The class balance &mdash; 8% here &mdash; rules out accuracy as a metric and argues for a stratified split.
+
+This step takes four lines and is the one most often skipped. Every decision that follows is made in the dark without it.
+
+## 2. Split
+
+Immediately, and stratified.
+
+The test set is set aside now, before anything has been fitted, scaled, imputed or selected. That is what makes the number at the end mean something, and it is the single most important line in the script.
+
+Stratifying matters at 8%: an unstratified 20% test set could easily land with a class rate of 5% or 11%, and every metric computed from it would be shifted by an amount nothing reveals.
+
+What remains is the **development set**, and everything up to the final step uses only that. Where this module says "development set", a larger project would cross-validate within it rather than splitting again.
+
+## 3. Build the pipeline
+
+Two branches, because the columns need different treatment.
+
+Numeric columns get an imputer &mdash; with `add_indicator=True`, since a missing charge may itself be informative &mdash; and then a scaler, because the model is regularised and a penalty on coefficient size needs comparable units. Categorical columns get one-hot encoding with `handle_unknown="ignore"`, so a region absent from a training fold does not crash the run.
+
+`class_weight="balanced"` goes on the model, because the positives are rare.
+
+The important property is that **nothing is fitted outside this object**. The imputer's median, the scaler's mean, the encoder's category list and the model's coefficients are all learned inside `fit`, which means they are all refitted on the training part of every cross-validation fold. The leakage module measured what happens otherwise.
+
+Printing the feature names after preprocessing is a cheap sanity check: ten columns from four, and reading them confirms the missing indicator survived and the categories expanded as expected.
+
+## 4. Check against a baseline
+
+Two numbers, and the first one is the dummy.
+
+`DummyClassifier(strategy="most_frequent")` scores an average precision of 0.082 &mdash; exactly the base rate, which is what average precision does for a model with no skill. The pipeline scores 0.478. That gap is the evidence that the model has learned something, and without the first number the second is uninterpretable.
+
+The metrics are chosen for the problem rather than accepted from the default. Average precision because positives are rare and ROC AUC would flatter both models. Recall and precision alongside it, because the single summary hides the trade.
+
+`make_scorer(precision_score, zero_division=0)` appears because the dummy never predicts a positive, which makes precision undefined. Saying what to return is better than five warnings in the output.
+
+## 5. Tune
+
+A randomised search over the model's regularisation and the preprocessing's imputation strategy, scored on average precision.
+
+Two things are worth noticing. The search covers a **preprocessing** choice as well as a model one, which is possible only because the preprocessing is inside the pipeline. And `scoring="average_precision"` is passed explicitly, because the default would optimise accuracy &mdash; and on 8% positives, accuracy prefers a model that predicts nothing.
+
+`best_score_` comes out at 0.4829. That number is optimistic: it is the best of eight tries on the same folds, and the hyperparameter-search module measured how much that inflates things. It is a guide for choosing, not a result to report.
+
+## 6. Choose the threshold, then report
+
+The threshold is a parameter, so it is chosen on the development set &mdash; here by maximising F1 along the precision-recall curve, though a cost calculation would be better if the costs were known.
+
+Then the test set is opened, once. Average precision on it is 0.5283, and the classification report gives the per-class picture at the chosen threshold: recall 0.667 and precision 0.468 on the positive class, from 33 positives in 400 rows.
+
+Those numbers are the deliverable. They are honest because nothing about them was chosen after seeing them.
+
+Finally the model is saved **with its threshold**. A pipeline pickled alone would be loaded elsewhere and used through `predict()`, silently reverting to 0.5 &mdash; which the thresholds module showed can be the difference between catching most of the positives and almost none.
+
+## What is missing, and would come next
+
+This is a complete workflow, not a complete project.
+
+**A second model family.** Gradient boosting would very likely beat this linear one, and the whole script would change by one line, because the pipeline interface does not care what the final estimator is.
+
+**More features.** The learning-curve check from the overfitting module would say whether more data helps, and feature work usually beats tuning when it does not.
+
+**The timing question.** Every column here was known at prediction time by construction. On real data that has to be asked of each one, and it is the check no code performs.
+
+**Monitoring.** A model is fitted on the past and used on the future, and the distributions drift. What is measured after deployment matters as much as anything measured before it.
+
+## The checklist, without the code
+
+The same procedure, stated so it can be applied to a dataset that looks nothing like this one.
+
+**Before modelling.** Count the rows and columns. List the dtypes. Count missing values per column. Count the classes, or describe the target's distribution. Ask, of every column, whether it would be known at prediction time.
+
+**Splitting.** Stratify for classification. Group when several rows share an entity. Order forward when the data has a time. Split before anything learns.
+
+**Building.** One pipeline. Numeric branch: impute, then scale if the model needs it. Categorical branch: impute, then encode with `handle_unknown="ignore"`. Nothing fitted outside.
+
+**Checking.** Fit a dummy. Choose a metric from the class balance and the cost of each mistake. Cross-validate with `return_train_score=True` and read the gap.
+
+**Tuning.** Randomised search over a logarithmic range for regularisation, including preprocessing choices, scored on the metric you chose. Check the winner is not at the edge of the range. Read `cv_results_` and treat settings within one standard deviation as tied.
+
+**Reporting.** Choose the threshold on development data. Open the test set once. Report the metric, the per-class breakdown, the counts behind the rates, and the baseline beside them. Save the model with its threshold and the library version.
+
+Nothing on that list is difficult. The discipline is doing it in that order every time, including when the first result already looks good &mdash; which is exactly when the temptation to skip to the end is strongest.
+
+## When the result is disappointing
+
+The procedure gives an honest number, and the honest number is often lower than hoped. What to do next depends on a diagnosis the workflow has already produced.
+
+**Train and test both low.** Underfitting. More flexible model, better features, less regularisation. Tuning will not help.
+
+**Train high, test low.** Overfitting. More regularisation, a simpler model, or more data &mdash; and the learning curve says whether more data would work.
+
+**Both reasonable, but not good enough.** The features do not carry enough signal. This is the most common case and the least welcome, because the answer is domain work rather than modelling: new features, a different unit of analysis, a reframed target.
+
+**Barely better than the dummy.** Consider that the problem may not be predictable from these features at all. That is a legitimate finding, and reporting it early is far more valuable than six weeks of tuning towards it.
+
+The workflow above is what makes each of those diagnoses available. A script that fits one model and prints one accuracy supports none of them.
+
+## Things to try
+
+1. <strong>Run the editors in order.</strong> They share one interpreter and build on each other, like a script.
+2. <strong>Swap the model.</strong> Change `LogisticRegression` to `RandomForestClassifier` in step three and re-run everything after it. Nothing else needs to change.
+3. <strong>Remove the indicator.</strong> Drop `add_indicator=True` and compare the cross-validated average precision.
+4. <strong>Break the order.</strong> Fit the imputer on all of `X` before the split, and watch the test score improve for the wrong reason.
+
+## Where this leaves you
+
+Look at the data, split it away, put everything that learns inside a pipeline, compare against a baseline on a metric you chose deliberately, tune with cross-validation, pick the threshold from the cost, and open the test set once. That is the whole of it, and the order is what makes the last number worth reporting.
