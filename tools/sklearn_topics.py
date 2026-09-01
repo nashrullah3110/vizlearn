@@ -6612,3 +6612,288 @@ Stratify the split, drop accuracy, and check whether the model is actually strug
          "why": "With the same 2% positives but separable classes, the untreated default model recalled 70.8%. Check before reaching for a remedy."},
     ],
 )
+
+
+# ---------------------------------------------------------------------------
+# 22. k-means clustering
+# ---------------------------------------------------------------------------
+topic(
+    "kmeans_clustering",
+    "k-Means Clustering",
+    "Models",
+    "Grouping data with no labels at all - and the three assumptions it makes "
+    "that decide whether the groups mean anything.",
+    _svg(_dots([(34, 30), (44, 38), (28, 42), (40, 26)]) +
+         _dots([(96, 60), (108, 68), (90, 70), (104, 54)]) +
+         _dots([(112, 26), (124, 32), (118, 20)], M) +
+         '<circle cx="36" cy="34" r="4" fill="none" stroke="var(--accent-primary)" stroke-width="2"/>' +
+         '<circle cx="100" cy="63" r="4" fill="none" stroke="var(--accent-primary)" stroke-width="2"/>' +
+         _txt(80, 86, "centres, and the points nearest each", M, 7)),
+    [
+        ("Fitting without a target",
+         "No y anywhere - the estimator is given features and asked to find "
+         "groups.",
+         '''from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+
+X, true_labels = make_blobs(n_samples=300, centers=3, cluster_std=1.0,
+                            random_state=0)
+
+km = KMeans(n_clusters=3, n_init=10, random_state=0).fit(X)
+
+print("labels_ (first 12):", km.labels_[:12])
+print("cluster_centers_:")
+print(km.cluster_centers_.round(2))
+print()
+print("no y was passed - this is unsupervised. the labels are")
+print("group numbers, and which group got which number is arbitrary.")
+'''),
+
+        ("Inertia cannot choose k for you",
+         "It falls forever, so its minimum is always the largest k you tried.",
+         '''from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+
+X, _ = make_blobs(n_samples=400, centers=4, cluster_std=1.0, random_state=0)
+
+print("  k    inertia")
+for k in range(1, 8):
+    km = KMeans(n_clusters=k, n_init=10, random_state=0).fit(X)
+    print("%3d %10.1f" % (k, km.inertia_))
+print()
+print("inertia always falls as k rises - at k = n it is zero.")
+print("the bend is the signal, not the minimum.")
+'''),
+
+        ("Silhouette does have a maximum",
+         "Which makes it the more useful of the two for choosing k.",
+         '''from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+from sklearn.datasets import make_blobs
+
+X, _ = make_blobs(n_samples=400, centers=4, cluster_std=1.0, random_state=0)
+
+print("  k   silhouette")
+best = None
+for k in range(2, 8):
+    km = KMeans(n_clusters=k, n_init=10, random_state=0).fit(X)
+    s = silhouette_score(X, km.labels_)
+    print("%3d %11.4f" % (k, s))
+    if best is None or s > best[1]:
+        best = (k, s)
+print()
+print("highest silhouette at k =", best[0], "- and unlike inertia,")
+print("this one has a maximum rather than always falling.")
+'''),
+
+        ("Without scaling it clusters the units",
+         "One noise column measured in a larger unit, and the grouping it finds "
+         "is worthless.",
+         '''from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import adjusted_rand_score
+import numpy as np
+
+rng = np.random.RandomState(0)
+y = np.array([0] * 150 + [1] * 150)
+
+# Column 0 carries the grouping. Column 1 is noise, measured in a unit
+# 500 times larger - so it dominates every distance.
+signal = np.concatenate([rng.normal(0, 1, 150), rng.normal(5, 1, 150)])
+noise = rng.normal(0, 1, 300) * 500.0
+X = np.column_stack([signal, noise])
+
+raw = KMeans(2, n_init=10, random_state=0).fit_predict(X)
+scaled = KMeans(2, n_init=10, random_state=0).fit_predict(
+    StandardScaler().fit_transform(X))
+
+print("agreement with the true grouping (0.0 is chance, 1.0 is perfect):")
+print("  unscaled:", round(adjusted_rand_score(y, raw), 4))
+print("  scaled  :", round(adjusted_rand_score(y, scaled), 4))
+print()
+print("unscaled, the clustering is entirely decided by the noise column.")
+'''),
+
+        ("It only finds round, similar-sized groups",
+         "Two interleaving crescents are the shape it cannot see.",
+         '''from sklearn.cluster import KMeans, DBSCAN
+from sklearn.datasets import make_moons
+from sklearn.metrics import adjusted_rand_score
+
+X, y = make_moons(n_samples=400, noise=0.06, random_state=0)
+
+km = KMeans(2, n_init=10, random_state=0).fit_predict(X)
+db = DBSCAN(eps=0.2, min_samples=5).fit_predict(X)
+
+print("agreement with the true crescents:")
+print("  KMeans:", round(adjusted_rand_score(y, km), 4))
+print("  DBSCAN:", round(adjusted_rand_score(y, db), 4))
+print()
+print("k-means draws straight boundaries around round blobs, so two")
+print("interleaving crescents are exactly what it cannot do.")
+'''),
+
+        ("The starting point matters",
+         "Eight random starts, and they do not all land in the same place.",
+         '''from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+
+X, _ = make_blobs(n_samples=300, centers=5, cluster_std=1.4, random_state=2)
+
+inertias = []
+for seed in range(8):
+    km = KMeans(5, n_init=1, init="random", random_state=seed).fit(X)
+    inertias.append(km.inertia_)
+print("n_init=1, eight seeds:", [round(v, 1) for v in inertias])
+print("  best %.1f, worst %.1f" % (min(inertias), max(inertias)))
+
+good = KMeans(5, n_init=10, random_state=0).fit(X)
+print()
+print("n_init=10 (the default) keeps the best of ten:", round(good.inertia_, 1))
+'''),
+    ],
+    [
+        "Unsupervised: <code class='mono-font'>fit(X)</code> with no "
+        "<code class='mono-font'>y</code>. The output is a group number per "
+        "row, and the numbering is arbitrary.",
+        "You must choose <code class='mono-font'>n_clusters</code> - the "
+        "algorithm cannot discover how many groups there are.",
+        "<code class='mono-font'>inertia_</code> falls monotonically with k, so "
+        "look for the bend; <code class='mono-font'>silhouette_score</code> has "
+        "an actual maximum.",
+        "It measures distance, so it <strong>must</strong> have scaled features "
+        "- unscaled, it clusters whichever column has the largest units.",
+        "It assumes clusters are round, similar in size and similar in density; "
+        "<code class='mono-font'>DBSCAN</code> handles shapes it cannot.",
+        "The result depends on the random start, which is why "
+        "<code class='mono-font'>n_init</code> repeats it and keeps the best.",
+    ],
+    """title: k-Means Clustering: A Practical Guide
+intro: Every model so far was told the answers. This one is given features and asked to find structure - which is a genuinely different job, and one whose results are much harder to check.
+
+## The algorithm
+
+Choose `k`. Place `k` centres. Assign every point to its nearest centre, move each centre to the mean of the points assigned to it, and repeat until nothing moves.
+
+That is the whole thing, and it converges quickly. `inertia_` is what it minimises: the total squared distance from each point to its centre.
+
+The interface is the familiar one with a piece missing. `fit(X)` takes no `y`, because there is none. `labels_` holds the group number for each training row, `cluster_centers_` holds the centres, and `predict` assigns new points to the nearest existing centre.
+
+The labels are arbitrary. Cluster 0 in one run may be cluster 2 in the next, with the same grouping. Comparing two clusterings therefore needs a metric that ignores the numbering, which is what `adjusted_rand_score` is for.
+
+## Choosing k is your problem
+
+The algorithm cannot tell you how many groups exist. It will happily split one blob into five or merge five into two.
+
+`inertia_` looks like it should help and cannot, because it falls monotonically: more centres always means points are closer to a centre, and at `k = n` it is zero. The second editor shows the curve dropping from 4219 to 469 with no minimum in sight. The **elbow** is the heuristic &mdash; the point where the improvement flattens &mdash; and on this data the drops are 2213, 831, 472, 89, 78, 67, which bends after 4.
+
+`silhouette_score` is the better tool because it has a genuine maximum. For each point it compares the distance to its own cluster against the distance to the nearest other cluster, and averages. Values run from -1 to 1, and higher means better-separated groups. The third editor peaks at k=4, which is the number of blobs the data was generated with.
+
+Neither is authoritative. Both are heuristics on an ill-posed question, and the honest answer usually comes from outside: how many segments the business can act on, how many categories the taxonomy allows, what the groups turn out to mean when you look at them.
+
+## Scale it, or cluster the units
+
+k-means is entirely distance-based, so an unscaled feature with large units decides everything.
+
+The fourth editor makes this stark. One column carries a real grouping; the other is pure noise measured in a unit 500 times larger. Unscaled, the agreement with the true grouping is **-0.0032** &mdash; chance. Scaled, it is 0.9867.
+
+The clustering was not merely worse; it was entirely determined by a column containing nothing. This is the same argument the scaling module made for k-NN, and it applies with more force here because there is no label to notice the problem with. A supervised model that clusters on noise scores badly and tells you. An unsupervised one produces groups, and the groups look like a result.
+
+`StandardScaler` in a pipeline before `KMeans` should be automatic.
+
+## What it assumes
+
+Three assumptions, all baked into "assign each point to the nearest centre".
+
+**Clusters are round.** The boundary between two centres is a straight line, so every cluster is a convex region. The fifth editor puts this against two interleaving crescents: k-means scores 0.27 and `DBSCAN` scores 1.00. No amount of tuning fixes it, because the shape is outside what the algorithm can express.
+
+**Clusters are similar in size.** k-means tends to split a large cluster and merge small ones, because that reduces total squared distance.
+
+**Clusters have similar density.** A tight group and a diffuse one confuse the distance comparison.
+
+When these hold, k-means is fast, simple and hard to beat. When they do not, the alternatives are `DBSCAN` for arbitrary shapes and outliers, `GaussianMixture` for elliptical clusters of different sizes with soft assignments, and `AgglomerativeClustering` when a hierarchy is more useful than a flat partition.
+
+## The random start
+
+The centres are initialised randomly, and the algorithm converges to a local minimum &mdash; so different starts give different answers.
+
+The last editor runs eight single-start fits with random initialisation and gets inertias from 1034.9 to 1188.6. Three of the eight found the good solution and five did not.
+
+`n_init` runs the whole thing several times and keeps the lowest inertia, which is why the default is 10 rather than 1. `init="k-means++"`, also the default, spreads the initial centres out rather than placing them at random, which makes good solutions much more likely and is the reason the default configuration mostly avoids this.
+
+Both defaults are sensible and both are worth knowing about, because a clustering that changes between runs is usually one of these two being overridden.
+
+## What the groups mean
+
+Nothing, until you look.
+
+k-means returns a partition whether or not there is structure to find &mdash; ask for four clusters in uniform noise and you get four. So the first question after fitting is always whether the groups are real, and the second is what distinguishes them.
+
+The practical checks are comparing the silhouette against what random data of the same shape scores, looking at the cluster centres in the original units to see what characterises each group, and checking the sizes for a cluster containing three rows.
+
+The step that gives clustering its value is naming the groups &mdash; describing each in terms someone can act on. A partition with no interpretation is a column of integers, and the algorithm cannot supply the interpretation.
+
+## Judging a clustering when there are no labels
+
+Supervised models are checked against the truth. Clustering has none, so the metrics split into two families and it is worth knowing which you are allowed to use.
+
+**Internal** measures use only the data and the labels the algorithm produced. `silhouette_score` compares within-cluster distance against nearest-other-cluster distance. `calinski_harabasz_score` and `davies_bouldin_score` are alternatives with different biases. All three reward compact, well-separated groups &mdash; which means they systematically favour exactly the round, equal-sized clusters that k-means produces, and would score a correct DBSCAN clustering of two crescents poorly. They measure the shape you asked for, not whether the grouping is meaningful.
+
+**External** measures compare against known labels. `adjusted_rand_score` and `normalized_mutual_info_score` both ignore the arbitrary numbering, which is what makes them usable at all. Adjusted Rand is adjusted for chance, so 0.0 is what random labelling scores and negative values are worse than random &mdash; which is how the unscaled run above landed at -0.0032.
+
+These are for the situation this track has been using throughout: generated data where the truth is known, or a subset somebody has labelled. In genuine unsupervised work there is nothing to compare against, and the honest evaluation is whether the groups turn out to be useful.
+
+## Where clustering earns its place
+
+Three uses, of which only one is what people usually mean by clustering.
+
+**Segmentation.** Finding groups of customers, documents or sessions that behave alike, so that each can be treated differently. This is the familiar use, and it is the one where the interpretation matters more than the algorithm: a partition nobody can name is not actionable.
+
+**Compression and feature construction.** The cluster label becomes a categorical feature for a supervised model, or the distances to each centre become numeric ones. This often helps, and it is subject to the usual rule &mdash; the clustering must be fitted inside the folds, or the labels carry information from the test rows.
+
+**Finding what is not in any group.** Points far from every centre are unusual, which makes clustering a crude anomaly detector. `DBSCAN` does this explicitly by labelling outliers `-1` rather than forcing them into a cluster, which is one of its real advantages over k-means.
+
+The use to be careful with is treating clusters as though they were discovered categories. The algorithm partitions whatever it is given; whether the partition corresponds to anything real is a separate question that the output cannot answer.
+
+## Things to try
+
+1. <strong>Watch inertia fail.</strong> The second editor's numbers fall forever. Compute the differences and find the bend yourself.
+2. <strong>Break it with scale.</strong> The fourth editor's unscaled run scores below chance. Change 500 to 5 and see where the crossover is.
+3. <strong>Try the wrong shape.</strong> In the fifth editor, raise `noise` to 0.15 and see whether DBSCAN still manages.
+4. <strong>Cluster noise.</strong> Fit k=4 on `np.random.rand(300, 2)` and look at the silhouette. It will not be zero.
+
+## Where this leaves you
+
+Scale first, choose k with silhouette rather than inertia, keep `n_init` at its default, and check that the groups mean something before reporting them. When the clusters are not round, the algorithm is the wrong one rather than badly tuned.
+""",
+    [
+        {"q": "Why can inertia_ not be used to choose k?",
+         "options": ["It is not computed by default",
+                     "It falls monotonically as k rises, reaching zero at k = n",
+                     "It only works for two clusters",
+                     "It requires labels"],
+         "answer": 1,
+         "why": "Its minimum is always the largest k you tried. The elbow is a heuristic on the curve; silhouette has an actual maximum."},
+        {"q": "What happens if you run k-means on unscaled features?",
+         "options": ["It scales them internally",
+                     "The column with the largest units dominates the distance and decides the clustering",
+                     "It raises an error",
+                     "Nothing - it is scale-invariant"],
+         "answer": 1,
+         "why": "In the editor, a pure-noise column with a 500x larger unit took the agreement with the true grouping to -0.0032, which is chance."},
+        {"q": "Why does k-means fail on two interleaving crescents?",
+         "options": ["Too few iterations",
+                     "Its boundaries are straight, so every cluster is a convex region",
+                     "The data is not scaled",
+                     "n_init is too low"],
+         "answer": 1,
+         "why": "Assigning each point to the nearest centre gives straight boundaries. DBSCAN scored 1.00 where k-means scored 0.27."},
+        {"q": "What does n_init do?",
+         "options": ["Sets the number of clusters",
+                     "Repeats the whole fit from different starts and keeps the lowest inertia",
+                     "Sets the iteration limit",
+                     "Initialises the random seed"],
+         "answer": 1,
+         "why": "k-means converges to a local minimum, and eight single starts in the editor ranged from 1034.9 to 1188.6."},
+    ],
+)

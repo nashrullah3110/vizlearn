@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>k-Means Clustering | VizLearn</title>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-ZT6JM33V5J');
+    </script>
+    <!-- The font stylesheet is render-blocking and lives on another origin, so
+         the browser cannot paint until it has done DNS, TCP and TLS for two
+         hosts it has not met. Warming both connections while the HTML is still
+         parsing takes that off the critical path. gstatic serves the font
+         files themselves and is fetched anonymously, hence crossorigin. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'light';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+                .py-note {
+            border-left: 2px solid var(--border-subtle);
+            padding-left: 0.9rem;
+            line-height: 1.7;
+        }
+        .py-note code { color: var(--accent-primary); }
+        .vz-pt-lead { margin-top: 0.5rem; max-width: 60ch; color: var(--text-muted); }
+
+        /* A step is numbered so the sequence reads as a sequence rather than
+           as six unrelated demos. */
+        .vz-step-head { display: flex; align-items: baseline; gap: 0.6rem; }
+        .vz-step-n {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+            font-weight: 700; color: var(--accent-primary);
+            border: 1px solid var(--border-subtle); border-radius: 5px;
+            padding: 0.1rem 0.4rem; flex: none;
+        }
+        .vz-step-blurb {
+            margin: 0.55rem 0 0.9rem; line-height: 1.7;
+            color: var(--text-muted); max-width: 68ch;
+        }
+        .vz-step-blurb code {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.85em;
+            color: var(--accent-primary);
+        }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen light-mode">
+<!-- Light is the default, so it ships on the tag: the theme script runs at the
+     bottom of the body, and waiting for it would flash dark on every load.
+     This removes the class before any content is parsed for readers who chose
+     dark, so neither theme flashes the other. -->
+<script>if(localStorage.getItem("theme")==="dark")document.body.classList.remove("light-mode");</script>
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-3 md:gap-4">
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <svg class="vz-icon text-sm" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/></svg>
+                    <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)" aria-label="Back to Home">
+                        <svg class="vz-icon text-xs" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.2 288 416 288c17.7 0 32-14.3 32-32s-14.3-32-32-32l-306.7 0L214.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <svg class="vz-icon hidden dark-icon" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M361.5 1.2c5 2.1 8.6 6.6 9.6 11.9L391 121l107.9 19.8c5.3 1 9.8 4.6 11.9 9.6s1.5 10.7-1.6 15.2L446.9 256l62.3 90.3c3.1 4.5 3.7 10.2 1.6 15.2s-6.6 8.6-11.9 9.6L391 391 371.1 498.9c-1 5.3-4.6 9.8-9.6 11.9s-10.7 1.5-15.2-1.6L256 446.9l-90.3 62.3c-4.5 3.1-10.2 3.7-15.2 1.6s-8.6-6.6-9.6-11.9L121 391 13.1 371.1c-5.3-1-9.8-4.6-11.9-9.6s-1.5-10.7 1.6-15.2L65.1 256 2.8 165.7c-3.1-4.5-3.7-10.2-1.6-15.2s6.6-8.6 11.9-9.6L121 121 140.9 13.1c1-5.3 4.6-9.8 9.6-11.9s10.7-1.5 15.2 1.6L256 65.1 346.3 2.8c4.5-3.1 10.2-3.7 15.2-1.6zM160 256a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zm224 0a128 128 0 1 0 -256 0 128 128 0 1 0 256 0z"/></svg>
+                        <svg class="vz-icon hidden light-icon" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M223.5 32C100 32 0 132.3 0 256S100 480 223.5 480c60.6 0 115.5-24.2 155.8-63.4c5-4.9 6.3-12.5 3.1-18.7s-10.1-9.7-17-8.5c-9.8 1.7-19.8 2.6-30.1 2.6c-96.9 0-175.5-78.8-175.5-176c0-65.8 36-123.1 89.3-153.3c6.1-3.5 9.2-10.5 7.7-17.3s-7.3-11.9-14.3-12.5c-6.3-.5-12.6-.8-19-.8z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+        <div class="mb-8 animate-fade-in">
+            <nav class="flex flex-wrap items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)" aria-label="Breadcrumb"><a href="../index.html" class="hover:text-green-400 transition-colors">Home</a><span aria-hidden="true">/</span><a href="../sklearn/" class="hover:text-green-400 transition-colors">scikit-learn</a><span aria-hidden="true">/</span><span aria-current="page">Models</span></nav>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">k-Means Clustering</h1>
+            <p class="vz-pt-lead">Grouping data with no labels at all - and the three assumptions it makes that decide whether the groups mean anything.</p>
+        </div>
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
+                <div class="card-container">
+                    <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
+                    <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
+                        <div class="py-note">Unsupervised: <code class='mono-font'>fit(X)</code> with no <code class='mono-font'>y</code>. The output is a group number per row, and the numbering is arbitrary.</div>
+                        <div class="py-note">You must choose <code class='mono-font'>n_clusters</code> - the algorithm cannot discover how many groups there are.</div>
+                        <div class="py-note"><code class='mono-font'>inertia_</code> falls monotonically with k, so look for the bend; <code class='mono-font'>silhouette_score</code> has an actual maximum.</div>
+                        <div class="py-note">It measures distance, so it <strong>must</strong> have scaled features - unscaled, it clusters whichever column has the largest units.</div>
+                        <div class="py-note">It assumes clusters are round, similar in size and similar in density; <code class='mono-font'>DBSCAN</code> handles shapes it cannot.</div>
+                        <div class="py-note">The result depends on the random start, which is why <code class='mono-font'>n_init</code> repeats it and keeps the best.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <!-- auto-article-vizlearn -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full" data-vz-prose>
+        <div class="card-container animate-fade-in">
+<!-- VIZLEARN:ARTICLE:BEGIN (generated by tools/build_articles.py) -->
+            <div class="card-header">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">k-Means Clustering: A Practical Guide</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">Every model so far was told the answers. This one is given features and asked to find structure - which is a genuinely different job, and one whose results are much harder to check.</p>
+            </div>
+            <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <div>
+                    <h3>The algorithm</h3>
+                    <p>Choose <code>k</code>. Place <code>k</code> centres. Assign every point to its nearest centre, move each centre to the mean of the points assigned to it, and repeat until nothing moves.</p><p>That is the whole thing, and it converges quickly. <code>inertia_</code> is what it minimises: the total squared distance from each point to its centre.</p><p>The interface is the familiar one with a piece missing. <code>fit(X)</code> takes no <code>y</code>, because there is none. <code>labels_</code> holds the group number for each training row, <code>cluster_centers_</code> holds the centres, and <code>predict</code> assigns new points to the nearest existing centre.</p><p>The labels are arbitrary. Cluster 0 in one run may be cluster 2 in the next, with the same grouping. Comparing two clusterings therefore needs a metric that ignores the numbering, which is what <code>adjusted_rand_score</code> is for.</p>
+                </div>
+                <div>
+                    <h3>Fitting without a target</h3>
+                    <p>No y anywhere - the estimator is given features and asked to find groups.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+
+X, true_labels = make_blobs(n_samples=300, centers=3, cluster_std=1.0,
+                            random_state=0)
+
+km = KMeans(n_clusters=3, n_init=10, random_state=0).fit(X)
+
+print("labels_ (first 12):", km.labels_[:12])
+print("cluster_centers_:")
+print(km.cluster_centers_.round(2))
+print()
+print("no y was passed - this is unsupervised. the labels are")
+print("group numbers, and which group got which number is arbitrary.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Inertia cannot choose k for you</h3>
+                    <p>It falls forever, so its minimum is always the largest k you tried.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+
+X, _ = make_blobs(n_samples=400, centers=4, cluster_std=1.0, random_state=0)
+
+print("  k    inertia")
+for k in range(1, 8):
+    km = KMeans(n_clusters=k, n_init=10, random_state=0).fit(X)
+    print("%3d %10.1f" % (k, km.inertia_))
+print()
+print("inertia always falls as k rises - at k = n it is zero.")
+print("the bend is the signal, not the minimum.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Silhouette does have a maximum</h3>
+                    <p>Which makes it the more useful of the two for choosing k.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+from sklearn.datasets import make_blobs
+
+X, _ = make_blobs(n_samples=400, centers=4, cluster_std=1.0, random_state=0)
+
+print("  k   silhouette")
+best = None
+for k in range(2, 8):
+    km = KMeans(n_clusters=k, n_init=10, random_state=0).fit(X)
+    s = silhouette_score(X, km.labels_)
+    print("%3d %11.4f" % (k, s))
+    if best is None or s > best[1]:
+        best = (k, s)
+print()
+print("highest silhouette at k =", best[0], "- and unlike inertia,")
+print("this one has a maximum rather than always falling.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Without scaling it clusters the units</h3>
+                    <p>One noise column measured in a larger unit, and the grouping it finds is worthless.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import adjusted_rand_score
+import numpy as np
+
+rng = np.random.RandomState(0)
+y = np.array([0] * 150 + [1] * 150)
+
+# Column 0 carries the grouping. Column 1 is noise, measured in a unit
+# 500 times larger - so it dominates every distance.
+signal = np.concatenate([rng.normal(0, 1, 150), rng.normal(5, 1, 150)])
+noise = rng.normal(0, 1, 300) * 500.0
+X = np.column_stack([signal, noise])
+
+raw = KMeans(2, n_init=10, random_state=0).fit_predict(X)
+scaled = KMeans(2, n_init=10, random_state=0).fit_predict(
+    StandardScaler().fit_transform(X))
+
+print("agreement with the true grouping (0.0 is chance, 1.0 is perfect):")
+print("  unscaled:", round(adjusted_rand_score(y, raw), 4))
+print("  scaled  :", round(adjusted_rand_score(y, scaled), 4))
+print()
+print("unscaled, the clustering is entirely decided by the noise column.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>It only finds round, similar-sized groups</h3>
+                    <p>Two interleaving crescents are the shape it cannot see.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.cluster import KMeans, DBSCAN
+from sklearn.datasets import make_moons
+from sklearn.metrics import adjusted_rand_score
+
+X, y = make_moons(n_samples=400, noise=0.06, random_state=0)
+
+km = KMeans(2, n_init=10, random_state=0).fit_predict(X)
+db = DBSCAN(eps=0.2, min_samples=5).fit_predict(X)
+
+print("agreement with the true crescents:")
+print("  KMeans:", round(adjusted_rand_score(y, km), 4))
+print("  DBSCAN:", round(adjusted_rand_score(y, db), 4))
+print()
+print("k-means draws straight boundaries around round blobs, so two")
+print("interleaving crescents are exactly what it cannot do.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>The starting point matters</h3>
+                    <p>Eight random starts, and they do not all land in the same place.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+
+X, _ = make_blobs(n_samples=300, centers=5, cluster_std=1.4, random_state=2)
+
+inertias = []
+for seed in range(8):
+    km = KMeans(5, n_init=1, init="random", random_state=seed).fit(X)
+    inertias.append(km.inertia_)
+print("n_init=1, eight seeds:", [round(v, 1) for v in inertias])
+print("  best %.1f, worst %.1f" % (min(inertias), max(inertias)))
+
+good = KMeans(5, n_init=10, random_state=0).fit(X)
+print()
+print("n_init=10 (the default) keeps the best of ten:", round(good.inertia_, 1))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Choosing k is your problem</h3>
+                    <p>The algorithm cannot tell you how many groups exist. It will happily split one blob into five or merge five into two.</p><p><code>inertia_</code> looks like it should help and cannot, because it falls monotonically: more centres always means points are closer to a centre, and at <code>k = n</code> it is zero. The second editor shows the curve dropping from 4219 to 469 with no minimum in sight. The <strong>elbow</strong> is the heuristic &mdash; the point where the improvement flattens &mdash; and on this data the drops are 2213, 831, 472, 89, 78, 67, which bends after 4.</p><p><code>silhouette_score</code> is the better tool because it has a genuine maximum. For each point it compares the distance to its own cluster against the distance to the nearest other cluster, and averages. Values run from -1 to 1, and higher means better-separated groups. The third editor peaks at k=4, which is the number of blobs the data was generated with.</p><p>Neither is authoritative. Both are heuristics on an ill-posed question, and the honest answer usually comes from outside: how many segments the business can act on, how many categories the taxonomy allows, what the groups turn out to mean when you look at them.</p>
+                </div>
+                <div>
+                    <h3>Scale it, or cluster the units</h3>
+                    <p>k-means is entirely distance-based, so an unscaled feature with large units decides everything.</p><p>The fourth editor makes this stark. One column carries a real grouping; the other is pure noise measured in a unit 500 times larger. Unscaled, the agreement with the true grouping is <strong>-0.0032</strong> &mdash; chance. Scaled, it is 0.9867.</p><p>The clustering was not merely worse; it was entirely determined by a column containing nothing. This is the same argument the scaling module made for k-NN, and it applies with more force here because there is no label to notice the problem with. A supervised model that clusters on noise scores badly and tells you. An unsupervised one produces groups, and the groups look like a result.</p><p><code>StandardScaler</code> in a pipeline before <code>KMeans</code> should be automatic.</p>
+                </div>
+                <div>
+                    <h3>What it assumes</h3>
+                    <p>Three assumptions, all baked into "assign each point to the nearest centre".</p><p><strong>Clusters are round.</strong> The boundary between two centres is a straight line, so every cluster is a convex region. The fifth editor puts this against two interleaving crescents: k-means scores 0.27 and <code>DBSCAN</code> scores 1.00. No amount of tuning fixes it, because the shape is outside what the algorithm can express.</p><p><strong>Clusters are similar in size.</strong> k-means tends to split a large cluster and merge small ones, because that reduces total squared distance.</p><p><strong>Clusters have similar density.</strong> A tight group and a diffuse one confuse the distance comparison.</p><p>When these hold, k-means is fast, simple and hard to beat. When they do not, the alternatives are <code>DBSCAN</code> for arbitrary shapes and outliers, <code>GaussianMixture</code> for elliptical clusters of different sizes with soft assignments, and <code>AgglomerativeClustering</code> when a hierarchy is more useful than a flat partition.</p>
+                </div>
+                <div>
+                    <h3>The random start</h3>
+                    <p>The centres are initialised randomly, and the algorithm converges to a local minimum &mdash; so different starts give different answers.</p><p>The last editor runs eight single-start fits with random initialisation and gets inertias from 1034.9 to 1188.6. Three of the eight found the good solution and five did not.</p><p><code>n_init</code> runs the whole thing several times and keeps the lowest inertia, which is why the default is 10 rather than 1. <code>init="k-means++"</code>, also the default, spreads the initial centres out rather than placing them at random, which makes good solutions much more likely and is the reason the default configuration mostly avoids this.</p><p>Both defaults are sensible and both are worth knowing about, because a clustering that changes between runs is usually one of these two being overridden.</p>
+                </div>
+                <div>
+                    <h3>What the groups mean</h3>
+                    <p>Nothing, until you look.</p><p>k-means returns a partition whether or not there is structure to find &mdash; ask for four clusters in uniform noise and you get four. So the first question after fitting is always whether the groups are real, and the second is what distinguishes them.</p><p>The practical checks are comparing the silhouette against what random data of the same shape scores, looking at the cluster centres in the original units to see what characterises each group, and checking the sizes for a cluster containing three rows.</p><p>The step that gives clustering its value is naming the groups &mdash; describing each in terms someone can act on. A partition with no interpretation is a column of integers, and the algorithm cannot supply the interpretation.</p>
+                </div>
+                <div>
+                    <h3>Judging a clustering when there are no labels</h3>
+                    <p>Supervised models are checked against the truth. Clustering has none, so the metrics split into two families and it is worth knowing which you are allowed to use.</p><p><strong>Internal</strong> measures use only the data and the labels the algorithm produced. <code>silhouette_score</code> compares within-cluster distance against nearest-other-cluster distance. <code>calinski_harabasz_score</code> and <code>davies_bouldin_score</code> are alternatives with different biases. All three reward compact, well-separated groups &mdash; which means they systematically favour exactly the round, equal-sized clusters that k-means produces, and would score a correct DBSCAN clustering of two crescents poorly. They measure the shape you asked for, not whether the grouping is meaningful.</p><p><strong>External</strong> measures compare against known labels. <code>adjusted_rand_score</code> and <code>normalized_mutual_info_score</code> both ignore the arbitrary numbering, which is what makes them usable at all. Adjusted Rand is adjusted for chance, so 0.0 is what random labelling scores and negative values are worse than random &mdash; which is how the unscaled run above landed at -0.0032.</p><p>These are for the situation this track has been using throughout: generated data where the truth is known, or a subset somebody has labelled. In genuine unsupervised work there is nothing to compare against, and the honest evaluation is whether the groups turn out to be useful.</p>
+                </div>
+                <div>
+                    <h3>Where clustering earns its place</h3>
+                    <p>Three uses, of which only one is what people usually mean by clustering.</p><p><strong>Segmentation.</strong> Finding groups of customers, documents or sessions that behave alike, so that each can be treated differently. This is the familiar use, and it is the one where the interpretation matters more than the algorithm: a partition nobody can name is not actionable.</p><p><strong>Compression and feature construction.</strong> The cluster label becomes a categorical feature for a supervised model, or the distances to each centre become numeric ones. This often helps, and it is subject to the usual rule &mdash; the clustering must be fitted inside the folds, or the labels carry information from the test rows.</p><p><strong>Finding what is not in any group.</strong> Points far from every centre are unusual, which makes clustering a crude anomaly detector. <code>DBSCAN</code> does this explicitly by labelling outliers <code>-1</code> rather than forcing them into a cluster, which is one of its real advantages over k-means.</p><p>The use to be careful with is treating clusters as though they were discovered categories. The algorithm partitions whatever it is given; whether the partition corresponds to anything real is a separate question that the output cannot answer.</p>
+                </div>
+                <div>
+                    <h3>Things to try</h3>
+                    <ol><li><strong>Watch inertia fail.</strong> The second editor's numbers fall forever. Compute the differences and find the bend yourself.</li><li><strong>Break it with scale.</strong> The fourth editor's unscaled run scores below chance. Change 500 to 5 and see where the crossover is.</li><li><strong>Try the wrong shape.</strong> In the fifth editor, raise <code>noise</code> to 0.15 and see whether DBSCAN still manages.</li><li><strong>Cluster noise.</strong> Fit k=4 on <code>np.random.rand(300, 2)</code> and look at the silhouette. It will not be zero.</li></ol>
+                </div>
+                <div>
+                    <h3>Where this leaves you</h3>
+                    <p>Scale first, choose k with silhouette rather than inertia, keep <code>n_init</code> at its default, and check that the groups mean something before reporting them. When the clusters are not round, the algorithm is the wrong one rather than badly tuned.</p>
+                </div>
+            </div>
+<!-- VIZLEARN:ARTICLE:END -->
+        </div>
+    </section>
+
+    <script>
+        (function () {
+            var btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            var sun = btn.querySelector('.dark-icon');
+            var moon = btn.querySelector('.light-icon');
+
+            function paint(theme) {
+                if (theme === 'light') {
+                    document.body.classList.add('light-mode');
+                    moon.classList.remove('hidden');
+                    sun.classList.add('hidden');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    sun.classList.remove('hidden');
+                    moon.classList.add('hidden');
+                }
+            }
+
+            paint(localStorage.getItem('theme') || 'light');
+
+            btn.addEventListener('click', function () {
+                var next = document.body.classList.contains('light-mode') ? 'dark' : 'light';
+                localStorage.setItem('theme', next);
+                paint(next);
+            });
+        })();
+    </script>
+
+</body>
+</html>
