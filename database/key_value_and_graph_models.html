@@ -317,21 +317,26 @@ SELECT value FROM kv WHERE key = 'user:1234';
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The simplest data model and the most relationship-centred one, and when each is worth leaving SQL for.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-graph-relationships-as-the-primary-thing">Graph: relationships as the primary thing</h3>
+                    <h3>Key-value: doing less on purpose</h3>
+                    <p>The interface is three operations:</p><pre><code>get(key)  -&gt;  value
+put(key, value)
+delete(key)</code></pre><p>The value is opaque &mdash; a blob the store does not interpret. You cannot query by its contents, sort by it, or join on it. There is no schema and no query language.</p><p>That poverty is the point. With no query planner, no join algorithms and no secondary indexes to maintain, a lookup is a hash and a read. Redis, Memcached, DynamoDB in its simplest mode and etcd all live here, and they are fast in a way a general-purpose database cannot match, because they have far less to do.</p><p>The cost is that every access path must be designed in advance, encoded in the key. Fetching a user by id means <code>user:1234</code>. Fetching them by email means maintaining a second key, <code>email:ada@example.com -&gt; 1234</code>, and keeping the two in step yourself &mdash; there is no unique constraint and no transaction spanning them.</p><p>The first variant above shows the shape: a two-column table used as nothing but a key lookup.</p><p><strong>Where it fits.</strong> Caches, sessions, feature flags, rate limiters, leaderboards, service discovery. Anything with one obvious access path and a strong preference for speed.</p><p><strong>Where it does not.</strong> Anything needing an ad-hoc question. "How many active sessions are from Leeds" is not answerable without scanning every key, which the model is not built for.</p>
+                </div>
+                <div>
+                    <h3>Graph: relationships as the primary thing</h3>
                     <p>A graph model stores <strong>nodes</strong> and <strong>edges</strong>, and both can carry properties. The edges are not derived from matching values, as a foreign key is; they are stored objects, and traversing one is following a pointer.</p><p>The difference shows up in queries about *paths*. "Who reports to Ada, directly or indirectly, to any depth" is one traversal in a graph and a recursive CTE in SQL &mdash; run the variant and compare it against the ordinary join beside it.</p><p>The gap widens with depth. Each level of a relational traversal is another join, and the planner's estimates degrade as they compound; a graph engine follows edges directly, and cost scales with the number of edges actually visited rather than with the size of the tables.</p><p><strong>Where it fits.</strong> Social networks, org charts, fraud rings, dependency graphs, recommendation paths, network topology, knowledge graphs. The test is whether your interesting questions are about connections rather than about attributes.</p><p><strong>Where it does not.</strong> Aggregating over millions of rows. A graph engine is usually worse at "total revenue by month" than any relational database.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-honest-comparison">The honest comparison</h3>
+                    <h3>The honest comparison</h3>
                     <div class="vz-table-wrap"><table><thead><tr><th></th><th>Key-value</th><th>Relational</th><th>Graph</th></tr></thead><tbody><tr><td>Lookup by id</td><td>fastest</td><td>fast</td><td>fast</td></tr><tr><td>Ad-hoc queries</td><td>no</td><td>yes</td><td>limited</td></tr><tr><td>Joins</td><td>no</td><td>yes</td><td>native, as traversal</td></tr><tr><td>Variable-depth paths</td><td>no</td><td>recursive CTE</td><td>native</td></tr><tr><td>Aggregation</td><td>no</td><td>yes</td><td>weak</td></tr><tr><td>Schema enforcement</td><td>none</td><td>strong</td><td>usually light</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-do-you-need-to-leave-sql">Do you need to leave SQL?</h3>
+                    <h3>Do you need to leave SQL?</h3>
                     <p>Frequently not, and the variants above are the argument.</p><p>A key-value table in Postgres &mdash; a primary key and a <code>jsonb</code> column &mdash; gets you most of the model with transactions and the option of querying the value later. Redis wins on raw latency; if that is not the binding constraint, the simpler operational story usually is.</p><p>Recursive CTEs handle graph traversal, and for a few hundred thousand edges at modest depth they are perfectly good. Dedicated graph engines start winning at deep traversals over large graphs, and at query *expressibility* &mdash; Cypher and Gremlin say in one line what a recursive CTE says in fifteen.</p><p>The strong argument for a separate store is when the workload is overwhelmingly of one shape. The weak argument is that the model is fashionable.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Using a key-value store as the system of record without a plan for secondary access.</strong> The second access path is your problem, forever.</p><p><strong>Assuming a graph database is faster at everything.</strong> It is faster at traversals and often slower at aggregates.</p><p><strong>Recursive CTEs without a depth limit.</strong> A cycle in the data is an infinite loop; the variant here carries a guard for exactly that reason.</p><p><strong>Modelling everything as a graph.</strong> If the questions are about attributes rather than connections, a table is the better graph.</p>
                 </div>
             </div>

@@ -232,25 +232,28 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Two transactions, two rows, and the one detail that decides whether they finish.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-database-will-break-it-badly">The database will break it, badly</h3>
+                    <h3>Waiting is normal; a cycle is not</h3>
+                    <p>When a transaction updates a row it takes an exclusive lock and holds it until it commits or rolls back. Anything else wanting that row waits.</p><p>Waiting is ordinary and self-resolving: the holder finishes, the waiter proceeds. A <strong>deadlock</strong> is different. It is a *cycle* in who is waiting for whom, and a cycle cannot resolve itself, because every participant is waiting for another participant that will never move.</p><p>Step through the timeline with "opposite order" selected. Nothing is wrong at step 4 &mdash; two transactions holding different rows is just concurrency. The problem appears at step 6, when the second edge closes the loop: A holds row 1 and wants row 2; B holds row 2 and wants row 1. Neither can proceed and neither will give up what it has.</p>
+                </div>
+                <div>
+                    <h3>The database will break it, badly</h3>
                     <p>Engines run a deadlock detector that periodically looks for cycles in the wait-for graph. When it finds one it picks a <strong>victim</strong> &mdash; usually the transaction that has done the least work, so the least is lost &mdash; and kills it with a deadlock error. The survivor continues.</p><p>That resolution is necessary and it is not a fix. The victim's work is gone. If the application does not catch the error and retry, a user's action simply failed, and it failed intermittently, under load, in a way that is very hard to reproduce.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-fix-is-ordering">The fix is ordering</h3>
+                    <h3>The fix is ordering</h3>
                     <p>Switch the timeline to "same order" and step through again. The schedule is almost identical; the only change is that B asks for row 1 before row 2, exactly as A does.</p><p>Now B blocks at step 4 and stays blocked. A proceeds, finishes and releases both locks. B unblocks and completes. Both transactions succeed, no error is raised, and nothing is retried.</p><p>This is the whole technique: <strong>acquire locks in a consistent order everywhere in the application.</strong> A cycle requires two transactions to disagree about the order, so if nobody disagrees, no cycle can form. Ordering by primary key is the usual choice because it is total, arbitrary and easy to apply mechanically.</p><p>The classic case is a transfer between two accounts. Written naively it locks the source then the destination, and two transfers in opposite directions deadlock immediately. Written as "lock the lower id first, then the higher" they queue instead.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-makes-it-more-likely">What makes it more likely</h3>
+                    <h3>What makes it more likely</h3>
                     <p><strong>Long transactions.</strong> Locks are held to the end, so the longer a transaction runs the wider the window in which someone can interleave with it. Do not open a transaction and then call an external API inside it.</p><p><strong>Broad locks.</strong> A statement without an index may lock far more rows than it needs, because rows it examines and rejects can still be locked. Adding the index narrows the query and the locking together, which is why an index sometimes fixes a deadlock nobody thought was an index problem.</p><p><strong>Escalation.</strong> Some engines convert many row locks into one table lock past a threshold, turning a narrow conflict into a broad one.</p><p><strong>Mixed access patterns.</strong> Different code paths touching the same tables in different orders is the underlying cause of most production deadlocks, and it tends to appear when two features written months apart meet under load.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-retry-properly">Retry properly</h3>
+                    <h3>Retry properly</h3>
                     <p>Even with good discipline, deadlocks happen. The handling is a small amount of code and it has to be right:</p><ol><li>Catch the deadlock error specifically, not every error.</li><li>Retry the <strong>whole transaction</strong> from the beginning. Re-running the failed statement alone is wrong &mdash; the transaction was rolled back entirely.</li><li>Back off before retrying, with some randomness, so two victims do not collide again on the same schedule.</li><li>Cap the attempts and log what happened, so a genuine design problem does not hide behind a retry loop that quietly succeeds on the fourth attempt.</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Treating it as a database configuration problem.</strong> No setting prevents deadlocks. The order in which your code takes locks does.</p><p><strong>Retrying the statement instead of the transaction.</strong> The rollback undid everything, so the retry starts from a state that no longer exists.</p><p><strong>Assuming reads are safe.</strong> <code>SELECT ... FOR UPDATE</code> takes locks and participates in cycles exactly like an update.</p><p><strong>Silently swallowing the retry.</strong> A rising deadlock rate is a signal about the system's design. Log it.</p>
                 </div>
             </div>

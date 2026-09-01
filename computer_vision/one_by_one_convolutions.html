@@ -231,21 +231,24 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">A kernel with no spatial extent, and why almost every modern architecture is full of them.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-it-is-a-fully-connected-layer-in-disguise">It is a fully-connected layer in disguise</h3>
+                    <h3>The operation that looks like nothing</h3>
+                    <p>A 3&#215;3 convolution combines a pixel with its eight neighbours. A 1&#215;1 convolution has no neighbours to combine. At first reading it appears to multiply each pixel by a number, which is a scaling and hardly worth a layer.</p><p>That reading forgets the channel dimension, and the channel dimension is where everything happens.</p><p>A feature map is not a grid of numbers; it is a <strong>stack</strong> of grids, one per channel. A layer with 256 channels holds 256 values at every spatial position. A 1&#215;1 convolution stands at one position, takes all 256 values there, and computes a weighted sum of them &mdash; then does it again for each output channel, and then repeats the whole thing at every position with the same weights.</p><p>So it does not mix neighbours. It mixes <strong>channels</strong>. Drag the two controls above and watch the connection pattern: every input channel reaches every output channel, and nothing spatial happens at all.</p>
+                </div>
+                <div>
+                    <h3>It is a fully-connected layer in disguise</h3>
                     <p>Fix one spatial position and the operation is exactly a dense layer: <code>Cin</code> inputs, <code>Cout</code> outputs, <code>Cin × Cout</code> weights. What makes it a convolution is that the same dense layer is applied, unchanged, at every position in the map.</p><p>That is the same weight-sharing argument that motivates convolution in the first place. If mixing channels in a particular way is useful at one location, it is probably useful at all of them, and sharing the weights makes the layer independent of the input's spatial size.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-it-is-actually-for">What it is actually for</h3>
+                    <h3>What it is actually for</h3>
                     <p><strong>Changing the channel count.</strong> This is the common case. A 1&#215;1 convolution is the cheapest possible way to turn 256 channels into 64, or 64 into 256, and it is why the layer is sometimes called a projection.</p><p><strong>Bottlenecks.</strong> Put a channel reduction before an expensive spatial convolution and an expansion after it. ResNet's bottleneck block is exactly this: 1&#215;1 down to 64 channels, 3&#215;3 at 64, 1&#215;1 back up to 256. The 3&#215;3 &mdash; by far the costliest part &mdash; runs on a quarter of the channels, and the two 1&#215;1s cost almost nothing by comparison.</p><p>Count it. A 3&#215;3 straight from 256 to 256 channels needs <code>9 × 256 × 256 ≈ 590,000</code> weights. The bottleneck version needs <code>256×64 + 9×64×64 + 64×256 ≈ 70,000</code>. Same input and output shape, an eighth of the parameters, and an extra two non-linearities thrown in.</p><p><strong>Adding non-linearity without touching resolution.</strong> Each 1&#215;1 is followed by an activation, so a stack of them increases representational depth at constant spatial size and negligible cost. This was the "network in network" idea that named the technique.</p><p><strong>Replacing the classifier head.</strong> Global average pooling followed by a 1&#215;1 convolution does the job of a large dense layer with a fraction of the parameters, and works for any input size.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-arithmetic">The arithmetic</h3>
+                    <h3>The arithmetic</h3>
                     <p>The readout above compares the two counts directly. For <code>Cin</code> input and <code>Cout</code> output channels:</p><div class="vz-table-wrap"><table><thead><tr><th>Kernel</th><th>Weights</th><th>Sees</th></tr></thead><tbody><tr><td>1&#215;1</td><td>Cin &#215; Cout</td><td>one position, all channels</td></tr><tr><td>3&#215;3</td><td>9 &#215; Cin &#215; Cout</td><td>3&#215;3 positions, all channels</td></tr><tr><td>Depthwise 3&#215;3</td><td>9 &#215; Cin</td><td>3&#215;3 positions, one channel each</td></tr></tbody></table></div><p>That last row is worth noticing. A <strong>depthwise separable</strong> convolution splits the work in two: a depthwise 3&#215;3 that mixes neighbours but not channels, followed by a 1&#215;1 that mixes channels but not neighbours. Together they approximate a full 3&#215;3 at roughly a ninth of the cost. MobileNet is built almost entirely from that pair, and half of it is 1&#215;1 convolutions.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Expecting spatial work from it.</strong> It cannot smooth, sharpen or find an edge. If the receptive field needs to grow, a 1&#215;1 contributes nothing &mdash; its contribution to the [receptive field](receptive_field.html) is exactly zero.</p><p><strong>Reducing channels too aggressively.</strong> The bottleneck is a genuine information bottleneck. Squeezing 256 channels to 8 before the spatial convolution saves computation and can cost more accuracy than it is worth.</p><p><strong>Forgetting the activation.</strong> A 1&#215;1 with no non-linearity after it, stacked on another linear layer, collapses into a single linear map. Two matrices multiplied together are one matrix.</p>
                 </div>
             </div>

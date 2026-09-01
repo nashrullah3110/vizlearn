@@ -96,6 +96,16 @@ def _sklearn_prelude():
 
 
 SPECS = {
+    "maths": {
+        # numpy alone, deliberately. It carries linalg (cholesky, eig, svd),
+        # cov, corrcoef and the random distributions, which covers almost every
+        # module in the track - and it loads in about seven seconds against the
+        # seventeen scikit-learn costs. scipy would add 47MB for a handful of
+        # distribution functions the simulations can do by sampling instead.
+        "packages": "numpy",
+        "label": "NumPy",
+        "filename": "example_%02d.py",
+    },
     "sklearn": {
         # scikit-learn ships with Pyodide, so this is a CDN fetch rather than a
         # wheel - and scikit-learn brings numpy, scipy, joblib and openblas

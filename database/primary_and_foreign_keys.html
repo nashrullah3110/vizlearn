@@ -280,25 +280,28 @@ INSERT INTO orders (id, customer_id, total) VALUES (1, 2, 5.00);
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The two constraints that make a row impossible to write if it could not be true.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-a-foreign-key-is-a-promise-about-reference">A foreign key is a promise about reference</h3>
+                    <h3>A key is a promise about identity</h3>
+                    <p>A <strong>primary key</strong> is the column, or set of columns, whose value identifies a row uniquely and permanently. Declaring one asks the database for two guarantees at once: no two rows share this value, and no row leaves it NULL.</p><p>That second half is easy to overlook and does real work. NULL means unknown. A row whose identity is unknown cannot be referred to, updated with confidence, or joined against, so a nullable identifier is not an identifier at all.</p><p>Run the first statement in the editor. The insert is refused, and the message comes from SQLite rather than from anything on this page: <code>UNIQUE constraint failed: orders.id</code>. Nothing in the application had to check first, and no amount of concurrent traffic can slip a duplicate past it.</p>
+                </div>
+                <div>
+                    <h3>A foreign key is a promise about reference</h3>
                     <p>A <strong>foreign key</strong> says: whatever value sits in this column must already exist in that column of that table. <code>orders.customer_id</code> references <code>customers.id</code>, so an order can only belong to a customer who is really there.</p><p>Uncomment the second statement and run it. Order 9 claims customer 77, and customer 77 does not exist, so the write fails. Without the constraint the row would be accepted and the problem would surface much later, as a join that silently returns fewer rows than expected or a report whose totals do not reconcile.</p><p>This is the value of the constraint and it is worth stating plainly: it turns a data-quality problem, which is discovered weeks later by a human, into a write error, which is discovered immediately by a machine.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-happens-to-the-other-side">What happens to the other side</h3>
+                    <h3>What happens to the other side</h3>
                     <p>Uncomment the third statement. Deleting customer 1 is refused, because orders 1 and 2 point at that customer and removing it would leave them pointing at nothing. The database will not create the orphan.</p><p>Refusing is one of several available answers, chosen with <code>ON DELETE</code>:</p><div class="vz-table-wrap"><table><thead><tr><th>Clause</th><th>Behaviour</th></tr></thead><tbody><tr><td><code>RESTRICT</code> / <code>NO ACTION</code></td><td>refuse the delete while children exist (the default)</td></tr><tr><td><code>CASCADE</code></td><td>delete the children too</td></tr><tr><td><code>SET NULL</code></td><td>keep the children, blank the reference</td></tr><tr><td><code>SET DEFAULT</code></td><td>point the children at a default row</td></tr></tbody></table></div><p><code>CASCADE</code> is convenient and worth respecting. Deleting one customer can silently remove thousands of orders, and a cascade that runs through several tables can remove a great deal more than the person pressing the button expected.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-natural-against-surrogate">Natural against surrogate</h3>
+                    <h3>Natural against surrogate</h3>
                     <p>Given a table of people, is the primary key the email address or an integer that means nothing?</p><p>An email address is a <strong>natural key</strong>: it comes from the domain and carries meaning. It is also mutable, occasionally shared, sometimes absent, and awkward to index. Every row that references it stores a whole string, and a person changing their address means updating every one of them.</p><p>A meaningless integer is a <strong>surrogate key</strong>. It is stable because nothing in the world can force it to change, compact to store and to index, and safe to scatter across a dozen referencing tables.</p><p>The usual practice is a surrogate primary key plus a <code>UNIQUE</code> constraint on the natural one, which buys stable identity and still refuses two accounts on the same address.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-composite-keys">Composite keys</h3>
+                    <h3>Composite keys</h3>
                     <p>A key can span several columns. A table recording which student is enrolled on which course has a primary key of <code>(student_id, course_id)</code>: neither column alone identifies a row, and the pair does. That declaration also states a business rule &mdash; a student can enrol on a course once &mdash; which the database will now enforce for free.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Turning foreign keys off for performance.</strong> They cost something on write. The cost of not having them is discovered in production, in data that no longer makes sense, and it is much harder to pay.</p><p><strong>Forgetting the pragma.</strong> SQLite ships with foreign key enforcement off for backwards compatibility. A schema full of <code>REFERENCES</code> clauses that were never enforced looks correct and guarantees nothing.</p><p><strong>Making the primary key meaningful.</strong> Anything that carries meaning can change, and a primary key that changes has to be chased through every table that references it.</p><p><strong>Leaving the foreign key column unindexed.</strong> The parent side is indexed by its primary key automatically. The child side usually is not, and every cascade or referential check then scans the whole child table.</p>
                 </div>
             </div>

@@ -322,29 +322,32 @@ ORDER  BY revenue DESC;
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The one schema design that analytical databases are actually optimised for.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-why-it-is-shaped-that-way">Why it is shaped that way</h3>
+                    <h3>Two kinds of table</h3>
+                    <p>A star schema splits everything into facts and dimensions, and the split is sharper than it first sounds.</p><p>A <strong>fact</strong> is a measurement of something that happened. One row per sale, per click, per sensor reading. It contains numbers you want to aggregate &mdash; quantity, amount, duration &mdash; and foreign keys pointing at the dimensions. Almost nothing else. Fact tables are enormous and narrow.</p><p>A <strong>dimension</strong> describes the context of a fact. The product dimension holds the name, category, brand, supplier; the date dimension holds the day, month, quarter, day of week, whether it was a holiday. Dimension tables are small and wide, and mostly text.</p><p>Drawn out, the fact table sits in the middle with dimensions radiating from it, which is where the name comes from.</p>
+                </div>
+                <div>
+                    <h3>Why it is shaped that way</h3>
                     <p>Every analytical question has the same form: *aggregate some measure, sliced by some attributes, filtered by others*. Revenue by category by month for one region. Units sold by store by weekday.</p><p>In a star schema every such query is the same join: fact table to the dimensions the question mentions, group by their attributes, aggregate the fact's measures. Run the variants above and they are all that shape.</p><p>That uniformity has three consequences worth having.</p><p><strong>Query planners handle it well.</strong> The pattern is recognisable enough that analytical engines have a dedicated *star join* optimisation: filter the small dimensions first, use the result to restrict the fact-table scan, and never materialise a large intermediate.</p><p><strong>Analysts can write the queries.</strong> Adding a slice means adding a join and a group-by column. No investigation of a normalised graph is required.</p><p><strong>BI tools generate them.</strong> Tableau, Looker and Power BI all assume this model, and produce good SQL against it and poor SQL against anything else.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-date-dimension">The date dimension</h3>
+                    <h3>The date dimension</h3>
                     <p>A table of dates looks redundant &mdash; a database has date functions. It earns its place anyway, because it holds things no function knows: your fiscal calendar, public holidays in the markets you sell in, which weeks were promotion periods, whether a day was a weekday in the local sense.</p><p><code>WHERE d.is_holiday</code> and <code>GROUP BY d.fiscal_quarter</code> are then ordinary joins rather than a growing pile of <code>CASE</code> expressions.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-grain">Grain</h3>
+                    <h3>Grain</h3>
                     <p>The most consequential decision is the <strong>grain</strong>: what exactly one fact row represents.</p><p>"One row per order line" and "one row per order" are different grains, and mixing them corrupts every aggregate &mdash; sum a per-order total across order lines and you have multiplied the revenue by the number of lines. This is the most common defect in real warehouses, and it is silent.</p><p>State the grain in one sentence before creating the table, and make every measure consistent with it.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-slowly-changing-dimensions">Slowly changing dimensions</h3>
+                    <h3>Slowly changing dimensions</h3>
                     <p>A product moves category. Do historical facts belong to the old category or the new one?</p><p><strong>Type 1</strong>: overwrite. Simple, and history is rewritten &mdash; last year's report changes.</p><p><strong>Type 2</strong>: add a new dimension row with validity dates and point new facts at it. History is preserved and the dimension grows. This is the usual choice, and it is why dimension tables have surrogate keys rather than using the natural business key.</p><p><strong>Type 3</strong>: keep a <code>previous_category</code> column. Enough for one level of history, rarely enough in practice.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-star-against-snowflake">Star against snowflake</h3>
+                    <h3>Star against snowflake</h3>
                     <p>Normalising the dimensions &mdash; splitting <code>product</code> into product, category and supplier tables &mdash; gives a <strong>snowflake schema</strong>. It removes redundancy and adds joins.</p><p>For warehouses the star is usually preferred, because dimensions are small enough that the redundancy costs little, the extra joins cost real query time, and the denormalised version is far easier to read. The exception is a genuinely large dimension &mdash; tens of millions of customers &mdash; where the duplication starts to matter.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Mixed grain.</strong> Silent, and it inflates every total.</p><p><strong>Text in the fact table.</strong> It belongs in a dimension; it makes the largest table wider for no benefit.</p><p><strong>No date dimension.</strong> Fiscal calendars and holidays end up as <code>CASE</code> expressions copied between queries.</p><p><strong>Type 1 everywhere.</strong> History quietly rewrites itself, and last quarter's report no longer reproduces.</p>
                 </div>
             </div>

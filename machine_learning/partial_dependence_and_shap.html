@@ -231,25 +231,28 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Three ways to ask what a model is doing, and the trap in the most popular one.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-trap">The trap</h3>
+                    <h3>Partial dependence</h3>
+                    <p>A partial dependence plot answers: as this feature moves across its range, what happens to the prediction on average?</p><p>The procedure is mechanical. Take the dataset. Set the feature to some value for *every* row, leaving all other columns untouched. Predict, and average. Repeat across the feature's range, and plot.</p><p>It is model-agnostic and easy to read, which is why it is everywhere.</p>
+                </div>
+                <div>
+                    <h3>The trap</h3>
                     <p>Leave the interaction control <strong>on</strong> and look at the thick line. It is nearly flat, and the readout gives its slope as close to zero. Read on its own, it says this feature does not matter.</p><p>Now the ICE curves underneath tell a completely different story. Every individual curve has a steep slope &mdash; the feature matters enormously to every single row. It is just that it slopes <strong>up</strong> for one group and <strong>down</strong> for the other, and averaging them cancels.</p><p>This is not a contrived case. Any feature whose effect reverses by subgroup behaves like this: a treatment that helps one population and harms another, a price change that attracts some customers and repels others.</p><p><strong>A flat partial dependence curve does not mean the feature is unimportant.</strong> It means the average effect is zero, which is a much weaker statement.</p><p>Switch the interaction off and the curves stack into a single shape. Now the average describes each individual well, and the partial dependence line is trustworthy.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-ice-curves">ICE curves</h3>
+                    <h3>ICE curves</h3>
                     <p><strong>Individual Conditional Expectation</strong> curves are partial dependence without the averaging: one line per row, showing what the model predicts for *that* row as the feature sweeps.</p><p>They cost nothing extra, since partial dependence computes them and then throws them away. Plotting them is the standard defence against the trap above, and the diagnostic is simple: if the ICE curves are parallel, the partial dependence line is a fair summary. If they fan out or cross, it is not, and there is an interaction worth finding.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-other-assumption">The other assumption</h3>
+                    <h3>The other assumption</h3>
                     <p>Partial dependence sets a feature to a value for every row regardless of whether that combination is possible. Sweeping <code>age</code> from 18 to 80 across a dataset creates rows with age 18 and forty years of work experience.</p><p>The model is asked to predict for combinations that never occur, and its answer there is extrapolation with nothing to anchor it. When features are strongly correlated, part of a partial dependence curve is describing regions of input space the model has never seen.</p><p><strong>Accumulated Local Effects</strong> plots address this by only varying a feature within the range of values that actually co-occur with the other features' values.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-shap">SHAP</h3>
+                    <h3>SHAP</h3>
                     <p>SHAP answers a different question. Partial dependence and ICE describe the model across a range; SHAP explains <strong>one prediction</strong>.</p><p>For a given row, it assigns each feature a number saying how much that feature pushed the prediction away from the base value &mdash; the average prediction over the dataset. The numbers sum exactly to the difference:</p><pre><code>prediction  =  base value  +  sum of every feature&#x27;s SHAP value</code></pre><p>That additivity is what makes it useful for an individual explanation: it accounts for the whole prediction, with nothing unattributed.</p><p>The values come from Shapley values in cooperative game theory, which distribute credit for a joint outcome fairly among contributors. Computing them exactly requires evaluating every subset of features, which is exponential, so implementations approximate &mdash; <code>TreeSHAP</code> exactly and quickly for trees, <code>KernelSHAP</code> by sampling for anything else.</p><div class="vz-table-wrap"><table><thead><tr><th></th><th>Answers</th><th>Scope</th></tr></thead><tbody><tr><td>Partial dependence</td><td>how the prediction moves with a feature, on average</td><td>global</td></tr><tr><td>ICE</td><td>the same, per row</td><td>per row</td></tr><tr><td>SHAP</td><td>how much each feature contributed here</td><td>one prediction</td></tr><tr><td>[Permutation importance](permutation_importance.html)</td><td>how much accuracy depends on a feature</td><td>global</td></tr></tbody></table></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Reading a flat PD curve as "unimportant".</strong> Plot the ICE curves.</p><p><strong>Ignoring correlated features.</strong> Part of the curve may be extrapolation.</p><p><strong>Treating SHAP as causal.</strong> It attributes a prediction, not an outcome. A model that uses postcode as a proxy for income will show postcode contributing, and that is a fact about the model.</p><p><strong>Averaging SHAP values into a global importance and stopping there.</strong> The mean absolute SHAP value is a reasonable global summary, and it discards the direction and the interactions that made SHAP worth computing.</p>
                 </div>
             </div>

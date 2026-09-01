@@ -345,9 +345,14 @@ print("agree:", all(band_elif(n) == band_nested(n) for n in (10, 60, 200)))</scr
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">An if inside an if is sometimes exactly right and more often a shape that grew. The useful skill is recognising which one you have, because most nesting can be flattened without changing the logic.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-guard-clauses-flatten-the-rest">Guard clauses flatten the rest</h3>
+                    <h3>When nesting is just <code>and</code></h3>
+                    <pre><code class="language-python">if age &gt;= 18:
+    if member:
+        allow()</code></pre><p>If the inner <code>if</code> is the entire body of the outer one, and there is no <code>else</code> on either, the two conditions are simply both required:</p><p>if age &gt;= 18 and member:</p><p>Same behaviour, one level of indentation, and the condition reads as one thought instead of two.</p>
+                </div>
+                <div>
+                    <h3>Guard clauses flatten the rest</h3>
                     <p>The most common nested shape is a series of refusals, each with an <code>else</code>:</p><pre><code class="language-python">if active:
     if no_fines:
         if available:
@@ -357,27 +362,27 @@ if not available: return &quot;book is out&quot;
 return &quot;yes&quot;</code></pre><p>Now every rule sits beside its own message, the happy path is the last line at zero indentation, and adding a rule is one line rather than another level. The page runs both over the same four cases and prints them side by side, because the point is that the behaviour is identical and only the shape changed.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-elif-is-not-nesting">elif is not nesting</h3>
+                    <h3>elif is not nesting</h3>
                     <p>if n &gt; 100: ... elif n &gt; 50: ... else: ...</p><p>An <code>elif</code> chain is one decision with several outcomes, all at the same indentation. Reaching for a nested <code>if</code> where an <code>elif</code> would do is how a flat choice becomes a staircase.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-rule-of-thumb">The rule of thumb</h3>
+                    <h3>The rule of thumb</h3>
                     <p>Two levels is normal. Three is worth a second look. Four almost always means either a set of guard clauses waiting to be inverted, or a block that wants to be its own function.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-when-nesting-is-genuinely-right">When nesting is genuinely right</h3>
+                    <h3>When nesting is genuinely right</h3>
                     <p>Guard clauses suit functions, because <code>return</code> is what makes them possible. Inside a loop or a block where you cannot return, the staircase is sometimes unavoidable - though <code>continue</code> plays the same role in a loop that <code>return</code> plays in a function, and is under-used for it.</p><p>Nesting is also right when the conditions are genuinely dependent: when the second question only makes sense if the first was true. <code>if user is not None:</code> followed by <code>if user.active:</code> is not a staircase to flatten, it is two questions where the second would raise without the first.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-combining-with-and-or">Combining with and or</h3>
+                    <h3>Combining with and or</h3>
                     <p>Two shallow conditions can often become one:</p><pre><code class="language-python">if user.active and not user.fines:</code></pre><p>This is clearer than nesting when the combination is what you mean, and worse than nesting when you need different responses to each failure - as soon as you want to tell the user *which* rule stopped them, the conditions have to be separate again.</p><p>Both <code>and</code> and <code>or</code> short-circuit, which is what makes <code>if user is not None and user.active</code> safe: the second half is never evaluated when the first is false. That ordering is load-bearing, and swapping the halves turns a working check into an <code>AttributeError</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-depth-as-a-design-signal">Depth as a design signal</h3>
+                    <h3>Depth as a design signal</h3>
                     <p>Three levels of nested conditions inside a loop inside a function is usually not a formatting problem, it is a sign that the function is making several different decisions and would be clearer as two or three named functions. The indentation is doing you a favour by making that visible.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-same-logic-four-ways">The same logic, four ways</h3>
+                    <h3>The same logic, four ways</h3>
                     <p>One rule set written four ways, so the difference is shape rather than behaviour:</p><pre><code class="language-python">def price(age, member):
     if age &lt; 18:
         if member:
@@ -408,34 +413,34 @@ for age, member in [(10, True), (10, False), (30, True), (30, False)]:
 30 False 12 12</code></pre><p>Both are correct, and which reads better is genuinely arguable here. The nested version makes the two-by-two structure visible: two ages, two membership states, four outcomes. The flat version reads as a list of rules in priority order, which is how a price list is usually written down.</p><p>The point of running both is that flattening is not automatically an improvement. It is an improvement when the nesting was accidental &mdash; when the inner <code>if</code> was the whole body of the outer one, or when the branches were refusals. When the nesting reflects a genuine grid of cases, keeping it can be the honest thing to do.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-conditions-that-depend-on-each-other">Conditions that depend on each other</h3>
+                    <h3>Conditions that depend on each other</h3>
                     <p>There is one case where flattening with <code>and</code> is not merely a style choice but actually required, and it comes from short-circuiting.</p><pre><code class="language-python">user = None
 if user is not None and user.active:
     print(&quot;never reached, and never raises&quot;)
 print(&quot;fine&quot;)</code></pre><pre><code>fine</code></pre><p><code>and</code> stops as soon as the left side is false, so <code>user.active</code> is never evaluated. Reverse the two halves and the same line raises <code>AttributeError</code> &mdash; the check that was supposed to protect the access happens after it.</p><p>This is why nesting <code>if user is not None:</code> around <code>if user.active:</code> and flattening it to a single <code>and</code> are equivalent: both express "only ask the second question if the first was true". What is *not* equivalent is writing them in the other order, or joining them with <code>&</code>, which evaluates both sides unconditionally.</p><p>The general shape is worth recognising. Any time one condition establishes that the next one is safe to ask &mdash; not <code>None</code>, non-empty, key present, index in range &mdash; the order is load-bearing and cannot be rearranged for readability.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-the-nesting-actually-came-from">Where the nesting actually came from</h3>
+                    <h3>Where the nesting actually came from</h3>
                     <p>Deep conditionals are rarely written that way. They accumulate, and the history is usually visible in the code.</p><p>A function starts with one check. A bug report arrives and someone adds a second condition inside the first, because that is the smallest possible change and it does not disturb what is already there. Six months and four reports later there are five levels, each added by someone being careful.</p><p>That is worth knowing because it tells you what the fix is. The problem is not that a particular developer wrote bad code; it is that adding a nested <code>if</code> is always the locally cheapest change, and nothing pushes back. The remedy is to treat depth as a review signal &mdash; when a change would add a fourth level, that is the moment to restructure, not later.</p><p>The restructuring is nearly always one of three moves. Invert the refusals into guard clauses. Combine conditions that were only ever both-required. Or extract the inner block into a function with a name, which resets the indentation and gives the logic a label at the same time.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-writing-the-condition-so-it-reads">Writing the condition so it reads</h3>
+                    <h3>Writing the condition so it reads</h3>
                     <p>Flattening helps only if the resulting condition is readable, and a flattened condition can easily be worse than the nesting it replaced. Three habits keep it honest.</p><p><strong>Avoid stacked negatives.</strong> <code>if not (not active or banned)</code> is correct and nobody can evaluate it at a glance. De Morgan's rules let you push the negation inwards &mdash; <code>not (A or B)</code> is <code>not A and not B</code>, and <code>not (A and B)</code> is <code>not A or not B</code> &mdash; and the version with fewer negations is almost always the one to keep. Better still, name the positive: <code>if is_eligible:</code>.</p><p><strong>Name the compound.</strong> When a condition needs three clauses, assigning it to a well-named variable on the line before turns the <code>if</code> into a sentence. <code>can_borrow = user.active and not user.fines and book.available</code> followed by <code>if can_borrow:</code> reads as intent, and the name explains what the combination *means* rather than only what it checks.</p><p><strong>Keep comparisons in a natural order.</strong> <code>if 0 &lt;= n &lt; 100</code> reads as a range and chains correctly in Python, where most languages would need two comparisons and an <code>and</code>. Writing <code>if n &gt;= 0 and n &lt; 100</code> says the same thing with more to parse.</p><p>The underlying test is whether a reader can say what the condition means without evaluating it. A staircase of simple conditions is sometimes easier to read than one flat condition that requires bookkeeping, and when that is true, the staircase is the right answer.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-every-branch-is-a-case-to-test">Every branch is a case to test</h3>
+                    <h3>Every branch is a case to test</h3>
                     <p>Nesting has a cost that is invisible while writing and obvious while testing: the number of paths multiplies.</p><p>Two nested conditions give four combinations. Three give eight. A function with four levels has sixteen paths through it, and the tests either cover all of them or leave some untried &mdash; and the ones left untried are, by construction, the unusual combinations where the bugs are.</p><p>Guard clauses do not remove the combinations, but they change what a test has to do. Each guard is a single condition with a single outcome, testable on its own by passing one bad value and checking one message. The final line is the case where everything passed. The tests read as a list matching the guards, and a new rule adds one test rather than doubling the table.</p><p>This is the practical argument for flattening, and it is stronger than the aesthetic one. A shape that makes each rule independently testable is a shape where a change to one rule cannot silently affect another &mdash; which is exactly the property a staircase does not have, because every inner branch sits inside the assumptions of every outer one.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-extracting-the-inner-block">Extracting the inner block</h3>
+                    <h3>Extracting the inner block</h3>
                     <p>The third remedy, after combining and inverting, is to give the inner block a name. It is the one people reach for last and it is often the best.</p><p>When a conditional is deep because the innermost part is doing real work, the depth is telling you that two jobs are in one function: deciding, and doing. Moving the inner block into its own function leaves an outer function that reads as a sequence of decisions ending in a call, and an inner one that starts at the left margin with its own name explaining what it is for.</p><p>The mechanical benefit is the indentation reset. The real benefit is the name. A block that was three levels deep and unlabelled becomes something with a title, which forces you to say what it does &mdash; and occasionally reveals that you cannot, because it was doing two things.</p><p>This is also the move that makes the guard-clause style available where it was not. Guards need <code>return</code>, and a block buried in a loop inside a function has nowhere to return to; extract it, and the guards become possible inside the new function.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Is there a limit to how deep nesting can go?</strong> Python allows about twenty levels before the parser complains, which is far past the point where anyone can read it.</p><p><strong>Does flattening change performance?</strong> Not meaningfully. Both forms evaluate the same conditions in the same order.</p><p><strong>Should I use <code>elif</code> or a nested <code>if</code>?</strong> <code>elif</code> when the conditions are alternatives to each other, nesting when the second question only makes sense given the first.</p><p><strong>What about <code>match</code>?</strong> When the branching is on the shape or value of one object, <code>match</code> often expresses it more directly than either nesting or an <code>elif</code> chain.</p><p><strong>Can guard clauses be used outside a function?</strong> <code>continue</code> plays the same role inside a loop, and it is under-used for exactly this.</p><p><strong>Is an early <code>return</code> bad practice?</strong> The single-exit rule comes from languages with manual cleanup. In Python, early returns make guard clauses possible and are standard style.</p><p><strong>How do I handle "at least one of these must be true"?</strong> <code>or</code>, or <code>any()</code> over a list of conditions when there are more than two or three.</p><p><strong>Does an early return make a function harder to debug?</strong> No. A breakpoint on each guard is as easy as one at the top, and the stack is shallower when it fires.</p><p><strong>What about conditions that are expensive to evaluate?</strong> Order them cheapest first. Short-circuiting means an expensive check is skipped whenever a cheaper one has already decided the answer.</p><p><strong>Is a dictionary lookup ever a replacement for the whole thing?</strong> Yes, when every branch is comparing one value against a constant. That is the dispatch table from the dictionary methods page.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>If the inner <code>if</code> is the entire body of the outer one, the two conditions are an <code>and</code>.</li><li>Refusals belong at the top as guard clauses, so the main path stays at the left margin and each rule sits beside its own message.</li><li>Genuine nesting is when the second question only makes sense given the first &mdash; and short-circuiting makes the order load-bearing.</li><li><code>elif</code> is one decision with several outcomes; reaching for nesting there turns a flat choice into a staircase.</li><li>Three levels is a review signal: combine, invert, or extract a function.</li></ul>
                 </div>
             </div>

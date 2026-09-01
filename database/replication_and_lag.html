@@ -232,28 +232,31 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">How to serve more reads than one machine can, and the staleness that comes with it.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-lag">Lag</h3>
+                    <h3>The arrangement</h3>
+                    <p>One server &mdash; the <strong>primary</strong> &mdash; accepts every write. It records each change in a log, and streams that log to one or more <strong>replicas</strong>, which apply the changes to their own copies and serve read queries.</p><p>The appeal is that most workloads are overwhelmingly reads. Adding replicas multiplies read capacity without any change to the data model, and unlike [sharding](sharding_in_databases.html) it is reversible: a replica that is not helping can simply be removed.</p><p>Replicas also serve as warm standbys. If the primary fails, one is promoted.</p>
+                </div>
+                <div>
+                    <h3>Lag</h3>
                     <p>A change committed on the primary is not instantly present on a replica. It has to be written to the log, sent over a network, received, and applied. The gap is <strong>replication lag</strong>, and it is never zero.</p><p>Under normal conditions it is milliseconds. Under load it is not, and the reasons matter:</p><p><strong>A large write.</strong> A single statement updating a million rows produces a great deal of log to ship and apply.</p><p><strong>Single-threaded apply.</strong> Some engines apply the log serially even though the primary generated it with many concurrent connections. The replica simply cannot keep up with a busy primary.</p><p><strong>A long query on the replica.</strong> Applying a change that conflicts with a running read forces a choice between cancelling the query and pausing replication. Both happen, depending on configuration.</p><p><strong>Network.</strong> A cross-region replica has a floor set by the speed of light.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-bug-this-causes">The bug this causes</h3>
+                    <h3>The bug this causes</h3>
                     <p>The failure mode is specific and extremely common:</p><pre><code>1. User updates their profile        -&gt; primary
 2. Application redirects to profile  -&gt;
 3. Profile page reads                -&gt; replica, 200ms behind
 4. User sees their OLD profile</code></pre><p>Nothing errored. The user changed something, was shown the previous value, and reasonably concluded the save failed.</p><p>The standard fixes, in rough order of preference:</p><p><strong>Read-your-writes routing.</strong> After a write, send that user's reads to the primary for a short window. Simple and effective.</p><p><strong>Route by criticality.</strong> Anything the user just affected reads from the primary; dashboards and search read from replicas.</p><p><strong>Wait for the log position.</strong> Record the primary's log position at commit and have the replica wait until it has applied at least that far. Correct, and requires engine support.</p><p><strong>Do not redirect to a read.</strong> Render the result from what was just written.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-synchronous-replication">Synchronous replication</h3>
+                    <h3>Synchronous replication</h3>
                     <p>The lag can be removed. <code>synchronous_commit</code> in PostgreSQL, semi-sync in MySQL: the primary does not acknowledge a commit until at least one replica confirms it has the change.</p><p>The cost is unavoidable and appears on every write: a commit now includes a network round trip. Throughput falls, and latency rises by the distance to the replica. If the synchronous replica becomes unreachable, writes stall entirely unless a fallback is configured.</p><p>This is a direct instance of the [CAP](cap_theorem.html) trade: consistency across replicas costs availability and latency, and no configuration escapes it. The usual compromise is one synchronous replica nearby for durability, and asynchronous replicas further away for read capacity.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-failover-and-lost-writes">Failover and lost writes</h3>
+                    <h3>Failover and lost writes</h3>
                     <p>If the primary fails while a replica is 200ms behind, promoting that replica loses 200ms of committed writes. They were acknowledged to clients and are gone.</p><p>Which is why durability requirements and replication mode are the same decision. Asynchronous replication means accepting that a failover can lose the most recent writes.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Assuming replicas are current.</strong> They are not, and the window is where the bugs live.</p><p><strong>Sending a write to a replica.</strong> It is read-only; the error is confusing when routing is implicit.</p><p><strong>Monitoring lag in bytes only.</strong> Bytes behind does not translate to seconds behind. Track both.</p><p><strong>Using replicas for locking or counters.</strong> Anything read-then-write must go to the primary, or two clients read the same stale value.</p>
                 </div>
             </div>

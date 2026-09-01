@@ -285,9 +285,12 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Design a cache with O(1) get and put that evicts the least recently used entry.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-run-it">Run it</h3>
+                    <h3>The requirement</h3>
+                    <p>A cache holding at most <code>capacity</code> items, evicting the least recently used when full, with <strong>O(1)</strong> <code>get</code> and <code>put</code>.</p><p>That complexity requirement is what makes it a design question rather than a coding exercise. Two operations must both be constant time:</p><p><strong>Find an item by key</strong> &mdash; a hash table. <strong>Reorder items by recency, and remove the oldest</strong> &mdash; a doubly linked list.</p><p>Neither structure alone suffices. A hash table has no order; a linked list has no lookup. The answer is to use both, with the hash table storing <em>pointers into</em> the list.</p><div class="vz-table-wrap"><table><thead><tr><th>Structure alone</th><th>Problem</th></tr></thead><tbody><tr><td>Dict only</td><td>No order &mdash; finding the oldest is O(n)</td></tr><tr><td>List only</td><td>No lookup &mdash; finding a key is O(n)</td></tr><tr><td>Sorted structure</td><td>Reordering is O(log n), not O(1)</td></tr><tr><td>Dict + doubly linked list</td><td><strong>Both O(1)</strong></td></tr></tbody></table></div>
+                </div>
+                <div>
+                    <h3>Run it</h3>
                     <p>The from-scratch version with sentinel nodes, the <code>OrderedDict</code> version, and both run through the same sequence of operations so their answers can be compared.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src">from collections import OrderedDict
 
 ops = [("put", "a", 1), ("put", "b", 2), ("get", "a", None),
@@ -371,7 +374,7 @@ c.put("a",1); c.put("b",2); c.get("a"); c.put("c",3)
 print("OrderedDict  -> a:", c.get("a"), "b:", c.get("b"), "(evicted)")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>2</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-implementation">The implementation</h3>
+                    <h3>The implementation</h3>
                     <div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src">class Node:
     __slots__ = ("key", "value", "prev", "next")
     def __init__(self, key=None, value=None):
@@ -428,19 +431,19 @@ print("get 2  :", c.get(2), "<- evicted")
 print("get 3  :", c.get(3))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>3</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><p>The line to point at is <code>del self.map[lru.key]</code>. Evicting from the list without removing from the dictionary leaves a dangling entry, and the cache reports hits for items it has discarded. That is why the node stores its own key &mdash; the list gives you the node, and you need the key to clean up the map.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-one-structure-is-not-enough">Why one structure is not enough</h3>
+                    <h3>Why one structure is not enough</h3>
                     <p>A dictionary gives O(1) lookup and knows nothing about order. A list keeps order and needs O(n) to find and remove an arbitrary element. The requirement is both at once, so you carry both.</p><p>The join between them is the important part: the map's value is not the cached value, it is the <em>node</em> in the linked list. That is what lets you go from a key straight to its position and unlink it without walking anything.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-the-list-must-be-doubly-linked">Why the list must be doubly linked</h3>
+                    <h3>Why the list must be doubly linked</h3>
                     <p>To move a node to the front on access, it must be unlinked from its current position &mdash; which requires knowing its <em>predecessor</em>.</p><p>In a singly linked list, finding the predecessor means walking from the head: O(n). A doubly linked list stores <code>prev</code>, so unlinking is four pointer assignments and O(1).</p><p>That is the specific reason for the "doubly" in the answer, and being able to say it is what distinguishes understanding from recall.</p><p>The other implementation detail worth building in from the start is <strong>sentinel nodes</strong> &mdash; a dummy head and tail. They remove every special case for inserting at the front, removing from the back, and handling an empty list, which is where a hand-rolled version usually breaks.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-python-answer">The Python answer</h3>
+                    <h3>The Python answer</h3>
                     <p><code>collections.OrderedDict</code> is exactly a dict plus a doubly linked list, and it exposes <code>move_to_end</code> and <code>popitem(last=False)</code>. That is the version to write in real code, and the ten-line implementation is a fine answer if you can also explain what it is doing underneath.</p><p>Say which one the interviewer wants. "Implement it from scratch" means the nodes; "use it" means <code>OrderedDict</code>, or <code>functools.lru_cache</code> if it is memoisation rather than a cache you control.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-python-shortcut">The Python shortcut</h3>
+                    <h3>The Python shortcut</h3>
                     <p><code>OrderedDict</code> maintains insertion order with O(1) reordering, which collapses the whole implementation:</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="" data-vz-label="Python"><script type="text/plain" class="py-src">from collections import OrderedDict
 
 class LRUCache:
@@ -469,19 +472,19 @@ print("get 2  :", c.get(2), "<- evicted")
 print("get 3  :", c.get(3))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>4</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><p><code>move_to_end</code> and <code>popitem(last=False)</code> are both O(1), because <code>OrderedDict</code> is itself a dict plus a doubly linked list &mdash; the same design, provided by the standard library.</p><p>In an interview, <strong>write the manual version</strong> unless told otherwise; the question is about the data structure choice. Mentioning <code>OrderedDict</code> afterwards shows you know the library, and mentioning <code>functools.lru_cache</code> &mdash; which is a C implementation of this for function memoisation &mdash; shows you know where it is already used.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-eviction-policies">Eviction policies</h3>
+                    <h3>Eviction policies</h3>
                     <p>LRU is one choice among several, and knowing the alternatives is a common follow-up.</p><div class="vz-table-wrap"><table><thead><tr><th>Policy</th><th>Evicts</th><th>Good when</th></tr></thead><tbody><tr><td>LRU</td><td>Least recently used</td><td>Recent access predicts future access</td></tr><tr><td>LFU</td><td>Least frequently used</td><td>Some items are persistently popular</td></tr><tr><td>FIFO</td><td>Oldest inserted</td><td>Simple; access does not matter</td></tr><tr><td>MRU</td><td>Most recently used</td><td>Sequential scans that will not revisit</td></tr><tr><td>Random</td><td>An arbitrary item</td><td>Cheap, and surprisingly competitive</td></tr><tr><td>TTL</td><td>Anything expired</td><td>Freshness matters more than recency</td></tr><tr><td>ARC / 2Q</td><td>Adaptive between recency and frequency</td><td>Mixed workloads</td></tr></tbody></table></div><p><strong>LRU's weakness</strong> is a sequential scan larger than the cache: it evicts everything useful while caching items that will never be read again. That is the case LFU and the adaptive policies exist to handle, and databases use variants of 2Q or ARC for exactly this reason.</p><p><strong>LFU's weakness</strong> is the mirror image: an item popular once stays cached forever unless counts decay.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-making-it-production-ready">Making it production-ready</h3>
+                    <h3>Making it production-ready</h3>
                     <p>An interview answer stops at the data structure. The follow-up questions usually go here:</p><p><strong>Thread safety.</strong> Every operation mutates both structures, so concurrent access needs a lock &mdash; and a single lock makes the cache a contention point. Sharding by key hash into several independently-locked caches is the standard fix.</p><p><strong>Memory limits by size, not count.</strong> Real caches bound total bytes, so each entry carries a size and eviction continues until the total fits.</p><p><strong>TTL alongside LRU.</strong> Entries expire on time as well as on pressure, which usually means a lazy check on access plus a background sweep.</p><p><strong>Metrics.</strong> Hit rate is the number that justifies the cache's existence, and eviction rate indicates whether it is too small.</p><p><strong>Distributed caching.</strong> Once there are several machines, consistent hashing decides which node owns a key, and invalidation becomes the hard problem.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Why not a singly linked list?</strong> Unlinking a node needs its predecessor, which costs O(n) to find without a <code>prev</code> pointer.</p><p><strong>Why store the key in the node?</strong> Eviction finds the node from the list and must delete the corresponding dictionary entry.</p><p><strong>Is <code>OrderedDict</code> acceptable in an interview?</strong> Mention it, and write the manual version &mdash; the question is about the design.</p><p><strong>What is <code>functools.lru_cache</code>?</strong> A C implementation of exactly this, for memoising function calls. Keyed on the arguments, which must be hashable.</p><p><strong>How do sentinels help?</strong> They remove the empty-list and first/last-element special cases that cause most pointer bugs.</p><p><strong>When is LRU the wrong policy?</strong> Sequential scans larger than the cache, where it evicts everything useful. LFU or an adaptive policy handles that.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>Hash table for O(1) lookup, doubly linked list for O(1) reordering and eviction &mdash; neither works alone.</li><li>The list must be doubly linked because unlinking a node requires its predecessor.</li><li>Use sentinel head and tail nodes to eliminate boundary special cases.</li><li>On eviction, remove from <em>both</em> the list and the dictionary &mdash; hence storing the key in the node.</li><li><code>OrderedDict</code> and <code>functools.lru_cache</code> are the library versions of the same design.</li></ul>
                 </div>
             </div>
