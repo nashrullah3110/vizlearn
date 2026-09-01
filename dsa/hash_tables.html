@@ -497,47 +497,47 @@
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
                 <div>
-                    <h3 id="vz-s-quick-context">Quick Context</h3>
+                    <h3>Quick Context</h3>
                     <p>A <strong>hash table</strong> stores key&ndash;value pairs in an array. A <strong>hash function</strong> converts each key into an array index, so finding a key requires no searching at all &mdash; you compute where it must be and go straight there.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-makes-a-good-hash-function">What Makes a Good Hash Function</h3>
+                    <h3>What Makes a Good Hash Function</h3>
                     <ul><li><strong>Deterministic</strong> &mdash; the same key must always give the same index, or you could never find anything again.</li><li><strong>Uniform</strong> &mdash; keys should spread evenly across buckets. A function that sends everything to bucket 0 turns your O(1) table into an O(n) list.</li><li><strong>Fast</strong> &mdash; it runs on every single operation, so it must be cheaper than the search it replaces.</li></ul><p>The lab uses a simple polynomial rolling hash, shown live above the buckets. Real implementations use stronger functions, but the mechanism is identical.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-collisions-are-inevitable">Collisions Are Inevitable</h3>
+                    <h3>Collisions Are Inevitable</h3>
                     <p>There are infinitely many possible keys and only a finite number of buckets, so two keys <em>will</em> eventually hash to the same index. This is not a flaw to be engineered away &mdash; it is a certainty to be handled. Press <strong>Force collision</strong> to see one.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-two-ways-to-resolve-them">Two Ways to Resolve Them</h3>
+                    <h3>Two Ways to Resolve Them</h3>
                     <ul><li><strong>Separate chaining</strong> &mdash; each bucket holds a small list. Colliding keys simply join the list. Simple, degrades gracefully, but costs extra memory for the pointers and loses cache locality.</li><li><strong>Open addressing</strong> &mdash; on a collision, probe forward to the next free slot. Everything stays in one contiguous array, which is cache-friendly and faster in practice &mdash; but deletion becomes awkward (you need tombstones) and performance collapses as the table fills.</li></ul><p>Switch between the two with the same keys and watch where the colliding entries end up.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-load-factor-and-resizing">Load factor and resizing</h3>
+                    <h3>Load factor and resizing</h3>
                     <p>The <strong>load factor</strong> is entries divided by slots. As it rises, collisions become more frequent and operations slow down.</p><p>So hash tables <strong>resize</strong>: when the load factor crosses a threshold (0.66 in CPython, 0.75 in Java), a larger table is allocated and every entry is rehashed into it.</p><p>That resize is O(n), which means an individual insertion can be expensive. Averaged over many insertions it is O(1) &mdash; this is what <strong>amortised</strong> constant time means, and it is the same mechanism behind Python list append.</p><p>The practical consequence: if you know roughly how many entries you will store, pre-sizing avoids repeated rehashing. In Python that is rarely exposed; in other languages the constructor takes a capacity.</p><p>The worst case remains O(n) per operation, when every key collides. That requires either a terrible hash function or adversarially chosen keys &mdash; which was a real denial-of-service vector until languages began randomising their hash seeds per process. That is why Python's string hashes differ between runs unless <code>PYTHONHASHSEED</code> is fixed.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-why-this-matters-to-you">Why This Matters to You</h3>
+                    <h3>Why This Matters to You</h3>
                     <p>Python's <span class="mono-font">dict</span>, JavaScript's <span class="mono-font">Map</span> and object, Java's <span class="mono-font">HashMap</span>, Go's <span class="mono-font">map</span> &mdash; all hash tables. When someone says "just use a dictionary for O(1) lookup", this is the machinery they are invoking. It is also why dictionary keys must be <em>hashable</em> and immutable: mutating a key after insertion changes its hash, and the entry becomes permanently unreachable.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-turning-a-key-into-an-address">Turning a key into an address</h3>
+                    <h3>Turning a key into an address</h3>
                     <p>A hash table stores key-value pairs and finds any of them in roughly constant time, whatever the size.</p><p>The mechanism: a <strong>hash function</strong> converts the key into an integer, that integer is reduced modulo the table size to give an index, and the pair is stored there.</p><p class="mono-font">"apple" &rarr; hash() &rarr; 1839274 &rarr; % 16 &rarr; slot 10</p><p>Lookup does the same computation and goes straight to slot 10. No scanning, no comparison against other keys &mdash; one calculation and one memory access.</p><p>That is the whole idea, and it is why dictionaries are the workhorse of practical programming:</p><div class="vz-table-wrap"><table><thead><tr><th>Operation</th><th>Hash table</th><th>Sorted array</th><th>Linked list</th></tr></thead><tbody><tr><td>Lookup</td><td>O(1)</td><td>O(log n)</td><td>O(n)</td></tr><tr><td>Insert</td><td>O(1)</td><td>O(n)</td><td>O(1)</td></tr><tr><td>Delete</td><td>O(1)</td><td>O(n)</td><td>O(n) to find</td></tr><tr><td>Ordered traversal</td><td>Insertion order</td><td>Sorted</td><td>Insertion order</td></tr></tbody></table></div><p>The trade is that nothing is sorted. If you need range queries or ordered iteration by key, a tree structure is the right choice.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-collisions-and-the-two-ways-to-handle-them">Collisions, and the two ways to handle them</h3>
+                    <h3>Collisions, and the two ways to handle them</h3>
                     <p>Two different keys can hash to the same slot. With 16 slots and 10 keys, collisions are not unlikely &mdash; they are near-certain, by the same reasoning as the birthday problem.</p><p><strong>Chaining</strong> stores a list at each slot. Colliding keys are appended, and lookup walks the short list comparing keys. Simple, and it degrades gracefully.</p><p><strong>Open addressing</strong> stores everything in the table itself: on collision, probe for the next free slot by a defined rule. Better cache behaviour, and deletion is awkward &mdash; a removed entry must leave a tombstone, or probe sequences break.</p><div class="vz-table-wrap"><table><thead><tr><th>&nbsp;</th><th>Chaining</th><th>Open addressing</th></tr></thead><tbody><tr><td>Extra memory</td><td>Pointers per entry</td><td>None</td></tr><tr><td>Cache behaviour</td><td>Poorer &mdash; pointer chasing</td><td>Better &mdash; contiguous</td></tr><tr><td>Deletion</td><td>Straightforward</td><td>Needs tombstones</td></tr><tr><td>Behaviour when full</td><td>Degrades gradually</td><td>Degrades sharply</td></tr></tbody></table></div><p>Python's <code>dict</code> uses open addressing with a randomised probe sequence. Java's <code>HashMap</code> uses chaining, switching a long chain to a tree above a threshold to bound the worst case.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-experiments-to-try">Experiments to try</h3>
-                    <ol><li><strong>Insert a few keys</strong> and watch each one compute its own index &mdash; no searching involved at any point.</li><li><strong>Press Force collision.</strong> Two keys land in the same bucket; the strategy selector decides what happens next.<button class="vz-run" type="button" data-vz-run="0" aria-label="Run this experiment in the visualisation: Press Force collision"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li><li><strong>Switch to open addressing</strong> with a collision present. The second key moves to the next free slot rather than sharing.</li><li><strong>Reduce the bucket count to 4</strong> and keep inserting. The load factor rises, collisions multiply, and lookups start needing several probes.</li><li><strong>Look up a key after several collisions.</strong> The probe count is exactly how far O(1) has drifted toward O(n).<button class="vz-run" type="button" data-vz-run="1" aria-label="Run this experiment in the visualisation: Look up a key after several collisions"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg><span>Run this</span></button></li></ol>
+                    <h3>Experiments to try</h3>
+                    <ol><li><strong>Insert a few keys</strong> and watch each one compute its own index &mdash; no searching involved at any point.</li><li><strong>Press Force collision.</strong> Two keys land in the same bucket; the strategy selector decides what happens next.</li><li><strong>Switch to open addressing</strong> with a collision present. The second key moves to the next free slot rather than sharing.</li><li><strong>Reduce the bucket count to 4</strong> and keep inserting. The load factor rises, collisions multiply, and lookups start needing several probes.</li><li><strong>Look up a key after several collisions.</strong> The probe count is exactly how far O(1) has drifted toward O(n).</li></ol>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-to-remember">What to remember</h3>
+                    <h3>What to remember</h3>
                     <p>Hashing replaces searching with computing an address. Collisions are unavoidable and must be resolved by chaining or probing; the load factor governs how often they happen. Keep it low and lookups stay effectively constant &mdash; let it climb and a hash table quietly becomes a linked list.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-makes-a-valid-key">What makes a valid key</h3>
+                    <h3>What makes a valid key</h3>
                     <p>A key must be <strong>hashable</strong>, which means two things: it has a hash value that never changes, and it can be compared for equality.</p><p>That is why mutable types cannot be keys:</p><pre><code class="language-python">d = {}
 d[(1, 2)] = &quot;ok&quot;          # tuple - immutable, hashable
 d[[1, 2]] = &quot;error&quot;       # TypeError: unhashable type: &#x27;list&#x27;</code></pre><p>If a list could be a key, mutating it after insertion would change its hash, and the entry would become unreachable &mdash; stored in a slot the new hash does not point to.</p><p>The contract between hashing and equality has two rules, and breaking the first causes genuinely confusing bugs:</p><p><strong>Equal objects must have equal hashes.</strong> Otherwise two objects that compare equal land in different slots and both exist in the table.</p><p><strong>Unequal objects may share a hash.</strong> That is just a collision, handled normally.</p><p>For a custom class, implement both together:</p><pre><code class="language-python">class Point:
@@ -551,7 +551,7 @@ d[[1, 2]] = &quot;error&quot;       # TypeError: unhashable type: &#x27;list&#x2
         return hash((self.x, self.y))     # hash the same fields as __eq__</code></pre><p>Defining <code>__eq__</code> without <code>__hash__</code> makes the class unhashable in Python 3 &mdash; a deliberate safeguard against exactly this inconsistency.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-hash-tables-show-up">Where hash tables show up</h3>
+                    <h3>Where hash tables show up</h3>
                     <ul><li><strong>Dictionaries and sets</strong> in every modern language.</li><li><strong>Caches and memoisation</strong> &mdash; a dictionary from arguments to results.</li><li><strong>Deduplication</strong> &mdash; <code>set(items)</code> in one pass.</li><li><strong>Counting and grouping</strong> &mdash; <code>Counter</code>, <code>defaultdict(list)</code>.</li><li><strong>Database indexes</strong> for equality lookups (though B-trees dominate, because they also support ranges).</li><li><strong>Symbol tables</strong> in compilers and interpreters &mdash; the objects in a Python program are themselves stored in dictionaries.</li></ul><p>The pattern that matters most in everyday code:</p><pre><code class="language-python"># O(n^2): for each order, scan every customer
 for order in orders:
     for c in customers:
@@ -563,11 +563,11 @@ for order in orders:
     c = by_id[order.customer_id]</code></pre><p>Building a dictionary to replace a repeated scan is the most common and most effective optimisation available in ordinary code.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Why is lookup O(1) if collisions exist?</strong> Because with a good hash function and a bounded load factor, the expected chain length is a small constant. The worst case is O(n) and is not encountered in practice.</p><p><strong>Are Python dictionaries ordered?</strong> They preserve insertion order, guaranteed since 3.7. That is not the same as sorted.</p><p><strong>Why can a list not be a dictionary key?</strong> Mutating it would change its hash and orphan the entry. Use a tuple.</p><p><strong>How much memory does a dictionary use?</strong> More than a list of the same values &mdash; it stores hashes and keeps spare slots. Lookup speed is what you are buying.</p><p><strong>What is hash randomisation?</strong> Per-process randomisation of string hashes, added to prevent denial-of-service attacks that deliberately collide keys.</p><p><strong>When should I not use a hash table?</strong> When you need sorted order, range queries, or a nearest-key lookup. Use a tree.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>A hash function maps a key to a slot, so lookup is one computation and one access.</li><li>Collisions are inevitable and are handled by chaining or open addressing.</li><li>Load factor drives resizing, which is O(n) occasionally and O(1) amortised.</li><li>Keys must be immutable, and <code>__eq__</code> and <code>__hash__</code> must agree.</li><li>Replacing a repeated scan with a pre-built dictionary is the standard way to turn quadratic code linear.</li></ul>
                 </div>
             </div>

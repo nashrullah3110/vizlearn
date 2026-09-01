@@ -231,25 +231,28 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The layer that turns discrete symbols into vectors, and the optimisation that makes it practical.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-matmul-that-is-a-lookup">The matmul that is a lookup</h3>
+                    <h3>The problem</h3>
+                    <p>Neural networks consume numbers. A word, a user id or a product code is a symbol, and there is no meaningful number to assign it &mdash; encoding "cat" as 7 and "dog" as 8 would tell the network they are adjacent, which is a claim nobody made.</p><p><strong>One-hot encoding</strong> avoids that: a vector of zeros with a single 1 at the token's index. No false ordering, and no useful structure either. Every pair of tokens is equally distant, and the vector is as long as the vocabulary.</p><p>An <strong>embedding layer</strong> maps each token to a dense learned vector instead. The vector has a few hundred dimensions rather than fifty thousand, and its contents are parameters, so training can put similar tokens near each other.</p>
+                </div>
+                <div>
+                    <h3>The matmul that is a lookup</h3>
                     <p>The formal definition is a one-hot vector multiplied by a weight matrix. Write it out and the reason nobody does it becomes obvious: multiplying a vector that is all zeros except one position by a matrix selects a single row and multiplies everything else by zero.</p><p>The readout does the arithmetic. At a 50,000-token vocabulary and 512 dimensions, the honest matmul touches <strong>25.6 million</strong> numbers to retrieve <strong>512</strong> of them.</p><p>So every framework implements the layer as an indexing operation. <code>nn.Embedding</code> in PyTorch and <code>tf.keras.layers.Embedding</code> are table lookups with a backward pass that scatters gradients to the rows that were used.</p><p>That is also why only the rows appearing in a batch receive a gradient. An embedding table is a very large parameter tensor that is almost entirely idle on any given step, which has consequences for optimisers keeping per-parameter state and for anyone writing distributed training.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-table-is-the-model-mostly">The table is the model, mostly</h3>
+                    <h3>The table is the model, mostly</h3>
                     <p>Drag the vocabulary and dimension controls and watch the count. The table alone is <code>vocab * dim</code> parameters, and for large vocabularies that is a substantial fraction of the entire model &mdash; often more than any other single layer.</p><p>Two standard responses:</p><p><strong>Weight tying.</strong> In a language model the output layer also has one row per token. Sharing it with the input embedding halves the cost and usually improves quality, since both are learning what tokens mean.</p><p><strong>Subword tokenisation.</strong> [Byte-pair encoding](../gen_ai/byte_pair_encoding_tokenizer.html) keeps the vocabulary in the tens of thousands rather than the millions a word-level vocabulary would need, and removes the out-of-vocabulary problem entirely.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-the-vectors-learn">What the vectors learn</h3>
+                    <h3>What the vectors learn</h3>
                     <p>Nothing is imposed on the geometry. The rows start random and become whatever minimises the loss, and the useful structure is a consequence rather than a design.</p><p>Word2vec's famous arithmetic &mdash; king minus man plus woman &mdash; is that consequence showing. Nobody built the analogy in; it fell out of a training objective about predicting neighbouring words.</p><p>Which also means the structure reflects the training data, including its biases. Embeddings trained on a corpus inherit that corpus's associations, and a great deal of fairness work in NLP is about that fact.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-beyond-words">Beyond words</h3>
+                    <h3>Beyond words</h3>
                     <p><strong>Categorical features</strong> in tabular models. A user id, a postcode, a product category &mdash; all embed, and this is why neural networks became competitive on tabular data with high-cardinality categories.</p><p><strong>Positional embeddings</strong> in transformers, which embed a position rather than a symbol.</p><p><strong>Recommendation.</strong> Users and items each get a table, and their dot product is a predicted affinity. Matrix factorisation is exactly this.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Implementing the one-hot matmul literally.</strong> Correct, and enormously wasteful.</p><p><strong>Choosing the dimension by feel.</strong> A rule of thumb is the fourth root of the vocabulary size, and it is worth tuning.</p><p><strong>Forgetting an out-of-vocabulary row.</strong> Something has to handle unseen tokens; subword tokenisation avoids the question.</p><p><strong>Reading similarity as meaning.</strong> Embedding proximity reflects co-occurrence in the training data, which is not the same thing.</p>
                 </div>
             </div>

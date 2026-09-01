@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Random Forests | VizLearn</title>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZT6JM33V5J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-ZT6JM33V5J');
+    </script>
+    <!-- The font stylesheet is render-blocking and lives on another origin, so
+         the browser cannot paint until it has done DNS, TCP and TLS for two
+         hosts it has not met. Warming both connections while the HTML is still
+         parsing takes that off the critical path. gstatic serves the font
+         files themselves and is fetched anonymously, hence crossorigin. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        (function(){
+            const apply = (t)=>{
+                if(t==='light') document.body.classList.add('light-mode');
+                else document.body.classList.remove('light-mode');
+            };
+            const t = localStorage.getItem('theme') || 'light';
+            if(document.body) apply(t); else document.addEventListener('DOMContentLoaded', ()=>apply(t));
+        })();
+    </script>
+    <style>
+                .py-note {
+            border-left: 2px solid var(--border-subtle);
+            padding-left: 0.9rem;
+            line-height: 1.7;
+        }
+        .py-note code { color: var(--accent-primary); }
+        .vz-pt-lead { margin-top: 0.5rem; max-width: 60ch; color: var(--text-muted); }
+
+        /* A step is numbered so the sequence reads as a sequence rather than
+           as six unrelated demos. */
+        .vz-step-head { display: flex; align-items: baseline; gap: 0.6rem; }
+        .vz-step-n {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+            font-weight: 700; color: var(--accent-primary);
+            border: 1px solid var(--border-subtle); border-radius: 5px;
+            padding: 0.1rem 0.4rem; flex: none;
+        }
+        .vz-step-blurb {
+            margin: 0.55rem 0 0.9rem; line-height: 1.7;
+            color: var(--text-muted); max-width: 68ch;
+        }
+        .vz-step-blurb code {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.85em;
+            color: var(--accent-primary);
+        }
+
+        /* The walkthrough now lives inside the article, so the notes card is
+           the only thing left up here. */
+        .vz-notes-wrap { max-width: 1100px; margin: 0 auto; }
+
+        /* An inline editor is part of the prose, not a card floating beside
+           it: full reading width, its own breathing room, and the same
+           border language as the article's static code blocks. */
+        .vz-py-inline {
+            margin: 1.4rem 0;
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .vz-py-inline .vz-code { border: 0; border-radius: 0; }
+        .vz-py-inline .py-controls {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 0.7rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .vz-py-inline .vz-console { border-top: 1px solid var(--border-subtle); }
+        .vz-py-inline .py-output { min-height: 0; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen light-mode">
+<!-- Light is the default, so it ships on the tag: the theme script runs at the
+     bottom of the body, and waiting for it would flash dark on every load.
+     This removes the class before any content is parsed for readers who chose
+     dark, so neither theme flashes the other. -->
+<script>if(localStorage.getItem("theme")==="dark")document.body.classList.remove("light-mode");</script>
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-50">
+        <div class="flex justify-center py-3 px-4 md:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-3 md:gap-4">
+                <a href="../index.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                    <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
+                    <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
+                </a>
+
+                <div class="search-input-wrapper rounded-full flex items-center w-full max-w-md px-4 py-2.5 mx-auto md:mx-0">
+                    <svg class="vz-icon text-sm" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/></svg>
+                    <input type="text" id="appSearchInput" aria-label="Search all articles" placeholder="Search all articles..." class="bg-transparent text-sm focus:outline-none ml-3 w-full font-sans tracking-wide">
+                    <div id="searchDropdown" class="search-dropdown"></div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="../index.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)" aria-label="Back to Home">
+                        <svg class="vz-icon text-xs" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.2 288 416 288c17.7 0 32-14.3 32-32s-14.3-32-32-32l-306.7 0L214.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg>
+                    </a>
+                    <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
+                        <svg class="vz-icon hidden dark-icon" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M361.5 1.2c5 2.1 8.6 6.6 9.6 11.9L391 121l107.9 19.8c5.3 1 9.8 4.6 11.9 9.6s1.5 10.7-1.6 15.2L446.9 256l62.3 90.3c3.1 4.5 3.7 10.2 1.6 15.2s-6.6 8.6-11.9 9.6L391 391 371.1 498.9c-1 5.3-4.6 9.8-9.6 11.9s-10.7 1.5-15.2-1.6L256 446.9l-90.3 62.3c-4.5 3.1-10.2 3.7-15.2 1.6s-8.6-6.6-9.6-11.9L121 391 13.1 371.1c-5.3-1-9.8-4.6-11.9-9.6s-1.5-10.7 1.6-15.2L65.1 256 2.8 165.7c-3.1-4.5-3.7-10.2-1.6-15.2s6.6-8.6 11.9-9.6L121 121 140.9 13.1c1-5.3 4.6-9.8 9.6-11.9s10.7-1.5 15.2 1.6L256 65.1 346.3 2.8c4.5-3.1 10.2-3.7 15.2-1.6zM160 256a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zm224 0a128 128 0 1 0 -256 0 128 128 0 1 0 256 0z"/></svg>
+                        <svg class="vz-icon hidden light-icon" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M223.5 32C100 32 0 132.3 0 256S100 480 223.5 480c60.6 0 115.5-24.2 155.8-63.4c5-4.9 6.3-12.5 3.1-18.7s-10.1-9.7-17-8.5c-9.8 1.7-19.8 2.6-30.1 2.6c-96.9 0-175.5-78.8-175.5-176c0-65.8 36-123.1 89.3-153.3c6.1-3.5 9.2-10.5 7.7-17.3s-7.3-11.9-14.3-12.5c-6.3-.5-12.6-.8-19-.8z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+        <div class="mb-8 animate-fade-in">
+            <nav class="flex flex-wrap items-center gap-2 text-sm mono-font mb-2" style="color: var(--text-muted)" aria-label="Breadcrumb"><a href="../index.html" class="hover:text-green-400 transition-colors">Home</a><span aria-hidden="true">/</span><a href="../sklearn/" class="hover:text-green-400 transition-colors">scikit-learn</a><span aria-hidden="true">/</span><span aria-current="page">Models</span></nav>
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Random Forests</h1>
+            <p class="vz-pt-lead">Many unstable trees, deliberately made to disagree, averaged into something stable - and the strongest default on tabular data.</p>
+        </div>
+        <div class="animate-fade-in" data-vz-viz>
+            <div class="vz-notes-wrap">
+                <div class="card-container">
+                    <div class="card-header"><h3 class="font-bold text-sm uppercase tracking-wide" style="color: var(--text-muted)">Worth knowing</h3></div>
+                    <div class="p-5 space-y-4 text-sm" style="color: var(--text-muted)">
+                        <div class="py-note">Each tree is fitted on a <strong>bootstrap sample</strong> and picks each split from a <strong>random subset of features</strong> - two sources of disagreement, deliberately introduced.</div>
+                        <div class="py-note">Averaging cancels errors that are independent, so the more the trees differ, the more the averaging buys.</div>
+                        <div class="py-note"><code class='mono-font'>n_estimators</code> cannot overfit; more trees only cost time.</div>
+                        <div class="py-note"><code class='mono-font'>oob_score=True</code> gives an estimate from the rows each tree did not see, for the price of a single fit.</div>
+                        <div class="py-note"><code class='mono-font'>feature_importances_</code> is biased towards high-cardinality columns - <code class='mono-font'>permutation_importance</code> answers the question people mean.</div>
+                        <div class="py-note">It inherits the tree's inability to extrapolate: predictions past the training range are flat.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <!-- auto-article-vizlearn -->
+    <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full" data-vz-prose>
+        <div class="card-container animate-fade-in">
+<!-- VIZLEARN:ARTICLE:BEGIN (generated by tools/build_articles.py) -->
+            <div class="card-header">
+                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">Random Forests: A Practical Guide</h2>
+                <p class="mt-2 text-sm" style="color: var(--text-muted)">The previous module ended with a model that changes its mind when you resample the data. This one fixes that by building hundreds of them and taking a vote.</p>
+            </div>
+            <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
+                <div>
+                    <h3>The idea</h3>
+                    <p>A single decision tree is unstable: the greedy choice at each node is decided by a handful of rows, and a different sample produces a different tree. That instability is variance, and variance is error.</p><p>Averaging independent estimates reduces variance. If the trees made *identical* errors, averaging would achieve nothing; if their errors are partly independent, the errors cancel and the signal survives. So the whole design problem is making the trees disagree.</p><p>A random forest introduces disagreement twice.</p><p><strong>Bootstrap sampling.</strong> Each tree is fitted on a sample of the training rows drawn with replacement, the same size as the original. About 63% of the rows appear in any given sample, so each tree sees a different subset.</p><p><strong>Random feature subsets.</strong> At every split, the tree considers only a random subset of the features rather than all of them. This is the more important of the two, and it is what distinguishes a random forest from plain bagging.</p><p>The second matters because bootstrapping alone leaves the trees too similar. If one feature is strongly predictive, every tree splits on it first and the trees end up nearly identical. Restricting the choice forces different trees down different paths, which is exactly the independence the averaging needs.</p>
+                </div>
+                <div>
+                    <h3>More accurate, and far more stable</h3>
+                    <p>The accuracy gain is modest. The stability gain is the real one, and it has to be measured across refits rather than across folds.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+X, y = make_classification(n_samples=600, n_features=20, n_informative=6,
+                           random_state=0)
+
+print("accuracy:")
+print("  one tree :", round(cross_val_score(DecisionTreeClassifier(random_state=0),
+                                            X, y, cv=5).mean(), 4))
+print("  a forest :", round(cross_val_score(RandomForestClassifier(random_state=0),
+                                            X, y, cv=5).mean(), 4))
+
+# The variance that averaging removes is in the predictions, not in the
+# fold scores - so measure it by refitting on resampled data.
+rng = np.random.RandomState(0)
+for label, make in [("one tree", lambda: DecisionTreeClassifier(random_state=0)),
+                    ("a forest", lambda: RandomForestClassifier(n_estimators=50,
+                                                                random_state=0))]:
+    preds = []
+    for _ in range(5):
+        idx = rng.choice(len(X), len(X), replace=True)
+        preds.append(make().fit(X[idx], y[idx]).predict(X[:60]))
+    disagree = sum(len(set(col)) > 1 for col in zip(*preds))
+    print("%-10s disagrees with itself on %2d of 60 rows across refits"
+          % (label, disagree))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>n_estimators is the one free parameter</h3>
+                    <p>Raising it cannot overfit. It only costs time.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import cross_val_score
+
+X, y = make_classification(n_samples=500, n_features=20, n_informative=5,
+                           random_state=0)
+
+print("n_estimators   accuracy")
+for n in (1, 5, 25, 100, 300):
+    s = cross_val_score(RandomForestClassifier(n_estimators=n, random_state=0),
+                        X, y, cv=5).mean()
+    print("%12d   %.4f" % (n, s))
+print()
+print("one tree is much worse; after about 25 the differences are")
+print("fold noise. more trees costs time and does not overfit -")
+print("it is the one parameter you can raise without a trade.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_02.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Two importances, one of them misleading</h3>
+                    <p>A pure-noise column with many distinct values, and the built-in measure gives it more credit than the other noise column.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.ensemble import RandomForestClassifier
+from sklearn.inspection import permutation_importance
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+rng = np.random.RandomState(0)
+n = 500
+signal = rng.normal(size=n)
+X = np.column_stack([
+    signal,                              # genuinely useful
+    rng.normal(size=n),                  # noise
+    rng.randint(0, 400, size=n),         # noise, many distinct values
+])
+y = (signal > 0).astype(int)
+
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3, random_state=0)
+rf = RandomForestClassifier(random_state=0).fit(X_tr, y_tr)
+
+names = ["signal", "noise", "noise_many_values"]
+perm = permutation_importance(rf, X_te, y_te, n_repeats=10, random_state=0)
+print("%-20s %10s %12s" % ("", "impurity", "permutation"))
+for i, nm in enumerate(names):
+    print("%-20s %10.4f %12.4f"
+          % (nm, rf.feature_importances_[i], perm.importances_mean[i]))
+print()
+print("impurity gives both noise columns a score, and more to the one")
+print("with more distinct values. permutation gives both exactly zero.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_03.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>A free estimate, without a second fit</h3>
+                    <p>Each tree misses about a third of the rows, so those rows can score it.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import cross_val_score
+
+X, y = make_classification(n_samples=600, n_features=20, n_informative=6,
+                           random_state=0)
+
+rf = RandomForestClassifier(n_estimators=200, oob_score=True,
+                            random_state=0).fit(X, y)
+
+print("out-of-bag score      :", round(rf.oob_score_, 4))
+print("5-fold cross-validated:",
+      round(cross_val_score(RandomForestClassifier(n_estimators=200,
+                                                   random_state=0),
+                            X, y, cv=5).mean(), 4))
+print()
+print("each tree is scored on the rows its bootstrap sample left out,")
+print("which gives an estimate for the cost of a single fit.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_04.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>max_features is the decorrelation dial</h3>
+                    <p>Letting every tree see every feature makes them agree, and agreement is what averaging cannot fix.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import cross_val_score
+
+X, y = make_classification(n_samples=400, n_features=30, n_informative=8,
+                           random_state=0)
+
+print("max_features   accuracy")
+for mf in ("sqrt", 0.5, None):
+    s = cross_val_score(RandomForestClassifier(n_estimators=50, max_features=mf,
+                                               random_state=0), X, y, cv=5).mean()
+    print("%12s   %.4f" % (str(mf), s))
+print()
+print("None means every tree sees every feature, so the trees resemble")
+print("each other more and the averaging buys less.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_05.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>Still cannot extrapolate</h3>
+                    <p>The one limitation the ensemble inherits whole from its trees.</p><div class="vz-py vz-py-inline" data-vz-py data-vz-packages="scikit-learn,pandas" data-vz-label="scikit-learn"><script type="text/plain" class="py-prelude">import warnings
+
+warnings.filterwarnings(
+    "ignore", message="(?s).*Pyarrow will become a required.*")
+
+import numpy
+import sklearn</script><script type="text/plain" class="py-src">from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+import numpy as np
+
+x = np.arange(0, 20).reshape(-1, 1).astype(float)
+y = 3.0 * x.ravel()
+
+rf = RandomForestRegressor(n_estimators=50, random_state=0).fit(x, y)
+lin = LinearRegression().fit(x, y)
+
+future = np.array([[25.0], [40.0]])
+print("truth at x=25, 40 :", [75.0, 120.0])
+print("linear            :", lin.predict(future).round(1).tolist())
+print("random forest     :", rf.predict(future).round(1).tolist())
+print()
+print("averaging many trees does not fix extrapolation - every tree")
+print("is flat past the edge, so the average is too.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_06.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                </div>
+                <div>
+                    <h3>What it buys</h3>
+                    <p>The accuracy improvement is real and usually modest &mdash; 0.79 to 0.83 in the first editor.</p><p>The stability improvement is the larger one, and it has to be measured properly. Fold-to-fold variation in a cross-validation score is *not* it; that measures how much the score depends on which rows were held out, and a forest is not especially better there. What averaging fixes is how much the *model* changes when the training data changes.</p><p>The first editor measures that directly: refitting on five bootstrap resamples, one tree disagrees with itself on 14 of 60 rows, and a fifty-tree forest on 6. That is the variance reduction, and it is why a forest's predictions can be relied on in a way a single tree's cannot.</p>
+                </div>
+                <div>
+                    <h3>The parameters worth setting</h3>
+                    <p><code>n_estimators</code> is unusual: <strong>it cannot overfit</strong>. More trees means a better estimate of the average, which converges rather than degrading. The only cost is time and memory. Something like 100 to 500 is normal, and the editor above shows the curve flattening after about 25 &mdash; past which the differences are fold noise rather than improvement.</p><p>That makes it the one complexity-shaped parameter with no trade-off, which is worth stating because it runs against the pattern of everything else in the track.</p><p><code>max_features</code> controls the decorrelation. <code>"sqrt"</code> is the default for classification and is usually right. Setting it to <code>None</code> gives every tree every feature, and the third editor shows the cost: 0.8500 against 0.8650, because the trees became too alike. Lower values mean more diverse and individually weaker trees, which is often a good trade.</p><p><code>max_depth</code> and <code>min_samples_leaf</code> are inherited from the tree, and a forest needs them far less. Individual trees are allowed to overfit, because their overfitting is uncorrelated and averages out. Leaving them unconstrained is a reasonable default, and constraining them slightly can help on small or very noisy data.</p><p><code>n_jobs=-1</code> fits the trees in parallel across cores. The trees are independent, so this is close to free.</p>
+                </div>
+                <div>
+                    <h3>Out-of-bag scoring</h3>
+                    <p>Because each tree misses about 37% of the rows, those rows can score it &mdash; and averaging that across trees gives a validation estimate without a separate fit.</p><p><code>oob_score=True</code> computes it, and <code>oob_score_</code> holds the result. The editor above gives 0.8683 against a cross-validated 0.8383, which is the usual relationship: OOB tends to run slightly optimistic relative to k-fold, because each OOB prediction comes from the subset of trees that missed that row rather than from a full forest.</p><p>It is genuinely useful when fitting is expensive, since it costs nothing beyond the fit you were doing anyway. It is not a replacement for cross-validation when you are comparing models or tuning, both because of the optimism and because it only exists for bagged ensembles.</p>
+                </div>
+                <div>
+                    <h3>Feature importances, and the trap</h3>
+                    <p><code>feature_importances_</code> is the attribute people reach for, and it has a known bias worth seeing rather than being told about.</p><p>The third editor gives a forest three columns: one carrying the signal, one pure noise, and one pure noise with 400 distinct values. The impurity-based measure gives the signal 0.89 &mdash; correct &mdash; and then gives both noise columns a non-zero score, with <strong>more</strong> going to the one with more distinct values.</p><p>The cause is that a column with many possible thresholds gets many chances to look good on the training data, and impurity importance is computed on the training data. <code>permutation_importance</code>, which measures how much the *test* score drops when a column is shuffled, gives both noise columns exactly 0.0000.</p><p>Two further cautions apply to both measures. Correlated features split the credit arbitrarily, so a genuinely important feature can look weak because a correlated one absorbed it. And importance is not causation &mdash; it says the model used the column, not that the column drives the outcome.</p><p>The practical rule: use permutation importance when the answer matters, on the test set, and treat the built-in attribute as a rough first look.</p>
+                </div>
+                <div>
+                    <h3>What it does not fix</h3>
+                    <p><strong>Extrapolation.</strong> Every tree is flat past the edge of its training range, so the average of many trees is flat too. The last editor asks for x=25 and x=40 on a perfect straight line and gets 55.3 for both. No number of trees changes this, and it disqualifies forests for anything with a trend unless the trend is removed first.</p><p><strong>Readability.</strong> A single shallow tree can be printed and audited. Three hundred trees cannot, and the model becomes a black box that happens to be made of transparent parts.</p><p><strong>Size and speed.</strong> A forest holds every tree, so a model fitted on a large dataset can be hundreds of megabytes, and prediction means traversing every tree.</p><p><strong>Extreme sparsity.</strong> On very high-dimensional sparse data &mdash; text, mostly &mdash; linear models usually win.</p>
+                </div>
+                <div>
+                    <h3>Where it sits</h3>
+                    <p>A random forest is the strongest thing you can fit with essentially no tuning, and that is its main claim. Defaults plus <code>n_estimators=200</code> produces a competitive model on most tabular problems, needing no scaling, no encoding decisions beyond making the columns numeric, and no search.</p><p>Gradient boosting generally beats it given tuning effort, and gradient boosting *needs* that effort &mdash; a badly tuned booster is worse than a default forest. The sensible sequence is a linear model for the baseline, a forest for the strong default, and boosting when the difference is worth the work.</p>
+                </div>
+                <div>
+                    <h3>The rest of the bagging family</h3>
+                    <p>Three near relatives share the design and differ in one choice each, and knowing what separates them saves trying all four blindly.</p><p><code>ExtraTreesClassifier</code> &mdash; extremely randomised trees &mdash; goes further than a forest: rather than searching for the best threshold on each candidate feature, it picks thresholds at random and keeps the best of those. That makes each tree weaker and the trees more different, which sometimes wins and is always faster to fit, since the expensive threshold search disappears. It is worth trying whenever a forest is your best model; it takes one word to swap.</p><p><code>BaggingClassifier</code> is the general form: bootstrap samples and averaging, wrapped around *any* estimator. A forest is bagging plus feature subsetting, specialised to trees. Bagging a linear model achieves almost nothing, because linear models are stable and there is no variance to average away &mdash; which is the clearest statement of when the technique applies at all.</p><p><code>RandomForestRegressor</code> is the same algorithm predicting the mean of each leaf rather than the majority class. Everything on this page transfers, including the extrapolation limit, which bites harder in regression because a flat prediction past the training range is more obviously wrong than a class label.</p><p>The pattern: bagging reduces variance and does nothing for bias. It helps unstable, low-bias models &mdash; deep trees &mdash; and wastes time on stable ones.</p>
+                </div>
+                <div>
+                    <h3>Costs worth knowing before deploying one</h3>
+                    <p>A forest is cheap to fit and expensive to keep.</p><p><strong>Memory.</strong> Every tree is stored in full. A forest of 500 unconstrained trees on a hundred thousand rows can run to hundreds of megabytes, and the pickle is the same size. Constraining <code>max_depth</code> or <code>min_samples_leaf</code> shrinks it substantially at a small accuracy cost, which is often the right trade for something that has to be shipped.</p><p><strong>Prediction latency.</strong> Every prediction traverses every tree. That is fast per tree and adds up: 500 trees is 500 traversals. For batch scoring it is irrelevant; for a request-response service with a latency budget it can decide the design.</p><p><strong>Fitting time</strong> scales with trees times rows times features, and parallelises almost perfectly with <code>n_jobs=-1</code>.</p><p>The lever for all three is the same: fewer, shallower trees. Measuring how much accuracy that actually costs, rather than assuming, usually shows the curve is flat well below the default.</p>
+                </div>
+                <div>
+                    <h3>Things to try</h3>
+                    <ol><li><strong>Watch the stability.</strong> The first editor's last two lines are the point: 14 rows against 6.</li><li><strong>Push the trees up.</strong> In the second editor, add 1000 and confirm the score does not fall.</li><li><strong>Compare the importances.</strong> The third editor's two columns disagree about a column that is pure noise.</li><li><strong>Break the decorrelation.</strong> In the fifth editor, try <code>max_features=1</code> and see whether so much diversity starts to hurt.</li></ol>
+                </div>
+                <div>
+                    <h3>Where this leaves you</h3>
+                    <p>Many deliberately different trees, averaged. More trees never hurt, <code>max_features</code> is the dial that matters, out-of-bag scoring is free, the built-in importances are biased towards many-valued columns, and the whole thing still cannot see past the edge of its training data.</p>
+                </div>
+            </div>
+<!-- VIZLEARN:ARTICLE:END -->
+        </div>
+    </section>
+
+    <script>
+        (function () {
+            var btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            var sun = btn.querySelector('.dark-icon');
+            var moon = btn.querySelector('.light-icon');
+
+            function paint(theme) {
+                if (theme === 'light') {
+                    document.body.classList.add('light-mode');
+                    moon.classList.remove('hidden');
+                    sun.classList.add('hidden');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    sun.classList.remove('hidden');
+                    moon.classList.add('hidden');
+                }
+            }
+
+            paint(localStorage.getItem('theme') || 'light');
+
+            btn.addEventListener('click', function () {
+                var next = document.body.classList.contains('light-mode') ? 'dark' : 'light';
+                localStorage.setItem('theme', next);
+                paint(next);
+            });
+        })();
+    </script>
+
+</body>
+</html>

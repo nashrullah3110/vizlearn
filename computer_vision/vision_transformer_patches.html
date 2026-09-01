@@ -231,25 +231,28 @@
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">The one step that lets a language architecture read a photograph, and the quadratic cost hiding in it.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-whole-preprocessing-step">The whole preprocessing step</h3>
+                    <h3>Images are grids; transformers want sequences</h3>
+                    <p>A transformer operates on a sequence of vectors and has no built-in notion of two dimensions. An image is a grid of pixels. Something has to convert one into the other.</p><p>The obvious approach &mdash; one token per pixel &mdash; is impossible. A 224&#215;224 image is 50,176 pixels, and attention costs grow with the square of the sequence length, so that is 2.5 billion pairwise interactions per layer.</p><p>The Vision Transformer's answer is almost aggressively simple: <strong>cut the image into square patches and treat each patch as a token.</strong></p>
+                </div>
+                <div>
+                    <h3>The whole preprocessing step</h3>
                     <p>Drag the patch control and watch the grid change. That is genuinely all that happens to the image before it enters the model:</p><ol><li>Cut into non-overlapping <code>P</code>&#215;<code>P</code> patches.</li><li>Flatten each patch to a vector of <code>P * P * 3</code> numbers.</li><li>Multiply by one learned matrix to get the model width.</li><li>Add a positional embedding, because otherwise the order is unknown.</li></ol><p>At the default of 16 pixels on a 224-pixel image, that is a 14&#215;14 grid, 196 tokens, each starting as 768 raw numbers. The readout gives the same figures for whatever patch size you choose.</p><p>Step 3 is the only learned part, and it is a linear projection with no non-linearity. Equivalently, it is a convolution with kernel size <code>P</code> and stride <code>P</code> &mdash; which is how it is usually implemented, and a nice reminder that the distinction between "convolutional" and "not" is thinner than the naming suggests.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-quadratic-cost">The quadratic cost</h3>
+                    <h3>The quadratic cost</h3>
                     <p>Halve the patch size and the token count quadruples, because the grid gains a factor of two in each dimension. Attention cost goes with the square of the token count, so it rises <strong>sixteenfold</strong>.</p><div class="vz-table-wrap"><table><thead><tr><th>Patch</th><th>Tokens (224px)</th><th>Attention cost</th></tr></thead><tbody><tr><td>32</td><td>49</td><td>1&#215;</td></tr><tr><td>16</td><td>196</td><td>16&#215;</td></tr><tr><td>8</td><td>784</td><td>256&#215;</td></tr><tr><td>4</td><td>3,136</td><td>4,096&#215;</td></tr></tbody></table></div><p>That table is the central constraint on ViT design, and it explains a great deal of what followed. Patch size is not a minor hyperparameter; it is the resolution at which the model perceives anything, traded directly against compute.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-is-lost-inside-a-patch">What is lost inside a patch</h3>
+                    <h3>What is lost inside a patch</h3>
                     <p>A 16&#215;16 patch is compressed to a single vector. Structure within it is not attended to at all; whatever the projection preserves is what survives.</p><p>This is the ViT's real weakness at small scale. A convolutional network has locality built in &mdash; nearby pixels are processed together by construction &mdash; and this <strong>inductive bias</strong> matches how images actually work. A ViT has none of it. Every relationship, including "these two patches are adjacent", must be learned from data through the positional embeddings.</p><p>Which is why the original paper's headline finding was about data. On ImageNet alone the ViT underperformed a ResNet; pre-trained on 300 million images it overtook it. With enough data the model learns the structure that convolution assumes, and gains flexibility convolution does not have.</p><p>Two responses followed. <strong>DeiT</strong> showed careful augmentation and distillation could train a ViT on ImageNet alone. <strong>Swin Transformer</strong> reintroduced locality by restricting attention to windows and merging patches hierarchically, which gives back the pyramid a CNN has and makes dense prediction practical.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-positional-embeddings">Positional embeddings</h3>
+                    <h3>Positional embeddings</h3>
                     <p>Attention is permutation-invariant: shuffle the tokens and the output is shuffled identically, with nothing else changed. Without positional information a ViT literally cannot tell a photograph from a jigsaw of itself.</p><p>The fix is to add a learned vector per position. It is worth appreciating how weak this is compared with convolution: the model is told "this is position 37" and must learn from data that position 37 is next to 36 and above 23.</p><p>Changing the input resolution changes the number of positions, which is why ViTs interpolate their positional embeddings when fine-tuned at a different size.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Shrinking the patch to gain resolution.</strong> The attention cost is quadratic in tokens, so this gets expensive faster than expected.</p><p><strong>Training a plain ViT on a small dataset.</strong> Without the inductive bias it needs either far more data or the DeiT training recipe.</p><p><strong>Forgetting positional embeddings on a resized input.</strong> The count must match, and interpolation is required.</p><p><strong>Assuming patches must be square and non-overlapping.</strong> Overlapping patches help; several later architectures use them.</p>
                 </div>
             </div>

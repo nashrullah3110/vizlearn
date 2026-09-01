@@ -292,29 +292,32 @@ SELECT * FROM orders WHERE status = 'paid' AND customer_id = 42;
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">Why column order decides which queries an index can serve, and why one query never touches the table.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-the-leftmost-prefix-rule">The leftmost prefix rule</h3>
+                    <h3>An index is a sorted copy</h3>
+                    <p>A single-column index is a sorted list of that column's values, each paired with a pointer to its row. Sorted means the database can binary-search it instead of reading everything.</p><p>A <strong>composite index</strong> on <code>(status, customer_id)</code> is a sorted list too, sorted by <code>status</code> first and, within each status, by <code>customer_id</code>. That is the whole mechanism, and every rule about composite indexes falls out of it.</p><p>Think of a phone book ordered by surname then first name. Finding everyone called Hopper is easy. Finding Grace Hopper is easy. Finding everyone whose first name is Grace is not &mdash; the Graces are scattered throughout, one per surname, and you would have to read the lot.</p>
+                </div>
+                <div>
+                    <h3>The leftmost prefix rule</h3>
                     <p>Run the four variants in order and watch the plan.</p><p><strong>Both columns</strong> &mdash; <code>SEARCH ... USING INDEX</code>. The index leads with <code>status</code>, narrows to <code>customer_id</code> within it, and lands on the rows.</p><p><strong>Leading column only</strong> &mdash; still <code>SEARCH</code>. All the <code>paid</code> rows are contiguous, so the index finds the block and reads it. A prefix of the index is itself a usable index.</p><p><strong>Second column only</strong> &mdash; <code>SCAN</code>. This is the important one. The index exists, <code>customer_id</code> is in it, and the query cannot use it for a seek, because rows for customer 42 are spread across every status value. There is no contiguous block to find.</p><p><strong>Covering</strong> &mdash; <code>USING COVERING INDEX</code>, discussed below.</p><p>So an index on <code>(a, b, c)</code> can serve queries filtering on <code>a</code>, on <code>a, b</code>, or on <code>a, b, c</code>. It cannot serve <code>b</code>, <code>c</code>, or <code>b, c</code>. <strong>Leading prefixes only.</strong></p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-ordering-rule-that-follows">The ordering rule that follows</h3>
+                    <h3>The ordering rule that follows</h3>
                     <p>Given that, the column order in a composite index is a design decision, not a detail. Two guidelines:</p><p><strong>Equality before range.</strong> An index on <code>(status, created_at)</code> serves <code>WHERE status = 'paid' AND created_at &gt; ?</code> well: the equality picks a block and the range narrows inside it. Reversed, the range comes first and everything after it is scattered, so only the range column is really used.</p><p><strong>Order for the queries you actually run.</strong> If most queries filter by customer and only some also filter by status, lead with customer. Reading the workload is the only way to decide.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-covering-indexes">Covering indexes</h3>
+                    <h3>Covering indexes</h3>
                     <p>The fourth variant selects only <code>status</code> and <code>customer_id</code> &mdash; both of which are already stored in the index. The plan says <code>USING COVERING INDEX</code>, and the table is never read at all.</p><p>This is worth understanding because of what an index normally costs. An ordinary index lookup happens in two stages: find the entries in the index, then fetch each corresponding row from the table. That second stage is random access, and on a large table it dominates. Returning a thousand rows can mean a thousand scattered reads.</p><p>A covering index removes the second stage entirely. Everything the query needs is already in the sorted structure it just searched.</p><p>Some engines let you add columns purely for coverage without making them part of the sort key &mdash; PostgreSQL's <code>INCLUDE</code>, SQL Server's <code>INCLUDE</code>. That keeps the index narrow where it matters for searching while still avoiding the table.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-two-indexes-are-not-one-index">Two indexes are not one index</h3>
+                    <h3>Two indexes are not one index</h3>
                     <p>A common mistake is to assume that indexes on <code>(a)</code> and <code>(b)</code> do the work of an index on <code>(a, b)</code>.</p><p>They do not. Given both, a database can search each separately and intersect the row sets, which some engines will do &mdash; but that means two searches and a merge, against one search on a composite index. It is materially worse, and for <code>ORDER BY a, b</code> the separate indexes provide no useful ordering at all.</p><p>The reverse substitution does work: <code>(a, b)</code> covers everything <code>(a)</code> alone would have, so having both is usually redundant.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-cost-side">The cost side</h3>
+                    <h3>The cost side</h3>
                     <p>Indexes are not free. Every one must be updated on every insert, update and delete of an indexed column, so a table with eight indexes does roughly nine units of write work instead of one. They take space, they take memory in cache that data pages could have used, and an index nobody queries costs all of that for nothing.</p><p>The practical loop is: find the slow query, read its [plan](explain_and_query_plans.html), add the one index the plan asks for, read the plan again. Not: add indexes and hope.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong</h3>
+                    <h3>Where it goes wrong</h3>
                     <p><strong>Indexing every column separately.</strong> Expensive on write, and none of them serves a multi-column filter well.</p><p><strong>Putting the range column first.</strong> Everything after it becomes unusable.</p><p><strong>Forgetting the sort.</strong> <code>ORDER BY</code> can use an index too, and a composite index that matches the ordering removes the sort step entirely.</p><p><strong>Leaving redundant indexes in place.</strong> If <code>(a, b)</code> exists, <code>(a)</code> is almost certainly dead weight.</p>
                 </div>
             </div>

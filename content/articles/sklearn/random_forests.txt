@@ -1,0 +1,270 @@
+title: Random Forests: A Practical Guide
+intro: The previous module ended with a model that changes its mind when you resample the data. This one fixes that by building hundreds of them and taking a vote.
+
+## The idea
+
+A single decision tree is unstable: the greedy choice at each node is decided by a handful of rows, and a different sample produces a different tree. That instability is variance, and variance is error.
+
+Averaging independent estimates reduces variance. If the trees made *identical* errors, averaging would achieve nothing; if their errors are partly independent, the errors cancel and the signal survives. So the whole design problem is making the trees disagree.
+
+A random forest introduces disagreement twice.
+
+**Bootstrap sampling.** Each tree is fitted on a sample of the training rows drawn with replacement, the same size as the original. About 63% of the rows appear in any given sample, so each tree sees a different subset.
+
+**Random feature subsets.** At every split, the tree considers only a random subset of the features rather than all of them. This is the more important of the two, and it is what distinguishes a random forest from plain bagging.
+
+The second matters because bootstrapping alone leaves the trees too similar. If one feature is strongly predictive, every tree splits on it first and the trees end up nearly identical. Restricting the choice forces different trees down different paths, which is exactly the independence the averaging needs.
+
+
+## More accurate, and far more stable
+
+The accuracy gain is modest. The stability gain is the real one, and it has to be measured across refits rather than across folds.
+
+```python-run
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+X, y = make_classification(n_samples=600, n_features=20, n_informative=6,
+                           random_state=0)
+
+print("accuracy:")
+print("  one tree :", round(cross_val_score(DecisionTreeClassifier(random_state=0),
+                                            X, y, cv=5).mean(), 4))
+print("  a forest :", round(cross_val_score(RandomForestClassifier(random_state=0),
+                                            X, y, cv=5).mean(), 4))
+
+# The variance that averaging removes is in the predictions, not in the
+# fold scores - so measure it by refitting on resampled data.
+rng = np.random.RandomState(0)
+for label, make in [("one tree", lambda: DecisionTreeClassifier(random_state=0)),
+                    ("a forest", lambda: RandomForestClassifier(n_estimators=50,
+                                                                random_state=0))]:
+    preds = []
+    for _ in range(5):
+        idx = rng.choice(len(X), len(X), replace=True)
+        preds.append(make().fit(X[idx], y[idx]).predict(X[:60]))
+    disagree = sum(len(set(col)) > 1 for col in zip(*preds))
+    print("%-10s disagrees with itself on %2d of 60 rows across refits"
+          % (label, disagree))
+```
+
+## n_estimators is the one free parameter
+
+Raising it cannot overfit. It only costs time.
+
+```python-run
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import cross_val_score
+
+X, y = make_classification(n_samples=500, n_features=20, n_informative=5,
+                           random_state=0)
+
+print("n_estimators   accuracy")
+for n in (1, 5, 25, 100, 300):
+    s = cross_val_score(RandomForestClassifier(n_estimators=n, random_state=0),
+                        X, y, cv=5).mean()
+    print("%12d   %.4f" % (n, s))
+print()
+print("one tree is much worse; after about 25 the differences are")
+print("fold noise. more trees costs time and does not overfit -")
+print("it is the one parameter you can raise without a trade.")
+```
+
+## Two importances, one of them misleading
+
+A pure-noise column with many distinct values, and the built-in measure gives it more credit than the other noise column.
+
+```python-run
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.inspection import permutation_importance
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+rng = np.random.RandomState(0)
+n = 500
+signal = rng.normal(size=n)
+X = np.column_stack([
+    signal,                              # genuinely useful
+    rng.normal(size=n),                  # noise
+    rng.randint(0, 400, size=n),         # noise, many distinct values
+])
+y = (signal > 0).astype(int)
+
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3, random_state=0)
+rf = RandomForestClassifier(random_state=0).fit(X_tr, y_tr)
+
+names = ["signal", "noise", "noise_many_values"]
+perm = permutation_importance(rf, X_te, y_te, n_repeats=10, random_state=0)
+print("%-20s %10s %12s" % ("", "impurity", "permutation"))
+for i, nm in enumerate(names):
+    print("%-20s %10.4f %12.4f"
+          % (nm, rf.feature_importances_[i], perm.importances_mean[i]))
+print()
+print("impurity gives both noise columns a score, and more to the one")
+print("with more distinct values. permutation gives both exactly zero.")
+```
+
+## A free estimate, without a second fit
+
+Each tree misses about a third of the rows, so those rows can score it.
+
+```python-run
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import cross_val_score
+
+X, y = make_classification(n_samples=600, n_features=20, n_informative=6,
+                           random_state=0)
+
+rf = RandomForestClassifier(n_estimators=200, oob_score=True,
+                            random_state=0).fit(X, y)
+
+print("out-of-bag score      :", round(rf.oob_score_, 4))
+print("5-fold cross-validated:",
+      round(cross_val_score(RandomForestClassifier(n_estimators=200,
+                                                   random_state=0),
+                            X, y, cv=5).mean(), 4))
+print()
+print("each tree is scored on the rows its bootstrap sample left out,")
+print("which gives an estimate for the cost of a single fit.")
+```
+
+## max_features is the decorrelation dial
+
+Letting every tree see every feature makes them agree, and agreement is what averaging cannot fix.
+
+```python-run
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import cross_val_score
+
+X, y = make_classification(n_samples=400, n_features=30, n_informative=8,
+                           random_state=0)
+
+print("max_features   accuracy")
+for mf in ("sqrt", 0.5, None):
+    s = cross_val_score(RandomForestClassifier(n_estimators=50, max_features=mf,
+                                               random_state=0), X, y, cv=5).mean()
+    print("%12s   %.4f" % (str(mf), s))
+print()
+print("None means every tree sees every feature, so the trees resemble")
+print("each other more and the averaging buys less.")
+```
+
+## Still cannot extrapolate
+
+The one limitation the ensemble inherits whole from its trees.
+
+```python-run
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+import numpy as np
+
+x = np.arange(0, 20).reshape(-1, 1).astype(float)
+y = 3.0 * x.ravel()
+
+rf = RandomForestRegressor(n_estimators=50, random_state=0).fit(x, y)
+lin = LinearRegression().fit(x, y)
+
+future = np.array([[25.0], [40.0]])
+print("truth at x=25, 40 :", [75.0, 120.0])
+print("linear            :", lin.predict(future).round(1).tolist())
+print("random forest     :", rf.predict(future).round(1).tolist())
+print()
+print("averaging many trees does not fix extrapolation - every tree")
+print("is flat past the edge, so the average is too.")
+```
+## What it buys
+
+The accuracy improvement is real and usually modest &mdash; 0.79 to 0.83 in the first editor.
+
+The stability improvement is the larger one, and it has to be measured properly. Fold-to-fold variation in a cross-validation score is *not* it; that measures how much the score depends on which rows were held out, and a forest is not especially better there. What averaging fixes is how much the *model* changes when the training data changes.
+
+The first editor measures that directly: refitting on five bootstrap resamples, one tree disagrees with itself on 14 of 60 rows, and a fifty-tree forest on 6. That is the variance reduction, and it is why a forest's predictions can be relied on in a way a single tree's cannot.
+
+## The parameters worth setting
+
+`n_estimators` is unusual: **it cannot overfit**. More trees means a better estimate of the average, which converges rather than degrading. The only cost is time and memory. Something like 100 to 500 is normal, and the editor above shows the curve flattening after about 25 &mdash; past which the differences are fold noise rather than improvement.
+
+That makes it the one complexity-shaped parameter with no trade-off, which is worth stating because it runs against the pattern of everything else in the track.
+
+`max_features` controls the decorrelation. `"sqrt"` is the default for classification and is usually right. Setting it to `None` gives every tree every feature, and the third editor shows the cost: 0.8500 against 0.8650, because the trees became too alike. Lower values mean more diverse and individually weaker trees, which is often a good trade.
+
+`max_depth` and `min_samples_leaf` are inherited from the tree, and a forest needs them far less. Individual trees are allowed to overfit, because their overfitting is uncorrelated and averages out. Leaving them unconstrained is a reasonable default, and constraining them slightly can help on small or very noisy data.
+
+`n_jobs=-1` fits the trees in parallel across cores. The trees are independent, so this is close to free.
+
+## Out-of-bag scoring
+
+Because each tree misses about 37% of the rows, those rows can score it &mdash; and averaging that across trees gives a validation estimate without a separate fit.
+
+`oob_score=True` computes it, and `oob_score_` holds the result. The editor above gives 0.8683 against a cross-validated 0.8383, which is the usual relationship: OOB tends to run slightly optimistic relative to k-fold, because each OOB prediction comes from the subset of trees that missed that row rather than from a full forest.
+
+It is genuinely useful when fitting is expensive, since it costs nothing beyond the fit you were doing anyway. It is not a replacement for cross-validation when you are comparing models or tuning, both because of the optimism and because it only exists for bagged ensembles.
+
+## Feature importances, and the trap
+
+`feature_importances_` is the attribute people reach for, and it has a known bias worth seeing rather than being told about.
+
+The third editor gives a forest three columns: one carrying the signal, one pure noise, and one pure noise with 400 distinct values. The impurity-based measure gives the signal 0.89 &mdash; correct &mdash; and then gives both noise columns a non-zero score, with **more** going to the one with more distinct values.
+
+The cause is that a column with many possible thresholds gets many chances to look good on the training data, and impurity importance is computed on the training data. `permutation_importance`, which measures how much the *test* score drops when a column is shuffled, gives both noise columns exactly 0.0000.
+
+Two further cautions apply to both measures. Correlated features split the credit arbitrarily, so a genuinely important feature can look weak because a correlated one absorbed it. And importance is not causation &mdash; it says the model used the column, not that the column drives the outcome.
+
+The practical rule: use permutation importance when the answer matters, on the test set, and treat the built-in attribute as a rough first look.
+
+## What it does not fix
+
+**Extrapolation.** Every tree is flat past the edge of its training range, so the average of many trees is flat too. The last editor asks for x=25 and x=40 on a perfect straight line and gets 55.3 for both. No number of trees changes this, and it disqualifies forests for anything with a trend unless the trend is removed first.
+
+**Readability.** A single shallow tree can be printed and audited. Three hundred trees cannot, and the model becomes a black box that happens to be made of transparent parts.
+
+**Size and speed.** A forest holds every tree, so a model fitted on a large dataset can be hundreds of megabytes, and prediction means traversing every tree.
+
+**Extreme sparsity.** On very high-dimensional sparse data &mdash; text, mostly &mdash; linear models usually win.
+
+## Where it sits
+
+A random forest is the strongest thing you can fit with essentially no tuning, and that is its main claim. Defaults plus `n_estimators=200` produces a competitive model on most tabular problems, needing no scaling, no encoding decisions beyond making the columns numeric, and no search.
+
+Gradient boosting generally beats it given tuning effort, and gradient boosting *needs* that effort &mdash; a badly tuned booster is worse than a default forest. The sensible sequence is a linear model for the baseline, a forest for the strong default, and boosting when the difference is worth the work.
+
+## The rest of the bagging family
+
+Three near relatives share the design and differ in one choice each, and knowing what separates them saves trying all four blindly.
+
+`ExtraTreesClassifier` &mdash; extremely randomised trees &mdash; goes further than a forest: rather than searching for the best threshold on each candidate feature, it picks thresholds at random and keeps the best of those. That makes each tree weaker and the trees more different, which sometimes wins and is always faster to fit, since the expensive threshold search disappears. It is worth trying whenever a forest is your best model; it takes one word to swap.
+
+`BaggingClassifier` is the general form: bootstrap samples and averaging, wrapped around *any* estimator. A forest is bagging plus feature subsetting, specialised to trees. Bagging a linear model achieves almost nothing, because linear models are stable and there is no variance to average away &mdash; which is the clearest statement of when the technique applies at all.
+
+`RandomForestRegressor` is the same algorithm predicting the mean of each leaf rather than the majority class. Everything on this page transfers, including the extrapolation limit, which bites harder in regression because a flat prediction past the training range is more obviously wrong than a class label.
+
+The pattern: bagging reduces variance and does nothing for bias. It helps unstable, low-bias models &mdash; deep trees &mdash; and wastes time on stable ones.
+
+## Costs worth knowing before deploying one
+
+A forest is cheap to fit and expensive to keep.
+
+**Memory.** Every tree is stored in full. A forest of 500 unconstrained trees on a hundred thousand rows can run to hundreds of megabytes, and the pickle is the same size. Constraining `max_depth` or `min_samples_leaf` shrinks it substantially at a small accuracy cost, which is often the right trade for something that has to be shipped.
+
+**Prediction latency.** Every prediction traverses every tree. That is fast per tree and adds up: 500 trees is 500 traversals. For batch scoring it is irrelevant; for a request-response service with a latency budget it can decide the design.
+
+**Fitting time** scales with trees times rows times features, and parallelises almost perfectly with `n_jobs=-1`.
+
+The lever for all three is the same: fewer, shallower trees. Measuring how much accuracy that actually costs, rather than assuming, usually shows the curve is flat well below the default.
+
+## Things to try
+
+1. <strong>Watch the stability.</strong> The first editor's last two lines are the point: 14 rows against 6.
+2. <strong>Push the trees up.</strong> In the second editor, add 1000 and confirm the score does not fall.
+3. <strong>Compare the importances.</strong> The third editor's two columns disagree about a column that is pure noise.
+4. <strong>Break the decorrelation.</strong> In the fifth editor, try `max_features=1` and see whether so much diversity starts to hurt.
+
+## Where this leaves you
+
+Many deliberately different trees, averaged. More trees never hurt, `max_features` is the dial that matters, out-of-bag scoring is free, the built-in importances are biased towards many-valued columns, and the whole thing still cannot see past the edge of its training data.

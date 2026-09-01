@@ -329,40 +329,44 @@ print("merged dict :", {**{"x": 1}, **{"y": 2}})</script>
                 <p class="mt-2 text-sm" style="color: var(--text-muted)">One star collects any number of positional arguments into a tuple; two stars collect keyword arguments into a dictionary. At a call site the same stars run in reverse, spreading a collection back out into arguments.</p>
             </div>
             <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">
-                <!-- VIZLEARN:LEDE:SLOT -->
                 <div>
-                    <h3 id="vz-s-order-in-a-definition">Order in a definition</h3>
+                    <h3>Collecting</h3>
+                    <pre><code class="language-python">def total(*args):
+    return sum(args)</code></pre><p><code>total(1, 2, 3)</code> gives <code>args = (1, 2, 3)</code>. <code>total()</code> gives <code>args = ()</code>. The function accepts any number of positional arguments without knowing in advance how many, and inside it <code>args</code> is an ordinary tuple.</p><p>Two stars do the same for keyword arguments:</p><p>def describe(**kwargs):</p><p><code>describe(name="ana", score=91)</code> gives <code>kwargs = {"name": "ana", "score": 91}</code> &mdash; an ordinary dict.</p><p>The names are pure convention. <code>*items</code> and <code>**options</code> work identically; the stars carry the meaning. Convention is strong enough here that using different names in a general-purpose helper will raise eyebrows, but in a specific function a descriptive name often reads better.</p>
+                </div>
+                <div>
+                    <h3>Order in a definition</h3>
                     <p>def report(label, *values, **options):</p><p>Named parameters first, then <code>*args</code>, then <code>**kwargs</code>. Python needs the fixed ones before the variable ones so it knows what to bind where.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-spreading">Spreading</h3>
+                    <h3>Spreading</h3>
                     <p>The same star at a call site does the opposite job:</p><pre><code class="language-python">dims = [2, 3, 4]
 volume(*dims)    # same as volume(2, 3, 4)</code></pre><p>Without the star you pass one argument &mdash; the list itself &mdash; and get a <code>TypeError</code> about missing parameters. With it, the list is spread across the parameters in order.</p><p><code>**</code> does the same for a dict, matching keys to parameter names:</p><p>volume(**{"length": 2, "width": 3, "height": 4})</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-pass-through-pattern">The pass-through pattern</h3>
+                    <h3>The pass-through pattern</h3>
                     <p>This is where the two halves meet, and it is by far the most common real use:</p><pre><code class="language-python">def logged(func, *args, **kwargs):
     print(&quot;calling&quot;, func.__name__)
     return func(*args, **kwargs)</code></pre><p><code>logged</code> accepts anything and forwards it untouched. It does not need to know the signature of what it is wrapping. Every decorator, every wrapper, every "do this then call that" helper is built on this shape.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-merging-collections">Merging collections</h3>
+                    <h3>Merging collections</h3>
                     <p>The stars also work when building literals:</p><p>[*first, *second]&nbsp;&nbsp;&nbsp;&nbsp;{<strong>defaults, </strong>overrides}</p><p>The dict form is a neat way to layer configuration: later keys win, so overrides beat defaults.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-where-you-will-actually-meet-them">Where you will actually meet them</h3>
+                    <h3>Where you will actually meet them</h3>
                     <p>Almost every use of <code>*args</code> and <code>**kwargs</code> in real code falls into one of three shapes, and recognising them makes the feature far less abstract.</p><p>The first is a function that genuinely takes an unknown number of things: <code>print</code>, <code>max</code>, <code>os.path.join</code>. These are rare to write and common to use.</p><p>The second is a wrapper. A decorator, a retry helper, a logging shim - anything that stands in front of another function and passes the call along. Here the star forms are not a convenience, they are the only way to write the wrapper without hard-coding the signature of everything it might wrap.</p><p>The third is a subclass extending its parent. <code>def __init__(self, *args, extra=None, <strong>kwargs)</code> accepts whatever the parent accepts, adds one option of its own, and forwards the rest with <code>super().__init__(*args, </strong>kwargs)</code>. This keeps working when the parent gains a parameter, which is the whole point.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-cost-of-being-too-flexible">The cost of being too flexible</h3>
+                    <h3>The cost of being too flexible</h3>
                     <p>A signature of <code>(*args, **kwargs)</code> accepts everything, and that is its problem as well as its purpose. Nobody can tell what the function wants by reading it. An editor cannot autocomplete the call. A typo in a keyword name no longer raises a clear <code>TypeError</code> about an unexpected argument - it lands silently in <code>kwargs</code> and surfaces later as a missing key, or worse, as a default quietly being used instead of the value you thought you passed.</p><p>So the rule is about position in the system rather than taste. At the surface, where people call your code directly, name the parameters. In the middle, where you are forwarding a call you did not construct, use the stars. The further a function is from a human caller, the more flexibility costs you nothing.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-reading-someone-else-s-signature">Reading someone else's signature</h3>
+                    <h3>Reading someone else's signature</h3>
                     <p>When you meet <code>def f(a, b=1, *args, c, **kwargs)</code>, read it in the order Python binds it. <code>a</code> is required and positional. <code>b</code> is positional with a default. <code>args</code> collects any further positional arguments. <code>c</code> comes after <code>*args</code>, which makes it keyword-only and, because it has no default, required by name. <code>kwargs</code> collects the rest.</p><p>The one that surprises people is <code>c</code>. Anything after <code>*args</code> can only be passed by keyword, whether or not it has a default. That is the mechanism behind keyword-only parameters, and it is why library authors sometimes write a bare <code>*</code> in a signature: it turns everything after it into a name you have to say out loud at the call site.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-keyword-only-and-positional-only-and-why-they-ex">Keyword-only and positional-only, and why they exist</h3>
+                    <h3>Keyword-only and positional-only, and why they exist</h3>
                     <p>The stars do a second job besides collecting: they mark boundaries in a signature. Two markers control how callers are allowed to pass arguments.</p><p>A bare <code>*</code> makes everything after it keyword-only:</p><pre><code class="language-python">def connect(host, *, timeout=30, retries=3):
     return host, timeout, retries
 
@@ -376,11 +380,11 @@ TypeError: connect() takes 1 positional argument but 2 were given</code></pre><p
     return abs(x - y)</code></pre><p>Now <code>distance(3, 5)</code> works and <code>distance(x=3, y=5)</code> does not. This is rarer, and the reason is the mirror image: it keeps the parameter *names* out of the API, so they can be renamed later without breaking callers. Most builtins are positional-only for exactly that reason, which is why <code>len(obj=x)</code> fails.</p><p>The rule of thumb: make a parameter keyword-only when its meaning is not obvious from the call site, which in practice means flags, options and anything numeric that is not the main subject.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-what-the-stars-cost-you">What the stars cost you</h3>
+                    <h3>What the stars cost you</h3>
                     <p><code>*args, **kwargs</code> accepts everything, and the price is paid by every reader and every tool afterwards.</p><p>The signature stops documenting anything. <code>def process(*args, **kwargs)</code> tells the next person nothing about what to pass, and the only way to find out is to read the body &mdash; and then the body of whatever it forwards to.</p><p>Editors and type checkers lose their grip. Autocompletion has nothing to suggest, and a type checker cannot verify a call it cannot see the shape of. For a codebase using type hints, a star signature is a hole in the coverage that propagates to every caller.</p><p>Errors move. A misspelled keyword argument would normally raise <code>TypeError: unexpected keyword argument 'timeuot'</code> at the call, naming the mistake. Absorbed into <code>**kwargs</code> it becomes a missing key later, or &mdash; worse &mdash; a default silently used instead of the value you passed, which produces wrong output and no error at all.</p><p>None of that is an argument against the feature; it is an argument about where to use it. Wrappers and subclass forwarding need it and pay none of the cost, because there is no meaningful signature to state. A function people call directly should name its parameters.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-unpacking-in-the-other-direction">Unpacking in the other direction</h3>
+                    <h3>Unpacking in the other direction</h3>
                     <p>The two stars appear in three places and mean the same thing in all of them, which is easier to hold on to than three separate rules.</p><p>In a <strong>definition</strong> they collect: <code>def f(*args)</code> gathers loose positional arguments into a tuple.</p><p>At a <strong>call site</strong> they spread: <code>f(*items)</code> hands each item over as a separate argument.</p><p>In a <strong>literal</strong> they merge: <code>[*a, *b]</code> builds one list from two, and <code>{<strong>a, </strong>b}</code> builds one dictionary from two, with later keys winning.</p><p>The last is worth dwelling on because it has quietly become the standard way to combine collections:</p><pre><code class="language-python">defaults = {&quot;colour&quot;: &quot;red&quot;, &quot;size&quot;: 1}
 overrides = {&quot;size&quot;: 3}
 
@@ -389,7 +393,7 @@ print([*&quot;ab&quot;, *&quot;cd&quot;])</code></pre><pre><code>{&#x27;colour&#
 [&#x27;a&#x27;, &#x27;b&#x27;, &#x27;c&#x27;, &#x27;d&#x27;]</code></pre><p>Both build a new object and leave the originals alone, which is the difference from <code>update</code> and <code>extend</code>. And in assignment the star runs backwards again: <code>first, *rest = items</code> collects rather than spreads, because the star is on the receiving side.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-a-decorator-concretely">A decorator, concretely</h3>
+                    <h3>A decorator, concretely</h3>
                     <p>The pass-through pattern exists mainly so that decorators can be written, and seeing one whole makes the pieces click:</p><pre><code class="language-python">import functools
 
 def announce(func):
@@ -414,19 +418,19 @@ print(add.__name__)</code></pre><pre><code>calling add with (2,) {&#x27;b&#x27;:
 add</code></pre><p>Four things are happening. <code>announce</code> takes a function and returns a replacement. <code>wrapper</code> accepts anything with <code>*args, <strong>kwargs</code>, so it can stand in front of any function at all. The forwarding call <code>func(*args, </strong>kwargs)</code> spreads them back out, so <code>add</code> receives exactly what the caller wrote. And <code>@announce</code> above <code>def add</code> is shorthand for <code>add = announce(add)</code>.</p><p><code>functools.wraps</code> is the part people leave out and then miss. Without it, <code>add.__name__</code> prints <code>wrapper</code>, the docstring is gone, and every traceback through the decorated function names the wrapper instead of the function. It copies the identifying attributes across, and it is one line.</p><p>Note how the arguments arrive: <code>2</code> in <code>args</code> and <code>b=3</code> in <code>kwargs</code>, exactly as the caller passed them. The wrapper does not know or need to know that <code>add</code> has a parameter called <code>b</code>.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-asking-a-function-what-it-accepts">Asking a function what it accepts</h3>
+                    <h3>Asking a function what it accepts</h3>
                     <p>When you do need to know the signature &mdash; validating a plugin, building a command-line interface, writing a framework &mdash; <code>inspect</code> answers it rather than parsing the source:</p><p><code>inspect.signature(func)</code> returns an object listing the parameters, their defaults, their kinds (positional, keyword-only, <code>*args</code>, <code><strong>kwargs</code>) and any annotations. <code>sig.bind(*args, </strong>kwargs)</code> matches a proposed call against it and raises the same <code>TypeError</code> the real call would, which is how you check arguments before doing expensive work.</p><p>This is also how a decorator can be smarter than pure forwarding. A caching decorator that wants a stable key needs to know that <code>f(1)</code> and <code>f(a=1)</code> are the same call; <code>sig.bind</code> plus <code>apply_defaults</code> normalises both to the same thing, which no amount of inspecting <code>args</code> and <code>kwargs</code> directly will do.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-the-star-in-assignment">The star in assignment</h3>
+                    <h3>The star in assignment</h3>
                     <p>The same star appears in assignment, and it is worth connecting to the rest rather than learning separately.</p><p><code>first, *rest = items</code> binds the first item and collects everything else into a list. <code>*most, last = items</code> does the mirror image. <code>a, *middle, b = items</code> takes both ends and collects what is between them. In each case the starred name gets a list &mdash; always a list, even when the right-hand side was a tuple or a string.</p><p>This is the collecting sense of the star, the same as in a definition: the star marks the name that absorbs however many items are left over. The spreading sense is what you get on the other side of the equals sign, in a call or a literal.</p><p>Only one star is allowed per assignment, for the obvious reason that two would make the split ambiguous. And the non-starred names are still required: unpacking <code>a, *rest = []</code> raises, because there is nothing for <code>a</code>, while <code>*rest, = []</code> succeeds and gives an empty list.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3>Questions people ask</h3>
                     <p><strong>Do the names <code>args</code> and <code>kwargs</code> matter?</strong> No, the stars carry the meaning. The names are a strong convention in general-purpose wrappers and worth replacing with something descriptive elsewhere.</p><p><strong>Can I have <code>*args</code> without <code>**kwargs</code>?</strong> Yes, and the reverse. They are independent.</p><p><strong>What order do they go in?</strong> Named parameters, then <code>*args</code>, then keyword-only parameters, then <code>**kwargs</code>.</p><p><strong>Is <code>**kwargs</code> ordered?</strong> Yes, it is a normal dictionary and keeps the order the caller used.</p><p><strong>Can I pass a list where <code>*args</code> is expected?</strong> Only with a star: <code>f(*items)</code>. Without it you pass the list as a single argument.</p><p><strong>Why does <code>f(**d)</code> fail with "keywords must be strings"?</strong> Because a dictionary with non-string keys cannot be turned into keyword arguments.</p><p><strong>How do I forward everything including the function's own new option?</strong> Take it as keyword-only, and forward <code>*args, **kwargs</code> unchanged: the new option is bound by name and never reaches the wrapped call.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-recap-in-one-screen">Recap in one screen</h3>
+                    <h3>Recap in one screen</h3>
                     <ul><li>One star collects positional arguments into a tuple; two collect keyword arguments into a dictionary.</li><li>The same stars at a call site spread a collection back into arguments, and in a literal they merge collections.</li><li>A bare <code>*</code> in a signature makes what follows keyword-only; a <code>/</code> makes what precedes it positional-only.</li><li>The pass-through <code>f(*args, **kwargs)</code> is what makes decorators and wrappers possible without knowing any signature.</li><li>A star signature costs documentation, tooling and clear errors &mdash; use it where there is no meaningful signature to state, not to avoid writing one.</li></ul>
                 </div>
             </div>
