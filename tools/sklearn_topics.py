@@ -7221,6 +7221,20 @@ The workflow above is what makes each of those diagnoses available. A script tha
 
 <strong>Is pickle the right way to save it?</strong> For your own short-lived use, yes. Record the scikit-learn version beside it, because a pickle is not portable across versions, and prefer `skops` for anything shared.
 
+## Where the track has taken you
+
+Twenty-three modules, and the shape of them was deliberate.
+
+The **API** came first, because `fit`, `predict` and `transform` are the part that transfers to every estimator in the library and to every one written after it. Learning the interface once is most of learning scikit-learn.
+
+**Honest numbers** came second and took four modules, which is more than the estimators got. That ordering reflects where the mistakes actually are. A model is a few lines; knowing whether its score is real is the difficult part, and splitting, cross-validation, overfitting and the search's optimism are all facets of the same question.
+
+**Preparing data** took six, because that is where leakage lives. Scaling, encoding, imputation and column routing are individually simple, and every one of them learns something from data &mdash; which is why they belong inside a pipeline and why the pipeline is not a convenience.
+
+**The models** came last and took the fewest. That is the honest proportion: choosing between logistic regression, a forest and a booster matters far less than everything before it, and the library makes the choice a one-line change precisely so that it can.
+
+What you can do now is take a table you have never seen, work out what it needs, build a pipeline that cannot cheat, and produce a number you would defend. The remaining skill is domain knowledge about the columns, which no library supplies.
+
 ## Things to try
 
 1. <strong>Run the editors in order.</strong> They share one interpreter and build on each other, like a script.
