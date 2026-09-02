@@ -129,6 +129,147 @@ Adam stores two extra values per parameter, so its optimiser state is twice the 
 
 <strong>Lion</strong> keeps only momentum and uses the sign of the update, halving the state. <strong>Sophia</strong> and other second-order-flavoured methods use curvature estimates. These matter at scale; for ordinary work AdamW remains the right default.
 
+## Four optimisers on one badly-scaled bowl
+
+A surface 1000x steeper in one direction than the other -- the normal situation in a real network. Plain SGD cannot solve it, and watching why explains every optimiser invented since.
+
+```python-run
+import numpy as np
+
+CURVE = np.array([1000.0, 1.0])       # curvature along x and along y
+START = np.array([-2.0, -2.0])
+
+def loss(w): return 0.5 * (CURVE * w ** 2).sum()
+def grad(w): return CURVE * w
+
+LIMIT = 2 / CURVE.max()
+LR = 0.9 * LIMIT
+print("a bowl %dx steeper along x than along y, starting at (-2, -2)."
+      % (CURVE[0] / CURVE[1]))
+print("the answer is (0, 0), loss 0.")
+print()
+print("SGD is capped by the STEEP direction: any step above 2/%d = %.5f"
+      % (CURVE.max(), LIMIT))
+print("diverges. so we use %.5f -- and the shallow direction now moves at"
+      % LR)
+print("%.5f x its own gradient, which is tiny." % LR)
+print()
+
+def sgd(steps, lr=LR):
+    w = START.copy()
+    for _ in range(steps):
+        w = w - lr * grad(w)
+    return w
+
+def momentum(steps, lr=LR * 0.5, beta=0.9):
+    w, v = START.copy(), np.zeros(2)
+    for _ in range(steps):
+        v = beta * v + grad(w)
+        w = w - lr * v
+    return w
+
+def rmsprop(steps, lr=0.05, beta=0.9, eps=1e-8):
+    w, s = START.copy(), np.zeros(2)
+    for _ in range(steps):
+        g = grad(w)
+        s = beta * s + (1 - beta) * g ** 2
+        w = w - lr * g / (np.sqrt(s) + eps)
+    return w
+
+def adam(steps, lr=0.05, b1=0.9, b2=0.999, eps=1e-8):
+    w, m, v = START.copy(), np.zeros(2), np.zeros(2)
+    for t in range(1, steps + 1):
+        g = grad(w)
+        m = b1 * m + (1 - b1) * g
+        v = b2 * v + (1 - b2) * g ** 2
+        w = w - lr * (m / (1 - b1 ** t)) / (np.sqrt(v / (1 - b2 ** t)) + eps)
+    return w
+
+print("%-22s %12s %12s %12s" % ("optimiser", "20 steps", "100 steps", "400 steps"))
+for name, fn in (("SGD", sgd), ("SGD + momentum", momentum),
+                 ("RMSProp", rmsprop), ("Adam", adam)):
+    print("%-22s %12.2e %12.2e %12.2e"
+          % (name, loss(fn(20)), loss(fn(100)), loss(fn(400))))
+print()
+
+w = sgd(400)
+print("SGD after 400 steps is at %s." % np.round(w, 6))
+print("  the steep coordinate is solved to %.1e. the shallow one has moved"
+      % abs(w[0]))
+print("  from -2.0 to %.4f. it is not stuck in a minimum -- it is crawling."
+      % w[1])
+print("  one learning rate has to serve a 1000x range of gradient sizes,")
+print("  and no single value can.")
+print()
+
+print("momentum accumulates the small consistent gradient instead of")
+print("re-deriving it each step, so the shallow direction picks up speed:")
+w, v = START.copy(), np.zeros(2)
+print("%8s %14s %14s" % ("step", "gradient y", "velocity y"))
+for t in range(1, 25):
+    g = grad(w)
+    v = 0.9 * v + g
+    if t in (1, 2, 5, 10, 24):
+        print("%8d %14.6f %14.6f" % (t, g[1], v[1]))
+    w = w - LR * 0.5 * v
+print("  the velocity grows to roughly 1/(1-beta) = %.0f times the gradient."
+      % (1 / (1 - 0.9)))
+print("  in the steep direction the gradient keeps flipping sign, so those")
+print("  same accumulations cancel instead. momentum speeds up consistency")
+print("  and damps oscillation with one mechanism.")
+print()
+
+print("RMSProp and Adam take a different route: divide each coordinate by")
+print("its own running gradient magnitude, so both get a comparable step.")
+w, m, v = START.copy(), np.zeros(2), np.zeros(2)
+print("%6s %24s %24s %20s" % ("step", "gradient", "v (mean square)", "step taken"))
+for t in range(1, 6):
+    g = grad(w)
+    m = 0.9 * m + 0.1 * g
+    v = 0.999 * v + 0.001 * g ** 2
+    upd = 0.05 * (m / (1 - 0.9 ** t)) / (np.sqrt(v / (1 - 0.999 ** t)) + 1e-8)
+    print("%6d %24s %24s %20s"
+          % (t, np.round(g, 2), np.round(v, 2), np.round(upd, 5)))
+    w = w - upd
+print("  the gradients differ by 1000x. the steps differ by almost nothing.")
+print()
+
+print("now the row worth staring at -- RMSProp got to 1e-38 by step 100 and")
+print("then went BACK UP by step 400:")
+for k in (60, 100, 200, 400):
+    print("   %3d steps: loss %.2e" % (k, loss(rmsprop(k))))
+print("  it is not diverging. once the gradient is tiny, the running average")
+print("  of its square is tiny too, and g/sqrt(v) is close to 1 regardless.")
+print("  so the step stays about lr forever and the optimiser wanders around")
+print("  the minimum at that radius instead of settling into it.")
+print()
+print("Adam's bias correction and momentum term damp this, but it has the")
+print("same character. it is the reason a decaying learning rate is not")
+print("optional with adaptive optimisers -- the schedule is what actually")
+print("lands the model, and 'Adam converged' usually means 'Adam stopped")
+print("improving at the resolution its learning rate allows'.")
+print()
+print("the bias correction, which looks like a hack and is not:")
+print("%6s %14s %16s %16s" % ("step", "m[1] raw", "m[1] corrected", "true gradient"))
+w2, m2 = START.copy(), np.zeros(2)
+for t in range(1, 5):
+    g = grad(w2)
+    m2 = 0.9 * m2 + 0.1 * g
+    print("%6d %14.4f %16.4f %16.4f" % (t, m2[1], m2[1] / (1 - 0.9 ** t), g[1]))
+print("  m starts at zero, so the first averages are biased toward zero.")
+print("  dividing by (1 - beta^t) undoes exactly that, and the correction")
+print("  fades as t grows. without it the opening steps are far too small.")
+print()
+print("AdamW changes one line: weight decay is applied to the weight directly")
+print("rather than added to the gradient. inside Adam, an L2 term would get")
+print("divided by sqrt(v) like everything else, so parameters with large")
+print("gradients would receive LESS decay -- the opposite of the intent.")
+print()
+print("the honest caveat: Adam converges faster and often generalises slightly")
+print("worse than well-tuned SGD with momentum. that is why image models are")
+print("still frequently trained with SGD, and transformers essentially never.")
+```
+
 ## Questions people ask
 
 <strong>Should I ever use plain SGD?</strong> With momentum, yes &mdash; it is still competitive on vision with a good schedule. Without momentum, essentially never.

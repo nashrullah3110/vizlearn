@@ -93,3 +93,84 @@ meaning without one.
 [temperature
 scaling](../machine_learning/probability_calibration.html) on a validation set
 helps more, and the two combine.
+
+## Tell the model it might be wrong
+
+Replacing a target of 1.0 with 0.9 changes what the loss is minimised by. This computes that optimum exactly, then shows the effect on confidence and on the logits themselves.
+
+```python-run
+import numpy as np
+
+K = 5           # classes
+EPS = 0.1       # smoothing strength
+
+hard = np.zeros(K); hard[0] = 1.0
+soft = np.full(K, EPS / K); soft[0] += 1 - EPS
+
+print("a %d-class problem, true class 0." % K)
+print("  hard target  :", np.round(hard, 4))
+print("  smoothed 0.1 :", np.round(soft, 4), " sums to", round(soft.sum(), 6))
+print("  the formula is (1 - eps) * onehot + eps / K.")
+print()
+
+def softmax(z):
+    e = np.exp(z - z.max())
+    return e / e.sum()
+
+def ce(z, target):
+    return -(target * np.log(softmax(z))).sum() + 0.0
+
+print("what each target is minimised BY. the loss against a hard target")
+print("keeps falling as the true logit grows, forever:")
+print("%14s %14s %16s" % ("logit gap", "hard loss", "smoothed loss"))
+for gap in (1.0, 2.0, 4.0, 8.0, 16.0, 40.0):
+    z = np.zeros(K); z[0] = gap
+    print("%14.1f %14.6f %16.6f" % (gap, ce(z, hard), ce(z, soft)))
+print()
+print("the hard column goes to zero and never stops rewarding a bigger gap.")
+print("the smoothed column has a MINIMUM. find it by search:")
+gaps = np.linspace(0.1, 20, 4000)
+losses = [ce(np.r_[g, np.zeros(K - 1)], soft) for g in gaps]
+best = gaps[int(np.argmin(losses))]
+print("  smoothed loss is lowest at a logit gap of %.4f" % best)
+print("  the closed form says log((1-eps+eps/K) / (eps/K)) = %.4f"
+      % np.log((1 - EPS + EPS / K) / (EPS / K)))
+print()
+print("so smoothing does not merely 'soften' the target -- it gives the model")
+print("a finite target to aim for. without it the optimum is at infinity, and")
+print("the weights grow without bound trying to reach it.")
+print()
+
+z_at_best = np.r_[best, np.zeros(K - 1)]
+print("the confidence that corresponds to that optimum:")
+print("  probabilities:", np.round(softmax(z_at_best), 4))
+print("  the model's best possible answer is %.4f, not 1.0000."
+      % softmax(z_at_best)[0])
+print()
+
+print("smoothing strength against the confidence it targets:")
+print("%10s %16s %16s" % ("eps", "optimal gap", "peak probability"))
+for eps in (0.0, 0.01, 0.05, 0.1, 0.2, 0.5):
+    if eps == 0:
+        print("%10.2f %16s %16s" % (eps, "infinite", "1.0000"))
+        continue
+    gap = np.log((1 - eps + eps / K) / (eps / K))
+    print("%10.2f %16.4f %16.4f"
+          % (eps, gap, softmax(np.r_[gap, np.zeros(K - 1)])[0]))
+print("  eps=0.5 targets only %.2f confidence, which is barely a decision."
+      % softmax(np.r_[np.log((1 - 0.5 + 0.5 / K) / (0.5 / K)), np.zeros(K - 1)])[0])
+print("  0.1 is the usual choice and 0.2 is about as far as anyone goes.")
+print()
+
+print("and what it costs. a genuinely certain example is now penalised:")
+z_sure = np.r_[12.0, np.zeros(K - 1)]
+print("  a model that is right and certain (p=%.6f):" % softmax(z_sure)[0])
+print("    hard loss     %.6f" % ce(z_sure, hard))
+print("    smoothed loss %.6f  <- it is being pushed back down"
+      % ce(z_sure, soft))
+print()
+print("that is the trade. label smoothing buys better-calibrated confidence")
+print("and slightly better accuracy, and costs you the ability to be certain")
+print("about anything. if your downstream system reads the probability as a")
+print("probability, measure the calibration before and after -- do not assume.")
+```

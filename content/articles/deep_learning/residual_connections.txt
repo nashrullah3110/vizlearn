@@ -108,6 +108,119 @@ The empirical evidence for this reading is striking: removing a single block fro
 
 That also explains why residual networks are unusually robust to layer dropping and to architectural surgery, and why <strong>stochastic depth</strong> &mdash; randomly skipping whole blocks during training &mdash; works as a regulariser.
 
+## Add the input back, and depth stops hurting
+
+A plain 40-layer network trains worse than a 10-layer one. The same network with skip connections does not, and the reason is visible in one line of the backward pass.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+WIDTH, N = 32, 256
+
+def build(depth, seed=0):
+    r = np.random.default_rng(seed)
+    return [r.normal(0, np.sqrt(2 / WIDTH) * 0.75, (WIDTH, WIDTH))
+            for _ in range(depth)]
+
+def measure(depth, mode, seed=0):
+    # mode: "plain", "residual", or "residual+norm"
+    Ws = build(depth, seed)
+    x = rng.normal(size=(N, WIDTH))
+    zs, invs, a = [], [], x
+    for W in Ws:
+        z = a @ W
+        zs.append(z)
+        a = np.maximum(0, z) + (a if mode != "plain" else 0.0)
+        if mode == "residual+norm":
+            inv = 1.0 / (a.std(axis=1, keepdims=True) + 1e-5)
+            a = (a - a.mean(axis=1, keepdims=True)) * inv
+            invs.append(inv)
+        else:
+            invs.append(None)
+    out_scale = np.abs(a).mean()
+    g = rng.normal(size=a.shape) / np.sqrt(N)
+    for i in range(depth - 1, -1, -1):
+        if mode == "residual+norm":
+            g = g * invs[i]            # the norm's scaling, on the way back
+        gz = g * (zs[i] > 0)
+        g = gz @ Ws[i].T + (g if mode != "plain" else 0.0)
+    return out_scale, np.abs(g).mean()
+
+print("weights deliberately set a little below He scale (0.75x), so each")
+print("layer shrinks the signal slightly. that is the normal situation --")
+print("nothing is ever exactly at the knife edge.")
+print()
+print("%7s | %11s %11s | %11s %11s | %11s %11s"
+      % ("depth", "plain out", "plain grad", "res out", "res grad",
+         "res+norm out", "r+n grad"))
+for depth in (5, 10, 20, 40, 80):
+    p_o, p_g = measure(depth, "plain")
+    r_o, r_g = measure(depth, "residual")
+    n_o, n_g = measure(depth, "residual+norm")
+    print("%7d | %11.2e %11.2e | %11.2e %11.2e | %11.2e %11.2e"
+          % (depth, p_o, p_g, r_o, r_g, n_o, n_g))
+print()
+print("read the three pairs. the PLAIN stack loses a constant factor per")
+print("layer, so it is exponential in depth: by 80 layers the first layer's")
+print("gradient is indistinguishable from zero and those weights never move.")
+print()
+print("the RAW residual stack has the opposite problem. every block adds a")
+print("non-negative relu output to the running sum, so the signal grows")
+print("without bound -- and the gradient with it. the skip path solved the")
+print("vanishing problem by creating an exploding one.")
+print()
+print("the third pair is what a real residual block actually does: a")
+print("normalisation inside the block bounds the stream, while the skip path")
+print("keeps the gradient's multiplier at 1. the output column is flat at")
+print("~0.81 for every depth from 5 to 80.")
+print()
+print("be precise about the gradient though: it still grows, from 0.08 to")
+print("about 50 across a 16x increase in depth. that is polynomial growth,")
+print("not exponential, and a growing gradient is a problem you solve with")
+print("one line of clipping. a gradient of 4e-13 is not a problem you solve")
+print("at all. that is the whole difference, and it is why the combination")
+print("of skip plus norm is the architecture -- neither piece works alone.")
+print()
+
+print("here is that path, in the one line that matters:")
+print("    plain    :  g = (g * relu') @ W.T")
+print("    residual :  g = (g * relu') @ W.T  +  g")
+print()
+print("the '+ g' term is not scaled by anything. so however small the first")
+print("term becomes, the gradient reaching the layer below is at least the")
+print("gradient that arrived. formally, for y = x + F(x):")
+print("    dy/dx = 1 + dF/dx")
+print("and a product of terms that are each '1 plus something small' does")
+print("not collapse the way a product of small terms does:")
+for f in (0.7, 0.9):
+    print("  20 layers at factor %.1f      : %.3e" % (f, f ** 20))
+    print("  20 layers at (1 + %.1f x 0.1): %.3e" % (f, (1 + f * 0.1) ** 20))
+print()
+
+print("what a residual block actually learns. if the useful function is close")
+print("to the identity, F only has to learn the DIFFERENCE:")
+target = np.array([1.0, 2.0, 3.0, 4.0])
+nearly = target * 1.02 + 0.01
+print("  input                      :", np.round(target, 4))
+print("  the layer should output     :", np.round(nearly, 4))
+print("  a plain layer must learn    :", np.round(nearly, 4), "from scratch")
+print("  a residual layer learns F = :", np.round(nearly - target, 4))
+print("  the second is a much smaller thing to represent, and F = 0 -- which")
+print("  is what small random weights already nearly are -- is a working")
+print("  block. that is why adding depth to a residual network cannot make")
+print("  it worse: the extra layers can learn to do nothing.")
+print()
+
+print("the shape rule that trips people up: x and F(x) must have the same")
+print("shape to be added. when a block changes width or downsamples, the")
+print("skip path needs a projection:")
+print("  same shape     : out = x + F(x)")
+print("  changing shape : out = W_s @ x + F(x)   (a 1x1 conv, or a linear)")
+print("  that projection is the only place a 'skip connection' has")
+print("  parameters, and it is why ResNet diagrams show dotted arrows.")
+```
+
 ## Questions people ask
 
 <strong>Do residual connections have parameters?</strong> Not when the shapes match. A projection shortcut has a 1&times;1 convolution's worth.

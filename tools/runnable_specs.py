@@ -106,6 +106,16 @@ SPECS = {
         "label": "NumPy",
         "filename": "example_%02d.py",
     },
+    "deep_learning": {
+        # numpy only, on purpose. Every idea in this track is clearer built
+        # from scratch than called from a framework: a backward pass you can
+        # read, a softmax you can check against its own definition. It also
+        # keeps the page at numpy's ~7s load rather than scikit-learn's ~17s,
+        # and torch is not available in Pyodide at all.
+        "packages": "numpy",
+        "label": "NumPy",
+        "filename": "example_%02d.py",
+    },
     "machine_learning": {
         # The concept track, so the code demonstrates an idea rather than an
         # API: bias/variance, leakage, class imbalance, gradient descent by

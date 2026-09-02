@@ -122,6 +122,120 @@ Failures and their signatures:
 
 That last row is worth expecting: a visible drop in the closing epochs is the schedule working as intended, not a fluke.
 
+## Five schedules, and the one that lands the model
+
+A fixed learning rate cannot be both fast at the start and precise at the end. Each schedule here is plotted as numbers and then run on the same problem.
+
+```python-run
+import numpy as np
+
+EPOCHS = 400
+base = 0.05
+
+def constant(e):   return base
+def step(e):       return base * 0.1 ** (e // (EPOCHS // 3))
+def exp_decay(e):  return base * np.exp(-4.0 * e / EPOCHS)
+def cosine(e):     return base * 0.5 * (1 + np.cos(np.pi * e / EPOCHS))
+def warmup_cos(e, warm=EPOCHS // 10):
+    if e < warm:
+        return base * (e + 1) / warm
+    t = (e - warm) / (EPOCHS - warm)
+    return base * 0.5 * (1 + np.cos(np.pi * t))
+
+schedules = [("constant", constant),
+             ("step (x0.1 every %d)" % (EPOCHS // 3), step),
+             ("exponential", exp_decay), ("cosine", cosine),
+             ("warmup + cosine", warmup_cos)]
+
+print("learning rate at each epoch:")
+MARKS = (0, 20, 60, 140, 200, 300, 399)
+print("%-24s %s" % ("epoch", "".join("%8d" % e for e in MARKS)))
+for name, fn in schedules:
+    print("%-24s %s" % (name, "".join("%8.5f" % fn(e) for e in MARKS)))
+print()
+
+print("cosine drawn as a shape, because that is how you usually meet it:")
+for e in range(0, EPOCHS, 28):
+    lr = cosine(e)
+    print("  epoch %3d  %.5f  %s" % (e, lr, "#" * int(lr / base * 50)))
+print()
+
+# a quadratic bowl, but with NOISY gradients -- which is what a mini-batch
+# actually hands you, and the reason a constant rate cannot settle.
+CURVE = np.array([8.0, 2.0])
+LIMIT = 2 / CURVE.max()
+def loss(w): return 0.5 * (CURVE * w ** 2).sum()
+def noisy_grad(w, r): return CURVE * w + r.normal(0, 0.6, 2)
+
+print("now run them on a noisy version of that bowl -- every gradient carries")
+print("mini-batch noise, exactly as it would in real training.")
+print("(base rate %.2f, comfortably under the stability limit of %.3f.)"
+      % (base, LIMIT))
+print()
+print("%-24s %14s %16s" % ("schedule", "final loss", "mean over last 20"))
+for name, fn in schedules:
+    finals, tail = [], []
+    for trial in range(30):
+        r = np.random.default_rng(trial)
+        w = np.array([-2.0, -2.0])
+        for e in range(EPOCHS):
+            w = w - fn(e) * noisy_grad(w, r)
+            if e >= EPOCHS - 20:
+                tail.append(loss(w))
+        finals.append(loss(w))
+    print("%-24s %14.5f %16.5f" % (name, np.mean(finals), np.mean(tail)))
+print()
+print("the constant rate never settles. noise keeps kicking the weights out,")
+print("and a fixed step size can only ever return them to within roughly")
+print("lr x noise of the minimum -- so it orbits at that radius forever.")
+print()
+print("watch one run of it. loss every 80 epochs, constant rate:")
+r = np.random.default_rng(0)
+w = np.array([-2.0, -2.0])
+for e in range(EPOCHS):
+    if e % 80 == 0:
+        print("  epoch %3d: loss %.5f  position %s" % (e, loss(w), np.round(w, 4)))
+    w = w - base * noisy_grad(w, r)
+print("  it gets close quickly and then stops improving -- every further")
+print("  step is the same size as the distance it has left to cover.")
+print()
+print("the same run with cosine decay:")
+r = np.random.default_rng(0)
+w = np.array([-2.0, -2.0])
+for e in range(EPOCHS):
+    if e % 80 == 0:
+        print("  epoch %3d: loss %.5f  position %s" % (e, loss(w), np.round(w, 4)))
+    w = w - cosine(e) * noisy_grad(w, r)
+print("  as the rate shrinks, so does the orbit. that is the whole purpose of")
+print("  a schedule: large steps to travel, small steps to arrive.")
+print()
+
+print("why warmup exists, which is less obvious. at step 1 the weights are")
+print("random, so the first gradients are large and point nowhere useful:")
+rng = np.random.default_rng(0)
+for step_i in range(1, 6):
+    g = grad(np.array([-2.0, -2.0])) * rng.uniform(0.8, 1.4)
+    print("  a big early step of size %.4f moves the weights %.3f"
+          % (base, base * np.linalg.norm(g)))
+print("  taking those steps at full size can throw the model somewhere it")
+print("  never recovers from. warmup ramps the rate up over the first few")
+print("  hundred steps so the early noise cannot do that damage. it is")
+print("  essential for transformers and largely optional elsewhere.")
+print()
+
+print("what to reach for:")
+print("  cosine with warmup   -- the default for transformers, and a")
+print("                          reasonable default for anything")
+print("  step decay           -- classic for image models; simple and")
+print("                          easy to reason about")
+print("  ReduceLROnPlateau    -- reactive: cut the rate when validation")
+print("                          loss stops improving. good when you cannot")
+print("                          predict the epoch budget in advance")
+print()
+print("and the one rule underneath all of them: the learning rate must end")
+print("much smaller than it started, or the model never settles.")
+```
+
 ## Questions people ask
 
 <strong>Do I need a schedule with Adam?</strong> Yes. Adam adapts per-parameter scaling; it does not replace a global decay, and every large-model recipe uses both.

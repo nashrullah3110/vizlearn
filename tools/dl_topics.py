@@ -1142,6 +1142,104 @@ subword tokenisation avoids the question.
 
 **Reading similarity as meaning.** Embedding proximity reflects co-occurrence in
 the training data, which is not the same thing.
+
+## A lookup table that learns what things mean
+
+An embedding layer is one-hot encoding times a weight matrix, with the multiplication skipped. This shows the equivalence, the cost saving, and what the learned vectors end up encoding.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+VOCAB, DIM = 8, 4
+words = ["cat", "dog", "wolf", "car", "truck", "bus", "the", "a"]
+E = rng.normal(0, 0.5, (VOCAB, DIM))
+
+print("an embedding table: %d words x %d dimensions = %d parameters."
+      % (VOCAB, DIM, E.size))
+print()
+print("look up word 2 ('wolf') two ways:")
+onehot = np.zeros(VOCAB); onehot[2] = 1
+print("  one-hot @ E :", np.round(onehot @ E, 4))
+print("  E[2]        :", np.round(E[2], 4))
+print("  identical:", np.allclose(onehot @ E, E[2]))
+print()
+print("that is the whole trick. multiplying by a one-hot vector selects one")
+print("row, so you index instead. the maths is unchanged, the cost is not:")
+for v, d in ((8, 4), (50_000, 256), (200_000, 1024)):
+    mults = v * d
+    print("  vocab %7d, dim %5d: one-hot matmul does %12d multiplications"
+          % (v, d, mults))
+    print("  %28s a lookup does %12d" % ("", d))
+print()
+
+print("the gradient is just as sparse. only the rows you used get updated:")
+grad_out = np.zeros_like(E)
+batch_ids = [2, 5, 2]
+upstream = rng.normal(size=(3, DIM))
+for i, wid in enumerate(batch_ids):
+    grad_out[wid] += upstream[i]
+print("  a batch using word ids %s" % batch_ids)
+print("  rows with a non-zero gradient:", np.where(np.abs(grad_out).sum(axis=1) > 0)[0])
+print("  word 2 appeared twice, so its gradients ADD -- that is why a")
+print("  frequent word's embedding moves further per batch than a rare one's,")
+print("  and why rare words end up close to their initial random values.")
+print()
+
+print("now train one, so the vectors mean something. the task: predict which")
+print("of three groups a word belongs to (animal, vehicle, article).")
+groups = np.array([0, 0, 0, 1, 1, 1, 2, 2])
+Emb = rng.normal(0, 0.3, (VOCAB, DIM))
+W = rng.normal(0, 0.3, (DIM, 3))
+lr = 0.5
+for step in range(600):
+    h = Emb                       # one row per word, whole vocabulary as a batch
+    logits = h @ W
+    p = np.exp(logits - logits.max(axis=1, keepdims=True))
+    p /= p.sum(axis=1, keepdims=True)
+    d = p.copy(); d[np.arange(VOCAB), groups] -= 1; d /= VOCAB
+    W -= lr * (h.T @ d)
+    Emb -= lr * (d @ W.T)
+print("  final accuracy: %.4f" % ((Emb @ W).argmax(axis=1) == groups).mean())
+print()
+
+def cos(a, b):
+    return a @ b / (np.linalg.norm(a) * np.linalg.norm(b))
+
+print("cosine similarity between the learned vectors:")
+print("%8s %s" % ("", "".join("%8s" % w for w in words)))
+for i, wi in enumerate(words):
+    print("%8s %s" % (wi, "".join("%8.3f" % cos(Emb[i], Emb[j])
+                                  for j in range(VOCAB))))
+print()
+print("nothing told the model that cat and dog are related. it only ever saw")
+print("a group label. the similarity appeared because words that need the")
+print("same output were pushed toward the same region of the space.")
+print()
+same = np.mean([cos(Emb[i], Emb[j]) for i in range(VOCAB) for j in range(VOCAB)
+                if i != j and groups[i] == groups[j]])
+diff = np.mean([cos(Emb[i], Emb[j]) for i in range(VOCAB) for j in range(VOCAB)
+                if groups[i] != groups[j]])
+print("  average similarity within a group : %+.4f" % same)
+print("  average similarity across groups  : %+.4f" % diff)
+print()
+print("that is what 'learned representation' means, and it is why embeddings")
+print("transfer: the geometry is a by-product of the task, so a table trained")
+print("on one task is often useful for another.")
+print()
+print("choosing the dimension is the only real decision. too small and")
+print("distinct words are forced to share space; too large and rare words")
+print("never see enough gradient to move. the usual rule of thumb is")
+print("a common starting point is four times the fourth root of the vocabulary,")
+print("then rounded to a power of two:")
+for v in (1_000, 50_000, 500_000):
+    raw = 4 * v ** 0.25
+    print("  vocab %7d -> 4 * %5.1f = %5.1f, so 64 to 256 in practice"
+          % (v, v ** 0.25, raw))
+print("  in real models the number is chosen by what fits in memory and what")
+print("  the downstream layers expect, far more often than by any formula.")
+```
+
 """,
     [
         {"q": "Why is an embedding layer implemented as a lookup rather than a matmul?",
@@ -1454,6 +1552,101 @@ touch. When the weights alone do not fit, accumulation is not the answer.
 **Using it with batch norm at a tiny micro-batch.** Real quality loss.
 
 **Expecting a speed-up.** It buys capability, not throughput.
+
+## A large batch on a small GPU
+
+Accumulating gradients over several small batches before stepping is arithmetically identical to one large batch. This proves the identity, then shows the two things that are not identical.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+N, D = 64, 5
+X = rng.normal(size=(N, D))
+w_true = rng.normal(size=D)
+y = X @ w_true + rng.normal(0, 0.3, N)
+w = np.zeros(D)
+
+def grad(Xb, yb, wv):
+    return 2 * Xb.T @ (Xb @ wv - yb) / len(Xb)
+
+print("64 rows. compute the gradient two ways.")
+print()
+big = grad(X, y, w)
+print("one batch of 64:")
+print("  ", np.round(big, 8))
+print()
+
+acc = np.zeros(D)
+STEPS = 4
+for i in range(STEPS):
+    chunk = slice(i * 16, (i + 1) * 16)
+    acc += grad(X[chunk], y[chunk], w) / STEPS
+print("four batches of 16, each gradient divided by 4 and summed:")
+print("  ", np.round(acc, 8))
+print("  max difference: %.2e" % np.abs(big - acc).max())
+print()
+print("identical. that is the whole technique: the mean over 64 rows is the")
+print("mean of four means over 16 rows, as long as the batches are equal")
+print("sized and you divide by the number of accumulation steps.")
+print()
+
+print("the division is the part people get wrong. without it:")
+wrong = sum(grad(X[i * 16:(i + 1) * 16], y[i * 16:(i + 1) * 16], w)
+            for i in range(STEPS))
+print("  summed without dividing:", np.round(wrong[:3], 4), "...")
+print("  correct:                ", np.round(big[:3], 4), "...")
+print("  ratio: %.1f -- you have silently multiplied your learning rate by %d."
+      % (np.abs(wrong).mean() / np.abs(big).mean(), STEPS))
+print()
+
+print("what it buys, in memory terms. activation memory scales with batch")
+print("size; gradient memory does not:")
+print("%14s %18s %18s" % ("micro-batch", "activations held", "effective batch"))
+for micro in (64, 16, 8, 4, 1):
+    print("%14d %18s %18d"
+          % (micro, "%dx" % micro, 64))
+print("  the gradient buffer is the same size in every row -- one number per")
+print("  parameter. only the activations kept for the backward pass shrink.")
+print()
+
+print("and now the two things that are NOT identical.")
+print()
+print("1. BatchNorm. its statistics come from the micro-batch, not the")
+print("   accumulated one, so accumulation does not restore large-batch")
+print("   behaviour there:")
+for micro in (64, 16, 4):
+    b = X[:micro]
+    print("     micro-batch of %2d: feature-0 mean %+.4f, sd %.4f"
+          % (micro, b[:, 0].mean(), b[:, 0].std()))
+print("     those are the numbers BatchNorm would use. they are noisier the")
+print("     smaller the micro-batch, and accumulation cannot fix it.")
+print("     LayerNorm and GroupNorm are unaffected, which is one more reason")
+print("     transformers are easier to train this way.")
+print()
+print("2. speed. four passes of 16 do the same arithmetic as one pass of 64,")
+print("   but with four times the kernel launches and less parallelism. you")
+print("   are trading wall-clock time for memory, not getting both.")
+print()
+
+print("the loop, written out, because the off-by-one is easy:")
+print("    optimizer.zero_grad()")
+print("    for i, batch in enumerate(loader):")
+print("        loss = criterion(model(batch.x), batch.y) / ACCUM")
+print("        loss.backward()                 # gradients ADD by default")
+print("        if (i + 1) % ACCUM == 0:")
+print("            optimizer.step()")
+print("            optimizer.zero_grad()")
+print()
+print("three things to check: divide the loss by ACCUM, do not zero the")
+print("gradients between micro-batches, and handle the final partial group")
+print("-- if the loader ends mid-accumulation those gradients are discarded.")
+print()
+print("and if you use a learning rate schedule, step it once per OPTIMIZER")
+print("step, not once per micro-batch, or your schedule runs %d times too fast."
+      % STEPS)
+```
+
 """,
     [
         {"q": "Why is the accumulated update identical to a large-batch update?",
@@ -1605,6 +1798,88 @@ meaning without one.
 [temperature
 scaling](../machine_learning/probability_calibration.html) on a validation set
 helps more, and the two combine.
+
+## Tell the model it might be wrong
+
+Replacing a target of 1.0 with 0.9 changes what the loss is minimised by. This computes that optimum exactly, then shows the effect on confidence and on the logits themselves.
+
+```python-run
+import numpy as np
+
+K = 5           # classes
+EPS = 0.1       # smoothing strength
+
+hard = np.zeros(K); hard[0] = 1.0
+soft = np.full(K, EPS / K); soft[0] += 1 - EPS
+
+print("a %d-class problem, true class 0." % K)
+print("  hard target  :", np.round(hard, 4))
+print("  smoothed 0.1 :", np.round(soft, 4), " sums to", round(soft.sum(), 6))
+print("  the formula is (1 - eps) * onehot + eps / K.")
+print()
+
+def softmax(z):
+    e = np.exp(z - z.max())
+    return e / e.sum()
+
+def ce(z, target):
+    return -(target * np.log(softmax(z))).sum() + 0.0
+
+print("what each target is minimised BY. the loss against a hard target")
+print("keeps falling as the true logit grows, forever:")
+print("%14s %14s %16s" % ("logit gap", "hard loss", "smoothed loss"))
+for gap in (1.0, 2.0, 4.0, 8.0, 16.0, 40.0):
+    z = np.zeros(K); z[0] = gap
+    print("%14.1f %14.6f %16.6f" % (gap, ce(z, hard), ce(z, soft)))
+print()
+print("the hard column goes to zero and never stops rewarding a bigger gap.")
+print("the smoothed column has a MINIMUM. find it by search:")
+gaps = np.linspace(0.1, 20, 4000)
+losses = [ce(np.r_[g, np.zeros(K - 1)], soft) for g in gaps]
+best = gaps[int(np.argmin(losses))]
+print("  smoothed loss is lowest at a logit gap of %.4f" % best)
+print("  the closed form says log((1-eps+eps/K) / (eps/K)) = %.4f"
+      % np.log((1 - EPS + EPS / K) / (EPS / K)))
+print()
+print("so smoothing does not merely 'soften' the target -- it gives the model")
+print("a finite target to aim for. without it the optimum is at infinity, and")
+print("the weights grow without bound trying to reach it.")
+print()
+
+z_at_best = np.r_[best, np.zeros(K - 1)]
+print("the confidence that corresponds to that optimum:")
+print("  probabilities:", np.round(softmax(z_at_best), 4))
+print("  the model's best possible answer is %.4f, not 1.0000."
+      % softmax(z_at_best)[0])
+print()
+
+print("smoothing strength against the confidence it targets:")
+print("%10s %16s %16s" % ("eps", "optimal gap", "peak probability"))
+for eps in (0.0, 0.01, 0.05, 0.1, 0.2, 0.5):
+    if eps == 0:
+        print("%10.2f %16s %16s" % (eps, "infinite", "1.0000"))
+        continue
+    gap = np.log((1 - eps + eps / K) / (eps / K))
+    print("%10.2f %16.4f %16.4f"
+          % (eps, gap, softmax(np.r_[gap, np.zeros(K - 1)])[0]))
+print("  eps=0.5 targets only %.2f confidence, which is barely a decision."
+      % softmax(np.r_[np.log((1 - 0.5 + 0.5 / K) / (0.5 / K)), np.zeros(K - 1)])[0])
+print("  0.1 is the usual choice and 0.2 is about as far as anyone goes.")
+print()
+
+print("and what it costs. a genuinely certain example is now penalised:")
+z_sure = np.r_[12.0, np.zeros(K - 1)]
+print("  a model that is right and certain (p=%.6f):" % softmax(z_sure)[0])
+print("    hard loss     %.6f" % ce(z_sure, hard))
+print("    smoothed loss %.6f  <- it is being pushed back down"
+      % ce(z_sure, soft))
+print()
+print("that is the trade. label smoothing buys better-calibrated confidence")
+print("and slightly better accuracy, and costs you the ability to be certain")
+print("about anything. if your downstream system reads the probability as a")
+print("probability, measure the calibration before and after -- do not assume.")
+```
+
 """,
     [
         {"q": "Why does a one-hot target make a model overconfident?",

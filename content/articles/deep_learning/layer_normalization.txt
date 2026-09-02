@@ -52,6 +52,84 @@ Every large language model uses pre-norm, and it is one of the small architectur
 
 <strong>RMSNorm</strong> is the further simplification now common in large models: it divides by the root mean square of the features and skips the mean subtraction entirely. One fewer statistic to compute, no accuracy cost in practice, and measurably faster at scale.
 
+## The same idea, along the other axis
+
+LayerNorm normalises across the features of one row instead of across the batch. That one change makes it independent of batch size, which is why every transformer uses it.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+x = rng.normal(0, 1, (4, 6)) * np.array([1.0, 5.0, 0.2, 3.0, 1.0, 0.5]) + 2.0
+np.set_printoptions(precision=4, suppress=True)
+print("4 rows, 6 features:")
+print(x)
+print()
+
+def batchnorm(a, eps=1e-5):
+    return (a - a.mean(axis=0)) / np.sqrt(a.var(axis=0) + eps)
+
+def layernorm(a, eps=1e-5):
+    return (a - a.mean(axis=1, keepdims=True)) / np.sqrt(a.var(axis=1, keepdims=True) + eps)
+
+bn, ln = batchnorm(x), layernorm(x)
+print("BatchNorm -- each COLUMN gets mean 0, sd 1:")
+print("  column means:", np.round(bn.mean(axis=0), 8))
+print("  row means   :", np.round(bn.mean(axis=1), 4), " <- not controlled")
+print()
+print("LayerNorm -- each ROW gets mean 0, sd 1:")
+print("  row means   :", np.round(ln.mean(axis=1), 8))
+print("  column means:", np.round(ln.mean(axis=0), 4), " <- not controlled")
+print()
+print("same formula, different axis. that is the entire difference.")
+print()
+
+print("and here is what it buys. process the SAME row in three batch sizes:")
+row = x[:1]
+for k in (1, 2, 4):
+    b = x[:k]
+    print("  batch of %d:" % k)
+    print("     BatchNorm gives", np.round(batchnorm(b)[0], 4))
+    print("     LayerNorm gives", np.round(layernorm(b)[0], 4))
+print("  LayerNorm returns the same numbers every time. BatchNorm does not,")
+print("  and at batch size 1 it collapses to zeros because a single row has")
+print("  no variance to divide by.")
+print()
+
+print("that independence is why LayerNorm won in sequence models:")
+print("  - sequences have variable length, so a 'batch' is ragged")
+print("  - inference is often batch size 1, and the answer must not change")
+print("  - there is no running mean to keep, so train and eval are identical")
+print("  - it works unchanged when the batch is split across 8 GPUs")
+print()
+
+print("it has gamma and beta too, one pair per feature:")
+gamma = np.array([1.0, 1.0, 2.0, 1.0, 0.5, 1.0])
+beta = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0])
+out = gamma * ln + beta
+print("  out[0] =", np.round(out[0], 4))
+print("  note gamma and beta are per-FEATURE even though the normalisation")
+print("  was per-row. the statistics are shared along one axis, the learned")
+print("  parameters along the other.")
+print()
+
+print("RMSNorm, which newer models use, drops the mean subtraction entirely:")
+def rmsnorm(a, eps=1e-6):
+    return a / np.sqrt((a ** 2).mean(axis=1, keepdims=True) + eps)
+print("  LayerNorm(x)[0] =", np.round(ln[0], 4))
+print("  RMSNorm(x)[0]   =", np.round(rmsnorm(x)[0], 4))
+print("  it only rescales, never recentres. one less reduction per call,")
+print("  and in practice the mean subtraction turned out not to matter much.")
+print()
+
+print("where the norm sits relative to the residual is its own decision:")
+print("  post-norm: x + Sublayer(x), then normalise. the original transformer.")
+print("  pre-norm:  x + Sublayer(norm(x)). the skip path never passes through")
+print("             a norm, so the gradient reaches layer 1 untouched --")
+print("             which is what made very deep transformers trainable")
+print("             without a long warmup.")
+```
+
 ## Guided experiments
 
 1. <strong>Start at None.</strong> Four samples with deliberately different overall magnitudes — Sample B in particular is roughly 500x the scale of Sample C. Per-column stats are dominated by whichever sample happens to be largest.

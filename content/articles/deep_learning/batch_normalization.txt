@@ -141,6 +141,97 @@ At inference, batch normalisation can be <strong>folded</strong> into the preced
 - <strong>Exclude `γ` and `β` from weight decay.</strong> Decaying them towards zero fights what the layer is for.
 - <strong>Shuffle your training data.</strong> Batches sorted by class give meaningless statistics.
 
+## Normalise, then let the network undo it
+
+BatchNorm rescales each feature to zero mean and unit variance, then gives the network two parameters to change that back. Both halves matter, and the train/eval difference is where most bugs live.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+# a batch of 8 rows, 4 features on wildly different scales
+x = np.column_stack([rng.normal(100, 15, 8), rng.normal(0, 0.01, 8),
+                     rng.normal(-5, 2, 8), rng.normal(1000, 300, 8)])
+print("a batch of %d rows, 4 features on very different scales:" % len(x))
+print("  per-feature mean:", np.round(x.mean(axis=0), 4))
+print("  per-feature sd  :", np.round(x.std(axis=0), 4))
+print()
+
+mu = x.mean(axis=0)
+var = x.var(axis=0)
+xhat = (x - mu) / np.sqrt(var + 1e-5)
+print("normalise each COLUMN across the batch:")
+print("  after: mean", np.round(xhat.mean(axis=0), 10))
+print("  after: sd  ", np.round(xhat.std(axis=0), 6))
+print("  every feature now arrives at the next layer on the same scale.")
+print()
+print("  except feature 1, which lands at %.4f rather than 1.0. its true sd"
+      % xhat.std(axis=0)[1])
+print("  is %.4f -- the same order as the eps of 1e-5 we added for safety,"
+      % x.std(axis=0)[1])
+print("  so eps is a meaningful part of the denominator rather than a rounding")
+print("  guard. that is worth knowing: on near-constant features BatchNorm")
+print("  quietly stops normalising, and eps is what stops it dividing by zero.")
+print()
+
+gamma = np.array([1.0, 2.0, 0.5, 1.0])
+beta = np.array([0.0, 0.0, 3.0, -1.0])
+out = gamma * xhat + beta
+print("then two LEARNED parameters per feature put the scale back if useful:")
+print("  gamma (scale) ", gamma)
+print("  beta  (shift) ", beta)
+print("  output mean   ", np.round(out.mean(axis=0), 4), " <- equals beta")
+print("  output sd     ", np.round(out.std(axis=0), 4),
+      " <- |gamma|, give or take the eps effect above")
+print()
+print("without gamma and beta, BatchNorm would force every layer's output to")
+print("be zero-mean and unit-variance whether that helps or not. with them,")
+print("the network can learn gamma=sd and beta=mean and recover the original")
+print("distribution exactly -- so normalisation costs it nothing it needs.")
+print()
+
+print("the axis matters, and getting it wrong is a classic bug:")
+print("  normalising over rows (correct, per feature):")
+print("    ", np.round(((x - x.mean(axis=0)) / x.std(axis=0)).mean(axis=0), 6))
+print("  normalising over columns (wrong -- that is LayerNorm's axis):")
+wrong = (x - x.mean(axis=1, keepdims=True)) / x.std(axis=1, keepdims=True)
+print("    per-feature mean is now", np.round(wrong.mean(axis=0), 4))
+print("    it mixed a feature measured in thousands with one measured in")
+print("    hundredths, inside a single row. that is not the same operation.")
+print()
+
+print("TRAINING vs INFERENCE -- the part that breaks in production.")
+print("at training time the statistics come from the batch. at inference")
+print("there may be only one row, so a running average is kept instead:")
+running_mu, running_var, mom = np.zeros(4), np.ones(4), 0.1
+for step in range(1, 6):
+    b = np.column_stack([rng.normal(100, 15, 8), rng.normal(0, 0.01, 8),
+                         rng.normal(-5, 2, 8), rng.normal(1000, 300, 8)])
+    running_mu = (1 - mom) * running_mu + mom * b.mean(axis=0)
+    running_var = (1 - mom) * running_var + mom * b.var(axis=0)
+    print("  after batch %d: running mean[0] = %8.3f (batch had %8.3f)"
+          % (step, running_mu[0], b.mean(axis=0)[0]))
+print("  true mean of feature 0 is 100. after 5 batches the estimate is %.3f"
+      % running_mu[0])
+print("  it takes roughly 1/momentum batches to converge, which is why a")
+print("  model evaluated too early can score badly for no other reason.")
+print()
+
+print("and the consequence people trip over -- at training time a prediction")
+print("depends on the OTHER rows in its batch:")
+one = x[:1]
+print("  row 0 alone, normalised by its own batch of 1:")
+print("    ", np.round(((one - one.mean(axis=0)) / np.sqrt(one.var(axis=0) + 1e-5))[0], 4))
+print("  the same row inside the batch of 8:")
+print("    ", np.round(xhat[0], 4))
+print("  a batch of 1 has zero variance, so BatchNorm outputs zeros. that is")
+print("  why batch_size=1 breaks it, why you must call model.eval(), and why")
+print("  small batches make it noisy.")
+print()
+print("that batch dependence is exactly what LayerNorm removes, which is why")
+print("transformers use LayerNorm and convolutional nets still use BatchNorm.")
+```
+
 ## Questions people ask
 
 <strong>Does batch normalisation replace input scaling?</strong> No. Scale the inputs as well; the first layer benefits from the same treatment as the rest.

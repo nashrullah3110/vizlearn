@@ -79,6 +79,88 @@ An epoch is one pass through the data; with 50,000 rows and a batch size of 64 t
 
 Batch size and learning rate move together: doubling the batch size roughly halves the gradient noise, and the usual rule is to scale the learning rate linearly with batch size (with a short warm-up for very large batches).
 
+## The loop, and what the learning rate does to it
+
+Gradient descent is three lines repeated. This runs them on a problem with a known answer, then sweeps the learning rate through working, crawling, and diverging.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 400
+X = np.column_stack([np.ones(n), rng.normal(size=(n, 2))])
+true_w = np.array([4.0, 2.5, -1.5])
+y = X @ true_w + rng.normal(0, 0.5, n)
+
+def descend(lr, steps=200, record=()):
+    w = np.zeros(3)
+    hist = []
+    for s in range(steps):
+        pred = X @ w
+        grad = 2 * X.T @ (pred - y) / n     # d/dw of mean squared error
+        w = w - lr * grad
+        if s in record:
+            hist.append((s, ((X @ w - y) ** 2).mean(), w.copy()))
+    return w, ((X @ w - y) ** 2).mean(), hist
+
+print("the loop, in full:")
+print("    pred = X @ w")
+print("    grad = 2 * X.T @ (pred - y) / n")
+print("    w    = w - lr * grad")
+print()
+
+w, mse, hist = descend(0.1, record=(0, 1, 2, 5, 20, 50, 199))
+print("lr = 0.1, watching it arrive:")
+print("%8s %12s %s" % ("step", "MSE", "weights"))
+for s, m, ww in hist:
+    print("%8d %12.6f %s" % (s, m, np.round(ww, 4)))
+print("  true weights:", true_w)
+print()
+
+print("the closed form agrees, because this problem has one:")
+exact = np.linalg.solve(X.T @ X, X.T @ y)
+print("  gradient descent:", np.round(w, 6))
+print("  normal equation :", np.round(exact, 6))
+print("  (a neural network has no closed form. that is the only reason we")
+print("   iterate at all.)")
+print()
+
+print("now the learning rate, which is the whole game:")
+print("%10s %14s %16s %s" % ("lr", "MSE @ 200", "distance to w*", "verdict"))
+for lr in (0.001, 0.01, 0.1, 0.5, 0.9, 1.05):
+    w2, m2, _ = descend(lr)
+    d = np.linalg.norm(w2 - exact)
+    if not np.isfinite(m2) or m2 > 1e6:
+        verdict = "DIVERGED"
+    elif d > 1.0:
+        verdict = "too slow, still travelling"
+    elif d > 1e-4:
+        verdict = "nearly there"
+    else:
+        verdict = "converged"
+    print("%10.3f %14s %16s %s"
+          % (lr, "%.6f" % m2 if np.isfinite(m2) and m2 < 1e9 else "overflow",
+             "%.6f" % d if np.isfinite(d) and d < 1e9 else "-", verdict))
+print()
+print("too small and 200 steps are not enough to arrive. too large and each")
+print("step overshoots further than the last, so the loss grows without")
+print("bound. there is a real threshold here, not a matter of taste:")
+eig = np.linalg.eigvalsh(2 * X.T @ X / n).max()
+print("  divergence starts above 2/L, where L is the largest curvature.")
+print("  L = %.4f, so the limit is %.4f." % (eig, 2 / eig))
+print()
+
+print("the gradient shrinks as you approach the answer, so the steps do too:")
+w3 = np.zeros(3)
+print("%8s %14s %14s" % ("step", "|gradient|", "step size"))
+for s in range(6):
+    g = 2 * X.T @ (X @ w3 - y) / n
+    print("%8d %14.6f %14.6f" % (s, np.linalg.norm(g), 0.1 * np.linalg.norm(g)))
+    w3 = w3 - 0.1 * g
+print("  that is automatic braking. it is also why a fixed learning rate")
+print("  works at all, and why schedulers exist for when it does not.")
+```
+
 ## Try it yourself
 
 1. <strong>Find the working range.</strong> Set <strong>Learning Rate</strong> to 0.01 and press <strong>Train</strong>. The line converges smoothly onto the data. This is what a healthy run looks like.

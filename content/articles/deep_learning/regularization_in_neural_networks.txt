@@ -73,6 +73,134 @@ Not everything at once. A sensible order:
 
 Stacking regularisers has diminishing and sometimes negative returns. Batch normalisation already injects noise, so heavy dropout on top of it often hurts. Add one at a time and measure.
 
+## Six ways to stop a model memorising
+
+L2, L1, dropout, early stopping, augmentation and more data all fight overfitting by different mechanisms. Here they are on one problem, so the differences are visible rather than described.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+NOISE, DEG = 0.4, 18
+
+def make(n):
+    x = rng.uniform(-3, 3, n)
+    return x, np.sin(1.5 * x) + rng.normal(0, NOISE, n)
+
+x_tr, y_tr = make(22)
+x_te, y_te = make(2000)
+
+# raw powers of x reach 3^18, which no iterative method can cope with.
+# normalise each column by its training-set norm and reuse those constants.
+SCALE = np.linalg.norm(np.vander(x_tr, DEG + 1), axis=0)
+
+def design(xv):
+    return np.vander(xv, DEG + 1) / SCALE
+
+A, A_te = design(x_tr), design(x_te)
+L = np.linalg.eigvalsh(2 * A.T @ A / len(A)).max()
+
+def score(w):
+    return ((A @ w - y_tr) ** 2).mean(), ((A_te @ w - y_te) ** 2).mean()
+
+def row(name, w, extra=""):
+    tr, te = score(w)
+    print("%-32s %11.5f %14s %13.3e %s"
+          % (name, tr, "%.4f" % te if te < 1e6 else "%.2e" % te,
+             np.abs(w).max(), extra))
+
+print("22 training points, a degree-%d model (%d parameters), noise sd %.1f."
+      % (DEG, DEG + 1, NOISE))
+print("the best any model can do on test data is the noise variance, %.4f."
+      % NOISE ** 2)
+print()
+print("%-32s %11s %14s %13s" % ("", "train MSE", "test MSE", "max |weight|"))
+
+w0 = np.linalg.lstsq(A, y_tr, rcond=None)[0]
+row("no regularisation", w0)
+
+for lam in (1e-6, 1e-3, 1e-1):
+    row("L2 (weight decay) %.0e" % lam,
+        np.linalg.solve(A.T @ A + lam * np.eye(DEG + 1), A.T @ y_tr))
+
+def lasso(lam, steps=8000):
+    lr = 0.9 / L
+    w = np.zeros(DEG + 1)
+    for _ in range(steps):
+        w -= lr * 2 * A.T @ (A @ w - y_tr) / len(A)
+        w = np.sign(w) * np.maximum(np.abs(w) - lr * lam, 0)
+    return w
+for lam in (1e-3, 1e-1):
+    w = lasso(lam)
+    row("L1 (lasso) %.0e" % lam, w,
+        "  %d of %d weights exactly 0" % ((w == 0).sum(), DEG + 1))
+
+def dropout_fit(p, steps=8000):
+    lr, w = 0.5 / L, np.zeros(DEG + 1)
+    r = np.random.default_rng(1)
+    for _ in range(steps):
+        Ad = A * ((r.random(A.shape) > p) / (1 - p))
+        w -= lr * 2 * Ad.T @ (Ad @ w - y_tr) / len(A)
+    return w
+row("dropout on inputs, p=0.3", dropout_fit(0.3))
+
+lr, w = 0.9 / L, np.zeros(DEG + 1)
+best_te, best_w, best_step = np.inf, w.copy(), 0
+for step in range(1, 60001):
+    w -= lr * 2 * A.T @ (A @ w - y_tr) / len(A)
+    if step % 250 == 0:
+        te = ((A_te @ w - y_te) ** 2).mean()
+        if te < best_te:
+            best_te, best_w, best_step = te, w.copy(), step
+row("early stopping", best_w, "  stopped at step %d of 60000" % best_step)
+row("trained to the end (60000)", w)
+
+aug_x = np.repeat(x_tr, 30) + rng.normal(0, 0.15, 22 * 30)
+row("augmentation (jitter x, 30x)",
+    np.linalg.lstsq(design(aug_x), np.repeat(y_tr, 30), rcond=None)[0])
+
+x_more, y_more = make(400)
+row("400 real training points",
+    np.linalg.lstsq(design(x_more), y_more, rcond=None)[0])
+print()
+
+print("the unregularised fit needs a coefficient of 7e+06 to pass through 22")
+print("scattered points. that is what memorising looks like from the inside:")
+print("enormous terms that very nearly cancel everywhere except at the")
+print("training points.")
+print()
+print("now notice that the last column splits the methods into two kinds.")
+print("L2, L1, dropout and early stopping all crush the largest weight -- they")
+print("work by making big coefficients expensive. augmentation and more data")
+print("do not: their weights stay large, and they still get the best test")
+print("scores on the board.")
+print()
+print("that is the real distinction. a penalty tells the model it may not use")
+print("a solution it would otherwise prefer. more data makes that solution")
+print("stop being the best fit at all -- there are no longer any gaps between")
+print("the points for a wild curve to swing through. only the second kind")
+print("adds information, which is why it is the one that always works.")
+print()
+print("what each one is actually doing:")
+print("  L2       -- adds lambda * sum(w^2) to the loss. shrinks everything")
+print("              smoothly and keeps every feature. the default.")
+print("  L1       -- adds lambda * sum(|w|). pushes weights to EXACTLY zero,")
+print("              so it selects features as well as shrinking them.")
+print("  dropout  -- randomly removes inputs, so no weight can rely on any")
+print("              other being present. noise used as a regulariser.")
+print("  early    -- stops before the weights have time to grow. it bounds")
+print("     stopping   how far they travel from their initial values, which")
+print("              is close to what L2 does, by a different route.")
+print("  augment  -- manufactures new training points. the only one that")
+print("              adds information, and only when the transformation")
+print("              genuinely preserves the label.")
+print("  more data-- the one that always works and usually cannot be bought.")
+print()
+print("they are not independent. stacking L2, dropout and early stopping")
+print("often helps less than any one alone, because all three constrain the")
+print("same quantity: how large the weights are allowed to get.")
+```
+
 ## Guided experiments
 
 1. <strong>Train with no penalty.</strong> Set <strong>Penalty Strength (&lambda;)</strong> to its minimum and press <strong>Train Network</strong>. Weights grow freely and the model fits the targets as closely as it can, noise included.

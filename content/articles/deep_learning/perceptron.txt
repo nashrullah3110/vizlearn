@@ -98,6 +98,78 @@ Extend to a layer of m units and it is m &times; (n + 1). For 100 inputs and 50 
 
 The bias is one per unit, not one per weight &mdash; a detail people get wrong when counting by hand.
 
+## Train one, and find the thing it cannot learn
+
+A perceptron is a weighted sum and a threshold. Twelve lines train it, and four rows of data defeat it -- which is the whole reason the rest of this track exists.
+
+```python-run
+import numpy as np
+
+def train(X, y, epochs=30, lr=0.1):
+    w = np.zeros(X.shape[1])
+    b = 0.0
+    for epoch in range(epochs):
+        errors = 0
+        for xi, target in zip(X, y):
+            pred = 1 if xi @ w + b > 0 else 0
+            update = lr * (target - pred)
+            w += update * xi
+            b += update
+            errors += int(update != 0.0)
+        if errors == 0:
+            return w, b, epoch + 1
+    return w, b, epochs
+
+print("AND -- linearly separable:")
+X = np.array([[0., 0.], [0., 1.], [1., 0.], [1., 1.]])
+y_and = np.array([0, 0, 0, 1])
+w, b, ep = train(X, y_and)
+print("  converged in %d epochs. w = %s, b = %.2f" % (ep, np.round(w, 2), b))
+for xi, t in zip(X, y_and):
+    z = xi @ w + b
+    print("    %s -> z %+6.2f -> %d   (wanted %d)" % (xi, z, int(z > 0), t))
+print()
+
+print("OR -- also separable:")
+y_or = np.array([0, 1, 1, 1])
+w, b, ep = train(X, y_or)
+print("  converged in %d epochs. w = %s, b = %.2f" % (ep, np.round(w, 2), b))
+print()
+
+print("XOR -- and here is the wall:")
+y_xor = np.array([0, 1, 1, 0])
+w, b, ep = train(X, y_xor, epochs=5000)
+print("  after %d epochs it has not converged. w = %s, b = %.2f"
+      % (ep, np.round(w, 2), b))
+correct = sum(int((xi @ w + b > 0)) == t for xi, t in zip(X, y_xor))
+print("  it gets %d of 4 right, which is what guessing gets you." % correct)
+print()
+print("this is not a training problem, it is an arithmetic one. a perceptron")
+print("draws ONE straight line. XOR needs the two diagonal corners on one side")
+print("and the other two on the other, and no straight line does that:")
+for xi, t in zip(X, y_xor):
+    print("    %s wants %d" % (xi, t))
+print()
+
+print("the fix is a hidden layer -- two lines instead of one:")
+W1 = np.array([[1.0, 1.0], [1.0, 1.0]])
+b1 = np.array([-0.5, -1.5])        # neuron 1 fires for OR, neuron 2 for AND
+W2 = np.array([1.0, -2.0])
+b2 = -0.5
+for xi, t in zip(X, y_xor):
+    h = (xi @ W1 + b1 > 0).astype(float)     # step activation
+    out = int(h @ W2 + b2 > 0)
+    print("    %s -> hidden %s -> %d   (wanted %d)" % (xi, h, out, t))
+print()
+print("neuron 1 computes OR, neuron 2 computes AND, and the output layer says")
+print("'OR but not AND' -- which is exactly XOR. one layer of composition")
+print("turned an impossible problem into a trivial one.")
+print()
+print("the historical note that matters: this limitation was published in 1969")
+print("and stalled the field for a decade. the hidden layer was not the hard")
+print("part -- training one was, and that needed backpropagation.")
+```
+
 ## Questions people ask
 
 <strong>Is a perceptron the same as a neuron?</strong> Historically the perceptron used a step activation. "Neuron" or "unit" today means the same structure with a smooth activation.

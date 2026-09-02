@@ -68,6 +68,131 @@ Note `log=True` on the learning rate and weight decay. Both span orders of magni
 
 Two habits that matter more than the search algorithm: change <strong>one thing at a time</strong> so you can attribute the effect, and <strong>fix the random seed</strong> so a 1% difference is a real difference rather than run-to-run variation.
 
+## Which knobs matter, and how to search them
+
+Hyperparameters are not equal -- a few dominate and the rest are noise. This measures which is which on a real training loop, then compares three ways of searching.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def make(n, seed):
+    r = np.random.default_rng(seed)
+    x = r.uniform(-3, 3, (n, 1))
+    y = np.sin(1.5 * x) + 0.25 * x + r.normal(0, 0.3, (n, 1))
+    return x, y
+
+Xtr, ytr = make(120, 0)
+Xva, yva = make(600, 1)
+
+def train(hidden, lr, epochs, wd, seed=0):
+    r = np.random.default_rng(seed)
+    W1 = r.normal(0, 1.0, (1, hidden)); b1 = r.normal(0, 0.5, (1, hidden))
+    W2 = r.normal(0, 1.0 / np.sqrt(hidden), (hidden, 1)); b2 = np.zeros((1, 1))
+    n = len(Xtr)
+    for _ in range(epochs):
+        a1 = np.tanh(Xtr @ W1 + b1)
+        d = 2 * (a1 @ W2 + b2 - ytr) / n
+        dW2 = a1.T @ d + wd * W2
+        d1 = (d @ W2.T) * (1 - a1 ** 2)
+        dW1 = Xtr.T @ d1 + wd * W1
+        W2 -= lr * dW2; b2 -= lr * d.sum(0, keepdims=True)
+        W1 -= lr * dW1; b1 -= lr * d1.sum(0, keepdims=True)
+        if not np.isfinite(W1).all():
+            return np.inf
+    val = np.tanh(Xva @ W1 + b1) @ W2 + b2
+    mse = ((val - yva) ** 2).mean()
+    return mse if np.isfinite(mse) else np.inf
+
+BASE = dict(hidden=16, lr=0.05, epochs=400, wd=0.0)
+print("baseline: %s -> validation MSE %.4f"
+      % (BASE, train(**BASE)))
+print()
+
+print("ONE AT A TIME. change a single knob, hold the rest:")
+sweeps = {
+    "lr":      [0.001, 0.01, 0.05, 0.2],
+    "hidden":  [2, 4, 16, 64],
+    "epochs":  [60, 200, 400, 1000],
+    "wd":      [0.0, 1e-2, 1e-1],
+}
+spread = {}
+for key, values in sweeps.items():
+    results = []
+    for v in values:
+        cfg = dict(BASE); cfg[key] = v
+        results.append((v, train(**cfg)))
+    finite = [m for _, m in results if np.isfinite(m)]
+    spread[key] = (max(finite) - min(finite)) if finite else np.inf
+    print("  %-8s %s" % (key, "  ".join(
+        "%s=%s" % (v, "diverged" if not np.isfinite(m) else "%.4f" % m)
+        for v, m in results)))
+print()
+print("the spread each knob produces -- this is the ranking that matters:")
+for key, sp in sorted(spread.items(), key=lambda kv: -kv[1]):
+    print("  %-8s %.4f  %s" % (key, sp, "#" * int(min(sp, 2.0) * 25)))
+print()
+print("this is the usual shape: one or two knobs dominate and the rest barely")
+print("register. tuning in that order is most of the skill -- and it is why")
+print("learning rate is almost always the first thing anyone tunes.")
+print()
+
+print("but one-at-a-time misses INTERACTIONS. lr and epochs are not")
+print("independent -- a smaller rate simply needs more steps:")
+print("%10s %10s %10s %10s" % ("", "150 ep", "400 ep", "1000 ep"))
+for lr in (0.005, 0.05):
+    row = []
+    for ep in (150, 400, 1000):
+        cfg = dict(BASE); cfg["lr"], cfg["epochs"] = lr, ep
+        m = train(**cfg)
+        row.append("diverged" if not np.isfinite(m) else "%.4f" % m)
+    print("%10s %10s %10s %10s" % ("lr=%.3f" % lr, *row))
+print("  read down a column and across a row: a rate ten times smaller is")
+print("  not simply worse, it is worse AT A GIVEN BUDGET. give it three times")
+print("  the epochs and it catches up. the two knobs trade against each")
+print("  other, and a one-at-a-time sweep through the baseline cannot see")
+print("  that -- it only ever moves along one axis of this table.")
+print()
+
+print("GRID vs RANDOM, on the same budget of 8 trials (400 epochs each):")
+grid = [(h, lr) for h in (4, 16) for lr in (0.01, 0.05, 0.1, 0.2)]
+best_g = min(((train(hidden=h, lr=lr, epochs=1200, wd=0.0), h, lr)
+              for h, lr in grid), key=lambda t: t[0])
+print("  grid  (2 hidden x 4 lr): best %.4f at hidden=%d, lr=%.3f"
+      % best_g)
+r = np.random.default_rng(3)
+rand = [(int(r.integers(2, 129)), float(10 ** r.uniform(-3, -0.3)))
+        for _ in range(8)]
+best_r = min(((train(hidden=h, lr=lr, epochs=1200, wd=0.0), h, lr)
+              for h, lr in rand), key=lambda t: t[0])
+print("  random (8 draws)       : best %.4f at hidden=%d, lr=%.4f"
+      % best_r)
+print("  the grid tried 2 distinct values of hidden and 4 of lr.")
+print("  random tried %d and %d, for the same number of fits."
+      % (len({h for h, _ in rand}), len({lr for _, lr in rand})))
+print()
+print("  on this particular draw the grid happened to win. that is worth")
+print("  saying plainly: random search is not reliably better on any ONE")
+print("  run. its advantage is that it does not waste budget re-testing a")
+print("  parameter that turns out not to matter, and that advantage grows")
+print("  with the number of parameters -- which is exactly when a grid")
+print("  becomes unaffordable anyway.")
+print()
+print("note the lr range above is 10**uniform(-3, -0.3), not uniform(0.001,")
+print("0.5). learning rate lives on a log scale, and sampling it linearly")
+print("puts most of your budget in a region that is almost always too large.")
+print()
+print("the practical order of operations:")
+print("  1. get the learning rate roughly right first. nothing else matters")
+print("     until it is.")
+print("  2. set epochs by early stopping rather than tuning it.")
+print("  3. then capacity (width, depth), then regularisation.")
+print("  4. random search over log-uniform ranges, not a grid.")
+print("  5. check the winner is not on the edge of your range. if it is,")
+print("     the range was wrong -- widen it and search again.")
+```
+
 ## Things to try
 
 1. <strong>Run a small search.</strong> Set <strong>N Trials</strong> to 5 and press <strong>Run Trial</strong> repeatedly. Results scatter widely &mdash; five samples is not enough to distinguish a good region from luck.

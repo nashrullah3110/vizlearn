@@ -56,6 +56,97 @@ Then watch how often it triggers. Occasional clipping &mdash; a few percent of s
 
 Common values: 1.0 for transformers and most language models, 5.0 for recurrent networks, 0.5 when training is particularly unstable. These are conventions rather than derived numbers.
 
+## Cap the step, keep the direction
+
+One bad batch can produce a gradient large enough to destroy a working model in a single update. Clipping bounds the damage, and the difference between the two ways of doing it matters.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+g = np.array([3.0, -4.0, 12.0, 0.5])
+print("a gradient:", g)
+print("its L2 norm: %.4f" % np.linalg.norm(g))
+print()
+
+def clip_norm(grad, max_norm):
+    n = np.linalg.norm(grad)
+    return grad * min(1.0, max_norm / (n + 1e-12)), n
+
+def clip_value(grad, limit):
+    return np.clip(grad, -limit, limit)
+
+print("clip by NORM to 5.0 -- rescale the whole vector:")
+c, n = clip_norm(g, 5.0)
+print("  scale factor %.4f" % (5.0 / n))
+print("  result", np.round(c, 4), " norm %.4f" % np.linalg.norm(c))
+print("  direction preserved:", np.allclose(c / np.linalg.norm(c), g / np.linalg.norm(g)))
+print()
+print("clip by VALUE to 5.0 -- truncate each element:")
+cv = clip_value(g, 5.0)
+print("  result", cv, " norm %.4f" % np.linalg.norm(cv))
+print("  direction preserved:",
+      np.allclose(cv / np.linalg.norm(cv), g / np.linalg.norm(g)))
+print()
+print("clipping by value CHANGED THE DIRECTION. the 12.0 carried %.0f percent"
+      % (100 * 12.0 / np.abs(g).sum()))
+print("of this gradient's total magnitude, and it was cut to 5.0 while the")
+print("0.5 was left alone, so the update now points somewhere the gradient")
+print("never pointed.")
+print("that is why clip_grad_norm_ is the standard and clipping by value is")
+print("a niche tool.")
+print()
+
+print("what it is protecting you from. training a small model where one")
+print("batch contains an outlier:")
+w = np.array([1.0, 1.0])
+X = rng.normal(size=(40, 2))
+y = X @ np.array([2.0, -1.0]) + rng.normal(0, 0.1, 40)
+X_bad = X.copy(); y_bad = y.copy()
+X_bad[0] *= 300                      # one corrupted row
+y_bad[0] *= 300
+
+for label, Xb, yb, clip in (("clean batch      ", X, y, None),
+                            ("corrupted batch  ", X_bad, y_bad, None),
+                            ("corrupted + clip ", X_bad, y_bad, 1.0)):
+    ww = np.array([1.0, 1.0])
+    g2 = 2 * Xb.T @ (Xb @ ww - yb) / len(Xb)
+    norm = np.linalg.norm(g2)
+    if clip:
+        g2 = g2 * min(1.0, clip / norm)
+    after = ww - 0.01 * g2
+    print("  %s gradient norm %12.2f -> weights %s"
+          % (label, norm, np.round(after, 4)))
+print("  the corrupted batch moves the weights by %s in one step."
+      % np.round(np.abs(np.array([1.0, 1.0])
+                        - (np.array([1.0, 1.0]) - 0.01 * 2 * X_bad.T
+                           @ (X_bad @ np.array([1.0, 1.0]) - y_bad) / 40)), 1))
+print("  with clipping it moves by at most lr * max_norm = %.4f in total."
+      % (0.01 * 1.0))
+print()
+
+print("that bound is the real guarantee, and it is worth stating plainly:")
+for lr, mn in ((0.01, 1.0), (0.001, 5.0), (0.1, 0.5)):
+    print("  lr=%.3f, max_norm=%.1f -> no single update can move the weights"
+          % (lr, mn))
+    print("     further than %.4f, whatever the data does." % (lr * mn))
+print()
+
+print("how to choose max_norm -- measure, do not guess. log the norms first:")
+norms = [np.linalg.norm(2 * X[i:i+8].T @ (X[i:i+8] @ np.array([0.5, 0.5])
+                                          - y[i:i+8]) / 8) for i in range(0, 32, 8)]
+print("  observed batch gradient norms:", np.round(norms, 4))
+print("  a common choice is around the 90th percentile of the normal range,")
+print("  here about %.2f. set it far below that and you are clipping every"
+      % np.percentile(norms, 90))
+print("  step, which silently turns your optimiser into normalised SGD.")
+print()
+print("where it is not optional: RNNs and LSTMs, where the same weight matrix")
+print("is applied at every timestep so gradients genuinely can explode")
+print("exponentially. transformers use it routinely too, usually at 1.0.")
+```
+
 ## Guided experiments
 
 1. <strong>Step twice normally.</strong> The weight descends the parabola exactly as gradient descent should.

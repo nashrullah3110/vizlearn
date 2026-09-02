@@ -110,6 +110,100 @@ Note that the effective batch size is multiplied by the number of GPUs, so the l
 
 For most work, one GPU with mixed precision and a well-tuned data loader is enough, and reaching for distributed training before saturating a single device is premature.
 
+## What a GPU is actually better at
+
+A GPU is not a fast CPU. It is thousands of slow cores, which makes it enormously better at some shapes of work and no better at all at others -- and that distinction decides how you write training code.
+
+```python-run
+import numpy as np
+import time
+
+rng = np.random.default_rng(0)
+
+print("the arithmetic in a training step, counted. one dense layer,")
+print("batch B, input D, output H, needs 2*B*D*H floating point operations")
+print("in the forward pass and roughly twice that backward:")
+print()
+print("%8s %8s %8s %16s %16s" % ("B", "D", "H", "forward FLOPs", "fwd+bwd"))
+for B, D, H in ((1, 512, 512), (32, 512, 512), (512, 512, 512),
+                (512, 4096, 4096)):
+    f = 2 * B * D * H
+    print("%8d %8d %8d %16s %16s" % (B, D, H, "%.2e" % f, "%.2e" % (3 * f)))
+print()
+print("a modern GPU does something like 1e14 of those per second and a CPU")
+print("core perhaps 1e10. but that peak is only reachable if there is enough")
+print("independent work to fill every core at once.")
+print()
+
+print("here is that dependency, measured in this browser. the SAME NUMBER OF")
+print("FLOPs every row -- a side x side matmul costs 2 * side^3, so the call")
+print("count is chosen to hold the total arithmetic fixed:")
+print()
+print("%14s %10s %14s %14s %12s"
+      % ("shape", "calls", "total FLOPs", "seconds", "relative"))
+BUDGET = 2e8
+first = None
+for side in (8, 32, 128, 256):
+    per_call = 2 * side ** 3
+    n_calls = max(int(BUDGET // per_call), 1)
+    A = rng.normal(size=(side, side)).astype(np.float32)
+    B = rng.normal(size=(side, side)).astype(np.float32)
+    t0 = time.time()
+    for _ in range(n_calls):
+        _ = A @ B
+    t = time.time() - t0
+    first = first or t
+    print("%14s %10d %14s %14.4f %11.2fx"
+          % ("%dx%d" % (side, side), n_calls, "%.2e" % (n_calls * per_call),
+             t, t / first))
+print()
+print("identical arithmetic, and the small-block version takes several times")
+print("longer. the cost is per-CALL overhead and poor cache reuse, neither of")
+print("which the FLOP count can see.")
+print()
+print("even on two CPU cores that gap is real. on a GPU it is far wider,")
+print("because an 8x8 matmul leaves essentially the whole chip idle while a")
+print("512x512 one can fill it.")
+print()
+
+print("what this means in practice, as a list of consequences:")
+print()
+print("  BATCH SIZE. a batch of 1 on a GPU is close to a waste of the GPU.")
+print("  this is the single biggest reason batching exists.")
+print()
+print("  DATA TRANSFER. moving arrays between host and device costs real")
+print("  time, and a step that transfers per-batch can spend more time")
+print("  moving than computing:")
+for mb in (1, 16, 256):
+    print("    %4d MB at ~10 GB/s over PCIe: %6.2f ms each way"
+          % (mb, mb / 10_000 * 1000))
+print("  which is why you pin memory, prefetch, and keep the model resident.")
+print()
+print("  PRECISION. a GPU's tensor cores run float16 and bfloat16 several")
+print("  times faster than float32. the same 128x128 matmul, three ways:")
+for dt in (np.float64, np.float32, np.float16):
+    A = rng.normal(size=(128, 128)).astype(dt)
+    t0 = time.time()
+    for _ in range(5):
+        _ = A @ A
+    print("    %-10s %8.4f s   (%d bytes per number)"
+          % (np.dtype(dt).name, time.time() - t0, np.dtype(dt).itemsize))
+print("    do not read the float16 row as an argument against it -- numpy")
+print("    has no float16 hardware path and emulates it in software, so it")
+print("    comes out SLOWEST here. on a GPU with tensor cores that row is")
+print("    several times faster than float32, and that gap is exactly what")
+print("    mixed precision training is buying.")
+print()
+print("  WHAT A GPU DOES NOT HELP WITH. python loops, data loading and")
+print("  preprocessing, small sequential operations, and anything that has")
+print("  to synchronise every step. a training loop that is slow because of")
+print("  its dataloader will be exactly as slow on a better GPU.")
+print()
+print("the diagnosis is always the same: measure whether you are compute")
+print("bound, memory bound, or input bound BEFORE buying anything. a GPU at")
+print("30 percent utilisation is telling you the bottleneck is somewhere else.")
+```
+
 ## Questions people ask
 
 <strong>How much GPU memory do I need?</strong> 8GB trains most vision models at modest batch sizes; 24GB is comfortable; large language model fine-tuning wants 40GB or more, or parameter-efficient methods like LoRA.

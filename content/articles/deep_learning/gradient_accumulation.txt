@@ -92,3 +92,97 @@ touch. When the weights alone do not fit, accumulation is not the answer.
 **Using it with batch norm at a tiny micro-batch.** Real quality loss.
 
 **Expecting a speed-up.** It buys capability, not throughput.
+
+## A large batch on a small GPU
+
+Accumulating gradients over several small batches before stepping is arithmetically identical to one large batch. This proves the identity, then shows the two things that are not identical.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+N, D = 64, 5
+X = rng.normal(size=(N, D))
+w_true = rng.normal(size=D)
+y = X @ w_true + rng.normal(0, 0.3, N)
+w = np.zeros(D)
+
+def grad(Xb, yb, wv):
+    return 2 * Xb.T @ (Xb @ wv - yb) / len(Xb)
+
+print("64 rows. compute the gradient two ways.")
+print()
+big = grad(X, y, w)
+print("one batch of 64:")
+print("  ", np.round(big, 8))
+print()
+
+acc = np.zeros(D)
+STEPS = 4
+for i in range(STEPS):
+    chunk = slice(i * 16, (i + 1) * 16)
+    acc += grad(X[chunk], y[chunk], w) / STEPS
+print("four batches of 16, each gradient divided by 4 and summed:")
+print("  ", np.round(acc, 8))
+print("  max difference: %.2e" % np.abs(big - acc).max())
+print()
+print("identical. that is the whole technique: the mean over 64 rows is the")
+print("mean of four means over 16 rows, as long as the batches are equal")
+print("sized and you divide by the number of accumulation steps.")
+print()
+
+print("the division is the part people get wrong. without it:")
+wrong = sum(grad(X[i * 16:(i + 1) * 16], y[i * 16:(i + 1) * 16], w)
+            for i in range(STEPS))
+print("  summed without dividing:", np.round(wrong[:3], 4), "...")
+print("  correct:                ", np.round(big[:3], 4), "...")
+print("  ratio: %.1f -- you have silently multiplied your learning rate by %d."
+      % (np.abs(wrong).mean() / np.abs(big).mean(), STEPS))
+print()
+
+print("what it buys, in memory terms. activation memory scales with batch")
+print("size; gradient memory does not:")
+print("%14s %18s %18s" % ("micro-batch", "activations held", "effective batch"))
+for micro in (64, 16, 8, 4, 1):
+    print("%14d %18s %18d"
+          % (micro, "%dx" % micro, 64))
+print("  the gradient buffer is the same size in every row -- one number per")
+print("  parameter. only the activations kept for the backward pass shrink.")
+print()
+
+print("and now the two things that are NOT identical.")
+print()
+print("1. BatchNorm. its statistics come from the micro-batch, not the")
+print("   accumulated one, so accumulation does not restore large-batch")
+print("   behaviour there:")
+for micro in (64, 16, 4):
+    b = X[:micro]
+    print("     micro-batch of %2d: feature-0 mean %+.4f, sd %.4f"
+          % (micro, b[:, 0].mean(), b[:, 0].std()))
+print("     those are the numbers BatchNorm would use. they are noisier the")
+print("     smaller the micro-batch, and accumulation cannot fix it.")
+print("     LayerNorm and GroupNorm are unaffected, which is one more reason")
+print("     transformers are easier to train this way.")
+print()
+print("2. speed. four passes of 16 do the same arithmetic as one pass of 64,")
+print("   but with four times the kernel launches and less parallelism. you")
+print("   are trading wall-clock time for memory, not getting both.")
+print()
+
+print("the loop, written out, because the off-by-one is easy:")
+print("    optimizer.zero_grad()")
+print("    for i, batch in enumerate(loader):")
+print("        loss = criterion(model(batch.x), batch.y) / ACCUM")
+print("        loss.backward()                 # gradients ADD by default")
+print("        if (i + 1) % ACCUM == 0:")
+print("            optimizer.step()")
+print("            optimizer.zero_grad()")
+print()
+print("three things to check: divide the loss by ACCUM, do not zero the")
+print("gradients between micro-batches, and handle the final partial group")
+print("-- if the loader ends mid-accumulation those gradients are discarded.")
+print()
+print("and if you use a learning rate schedule, step it once per OPTIMIZER")
+print("step, not once per micro-batch, or your schedule runs %d times too fast."
+      % STEPS)
+```

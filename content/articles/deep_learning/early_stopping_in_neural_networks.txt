@@ -121,6 +121,91 @@ The one situation where it is set aside is very large-scale pretraining, where a
 - <strong>A validation set too small</strong> to give a stable signal &mdash; a few hundred examples produce metrics that swing by several percent.
 - <strong>Stopping before a scheduled learning-rate drop</strong> has had a chance to help.
 
+## Stop at the bottom, not at the end
+
+Validation loss falls, turns, and rises. Early stopping keeps the weights from the turn -- and the two parameters that decide when to stop are where the subtlety lives.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# a synthetic training curve with the shape real ones have:
+# training loss falling forever, validation loss turning at some point
+EPOCHS = 60
+epochs = np.arange(EPOCHS)
+train = 1.2 * np.exp(-epochs / 12) + 0.05
+val = 1.2 * np.exp(-epochs / 12) + 0.05 + 0.010 * np.maximum(0, epochs - 18)
+val = val + rng.normal(0, 0.012, EPOCHS)      # real curves are noisy
+
+print("%8s %12s %12s" % ("epoch", "train", "validation"))
+for e in range(0, EPOCHS, 5):
+    mark = ""
+    print("%8d %12.4f %12.4f %s" % (e, train[e], val[e], mark))
+print()
+best = int(np.argmin(val))
+print("training loss falls for all %d epochs and never turns." % EPOCHS)
+print("validation loss bottoms out at epoch %d (%.4f) and ends at %.4f."
+      % (best, val[best], val[-1]))
+print("training to the end costs you %.4f of validation loss for nothing."
+      % (val[-1] - val[best]))
+print()
+
+def run(patience, min_delta=0.0):
+    best_val, best_epoch, wait = np.inf, 0, 0
+    for e in range(EPOCHS):
+        if val[e] < best_val - min_delta:
+            best_val, best_epoch, wait = val[e], e, 0
+        else:
+            wait += 1
+            if wait >= patience:
+                return e, best_epoch, best_val
+    return EPOCHS - 1, best_epoch, best_val
+
+print("patience -- how many epochs of no improvement you tolerate:")
+print("%10s %12s %14s %12s %12s"
+      % ("patience", "stopped at", "restored to", "val loss", "epochs saved"))
+for p in (1, 3, 5, 10, 20):
+    stop, be, bv = run(p)
+    print("%10d %12d %14d %12.4f %12d" % (p, stop, be, bv, EPOCHS - 1 - stop))
+print()
+print("patience=1 stops at epoch %d -- the curve is noisy, so a single bad"
+      % run(1)[0])
+print("epoch looks like the end. the true minimum is at %d." % best)
+print("patience=10 finds it and still saves %d epochs of compute."
+      % (EPOCHS - 1 - run(10)[0]))
+print()
+
+print("the second parameter is min_delta -- how much counts as improvement:")
+for md in (0.0, 0.005, 0.02):
+    stop, be, bv = run(10, md)
+    print("  min_delta %.3f: stopped at %2d, best epoch %2d, val %.4f"
+          % (md, stop, be, bv))
+print("  a min_delta larger than the noise stops you chasing it. a min_delta")
+print("  larger than the real improvements stops you too early.")
+print()
+
+print("and the part that is easy to get wrong -- RESTORING the weights:")
+print("  stopping at epoch %d without restoring leaves you the weights from"
+      % run(10)[0])
+print("  epoch %d, with validation loss %.4f." % (run(10)[0], val[run(10)[0]]))
+print("  restoring gives you epoch %d, at %.4f." % (best, val[best]))
+print("  the difference is %.4f, which is the entire benefit. an early"
+      % (val[run(10)[0]] - val[best]))
+print("  stopping callback that does not restore is just a compute saver.")
+print()
+
+print("what it is really doing: early stopping is a regulariser. it limits")
+print("how far the weights can travel from their initialisation, which is")
+print("the same thing weight decay does by a different route. that is why")
+print("stacking both often helps less than you would expect.")
+print()
+print("two practical notes. stop on the metric you care about, not always on")
+print("loss -- a model can improve F1 while its loss worsens. and never stop")
+print("on the TEST set: the epoch you choose is a fitted parameter, so a test")
+print("set used to choose it is no longer a test set.")
+```
+
 ## Questions people ask
 
 <strong>What patience should I use?</strong> 5&ndash;10 epochs for most work; more if the metric is noisy or the schedule is long.

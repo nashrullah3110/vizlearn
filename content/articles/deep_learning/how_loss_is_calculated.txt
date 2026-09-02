@@ -106,6 +106,83 @@ The two can disagree, and that is informative rather than alarming. Validation l
 
 Some metrics have differentiable relaxations &mdash; soft-Dice, soft-IoU, and the CIoU family for bounding boxes &mdash; and using them closes part of the gap between what you optimise and what you measure.
 
+## Every loss, computed by hand
+
+MSE, MAE, Huber, binary and categorical cross-entropy on the same predictions -- so you can see what each one punishes and how hard.
+
+```python-run
+import numpy as np
+
+truth = np.array([3.0, 3.0, 3.0, 3.0])
+preds = np.array([3.1, 3.5, 4.0, 8.0])
+print("regression losses. truth is 3.0 in every row:")
+print("%12s %10s %10s %10s %10s" % ("prediction", "error", "squared", "absolute", "huber"))
+def huber(e, d=1.0):
+    return np.where(np.abs(e) <= d, 0.5 * e ** 2, d * (np.abs(e) - 0.5 * d))
+for p in preds:
+    e = p - 3.0
+    print("%12.1f %10.1f %10.4f %10.4f %10.4f" % (p, e, e ** 2, abs(e), huber(e)))
+print()
+e = preds - truth
+print("  MSE   %.4f   -- the 8.0 row alone contributes %.1f%% of it"
+      % ((e ** 2).mean(), 100 * e[-1] ** 2 / (e ** 2).sum()))
+print("  MAE   %.4f   -- that row contributes %.1f%%"
+      % (np.abs(e).mean(), 100 * abs(e[-1]) / np.abs(e).sum()))
+print("  Huber %.4f   -- squared near zero, linear far out: %.1f%%"
+      % (huber(e).mean(), 100 * huber(e)[-1] / huber(e).sum()))
+print()
+print("that is the entire choice. MSE says one bad miss is worse than many")
+print("small ones. MAE says they are the same. Huber says the first thing")
+print("near the middle and the second thing in the tail.")
+print()
+
+print("binary cross-entropy -- the loss for a yes/no answer:")
+print("%10s %10s %12s" % ("said", "truth", "loss"))
+for p, t in ((0.99, 1), (0.90, 1), (0.60, 1), (0.50, 1), (0.10, 1), (0.01, 1)):
+    print("%10.2f %10d %12.4f" % (p, t, -np.log(p)))
+print("  the loss for being right is small but never zero. the loss for being")
+print("  confidently wrong has no ceiling -- at p=0.001 it is %.4f."
+      % -np.log(0.001))
+print()
+print("  it is symmetric, so predicting 0.01 when the answer is 0 is cheap:")
+for p, t in ((0.01, 0), (0.50, 0), (0.99, 0)):
+    print("%10.2f %10d %12.4f" % (p, t, -np.log(1 - p)))
+print()
+
+print("categorical cross-entropy over 4 classes -- only the true class counts:")
+logits = np.array([2.0, 1.0, 0.1, -1.0])
+probs = np.exp(logits - logits.max()); probs /= probs.sum()
+print("  logits      ", np.round(logits, 2))
+print("  softmax     ", np.round(probs, 4), " sums to", round(probs.sum(), 10))
+for true_class in range(4):
+    onehot = np.zeros(4); onehot[true_class] = 1
+    print("    if the answer is class %d: loss = -log(%.4f) = %.4f"
+          % (true_class, probs[true_class], -np.log(probs[true_class])))
+print("  the full formula sums over all classes, but the one-hot target")
+print("  zeroes every term except the true one. that is why implementations")
+print("  just index into the probability vector.")
+print()
+
+print("why the loss must be differentiable -- accuracy is not:")
+print("%10s %12s %12s" % ("nudge", "accuracy", "cross-entropy"))
+p = np.array([0.30, 0.40, 0.45, 0.48])
+t = np.array([1, 1, 1, 1])
+for shift in (0.00, 0.01, 0.02, 0.03, 0.04, 0.05, 0.10):
+    q = np.clip(p + shift, 1e-9, 1 - 1e-9)
+    acc = ((q > 0.5).astype(int) == t).mean()
+    ce = -(t * np.log(q) + (1 - t) * np.log(1 - q)).mean()
+    print("%10s %12.4f %12.4f" % ("+%.2f" % shift, acc, ce))
+print()
+print("every nudge makes the model measurably better, and accuracy notices")
+print("exactly twice -- when a prediction crosses 0.50. in between it is")
+print("perfectly flat, which means its gradient is zero, which means gradient")
+print("descent has nothing to follow.")
+print()
+print("cross-entropy moves on every single nudge. that is not a nicety, it is")
+print("the requirement: you optimise a loss and you REPORT a metric, and they")
+print("are usually not the same function.")
+```
+
 ## Questions people ask
 
 <strong>Why is my loss `NaN`?</strong> A `log(0)`, a division by zero, or a learning rate high enough to send the weights to infinity. Use the framework's fused losses, which guard the logarithm.

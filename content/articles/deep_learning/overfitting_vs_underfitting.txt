@@ -126,6 +126,120 @@ Two practical implications. Training accuracy of 100% is not by itself evidence 
 
 The classical U-curve is still real. It is now understood as the first half of a longer story.
 
+## Both failures, on one dial
+
+Capacity swept from far too little to far too much, with train and test error side by side. The two failures are opposite ends of one axis, and the gap between the two numbers is the diagnosis.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+NOISE = 0.35
+
+def make(n):
+    x = rng.uniform(-3, 3, n)
+    return x, np.sin(1.6 * x) + 0.25 * x ** 2 + rng.normal(0, NOISE, n)
+
+x_tr, y_tr = make(20)
+x_te, y_te = make(2000)
+print("20 training points from a smooth curve, plus noise of sd %.2f." % NOISE)
+print("2000 test points from the same curve.")
+print()
+print("no model can score better than %.4f on test data, because that is the"
+      % NOISE ** 2)
+print("variance of the noise itself. that number is the floor.")
+print()
+
+def fit(deg, xa, ya):
+    A = np.vander(xa, deg + 1)
+    w = np.linalg.lstsq(A, ya, rcond=None)[0]
+    return lambda xb: np.vander(xb, deg + 1) @ w, w
+
+print("%8s %8s %12s %12s %10s   %s"
+      % ("degree", "params", "train MSE", "test MSE", "gap", "verdict"))
+for deg in (0, 1, 2, 4, 8, 14, 19):
+    f, w = fit(deg, x_tr, y_tr)
+    tr = ((f(x_tr) - y_tr) ** 2).mean()
+    te = ((f(x_te) - y_te) ** 2).mean()
+    if tr > 1.5 * NOISE ** 2:
+        v = "underfitting"
+    elif tr < 0.4 * NOISE ** 2:
+        v = "overfitting -- fitting the noise"
+    else:
+        v = "about right"
+    print("%8d %8d %12.4f %12s %10s   %s"
+          % (deg, deg + 1, tr,
+             "%.4f" % te if te < 1e6 else "%.2e" % te,
+             "%.4f" % (te - tr) if te < 1e6 else "huge", v))
+best = min(range(0, 20), key=lambda d: ((fit(d, x_tr, y_tr)[0](x_te) - y_te) ** 2).mean())
+print()
+print("lowest test error is at degree %d. note that the 'verdict' column is a"
+      % best)
+print("heuristic on the TRAINING error alone -- it flags degree 8 even though")
+print("degree 8 happens to test better than degree 4. that is the point of it:")
+print("a training error below the noise floor is a warning worth acting on,")
+print("not a verdict. only test error settles the question.")
+print()
+print("degree 0 predicts one number for everything. degree 19 has 20")
+print("parameters for 20 points, so it passes through every one of them")
+print("exactly -- training error %.2e -- and is useless between them."
+      % ((fit(19, x_tr, y_tr)[0](x_tr) - y_tr) ** 2).mean())
+print()
+
+print("the coefficients tell you the same story on their own:")
+for deg in (2, 8, 19):
+    _, w = fit(deg, x_tr, y_tr)
+    print("  degree %2d: largest coefficient %.3e" % (deg, np.abs(w).max()))
+print("  enormous coefficients that cancel each other out is what memorising")
+print("  looks like from the inside. it is also exactly what weight decay")
+print("  and L2 regularisation are built to prevent.")
+print()
+
+print("ridge regularisation on the degree-19 fit -- same model, penalised:")
+A = np.vander(x_tr, 20)
+for lam in (0.0, 1e-8, 1e-4, 1e-1, 10.0):
+    w = np.linalg.solve(A.T @ A + lam * np.eye(20), A.T @ y_tr)
+    tr = ((np.vander(x_tr, 20) @ w - y_tr) ** 2).mean()
+    te = ((np.vander(x_te, 20) @ w - y_te) ** 2).mean()
+    print("  lambda %8.0e: train %8.4f  test %12s  max|w| %.2e"
+          % (lam, tr, "%.4f" % te if te < 1e6 else "%.2e" % te, np.abs(w).max()))
+print("  the penalty cut the largest coefficient from 6.1e+02 to 5.9e-01 and")
+print("  the test error by four orders of magnitude. it still did not rescue")
+print("  the fit -- 20 parameters on 20 points is past saving by a penalty")
+print("  alone. what it did do is stop the coefficients exploding, without")
+print("  making the model any smaller.")
+print()
+
+print("and the other lever -- the same degree-19 model, given more points")
+print("(each row draws a fresh training sample, so the 20-point row differs")
+print("from the table above):")
+for n in (20, 50, 200, 2000):
+    xb, yb = make(n)
+    f, _ = fit(19, xb, yb)
+    tr = ((f(xb) - yb) ** 2).mean()
+    te = ((f(x_te) - y_te) ** 2).mean()
+    print("  %4d training points: train %8.4f  test %12s"
+          % (n, tr, "%.4f" % te if te < 1e6 else "%.2e" % te))
+print("  20 parameters overfit 20 points and are fine on 2000. capacity is")
+print("  never too large in the abstract -- only relative to your data.")
+print()
+
+print("all of this transfers directly to a neural network. the dial is width,")
+print("depth, and epochs rather than polynomial degree, and the two fixes are")
+print("the same two: more data, or less freedom to use the capacity you have")
+print("-- weight decay, dropout, early stopping.")
+print()
+print("the diagnosis, in one line each:")
+print("  training error high        -> underfitting. a bigger model, longer")
+print("                                training, better features. more data")
+print("                                will NOT help.")
+print("  training low, test high    -> overfitting. more data, or regularise.")
+print("  both low and close together-> done.")
+print()
+print("which is why you print both numbers every epoch. one loss curve cannot")
+print("tell you which of the two problems you have.")
+```
+
 ## Questions people ask
 
 <strong>How big a train/validation gap is acceptable?</strong> There is no universal number. What matters is whether validation performance is good enough and stable. A 2% gap on a hard task may be fine; a 30% gap rarely is.

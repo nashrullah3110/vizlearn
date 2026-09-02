@@ -72,6 +72,115 @@ Calling `fit_transform` on validation or test data computes their means and stan
 
 Two further practical points. The fitted scaler must be <strong>saved and shipped with the model</strong> &mdash; a model served with unscaled inputs, or scaled by recomputed statistics, produces confident nonsense. And for neural networks, the <strong>target</strong> is often scaled too, in which case the predictions must be inverse-transformed before any error is reported, or the RMSE is in the wrong units.
 
+## Why an unscaled input slows everything down
+
+Two features on different scales make the loss surface an ellipse, and gradient descent is bad at ellipses. This measures the condition number, then fixes it three ways.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 400
+raw = np.column_stack([rng.normal(0.5, 0.02, n),      # e.g. a ratio
+                       rng.normal(60_000, 15_000, n)])  # e.g. an income
+w_true = np.array([3.0, 0.00004])
+y = raw @ w_true + rng.normal(0, 0.05, n)
+
+print("two features:")
+print("  feature 0: mean %8.3f, sd %8.3f" % (raw[:, 0].mean(), raw[:, 0].std()))
+print("  feature 1: mean %8.1f, sd %8.1f" % (raw[:, 1].mean(), raw[:, 1].std()))
+print()
+
+def design(a):
+    # every variant gets a bias column, or a centred feature set could not
+    # represent y's mean and the comparison would be meaningless
+    return np.column_stack([a, np.ones(len(a))])
+
+def cond(a):
+    M = design(a)
+    ev = np.linalg.eigvalsh(M.T @ M / len(M))
+    return ev.max() / max(ev.min(), 1e-30), ev.max()
+
+def standardize(a): return (a - a.mean(axis=0)) / a.std(axis=0)
+def minmax(a):      return (a - a.min(axis=0)) / (a.max(axis=0) - a.min(axis=0))
+def center(a):      return a - a.mean(axis=0)
+
+print("%-24s %18s %16s %20s"
+      % ("preprocessing", "condition number", "max curvature", "max stable lr"))
+variants = [("raw", raw), ("centred only", center(raw)),
+            ("min-max to [0,1]", minmax(raw)), ("standardised", standardize(raw))]
+for name, A in variants:
+    c, L = cond(A)
+    print("%-24s %18.3e %16.3e %20.3e" % (name, c, L, 2 / (2 * L)))
+print()
+print("the condition number is the ratio of the steepest curvature to the")
+print("shallowest. gradient descent needs roughly that many steps to")
+print("converge, so a condition number of 1e9 means it will not converge in")
+print("any budget you have.")
+print()
+
+print("run it and see. the same %d steps on each version:" % 400)
+for name, A in variants:
+    c, L = cond(A)
+    lr = 0.9 * 2 / (2 * L)          # just under each version's own limit
+    M = design(A)
+    w = np.zeros(M.shape[1])
+    for _ in range(400):
+        w -= lr * 2 * M.T @ (M @ w - y) / n
+    resid = ((M @ w - y) ** 2).mean()
+    print("  %-22s lr %10.3e  final MSE %14s"
+          % (name, lr,
+             "%.6f" % resid if np.isfinite(resid) and resid < 1e9 else "diverged"))
+print()
+best = ((design(standardize(raw)) @ np.linalg.lstsq(design(standardize(raw)),
+                                                    y, rcond=None)[0] - y) ** 2).mean()
+print("  the exact least-squares answer, for reference: MSE %.6f" % best)
+print()
+print("every version uses the largest learning rate that is stable FOR IT,")
+print("so this is not a handicap -- it is the best each one can do in 400")
+print("steps. the two scaled versions reach the exact optimum; the other two")
+print("do not get close.")
+print()
+print("note that 'centred only' came out WORSE than raw. subtracting the mean")
+print("changes where the surface sits without changing how elongated it is,")
+print("so the condition number stays astronomical -- and it happened to")
+print("remove the one large gradient that was letting the raw version make")
+print("any progress at all. centring is not scaling, and on its own it is")
+print("not reliably an improvement.")
+print()
+
+print("why it happens, geometrically. a step moves each weight by")
+print("lr x gradient, and the gradient for a weight is scaled by its input:")
+g = 2 * raw.T @ (raw @ np.zeros(2) - y) / n
+print("  at w = 0, the two gradient components are:")
+print("    feature 0: %14.4f" % g[0])
+print("    feature 1: %14.4f" % g[1])
+print("  a factor of %.0f apart. one learning rate has to serve both, so it"
+      % abs(g[1] / g[0]))
+print("  is set by the larger one and the smaller weight barely moves.")
+print()
+
+print("which scaler to use:")
+print("  StandardScaler (mean 0, sd 1) -- the default. works with any")
+print("     distribution and is what most initialisation schemes assume.")
+print("  MinMaxScaler ([0,1])          -- when you need a bounded range, e.g.")
+print("     image pixels. one outlier squashes everything else.")
+print("  RobustScaler (median, IQR)    -- when outliers are real data.")
+print()
+print("three rules that are not optional:")
+print("  1. fit the scaler on TRAINING data only. fitting on everything")
+print("     leaks the test set's mean into training.")
+print("  2. save the scaler with the model. an unscaled input at serving")
+print("     time produces confident nonsense, silently.")
+print("  3. scale the TARGET too for regression -- a target in the millions")
+print("     produces gradients in the millions, and the same problem.")
+print()
+print("and the reason BatchNorm and LayerNorm exist: the inputs to layer 5")
+print("drift out of scale during training even if layer 1's inputs were")
+print("perfect. scaling the input fixes the first layer. normalisation")
+print("layers fix the rest of them, continuously.")
+```
+
 ## Guided experiments
 
 1. <strong>Train unscaled.</strong> Set <strong>Data Normalization Method</strong> to none, put <strong>Salary Input</strong> near 200000 and <strong>Age Input</strong> near 30, and press <strong>Start Training</strong>. Training is unstable or crawls, because one input dominates every gradient.

@@ -91,3 +91,100 @@ subword tokenisation avoids the question.
 
 **Reading similarity as meaning.** Embedding proximity reflects co-occurrence in
 the training data, which is not the same thing.
+
+## A lookup table that learns what things mean
+
+An embedding layer is one-hot encoding times a weight matrix, with the multiplication skipped. This shows the equivalence, the cost saving, and what the learned vectors end up encoding.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+VOCAB, DIM = 8, 4
+words = ["cat", "dog", "wolf", "car", "truck", "bus", "the", "a"]
+E = rng.normal(0, 0.5, (VOCAB, DIM))
+
+print("an embedding table: %d words x %d dimensions = %d parameters."
+      % (VOCAB, DIM, E.size))
+print()
+print("look up word 2 ('wolf') two ways:")
+onehot = np.zeros(VOCAB); onehot[2] = 1
+print("  one-hot @ E :", np.round(onehot @ E, 4))
+print("  E[2]        :", np.round(E[2], 4))
+print("  identical:", np.allclose(onehot @ E, E[2]))
+print()
+print("that is the whole trick. multiplying by a one-hot vector selects one")
+print("row, so you index instead. the maths is unchanged, the cost is not:")
+for v, d in ((8, 4), (50_000, 256), (200_000, 1024)):
+    mults = v * d
+    print("  vocab %7d, dim %5d: one-hot matmul does %12d multiplications"
+          % (v, d, mults))
+    print("  %28s a lookup does %12d" % ("", d))
+print()
+
+print("the gradient is just as sparse. only the rows you used get updated:")
+grad_out = np.zeros_like(E)
+batch_ids = [2, 5, 2]
+upstream = rng.normal(size=(3, DIM))
+for i, wid in enumerate(batch_ids):
+    grad_out[wid] += upstream[i]
+print("  a batch using word ids %s" % batch_ids)
+print("  rows with a non-zero gradient:", np.where(np.abs(grad_out).sum(axis=1) > 0)[0])
+print("  word 2 appeared twice, so its gradients ADD -- that is why a")
+print("  frequent word's embedding moves further per batch than a rare one's,")
+print("  and why rare words end up close to their initial random values.")
+print()
+
+print("now train one, so the vectors mean something. the task: predict which")
+print("of three groups a word belongs to (animal, vehicle, article).")
+groups = np.array([0, 0, 0, 1, 1, 1, 2, 2])
+Emb = rng.normal(0, 0.3, (VOCAB, DIM))
+W = rng.normal(0, 0.3, (DIM, 3))
+lr = 0.5
+for step in range(600):
+    h = Emb                       # one row per word, whole vocabulary as a batch
+    logits = h @ W
+    p = np.exp(logits - logits.max(axis=1, keepdims=True))
+    p /= p.sum(axis=1, keepdims=True)
+    d = p.copy(); d[np.arange(VOCAB), groups] -= 1; d /= VOCAB
+    W -= lr * (h.T @ d)
+    Emb -= lr * (d @ W.T)
+print("  final accuracy: %.4f" % ((Emb @ W).argmax(axis=1) == groups).mean())
+print()
+
+def cos(a, b):
+    return a @ b / (np.linalg.norm(a) * np.linalg.norm(b))
+
+print("cosine similarity between the learned vectors:")
+print("%8s %s" % ("", "".join("%8s" % w for w in words)))
+for i, wi in enumerate(words):
+    print("%8s %s" % (wi, "".join("%8.3f" % cos(Emb[i], Emb[j])
+                                  for j in range(VOCAB))))
+print()
+print("nothing told the model that cat and dog are related. it only ever saw")
+print("a group label. the similarity appeared because words that need the")
+print("same output were pushed toward the same region of the space.")
+print()
+same = np.mean([cos(Emb[i], Emb[j]) for i in range(VOCAB) for j in range(VOCAB)
+                if i != j and groups[i] == groups[j]])
+diff = np.mean([cos(Emb[i], Emb[j]) for i in range(VOCAB) for j in range(VOCAB)
+                if groups[i] != groups[j]])
+print("  average similarity within a group : %+.4f" % same)
+print("  average similarity across groups  : %+.4f" % diff)
+print()
+print("that is what 'learned representation' means, and it is why embeddings")
+print("transfer: the geometry is a by-product of the task, so a table trained")
+print("on one task is often useful for another.")
+print()
+print("choosing the dimension is the only real decision. too small and")
+print("distinct words are forced to share space; too large and rare words")
+print("never see enough gradient to move. the usual rule of thumb is")
+print("a common starting point is four times the fourth root of the vocabulary,")
+print("then rounded to a power of two:")
+for v in (1_000, 50_000, 500_000):
+    raw = 4 * v ** 0.25
+    print("  vocab %7d -> 4 * %5.1f = %5.1f, so 64 to 256 in practice"
+          % (v, v ** 0.25, raw))
+print("  in real models the number is chosen by what fits in memory and what")
+print("  the downstream layers expect, far more often than by any formula.")
+```

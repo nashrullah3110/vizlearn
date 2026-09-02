@@ -131,6 +131,91 @@ In transformers the arrangement differs: `LayerNorm → Attention → residual`,
 
 A detail worth knowing: when batch normalisation follows a convolution, the convolution's bias is redundant, because normalisation subtracts the mean anyway. That is why `bias=False` appears on convolutions in ResNet-style code.
 
+## Six activations, and the one property they exist for
+
+Without a non-linear activation a hundred layers collapse into one matrix. This proves that, then compares what each function does to a gradient.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+print("first, why they are needed at all. stack three LINEAR layers:")
+A = rng.normal(0, 0.5, (4, 6))
+B = rng.normal(0, 0.5, (6, 5))
+C = rng.normal(0, 0.5, (5, 3))
+x = rng.normal(size=(2, 4))
+three = ((x @ A) @ B) @ C
+one = x @ (A @ B @ C)
+print("  x @ A @ B @ C  =", np.round(three[0], 6))
+print("  x @ (A @ B @ C)=", np.round(one[0], 6))
+print("  identical:", np.allclose(three, one))
+print("  three layers, %d parameters, and it is EXACTLY equivalent to one"
+      % (A.size + B.size + C.size))
+print("  4x3 matrix with %d. depth bought nothing." % (4 * 3))
+print()
+
+acts = {
+    "sigmoid":    (lambda z: 1 / (1 + np.exp(-z)),
+                   lambda z: (1 / (1 + np.exp(-z))) * (1 - 1 / (1 + np.exp(-z)))),
+    "tanh":       (np.tanh, lambda z: 1 - np.tanh(z) ** 2),
+    "relu":       (lambda z: np.maximum(0, z), lambda z: (z > 0).astype(float)),
+    "leaky relu": (lambda z: np.where(z > 0, z, 0.01 * z),
+                   lambda z: np.where(z > 0, 1.0, 0.01)),
+    "gelu":       (lambda z: 0.5 * z * (1 + np.tanh(np.sqrt(2 / np.pi) *
+                                                    (z + 0.044715 * z ** 3))),
+                   None),
+    "softplus":   (lambda z: np.log1p(np.exp(-np.abs(z))) + np.maximum(z, 0),
+                   lambda z: 1 / (1 + np.exp(-z))),
+}
+
+zs = np.array([-4.0, -1.0, -0.1, 0.0, 0.1, 1.0, 4.0])
+print("the functions themselves:")
+print("%12s %s" % ("z", "".join("%9.1f" % z for z in zs)))
+for name, (f, _) in acts.items():
+    print("%12s %s" % (name, "".join("%9.4f" % v for v in f(zs))))
+print()
+
+print("and their gradients -- this is the column that decides training:")
+print("%12s %s" % ("z", "".join("%9.1f" % z for z in zs)))
+h = 1e-6
+for name, (f, d) in acts.items():
+    g = d(zs) if d else (f(zs + h) - f(zs - h)) / (2 * h)
+    print("%12s %s" % (name, "".join("%9.4f" % v for v in g)))
+print()
+print("look at the softplus gradient row and the sigmoid FUNCTION row above --")
+print("they are identical. the derivative of softplus is exactly the sigmoid,")
+print("which is a pleasant thing to discover rather than be told.")
+print()
+print("read the row for sigmoid. at z=4 the gradient is %.4f. multiply ten of"
+      % ((1 / (1 + np.exp(-4))) * (1 - 1 / (1 + np.exp(-4)))))
+print("those together for a ten-layer network and you get %.2e -- the signal"
+      % ((1 / (1 + np.exp(-4)) * (1 - 1 / (1 + np.exp(-4)))) ** 10))
+print("reaching the first layer is gone. that is the vanishing gradient, and")
+print("it is why sigmoid stopped being used in hidden layers.")
+print()
+print("relu's gradient is exactly 1 wherever it is positive, so stacking does")
+print("not shrink it. the price is the other half:")
+z = rng.normal(-0.5, 1.0, 10000)
+print("  with inputs centred at -0.5, %.1f%% of relu units output exactly 0"
+      % (100 * (z <= 0).mean()))
+print("  and a unit stuck at 0 has gradient 0, so it never updates again.")
+print("  that is a 'dead relu'. leaky relu's 0.01 slope is the cheap fix.")
+print()
+
+print("max magnitude of each gradient -- how much signal survives one layer:")
+for name, (f, d) in acts.items():
+    g = d(np.linspace(-6, 6, 2001)) if d else None
+    if g is None:
+        zz = np.linspace(-6, 6, 2001)
+        g = (f(zz + h) - f(zz - h)) / (2 * h)
+    print("  %-12s %.4f" % (name, g.max()))
+print()
+print("the practical summary: relu or gelu in hidden layers. sigmoid only on")
+print("a binary output, softmax only on a multi-class output. tanh survives in")
+print("recurrent nets, where its zero-centred output genuinely helps.")
+```
+
 ## Questions people ask
 
 <strong>Why not use a linear activation?</strong> Because stacked linear layers collapse into one matrix, so the network could only ever draw a straight boundary.

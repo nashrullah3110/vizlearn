@@ -123,6 +123,80 @@ When a training run looks wrong, work through this in order:
 
 Most training failures are caught by the first four.
 
+## Six curves and what each one is telling you
+
+Training curves are the main diagnostic you get, and most of their shapes have a specific cause. Here are six, generated from those causes, with the reading for each.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+E = 60
+e = np.arange(E)
+
+def show(name, train, val, reading):
+    print(name)
+    print("%8s %10s %10s" % ("epoch", "train", "val"))
+    for i in range(0, E, 10):
+        print("%8d %10.4f %10.4f" % (i, train[i], val[i]))
+    print("  %s" % reading)
+    print()
+
+show("1. HEALTHY -- both fall and stay close",
+     1.2 * np.exp(-e / 14) + 0.18 + rng.normal(0, 0.006, E),
+     1.2 * np.exp(-e / 14) + 0.22 + rng.normal(0, 0.012, E),
+     "keep going, or stop when the improvement stops paying for the compute.")
+
+show("2. OVERFITTING -- train keeps falling, val turns",
+     1.2 * np.exp(-e / 10) + 0.03 + rng.normal(0, 0.005, E),
+     1.2 * np.exp(-e / 10) + 0.20 + 0.011 * np.maximum(0, e - 20)
+     + rng.normal(0, 0.012, E),
+     "stop at the turn. then: more data, regularisation, or less capacity.")
+
+show("3. UNDERFITTING -- both flat and high",
+     0.82 - 0.03 * np.exp(-e / 30) + rng.normal(0, 0.004, E),
+     0.84 - 0.03 * np.exp(-e / 30) + rng.normal(0, 0.006, E),
+     "the model cannot represent the problem. more data will NOT help --\n"
+     "  bigger model, better features, or train much longer.")
+
+lr_too_high = 1.2 * np.exp(-e / 30) + 0.3 + 0.25 * np.abs(np.sin(e * 1.7))
+show("4. LEARNING RATE TOO HIGH -- noisy and stalling",
+     lr_too_high, lr_too_high + 0.05 + rng.normal(0, 0.02, E),
+     "the loss bounces instead of descending. cut the learning rate, and\n"
+     "  check for exploding gradients if it eventually goes to NaN.")
+
+show("5. LEARNING RATE TOO LOW -- smooth and barely moving",
+     1.4 - 0.004 * e + rng.normal(0, 0.002, E),
+     1.42 - 0.004 * e + rng.normal(0, 0.003, E),
+     "a clean straight line going nowhere. raise the rate; you are wasting\n"
+     "  most of your compute budget.")
+
+show("6. VALIDATION BELOW TRAINING -- the confusing one",
+     1.2 * np.exp(-e / 14) + 0.40 + rng.normal(0, 0.008, E),
+     1.2 * np.exp(-e / 14) + 0.22 + rng.normal(0, 0.010, E),
+     "usually not a bug. dropout and augmentation are active during\n"
+     "  training and not during validation, so training is a harder task.\n"
+     "  it can also mean your validation split is easier than your\n"
+     "  training split -- worth checking before you celebrate.")
+
+print("the two rules that cover most of it:")
+print("  the GAP between the curves tells you about capacity.")
+print("  the SHAPE of the training curve tells you about the learning rate.")
+print()
+print("and two things worth doing before you read anything into a curve:")
+print("  plot the loss on a log scale -- a curve that looks flat at the end")
+print("  is often still improving substantially.")
+raw = 1.2 * np.exp(-e / 14) + 0.02
+print("     epoch 40 to 50, linear:  %.4f -> %.4f  (looks finished)"
+      % (raw[40], raw[50]))
+print("     the same numbers, as a ratio: %.3f -- still falling %.0f percent"
+      % (raw[50] / raw[40], 100 * (1 - raw[50] / raw[40])))
+print("     over those ten epochs, which a linear axis hides completely.")
+print("  and smooth it, or you will read noise as signal. a single epoch's")
+print("  validation loss on a small split moves by more than most real")
+print("  improvements do.")
+```
+
 ## Questions people ask
 
 <strong>How many epochs should I train for?</strong> Until validation stops improving, with early stopping deciding rather than a fixed number.

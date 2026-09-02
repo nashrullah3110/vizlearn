@@ -57,6 +57,94 @@ That rule holds well up to a point. Beyond a few thousand examples per batch, th
 
 Note that batch normalisation adds a constraint of its own: with batches below about 8, its statistics become unreliable and GroupNorm or LayerNorm is the better choice.
 
+## Why we process many rows at once
+
+One row at a time is correct and slow. The whole dataset at once is correct and will not fit. Everything in between is a trade between gradient quality and hardware efficiency, measured here.
+
+```python-run
+import numpy as np
+import time
+
+rng = np.random.default_rng(0)
+N, D, H = 4096, 64, 128
+X = rng.normal(size=(N, D))
+W = rng.normal(0, 0.1, (D, H))
+
+print("the same %d x %d @ %d x %d matmul, split into batches of different"
+      % (N, D, D, H))
+print("sizes. identical arithmetic every time -- only the call count changes:")
+print()
+print("%12s %10s %12s %16s" % ("batch size", "calls", "seconds", "us per row"))
+for bs in (1, 8, 64, 512, 4096):
+    t0 = time.time()
+    for i in range(0, N, bs):
+        _ = X[i:i + bs] @ W
+    t = time.time() - t0
+    print("%12d %10d %12.4f %16.2f" % (bs, N // bs, t, 1e6 * t / N))
+print()
+print("the multiplications are identical in every row. what changes is how")
+print("much work happens per call: one row is a matrix-VECTOR product, which")
+print("leaves most of the hardware idle, while a batch is a matrix-MATRIX")
+print("product, which does not.")
+print()
+print("in this browser the gap is modest -- a factor of one and a half or so,")
+print("because WebAssembly runs on a couple of CPU cores and the per-call")
+print("overhead is small. on a GPU with thousands of cores the same")
+print("comparison is a factor of a hundred or more, and that is the number")
+print("that made batching universal. the SHAPE of the effect is what to take")
+print("from this table, not its size.")
+print()
+
+print("now the statistical side. gradient quality against batch size:")
+w_true = rng.normal(size=D)
+y = X @ w_true + rng.normal(0, 1.0, N)
+w0 = np.zeros(D)
+full = 2 * X.T @ (X @ w0 - y) / N
+
+print("%12s %18s %20s" % ("batch size", "cosine to full", "relative noise"))
+for bs in (1, 4, 32, 256, 1024, 4096):
+    sims, mags = [], []
+    for _ in range(40):
+        idx = rng.integers(0, N, bs)
+        g = 2 * X[idx].T @ (X[idx] @ w0 - y[idx]) / bs
+        sims.append(g @ full / (np.linalg.norm(g) * np.linalg.norm(full)))
+        mags.append(np.linalg.norm(g - full))
+    print("%12d %18.4f %20.4f"
+          % (bs, np.mean(sims), np.mean(mags) / np.linalg.norm(full)))
+print()
+print("read the cosine column: a batch of 1 barely points toward the true")
+print("gradient at all, and a batch of 256 is already at 0.90.")
+print("the error falls as 1/sqrt(batch size), which is the same square root")
+print("that governs every other average -- so quadrupling the batch halves")
+print("the noise, and there are diminishing returns very quickly.")
+print()
+
+print("that square root is why large batches need a larger learning rate:")
+for bs in (32, 128, 512):
+    print("  batch %4d -> gradient noise x%.2f -> linear scaling suggests"
+          % (bs, np.sqrt(32 / bs)))
+    print("     lr x%.0f relative to batch 32" % (bs / 32))
+print("  the linear scaling rule (lr proportional to batch size) works up to")
+print("  a few thousand, then stops. beyond that you need warmup, and beyond")
+print("  that the returns disappear entirely.")
+print()
+
+print("and the memory, which is what actually decides it in practice:")
+ACT_BYTES = 4
+for bs in (1, 32, 256, 2048):
+    per_layer = bs * H * ACT_BYTES
+    print("  batch %5d: %8.1f KB of activations per layer, %7.1f MB over 40 layers"
+          % (bs, per_layer / 1024, per_layer * 40 / 1024 / 1024))
+print()
+print("that is the real constraint. the batch size you use is usually the")
+print("largest one that fits, rounded down to a power of two -- and gradient")
+print("accumulation is how you exceed it when you must.")
+print()
+print("one last thing that is not optional: SHUFFLE between epochs. if the")
+print("batches are always the same rows, the gradient noise is correlated")
+print("from epoch to epoch and stops averaging out.")
+```
+
 ## Things to try
 
 1. <strong>Watch a single sample flow.</strong> Set <strong>Batch Size</strong> to 1 and press <strong>Simulate Flow</strong>. One activation pattern moves through the network and one update follows &mdash; maximally noisy and maximally frequent.

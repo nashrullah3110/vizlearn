@@ -70,6 +70,87 @@ Compare with sigmoid plus squared error, where the gradient includes `a(1 − a)
 
 It also explains why frameworks fuse them. `nn.CrossEntropyLoss` applies log-softmax and the negative log-likelihood in one numerically stable step, and computes that clean gradient directly.
 
+## Why they are always implemented together
+
+Softmax turns scores into probabilities and cross-entropy scores them. Computed separately both overflow; computed together the gradient collapses to one subtraction.
+
+```python-run
+import numpy as np
+
+logits = np.array([2.0, 1.0, 0.1, -1.0])
+print("raw scores from the last layer:", logits)
+print("softmax makes them a distribution -- positive, and summing to 1:")
+e = np.exp(logits)
+p = e / e.sum()
+print("  exp(z)      ", np.round(e, 4))
+print("  exp(z)/sum  ", np.round(p, 6), " sum %.10f" % p.sum())
+print()
+
+print("it is shift-invariant, which is the fact the implementation relies on:")
+for shift in (0.0, 100.0, -50.0):
+    z = logits + shift
+    zz = z - z.max()
+    q = np.exp(zz) / np.exp(zz).sum()
+    print("  add %+7.1f to every score -> %s" % (shift, np.round(q, 6)))
+print("  the same distribution every time. only DIFFERENCES between scores")
+print("  matter, never their absolute size.")
+print()
+
+print("which is what stops it overflowing. the naive version:")
+big = np.array([1000.0, 999.0, 998.0])
+naive = np.exp(big) / np.exp(big).sum()
+print("  exp([1000, 999, 998]) = %s  <- inf/inf" % np.exp(big))
+print("  naive softmax          = %s" % naive)
+stable = np.exp(big - big.max()) / np.exp(big - big.max()).sum()
+print("  subtract the max first = %s" % np.round(stable, 6))
+print("  every library does that subtraction. it changes nothing")
+print("  mathematically and everything numerically.")
+print()
+
+print("cross-entropy over that distribution, per possible answer:")
+for c in range(4):
+    print("  true class %d -> loss = -log(%.6f) = %.6f" % (c, p[c], -np.log(p[c])))
+print()
+
+print("the same trap on the loss side. a confident wrong answer:")
+z = np.array([400.0, -400.0])
+q = np.exp(z - z.max()) / np.exp(z - z.max()).sum()
+print("  softmax([400, -400]) = %s" % q)
+print("  the second entry underflowed to exactly %s" % q[1])
+print("  so -log of it is %s, and the gradient is meaningless"
+      % ("inf" if q[1] == 0 else "%.4f" % -np.log(q[1])))
+print("  combining the two steps avoids ever forming that number:")
+print("  log_softmax(z)[1] = z[1] - logsumexp(z) = %.4f"
+      % (z[1] - (z.max() + np.log(np.exp(z - z.max()).sum()))))
+print("  that is why frameworks give you cross_entropy(LOGITS, target) and")
+print("  warn you not to apply softmax yourself first.")
+print()
+
+print("and now the reason it is elegant rather than merely stable.")
+print("the gradient of (softmax + cross-entropy) with respect to the logits:")
+true_class = 0
+onehot = np.zeros(4); onehot[true_class] = 1
+analytic = p - onehot
+
+def loss_of(z):
+    zz = z - z.max()
+    pp = np.exp(zz) / np.exp(zz).sum()
+    return -np.log(pp[true_class])
+
+h = 1e-6
+numeric = np.array([(loss_of(logits + h * np.eye(4)[i])
+                     - loss_of(logits - h * np.eye(4)[i])) / (2 * h)
+                    for i in range(4)])
+print("  analytic  (p - onehot):", np.round(analytic, 8))
+print("  numeric               :", np.round(numeric, 8))
+print("  max difference: %.2e" % np.abs(analytic - numeric).max())
+print()
+print("the whole derivative is 'predicted minus actual'. no softmax")
+print("derivative, no chain rule term, no jacobian -- they cancel exactly.")
+print("that cancellation is why this pairing is the default and why any")
+print("other loss on top of a softmax is a worse deal than it looks.")
+```
+
 ## Guided tour
 
 1. <strong>Watch the gap do the work.</strong> Set the <strong>Score for cat</strong> slider to 6. Its probability shoots up and every other class is squeezed toward zero. Softmax cares about the <em>differences</em> between logits, not their absolute size.

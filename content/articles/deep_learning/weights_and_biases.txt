@@ -109,6 +109,71 @@ The gradient with respect to a weight includes the input value (`∂z/∂w = x`)
 
 One deliberate exception to zero-initialised biases: setting the final bias of a binary classifier to the log-odds of the positive class makes the model start out predicting the base rate, which noticeably speeds up early training on imbalanced data.
 
+## Count the parameters, then see what each one does
+
+A layer is a matrix and a vector. This counts them for a real architecture, then moves single values to watch what they control.
+
+```python-run
+import numpy as np
+
+def layer_shapes(sizes):
+    return [(sizes[i], sizes[i + 1]) for i in range(len(sizes) - 1)]
+
+arch = [784, 128, 64, 10]
+print("a small classifier: %s" % " -> ".join(map(str, arch)))
+print()
+print("%-14s %14s %10s %12s" % ("layer", "weight shape", "biases", "parameters"))
+total = 0
+for i, (a, b) in enumerate(layer_shapes(arch)):
+    n = a * b + b
+    total += n
+    print("%-14s %14s %10d %12d" % ("layer %d" % (i + 1), "(%d, %d)" % (a, b), b, n))
+print("%-14s %14s %10s %12d" % ("total", "", "", total))
+print()
+print("%.1f%% of them are in the first layer. that is the usual shape --"
+      % (100 * (784 * 128 + 128) / total))
+print("parameters concentrate where the input is widest.")
+print()
+
+print("what one weight controls. a single neuron, two inputs:")
+w = np.array([0.5, -1.2])
+b = 0.3
+x = np.array([2.0, 1.0])
+print("  x = %s, w = %s, b = %.1f" % (x, w, b))
+print("  z = w.x + b = %.2f*%.1f + %.2f*%.1f + %.1f = %.2f"
+      % (w[0], x[0], w[1], x[1], b, x @ w + b))
+print()
+print("  nudge each parameter by +0.1 and watch z:")
+for i in range(2):
+    w2 = w.copy(); w2[i] += 0.1
+    print("    w[%d] +0.1 -> z %.2f   (changed by %+.2f = 0.1 * x[%d])"
+          % (i, x @ w2 + b, (x @ w2 + b) - (x @ w + b), i))
+print("    b    +0.1 -> z %.2f   (changed by +0.10, always)" % (x @ w + b + 0.1))
+print()
+print("  a weight's influence is scaled by its input. the bias's is not --")
+print("  that is the whole difference between them, and it is why the bias")
+print("  can shift the whole function while a weight only tilts it.")
+print()
+
+print("without a bias a layer is stuck passing through the origin:")
+for xv in (0.0, 1.0, 2.0):
+    print("    x=%.0f  w*x = %.2f   w*x + b = %.2f" % (xv, 2.0 * xv, 2.0 * xv + 3.0))
+print("  at x=0 the first column can only be 0. no weight fixes that.")
+print()
+
+print("the same layer, written the way a framework stores it:")
+rng = np.random.default_rng(0)
+W = rng.normal(0, 0.1, (4, 3))     # 4 inputs -> 3 outputs
+bb = np.zeros(3)
+batch = rng.normal(size=(5, 4))     # 5 rows at once
+out = batch @ W + bb
+print("  input  %s @ weights %s + bias %s = output %s"
+      % (batch.shape, W.shape, bb.shape, out.shape))
+print("  the bias is one number per OUTPUT, broadcast across all 5 rows.")
+print("  that broadcast is why the shapes work and why a bias is cheap:")
+print("  %d weights against %d biases." % (W.size, bb.size))
+```
+
 ## Questions people ask
 
 <strong>How many parameters does a layer have?</strong> `inputs × units` weights plus `units` biases.

@@ -70,6 +70,90 @@ In modern convolutional architectures, dropout has largely been replaced by batc
 
 Tuning it is straightforward: raise p if training accuracy far exceeds validation accuracy, lower it if both are stuck low and training is slow to converge.
 
+## Break the network on purpose, then put it back
+
+Dropout zeroes random units during training and scales the survivors so the expected output does not change. That scaling is the part that gets implemented wrong.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+a = np.ones((4, 8))
+p = 0.5
+
+print("a layer's output, 4 rows of 8 units, all 1.0:")
+mask = (rng.random(a.shape) > p)
+dropped = a * mask
+print("  keep mask (p_drop=%.1f):" % p)
+print(mask.astype(int))
+print("  after dropping, before any scaling -- row sums:", dropped.sum(axis=1))
+print("  the next layer expected around %d. it is now getting about %d."
+      % (a.shape[1], dropped.sum(axis=1).mean()))
+print()
+
+print("INVERTED dropout, which is what every framework actually does:")
+scaled = dropped / (1 - p)
+print("  divide the survivors by (1 - p) = %.1f" % (1 - p))
+print("  row sums now:", scaled.sum(axis=1))
+print("  over many draws the expectation is preserved:")
+sums = []
+for _ in range(20000):
+    m = (rng.random(8) > p)
+    sums.append((np.ones(8) * m / (1 - p)).sum())
+print("    mean row sum over 20,000 draws: %.4f  (target %d)"
+      % (np.mean(sums), 8))
+print()
+print("the scaling happens at TRAINING time, which is why inference needs no")
+print("special case: you simply stop dropping and change nothing else.")
+print("the original paper scaled at test time instead, and that is the")
+print("version that leads to 'my model is fine in training and broken in")
+print("production' -- you have to remember to do something.")
+print()
+
+print("what it costs in variance. one row, same weights, 10 forward passes:")
+w = rng.normal(0, 0.5, 8)
+h = rng.normal(1.0, 0.3, 8)
+outs = []
+for i in range(10):
+    m = (rng.random(8) > p)
+    outs.append(((h * m / (1 - p)) @ w))
+print("  outputs:", np.round(outs, 4))
+print("  no dropout:", round(h @ w, 4))
+print("  mean %.4f, sd %.4f -- the prediction is now a random variable."
+      % (np.mean(outs), np.std(outs)))
+print()
+
+print("the rate matters, and 0.5 is not a default so much as a starting point:")
+for pd in (0.0, 0.1, 0.3, 0.5, 0.8, 0.95):
+    trials = [((h * (rng.random(8) > pd) / max(1 - pd, 1e-9)) @ w) for _ in range(4000)]
+    print("  p=%.2f  expected units kept %.1f/8   output sd %.4f"
+          % (pd, 8 * (1 - pd), np.std(trials)))
+print("  at p=0.95 almost nothing survives and the surviving unit is")
+print("  multiplied by 20. the signal is gone and the noise is enormous.")
+print()
+
+print("why it regularises, in one sentence: a unit cannot rely on any")
+print("particular other unit being present, so the network cannot build")
+print("fragile co-adapted chains. here is that co-adaptation being broken:")
+print("  two units that always fire together can share the work 50/50.")
+print("  with dropout, each must carry the load alone half the time, so")
+print("  both end up individually useful rather than jointly useful.")
+print()
+
+print("where to put it, and where not to:")
+print("  after a dense layer's activation -- the standard place")
+print("  NOT between a conv layer and its BatchNorm, where it corrupts the")
+print("    statistics BatchNorm is trying to estimate")
+print("  rarely alongside BatchNorm at all -- BN already injects batch noise,")
+print("    and the two together often underperform either alone")
+print("  transformers use it on attention weights and after each sublayer,")
+print("    usually at 0.1, not 0.5")
+print()
+print("and the one that catches people: at eval time dropout must be OFF.")
+print("if your validation loss is mysteriously higher than training loss on")
+print("the same data, this is the first thing to check.")
+```
+
 ## Experiments to try
 
 1. <strong>Turn it off.</strong> Set <strong>Dropout</strong> to 0 and press <strong>Simulate Flow</strong>. Every neuron participates and signal reaches the output along every path.

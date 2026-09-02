@@ -137,6 +137,102 @@ Serving has its own reproducibility requirements, and they are usually easier.
 
 <strong>Pin the runtime.</strong> A model exported to ONNX or TorchScript and run on a different runtime version can differ in the last decimal places.
 
+## The same code, twice, with different answers
+
+Five separate sources of randomness sit between your script and your weights. Each is demonstrated and then pinned down, in the order they bite.
+
+```python-run
+import numpy as np
+
+print("1. INITIALISATION -- the most obvious one.")
+for seed in (None, None):
+    r = np.random.default_rng()
+    print("   unseeded weights:", np.round(r.normal(size=3), 6))
+print("   two runs, two answers. now with a seed:")
+for _ in range(2):
+    print("   seeded weights  :", np.round(np.random.default_rng(42).normal(size=3), 6))
+print()
+
+print("2. DATA ORDER -- shuffling changes which rows land in which batch,")
+print("   which changes every gradient after the first.")
+data = np.arange(10)
+for label, r in (("unseeded", np.random.default_rng()),
+                 ("unseeded", np.random.default_rng()),
+                 ("seed 0  ", np.random.default_rng(0)),
+                 ("seed 0  ", np.random.default_rng(0))):
+    print("   %s first batch: %s" % (label, r.permutation(data)[:5]))
+print()
+
+print("3. DROPOUT AND AUGMENTATION -- more draws, usually from a different")
+print("   generator than the one you seeded.")
+r1, r2 = np.random.default_rng(7), np.random.default_rng(7)
+print("   two generators seeded identically stay in step:")
+print("     ", (r1.random(6) > 0.5).astype(int), (r2.random(6) > 0.5).astype(int))
+r1.random(1)          # one extra draw from r1 only
+print("   one extra draw from the first, and they diverge forever:")
+print("     ", (r1.random(6) > 0.5).astype(int), (r2.random(6) > 0.5).astype(int))
+print("   this is why a seed set once at the top is not enough. any code")
+print("   path that consumes a different NUMBER of random values -- a")
+print("   conditional augmentation, an early break -- shifts everything")
+print("   downstream.")
+print()
+
+print("4. FLOATING POINT ORDER -- the one that surprises people. addition")
+print("   is not associative in floating point:")
+a = np.array([1e16, 1.0, -1e16, 1.0])
+print("   the same four numbers, summed in two orders:")
+print("     left to right : %.4f" % (((a[0] + a[1]) + a[2]) + a[3]))
+print("     regrouped     : %.4f" % ((a[0] + a[2]) + (a[1] + a[3])))
+print("   both are 'correct'. neither is wrong. they differ by %.1f."
+      % abs(((a[0] + a[1]) + a[2]) + a[3] - ((a[0] + a[2]) + (a[1] + a[3]))))
+print()
+big = np.random.default_rng(0).normal(size=100_000).astype(np.float32)
+print("   and at scale, with float32, the effect is routine:")
+print("     np.sum      : %.8f" % big.sum())
+print("     pairwise    : %.8f" % np.add.reduce(big))
+print("     python sum  : %.8f" % float(sum(big.tolist())))
+print("   a GPU splits a reduction across thousands of threads and combines")
+print("   them in whatever order they finish. that order is not guaranteed")
+print("   to repeat, which is why the same GPU can give two answers.")
+print()
+
+print("5. LIBRARY VERSIONS -- a different BLAS, cuDNN algorithm or numpy")
+print("   release changes the summation order without changing your code.")
+print("   this is the source you cannot fix with a seed, only with a lockfile.")
+print()
+
+print("what actually to do, in order of how much it buys you:")
+print()
+print("  # every generator, not just one")
+print("  random.seed(S); np.random.seed(S)")
+print("  torch.manual_seed(S); torch.cuda.manual_seed_all(S)")
+print()
+print("  # make the dataloader workers deterministic too")
+print("  DataLoader(..., worker_init_fn=seed_worker, generator=g)")
+print()
+print("  # force deterministic kernels, and accept the slowdown")
+print("  torch.use_deterministic_algorithms(True)")
+print("  torch.backends.cudnn.benchmark = False")
+print()
+print("that last pair is a real cost -- cudnn.benchmark picks the fastest")
+print("algorithm for your shapes at runtime, and turning it off can cost 10")
+print("to 30 percent. bit-exact reproducibility is a thing you buy, not a")
+print("thing you get.")
+print()
+print("the more useful target is usually STATISTICAL reproducibility: run")
+print("with five seeds and report mean and spread. a result that only holds")
+print("for seed 42 is not a result, and a paper that reports one number")
+print("without a spread has not told you whether its improvement is real:")
+rng = np.random.default_rng(1)
+scores = 0.842 + rng.normal(0, 0.011, 5)
+print("   five seeds: %s" % np.round(scores, 4))
+print("   mean %.4f, sd %.4f, range %.4f"
+      % (scores.mean(), scores.std(), scores.max() - scores.min()))
+print("   an 'improvement' of %.3f over a baseline would be indistinguishable"
+      % (scores.std()))
+print("   from seed noise on this model.")
+```
+
 ## Questions people ask
 
 <strong>Why is 42 the conventional seed?</strong> Cultural, from <em>The Hitchhiker's Guide to the Galaxy</em>. Any fixed value works; the point is that it is fixed.

@@ -119,6 +119,98 @@ Three additions turn the code above into a network, and nothing else changes con
 
 That is genuinely all of it. Everything else &mdash; Adam, batch normalisation, dropout, schedules &mdash; is a refinement of the same loop: predict, measure error, compute gradients, step.
 
+## The smallest possible training loop
+
+One weight, one bias, and a loop -- then the same problem solved exactly, so you can watch gradient descent arrive at an answer you already know.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+n = 200
+x = rng.uniform(0, 10, n)
+TRUE_W, TRUE_B = 2.4, -3.1
+y = TRUE_W * x + TRUE_B + rng.normal(0, 1.2, n)
+print("%d points from y = %.1fx %+.1f, plus noise of sd 1.2." % (n, TRUE_W, TRUE_B))
+print()
+
+print("the loss, and its two derivatives, written out:")
+print("    L      = mean((w*x + b - y)^2)")
+print("    dL/dw  = mean(2 * (w*x + b - y) * x)")
+print("    dL/db  = mean(2 * (w*x + b - y))")
+print()
+
+w, b, lr = 0.0, 0.0, 0.02
+print("%8s %10s %10s %14s %14s %12s"
+      % ("step", "w", "b", "dL/dw", "dL/db", "loss"))
+for step in range(301):
+    err = w * x + b - y
+    dw = 2 * (err * x).mean()
+    db = 2 * err.mean()
+    if step in (0, 1, 2, 10, 50, 150, 300):
+        print("%8d %10.4f %10.4f %14.4f %14.4f %12.4f"
+              % (step, w, b, dw, db, (err ** 2).mean()))
+    w -= lr * dw
+    b -= lr * db
+print()
+print("the exact answer, from the normal equation:")
+A = np.column_stack([x, np.ones(n)])
+exact = np.linalg.solve(A.T @ A, A.T @ y)
+print("  closed form      w = %.6f, b = %.6f" % (exact[0], exact[1]))
+print("  gradient descent w = %.6f, b = %.6f" % (w, b))
+print("  true values      w = %.6f, b = %.6f" % (TRUE_W, TRUE_B))
+print()
+print("the closed form is available here and is not for a neural network.")
+print("that is the only reason we iterate -- not because iteration is better.")
+print()
+
+print("watch the derivatives shrink as it arrives. that is the automatic")
+print("braking that makes a fixed learning rate work at all:")
+w2, b2 = 0.0, 0.0
+for step in range(6):
+    err = w2 * x + b2 - y
+    dw, db = 2 * (err * x).mean(), 2 * err.mean()
+    print("  step %d: |dL/dw| = %9.4f, so the step is %8.4f"
+          % (step, abs(dw), lr * abs(dw)))
+    w2 -= lr * dw; b2 -= lr * db
+print()
+
+print("the learning rate is the whole game, and it has a hard limit:")
+L = 2 * np.linalg.eigvalsh(A.T @ A / n).max()
+print("  the largest curvature here is %.4f, so anything above 2/%.4f = %.5f"
+      % (L, L, 2 / L))
+print("  will diverge. testing that:")
+for test_lr in (0.001, 0.01, 0.02, 0.028, 0.032):
+    ww, bb = 0.0, 0.0
+    for _ in range(300):
+        e2 = ww * x + bb - y
+        ww -= test_lr * 2 * (e2 * x).mean()
+        bb -= test_lr * 2 * e2.mean()
+    final = (ww * x + bb - y) ** 2
+    print("    lr=%.3f -> %s"
+          % (test_lr,
+             "diverged" if not np.isfinite(final.mean()) or final.mean() > 1e6
+             else "w=%.4f b=%.4f loss=%.4f" % (ww, bb, final.mean())))
+print()
+
+print("and one detail that matters more than it looks: the two parameters")
+print("have very different gradient scales, because x runs from 0 to 10:")
+err = 0 * x + 0 - y
+print("  at the start, |dL/dw| = %.2f and |dL/db| = %.2f -- a factor of %.1f."
+      % (abs(2 * (err * x).mean()), abs(2 * err.mean()),
+         abs((err * x).mean() / err.mean())))
+print("  so b converges long before w does. centring x fixes it:")
+xc = x - x.mean()
+Ac = np.column_stack([xc, np.ones(n)])
+print("  curvature ratio before centring: %.2f"
+      % (np.linalg.eigvalsh(A.T @ A).max() / np.linalg.eigvalsh(A.T @ A).min()))
+print("  after centring:                  %.2f"
+      % (np.linalg.eigvalsh(Ac.T @ Ac).max() / np.linalg.eigvalsh(Ac.T @ Ac).min()))
+print("  that ratio is the condition number, and it is exactly the thing")
+print("  feature scaling exists to reduce -- in a one-weight model and in a")
+print("  billion-parameter one alike.")
+```
+
 ## Questions people ask
 
 <strong>Why the factor of 2 in the gradients?</strong> It comes from differentiating the square. Some texts use `1/(2n)` in the loss so it cancels; it only rescales the effective learning rate.
