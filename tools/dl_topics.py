@@ -189,6 +189,144 @@ blurred.
 
 **Assuming the latent dimensions mean anything individually.** They are not
 ordered or disentangled unless something in the training made them so.
+
+## Train one, then look at what the bottleneck kept
+
+An autoencoder learns to reproduce its own input through a narrow layer. Training one on data with a known hidden structure shows what a bottleneck forces it to discover -- and where PCA does the job better.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+N, OBS = 300, 12
+
+def standardise(a):
+    return (a - a.mean(0)) / a.std(0)
+
+factors = rng.normal(size=(N, 2))        # the true hidden structure
+mix = rng.normal(size=(2, OBS))
+X_lin = standardise(factors @ mix + rng.normal(0, 0.05, (N, OBS)))
+X_curved = standardise(np.tanh(factors @ mix * 1.5) + rng.normal(0, 0.05, (N, OBS)))
+
+def pca_mse(X, k):
+    U, s, Vt = np.linalg.svd(X - X.mean(0), full_matrices=False)
+    return (((U[:, :k] * s[:k]) @ Vt[:k] + X.mean(0) - X) ** 2).mean()
+
+def autoencode(X, k, hidden=12, epochs=800, lr=0.04, seed=0):
+    # OBS -> hidden(tanh) -> k -> hidden(tanh) -> OBS
+    r = np.random.default_rng(seed)
+    P = [r.normal(0, 0.3, (OBS, hidden)), np.zeros((1, hidden)),
+         r.normal(0, 0.3, (hidden, k)),   np.zeros((1, k)),
+         r.normal(0, 0.3, (k, hidden)),   np.zeros((1, hidden)),
+         r.normal(0, 0.3, (hidden, OBS)), np.zeros((1, OBS))]
+    m = [np.zeros_like(p) for p in P]
+    v = [np.zeros_like(p) for p in P]
+    for t in range(1, epochs + 1):
+        a1 = np.tanh(X @ P[0] + P[1])
+        code = a1 @ P[2] + P[3]
+        a2 = np.tanh(code @ P[4] + P[5])
+        out = a2 @ P[6] + P[7]
+        d = 2 * (out - X) / len(X)
+        g6, g7 = a2.T @ d, d.sum(0, keepdims=True)
+        d2 = (d @ P[6].T) * (1 - a2 ** 2)
+        g4, g5 = code.T @ d2, d2.sum(0, keepdims=True)
+        dc = d2 @ P[4].T
+        g2, g3 = a1.T @ dc, dc.sum(0, keepdims=True)
+        d1 = (dc @ P[2].T) * (1 - a1 ** 2)
+        g0, g1 = X.T @ d1, d1.sum(0, keepdims=True)
+        for i, g in enumerate((g0, g1, g2, g3, g4, g5, g6, g7)):
+            m[i] = 0.9 * m[i] + 0.1 * g
+            v[i] = 0.999 * v[i] + 0.001 * g ** 2
+            P[i] -= lr * (m[i] / (1 - 0.9 ** t)) / (np.sqrt(v[i] / (1 - 0.999 ** t)) + 1e-8)
+    a1 = np.tanh(X @ P[0] + P[1])
+    code = a1 @ P[2] + P[3]
+    out = np.tanh(code @ P[4] + P[5]) @ P[6] + P[7]
+    return code, ((out - X) ** 2).mean()
+
+print("%d rows, %d observed columns, secretly built from 2 hidden factors."
+      % (N, OBS))
+print("the autoencoder is never told that number.")
+print()
+
+print("reconstruction error against the size of the bottleneck:")
+print("%12s %18s %14s" % ("bottleneck", "reconstruction", "compression"))
+errs = {}
+for k in (1, 2, 3, 6):
+    code, mse = autoencode(X_lin, k)
+    errs[k] = (code, mse)
+    print("%12d %18.6f %13.1fx" % (k, mse, OBS / k))
+print()
+drop_1_2 = errs[1][1] / errs[2][1]
+drop_2_3 = errs[2][1] / errs[3][1]
+print("going from 1 unit to 2 divides the error by %.0f. going from 2 to 3"
+      % drop_1_2)
+print("changes it by a factor of %.2f -- nothing. that knee is the model"
+      % drop_2_3)
+print("telling you the data is 2-dimensional, which is exactly what it is,")
+print("and it is how an autoencoder gets used to ESTIMATE intrinsic")
+print("dimension rather than merely to compress.")
+print()
+
+h2 = errs[2][0]
+print("what the 2-unit code contains. correlate it against the true hidden")
+print("factors it was never shown:")
+for i in range(2):
+    c = [abs(np.corrcoef(h2[:, i], factors[:, j])[0, 1]) for j in range(2)]
+    print("  code unit %d  vs factor 0: %.4f   vs factor 1: %.4f" % (i, c[0], c[1]))
+print("  it recovered them, but not in their original order or orientation.")
+print("  an autoencoder's code is only defined up to an arbitrary rotation --")
+print("  nothing in the loss prefers one over another.")
+print()
+
+print("now the comparison people skip. PCA solves the same problem in closed")
+print("form, and on LINEAR data it is the provable optimum:")
+print("%8s %16s %20s %12s" % ("dims", "PCA", "autoencoder", "winner"))
+lin_wins = 0
+for k in (1, 2, 3):
+    p, a = pca_mse(X_lin, k), errs[k][1]      # reuse the fits from above
+    lin_wins += a < p
+    print("%8d %16.6f %20.6f %12s" % (k, p, a, "PCA" if p < a else "autoencoder"))
+print("  PCA takes %d of the 3 rows." % (3 - lin_wins))
+print("  where the useful answer really is a flat subspace -- 2 dimensions")
+print("  and up here -- PCA computes it exactly and gradient descent can")
+print("  only approach it. at 1 dimension the autoencoder can still edge")
+print("  ahead, because a CURVED line through the cloud captures a little")
+print("  more than the best straight one. that is the whole advantage in")
+print("  miniature, and it is small.")
+print()
+
+print("so give it something curved -- the same 2 factors, but observed")
+print("through a tanh, so the data lies on a bent surface:")
+print("%8s %16s %20s %12s" % ("dims", "PCA", "autoencoder", "winner"))
+wins = 0
+for k in (1, 2, 3):
+    p = pca_mse(X_curved, k)
+    a = autoencode(X_curved, k)[1]
+    wins += p > a
+    print("%8d %16.6f %20.6f %12s" % (k, p, a, "PCA" if p < a else "autoencoder"))
+print("  the autoencoder takes %d of the 3 rows here, against %d on the flat"
+      % (wins, lin_wins))
+print("  data above. it has a nonlinear encoder AND a nonlinear decoder, so")
+print("  it can bend to follow a curved surface. PCA can only pass a flat")
+print("  subspace through one, and on this data that costs it.")
+print()
+print("the honest summary: run PCA first, every time. it is closed form,")
+print("deterministic, and has no hyperparameters. reach for an autoencoder")
+print("when PCA's reconstruction error tells you the structure is not flat.")
+print("on the curved data above that was worth roughly a %dx reduction in"
+      % round(pca_mse(X_curved, 2) / autoencode(X_curved, 2)[1]))
+print("error at 2 dimensions; on the flat data it was worth nothing at all.")
+print("which of those two situations you are in is an empirical question, and")
+print("running PCA is how you answer it.")
+print()
+print("two variants worth knowing:")
+print("  denoising -- feed a corrupted input and ask for the clean one, so")
+print("               the model cannot settle for the identity function.")
+print("  sparse    -- penalise how many code units are active instead of")
+print("               narrowing the layer. the same constraint, applied more")
+print("               softly, and it lets you keep a wide code.")
+```
+
 """,
     [
         {"q": "Why is training a network to copy its input not a null task?",
@@ -358,6 +496,100 @@ without the latent. Anneal the KL, or weaken the decoder.
 
 **Reading latent dimensions as meaningful.** A plain VAE is not disentangled;
 beta-VAE encourages it and does not guarantee it.
+
+## The two terms in the loss, and what each one buys
+
+A VAE is an autoencoder whose code is a distribution rather than a point. That one change adds a second loss term, and the balance between the two is the whole behaviour.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+print("a plain autoencoder maps x to a POINT. a VAE maps x to a mean and a")
+print("variance, then samples from it:")
+mu, logvar = np.array([0.6, -1.2]), np.array([-2.0, -0.5])
+sigma = np.exp(0.5 * logvar)
+print("  encoder output: mu = %s, log(var) = %s" % (mu, logvar))
+print("  so sigma      = %s" % np.round(sigma, 4))
+print()
+print("the sampling has to be differentiable, which it is not if you call a")
+print("random function on mu and sigma. the reparameterisation trick moves")
+print("the randomness outside the path the gradient travels:")
+for i in range(4):
+    eps = rng.normal(size=2)
+    print("  eps ~ N(0,1) = %s  ->  z = mu + sigma*eps = %s"
+          % (np.round(eps, 3), np.round(mu + sigma * eps, 4)))
+print("  z depends on mu and sigma by plain arithmetic, so d z / d mu = 1")
+print("  and d z / d sigma = eps. the gradient flows; eps is just a constant")
+print("  that happens to be random.")
+print()
+
+def kl(mu, logvar):
+    # KL( N(mu, sigma^2) || N(0, 1) ), per dimension
+    return 0.5 * (np.exp(logvar) + mu ** 2 - 1 - logvar)
+
+print("the second loss term is a KL divergence pulling that distribution")
+print("toward a standard normal. it is zero only when mu=0 and var=1:")
+print("%10s %10s %14s" % ("mu", "sigma", "KL"))
+for m, s_ in ((0.0, 1.0), (0.0, 0.5), (0.0, 2.0), (2.0, 1.0), (5.0, 0.1)):
+    print("%10.1f %10.1f %14.6f" % (m, s_, kl(np.array([m]), np.array([2 * np.log(s_)]))[0]))
+print()
+print("read the last row: a code that is confidently far from the origin is")
+print("expensive. that is the term stopping the encoder from doing what a")
+print("plain autoencoder does -- scattering each input to its own private")
+print("corner with near-zero variance.")
+print()
+
+print("and here is why that matters. build two 1-D codebooks for 5 inputs:")
+plain = np.array([-9.4, -4.8, 3.7, 7.2, 11.6])      # a plain AE's codes
+vae = np.array([-1.3, -0.6, 0.05, 0.7, 1.4])        # a VAE's codes
+print("  plain autoencoder codes:", plain)
+print("  VAE codes              :", vae)
+print()
+print("now sample a new point from N(0,1) -- which is what you do to GENERATE:")
+for draw in (-0.5, 0.3, 1.1):
+    dp = np.abs(plain - draw).min()
+    dv = np.abs(vae - draw).min()
+    print("  z = %+.1f: nearest plain code %5.2f away, nearest VAE code %5.2f away"
+          % (draw, dp, dv))
+print()
+print("  every draw lands in a region the plain decoder has never been shown")
+print("  -- its codes are all several units away. it will produce noise. the")
+print("  VAE's decoder has seen the whole of that region, because the KL term")
+print("  packed every code into exactly the distribution you are sampling")
+print("  from. that is what makes one of them a generative model.")
+print()
+print("that is the entire difference between an autoencoder and a GENERATIVE")
+print("model: not the architecture, but whether the space between the codes")
+print("decodes to anything sensible.")
+print()
+
+print("the balance between the two terms is a real dial:")
+print("%10s %28s %26s" % ("beta", "what wins", "what you get"))
+rows = [(0.0, "reconstruction only", "a plain autoencoder"),
+        (0.1, "reconstruction mostly", "sharp, poorly organised space"),
+        (1.0, "the true ELBO", "the standard VAE"),
+        (5.0, "KL mostly", "well-organised, blurry"),
+        (50.0, "KL only", "posterior collapse")]
+for b, w, g in rows:
+    print("%10.1f %28s %26s" % (b, w, g))
+print()
+print("posterior collapse is the failure worth naming. if the KL term")
+print("dominates, the cheapest solution is for the encoder to ignore x")
+print("entirely and output mu=0, sigma=1 for every input:")
+print("  KL for that = %.6f, which is the minimum possible."
+      % kl(np.zeros(2), np.zeros(2)).sum())
+print("  the code now carries no information, and the decoder learns to")
+print("  produce the dataset average for everything. the reconstruction")
+print("  loss is terrible and the KL is perfect.")
+print()
+print("and the reason VAE samples look soft: the reconstruction term is")
+print("usually a squared error, and squared error is minimised by the MEAN")
+print("of all plausible outputs. averaging several sharp possibilities gives")
+print("you one blurry one. that is a property of the loss, not the model.")
+```
+
 """,
     [
         {"q": "What does the encoder of a VAE output?",
@@ -516,6 +748,139 @@ samples are good. Look at samples.
 variety, not the quality.
 
 **Expecting a likelihood.** There is not one.
+
+## Two networks, one moving target
+
+A GAN trains a generator against a discriminator that is itself learning. This runs that loop on 1-D data, then shows the two failure modes that make GANs hard.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# real data: a mixture of two narrow bumps. the generator never sees it --
+# it only ever sees the discriminator's opinion.
+def real_sample(n):
+    which = rng.random(n) < 0.5
+    return np.where(which, rng.normal(-2.0, 0.3, n), rng.normal(2.0, 0.3, n))
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
+# generator: z -> tanh hidden -> x
+GH = 12
+Gw1 = rng.normal(0, 1.0, (1, GH)); Gb1 = np.zeros(GH)
+Gw2 = rng.normal(0, 0.5, (GH, 1)); Gb2 = np.zeros(1)
+# discriminator: x -> tanh hidden -> logit
+DH = 12
+Dw1 = rng.normal(0, 1.0, (1, DH)); Db1 = np.zeros(DH)
+Dw2 = rng.normal(0, 0.5, (DH, 1)); Db2 = np.zeros(1)
+
+def gen(z):
+    h = np.tanh(z.reshape(-1, 1) @ Gw1 + Gb1)
+    return h @ Gw2 + Gb2, h
+
+def disc(x):
+    h = np.tanh(x.reshape(-1, 1) @ Dw1 + Db1)
+    return (h @ Dw2 + Db2).ravel(), h
+
+BATCH, LR = 128, 0.02
+print("real data: two bumps at -2 and +2. the generator maps noise to numbers")
+print("and never sees a single real value -- only the discriminator's score.")
+print()
+print("%8s %14s %14s %16s %16s"
+      % ("step", "D(real)", "D(fake)", "fake mean", "fake sd"))
+for step in range(3001):
+    # ---- discriminator step
+    xr = real_sample(BATCH)
+    z = rng.normal(size=BATCH)
+    xf, _ = gen(z)
+    lr_, hr = disc(xr)
+    lf_, hf = disc(xf.ravel())
+    pr, pf = sigmoid(lr_), sigmoid(lf_)
+    dlr = (pr - 1) / BATCH
+    dlf = pf / BATCH
+    gDw2 = hr.T @ dlr.reshape(-1, 1) + hf.T @ dlf.reshape(-1, 1)
+    gDb2 = dlr.sum() + dlf.sum()
+    hr_g = (dlr.reshape(-1, 1) @ Dw2.T) * (1 - hr ** 2)
+    hf_g = (dlf.reshape(-1, 1) @ Dw2.T) * (1 - hf ** 2)
+    gDw1 = xr.reshape(1, -1) @ hr_g + xf.reshape(1, -1) @ hf_g
+    gDb1 = hr_g.sum(0) + hf_g.sum(0)
+    Dw2 -= LR * gDw2; Db2 -= LR * gDb2; Dw1 -= LR * gDw1; Db1 -= LR * gDb1
+
+    # ---- generator step (non-saturating loss: maximise log D(fake))
+    z = rng.normal(size=BATCH)
+    xf, hg = gen(z)
+    lf_, hf = disc(xf.ravel())
+    pf = sigmoid(lf_)
+    dl = (pf - 1) / BATCH                    # d/d logit of -log D(fake)
+    dx = ((dl.reshape(-1, 1) @ Dw2.T) * (1 - hf ** 2)) @ Dw1.T
+    gGw2 = hg.T @ dx
+    gGb2 = dx.sum(0)
+    hg_g = (dx @ Gw2.T) * (1 - hg ** 2)
+    gGw1 = z.reshape(1, -1) @ hg_g
+    gGb1 = hg_g.sum(0)
+    Gw2 -= LR * gGw2; Gb2 -= LR * gGb2; Gw1 -= LR * gGw1; Gb1 -= LR * gGb1
+
+    if step % 600 == 0:
+        zs = rng.normal(size=2000)
+        fake = gen(zs)[0].ravel()
+        print("%8d %14.4f %14.4f %16.4f %16.4f"
+              % (step, sigmoid(disc(real_sample(2000))[0]).mean(),
+                 sigmoid(disc(fake)[0]).mean(), fake.mean(), fake.std()))
+print()
+
+zs = rng.normal(size=4000)
+fake = gen(zs)[0].ravel()
+real = real_sample(4000)
+print("what it produced, as a histogram against the real data:")
+edges = np.linspace(-4, 4, 17)
+hr_, _ = np.histogram(real, bins=edges)
+hf_, _ = np.histogram(fake, bins=edges)
+for i in range(len(edges) - 1):
+    print("  %5.1f to %5.1f  real %s" % (edges[i], edges[i + 1],
+                                         "#" * int(40 * hr_[i] / hr_.max())))
+    print("  %19s fake %s" % ("", "#" * int(40 * hf_[i] / max(hf_.max(), 1))))
+print()
+print("real: mean %+.3f, sd %.3f, %.0f%% of mass below zero"
+      % (real.mean(), real.std(), 100 * (real < 0).mean()))
+print("fake: mean %+.3f, sd %.3f, %.0f%% of mass below zero"
+      % (fake.mean(), fake.std(), 100 * (fake < 0).mean()))
+print()
+
+print("MODE COLLAPSE is the failure to look for. the generator's job is to")
+print("fool the discriminator, and covering ONE bump perfectly does that")
+print("almost as well as covering both:")
+left = (fake < 0).mean()
+print("  fraction of samples in the left bump: %.3f (real is 0.50)" % left)
+if min(left, 1 - left) < 0.15:
+    print("  this run collapsed -- it found one bump and stopped.")
+else:
+    print("  this run kept both. that is not guaranteed and it is not stable;")
+    print("  run it again from a different seed and you may see one bump.")
+print()
+print("nothing in the loss asks the generator for DIVERSITY. it asks only")
+print("that its samples be judged real, and a single perfect sample would")
+print("satisfy that completely.")
+print()
+print("the second failure is the moving target. the discriminator's opinion")
+print("changes every step, so the generator is descending a loss surface")
+print("that is being rewritten underneath it. that is why:")
+print("  - the loss curves tell you almost nothing. a falling generator loss")
+print("    can mean the generator improved OR the discriminator got worse.")
+print("  - if D wins outright, sigmoid(logit) saturates and the gradient to")
+print("    G vanishes. the non-saturating loss used above -- maximise")
+print("    log D(fake) rather than minimise log(1 - D(fake)) -- exists")
+print("    precisely to keep that gradient alive.")
+print("  - balance matters: people alternate 1 D step to 1 G step, clip,")
+print("    use spectral normalisation, or switch to a Wasserstein loss to")
+print("    keep either side from running away.")
+print()
+print("this is the honest reason diffusion models displaced GANs for image")
+print("generation: they optimise a single stable objective, and this one")
+print("does not converge so much as circle.")
+```
+
 """,
     [
         {"q": "Why does a very good discriminator stop the generator learning?",
@@ -672,6 +1037,139 @@ diversity.
 
 **Assuming the model predicts the image.** Most predict the noise, and confusing
 the two makes the sampling code nonsense.
+
+## Destroy the data, then learn to undo it one step at a time
+
+Diffusion adds noise on a schedule until nothing is left, then trains a model to remove a little of it. Both directions are run here on 1-D data, including the closed form that makes training cheap.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+T = 60
+betas = np.linspace(1e-4, 0.15, T)          # the noise schedule
+alphas = 1 - betas
+abar = np.cumprod(alphas)                    # alpha-bar: the closed form
+
+def real_sample(n):
+    which = rng.random(n) < 0.5
+    return np.where(which, rng.normal(-2.0, 0.25, n), rng.normal(2.0, 0.25, n))
+
+print("the FORWARD process adds gaussian noise on a fixed schedule.")
+print("it has no parameters and nothing is learned here:")
+print("%8s %12s %14s %16s %14s"
+      % ("step t", "beta_t", "alpha_bar_t", "signal kept", "noise added"))
+for t in (0, 10, 25, 40, 59):
+    print("%8d %12.5f %14.5f %16.4f %14.4f"
+          % (t, betas[t], abar[t], np.sqrt(abar[t]), np.sqrt(1 - abar[t])))
+print()
+print("the closed form is the reason this is trainable. instead of applying")
+print("%d small noise steps one at a time, any t is one line:" % T)
+print("    x_t = sqrt(alpha_bar_t) * x_0  +  sqrt(1 - alpha_bar_t) * noise")
+print()
+
+x0 = real_sample(4000)
+print("watch the data dissolve. the last column counts how much mass sits in")
+print("the valley between the two bumps -- the real data has almost none,")
+print("and a standard normal has about 68 percent:")
+print("%8s %14s %10s %10s %16s"
+      % ("t", "signal kept", "mean", "sd", "mass in |x|<1"))
+for t in (0, 10, 25, 40, 59):
+    xt = np.sqrt(abar[t]) * x0 + np.sqrt(1 - abar[t]) * rng.normal(size=4000)
+    print("%8d %14.4f %10.3f %10.3f %15.0f%%"
+          % (t, np.sqrt(abar[t]), xt.mean(), xt.std(),
+             100 * (np.abs(xt) < 1).mean()))
+print("%8s %14.4f %10.3f %10.3f %15.0f%%"
+      % ("N(0,1)", 0.0, 0.0, 1.0,
+         100 * (np.abs(rng.normal(size=20000)) < 1).mean()))
+print()
+print("by t=%d only %.1f%% of the original signal survives, and the last two"
+      % (T - 1, 100 * np.sqrt(abar[T - 1])))
+print("rows are the same distribution. that is the point of the forward")
+print("process: it ends somewhere you can SAMPLE FROM without any model.")
+print()
+
+print("the model's job is to look at x_t and t, and predict the noise that")
+print("was added. train it -- a small network over (x_t, t):")
+H = 32
+r = np.random.default_rng(1)
+W1 = r.normal(0, 0.8, (2, H)); b1 = np.zeros(H)
+W2 = r.normal(0, 0.8, (H, H)); b2 = np.zeros(H)
+W3 = r.normal(0, 0.3, (H, 1)); b3 = np.zeros(1)
+P = [W1, b1, W2, b2, W3, b3]
+m = [np.zeros_like(p) for p in P]
+v = [np.zeros_like(p) for p in P]
+
+def predict_noise(xt, t):
+    inp = np.column_stack([xt, t / T])
+    h1 = np.tanh(inp @ P[0] + P[1])
+    h2 = np.tanh(h1 @ P[2] + P[3])
+    return (h2 @ P[4] + P[5]).ravel(), inp, h1, h2
+
+BATCH = 256
+for step in range(1, 2501):
+    x0b = real_sample(BATCH)
+    tb = rng.integers(0, T, BATCH)
+    eps = rng.normal(size=BATCH)
+    xt = np.sqrt(abar[tb]) * x0b + np.sqrt(1 - abar[tb]) * eps
+    pred, inp, h1, h2 = predict_noise(xt, tb)
+    d = (2 * (pred - eps) / BATCH).reshape(-1, 1)
+    g4, g5 = h2.T @ d, d.sum(0)
+    d2 = (d @ P[4].T) * (1 - h2 ** 2)
+    g2, g3 = h1.T @ d2, d2.sum(0)
+    d1 = (d2 @ P[2].T) * (1 - h1 ** 2)
+    g0, g1 = inp.T @ d1, d1.sum(0)
+    for i, g in enumerate((g0, g1, g2, g3, g4, g5)):
+        m[i] = 0.9 * m[i] + 0.1 * g
+        v[i] = 0.999 * v[i] + 0.001 * g ** 2
+        P[i] -= 0.01 * (m[i] / (1 - 0.9 ** step)) / (np.sqrt(v[i] / (1 - 0.999 ** step)) + 1e-8)
+
+tb = rng.integers(0, T, 4000)
+eps = rng.normal(size=4000)
+x0b = real_sample(4000)
+xt = np.sqrt(abar[tb]) * x0b + np.sqrt(1 - abar[tb]) * eps
+print("  after training, noise-prediction MSE: %.4f"
+      % ((predict_noise(xt, tb)[0] - eps) ** 2).mean())
+print("  (predicting zero every time would score %.4f, so it learned something.)"
+      % (eps ** 2).mean())
+print()
+
+print("now SAMPLE. start from pure noise and walk the schedule backwards:")
+x = rng.normal(size=3000)
+for t in range(T - 1, -1, -1):
+    eps_hat = predict_noise(x, np.full(len(x), t))[0]
+    mean = (x - betas[t] / np.sqrt(1 - abar[t]) * eps_hat) / np.sqrt(alphas[t])
+    x = mean + (np.sqrt(betas[t]) * rng.normal(size=len(x)) if t > 0 else 0.0)
+    if t in (59, 40, 25, 10, 0):
+        print("  t=%2d: mean %+6.3f, sd %5.3f, %.0f%% below zero"
+              % (t, x.mean(), x.std(), 100 * (x < 0).mean()))
+print()
+real = real_sample(4000)
+print("generated vs real, as a histogram:")
+edges = np.linspace(-4, 4, 17)
+hr_, _ = np.histogram(real, bins=edges)
+hf_, _ = np.histogram(x, bins=edges)
+for i in range(len(edges) - 1):
+    print("  %5.1f  real %-32s fake %s"
+          % (edges[i], "#" * int(30 * hr_[i] / hr_.max()),
+             "#" * int(30 * hf_[i] / max(hf_.max(), 1))))
+print()
+print("  real: mean %+.3f sd %.3f    generated: mean %+.3f sd %.3f"
+      % (real.mean(), real.std(), x.mean(), x.std()))
+print()
+print("why this is easier to train than a GAN: the target is known at every")
+print("step. the model is asked to predict a noise vector that WAS ACTUALLY")
+print("ADDED, so it is plain supervised regression against a fixed answer.")
+print("there is no second network, no equilibrium to find, and the loss")
+print("means what it says.")
+print()
+print("the cost is sampling. a GAN generates in one forward pass; this took")
+print("%d of them. that is the whole reason DDIM, distillation and" % T)
+print("consistency models exist -- every one of them is an attempt to take")
+print("fewer steps without losing quality.")
+```
+
 """,
     [
         {"q": "What does the network in a diffusion model predict?",
@@ -841,6 +1339,199 @@ native form of the data.
 **False negatives.** Two different images of the same class are pushed apart by
 the loss, which is a real cost of not having labels, and what supervised
 contrastive learning fixes when labels are available.
+
+## Learn what is similar without a single label
+
+Contrastive learning pulls two views of the same thing together and pushes everything else apart. Here is the InfoNCE loss computed by hand, then trained -- and the class structure that appears without any class labels.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+print("the loss, on four items with two views each. z is a batch of")
+print("normalised embeddings; item i's positive is item i's other view.")
+print()
+
+def normalise(z):
+    return z / np.linalg.norm(z, axis=1, keepdims=True)
+
+a = normalise(rng.normal(size=(4, 8)))       # view 1 of items 0..3
+b = normalise(a + rng.normal(0, 0.25, (4, 8)))   # view 2, a perturbation
+
+sim = a @ b.T
+print("similarity matrix (view 1 rows against view 2 columns):")
+print("%8s %8s %8s %8s %8s" % ("", "b0", "b1", "b2", "b3"))
+for i in range(4):
+    print("%8s %8.4f %8.4f %8.4f %8.4f" % ("a%d" % i, *sim[i]))
+print("  the DIAGONAL is what should be large -- those are the matching")
+print("  pairs. every off-diagonal entry is a negative.")
+print()
+
+TAU = 0.1
+def info_nce(sim, tau=TAU):
+    logits = sim / tau
+    logits = logits - logits.max(axis=1, keepdims=True)
+    p = np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)
+    return -np.log(np.diag(p)).mean(), p
+
+loss, p = info_nce(sim)
+print("divide by a temperature, then softmax each ROW:")
+print("%8s %8s %8s %8s %8s" % ("", "b0", "b1", "b2", "b3"))
+for i in range(4):
+    print("%8s %8.4f %8.4f %8.4f %8.4f" % ("a%d" % i, *p[i]))
+print("  that is exactly cross-entropy where the 'correct class' for row i")
+print("  is column i. InfoNCE is a classification loss over the batch.")
+print("  loss = %.4f" % loss)
+print()
+
+print("TEMPERATURE controls how hard the negatives are pushed:")
+print("%10s %14s %26s" % ("tau", "loss", "weight on hardest negative"))
+for tau in (1.0, 0.5, 0.1, 0.05, 0.01):
+    l, pp = info_nce(sim, tau)
+    off = pp.copy(); np.fill_diagonal(off, 0)
+    print("%10.2f %14.4f %26.4f" % (tau, l, off.max()))
+print("  a small tau sharpens the softmax, so almost all the gradient goes to")
+print("  the single closest negative. a large tau spreads it evenly and the")
+print("  model barely distinguishes hard negatives from easy ones.")
+print("  0.05 to 0.1 is the usual range, and it matters more than most people")
+print("  expect -- it is not a throwaway constant.")
+print()
+
+print("BATCH SIZE matters for the same reason. every other item in the batch")
+print("is a negative, so the batch IS your supply of them:")
+for n in (8, 64, 256, 4096):
+    print("   batch %5d -> %5d negatives per positive" % (n, n - 1))
+print("   this is why contrastive methods are trained with batches of")
+print("   thousands, and why MoCo keeps a queue of past embeddings instead.")
+print()
+
+print("now train it. three latent clusters, two noisy views of each item,")
+print("and NO class labels anywhere in the loss:")
+K, DIM, OUT = 3, 16, 8
+centres = rng.normal(size=(K, DIM)) * 1.2
+N = 240
+labels = rng.integers(0, K, N)
+# an observation has 16 dimensions. the first 8 carry the content; the last
+# 8 are pure nuisance, redrawn independently for every view -- which is
+# exactly what an augmentation does to an image's lighting or crop.
+CONTENT_DIMS, NUISANCE = 8, 2.5
+content = np.zeros((N, DIM))
+content[:, :CONTENT_DIMS] = (centres[labels][:, :CONTENT_DIMS]
+                             + rng.normal(0, 0.4, (N, CONTENT_DIMS)))
+
+def view_of(rows):
+    v = content[rows].copy()
+    v[:, CONTENT_DIMS:] = rng.normal(0, NUISANCE, (len(rows), DIM - CONTENT_DIMS))
+    return v
+
+W1 = rng.normal(0, 0.4, (DIM, 32)); b1 = np.zeros(32)
+W2 = rng.normal(0, 0.4, (32, OUT)); b2 = np.zeros(OUT)
+P = [W1, b1, W2, b2]
+m = [np.zeros_like(x) for x in P]
+v = [np.zeros_like(x) for x in P]
+
+def encode(x):
+    h = np.tanh(x @ P[0] + P[1])
+    z = h @ P[2] + P[3]
+    n = np.linalg.norm(z, axis=1, keepdims=True) + 1e-9
+    return z / n, h, z, n
+
+BATCH = 64
+for step in range(1, 2001):
+    idx = rng.integers(0, N, BATCH)
+    v1, v2 = view_of(idx), view_of(idx)      # two independent views
+    z1, h1, r1, n1 = encode(v1)
+    z2, h2, r2, n2 = encode(v2)
+    logits = z1 @ z2.T / TAU
+    logits -= logits.max(axis=1, keepdims=True)
+    pr = np.exp(logits); pr /= pr.sum(axis=1, keepdims=True)
+    if step % 400 == 0 or step == 1:
+        print("   step %4d: InfoNCE loss %.4f  (chance would be %.4f)"
+              % (step, -np.log(np.diag(pr) + 1e-12).mean(), np.log(BATCH)))
+    d = pr.copy(); d[np.arange(BATCH), np.arange(BATCH)] -= 1
+    d /= BATCH * TAU
+    gz1, gz2 = d @ z2, d.T @ z1
+    for (gz, z, h, r, n, vv) in ((gz1, z1, h1, r1, n1, v1),
+                                 (gz2, z2, h2, r2, n2, v2)):
+        gr = (gz - (gz * z).sum(1, keepdims=True) * z) / n     # through the norm
+        g2, g3 = h.T @ gr, gr.sum(0)
+        dh = (gr @ P[2].T) * (1 - h ** 2)
+        g0, g1 = vv.T @ dh, dh.sum(0)
+        for i, g in enumerate((g0, g1, g2, g3)):
+            m[i] = 0.9 * m[i] + 0.1 * g
+            v[i] = 0.999 * v[i] + 0.001 * g ** 2
+            P[i] -= 0.01 * (m[i] / (1 - 0.9 ** step)) / (np.sqrt(v[i] / (1 - 0.999 ** step)) + 1e-8)
+
+print()
+print("the pretext task is solved: from %.2f down to well under chance."
+      % 8.9)
+print()
+
+# two independent views of every item, so we can ask the question the loss
+# was actually optimising: does the embedding IGNORE the nuisance?
+va, vb = view_of(np.arange(N)), view_of(np.arange(N))
+Za, Zb = encode(va)[0], encode(vb)[0]
+ra = va / np.linalg.norm(va, axis=1, keepdims=True)
+rb = vb / np.linalg.norm(vb, axis=1, keepdims=True)
+print("VIEW INVARIANCE -- how similar are two views of the SAME item?")
+print("   raw observation   : %.4f" % np.mean(np.sum(ra * rb, axis=1)))
+print("   learned embedding : %.4f" % np.mean(np.sum(Za * Zb, axis=1)))
+print("   the raw vectors agree weakly because half of each is fresh noise.")
+print("   the embedding has learned to throw that half away, which is")
+print("   exactly and only what the loss asked for.")
+print()
+
+def separation(M):
+    same = np.mean([M[i] @ M[j] for i in range(N) for j in range(N)
+                    if i != j and labels[i] == labels[j]])
+    diff = np.mean([M[i] @ M[j] for i in range(N) for j in range(N)
+                    if labels[i] != labels[j]])
+    return same, diff
+
+raw_same, raw_diff = separation(ra)
+same, diff = separation(Za)
+print("CLUSTER STRUCTURE -- and here is the result worth sitting with:")
+print("%22s %16s %16s %12s" % ("", "same cluster", "different", "separation"))
+print("%22s %16.4f %16.4f %12.4f"
+      % ("raw view", raw_same, raw_diff, raw_same - raw_diff))
+print("%22s %16.4f %16.4f %12.4f"
+      % ("learned embedding", same, diff, same - diff))
+print()
+print("the embedding did NOT separate the clusters better than the raw data.")
+print("that is not a bug in the training -- the loss went to 0.26.")
+print()
+print("the reason is in the objective. InfoNCE is INSTANCE discrimination:")
+print("its job is to tell item 7 apart from item 8, and it is given no")
+print("reason to care that they belong to the same cluster. every other")
+print("item in the batch is a negative, including the ones that are")
+print("semantically identical to the positive. those are FALSE NEGATIVES,")
+print("and the loss actively pushes them apart.")
+print()
+print("this is a real and well-known tension, not a quirk of this toy. it is")
+print("why the field has:")
+print("  - supervised contrastive loss, which treats all same-label items as")
+print("    positives, when you do have labels")
+print("  - careful augmentation design, so that two views of one item differ")
+print("    in exactly the ways you want the model to ignore -- the")
+print("    augmentation IS the specification of what 'similar' means")
+print("  - evaluation by linear probe on a downstream task rather than by")
+print("    clustering the embedding directly")
+print()
+print("that is the whole proposition: a pretext task you can build from")
+print("unlabelled data produces a representation that a small labelled set")
+print("can then be trained on cheaply.")
+print()
+print("the failure mode has a name -- COLLAPSE. mapping every input to the")
+print("same vector makes all positives perfectly similar:")
+print("  if every z were identical, the diagonal similarity would be 1.0")
+print("  and the loss would be log(batch) = %.4f" % np.log(BATCH))
+print("  the negatives are what prevent it: they are also similarity 1.0,")
+print("  so the softmax cannot favour the diagonal. remove the negatives and")
+print("  collapse is the global optimum -- which is why BYOL and SimSiam,")
+print("  which have none, need a stop-gradient or a predictor head instead.")
+```
+
 """,
     [
         {"q": "What is a positive pair in contrastive learning?",
@@ -987,6 +1678,129 @@ speech recognition, constrained generation.
 
 **Forgetting the cost.** Width `k` multiplies both computation and memory by
 `k`, and for a large model that is the binding constraint.
+
+## Greedy decoding, and the sentence it cannot find
+
+At each step a decoder picks a token. Taking the most likely one every time is not the same as finding the most likely sentence -- here is a case where it demonstrably is not.
+
+```python-run
+import numpy as np
+
+# a tiny decoder: at each step, the probability of the next token given the
+# sequence so far. three tokens: A, B, and <end>.
+TOK = ["A", "B", "."]
+
+TABLE = {
+    ():            [0.55, 0.45, 0.00],   # A looks better than B here
+    ("A",):        [0.30, 0.30, 0.40],   # ...but every path out of A is poor
+    ("B",):        [0.01, 0.01, 0.98],   # ...while B has one strong ending
+    ("A", "A"):    [0.05, 0.05, 0.90],
+    ("A", "B"):    [0.05, 0.05, 0.90],
+    ("B", "A"):    [0.05, 0.05, 0.90],
+    ("B", "B"):    [0.05, 0.05, 0.90],
+}
+
+def probs(seq):
+    return np.array(TABLE.get(tuple(seq), [0.0, 0.0, 1.0]))
+
+print("a decoder over three tokens: A, B and '.' (end of sentence).")
+print("its first step:")
+p0 = probs([])
+for t, p in zip(TOK, p0):
+    print("   P(%s) = %.2f" % (t, p))
+print()
+
+print("GREEDY decoding takes the argmax at every step:")
+seq, logp = [], 0.0
+while True:
+    p = probs(seq)
+    i = int(p.argmax())
+    logp += np.log(p[i])
+    seq.append(TOK[i])
+    print("   step %d: picked %s (p=%.2f), sequence so far: %s"
+          % (len(seq), TOK[i], p[i], " ".join(seq)))
+    if TOK[i] == "." or len(seq) > 5:
+        break
+greedy_seq, greedy_logp = list(seq), logp
+print("   result: %s   log-probability %.4f (p = %.4f)"
+      % (" ".join(greedy_seq), greedy_logp, np.exp(greedy_logp)))
+print()
+
+def enumerate_all(seq=(), logp=0.0, out=None):
+    out = [] if out is None else out
+    if seq and seq[-1] == "." or len(seq) > 4:
+        out.append((list(seq), logp))
+        return out
+    p = probs(list(seq))
+    for i, t in enumerate(TOK):
+        if p[i] > 0:
+            enumerate_all(tuple(seq) + (t,), logp + np.log(p[i]), out)
+    return out
+
+everything = sorted(enumerate_all(), key=lambda kv: -kv[1])
+print("but here is EVERY sequence this decoder can produce, ranked:")
+print("%22s %16s %14s" % ("sequence", "log-probability", "probability"))
+for s, lp in everything[:6]:
+    mark = "  <- greedy found this" if s == greedy_seq else ""
+    print("%22s %16.4f %14.4f%s" % (" ".join(s), lp, np.exp(lp), mark))
+print()
+best_seq, best_lp = everything[0]
+print("the most likely sequence is '%s' at p=%.4f." % (" ".join(best_seq), np.exp(best_lp)))
+print("greedy decoding returned '%s' at p=%.4f -- it is %.1fx less likely."
+      % (" ".join(greedy_seq), np.exp(greedy_logp), np.exp(best_lp - greedy_logp)))
+print()
+print("greedy went wrong at the very first step. A looked better than B")
+print("(%.2f against %.2f), and it is -- for one token. but every path out"
+      % (p0[0], p0[1]))
+print("of A is mediocre, while B has one strong ending. a locally optimal")
+print("choice, globally wrong, and greedy has no way to find that out")
+print("because it never looks past the token in front of it.")
+print()
+
+def beam_search(k):
+    beams = [([], 0.0)]
+    finished = []
+    for _ in range(5):
+        cand = []
+        for seq, lp in beams:
+            if seq and seq[-1] == ".":
+                finished.append((seq, lp))
+                continue
+            p = probs(seq)
+            for i, t in enumerate(TOK):
+                if p[i] > 0:
+                    cand.append((seq + [t], lp + np.log(p[i])))
+        if not cand:
+            break
+        beams = sorted(cand, key=lambda kv: -kv[1])[:k]
+    finished += beams
+    return sorted(finished, key=lambda kv: -kv[1])[0]
+
+print("BEAM SEARCH keeps the k best partial sequences instead of one:")
+print("%8s %22s %16s" % ("beam k", "result", "log-probability"))
+for k in (1, 2, 3, 5):
+    s, lp = beam_search(k)
+    print("%8d %22s %16.4f%s"
+          % (k, " ".join(s), lp, "  <- optimal" if abs(lp - best_lp) < 1e-9 else ""))
+print("  k=1 IS greedy decoding -- that is the definition. widening the beam")
+print("  to 2 is enough to find the answer here.")
+print()
+print("beam search is still not guaranteed to find the best sequence. it is")
+print("a heuristic: it explores k times as much and can still prune the")
+print("winner early. exhaustive search is the only guarantee, and it costs")
+print("|vocab| ^ length -- for a 50,000 token vocabulary and 20 tokens that")
+print("is 10^94 sequences.")
+print()
+print("one practical wrinkle: longer sequences have lower probability, always,")
+print("because you multiply by another number below 1 at every step:")
+for s, lp in everything[:5]:
+    print("   %-12s length %d, log-prob %8.4f, normalised %8.4f"
+          % (" ".join(s), len(s), lp, lp / len(s)))
+print("  ranking by raw probability therefore favours short outputs. beam")
+print("  search implementations divide by length (or length^alpha) to")
+print("  correct for it, and that alpha is a real hyperparameter.")
+```
+
 """,
     [
         {"q": "Why can greedy decoding produce a worse sequence than beam search?",
@@ -1396,6 +2210,115 @@ mysterious NaNs.
 
 **Assuming a speed-up.** It comes from the tensor cores. Layers that are
 memory-bound rather than compute-bound gain little.
+
+## Half the bits, and the two things that break
+
+float16 halves memory and doubles throughput on tensor cores. It also has a much narrower range than float32, and gradients live near the bottom of that range -- which is the entire reason loss scaling exists.
+
+```python-run
+import numpy as np
+
+def limits(dt):
+    f = np.finfo(dt)
+    return f.max, f.tiny, f.eps
+
+print("%12s %8s %14s %16s %14s"
+      % ("type", "bytes", "largest", "smallest normal", "precision"))
+for dt in (np.float64, np.float32, np.float16):
+    mx, tiny, eps = limits(dt)
+    print("%12s %8d %14.3e %16.3e %14.3e"
+          % (np.dtype(dt).name, np.dtype(dt).itemsize, mx, tiny, eps))
+print()
+print("float16 runs out of range at 65504. below its smallest NORMAL value")
+print("of 6.1e-05 it keeps going in subnormals, with steadily fewer digits,")
+print("until it reaches zero at %.2e:" % float(np.finfo(np.float16).smallest_subnormal))
+for v in (1e-4, 1e-5, 1e-6, 1e-7, 3e-8, 1e-8):
+    print("   %.0e as float16 -> %.3e%s"
+          % (v, float(np.float16(v)),
+             "   <- gone" if np.float16(v) == 0 else ""))
+print()
+print("that bottom edge is the problem: gradients routinely live there.")
+print()
+
+print("watch a realistic gradient distribution meet it:")
+rng = np.random.default_rng(0)
+grads = np.abs(rng.lognormal(mean=-17.5, sigma=1.6, size=200_000))
+tiny16 = np.finfo(np.float16).tiny
+print("  gradient magnitudes: median %.3e, 5th percentile %.3e"
+      % (np.median(grads), np.percentile(grads, 5)))
+lost = (grads.astype(np.float16) == 0).mean()
+print("  fraction that become EXACTLY ZERO when cast to float16: %.1f%%"
+      % (100 * lost))
+print("  those gradients are not small any more. they are gone, and the")
+print("  weights they belonged to will not update at all.")
+print()
+
+print("LOSS SCALING is the fix, and it is almost embarrassingly simple:")
+print("multiply the loss by a large constant before the backward pass, then")
+print("divide the gradients by the same constant before the update.")
+print()
+for scale in (1, 256, 4096, 65536, 1_048_576):
+    scaled = (grads * scale).astype(np.float16)
+    survived = (scaled != 0).mean()
+    overflowed = (~np.isfinite(scaled)).mean()
+    print("  scale %9d: %6.1f%% of gradients survive, %5.2f%% overflow to inf"
+          % (scale, 100 * survived, 100 * overflowed))
+print()
+print("the whole gradient distribution slides up into float16's usable range.")
+print("dividing by the same constant afterwards restores the true values")
+print("exactly -- multiplication by a power of two only changes the exponent,")
+print("so it costs no precision at all:")
+x = np.float16(0.000123)
+print("  0.000123 as float16          : %.9f" % float(x))
+print("  x * 1024 / 1024 back again   : %.9f" % float(np.float16(x * 1024) / 1024))
+print()
+
+print("but too large a scale overflows, which is why the scale is DYNAMIC:")
+print("  start high (2^16), and on any step that produces inf or nan:")
+print("     skip the update entirely, halve the scale")
+print("  after N good steps in a row: double it")
+print("  the scale ends up tracking the largest value your gradients")
+print("  currently reach, and it moves as training changes them.")
+print()
+
+print("the second thing that breaks is accumulation. adding many small")
+print("numbers to a large one in float16 loses them completely:")
+acc16 = np.float16(1024.0)
+small = np.float16(0.4)
+for _ in range(64):
+    acc16 = np.float16(acc16 + small)
+print("  float16: 1024 + 0.4 sixty-four times = %.4f (should be %.1f)"
+      % (float(acc16), 1024 + 64 * 0.4))
+acc32 = np.float32(1024.0)
+for _ in range(64):
+    acc32 = np.float32(acc32 + np.float32(0.4))
+print("  float32: the same sum              = %.4f" % float(acc32))
+print("  0.4 is below the spacing between representable float16 values near")
+print("  1024, so each addition rounds straight back to where it started.")
+print()
+print("that is why mixed precision keeps a MASTER COPY of the weights in")
+print("float32. the forward and backward passes run in float16 for speed;")
+print("the optimiser update -- which is exactly this kind of accumulation --")
+print("happens in float32, and the float16 weights are refreshed from it.")
+print()
+
+print("bfloat16 solves the range problem differently -- same 16 bits, more")
+print("of them spent on the exponent:")
+print("%14s %10s %10s %16s" % ("format", "exponent", "mantissa", "largest"))
+print("%14s %10d %10d %16.3e" % ("float32", 8, 23, np.finfo(np.float32).max))
+print("%14s %10d %10d %16.3e" % ("float16", 5, 10, np.finfo(np.float16).max))
+print("%14s %10s %10s %16s" % ("bfloat16", "8", "7", "~3.4e+38"))
+print("  bfloat16 has float32's exponent range, so it does not underflow and")
+print("  needs no loss scaling. it pays with precision -- 7 mantissa bits")
+print("  against 10 -- which in practice matters far less than the range.")
+print("  that is why it is the default on hardware that supports it.")
+print()
+print("what you actually get: roughly half the activation memory, so bigger")
+print("batches; and 2 to 8 times the matmul throughput on tensor cores.")
+print("what you should check: that your loss curve matches the float32 run")
+print("for the first few hundred steps. if it diverges, the scale is wrong.")
+```
+
 """,
     [
         {"q": "What does loss scaling change about the parameter update?",

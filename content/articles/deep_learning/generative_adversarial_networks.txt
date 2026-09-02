@@ -94,3 +94,135 @@ samples are good. Look at samples.
 variety, not the quality.
 
 **Expecting a likelihood.** There is not one.
+
+## Two networks, one moving target
+
+A GAN trains a generator against a discriminator that is itself learning. This runs that loop on 1-D data, then shows the two failure modes that make GANs hard.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# real data: a mixture of two narrow bumps. the generator never sees it --
+# it only ever sees the discriminator's opinion.
+def real_sample(n):
+    which = rng.random(n) < 0.5
+    return np.where(which, rng.normal(-2.0, 0.3, n), rng.normal(2.0, 0.3, n))
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
+# generator: z -> tanh hidden -> x
+GH = 12
+Gw1 = rng.normal(0, 1.0, (1, GH)); Gb1 = np.zeros(GH)
+Gw2 = rng.normal(0, 0.5, (GH, 1)); Gb2 = np.zeros(1)
+# discriminator: x -> tanh hidden -> logit
+DH = 12
+Dw1 = rng.normal(0, 1.0, (1, DH)); Db1 = np.zeros(DH)
+Dw2 = rng.normal(0, 0.5, (DH, 1)); Db2 = np.zeros(1)
+
+def gen(z):
+    h = np.tanh(z.reshape(-1, 1) @ Gw1 + Gb1)
+    return h @ Gw2 + Gb2, h
+
+def disc(x):
+    h = np.tanh(x.reshape(-1, 1) @ Dw1 + Db1)
+    return (h @ Dw2 + Db2).ravel(), h
+
+BATCH, LR = 128, 0.02
+print("real data: two bumps at -2 and +2. the generator maps noise to numbers")
+print("and never sees a single real value -- only the discriminator's score.")
+print()
+print("%8s %14s %14s %16s %16s"
+      % ("step", "D(real)", "D(fake)", "fake mean", "fake sd"))
+for step in range(3001):
+    # ---- discriminator step
+    xr = real_sample(BATCH)
+    z = rng.normal(size=BATCH)
+    xf, _ = gen(z)
+    lr_, hr = disc(xr)
+    lf_, hf = disc(xf.ravel())
+    pr, pf = sigmoid(lr_), sigmoid(lf_)
+    dlr = (pr - 1) / BATCH
+    dlf = pf / BATCH
+    gDw2 = hr.T @ dlr.reshape(-1, 1) + hf.T @ dlf.reshape(-1, 1)
+    gDb2 = dlr.sum() + dlf.sum()
+    hr_g = (dlr.reshape(-1, 1) @ Dw2.T) * (1 - hr ** 2)
+    hf_g = (dlf.reshape(-1, 1) @ Dw2.T) * (1 - hf ** 2)
+    gDw1 = xr.reshape(1, -1) @ hr_g + xf.reshape(1, -1) @ hf_g
+    gDb1 = hr_g.sum(0) + hf_g.sum(0)
+    Dw2 -= LR * gDw2; Db2 -= LR * gDb2; Dw1 -= LR * gDw1; Db1 -= LR * gDb1
+
+    # ---- generator step (non-saturating loss: maximise log D(fake))
+    z = rng.normal(size=BATCH)
+    xf, hg = gen(z)
+    lf_, hf = disc(xf.ravel())
+    pf = sigmoid(lf_)
+    dl = (pf - 1) / BATCH                    # d/d logit of -log D(fake)
+    dx = ((dl.reshape(-1, 1) @ Dw2.T) * (1 - hf ** 2)) @ Dw1.T
+    gGw2 = hg.T @ dx
+    gGb2 = dx.sum(0)
+    hg_g = (dx @ Gw2.T) * (1 - hg ** 2)
+    gGw1 = z.reshape(1, -1) @ hg_g
+    gGb1 = hg_g.sum(0)
+    Gw2 -= LR * gGw2; Gb2 -= LR * gGb2; Gw1 -= LR * gGw1; Gb1 -= LR * gGb1
+
+    if step % 600 == 0:
+        zs = rng.normal(size=2000)
+        fake = gen(zs)[0].ravel()
+        print("%8d %14.4f %14.4f %16.4f %16.4f"
+              % (step, sigmoid(disc(real_sample(2000))[0]).mean(),
+                 sigmoid(disc(fake)[0]).mean(), fake.mean(), fake.std()))
+print()
+
+zs = rng.normal(size=4000)
+fake = gen(zs)[0].ravel()
+real = real_sample(4000)
+print("what it produced, as a histogram against the real data:")
+edges = np.linspace(-4, 4, 17)
+hr_, _ = np.histogram(real, bins=edges)
+hf_, _ = np.histogram(fake, bins=edges)
+for i in range(len(edges) - 1):
+    print("  %5.1f to %5.1f  real %s" % (edges[i], edges[i + 1],
+                                         "#" * int(40 * hr_[i] / hr_.max())))
+    print("  %19s fake %s" % ("", "#" * int(40 * hf_[i] / max(hf_.max(), 1))))
+print()
+print("real: mean %+.3f, sd %.3f, %.0f%% of mass below zero"
+      % (real.mean(), real.std(), 100 * (real < 0).mean()))
+print("fake: mean %+.3f, sd %.3f, %.0f%% of mass below zero"
+      % (fake.mean(), fake.std(), 100 * (fake < 0).mean()))
+print()
+
+print("MODE COLLAPSE is the failure to look for. the generator's job is to")
+print("fool the discriminator, and covering ONE bump perfectly does that")
+print("almost as well as covering both:")
+left = (fake < 0).mean()
+print("  fraction of samples in the left bump: %.3f (real is 0.50)" % left)
+if min(left, 1 - left) < 0.15:
+    print("  this run collapsed -- it found one bump and stopped.")
+else:
+    print("  this run kept both. that is not guaranteed and it is not stable;")
+    print("  run it again from a different seed and you may see one bump.")
+print()
+print("nothing in the loss asks the generator for DIVERSITY. it asks only")
+print("that its samples be judged real, and a single perfect sample would")
+print("satisfy that completely.")
+print()
+print("the second failure is the moving target. the discriminator's opinion")
+print("changes every step, so the generator is descending a loss surface")
+print("that is being rewritten underneath it. that is why:")
+print("  - the loss curves tell you almost nothing. a falling generator loss")
+print("    can mean the generator improved OR the discriminator got worse.")
+print("  - if D wins outright, sigmoid(logit) saturates and the gradient to")
+print("    G vanishes. the non-saturating loss used above -- maximise")
+print("    log D(fake) rather than minimise log(1 - D(fake)) -- exists")
+print("    precisely to keep that gradient alive.")
+print("  - balance matters: people alternate 1 D step to 1 G step, clip,")
+print("    use spectral normalisation, or switch to a Wasserstein loss to")
+print("    keep either side from running away.")
+print()
+print("this is the honest reason diffusion models displaced GANs for image")
+print("generation: they optimise a single stable objective, and this one")
+print("does not converge so much as circle.")
+```

@@ -131,6 +131,140 @@ This is the same accumulation behaviour that makes a forgotten `zero_grad()` a b
 
 The cost is wall-clock time: eight small batches take about as long as one large one would have. You get the large-batch statistics, not the large-batch speed.
 
+## Full batch, one row, and everything between
+
+The same problem solved by batch, stochastic and mini-batch gradient descent, with the noise each one injects measured directly -- because that noise is the whole difference.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+N, D = 2048, 8
+X = rng.normal(size=(N, D))
+w_true = rng.normal(size=D)
+y = X @ w_true + rng.normal(0, 0.5, N)
+
+def full_grad(w):
+    return 2 * X.T @ (X @ w - y) / N
+
+def loss(w):
+    return ((X @ w - y) ** 2).mean()
+
+print("%d rows. one epoch means seeing all of them once." % N)
+print()
+print("%-24s %14s %18s %16s"
+      % ("method", "batch size", "updates per epoch", "rows per update"))
+for name, bs in (("batch (full)", N), ("mini-batch", 64),
+                 ("stochastic (SGD)", 1)):
+    print("%-24s %14d %18d %16d" % (name, bs, N // bs, bs))
+print()
+
+print("how noisy is each one's gradient? cosine to the true full-batch")
+print("gradient, and how far off in magnitude:")
+w0 = np.zeros(D)
+true_g = full_grad(w0)
+print("%14s %20s %20s" % ("batch size", "cosine to true", "relative error"))
+for bs in (1, 8, 64, 512, 2048):
+    cos, err = [], []
+    for _ in range(200):
+        idx = rng.integers(0, N, bs)
+        g = 2 * X[idx].T @ (X[idx] @ w0 - y[idx]) / bs
+        cos.append(g @ true_g / (np.linalg.norm(g) * np.linalg.norm(true_g)))
+        err.append(np.linalg.norm(g - true_g) / np.linalg.norm(true_g))
+    print("%14d %20.4f %20.4f" % (bs, np.mean(cos), np.mean(err)))
+print("  the error falls as 1/sqrt(batch size). quadrupling the batch halves")
+print("  it, so the returns diminish immediately and never stop diminishing.")
+print()
+
+def run(bs, epochs, lr, seed=0):
+    r = np.random.default_rng(seed)
+    w = np.zeros(D)
+    trace = []
+    for e in range(epochs):
+        order = r.permutation(N)          # reshuffle every epoch
+        for i in range(0, N, bs):
+            idx = order[i:i + bs]
+            w -= lr * 2 * X[idx].T @ (X[idx] @ w - y[idx]) / len(idx)
+        trace.append(loss(w))
+    return w, trace
+
+print("now run all three for 30 epochs, each at a learning rate that suits it:")
+print("%-22s %10s %14s %16s %16s"
+      % ("method", "updates", "final loss", "loss at epoch 5", "wobble"))
+for name, bs, lr in (("batch (full)", N, 0.15), ("mini-batch 64", 64, 0.05),
+                     ("stochastic", 1, 0.01)):
+    w, trace = run(bs, 30, lr)
+    wobble = np.std(trace[-10:])
+    print("%-22s %10d %14.6f %16.6f %16.2e"
+          % (name, 30 * (N // bs), trace[-1], trace[4], wobble))
+print()
+print("full batch does %d updates in 30 epochs; SGD does %d. that is the"
+      % (30, 30 * N))
+print("trade: full batch takes a perfect step rarely, SGD takes a noisy step")
+print("constantly, and mini-batch is the only one that uses the hardware.")
+print()
+
+print("look at the wobble column. the noisy methods never fully settle:")
+w, trace = run(1, 30, 0.01)
+print("   SGD loss over the last 6 epochs:", np.round(trace[-6:], 6))
+w, trace = run(N, 30, 0.15)
+print("   full batch, same epochs:        ", np.round(trace[-6:], 6))
+print("   full batch converges to a point. SGD orbits one, at a radius set")
+print("   by its learning rate -- which is why a decay schedule matters far")
+print("   more for SGD than for full-batch descent.")
+print()
+
+print("and the noise is not purely a cost. on a bumpy surface it is the only")
+print("thing that can move you off a bad minimum -- provided it is ANNEALED,")
+print("so the run can still settle at the end:")
+
+def bumpy(x):
+    return 0.05 * (x - 3.0) ** 2 + np.sin(3 * x)
+
+def bumpy_grad(x):
+    return 0.1 * (x - 3.0) + 3 * np.cos(3 * x)
+
+grid = np.linspace(-8, 12, 40001)
+best = bumpy(grid).min()
+print("   the global minimum of this surface is %.4f" % best)
+print()
+print("%18s %18s %20s" % ("noise sd", "average final loss", "runs within 0.05"))
+hits = {}
+for noise in (0.0, 5.0, 20.0, 60.0):
+    finals = []
+    for seed in range(60):
+        r = np.random.default_rng(seed)
+        x = r.uniform(-6, 10)              # a different starting basin each run
+        for t in range(600):
+            anneal = noise * (1 - t / 600)  # noise decays to zero
+            x -= 0.05 * (bumpy_grad(x) + r.normal(0, anneal))
+        finals.append(bumpy(x))
+    finals = np.array(finals)
+    hits[noise] = (finals.mean(), (finals < best + 0.05).mean())
+    print("%18.1f %18.4f %19.0f%%"
+          % (noise, finals.mean(), 100 * hits[noise][1]))
+print()
+bestn = max(hits, key=lambda k: hits[k][1])
+print("   with no noise, each run slides into whichever dip it started next")
+print("   to and stops there -- %.0f%% of them find the global minimum."
+      % (100 * hits[0.0][1]))
+print("   at sd %.0f that rises to %.0f%%: the kicks are large enough to hop"
+      % (bestn, 100 * hits[bestn][1]))
+print("   a barrier, and the annealing lets the run settle once it has.")
+print("   at sd 60 it collapses to %.0f%% and the average loss is %.1f --"
+      % (100 * hits[60.0][1], hits[60.0][0]))
+print("   still being thrown around when the budget runs out.")
+print()
+print("   the gain is real but modest, and that is the honest shape of it.")
+print("   mini-batch noise is not a magic escape hatch; it is a small,")
+print("   free nudge that costs nothing because you were going to have it")
+print("   anyway.")
+print()
+print("the practical answer is almost always mini-batch: 32 to 512, the")
+print("largest that fits, shuffled every epoch, with a decaying learning")
+print("rate to remove the noise once it has done its job.")
+```
+
 ## Questions people ask
 
 <strong>How many updates does one epoch give?</strong> `dataset size / batch size`. With 50,000 examples and a batch of 64, that is 782 &mdash; not 1.

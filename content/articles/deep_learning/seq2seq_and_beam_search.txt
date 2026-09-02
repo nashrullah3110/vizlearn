@@ -83,3 +83,125 @@ speech recognition, constrained generation.
 
 **Forgetting the cost.** Width `k` multiplies both computation and memory by
 `k`, and for a large model that is the binding constraint.
+
+## Greedy decoding, and the sentence it cannot find
+
+At each step a decoder picks a token. Taking the most likely one every time is not the same as finding the most likely sentence -- here is a case where it demonstrably is not.
+
+```python-run
+import numpy as np
+
+# a tiny decoder: at each step, the probability of the next token given the
+# sequence so far. three tokens: A, B, and <end>.
+TOK = ["A", "B", "."]
+
+TABLE = {
+    ():            [0.55, 0.45, 0.00],   # A looks better than B here
+    ("A",):        [0.30, 0.30, 0.40],   # ...but every path out of A is poor
+    ("B",):        [0.01, 0.01, 0.98],   # ...while B has one strong ending
+    ("A", "A"):    [0.05, 0.05, 0.90],
+    ("A", "B"):    [0.05, 0.05, 0.90],
+    ("B", "A"):    [0.05, 0.05, 0.90],
+    ("B", "B"):    [0.05, 0.05, 0.90],
+}
+
+def probs(seq):
+    return np.array(TABLE.get(tuple(seq), [0.0, 0.0, 1.0]))
+
+print("a decoder over three tokens: A, B and '.' (end of sentence).")
+print("its first step:")
+p0 = probs([])
+for t, p in zip(TOK, p0):
+    print("   P(%s) = %.2f" % (t, p))
+print()
+
+print("GREEDY decoding takes the argmax at every step:")
+seq, logp = [], 0.0
+while True:
+    p = probs(seq)
+    i = int(p.argmax())
+    logp += np.log(p[i])
+    seq.append(TOK[i])
+    print("   step %d: picked %s (p=%.2f), sequence so far: %s"
+          % (len(seq), TOK[i], p[i], " ".join(seq)))
+    if TOK[i] == "." or len(seq) > 5:
+        break
+greedy_seq, greedy_logp = list(seq), logp
+print("   result: %s   log-probability %.4f (p = %.4f)"
+      % (" ".join(greedy_seq), greedy_logp, np.exp(greedy_logp)))
+print()
+
+def enumerate_all(seq=(), logp=0.0, out=None):
+    out = [] if out is None else out
+    if seq and seq[-1] == "." or len(seq) > 4:
+        out.append((list(seq), logp))
+        return out
+    p = probs(list(seq))
+    for i, t in enumerate(TOK):
+        if p[i] > 0:
+            enumerate_all(tuple(seq) + (t,), logp + np.log(p[i]), out)
+    return out
+
+everything = sorted(enumerate_all(), key=lambda kv: -kv[1])
+print("but here is EVERY sequence this decoder can produce, ranked:")
+print("%22s %16s %14s" % ("sequence", "log-probability", "probability"))
+for s, lp in everything[:6]:
+    mark = "  <- greedy found this" if s == greedy_seq else ""
+    print("%22s %16.4f %14.4f%s" % (" ".join(s), lp, np.exp(lp), mark))
+print()
+best_seq, best_lp = everything[0]
+print("the most likely sequence is '%s' at p=%.4f." % (" ".join(best_seq), np.exp(best_lp)))
+print("greedy decoding returned '%s' at p=%.4f -- it is %.1fx less likely."
+      % (" ".join(greedy_seq), np.exp(greedy_logp), np.exp(best_lp - greedy_logp)))
+print()
+print("greedy went wrong at the very first step. A looked better than B")
+print("(%.2f against %.2f), and it is -- for one token. but every path out"
+      % (p0[0], p0[1]))
+print("of A is mediocre, while B has one strong ending. a locally optimal")
+print("choice, globally wrong, and greedy has no way to find that out")
+print("because it never looks past the token in front of it.")
+print()
+
+def beam_search(k):
+    beams = [([], 0.0)]
+    finished = []
+    for _ in range(5):
+        cand = []
+        for seq, lp in beams:
+            if seq and seq[-1] == ".":
+                finished.append((seq, lp))
+                continue
+            p = probs(seq)
+            for i, t in enumerate(TOK):
+                if p[i] > 0:
+                    cand.append((seq + [t], lp + np.log(p[i])))
+        if not cand:
+            break
+        beams = sorted(cand, key=lambda kv: -kv[1])[:k]
+    finished += beams
+    return sorted(finished, key=lambda kv: -kv[1])[0]
+
+print("BEAM SEARCH keeps the k best partial sequences instead of one:")
+print("%8s %22s %16s" % ("beam k", "result", "log-probability"))
+for k in (1, 2, 3, 5):
+    s, lp = beam_search(k)
+    print("%8d %22s %16.4f%s"
+          % (k, " ".join(s), lp, "  <- optimal" if abs(lp - best_lp) < 1e-9 else ""))
+print("  k=1 IS greedy decoding -- that is the definition. widening the beam")
+print("  to 2 is enough to find the answer here.")
+print()
+print("beam search is still not guaranteed to find the best sequence. it is")
+print("a heuristic: it explores k times as much and can still prune the")
+print("winner early. exhaustive search is the only guarantee, and it costs")
+print("|vocab| ^ length -- for a 50,000 token vocabulary and 20 tokens that")
+print("is 10^94 sequences.")
+print()
+print("one practical wrinkle: longer sequences have lower probability, always,")
+print("because you multiply by another number below 1 at every step:")
+for s, lp in everything[:5]:
+    print("   %-12s length %d, log-prob %8.4f, normalised %8.4f"
+          % (" ".join(s), len(s), lp, lp / len(s)))
+print("  ranking by raw probability therefore favours short outputs. beam")
+print("  search implementations divide by length (or length^alpha) to")
+print("  correct for it, and that alpha is a real hyperparameter.")
+```

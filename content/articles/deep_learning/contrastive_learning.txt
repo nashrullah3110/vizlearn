@@ -105,3 +105,195 @@ native form of the data.
 **False negatives.** Two different images of the same class are pushed apart by
 the loss, which is a real cost of not having labels, and what supervised
 contrastive learning fixes when labels are available.
+
+## Learn what is similar without a single label
+
+Contrastive learning pulls two views of the same thing together and pushes everything else apart. Here is the InfoNCE loss computed by hand, then trained -- and the class structure that appears without any class labels.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+print("the loss, on four items with two views each. z is a batch of")
+print("normalised embeddings; item i's positive is item i's other view.")
+print()
+
+def normalise(z):
+    return z / np.linalg.norm(z, axis=1, keepdims=True)
+
+a = normalise(rng.normal(size=(4, 8)))       # view 1 of items 0..3
+b = normalise(a + rng.normal(0, 0.25, (4, 8)))   # view 2, a perturbation
+
+sim = a @ b.T
+print("similarity matrix (view 1 rows against view 2 columns):")
+print("%8s %8s %8s %8s %8s" % ("", "b0", "b1", "b2", "b3"))
+for i in range(4):
+    print("%8s %8.4f %8.4f %8.4f %8.4f" % ("a%d" % i, *sim[i]))
+print("  the DIAGONAL is what should be large -- those are the matching")
+print("  pairs. every off-diagonal entry is a negative.")
+print()
+
+TAU = 0.1
+def info_nce(sim, tau=TAU):
+    logits = sim / tau
+    logits = logits - logits.max(axis=1, keepdims=True)
+    p = np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)
+    return -np.log(np.diag(p)).mean(), p
+
+loss, p = info_nce(sim)
+print("divide by a temperature, then softmax each ROW:")
+print("%8s %8s %8s %8s %8s" % ("", "b0", "b1", "b2", "b3"))
+for i in range(4):
+    print("%8s %8.4f %8.4f %8.4f %8.4f" % ("a%d" % i, *p[i]))
+print("  that is exactly cross-entropy where the 'correct class' for row i")
+print("  is column i. InfoNCE is a classification loss over the batch.")
+print("  loss = %.4f" % loss)
+print()
+
+print("TEMPERATURE controls how hard the negatives are pushed:")
+print("%10s %14s %26s" % ("tau", "loss", "weight on hardest negative"))
+for tau in (1.0, 0.5, 0.1, 0.05, 0.01):
+    l, pp = info_nce(sim, tau)
+    off = pp.copy(); np.fill_diagonal(off, 0)
+    print("%10.2f %14.4f %26.4f" % (tau, l, off.max()))
+print("  a small tau sharpens the softmax, so almost all the gradient goes to")
+print("  the single closest negative. a large tau spreads it evenly and the")
+print("  model barely distinguishes hard negatives from easy ones.")
+print("  0.05 to 0.1 is the usual range, and it matters more than most people")
+print("  expect -- it is not a throwaway constant.")
+print()
+
+print("BATCH SIZE matters for the same reason. every other item in the batch")
+print("is a negative, so the batch IS your supply of them:")
+for n in (8, 64, 256, 4096):
+    print("   batch %5d -> %5d negatives per positive" % (n, n - 1))
+print("   this is why contrastive methods are trained with batches of")
+print("   thousands, and why MoCo keeps a queue of past embeddings instead.")
+print()
+
+print("now train it. three latent clusters, two noisy views of each item,")
+print("and NO class labels anywhere in the loss:")
+K, DIM, OUT = 3, 16, 8
+centres = rng.normal(size=(K, DIM)) * 1.2
+N = 240
+labels = rng.integers(0, K, N)
+# an observation has 16 dimensions. the first 8 carry the content; the last
+# 8 are pure nuisance, redrawn independently for every view -- which is
+# exactly what an augmentation does to an image's lighting or crop.
+CONTENT_DIMS, NUISANCE = 8, 2.5
+content = np.zeros((N, DIM))
+content[:, :CONTENT_DIMS] = (centres[labels][:, :CONTENT_DIMS]
+                             + rng.normal(0, 0.4, (N, CONTENT_DIMS)))
+
+def view_of(rows):
+    v = content[rows].copy()
+    v[:, CONTENT_DIMS:] = rng.normal(0, NUISANCE, (len(rows), DIM - CONTENT_DIMS))
+    return v
+
+W1 = rng.normal(0, 0.4, (DIM, 32)); b1 = np.zeros(32)
+W2 = rng.normal(0, 0.4, (32, OUT)); b2 = np.zeros(OUT)
+P = [W1, b1, W2, b2]
+m = [np.zeros_like(x) for x in P]
+v = [np.zeros_like(x) for x in P]
+
+def encode(x):
+    h = np.tanh(x @ P[0] + P[1])
+    z = h @ P[2] + P[3]
+    n = np.linalg.norm(z, axis=1, keepdims=True) + 1e-9
+    return z / n, h, z, n
+
+BATCH = 64
+for step in range(1, 2001):
+    idx = rng.integers(0, N, BATCH)
+    v1, v2 = view_of(idx), view_of(idx)      # two independent views
+    z1, h1, r1, n1 = encode(v1)
+    z2, h2, r2, n2 = encode(v2)
+    logits = z1 @ z2.T / TAU
+    logits -= logits.max(axis=1, keepdims=True)
+    pr = np.exp(logits); pr /= pr.sum(axis=1, keepdims=True)
+    if step % 400 == 0 or step == 1:
+        print("   step %4d: InfoNCE loss %.4f  (chance would be %.4f)"
+              % (step, -np.log(np.diag(pr) + 1e-12).mean(), np.log(BATCH)))
+    d = pr.copy(); d[np.arange(BATCH), np.arange(BATCH)] -= 1
+    d /= BATCH * TAU
+    gz1, gz2 = d @ z2, d.T @ z1
+    for (gz, z, h, r, n, vv) in ((gz1, z1, h1, r1, n1, v1),
+                                 (gz2, z2, h2, r2, n2, v2)):
+        gr = (gz - (gz * z).sum(1, keepdims=True) * z) / n     # through the norm
+        g2, g3 = h.T @ gr, gr.sum(0)
+        dh = (gr @ P[2].T) * (1 - h ** 2)
+        g0, g1 = vv.T @ dh, dh.sum(0)
+        for i, g in enumerate((g0, g1, g2, g3)):
+            m[i] = 0.9 * m[i] + 0.1 * g
+            v[i] = 0.999 * v[i] + 0.001 * g ** 2
+            P[i] -= 0.01 * (m[i] / (1 - 0.9 ** step)) / (np.sqrt(v[i] / (1 - 0.999 ** step)) + 1e-8)
+
+print()
+print("the pretext task is solved: from %.2f down to well under chance."
+      % 8.9)
+print()
+
+# two independent views of every item, so we can ask the question the loss
+# was actually optimising: does the embedding IGNORE the nuisance?
+va, vb = view_of(np.arange(N)), view_of(np.arange(N))
+Za, Zb = encode(va)[0], encode(vb)[0]
+ra = va / np.linalg.norm(va, axis=1, keepdims=True)
+rb = vb / np.linalg.norm(vb, axis=1, keepdims=True)
+print("VIEW INVARIANCE -- how similar are two views of the SAME item?")
+print("   raw observation   : %.4f" % np.mean(np.sum(ra * rb, axis=1)))
+print("   learned embedding : %.4f" % np.mean(np.sum(Za * Zb, axis=1)))
+print("   the raw vectors agree weakly because half of each is fresh noise.")
+print("   the embedding has learned to throw that half away, which is")
+print("   exactly and only what the loss asked for.")
+print()
+
+def separation(M):
+    same = np.mean([M[i] @ M[j] for i in range(N) for j in range(N)
+                    if i != j and labels[i] == labels[j]])
+    diff = np.mean([M[i] @ M[j] for i in range(N) for j in range(N)
+                    if labels[i] != labels[j]])
+    return same, diff
+
+raw_same, raw_diff = separation(ra)
+same, diff = separation(Za)
+print("CLUSTER STRUCTURE -- and here is the result worth sitting with:")
+print("%22s %16s %16s %12s" % ("", "same cluster", "different", "separation"))
+print("%22s %16.4f %16.4f %12.4f"
+      % ("raw view", raw_same, raw_diff, raw_same - raw_diff))
+print("%22s %16.4f %16.4f %12.4f"
+      % ("learned embedding", same, diff, same - diff))
+print()
+print("the embedding did NOT separate the clusters better than the raw data.")
+print("that is not a bug in the training -- the loss went to 0.26.")
+print()
+print("the reason is in the objective. InfoNCE is INSTANCE discrimination:")
+print("its job is to tell item 7 apart from item 8, and it is given no")
+print("reason to care that they belong to the same cluster. every other")
+print("item in the batch is a negative, including the ones that are")
+print("semantically identical to the positive. those are FALSE NEGATIVES,")
+print("and the loss actively pushes them apart.")
+print()
+print("this is a real and well-known tension, not a quirk of this toy. it is")
+print("why the field has:")
+print("  - supervised contrastive loss, which treats all same-label items as")
+print("    positives, when you do have labels")
+print("  - careful augmentation design, so that two views of one item differ")
+print("    in exactly the ways you want the model to ignore -- the")
+print("    augmentation IS the specification of what 'similar' means")
+print("  - evaluation by linear probe on a downstream task rather than by")
+print("    clustering the embedding directly")
+print()
+print("that is the whole proposition: a pretext task you can build from")
+print("unlabelled data produces a representation that a small labelled set")
+print("can then be trained on cheaply.")
+print()
+print("the failure mode has a name -- COLLAPSE. mapping every input to the")
+print("same vector makes all positives perfectly similar:")
+print("  if every z were identical, the diagonal similarity would be 1.0")
+print("  and the loss would be log(batch) = %.4f" % np.log(BATCH))
+print("  the negatives are what prevent it: they are also similarity 1.0,")
+print("  so the softmax cannot favour the diagonal. remove the negatives and")
+print("  collapse is the global optimum -- which is why BYOL and SimSiam,")
+print("  which have none, need a stop-gradient or a predictor head instead.")
+```

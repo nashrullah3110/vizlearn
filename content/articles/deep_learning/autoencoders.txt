@@ -88,3 +88,140 @@ blurred.
 
 **Assuming the latent dimensions mean anything individually.** They are not
 ordered or disentangled unless something in the training made them so.
+
+## Train one, then look at what the bottleneck kept
+
+An autoencoder learns to reproduce its own input through a narrow layer. Training one on data with a known hidden structure shows what a bottleneck forces it to discover -- and where PCA does the job better.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+N, OBS = 300, 12
+
+def standardise(a):
+    return (a - a.mean(0)) / a.std(0)
+
+factors = rng.normal(size=(N, 2))        # the true hidden structure
+mix = rng.normal(size=(2, OBS))
+X_lin = standardise(factors @ mix + rng.normal(0, 0.05, (N, OBS)))
+X_curved = standardise(np.tanh(factors @ mix * 1.5) + rng.normal(0, 0.05, (N, OBS)))
+
+def pca_mse(X, k):
+    U, s, Vt = np.linalg.svd(X - X.mean(0), full_matrices=False)
+    return (((U[:, :k] * s[:k]) @ Vt[:k] + X.mean(0) - X) ** 2).mean()
+
+def autoencode(X, k, hidden=12, epochs=800, lr=0.04, seed=0):
+    # OBS -> hidden(tanh) -> k -> hidden(tanh) -> OBS
+    r = np.random.default_rng(seed)
+    P = [r.normal(0, 0.3, (OBS, hidden)), np.zeros((1, hidden)),
+         r.normal(0, 0.3, (hidden, k)),   np.zeros((1, k)),
+         r.normal(0, 0.3, (k, hidden)),   np.zeros((1, hidden)),
+         r.normal(0, 0.3, (hidden, OBS)), np.zeros((1, OBS))]
+    m = [np.zeros_like(p) for p in P]
+    v = [np.zeros_like(p) for p in P]
+    for t in range(1, epochs + 1):
+        a1 = np.tanh(X @ P[0] + P[1])
+        code = a1 @ P[2] + P[3]
+        a2 = np.tanh(code @ P[4] + P[5])
+        out = a2 @ P[6] + P[7]
+        d = 2 * (out - X) / len(X)
+        g6, g7 = a2.T @ d, d.sum(0, keepdims=True)
+        d2 = (d @ P[6].T) * (1 - a2 ** 2)
+        g4, g5 = code.T @ d2, d2.sum(0, keepdims=True)
+        dc = d2 @ P[4].T
+        g2, g3 = a1.T @ dc, dc.sum(0, keepdims=True)
+        d1 = (dc @ P[2].T) * (1 - a1 ** 2)
+        g0, g1 = X.T @ d1, d1.sum(0, keepdims=True)
+        for i, g in enumerate((g0, g1, g2, g3, g4, g5, g6, g7)):
+            m[i] = 0.9 * m[i] + 0.1 * g
+            v[i] = 0.999 * v[i] + 0.001 * g ** 2
+            P[i] -= lr * (m[i] / (1 - 0.9 ** t)) / (np.sqrt(v[i] / (1 - 0.999 ** t)) + 1e-8)
+    a1 = np.tanh(X @ P[0] + P[1])
+    code = a1 @ P[2] + P[3]
+    out = np.tanh(code @ P[4] + P[5]) @ P[6] + P[7]
+    return code, ((out - X) ** 2).mean()
+
+print("%d rows, %d observed columns, secretly built from 2 hidden factors."
+      % (N, OBS))
+print("the autoencoder is never told that number.")
+print()
+
+print("reconstruction error against the size of the bottleneck:")
+print("%12s %18s %14s" % ("bottleneck", "reconstruction", "compression"))
+errs = {}
+for k in (1, 2, 3, 6):
+    code, mse = autoencode(X_lin, k)
+    errs[k] = (code, mse)
+    print("%12d %18.6f %13.1fx" % (k, mse, OBS / k))
+print()
+drop_1_2 = errs[1][1] / errs[2][1]
+drop_2_3 = errs[2][1] / errs[3][1]
+print("going from 1 unit to 2 divides the error by %.0f. going from 2 to 3"
+      % drop_1_2)
+print("changes it by a factor of %.2f -- nothing. that knee is the model"
+      % drop_2_3)
+print("telling you the data is 2-dimensional, which is exactly what it is,")
+print("and it is how an autoencoder gets used to ESTIMATE intrinsic")
+print("dimension rather than merely to compress.")
+print()
+
+h2 = errs[2][0]
+print("what the 2-unit code contains. correlate it against the true hidden")
+print("factors it was never shown:")
+for i in range(2):
+    c = [abs(np.corrcoef(h2[:, i], factors[:, j])[0, 1]) for j in range(2)]
+    print("  code unit %d  vs factor 0: %.4f   vs factor 1: %.4f" % (i, c[0], c[1]))
+print("  it recovered them, but not in their original order or orientation.")
+print("  an autoencoder's code is only defined up to an arbitrary rotation --")
+print("  nothing in the loss prefers one over another.")
+print()
+
+print("now the comparison people skip. PCA solves the same problem in closed")
+print("form, and on LINEAR data it is the provable optimum:")
+print("%8s %16s %20s %12s" % ("dims", "PCA", "autoencoder", "winner"))
+lin_wins = 0
+for k in (1, 2, 3):
+    p, a = pca_mse(X_lin, k), errs[k][1]      # reuse the fits from above
+    lin_wins += a < p
+    print("%8d %16.6f %20.6f %12s" % (k, p, a, "PCA" if p < a else "autoencoder"))
+print("  PCA takes %d of the 3 rows." % (3 - lin_wins))
+print("  where the useful answer really is a flat subspace -- 2 dimensions")
+print("  and up here -- PCA computes it exactly and gradient descent can")
+print("  only approach it. at 1 dimension the autoencoder can still edge")
+print("  ahead, because a CURVED line through the cloud captures a little")
+print("  more than the best straight one. that is the whole advantage in")
+print("  miniature, and it is small.")
+print()
+
+print("so give it something curved -- the same 2 factors, but observed")
+print("through a tanh, so the data lies on a bent surface:")
+print("%8s %16s %20s %12s" % ("dims", "PCA", "autoencoder", "winner"))
+wins = 0
+for k in (1, 2, 3):
+    p = pca_mse(X_curved, k)
+    a = autoencode(X_curved, k)[1]
+    wins += p > a
+    print("%8d %16.6f %20.6f %12s" % (k, p, a, "PCA" if p < a else "autoencoder"))
+print("  the autoencoder takes %d of the 3 rows here, against %d on the flat"
+      % (wins, lin_wins))
+print("  data above. it has a nonlinear encoder AND a nonlinear decoder, so")
+print("  it can bend to follow a curved surface. PCA can only pass a flat")
+print("  subspace through one, and on this data that costs it.")
+print()
+print("the honest summary: run PCA first, every time. it is closed form,")
+print("deterministic, and has no hyperparameters. reach for an autoencoder")
+print("when PCA's reconstruction error tells you the structure is not flat.")
+print("on the curved data above that was worth roughly a %dx reduction in"
+      % round(pca_mse(X_curved, 2) / autoencode(X_curved, 2)[1]))
+print("error at 2 dimensions; on the flat data it was worth nothing at all.")
+print("which of those two situations you are in is an empirical question, and")
+print("running PCA is how you answer it.")
+print()
+print("two variants worth knowing:")
+print("  denoising -- feed a corrupted input and ask for the clean one, so")
+print("               the model cannot settle for the identity function.")
+print("  sparse    -- penalise how many code units are active instead of")
+print("               narrowing the layer. the same constraint, applied more")
+print("               softly, and it lets you keep a wide code.")
+```

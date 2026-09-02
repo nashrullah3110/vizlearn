@@ -107,3 +107,96 @@ without the latent. Anneal the KL, or weaken the decoder.
 
 **Reading latent dimensions as meaningful.** A plain VAE is not disentangled;
 beta-VAE encourages it and does not guarantee it.
+
+## The two terms in the loss, and what each one buys
+
+A VAE is an autoencoder whose code is a distribution rather than a point. That one change adds a second loss term, and the balance between the two is the whole behaviour.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+print("a plain autoencoder maps x to a POINT. a VAE maps x to a mean and a")
+print("variance, then samples from it:")
+mu, logvar = np.array([0.6, -1.2]), np.array([-2.0, -0.5])
+sigma = np.exp(0.5 * logvar)
+print("  encoder output: mu = %s, log(var) = %s" % (mu, logvar))
+print("  so sigma      = %s" % np.round(sigma, 4))
+print()
+print("the sampling has to be differentiable, which it is not if you call a")
+print("random function on mu and sigma. the reparameterisation trick moves")
+print("the randomness outside the path the gradient travels:")
+for i in range(4):
+    eps = rng.normal(size=2)
+    print("  eps ~ N(0,1) = %s  ->  z = mu + sigma*eps = %s"
+          % (np.round(eps, 3), np.round(mu + sigma * eps, 4)))
+print("  z depends on mu and sigma by plain arithmetic, so d z / d mu = 1")
+print("  and d z / d sigma = eps. the gradient flows; eps is just a constant")
+print("  that happens to be random.")
+print()
+
+def kl(mu, logvar):
+    # KL( N(mu, sigma^2) || N(0, 1) ), per dimension
+    return 0.5 * (np.exp(logvar) + mu ** 2 - 1 - logvar)
+
+print("the second loss term is a KL divergence pulling that distribution")
+print("toward a standard normal. it is zero only when mu=0 and var=1:")
+print("%10s %10s %14s" % ("mu", "sigma", "KL"))
+for m, s_ in ((0.0, 1.0), (0.0, 0.5), (0.0, 2.0), (2.0, 1.0), (5.0, 0.1)):
+    print("%10.1f %10.1f %14.6f" % (m, s_, kl(np.array([m]), np.array([2 * np.log(s_)]))[0]))
+print()
+print("read the last row: a code that is confidently far from the origin is")
+print("expensive. that is the term stopping the encoder from doing what a")
+print("plain autoencoder does -- scattering each input to its own private")
+print("corner with near-zero variance.")
+print()
+
+print("and here is why that matters. build two 1-D codebooks for 5 inputs:")
+plain = np.array([-9.4, -4.8, 3.7, 7.2, 11.6])      # a plain AE's codes
+vae = np.array([-1.3, -0.6, 0.05, 0.7, 1.4])        # a VAE's codes
+print("  plain autoencoder codes:", plain)
+print("  VAE codes              :", vae)
+print()
+print("now sample a new point from N(0,1) -- which is what you do to GENERATE:")
+for draw in (-0.5, 0.3, 1.1):
+    dp = np.abs(plain - draw).min()
+    dv = np.abs(vae - draw).min()
+    print("  z = %+.1f: nearest plain code %5.2f away, nearest VAE code %5.2f away"
+          % (draw, dp, dv))
+print()
+print("  every draw lands in a region the plain decoder has never been shown")
+print("  -- its codes are all several units away. it will produce noise. the")
+print("  VAE's decoder has seen the whole of that region, because the KL term")
+print("  packed every code into exactly the distribution you are sampling")
+print("  from. that is what makes one of them a generative model.")
+print()
+print("that is the entire difference between an autoencoder and a GENERATIVE")
+print("model: not the architecture, but whether the space between the codes")
+print("decodes to anything sensible.")
+print()
+
+print("the balance between the two terms is a real dial:")
+print("%10s %28s %26s" % ("beta", "what wins", "what you get"))
+rows = [(0.0, "reconstruction only", "a plain autoencoder"),
+        (0.1, "reconstruction mostly", "sharp, poorly organised space"),
+        (1.0, "the true ELBO", "the standard VAE"),
+        (5.0, "KL mostly", "well-organised, blurry"),
+        (50.0, "KL only", "posterior collapse")]
+for b, w, g in rows:
+    print("%10.1f %28s %26s" % (b, w, g))
+print()
+print("posterior collapse is the failure worth naming. if the KL term")
+print("dominates, the cheapest solution is for the encoder to ignore x")
+print("entirely and output mu=0, sigma=1 for every input:")
+print("  KL for that = %.6f, which is the minimum possible."
+      % kl(np.zeros(2), np.zeros(2)).sum())
+print("  the code now carries no information, and the decoder learns to")
+print("  produce the dataset average for everything. the reconstruction")
+print("  loss is terrible and the KL is perfect.")
+print()
+print("and the reason VAE samples look soft: the reconstruction term is")
+print("usually a squared error, and squared error is minimised by the MEAN")
+print("of all plausible outputs. averaging several sharp possibilities gives")
+print("you one blurry one. that is a property of the loss, not the model.")
+```

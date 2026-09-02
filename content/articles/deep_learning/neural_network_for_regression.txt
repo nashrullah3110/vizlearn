@@ -129,6 +129,120 @@ Three habits make the numbers meaningful:
 
 <strong>Plot the residuals</strong> against the predictions. A shapeless band around zero is healthy. A curve means a missing non-linear relationship. A funnel widening to the right means the error grows with the target &mdash; predict the logarithm instead. A cluster far from the rest is an outlier group worth investigating.
 
+## The four things you change for a continuous target
+
+A regression network differs from a classifier in the last layer, the loss, the metric and the target scaling. Each one is shown here, along with what breaks if you skip it.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def make(n):
+    x = rng.uniform(-3, 3, (n, 2))
+    y = (np.sin(1.4 * x[:, 0]) * 3.0 + 0.6 * x[:, 1] ** 2
+         + rng.normal(0, 0.4, n))
+    return x, y.reshape(-1, 1)
+
+Xtr, ytr = make(400)
+Xte, yte = make(1200)
+print("2 inputs, 1 continuous output. %d training rows." % len(Xtr))
+print()
+
+print("1. THE OUTPUT LAYER has no activation. that is the whole change.")
+print("   a classifier ends in sigmoid or softmax to produce a probability;")
+print("   a regressor must be able to output any real number:")
+z = np.array([-8.0, -1.0, 0.0, 1.0, 8.0])
+print("      raw layer output :", z)
+print("      through sigmoid  :", np.round(1 / (1 + np.exp(-z)), 4))
+print("   a sigmoid can never return %.1f, and your target range is %.2f to"
+      % (z[-1], ytr.min()))
+print("   %.2f. an activation on the last layer silently caps what the model"
+      % ytr.max())
+print("   is able to say.")
+print()
+
+def train(Xa, ya, hidden=24, epochs=500, lr=0.04, huber=False, seed=0):
+    r = np.random.default_rng(seed)
+    P = [r.normal(0, 0.7, (Xa.shape[1], hidden)), np.zeros((1, hidden)),
+         r.normal(0, 0.7, (hidden, hidden)), np.zeros((1, hidden)),
+         r.normal(0, 0.3, (hidden, 1)), np.zeros((1, 1))]
+    m = [np.zeros_like(p) for p in P]
+    v = [np.zeros_like(p) for p in P]
+    n = len(Xa)
+    for t in range(1, epochs + 1):
+        a1 = np.tanh(Xa @ P[0] + P[1])
+        a2 = np.tanh(a1 @ P[2] + P[3])
+        out = a2 @ P[4] + P[5]                  # <- no activation here
+        err = out - ya
+        if huber:
+            d = np.where(np.abs(err) <= 1.0, err, np.sign(err)) / n
+        else:
+            d = 2 * err / n
+        g4, g5 = a2.T @ d, d.sum(0, keepdims=True)
+        d2 = (d @ P[4].T) * (1 - a2 ** 2)
+        g2, g3 = a1.T @ d2, d2.sum(0, keepdims=True)
+        d1 = (d2 @ P[2].T) * (1 - a1 ** 2)
+        g0, g1 = Xa.T @ d1, d1.sum(0, keepdims=True)
+        for i, g in enumerate((g0, g1, g2, g3, g4, g5)):
+            m[i] = 0.9 * m[i] + 0.1 * g
+            v[i] = 0.999 * v[i] + 0.001 * g ** 2
+            P[i] -= lr * (m[i] / (1 - 0.9 ** t)) / (np.sqrt(v[i] / (1 - 0.999 ** t)) + 1e-8)
+    return lambda Xb: np.tanh(np.tanh(Xb @ P[0] + P[1]) @ P[2] + P[3]) @ P[4] + P[5]
+
+f = train(Xtr, ytr)
+pred = f(Xte)
+print("2. THE LOSS is squared error, not cross-entropy. trained:")
+mse = ((pred - yte) ** 2).mean()
+mae = np.abs(pred - yte).mean()
+r2 = 1 - mse / yte.var()
+print("      MSE  %.4f   (the noise floor is %.4f)" % (mse, 0.4 ** 2))
+print("      MAE  %.4f" % mae)
+print("      R^2  %.4f" % r2)
+print()
+
+print("3. THE METRIC cannot be accuracy -- there is nothing to be exactly")
+print("   right about:")
+print("      predictions exactly equal to the target: %d of %d"
+      % ((pred == yte).sum(), len(yte)))
+print("   so you report error in the units of the thing, plus R^2 for scale:")
+for tol in (0.1, 0.25, 0.5, 1.0):
+    print("      within %.2f of the truth: %5.1f%%"
+          % (tol, 100 * (np.abs(pred - yte) < tol).mean()))
+print()
+
+print("4. THE TARGET SCALE matters as much as the input scale. the same")
+print("   problem with the target multiplied by 1000:")
+big = ytr * 1000.0
+mu, sd = big.mean(), big.std()
+for label, p2 in (("target as-is", f(Xte)),
+                  ("target x1000", train(Xtr, big)(Xte) / 1000.0),
+                  ("target x1000, standardised",
+                   (train(Xtr, (big - mu) / sd)(Xte) * sd + mu) / 1000.0)):
+    err = p2 - yte
+    print("      %-28s R^2 %8.4f" % (label, 1 - (err ** 2).mean() / yte.var()))
+print("   a target in the thousands produces gradients in the thousands, and")
+print("   the first update throws the weights somewhere useless. standardise")
+print("   the target, then invert the transform on the way out -- and store")
+print("   that mean and sd with the model.")
+print()
+
+print("and one thing that is not on the list but should be. outliers:")
+ytr_out = ytr.copy()
+ytr_out[:12] += 40.0                       # 12 corrupted labels out of 700
+for huber, label in ((False, "squared error"), (True, "Huber")):
+    g = train(Xtr, ytr_out, huber=huber)
+    e = g(Xte) - yte
+    print("      %-16s on 12 corrupted rows: R^2 %8.4f  MAE %7.4f"
+          % (label, 1 - (e ** 2).mean() / yte.var(), np.abs(e).mean()))
+print("   squared error weights a miss of 40 as %.0f times worse than a miss"
+      % (40 ** 2 / 1 ** 2))
+print("   of 1, so 12 bad rows out of %d dominate the gradient. Huber is"
+      % len(Xtr))
+print("   squared near zero and linear beyond it, which caps how much any")
+print("   single row can say.")
+```
+
 ## Questions people ask
 
 <strong>Should the output layer have an activation?</strong> No, for unbounded targets. Never ReLU unless negatives are genuinely impossible <em>and</em> you have considered a log transform instead.

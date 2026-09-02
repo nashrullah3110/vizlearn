@@ -49,6 +49,111 @@ The second row is the important one. One-hot encoding makes every category exact
 
 A common width heuristic is `min(50, (cardinality + 1) // 2)`, or the fourth root of the cardinality &mdash; both are starting points to be tuned rather than rules.
 
+## Mostly zeros, and what that costs
+
+Sparse data breaks dense assumptions in three specific ways -- memory, gradient flow, and distance. Each one is measured here, along with the standard fix.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+N, VOCAB = 2000, 5000
+DENSITY = 0.004
+
+# word frequencies follow a Zipf law in real text: a few words everywhere,
+# a long tail of words that appear once or twice in the whole corpus
+zipf = 1.0 / (np.arange(1, VOCAB + 1) ** 1.05)
+zipf = zipf / zipf.sum() * VOCAB * DENSITY
+X = (rng.random((N, VOCAB)) < np.clip(zipf, 0, 0.95)).astype(np.float32)
+nnz = int(X.sum())
+print("%d rows over a %d-word vocabulary, like bag-of-words text." % (N, VOCAB))
+print("  non-zero entries: %d of %d (%.3f%%)"
+      % (nnz, X.size, 100 * nnz / X.size))
+print("  average words per row: %.1f" % X.sum(1).mean())
+print()
+
+print("1. MEMORY. a dense array stores every zero:")
+dense_mb = X.nbytes / 1024 / 1024
+sparse_mb = (nnz * (4 + 4) + N * 4) / 1024 / 1024      # values + indices + row ptrs
+print("   dense  (float32)          : %8.2f MB" % dense_mb)
+print("   sparse (value + index)    : %8.2f MB" % sparse_mb)
+print("   ratio                     : %8.1fx" % (dense_mb / sparse_mb))
+print("   at 100,000 rows the dense version is %.1f GB and the sparse one"
+      % (dense_mb * 50 / 1024))
+print("   is %.2f GB. that is the difference between fitting and not."
+      % (sparse_mb * 50 / 1024))
+print()
+
+print("2. GRADIENT FLOW. a column that is almost always zero receives almost")
+print("   no gradient, because the gradient for a weight is scaled by its")
+print("   input:")
+counts = X.sum(0)
+print("   %-16s %14s %18s" % ("word rank", "rows it appears in", "share of updates"))
+for q, label in ((100, "the commonest"), (99, "top 1 percent"),
+                 (90, "top 10 percent"), (50, "median"), (10, "long tail")):
+    c = np.percentile(counts, q)
+    print("   %-16s %14.0f %17.2f%%" % (label, c, 100 * c / N))
+print("   %d of the %d columns appear in fewer than 5 rows."
+      % (int((counts < 5).sum()), VOCAB))
+print()
+never = int((counts == 0).sum())
+print("   the commonest word is updated on %.0f%% of rows. %d of the %d"
+      % (100 * counts.max() / N, never, VOCAB))
+print("   columns never appear at all in this sample, so their weights end")
+print("   the epoch exactly where they were initialised. a word appearing")
+print("   twice has had two updates -- indistinguishable from random.")
+print("   any feature-importance measure will call all of them unimportant,")
+print("   when the truth is they were never given a chance.")
+print()
+print("   this is exactly what Adagrad was invented for. it accumulates the")
+print("   squared gradient per parameter and divides by its square root, so a")
+print("   rarely-seen parameter keeps a large effective learning rate:")
+for seen in (1000, 100, 10, 1):
+    acc = seen * (0.5 ** 2)
+    print("     a weight updated %5d times has accumulated %8.2f, so its"
+          % (seen, acc))
+    print("     effective rate is lr / %.2f = %.3f x lr" % (np.sqrt(acc), 1 / np.sqrt(acc)))
+print()
+
+print("3. DISTANCE. two sparse rows almost never share a non-zero, so")
+print("   everything looks equally far from everything else:")
+sub = X[:400]
+norms = np.linalg.norm(sub, axis=1, keepdims=True)
+cos = (sub @ sub.T) / np.clip(norms * norms.T, 1e-9, None)
+off = ~np.eye(len(sub), dtype=bool)
+print("   cosine similarity between %d rows:" % len(sub))
+print("     exactly zero (no shared word): %.1f%% of pairs"
+      % (100 * (cos[off] == 0).mean()))
+print("     mean similarity              : %.4f" % cos[off].mean())
+print("   a k-nearest-neighbour search over this is meaningless -- most")
+print("   candidates are tied at zero, so the 'nearest' one is arbitrary.")
+print()
+
+print("the standard fix for all three is the same: stop representing the")
+print("data as a %d-wide vector of mostly zeros. an embedding maps each" % VOCAB)
+print("word to a short dense vector, and a row becomes the sum or mean of")
+print("the vectors for the words it contains:")
+DIM = 64
+E = rng.normal(0, 0.1, (VOCAB, DIM))
+dense_rows = np.array([E[np.flatnonzero(r)].mean(0) if r.any() else np.zeros(DIM)
+                       for r in X[:400]])
+dn = np.linalg.norm(dense_rows, axis=1, keepdims=True)
+dcos = (dense_rows @ dense_rows.T) / np.clip(dn * dn.T, 1e-9, None)
+print("   %d dimensions instead of %d: %.1fx narrower" % (DIM, VOCAB, VOCAB / DIM))
+print("   pairs with exactly zero similarity: %.1f%% (was %.1f%%)"
+      % (100 * (np.abs(dcos[off]) < 1e-12).mean(), 100 * (cos[off] == 0).mean()))
+print("   every dimension is now dense, so every parameter is updated by")
+print("   every row and the gradient-flow problem disappears with it.")
+print()
+print("three practical notes:")
+print("  use scipy.sparse (or a framework's sparse tensors) end to end -- one")
+print("  .toarray() call in a dataloader undoes the entire saving.")
+print("  prefer Adagrad or Adam over plain SGD on genuinely sparse features.")
+print("  and check your embedding is actually learning: a word seen twice in")
+print("  the corpus has had two gradient updates, and its vector is still")
+print("  essentially the random one you initialised.")
+```
+
 ## Guided experiments
 
 1. <strong>Start dense.</strong> Set <strong>Input Sparsity Level</strong> to 0 and press <strong>Stream Data</strong>. Every input carries signal and every weight receives a gradient on every sample.

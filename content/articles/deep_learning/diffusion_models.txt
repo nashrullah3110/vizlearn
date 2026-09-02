@@ -93,3 +93,135 @@ diversity.
 
 **Assuming the model predicts the image.** Most predict the noise, and confusing
 the two makes the sampling code nonsense.
+
+## Destroy the data, then learn to undo it one step at a time
+
+Diffusion adds noise on a schedule until nothing is left, then trains a model to remove a little of it. Both directions are run here on 1-D data, including the closed form that makes training cheap.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+T = 60
+betas = np.linspace(1e-4, 0.15, T)          # the noise schedule
+alphas = 1 - betas
+abar = np.cumprod(alphas)                    # alpha-bar: the closed form
+
+def real_sample(n):
+    which = rng.random(n) < 0.5
+    return np.where(which, rng.normal(-2.0, 0.25, n), rng.normal(2.0, 0.25, n))
+
+print("the FORWARD process adds gaussian noise on a fixed schedule.")
+print("it has no parameters and nothing is learned here:")
+print("%8s %12s %14s %16s %14s"
+      % ("step t", "beta_t", "alpha_bar_t", "signal kept", "noise added"))
+for t in (0, 10, 25, 40, 59):
+    print("%8d %12.5f %14.5f %16.4f %14.4f"
+          % (t, betas[t], abar[t], np.sqrt(abar[t]), np.sqrt(1 - abar[t])))
+print()
+print("the closed form is the reason this is trainable. instead of applying")
+print("%d small noise steps one at a time, any t is one line:" % T)
+print("    x_t = sqrt(alpha_bar_t) * x_0  +  sqrt(1 - alpha_bar_t) * noise")
+print()
+
+x0 = real_sample(4000)
+print("watch the data dissolve. the last column counts how much mass sits in")
+print("the valley between the two bumps -- the real data has almost none,")
+print("and a standard normal has about 68 percent:")
+print("%8s %14s %10s %10s %16s"
+      % ("t", "signal kept", "mean", "sd", "mass in |x|<1"))
+for t in (0, 10, 25, 40, 59):
+    xt = np.sqrt(abar[t]) * x0 + np.sqrt(1 - abar[t]) * rng.normal(size=4000)
+    print("%8d %14.4f %10.3f %10.3f %15.0f%%"
+          % (t, np.sqrt(abar[t]), xt.mean(), xt.std(),
+             100 * (np.abs(xt) < 1).mean()))
+print("%8s %14.4f %10.3f %10.3f %15.0f%%"
+      % ("N(0,1)", 0.0, 0.0, 1.0,
+         100 * (np.abs(rng.normal(size=20000)) < 1).mean()))
+print()
+print("by t=%d only %.1f%% of the original signal survives, and the last two"
+      % (T - 1, 100 * np.sqrt(abar[T - 1])))
+print("rows are the same distribution. that is the point of the forward")
+print("process: it ends somewhere you can SAMPLE FROM without any model.")
+print()
+
+print("the model's job is to look at x_t and t, and predict the noise that")
+print("was added. train it -- a small network over (x_t, t):")
+H = 32
+r = np.random.default_rng(1)
+W1 = r.normal(0, 0.8, (2, H)); b1 = np.zeros(H)
+W2 = r.normal(0, 0.8, (H, H)); b2 = np.zeros(H)
+W3 = r.normal(0, 0.3, (H, 1)); b3 = np.zeros(1)
+P = [W1, b1, W2, b2, W3, b3]
+m = [np.zeros_like(p) for p in P]
+v = [np.zeros_like(p) for p in P]
+
+def predict_noise(xt, t):
+    inp = np.column_stack([xt, t / T])
+    h1 = np.tanh(inp @ P[0] + P[1])
+    h2 = np.tanh(h1 @ P[2] + P[3])
+    return (h2 @ P[4] + P[5]).ravel(), inp, h1, h2
+
+BATCH = 256
+for step in range(1, 2501):
+    x0b = real_sample(BATCH)
+    tb = rng.integers(0, T, BATCH)
+    eps = rng.normal(size=BATCH)
+    xt = np.sqrt(abar[tb]) * x0b + np.sqrt(1 - abar[tb]) * eps
+    pred, inp, h1, h2 = predict_noise(xt, tb)
+    d = (2 * (pred - eps) / BATCH).reshape(-1, 1)
+    g4, g5 = h2.T @ d, d.sum(0)
+    d2 = (d @ P[4].T) * (1 - h2 ** 2)
+    g2, g3 = h1.T @ d2, d2.sum(0)
+    d1 = (d2 @ P[2].T) * (1 - h1 ** 2)
+    g0, g1 = inp.T @ d1, d1.sum(0)
+    for i, g in enumerate((g0, g1, g2, g3, g4, g5)):
+        m[i] = 0.9 * m[i] + 0.1 * g
+        v[i] = 0.999 * v[i] + 0.001 * g ** 2
+        P[i] -= 0.01 * (m[i] / (1 - 0.9 ** step)) / (np.sqrt(v[i] / (1 - 0.999 ** step)) + 1e-8)
+
+tb = rng.integers(0, T, 4000)
+eps = rng.normal(size=4000)
+x0b = real_sample(4000)
+xt = np.sqrt(abar[tb]) * x0b + np.sqrt(1 - abar[tb]) * eps
+print("  after training, noise-prediction MSE: %.4f"
+      % ((predict_noise(xt, tb)[0] - eps) ** 2).mean())
+print("  (predicting zero every time would score %.4f, so it learned something.)"
+      % (eps ** 2).mean())
+print()
+
+print("now SAMPLE. start from pure noise and walk the schedule backwards:")
+x = rng.normal(size=3000)
+for t in range(T - 1, -1, -1):
+    eps_hat = predict_noise(x, np.full(len(x), t))[0]
+    mean = (x - betas[t] / np.sqrt(1 - abar[t]) * eps_hat) / np.sqrt(alphas[t])
+    x = mean + (np.sqrt(betas[t]) * rng.normal(size=len(x)) if t > 0 else 0.0)
+    if t in (59, 40, 25, 10, 0):
+        print("  t=%2d: mean %+6.3f, sd %5.3f, %.0f%% below zero"
+              % (t, x.mean(), x.std(), 100 * (x < 0).mean()))
+print()
+real = real_sample(4000)
+print("generated vs real, as a histogram:")
+edges = np.linspace(-4, 4, 17)
+hr_, _ = np.histogram(real, bins=edges)
+hf_, _ = np.histogram(x, bins=edges)
+for i in range(len(edges) - 1):
+    print("  %5.1f  real %-32s fake %s"
+          % (edges[i], "#" * int(30 * hr_[i] / hr_.max()),
+             "#" * int(30 * hf_[i] / max(hf_.max(), 1))))
+print()
+print("  real: mean %+.3f sd %.3f    generated: mean %+.3f sd %.3f"
+      % (real.mean(), real.std(), x.mean(), x.std()))
+print()
+print("why this is easier to train than a GAN: the target is known at every")
+print("step. the model is asked to predict a noise vector that WAS ACTUALLY")
+print("ADDED, so it is plain supervised regression against a fixed answer.")
+print("there is no second network, no equilibrium to find, and the loss")
+print("means what it says.")
+print()
+print("the cost is sampling. a GAN generates in one forward pass; this took")
+print("%d of them. that is the whole reason DDIM, distillation and" % T)
+print("consistency models exist -- every one of them is an attempt to take")
+print("fewer steps without losing quality.")
+```

@@ -91,6 +91,171 @@ The standard modern pipeline is two stages: <strong>learn a representation</stro
 
 Deep clustering methods (DEC and successors) train the representation and the clustering jointly, which can work better and is considerably more fiddly.
 
+## Four ways to train with no labels at all
+
+Reconstruction, clustering, self-prediction and density -- four objectives that need no target column, run on the same data so you can see what each one actually optimises.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+# three blobs in 10 dimensions. the labels exist only so we can CHECK the
+# results afterwards -- none of the four methods below ever sees them.
+K, DIM, N = 3, 10, 500
+centres = rng.normal(size=(K, DIM)) * 1.15
+labels = rng.integers(0, K, N).astype(np.int32)   # int32: WASM numpy
+                                                 # bincount will not take int64
+X = centres[labels] + rng.normal(0, 1.5, (N, DIM))   # heavy overlap
+X = (X - X.mean(0)) / X.std(0)
+print("%d rows, %d dimensions, %d hidden groups that overlap heavily."
+      % (N, DIM, K))
+print("the group labels are used ONLY to score the results at the end.")
+print()
+
+def purity(assign):
+    # what fraction of rows share the majority true label of their group
+    total = 0
+    for g in np.unique(assign):
+        m = assign == g
+        if m.any():
+            total += np.bincount(labels[m], minlength=K).max()
+    return total / len(labels)
+
+print("baseline: assigning everything to one group scores %.4f purity,"
+      % purity(np.zeros(N, dtype=int)))
+print("because the largest true group is that fraction of the data.")
+print()
+
+print("1. RECONSTRUCTION -- an autoencoder. the target is the input itself.")
+def autoencoder(k, epochs=800, lr=0.03):
+    r = np.random.default_rng(1)
+    P = [r.normal(0, 0.4, (DIM, 16)), np.zeros((1, 16)),
+         r.normal(0, 0.4, (16, k)),   np.zeros((1, k)),
+         r.normal(0, 0.4, (k, 16)),   np.zeros((1, 16)),
+         r.normal(0, 0.4, (16, DIM)), np.zeros((1, DIM))]
+    m = [np.zeros_like(p) for p in P]
+    v = [np.zeros_like(p) for p in P]
+    for t in range(1, epochs + 1):
+        a1 = np.tanh(X @ P[0] + P[1])
+        code = a1 @ P[2] + P[3]
+        a2 = np.tanh(code @ P[4] + P[5])
+        out = a2 @ P[6] + P[7]
+        d = 2 * (out - X) / N
+        g6, g7 = a2.T @ d, d.sum(0, keepdims=True)
+        d2 = (d @ P[6].T) * (1 - a2 ** 2)
+        g4, g5 = code.T @ d2, d2.sum(0, keepdims=True)
+        dc = d2 @ P[4].T
+        g2, g3 = a1.T @ dc, dc.sum(0, keepdims=True)
+        d1 = (dc @ P[2].T) * (1 - a1 ** 2)
+        g0, g1 = X.T @ d1, d1.sum(0, keepdims=True)
+        for i, g in enumerate((g0, g1, g2, g3, g4, g5, g6, g7)):
+            m[i] = 0.9 * m[i] + 0.1 * g
+            v[i] = 0.999 * v[i] + 0.001 * g ** 2
+            P[i] -= lr * (m[i] / (1 - 0.9 ** t)) / (np.sqrt(v[i] / (1 - 0.999 ** t)) + 1e-8)
+    a1 = np.tanh(X @ P[0] + P[1])
+    code = a1 @ P[2] + P[3]
+    out = np.tanh(code @ P[4] + P[5]) @ P[6] + P[7]
+    return code, ((out - X) ** 2).mean()
+
+code, rec = autoencoder(2)
+print("   2-unit code, reconstruction MSE %.4f (predicting the mean scores %.4f)"
+      % (rec, ((X - X.mean(0)) ** 2).mean()))
+print("   the objective is 'reproduce the input', so the code keeps whatever")
+print("   is needed for that -- which is variance, not necessarily groups.")
+print()
+
+def kmeans(Z, k, iters=60, seed=0):
+    r = np.random.default_rng(seed)
+    C = Z[r.choice(len(Z), k, replace=False)]
+    for _ in range(iters):
+        d = ((Z[:, None, :] - C[None]) ** 2).sum(2)
+        a = d.argmin(1)
+        for c in range(k):
+            if (a == c).any():
+                C[c] = Z[a == c].mean(0)
+    return a, ((Z - C[a]) ** 2).sum()
+
+print("2. CLUSTERING -- k-means. the objective is compactness, nothing else.")
+a_raw, inertia = kmeans(X, K)
+print("   on the raw 10-D data : purity %.4f, inertia %.1f" % (purity(a_raw), inertia))
+a_code, _ = kmeans(code, K)
+print("   on the 2-D code above: purity %.4f" % purity(a_code))
+print("   the autoencoder was not trying to help k-means, and here it")
+print("   %s. compression and clustering are different objectives that"
+      % ("did" if purity(a_code) > purity(a_raw) else "did not"))
+print("   sometimes agree.")
+print()
+
+print("3. SELF-PREDICTION -- hide part of the input, predict it from the rest.")
+print("   this is what a language model does, and it needs no labels either:")
+HOLD = 3
+def masked_fit(epochs=800, lr=0.03):
+    r = np.random.default_rng(2)
+    P = [r.normal(0, 0.4, (DIM - HOLD, 24)), np.zeros((1, 24)),
+         r.normal(0, 0.4, (24, HOLD)), np.zeros((1, HOLD))]
+    m = [np.zeros_like(p) for p in P]
+    v = [np.zeros_like(p) for p in P]
+    seen, hidden = X[:, :-HOLD], X[:, -HOLD:]
+    for t in range(1, epochs + 1):
+        h = np.tanh(seen @ P[0] + P[1])
+        out = h @ P[2] + P[3]
+        d = 2 * (out - hidden) / N
+        g2, g3 = h.T @ d, d.sum(0, keepdims=True)
+        dh = (d @ P[2].T) * (1 - h ** 2)
+        g0, g1 = seen.T @ dh, dh.sum(0, keepdims=True)
+        for i, g in enumerate((g0, g1, g2, g3)):
+            m[i] = 0.9 * m[i] + 0.1 * g
+            v[i] = 0.999 * v[i] + 0.001 * g ** 2
+            P[i] -= lr * (m[i] / (1 - 0.9 ** t)) / (np.sqrt(v[i] / (1 - 0.999 ** t)) + 1e-8)
+    h = np.tanh(seen @ P[0] + P[1])
+    return h, ((h @ P[2] + P[3] - hidden) ** 2).mean()
+
+hid, mse = masked_fit()
+print("   predict the last %d columns from the first %d: MSE %.4f"
+      % (HOLD, DIM - HOLD, mse))
+print("   guessing the mean would score %.4f" % (X[:, -HOLD:] ** 2).mean())
+a_self, _ = kmeans(hid, K)
+print("   clustering its hidden layer: purity %.4f" % purity(a_self))
+print("   the target was manufactured from the data itself. that is the")
+print("   whole trick behind every self-supervised method.")
+print()
+
+print("4. DENSITY -- fit a gaussian and score how unusual each row is.")
+mu, cov = X.mean(0), np.cov(X.T) + 1e-6 * np.eye(DIM)
+inv = np.linalg.inv(cov)
+d2 = np.einsum("ij,jk,ik->i", X - mu, inv, X - mu)
+print("   Mahalanobis distance: median %.2f, 99th percentile %.2f"
+      % (np.median(d2), np.percentile(d2, 99)))
+odd = np.argsort(-d2)[:5]
+print("   the 5 most unusual rows are at distances %s"
+      % np.round(d2[odd], 1))
+print("   no labels, no clusters -- just 'how surprising is this row'. this")
+print("   is the objective behind anomaly detection, and it answers a")
+print("   different question from the other three.")
+print()
+
+print("%-34s %12s" % ("method", "purity"))
+for name, a in (("k-means on raw data", a_raw),
+                ("k-means on autoencoder code", a_code),
+                ("k-means on self-prediction features", a_self)):
+    print("%-34s %12.4f" % (name, purity(a)))
+print("%-34s %12.4f" % ("everything in one group", purity(np.zeros(N, dtype=int))))
+print()
+print("the lesson is not which number is largest. it is that all four")
+print("objectives are legitimate and none of them is 'unsupervised learning'")
+print("in general -- each optimises a specific thing:")
+print("   reconstruction  -> keep enough to rebuild the input")
+print("   clustering      -> put nearby points in the same group")
+print("   self-prediction -> keep enough to predict the missing part")
+print("   density         -> know what normal looks like")
+print()
+print("choosing among them is choosing what you want, and there is no label")
+print("column to tell you afterwards whether you chose correctly. that is")
+print("the genuinely hard part of unsupervised work, and it is a design")
+print("question rather than a modelling one.")
+```
+
 ## Questions people ask
 
 <strong>Is self-supervised learning the same as unsupervised?</strong> Self-supervision is a subset: it invents labels from the data. The training loop is then fully supervised.
