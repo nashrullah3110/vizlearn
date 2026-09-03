@@ -69,6 +69,124 @@ Stemming before a transformer therefore does two harmful things: it destroys gra
 
 The rule is simple. <strong>Stem or lemmatise for classical bag-of-words models. Never for transformers.</strong>
 
+## Chopping suffixes against looking words up
+
+A stemmer applies rules and can produce nonsense. A lemmatiser consults a dictionary and needs to know the part of speech. Both are implemented here on the same words, including the cases where each one fails.
+
+```python-run
+import re
+
+def crude_stem(w):
+    # a simplified Porter-style stemmer: strip the commonest suffixes
+    for suf, repl in (("sses", "ss"), ("ies", "i"), ("ational", "ate"),
+                      ("tional", "tion"), ("ization", "ize"), ("iveness", "ive"),
+                      ("fulness", "ful"), ("ousness", "ous"), ("ing", ""),
+                      ("edly", ""), ("ed", ""), ("ly", ""), ("es", ""),
+                      ("s", "")):
+        if w.endswith(suf) and len(w) - len(suf) >= 3:
+            return w[:-len(suf)] + repl
+    return w
+
+LEMMAS = {
+    ("running", "v"): "run", ("ran", "v"): "run", ("runs", "v"): "run",
+    ("better", "a"): "good", ("best", "a"): "good",
+    ("was", "v"): "be", ("were", "v"): "be", ("is", "v"): "be",
+    ("mice", "n"): "mouse", ("geese", "n"): "goose", ("feet", "n"): "foot",
+    ("studies", "n"): "study", ("studies", "v"): "study",
+    ("studying", "v"): "study", ("universities", "n"): "university",
+    ("meeting", "n"): "meeting", ("meeting", "v"): "meet",
+    ("saw", "v"): "see", ("saw", "n"): "saw",
+}
+
+def lemma(w, pos):
+    return LEMMAS.get((w, pos), w)
+
+words = ["running", "runs", "ran", "studies", "studying", "universities",
+         "better", "mice", "was", "flies", "caresses"]
+print("%16s %16s %16s" % ("word", "stem (rules)", "lemma (dictionary)"))
+def best_lemma(w):
+    for pos in ("v", "n", "a"):
+        if (w, pos) in LEMMAS:
+            return lemma(w, pos)
+    return w
+for w in words:
+    print("%16s %16s %16s" % (w, crude_stem(w), best_lemma(w)))
+print()
+
+print("READ THE STEM COLUMN. several of those are not words:")
+for w in ("studies", "universities", "flies"):
+    print("   %-14s -> %-10s   <- not a word, and that is fine"
+          % (w, crude_stem(w)))
+print("   a stemmer's output is not meant to be readable. it is meant to be")
+print("   CONSISTENT -- if two words share a stem they get grouped, and that")
+print("   is all a search index needs.")
+print()
+
+print("WHERE STEMMING GOES WRONG. two failure modes with names:")
+print()
+print("   OVER-STEMMING -- unrelated words collapsing to one stem. rather")
+print("   than assert an example, let the stemmer find its own. stem a word")
+print("   list and report every group that ends up sharing a stem:")
+wordlist = ("universe university universal organ organic organize organization "
+            "relate relative relativity news new arm arms army general generous "
+            "operate operates operating operated police policy sing sings "
+            "singing communism communist community").split()
+groups = {}
+for w in wordlist:
+    groups.setdefault(crude_stem(w), []).append(w)
+collisions = {k: v for k, v in groups.items() if len(v) > 1}
+for stem_, members in sorted(collisions.items()):
+    print("      %-12s <- %s" % (stem_, ", ".join(members)))
+if not collisions:
+    print("      (none in this list -- this stemmer is too simple to collide)")
+print()
+print("   look at each group and decide whether it SHOULD be one group.")
+print("   'operate/operates/operating' is correct -- those are one word.")
+print("   any group mixing genuinely different meanings is over-stemming,")
+print("   and a real Porter stemmer produces well-known ones: 'universe'")
+print("   and 'university' both stem to 'univers', 'organization' and")
+print("   'organ' both to 'organ'.")
+print()
+print("LEMMATISATION HANDLES THOSE, because it looks them up:")
+for w, pos in (("ran", "v"), ("mice", "n"), ("was", "v"), ("better", "a")):
+    print("   %-10s (%s) -> %s" % (w, pos, lemma(w, pos)))
+print()
+print("but it needs the part of speech, and the same string can be two")
+print("things:")
+for w in ("meeting", "saw", "studies"):
+    forms = {p: lemma(w, p) for p in ("n", "v", "a") if (w, p) in LEMMAS}
+    print("   %-10s %s" % (w, "   ".join("as %s -> %s" % (p, l)
+                                         for p, l in forms.items())))
+print("   so a lemmatiser needs a POS tagger in front of it, which needs")
+print("   the surrounding sentence, which makes it far slower than a")
+print("   stemmer and dependent on a second model being right.")
+print()
+
+print("THE COMPARISON, plainly:")
+rows = [("what it does", "strips suffixes by rule", "looks up a dictionary"),
+        ("output", "may not be a word", "always a real word"),
+        ("needs context", "no", "yes -- part of speech"),
+        ("speed", "microseconds", "milliseconds"),
+        ("irregulars", "fails", "handles"),
+        ("language support", "one stemmer per language", "needs a lexicon")]
+print("%18s %28s %28s" % ("", "stemming", "lemmatisation"))
+for a, b, c in rows:
+    print("%18s %28s %28s" % (a, b, c))
+print()
+
+print("AND THE MODERN ANSWER: usually neither.")
+print("   subword tokenisation already splits 'running' into pieces that")
+print("   'runs' and 'ran' partly share, and the model learns the")
+print("   relationship from data rather than from a rule table.")
+print("   a transformer given 'ran' and 'running' places them near each")
+print("   other in embedding space without anyone writing a suffix rule.")
+print()
+print("   they are still worth knowing for: classical search indexes (where")
+print("   a stemmer is what makes a query for 'running' match a document")
+print("   about 'runs'), bag-of-words baselines, and any pipeline where you")
+print("   need the vocabulary to be small and the behaviour explainable.")
+```
+
 ## Things to try
 
 Use the interactive tool above to see the difference firsthand:

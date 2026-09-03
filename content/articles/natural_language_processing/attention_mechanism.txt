@@ -63,6 +63,124 @@ The output for token 2 is 0.63 × value₁ + 0.14 × value₂ + 0.23 × value₃
 
 Those weights are what get visualised as attention heatmaps. They are genuinely informative about what the model connected to what, and they are not an explanation of <em>why</em> &mdash; a caution worth keeping, since attention maps are frequently over-interpreted.
 
+## The bottleneck it was invented to remove
+
+Attention was not invented for transformers. It was a patch on sequence-to-sequence translation, and understanding the problem it patched makes the mechanism obvious rather than arbitrary.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+print("THE ORIGINAL DESIGN (2014). an encoder RNN reads the whole source")
+print("sentence into ONE fixed vector, and a decoder RNN generates from it:")
+print("    source -> [encoder RNN] -> context vector -> [decoder RNN] -> target")
+print()
+H = 8
+for n in (5, 15, 40, 100):
+    print("   a %3d-word sentence -> the same %d numbers" % (n, H))
+print("   that is the bottleneck. every sentence, however long, is squeezed")
+print("   through a vector of fixed size, and the first words have been")
+print("   overwritten many times by the time the encoder finishes.")
+print()
+
+print("here is that overwriting, measured. run an encoder over a sequence")
+print("and ask how much of word 0 survives in the final state:")
+Wx = rng.normal(0, 0.5, (4, H))
+Wh = rng.normal(0, 0.5, (H, H))
+def encode(seq):
+    h = np.zeros(H)
+    states = []
+    for x in seq:
+        h = np.tanh(x @ Wx + h @ Wh)
+        states.append(h.copy())
+    return h, states
+
+print("   %10s %28s" % ("length", "effect of changing word 0"))
+for L in (3, 6, 12, 25, 50):
+    shifts = []
+    for _ in range(40):
+        seq = rng.normal(0, 1.0, (L, 4))
+        base, _ = encode(seq)
+        alt = seq.copy()
+        alt[0] = rng.normal(0, 1.0, 4)               # change ONLY word 0
+        changed, _ = encode(alt)
+        shifts.append(np.linalg.norm(base - changed))
+    print("   %10d %28.5f" % (L, np.mean(shifts)))
+print("   by 25 words the first word barely registers. a translation model")
+print("   built this way degrades sharply with sentence length, and that is")
+print("   exactly what the 2014 papers reported.")
+print()
+
+print("THE FIX. keep every encoder state, and let the decoder choose which")
+print("to look at as it generates each output word:")
+src = ["le", "chat", "noir", "dort"]
+tgt = ["the", "black", "cat", "sleeps"]
+S, T = len(src), len(tgt)
+enc_states = rng.normal(0, 1.0, (S, H))
+dec_states = rng.normal(0, 1.0, (T, H))
+print("   source: %s" % " ".join(src))
+print("   target: %s" % " ".join(tgt))
+print()
+
+Wa = rng.normal(0, 0.5, (H, H))
+scores = dec_states @ Wa @ enc_states.T
+def softmax(z):
+    e = np.exp(z - z.max(axis=-1, keepdims=True))
+    return e / e.sum(axis=-1, keepdims=True)
+A = softmax(scores)
+print("   for each output word, a distribution over the source words:")
+print("%12s %s" % ("", "".join("%9s" % w for w in src)))
+for i, w in enumerate(tgt):
+    print("%12s %s" % (w, "".join("%9.4f" % a for a in A[i])))
+print("   row sums:", np.round(A.sum(1), 6))
+print()
+print("   these weights are random here. in a trained model they line up")
+print("   with the translation -- and that alignment was the result that")
+print("   made the technique famous, because nobody had supervised it. it")
+print("   fell out of training the model to translate.")
+print()
+
+context = A @ enc_states
+print("   each output step gets its OWN context vector, not one shared one:")
+for i, w in enumerate(tgt):
+    print("      %-8s context = %s ..." % (w, np.round(context[i][:4], 4)))
+print("   the bottleneck is gone. the decoder has access to all %d encoder"
+      % S)
+print("   states at every step, weighted by what it currently needs.")
+print()
+
+print("THE THREE SCORING FUNCTIONS people used, before dot-product won:")
+q, k = dec_states[0], enc_states[0]
+v = rng.normal(0, 0.5, H)
+Wc = rng.normal(0, 0.5, (H, H))
+Wcat = rng.normal(0, 0.5, (2 * H, H))
+print("   dot        q . k                    = %+8.4f" % (q @ k))
+print("   general    q @ W @ k                = %+8.4f" % (q @ Wc @ k))
+print("   additive   v . tanh(W @ [q; k])     = %+8.4f"
+      % (v @ np.tanh(np.concatenate([q, k]) @ Wcat)))
+print("   additive (Bahdanau) came first and works with different encoder")
+print("   and decoder sizes. dot-product (Luong) is a single matmul with no")
+print("   parameters at all, which is why it is what transformers use --")
+print("   it maps straight onto hardware built for matrix multiplication.")
+print()
+
+print("WHAT CAME NEXT. the 2017 paper's contribution was noticing that if")
+print("attention alone can connect any two positions, the RNN underneath is")
+print("no longer necessary:")
+print("%28s %14s %20s" % ("", "path length", "parallel over t?"))
+print("%28s %14s %20s" % ("RNN", "O(n)", "no -- sequential"))
+print("%28s %14s %20s" % ("RNN + attention", "O(1) to encoder", "no -- still an RNN"))
+print("%28s %14s %20s" % ("transformer", "O(1)", "yes"))
+print("   'path length' is how many steps a gradient travels between two")
+print("   positions. an RNN's is the distance between them, which is the")
+print("   vanishing gradient problem restated. attention's is 1.")
+print()
+print("so the sequence of ideas is: a fixed context vector is too small ->")
+print("let the decoder look at all the encoder states -> if it can do that,")
+print("it does not need the recurrence at all.")
+```
+
 ## Things to try
 
 1. <strong>Walk the output.</strong> Set the <strong>Output Step</strong> slider to 1, then step it up one at a time. The bright connection moves across the source sentence as each output word is produced &mdash; the decoder is looking somewhere different every time.

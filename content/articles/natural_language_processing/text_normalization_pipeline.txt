@@ -122,6 +122,123 @@ The generic pipeline is rarely enough, and the additions depend on where the tex
 - <strong>Stripping numbers</strong> when they carry meaning &mdash; prices, dates, quantities.
 - <strong>Applying an English pipeline to other languages.</strong> Stop-word lists, stemmers and even whitespace tokenisation are language-specific.
 
+## Every step, and what each one destroys
+
+Normalisation is a sequence of lossy transformations. Running them one at a time on messy text shows what each buys in vocabulary size and what it throws away that you might have wanted.
+
+```python-run
+import re
+import unicodedata
+from collections import Counter
+
+raw = ("  The QUICK brown fox didn't jump over 2 lazy dogs!!! "
+       "Visit https://example.com or e-mail Bob@Example.COM -- it's #1. "
+       "Café café CAFÉ — naïve resumé 100% \U0001F600  ")
+print("raw input (%d characters):" % len(raw))
+print("   %r" % raw)
+print()
+
+steps = []
+t = raw
+
+t = t.strip()
+steps.append(("strip whitespace", t, "leading/trailing space only"))
+
+t = unicodedata.normalize("NFKC", t)
+steps.append(("unicode NFKC", t,
+              "combines e + combining-accent into a single e-acute"))
+
+t = t.lower()
+steps.append(("lowercase", t, "'US' and 'us', 'Apple' and 'apple'"))
+
+t = re.sub(r"https?://\S+", " <url> ", t)
+t = re.sub(r"\S+@\S+\.\S+", " <email> ", t)
+steps.append(("replace urls/emails", t, "the specific address"))
+
+t = re.sub(r"\d+", " <num> ", t)
+steps.append(("replace numbers", t, "every quantity and date"))
+
+t = re.sub(r"[^\w\s<>]", " ", t)
+steps.append(("strip punctuation", t,
+              "sentence boundaries, contractions, negation markers"))
+
+t = re.sub(r"\s+", " ", t).strip()
+steps.append(("collapse whitespace", t, "formatting"))
+
+print("%22s %14s %s" % ("step", "length", "result"))
+for name, val, _ in steps:
+    print("%22s %14d %s" % (name, len(val), repr(val[:58])))
+print()
+
+print("what each step DESTROYS, which is the part worth thinking about:")
+for name, _, lost in steps:
+    print("   %-22s %s" % (name, lost))
+print()
+
+STOP = {"the", "a", "an", "and", "or", "but", "it", "s", "t", "over", "is",
+        "was", "of", "to", "in", "on"}
+tokens = t.split()
+kept = [w for w in tokens if w not in STOP]
+print("stopword removal: %d tokens -> %d (%.0f%% dropped)"
+      % (len(tokens), len(kept), 100 * (1 - len(kept) / len(tokens))))
+print("   %s" % " ".join(kept))
+print()
+
+print("THE VOCABULARY ARGUMENT, which is why any of this is done:")
+corpus = ("The cat Ran. the CAT ran! A cat, running; the Cats RAN?? "
+          "cats run. Cat runs the CATS Running")
+variants = {}
+v_raw = Counter(corpus.split())
+v_low = Counter(corpus.lower().split())
+v_clean = Counter(re.sub(r"[^\w\s]", "", corpus.lower()).split())
+print("   raw                        : %2d distinct tokens" % len(v_raw))
+print("   lowercased                 : %2d" % len(v_low))
+print("   lowercased, no punctuation : %2d" % len(v_clean))
+print("   %s" % sorted(v_clean))
+print("   from %d down to %d. every collapsed pair is one fewer thing the"
+      % (len(v_raw), len(v_clean)))
+print("   model has to learn separately -- and one fewer distinction it CAN")
+print("   make.")
+print()
+
+print("AND HERE IS WHERE IT COSTS YOU. cases where a standard step is")
+print("the wrong choice:")
+cases = [
+    ("sentiment", "lowercasing", "'GREAT' and 'great' carry different heat"),
+    ("sentiment", "stripping punctuation", "'good!!!' vs 'good' vs 'good?'"),
+    ("negation", "stopword removal", "'not' is on most stopword lists"),
+    ("NER", "lowercasing", "'Apple' the company vs 'apple' the fruit"),
+    ("code search", "punctuation", "'->' and '==' ARE the tokens"),
+]
+print("%14s %24s %s" % ("task", "step that hurts", "why"))
+for task, step, why in cases:
+    print("%14s %24s %s" % (task, step, why))
+print()
+neg = "the film was not good"
+print("   watch the negation case concretely:")
+print("      original                : %r" % neg)
+print("      after stopword removal  : %r"
+      % " ".join(w for w in neg.split() if w not in STOP | {"not"}))
+print("      the sentiment has inverted, and nothing downstream can tell.")
+print()
+
+print("THE MODERN POSITION. a transformer with subword tokenisation wants")
+print("almost none of this:")
+print("   casing carries information -- keep it")
+print("   punctuation carries information -- keep it")
+print("   subwords handle morphology, so no stemming")
+print("   the tokeniser handles rare words, so no <UNK> to avoid")
+print()
+print("what survives even there: unicode normalisation (so the two ways of")
+print("writing an accented character are one token), whitespace cleanup, and")
+print("replacing genuinely unbounded things like URLs and long digit strings")
+print("that would otherwise waste context on noise.")
+print()
+print("the rule to take away: every normalisation step is a decision that")
+print("some distinction does not matter. write down which distinction, and")
+print("check that your task agrees.")
+```
+
 ## Questions people ask
 
 <strong>Should I lowercase?</strong> For classical bag-of-words models, yes. For cased transformers, no.

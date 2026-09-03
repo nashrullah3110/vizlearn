@@ -55,6 +55,146 @@ To TF-IDF, "excellent" and "superb" are two unrelated columns. A model trained o
 
 To represent a whole document with static embeddings, the usual approach is to average the word vectors &mdash; which works better than it should and still loses order. Sentence encoders trained with a similarity objective do the job properly.
 
+## Five ways to turn words into numbers
+
+One-hot, bag-of-words, TF-IDF, co-occurrence and learned embeddings, all built on the same four documents -- so the progression from "counting" to "meaning" is visible rather than asserted.
+
+```python-run
+import numpy as np
+from collections import Counter
+
+docs = [
+    "the cat sat on the mat",
+    "the dog sat on the rug",
+    "a cat and a dog play",
+    "the stock market fell today",
+]
+tokens = [d.split() for d in docs]
+vocab = sorted({w for t in tokens for w in t})
+idx = {w: i for i, w in enumerate(vocab)}
+V, N = len(vocab), len(docs)
+print("%d documents, %d distinct words." % (N, V))
+for i, d in enumerate(docs):
+    print("   doc %d: %s" % (i, d))
+print()
+
+print("1. ONE-HOT. one column per word, one row per WORD occurrence:")
+for w in ("cat", "dog", "market"):
+    v = np.zeros(V, int); v[idx[w]] = 1
+    print("   %-8s %s" % (w, v))
+print("   %d numbers to encode one word, %d of them zero." % (V, V - 1))
+print("   and every pair is orthogonal, so it encodes identity and nothing")
+print("   else. it is the input format, not a representation.")
+print()
+
+BOW = np.zeros((N, V), int)
+for i, t in enumerate(tokens):
+    for w in t:
+        BOW[i, idx[w]] += 1
+print("2. BAG OF WORDS. one row per DOCUMENT, counting occurrences:")
+print("%8s %s" % ("", "".join("%7s" % w[:6] for w in vocab[:9])))
+for i in range(N):
+    print("%8s %s" % ("doc %d" % i, "".join("%7d" % c for c in BOW[i][:9])))
+print("   the word order is gone. 'dog bites man' and 'man bites dog' are")
+print("   the same row, which is the defect the name refers to.")
+print()
+
+def cos(a, b):
+    return a @ b / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-12)
+
+print("   document similarity by bag of words:")
+for i in range(N):
+    print("      doc %d vs others: %s"
+          % (i, " ".join("%.3f" % cos(BOW[i], BOW[j]) for j in range(N))))
+print("   docs 0 and 1 come out similar, which is right. but look at WHY --")
+print("   they share 'the', 'sat' and 'on'. the word doing most of the work")
+print("   is 'the', which carries no information at all.")
+print()
+
+df = (BOW > 0).sum(0)
+idf = np.log((1 + N) / (1 + df)) + 1
+TF = BOW / np.maximum(BOW.sum(1, keepdims=True), 1)
+TFIDF = TF * idf
+TFIDF = TFIDF / (np.linalg.norm(TFIDF, axis=1, keepdims=True) + 1e-12)
+print("3. TF-IDF. weight each count by how RARE the word is across docs:")
+print("%12s %10s %10s %10s %16s"
+      % ("word", "doc freq", "idf", "raw count", "tf-idf weight"))
+for w, d in (("the", 0), ("cat", 0), ("sat", 0), ("market", 3), ("fell", 3)):
+    print("%12s %10d %10.4f %10d %16.4f"
+          % (w, df[idx[w]], idf[idx[w]], BOW[d, idx[w]], TFIDF[d, idx[w]]))
+print("   (each weight is shown for a document the word actually appears in.)")
+print()
+print("   note that 'the' STILL has the largest weight in doc 0. idf lowered")
+print("   it, but 'the' occurs twice there against everything else's once,")
+print("   and tf wins. with only 4 documents 'the' is not rare enough to be")
+print("   crushed -- in a real corpus it appears in nearly every document:")
+for n_docs, in_docs in ((4, 3), (1000, 990), (1_000_000, 999_000)):
+    v = np.log((1 + n_docs) / (1 + in_docs)) + 1
+    print("      appears in %7d of %7d docs -> idf %.4f" % (in_docs, n_docs, v))
+print("   at a million documents idf('the') is barely above 1 while a rare")
+print("   term is several times that. the discounting is real; it just needs")
+print("   a corpus to work with.")
+print()
+print("   the same similarities, now with common words discounted:")
+for i in range(N):
+    print("      doc %d vs others: %s"
+          % (i, " ".join("%.3f" % cos(TFIDF[i], TFIDF[j]) for j in range(N))))
+print("   doc 3's similarity to docs 0 and 1 fell from %.3f to %.3f -- the"
+      % (cos(BOW[3], BOW[0]), cos(TFIDF[3], TFIDF[0])))
+print("   only thing it shared with them was 'the', and that now counts for")
+print("   less. that is exactly what idf is for.")
+print()
+
+W = 2
+C = np.zeros((V, V))
+for t in tokens:
+    for i, w in enumerate(t):
+        for j in range(max(0, i - W), min(len(t), i + W + 1)):
+            if i != j:
+                C[idx[w], idx[t[j]]] += 1
+print("4. CO-OCCURRENCE. count which words appear near which:")
+show = ["cat", "dog", "market", "sat"]
+print("%10s %s" % ("", "".join("%8s" % w[:7] for w in show)))
+for a in show:
+    print("%10s %s" % (a, "".join("%8.0f" % C[idx[a], idx[b]] for b in show)))
+print("   this is the first representation that is about WORDS rather than")
+print("   documents, and the first where two words can be similar without")
+print("   ever appearing together.")
+print()
+
+U, S, Vt = np.linalg.svd(np.log1p(C) - np.log1p(C).mean(0), full_matrices=False)
+E = U[:, :4] * S[:4]
+E = E / (np.linalg.norm(E, axis=1, keepdims=True) + 1e-12)
+print("5. EMBEDDINGS. factorise that matrix down to 4 dimensions:")
+print("   %d x %d counts -> %d x 4 dense vectors" % (V, V, V))
+print("   word similarities in the compressed space:")
+for a, b in (("cat", "dog"), ("cat", "market"), ("sat", "play")):
+    print("      %-8s vs %-8s %+.4f" % (a, b, E[idx[a]] @ E[idx[b]]))
+print()
+
+print("THE PROGRESSION, and what each step added:")
+rows = [("one-hot", "identity only", "%d numbers per word" % V, "no"),
+        ("bag of words", "which words, how many", "%d per document" % V, "no"),
+        ("TF-IDF", "+ how surprising", "%d per document" % V, "no"),
+        ("co-occurrence", "+ what a word neighbours", "%d per word" % V, "yes"),
+        ("embedding", "+ compressed to what matters", "4 per word", "yes")]
+print("%16s %30s %20s %10s"
+      % ("technique", "what it captures", "size", "words related?"))
+for a, b, c, d in rows:
+    print("%16s %30s %20s %10s" % (a, b, c, d))
+print()
+print("the first three are document representations and are still the right")
+print("answer for search ranking and for a fast text classifier. the last")
+print("two are word representations, and are what everything since")
+print("word2vec has built on.")
+print()
+print("what none of them capture is order and context. 'bank' has one")
+print("vector here whatever it means in the sentence. that is the gap")
+print("contextual embeddings -- a transformer's per-token output -- fill,")
+print("and it is why 'the embedding of a word' stopped being a well-defined")
+print("thing after 2018.")
+```
+
 ## Experiments to try
 
 1. <strong>Walk the tabs left to right</strong> with the default corpus. Watch the representation grow from a simple ID list to a weighted document-term matrix.

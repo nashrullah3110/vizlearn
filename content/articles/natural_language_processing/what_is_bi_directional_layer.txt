@@ -76,6 +76,101 @@ h_fwd, h_bwd = h[0], h[1]
 summary = torch.cat([h_fwd, h_bwd], dim=-1)     # correct for classification
 ```
 
+## Reading the sequence twice, in both directions
+
+A bidirectional layer runs two independent RNNs and concatenates them. That doubles the parameters, gives every position full context, and makes the layer unusable for generation -- all for the same reason.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+words = ["the", "bank", "by", "the", "river", "flooded"]
+T, X, H = len(words), 4, 5
+seq = rng.normal(0, 1.0, (T, X))
+
+Wxf = rng.normal(0, 0.5, (X, H)); Whf = rng.normal(0, 0.5, (H, H))
+Wxb = rng.normal(0, 0.5, (X, H)); Whb = rng.normal(0, 0.5, (H, H))
+
+def run(seq, Wx, Wh):
+    h = np.zeros(H)
+    out = []
+    for x in seq:
+        h = np.tanh(x @ Wx + h @ Wh)
+        out.append(h.copy())
+    return np.array(out)
+
+fwd = run(seq, Wxf, Whf)                    # left to right
+bwd = run(seq[::-1], Wxb, Whb)[::-1]        # right to left, then re-align
+both = np.concatenate([fwd, bwd], axis=1)
+
+print("two SEPARATE RNNs with their own weights, run over the same tokens:")
+print("   forward  reads %s" % " -> ".join(words))
+print("   backward reads %s" % " -> ".join(words[::-1]))
+print()
+print("%10s %14s %14s %14s"
+      % ("position", "forward h[0]", "backward h[0]", "concatenated"))
+for t, w in enumerate(words):
+    print("%10s %14.4f %14.4f %14s"
+          % (w, fwd[t][0], bwd[t][0], "%d dims" % both.shape[1]))
+print()
+print("the re-alignment matters and is the usual bug: the backward pass is")
+print("computed on the reversed sequence and must be flipped back, so that")
+print("position t's forward and backward states describe the SAME token.")
+print()
+
+print("WHAT EACH DIRECTION KNOWS at position 1 ('bank'):")
+print("   forward  has seen: %s" % " ".join(words[:2]))
+print("   backward has seen: %s" % " ".join(words[1:][::-1]))
+print("   together: the whole sentence.")
+print()
+print("measure it -- change the LAST word and see which states move:")
+alt = seq.copy()
+alt[-1] = rng.normal(0, 1.0, X)
+f2 = run(alt, Wxf, Whf)
+b2 = run(alt[::-1], Wxb, Whb)[::-1]
+print("%10s %18s %18s" % ("position", "forward changed?", "backward changed?"))
+for t, w in enumerate(words):
+    df = np.linalg.norm(fwd[t] - f2[t])
+    db = np.linalg.norm(bwd[t] - b2[t])
+    print("%10s %18.5f %18.5f" % (w, df, db))
+print("   the forward states before the last position are untouched -- they")
+print("   were computed before that word arrived. the backward states all")
+print("   moved, because for them it was the FIRST word.")
+print("   that column is the whole value of the layer.")
+print()
+
+print("THE COST. parameters and compute both double:")
+uni = X * H + H * H + H
+print("   unidirectional : %d parameters, output width %d" % (uni, H))
+print("   bidirectional  : %d parameters, output width %d" % (2 * uni, 2 * H))
+print("   and the next layer's input is twice as wide, so ITS parameters")
+print("   grow too. a stack of bidirectional layers costs more than 2x.")
+print()
+
+print("THE RESTRICTION, which is not a detail. the backward pass needs the")
+print("whole sequence before it can produce position 0's state:")
+print("   generation      -- impossible. you would need the tokens you have")
+print("                      not generated yet.")
+print("   streaming       -- impossible. no output until the input ends.")
+print("   classification  -- fine. you have the whole input already.")
+print("   tagging (NER,   -- fine, and this is where it shines: deciding")
+print("   POS)               whether 'bank' is a noun or a verb needs the")
+print("                      words after it as much as the ones before.")
+print()
+print("that trade is exactly the BERT/GPT distinction one level down. a")
+print("bidirectional encoder and a causal decoder are answering the same")
+print("question -- may this position see the future? -- and the answer")
+print("decides what the model can be used for.")
+print()
+
+print("the practical shape, for a tagging model:")
+print("   embed -> BiLSTM -> concat(forward, backward) -> per-token classifier")
+print("   output width %d -> %d classes" % (2 * H, 9))
+print("   note the classifier sees both halves for every token. that is the")
+print("   arrangement, and it was the standard for named-entity recognition")
+print("   for most of a decade before encoders replaced it.")
+```
+
 ## Guided experiments
 
 1. <strong>Watch both passes.</strong> Press <strong>Simulate Dual Passes</strong> and follow the two chains. One advances left to right, the other right to left, and they meet only where the outputs concatenate.

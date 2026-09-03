@@ -71,6 +71,143 @@ Step 6 is often <em>tied</em> to the embedding table &mdash; the same matrix use
 
 The shape of the tensors flowing through: (batch, sequence, model_dim) from step 2 onwards, unchanged by every block. That constancy is what makes the stack composable.
 
+## A whole block, run end to end
+
+A transformer block is attention, a feed-forward network, two residual connections and two layer norms. All of it is here, followed by the parameter count that explains where the compute actually goes.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+T, D, H, FF = 6, 32, 4, 128
+D_HEAD = D // H
+x = rng.normal(0, 1.0, (T, D))
+
+def softmax(z):
+    e = np.exp(z - z.max(axis=-1, keepdims=True))
+    return e / e.sum(axis=-1, keepdims=True)
+
+def layernorm(a, g=None, b=None, eps=1e-5):
+    mu = a.mean(-1, keepdims=True)
+    sd = a.std(-1, keepdims=True)
+    out = (a - mu) / (sd + eps)
+    return out if g is None else out * g + b
+
+Wq = rng.normal(0, 0.3, (H, D, D_HEAD))
+Wk = rng.normal(0, 0.3, (H, D, D_HEAD))
+Wv = rng.normal(0, 0.3, (H, D, D_HEAD))
+Wo = rng.normal(0, 0.3, (D, D))
+W1 = rng.normal(0, 0.2, (D, FF)); b1 = np.zeros(FF)
+W2 = rng.normal(0, 0.2, (FF, D)); b2 = np.zeros(D)
+
+def gelu(z):
+    return 0.5 * z * (1 + np.tanh(np.sqrt(2 / np.pi) * (z + 0.044715 * z ** 3)))
+
+print("PRE-NORM block, which is what modern models use:")
+print("    x = x + Attention(LayerNorm(x))")
+print("    x = x + FeedForward(LayerNorm(x))")
+print()
+print("input %s, %d heads of %d dims each, feed-forward width %d."
+      % (x.shape, H, D_HEAD, FF))
+print()
+
+def block(x):
+    trace = {}
+    # --- sublayer 1: attention
+    a = layernorm(x)
+    heads = []
+    for h in range(H):
+        Q, K, V = a @ Wq[h], a @ Wk[h], a @ Wv[h]
+        A = softmax(Q @ K.T / np.sqrt(D_HEAD))
+        heads.append(A @ V)
+    attn = np.concatenate(heads, axis=1) @ Wo
+    trace["attn_out"] = attn
+    x = x + attn                                   # residual 1
+    trace["after_attn"] = x
+    # --- sublayer 2: feed-forward
+    f = layernorm(x)
+    ff = gelu(f @ W1 + b1) @ W2 + b2
+    trace["ff_out"] = ff
+    x = x + ff                                     # residual 2
+    trace["after_ff"] = x
+    return x, trace
+
+out, tr = block(x)
+print("%22s %14s %14s %14s"
+      % ("stage", "shape", "mean", "sd"))
+for name, arr in (("input x", x), ("attention output", tr["attn_out"]),
+                  ("after residual 1", tr["after_attn"]),
+                  ("feed-forward output", tr["ff_out"]),
+                  ("after residual 2", tr["after_ff"])):
+    print("%22s %14s %14.4f %14.4f" % (name, str(arr.shape), arr.mean(), arr.std()))
+print()
+print("the shape never changes. that is what lets blocks stack -- the output")
+print("of one is a valid input to the next, forever.")
+print()
+
+print("WHAT EACH SUBLAYER IS FOR:")
+print("   attention     mixes information ACROSS positions. it is the only")
+print("                 part of the block that does.")
+print("   feed-forward  transforms each position INDEPENDENTLY. the same")
+print("                 two matrices are applied to every token.")
+print()
+print("   proof of the second claim -- shuffle the rows and run the")
+print("   feed-forward alone:")
+perm = np.array([4, 1, 0, 5, 3, 2])
+f = layernorm(x)
+ff_normal = gelu(f @ W1 + b1) @ W2 + b2
+ff_shuffled = gelu(layernorm(x[perm]) @ W1 + b1) @ W2 + b2
+print("      identical up to the permutation: %s"
+      % np.allclose(ff_normal[perm], ff_shuffled))
+print("   so a transformer alternates: mix across tokens, then think about")
+print("   each token separately. every layer does both.")
+print()
+
+print("THE PARAMETER COUNT, and where it goes:")
+attn_p = 4 * D * D                       # Q, K, V and the output projection
+ff_p = 2 * D * FF + FF + D
+ln_p = 2 * 2 * D
+total = attn_p + ff_p + ln_p
+print("%26s %12s %10s" % ("component", "parameters", "share"))
+for name, n in (("attention (Q,K,V,O)", attn_p), ("feed-forward", ff_p),
+                ("layer norms", ln_p)):
+    print("%26s %12d %9.1f%%" % (name, n, 100 * n / total))
+print("%26s %12d" % ("total per block", total))
+print()
+print("   the feed-forward layer holds two thirds of the parameters, and it")
+print("   is the part people think about least. the standard ratio is")
+print("   FF = 4 x d_model, which is why:")
+for d in (768, 4096):
+    print("      d_model %5d -> feed-forward width %5d, %s parameters"
+          % (d, 4 * d, "{:,}".format(2 * d * 4 * d)))
+print()
+
+print("BUT ATTENTION DOMINATES THE COMPUTE, because its cost grows with")
+print("sequence length and the feed-forward's does not:")
+print("%10s %20s %20s %14s" % ("tokens", "attention FLOPs", "feed-forward FLOPs", "attn share"))
+for t in (128, 512, 2048, 8192):
+    a_f = 4 * t * D * D + 2 * t * t * D          # projections + the T x T part
+    f_f = 4 * t * D * FF
+    print("%10d %20s %20s %13.0f%%"
+          % (t, "{:,}".format(a_f), "{:,}".format(f_f), 100 * a_f / (a_f + f_f)))
+print("   at short lengths the feed-forward is the expensive part. as the")
+print("   context grows the T x T term takes over, and that crossover is")
+print("   why long-context work is all about attention and never about the")
+print("   feed-forward.")
+print()
+
+print("STACKING. run the same block 6 times and watch the residual stream")
+print("grow while every sublayer INPUT stays normalised:")
+h = x.copy()
+for i in range(6):
+    h, _ = block(h)
+    print("   after block %d: mean %+8.4f, sd %8.4f, max |value| %8.4f"
+          % (i + 1, h.mean(), h.std(), np.abs(h).max()))
+print("   the residual stream grows -- each block ADDS to it -- while the")
+print("   layer norms keep each sublayer's INPUT on scale. that is the")
+print("   arrangement that makes 100-layer models trainable.")
+```
+
 ## Try it yourself
 
 1. <strong>Take the residuals away.</strong> Untick <strong>Residual Connections</strong> and set the <strong>Number of Layers</strong> slider to 24. Watch the gradient curve decay toward zero and Trainable flip to no. Each sublayer shrinks what passes through it, and twenty-four of those in a row leave nothing to learn from.

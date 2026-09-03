@@ -59,6 +59,113 @@ What changed is scale. A sufficiently large decoder, prompted appropriately, doe
 - You have <strong>few or no labels</strong> and want to work by prompting.
 - You need <strong>several tasks from one model</strong> without training a head per task.
 
+## One matrix of zeros and infinities
+
+BERT and GPT share almost all their architecture. The difference is a mask applied to the attention scores, and this builds both so you can see what each one can and cannot look at.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+words = ["the", "bank", "raised", "its", "rates"]
+T, D = len(words), 8
+E = rng.normal(0, 1.0, (T, D))
+Wq, Wk, Wv = (rng.normal(0, 0.5, (D, D)) for _ in range(3))
+
+def softmax(z):
+    e = np.exp(z - z.max(axis=-1, keepdims=True))
+    return e / e.sum(axis=-1, keepdims=True)
+
+scores = (E @ Wq) @ (E @ Wk).T / np.sqrt(D)
+
+print("BIDIRECTIONAL (BERT). no mask -- every token sees every token:")
+A_bi = softmax(scores)
+print("%8s %s" % ("", "".join("%9s" % w for w in words)))
+for i, w in enumerate(words):
+    print("%8s %s" % (w, "".join("%9.4f" % a for a in A_bi[i])))
+print()
+
+causal = np.triu(np.ones((T, T)), k=1) * -np.inf
+causal = np.nan_to_num(causal, neginf=-np.inf)
+print("CAUSAL (GPT). add this mask to the scores before the softmax:")
+print("%8s %s" % ("", "".join("%9s" % w for w in words)))
+for i, w in enumerate(words):
+    print("%8s %s" % (w, "".join("%9s" % ("-inf" if np.isinf(causal[i][j]) else "0")
+                                 for j in range(T))))
+A_causal = softmax(scores + causal)
+print()
+print("exp(-inf) = 0, so those positions get exactly zero weight:")
+print("%8s %s" % ("", "".join("%9s" % w for w in words)))
+for i, w in enumerate(words):
+    print("%8s %s" % (w, "".join("%9.4f" % a for a in A_causal[i])))
+print("   row sums:", np.round(A_causal.sum(1), 6))
+print()
+print("   the first row has one option and must give it all 1.0. the last")
+print("   row can see everything. each row renormalises over what is left.")
+print()
+
+print("WHAT THAT CHANGES. take 'bank', which is ambiguous until you reach")
+print("'rates':")
+i = words.index("bank")
+print("   bidirectional -- it can see 'rates' with weight %.4f"
+      % A_bi[i][words.index("rates")])
+print("   causal        -- it can see 'rates' with weight %.4f"
+      % A_causal[i][words.index("rates")])
+print("   in the causal model the representation of 'bank' at position 1 is")
+print("   built without ever seeing the rest of the sentence. it cannot be")
+print("   disambiguated, because the disambiguating word has not arrived.")
+print()
+
+print("WHY GPT ACCEPTS THAT COST. the mask is what makes next-token")
+print("prediction a valid training objective:")
+print("   without a mask, predicting token t is trivial -- token t is in")
+print("   the input. the model would learn to copy and nothing else.")
+print("   with the mask, position t only sees tokens 0..t, so predicting")
+print("   t+1 is a real problem. and EVERY position is a training example")
+print("   at once:")
+print("      a %d-token sequence gives %d predictions in one forward pass."
+      % (T, T - 1))
+print("   that is why generative pretraining scales: no labels, and the")
+print("   whole sequence is supervision.")
+print()
+
+print("HOW BERT TRAINS INSTEAD. it cannot predict the next token -- it can")
+print("see it. so it corrupts the input and predicts the corruption:")
+masked = list(words)
+masked[2] = "[MASK]"
+print("   input : %s" % " ".join(masked))
+print("   target: predict 'raised' at position 2, using BOTH sides")
+print("   about 15 percent of tokens are masked, so a %d-token sequence"
+      % T)
+print("   yields roughly %.1f training signals rather than %d." % (0.15 * T, T - 1))
+print("   BERT gets a better representation per token and far less")
+print("   supervision per sequence, which is a real part of why generative")
+print("   models scaled further.")
+print()
+
+print("THE SUMMARY, as a table:")
+rows = [("attention mask", "none", "causal (lower triangular)"),
+        ("a token sees", "all positions", "itself and earlier"),
+        ("pretraining", "masked-token prediction", "next-token prediction"),
+        ("signals per sequence", "~15% of tokens", "every token"),
+        ("natural at", "classification, tagging,", "generation, completion,"),
+        ("", "retrieval, span extraction", "anything autoregressive"),
+        ("generation", "awkward -- no natural order", "native")]
+print("%22s %28s %28s" % ("", "BERT (encoder)", "GPT (decoder)"))
+for a, b, c in rows:
+    print("%22s %28s %28s" % (a, b, c))
+print()
+print("everything else -- the attention arithmetic, the feed-forward blocks,")
+print("the residuals, the layer norms -- is the same in both. the")
+print("architectural difference really is that one matrix.")
+print()
+print("and the practical consequence: a bidirectional encoder is usually the")
+print("better choice when you have the whole input and want to LABEL it. a")
+print("causal decoder is the only choice when you need to PRODUCE text. the")
+print("fact that decoders now also do the labelling well is a result about")
+print("scale, not about the mask.")
+```
+
 ## Experiments to try
 
 1. <strong>Look around from the middle.</strong> With bidirectional attention selected and position 5, the whole sentence lights up: 8 tokens visible, 2 of them to the right.

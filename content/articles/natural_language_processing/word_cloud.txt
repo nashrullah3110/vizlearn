@@ -140,6 +140,117 @@ What to do to make it as good as it can be: remove stop words aggressively, weig
 - <strong>Numbers and URLs</strong> usually want removing.
 - <strong>Font support.</strong> Non-Latin scripts need a font that contains them, or the cloud renders as boxes.
 
+## What a word cloud shows, and what it hides
+
+A word cloud is a frequency count with a font size attached. Building one from raw counts and then from TF-IDF shows why the raw version almost always says the same thing regardless of the text.
+
+```python-run
+from collections import Counter
+import re
+
+text = ("The quarterly report shows that revenue growth in the cloud division "
+        "exceeded expectations. The cloud business grew 34 percent while the "
+        "hardware division declined. Analysts noted that the cloud margin "
+        "improved and that the company expects cloud revenue to continue "
+        "growing. The report also noted that hardware revenue fell for the "
+        "third quarter in a row and that the company is shifting investment "
+        "toward the cloud.")
+
+words = re.findall(r"[a-z]+", text.lower())
+counts = Counter(words)
+print("%d words, %d distinct." % (len(words), len(counts)))
+print()
+
+print("RAW COUNTS -- what a naive word cloud would size by:")
+for w, c in counts.most_common(10):
+    print("   %-14s %3d  %s" % (w, c, "#" * (c * 3)))
+print()
+print("the top of that list is 'the', 'that' and 'in'. a word cloud built")
+print("from raw counts is mostly a picture of English, not of this document.")
+print()
+
+STOP = set(("the a an and or but in on at to for of that this is are was were "
+            "it its as with by from has have had will would can could").split())
+filtered = Counter({w: c for w, c in counts.items() if w not in STOP and len(w) > 2})
+print("AFTER STOPWORD REMOVAL, which is the minimum any tool does:")
+for w, c in filtered.most_common(10):
+    print("   %-14s %3d  %s" % (w, c, "#" * (c * 3)))
+print()
+print("better -- 'cloud' and 'revenue' are genuinely what this text is")
+print("about. but the stopword list is doing the work, and it is a fixed")
+print("list somebody else wrote.")
+print()
+
+reference = Counter(("the company reported results for the quarter revenue "
+                     "was in line with expectations the division performed "
+                     "and the report noted results the company said that "
+                     "growth in the business was steady the quarter results "
+                     "report company revenue division business growth").split())
+import math
+N_REF = sum(reference.values())
+N_DOC = sum(filtered.values())
+print("TF-IDF STYLE -- score each word against how common it is in a")
+print("reference corpus of similar documents, rather than against a list:")
+print("%14s %10s %14s %12s" % ("word", "in doc", "in reference", "score"))
+scored = []
+for w, c in filtered.items():
+    ref = reference.get(w, 0)
+    score = (c / N_DOC) * math.log((N_REF + 1) / (ref + 1))
+    scored.append((score, w, c, ref))
+for score, w, c, ref in sorted(scored, reverse=True)[:10]:
+    print("%14s %10d %14d %12.4f" % (w, c, ref, score))
+print()
+print("now the ranking is about what makes THIS document unusual. 'revenue'")
+print("and 'company' appear here and in every other quarterly report, so")
+print("they fall. 'cloud' stays at the top because it does not.")
+print()
+
+print("THE THREE THINGS A WORD CLOUD CANNOT SHOW:")
+print()
+print("   1. ORDER. these two sentences produce the SAME bag of words:")
+pair = ("the cloud division grew and hardware declined",
+        "hardware grew and the cloud division declined")
+bags = []
+for sent in pair:
+    ws = sorted(w for w in re.findall(r"[a-z]+", sent.lower()) if w not in STOP)
+    bags.append(ws)
+    print("      %s" % sent)
+    print("         -> %s" % " ".join(ws))
+print("      identical: %s" % (bags[0] == bags[1]))
+print("      those two sentences say opposite things about the business, and")
+print("      a word cloud draws them the same way.")
+print()
+print("      NEGATION is the same problem wearing a different hat: 'not' is")
+print("      on almost every stopword list, so 'margins improved' and")
+print("      'margins did not improve' can land in the same picture.")
+print()
+print("   2. RELATIONSHIPS. 'cloud' appears %d times and 'revenue' %d times."
+      % (counts["cloud"], counts["revenue"]))
+print("      whether they appear TOGETHER is invisible. a bigram count says:")
+bigrams = Counter(zip(words, words[1:]))
+with_cloud = [(p, c) for p, c in bigrams.items() if "cloud" in p]
+print("      every pair containing 'cloud':")
+for p, c in sorted(with_cloud, key=lambda kv: -kv[1]):
+    print("         %-24s %d" % (" ".join(p), c))
+together = sum(c for p, c in with_cloud if "revenue" in p)
+print("      'cloud' and 'revenue' appear adjacent %d time(s). the cloud"
+      % together)
+print("      shows you both words are frequent and never that they are")
+print("      related -- and 'cloud division', 'cloud business' and 'cloud")
+print("      margin' are three distinct facts it collapses into one word.")
+print()
+print("   3. SCALE. font size maps to count, and human area perception is")
+print("      not linear. a word twice as frequent drawn at twice the height")
+print("      covers four times the area:")
+for c in (2, 4, 8, 16):
+    print("         count %2d -> height %2dx -> area %3dx" % (c, c // 2, (c // 2) ** 2)
+          if c >= 2 else "")
+print("      so the picture systematically exaggerates the top few words.")
+print()
+print("word clouds are a reasonable first look at an unfamiliar corpus and a")
+print("poor basis for a claim. if the finding matters, report the counts.")
+```
+
 ## Questions people ask
 
 <strong>Are word clouds bad?</strong> They are imprecise, which is a real limitation for analysis and not disqualifying for orientation and presentation.

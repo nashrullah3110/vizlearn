@@ -62,6 +62,117 @@ It reduces vanishing gradients rather than eliminating them, and exploding gradi
 3. <strong>Force z &rarr; 0.</strong> Now the state is rewritten from scratch at every token &mdash; the network becomes almost memoryless. The learned mode is powerful precisely because it sits <em>between</em> these extremes, per dimension, per step.
 4. <strong>Drag the hidden-size slider</strong> and watch the LSTM/GRU parameter gap widen &mdash; at H = 512 the GRU saves over a million weights in a single layer.
 
+## The same job with two gates instead of three
+
+A GRU ties the forget and input gates together and drops the cell state entirely. Both simplifications are run side by side against an LSTM here, along with what the GRU consequently cannot express.
+
+```python-run
+import numpy as np
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
+H, X = 4, 3
+rng = np.random.default_rng(0)
+
+# --- GRU
+Wz = rng.normal(0, 0.5, (X + H, H)); bz = np.zeros(H)   # update gate
+Wr = rng.normal(0, 0.5, (X + H, H)); br = np.zeros(H)   # reset gate
+Wh = rng.normal(0, 0.5, (X + H, H)); bh = np.zeros(H)   # candidate
+
+def gru_step(x, h):
+    z = sigmoid(np.concatenate([x, h]) @ Wz + bz)
+    r = sigmoid(np.concatenate([x, h]) @ Wr + br)
+    cand = np.tanh(np.concatenate([x, r * h]) @ Wh + bh)   # note r * h
+    return (1 - z) * h + z * cand, (z, r, cand)
+
+print("a GRU has ONE state, not two:")
+print("   LSTM: c (memory) and h (what is exposed)")
+print("   GRU : h only")
+print()
+print("and two gates:")
+print("   update z -- how much of h to replace")
+print("   reset  r -- how much of h the candidate is allowed to see")
+print()
+print("the update rule is the tied one:")
+print("    h = (1 - z) * h_old + z * candidate")
+print("whatever it forgets, it writes exactly that much back.")
+print()
+
+print("parameters, against an LSTM of the same width:")
+gru_p = 3 * ((X + H) * H + H)
+lstm_p = 4 * ((X + H) * H + H)
+print("   GRU  : 3 gates x ((%d+%d) x %d + %d) = %d" % (X, H, H, H, gru_p))
+print("   LSTM : 4 gates x ((%d+%d) x %d + %d) = %d" % (X, H, H, H, lstm_p))
+print("   %.0f%% fewer parameters, and one fewer state to carry."
+      % (100 * (1 - gru_p / lstm_p)))
+print()
+
+print("WHAT THE TYING COSTS. an LSTM's forget and input gates are")
+print("independent, so it has four behaviours. a GRU has one dial:")
+print("%12s %14s %16s %s" % ("z", "keeps", "writes", "LSTM equivalent"))
+for z in (0.0, 0.3, 0.7, 1.0):
+    print("%12.1f %14.2f %16.2f %s" % (z, 1 - z, z, "f=%.1f, i=%.1f" % (1 - z, z)))
+print()
+print("   the LSTM can also do:")
+print("      f=0.99, i=0.95 -- accumulate: keep everything AND add more")
+print("      f=0.05, i=0.01 -- clear: throw it away and store nothing")
+print("   a GRU cannot reach either. z would have to be simultaneously")
+print("   near 0 and near 1.")
+print()
+c_lstm, h_gru = 1.0, 1.0
+print("   accumulating from 1.0, ten steps, candidate 0.5 each time:")
+for t in range(1, 11):
+    c_lstm = 0.99 * c_lstm + 0.95 * 0.5      # LSTM: f and i both high
+    h_gru = (1 - 0.95) * h_gru + 0.95 * 0.5  # GRU: z high means forget too
+    if t in (1, 3, 10):
+        print("      step %2d: LSTM cell %8.4f   GRU state %8.4f" % (t, c_lstm, h_gru))
+print("   the LSTM builds a running total. the GRU converges to the")
+print("   candidate value and stays there -- it cannot accumulate, because")
+print("   writing means forgetting.")
+print()
+
+print("THE RESET GATE is the piece with no LSTM counterpart. it controls")
+print("what the CANDIDATE is allowed to see:")
+print("    candidate = tanh(W @ [x, r * h])")
+print("%12s %s" % ("reset r", "what the candidate is computed from"))
+for r in (0.0, 0.5, 1.0):
+    print("%12.1f %s" % (r, "x alone -- the past is ignored" if r == 0 else
+                         ("x and %.0f%% of h" % (100 * r) if r < 1 else
+                          "x and the full previous state")))
+print("   r near 0 lets a unit start fresh -- useful at a sentence boundary,")
+print("   or when the new input makes the accumulated context irrelevant.")
+print("   it is a different kind of forgetting from z: z drops the STATE,")
+print("   r drops the state's INFLUENCE on what comes next.")
+print()
+
+seq = rng.normal(0, 1.0, (8, X))
+h = np.zeros(H)
+print("run 8 steps. watch z and r move independently:")
+print("%6s %12s %12s %14s" % ("step", "mean z", "mean r", "|h| change"))
+for t, x in enumerate(seq):
+    prev = h.copy()
+    h, (z, r, cand) = gru_step(x, h)
+    print("%6d %12.4f %12.4f %14.4f"
+          % (t, z.mean(), r.mean(), np.linalg.norm(h - prev)))
+print()
+
+print("WHICH TO USE. the honest answer from a decade of benchmarks:")
+print("   they perform about the same on most tasks.")
+print("   a GRU is faster and smaller, so it wins when data or compute is")
+print("      limited.")
+print("   an LSTM's separate cell state and independent gates occasionally")
+print("      win on very long sequences and on tasks needing counting or")
+print("      accumulation -- exactly the behaviour shown above.")
+print("   and in practice the question is now usually moot, because a")
+print("      transformer beats both when the sequence fits in a context")
+print("      window.")
+print()
+print("the reason to know both is that the design question they answer --")
+print("how much control over memory is worth its cost in parameters --")
+print("keeps reappearing, most recently in state-space models.")
+```
+
 ## Summing up
 
 The GRU keeps the essential insight of gating &mdash; <em>memory updates as learned, per-dimension decisions</em> &mdash; while cutting a gate, a state track, and a quarter of the parameters. Both LSTM and GRU still read strictly left-to-right, though. What if the meaning of a word depends on what comes <em>after</em> it? That is the next module: bidirectional processing.

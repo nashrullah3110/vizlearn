@@ -77,6 +77,99 @@ UTF-8's decisive property is that the first 128 code points encode as single byt
 
 <strong>Encoding errors are silent or fatal.</strong> Reading a UTF-8 file as Latin-1 succeeds and produces mojibake; reading a Latin-1 file as UTF-8 raises `UnicodeDecodeError`. Always specify the encoding explicitly.
 
+## Before any of it is text, it is numbers
+
+Every string is bytes, and the mapping from bytes to characters is where a surprising amount of NLP goes wrong. ASCII, Unicode and UTF-8 are all inspected here directly.
+
+```python-run
+import unicodedata
+
+print("ASCII assigns a number to 128 characters. that is the whole standard:")
+print("%10s %10s %10s %s" % ("char", "decimal", "hex", "binary"))
+for ch in "A a 0 ~".split() + [" "]:
+    c = ch if ch != " " else " "
+    print("%10s %10d %10s %s"
+          % (repr(c), ord(c), hex(ord(c)), format(ord(c), "08b")))
+print()
+print("the ranges worth remembering:")
+for lo, hi, what in ((48, 57, "digits 0-9"), (65, 90, "uppercase A-Z"),
+                     (97, 122, "lowercase a-z"), (0, 31, "control codes")):
+    print("   %3d to %3d   %s" % (lo, hi, what))
+print()
+print("uppercase and lowercase are exactly %d apart, which is one bit:"
+      % (ord("a") - ord("A")))
+for ch in "AaZz":
+    print("   %s = %3d = %s" % (ch, ord(ch), format(ord(ch), "08b")))
+print("   flipping bit 5 changes the case. that is why the old trick")
+print("   'ord(c) ^ 32' works, and why it breaks the moment you leave ASCII.")
+print()
+
+print("UNICODE assigns a number to every character in every script --")
+print("about 150,000 of them so far:")
+samples = ["A", "e", "é", "中", "ا", "€", "\U0001F600"]
+print("%10s %12s %10s %s" % ("char", "code point", "name", ""))
+for ch in samples:
+    try:
+        name = unicodedata.name(ch)
+    except ValueError:
+        name = "?"
+    print("%10s %12s %s" % (repr(ch), "U+%04X" % ord(ch), name[:40]))
+print()
+
+print("UTF-8 encodes those numbers as bytes, using a variable number:")
+print("%10s %12s %8s %s" % ("char", "code point", "bytes", "the actual bytes"))
+for ch in samples:
+    b = ch.encode("utf-8")
+    print("%10s %12s %8d %s"
+          % (repr(ch), "U+%04X" % ord(ch), len(b), " ".join("%02x" % x for x in b)))
+print()
+print("   ASCII characters are 1 byte and unchanged -- UTF-8 was designed to")
+print("   be backward compatible, which is most of why it won.")
+print("   everything else is 2 to 4 bytes.")
+print()
+
+print("SO len() DEPENDS ON WHAT YOU ARE COUNTING:")
+for s in ("hello", "café", "中文", "\U0001F600"):
+    print("   %-8s characters %d, utf-8 bytes %d"
+          % (repr(s), len(s), len(s.encode("utf-8"))))
+print("   a length limit measured in bytes is not a length limit measured")
+print("   in characters, and neither is a length limit measured in tokens.")
+print()
+
+print("THE TRAP THAT BITES EVERYONE. the same visible character can be")
+print("stored two different ways:")
+a = "café"                 # e-acute as one code point
+b = "café"                # e followed by a combining accent
+print("   %r  -> %d chars, code points %s"
+      % (a, len(a), [hex(ord(c)) for c in a]))
+print("   %r  -> %d chars, code points %s"
+      % (b, len(b), [hex(ord(c)) for c in b]))
+print("   they look identical. a == b is %s." % (a == b))
+print("   normalise first and they agree: %s"
+      % (unicodedata.normalize("NFC", a) == unicodedata.normalize("NFC", b)))
+print("   this is why every text pipeline should start with a unicode")
+print("   normalisation step. two spellings of one word become two")
+print("   vocabulary entries otherwise, and only one of them ever trains.")
+print()
+
+print("AND WHY MODELS WORK ON BYTES. a byte-level tokeniser has a")
+print("vocabulary of exactly 256 and can represent any text ever written:")
+text = "hello 中文 \U0001F600"
+raw = text.encode("utf-8")
+print("   %r" % text)
+print("   as bytes: %s" % " ".join("%02x" % x for x in raw))
+print("   %d bytes, every one of them in 0..255. no unknown characters are"
+      % len(raw))
+print("   possible, in any language, ever.")
+print()
+print("   the cost is length. GPT-style models run byte-pair encoding ON TOP")
+print("   of bytes -- merging common byte sequences into single tokens -- so")
+print("   they get the coverage of bytes with something closer to the")
+print("   sequence length of words. that is what 'byte-level BPE' means, and")
+print("   it is why a model can handle an emoji it has never seen without")
+print("   any special case at all.")
+```
+
 ## Try it yourself
 
 Use the "ASCII Code Explorer" above to see this process in action:
