@@ -76,6 +76,100 @@ That third path is the subtle one. The output gate does not only control what le
 
 That is a real mechanism rather than a curiosity: a trained cell can use it to isolate a segment of the sequence from what came before.
 
+## The gate that decides what to reveal
+
+The output gate is the only one that does not touch memory. It controls what the rest of the network gets to see -- which is why an LSTM can hold something for fifty steps and act on it once.
+
+```python-run
+import numpy as np
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
+print("the other three gates edit the cell state. this one does not:")
+print("    o = sigmoid(Wo @ [x, h] + bo)")
+print("    h = o * tanh(c)")
+print()
+print("c is unchanged by o. the gate sits between the memory and everything")
+print("downstream -- the next timestep, the next layer, the output head.")
+print()
+
+print("so a cell can hold a value and expose none of it:")
+print("%12s %12s %14s %14s" % ("cell c", "tanh(c)", "gate o", "hidden h"))
+for c, o in ((2.5, 0.99), (2.5, 0.50), (2.5, 0.02), (-1.8, 0.95), (0.0, 0.99)):
+    print("%12.2f %12.4f %14.2f %14.4f" % (c, np.tanh(c), o, o * np.tanh(c)))
+print("   row 3: the memory holds 2.5 and the network sees 0.02. the")
+print("   information is there and deliberately withheld.")
+print()
+
+print("WHY THAT IS USEFUL. a cell that must reveal everything it stores")
+print("cannot hold state across a region where the state is irrelevant.")
+print("here is a cell told to remember a value at step 2 and report it at")
+print("step 12, staying quiet in between:")
+c, h = 0.0, 0.0
+print("%6s %10s %10s %10s %12s %12s"
+      % ("step", "input", "i", "o", "cell c", "hidden h"))
+for t in range(15):
+    x = 1.0 if t == 2 else 0.0
+    i = 0.95 if t == 2 else 0.0        # store only at step 2
+    o = 0.95 if t == 12 else 0.02      # reveal only at step 12
+    c = 0.99 * c + i * np.tanh(3.0 * x)
+    h = o * np.tanh(c)
+    if t in (0, 2, 5, 11, 12, 13, 14):
+        print("%6d %10.1f %10.2f %10.2f %12.4f %12.4f" % (t, x, i, o, c, h))
+print("   the cell state decays only slowly across those twelve steps -- the")
+print("   forget gate is at 0.99, so it loses about 1 percent per step. the")
+print("   hidden state stays near zero the whole way, then jumps when the")
+print("   gate opens at step 12 and the stored value finally appears.")
+print()
+print("   that is the separation the output gate buys: WHAT IS REMEMBERED")
+print("   and WHAT IS ACTED ON are two different decisions, made by two")
+print("   different networks.")
+print()
+
+print("THE TANH BEFORE THE GATE is not decoration. c is unbounded -- it")
+print("accumulates -- while h feeds the next timestep and the next layer:")
+print("%14s %16s %20s" % ("cell state c", "tanh(c)", "h with o = 0.9"))
+for c in (0.5, 2.0, 10.0, 100.0):
+    print("%14.1f %16.6f %20.6f" % (c, np.tanh(c), 0.9 * np.tanh(c)))
+print("   without the tanh, a cell state of 100 would put 90 into the next")
+print("   layer's input and the activations would blow up in one step.")
+print("   with it, h is always in (-1, 1) whatever the memory is doing.")
+print()
+print("   the cost is saturation. beyond about |c| = 3 the tanh is flat:")
+for c in (2.0, 3.0, 5.0, 10.0):
+    print("      c = %5.1f -> tanh = %.6f, gradient = %.2e"
+          % (c, np.tanh(c), 1 - np.tanh(c) ** 2))
+print("   a memory that has grown large stops producing a useful gradient")
+print("   through h. the gradient through c itself is unaffected, which is")
+print("   why the cell state is the path that matters for long dependencies.")
+print()
+
+print("AND h FEEDS BACK INTO ALL FOUR GATES at the next step:")
+print("   f, i, g, o at step t+1 are all computed from [x_(t+1), h_t]")
+print("   so the output gate does not merely control what leaves the cell --")
+print("   it controls what the cell can see about itself next step.")
+print("   a closed output gate makes the cell partly blind to its own")
+print("   memory, which is a real and occasionally useful behaviour: it")
+print("   lets a unit accumulate without that accumulation disturbing the")
+print("   gating decisions.")
+print()
+
+H, X = 4, 3
+rng = np.random.default_rng(0)
+Wo = rng.normal(0, 0.5, (X + H, H)); bo = np.zeros(H)
+x, h_prev = rng.normal(size=X), rng.normal(size=H)
+c_state = np.array([2.4, -1.7, 0.3, 5.0])
+o = sigmoid(np.concatenate([x, h_prev]) @ Wo + bo)
+print("one real step, %d units at once:" % H)
+print("   cell state c    = %s" % np.round(c_state, 3))
+print("   tanh(c)         = %s" % np.round(np.tanh(c_state), 4))
+print("   output gate o   = %s" % np.round(o, 4))
+print("   hidden state h  = %s" % np.round(o * np.tanh(c_state), 4))
+print("   the gate is per-unit, so the cell reveals some of its memory and")
+print("   not the rest, on the same step.")
+```
+
 ## Things to try
 
 1. <strong>Run the simulation.</strong> The highlighted route runs from the glowing $o_t$ box to the final $\times$, where it meets the cell state coming down through the $\tanh$ block &mdash; and only then splits out as $H_t$, both upward and to the right.

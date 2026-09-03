@@ -106,6 +106,15 @@ SPECS = {
         "label": "NumPy",
         "filename": "example_%02d.py",
     },
+    "natural_language_processing": {
+        # numpy alone. attention, the LSTM gates, positional encoding and
+        # n-gram counting are all clearer written out than called, and the
+        # track has no need for a tokenizer library to make its points --
+        # the tokenisers here are built in the article.
+        "packages": "numpy",
+        "label": "NumPy",
+        "filename": "example_%02d.py",
+    },
     "deep_learning": {
         # numpy only, on purpose. Every idea in this track is clearer built
         # from scratch than called from a framework: a backward pass you can

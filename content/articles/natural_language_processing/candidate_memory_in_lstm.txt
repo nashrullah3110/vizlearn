@@ -71,6 +71,89 @@ What the trained cell learns is to use the gates to combine these correctly rath
 
 That division of labour &mdash; the candidate reading the current word, the gates reading the context &mdash; is what the four-way structure buys, and it is why a single computation producing both content and strength would be less expressive.
 
+## The only part of the cell that is not a gate
+
+Three of an LSTM's four small networks are sigmoids that act as valves. The candidate is a tanh, and it is the one that carries actual content -- which is why its activation function is different.
+
+```python-run
+import numpy as np
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
+print("the four sub-networks, and their ranges:")
+print("%14s %12s %14s %s" % ("name", "activation", "range", "role"))
+for n, a, r, role in (("forget", "sigmoid", "0 to 1", "a valve"),
+                      ("input", "sigmoid", "0 to 1", "a valve"),
+                      ("output", "sigmoid", "0 to 1", "a valve"),
+                      ("candidate", "tanh", "-1 to 1", "the content")):
+    print("%14s %12s %14s %s" % (n, a, r, role))
+print()
+print("the update is  c = f * c_old + i * g,  where g is the candidate.")
+print("f and i decide HOW MUCH. g decides WHAT.")
+print()
+
+print("why tanh and not sigmoid. a sigmoid candidate could only ever ADD:")
+print("%10s %14s %14s" % ("pre-act", "sigmoid", "tanh"))
+for z in (-4, -2, -0.5, 0, 0.5, 2, 4):
+    print("%10.1f %14.4f %14.4f" % (z, sigmoid(z), np.tanh(z)))
+print()
+c_sig, c_tanh = 0.0, 0.0
+print("run 20 steps of small updates with each, input gate fixed at 0.5:")
+rng = np.random.default_rng(0)
+pre = rng.normal(0, 1.0, 20)
+for t, z in enumerate(pre):
+    c_sig = 0.95 * c_sig + 0.5 * sigmoid(z)
+    c_tanh = 0.95 * c_tanh + 0.5 * np.tanh(z)
+    if t in (0, 4, 9, 19):
+        print("   step %2d: sigmoid candidate -> c = %8.4f   tanh -> c = %8.4f"
+              % (t, c_sig, c_tanh))
+print("   the sigmoid version only ever climbs -- every contribution is")
+print("   positive, so the state drifts up until the forget gate balances")
+print("   it. the tanh version can push the state in either direction, so")
+print("   it can also CORRECT a memory rather than only reinforcing it.")
+print()
+
+print("and the range bounds how fast the state can move. with |g| <= 1 and")
+print("the input gate in [0, 1], one step can change c by at most 1:")
+c = 0.0
+print("   fastest possible accumulation, i=1 and g=1 at every step,")
+print("   with the forget gate wide open at 0.99:")
+for t in range(1, 2001):
+    c = 0.99 * c + 1.0
+    if t in (1, 5, 50, 200, 1000, 2000):
+        print("      step %4d: c = %8.4f" % (t, c))
+print("   it levels off at 1/(1-f) = %.1f instead of growing without bound."
+      % (1 / (1 - 0.99)))
+print("   an unbounded candidate would let the state explode, and tanh")
+print("   saturating at +/-1 is what prevents that.")
+print()
+
+print("the candidate is computed from the same inputs as the gates, with")
+print("its own weights -- it is a full layer, not a transformation of them:")
+H, X = 4, 3
+rng = np.random.default_rng(1)
+Wc = rng.normal(0, 0.5, (X + H, H)); bc = np.zeros(H)
+Wi = rng.normal(0, 0.5, (X + H, H)); bi = np.zeros(H)
+x, h = rng.normal(size=X), rng.normal(size=H)
+z = np.concatenate([x, h])
+g, i = np.tanh(z @ Wc + bc), sigmoid(z @ Wi + bi)
+print("   input x = %s, hidden h = %s" % (np.round(x, 3), np.round(h, 3)))
+print("   candidate g = %s" % np.round(g, 4))
+print("   input gate i = %s" % np.round(i, 4))
+print("   what actually reaches memory, i * g = %s" % np.round(i * g, 4))
+print()
+print("   read the last row against the one above it. unit by unit, the gate")
+print("   scales the content down -- and where the gate is small, a large")
+print("   candidate contributes almost nothing. the cell can compute a")
+print("   strong opinion and then decline to store it.")
+print()
+print("that separation is the design. one network decides what the new")
+print("information IS, a second decides whether it is worth keeping, and")
+print("they are trained independently. a plain RNN has only the first, which")
+print("is why it cannot choose to ignore an input.")
+```
+
 ## Guided tour
 
 1. <strong>Run the simulation.</strong> Watch the highlighted red route: the candidate is computed alongside the gates, then immediately meets the Input Gate at a $\times$ before it is ever allowed near the conveyor belt.

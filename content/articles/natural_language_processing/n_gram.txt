@@ -117,6 +117,138 @@ X = vec.fit_transform(docs)
 
 For character n-grams, `analyzer="char_wb", ngram_range=(3, 5)` is a strong setting for noisy or multilingual text.
 
+## Count, predict, and watch it fall apart
+
+An n-gram model is a table of counts. Building one shows both why it works at all and the two walls it hits -- sparsity and no generalisation.
+
+```python-run
+import numpy as np
+from collections import Counter, defaultdict
+
+corpus = (
+    "the cat sat on the mat the cat ate the fish the dog sat on the rug "
+    "the dog ate the bone the cat sat on the rug the bird sat on the branch "
+    "the cat chased the mouse the dog chased the cat the mouse ate the cheese"
+).split()
+
+print("a corpus of %d words, %d distinct." % (len(corpus), len(set(corpus))))
+print()
+
+def ngrams(tokens, n):
+    return [tuple(tokens[i:i + n]) for i in range(len(tokens) - n + 1)]
+
+print("%6s %14s %16s %20s" % ("n", "distinct n-grams", "possible", "coverage"))
+V = len(set(corpus))
+for n in (1, 2, 3, 4):
+    seen = len(set(ngrams(corpus, n)))
+    print("%6d %14d %16s %19.6f%%"
+          % (n, seen, "{:,}".format(V ** n), 100 * seen / V ** n))
+print()
+print("that last column is the sparsity problem, and it is not a small one.")
+print("the number of possible n-grams grows as V^n while the number you have")
+print("ever SEEN grows at best linearly with your corpus. by n=4 you have")
+print("observed a rounding error's worth of the space.")
+print()
+
+bigrams = defaultdict(Counter)
+for a, b in ngrams(corpus, 2):
+    bigrams[a][b] += 1
+
+print("the model itself is a table. what follows 'the'?")
+total = sum(bigrams["the"].values())
+for w, c in bigrams["the"].most_common(6):
+    print("   %-8s %3d / %d = %.4f  %s"
+          % (w, c, total, c / total, "#" * int(40 * c / total)))
+print()
+
+def generate(start, n_words, seed=0):
+    rng = np.random.default_rng(seed)
+    out = [start]
+    for _ in range(n_words - 1):
+        opts = bigrams[out[-1]]
+        if not opts:
+            break
+        words = list(opts)
+        probs = np.array([opts[w] for w in words], float)
+        out.append(words[rng.choice(len(words), p=probs / probs.sum())])
+    return " ".join(out)
+
+print("sample from it and you get text that is locally plausible:")
+for seed in range(4):
+    print("   %s" % generate("the", 10, seed))
+print("   each pair of adjacent words is real. the sentences are not.")
+print()
+
+trigrams = defaultdict(Counter)
+for a, b, c in ngrams(corpus, 3):
+    trigrams[(a, b)][c] += 1
+print("a trigram model has more context and sounds better:")
+def gen3(start, n_words, seed=0):
+    rng = np.random.default_rng(seed)
+    out = list(start)
+    for _ in range(n_words - 2):
+        opts = trigrams[tuple(out[-2:])]
+        if not opts:
+            break
+        ws = list(opts)
+        ps = np.array([opts[w] for w in ws], float)
+        out.append(ws[rng.choice(len(ws), p=ps / ps.sum())])
+    return " ".join(out)
+for seed in range(3):
+    print("   %s" % gen3(("the", "cat"), 10, seed))
+print("   but look at how often it simply runs out of options:")
+dead = sum(1 for k in trigrams if len(trigrams[k]) == 1)
+print("      %d of %d trigram contexts have exactly ONE continuation."
+      % (dead, len(trigrams)))
+print("      the model is not predicting there, it is reciting.")
+print()
+
+print("WALL 1 -- unseen n-grams have probability zero:")
+for test in (("the", "cat"), ("the", "elephant"), ("cat", "sat")):
+    c = bigrams[test[0]][test[1]]
+    tot = sum(bigrams[test[0]].values())
+    print("   P(%-8s | %-4s) = %d/%d = %.4f%s"
+          % (test[1], test[0], c, tot, c / tot if tot else 0,
+             "   <- zero. the whole sentence is now impossible." if not c else ""))
+print()
+print("   one unseen pair makes an entire sentence's probability zero, which")
+print("   is why smoothing exists. add-one is the simplest:")
+for test in (("the", "elephant"),):
+    c = bigrams[test[0]][test[1]]
+    tot = sum(bigrams[test[0]].values())
+    print("      unsmoothed : %d / %d       = %.6f" % (c, tot, c / tot))
+    print("      add-one    : (%d+1) / (%d+%d) = %.6f"
+          % (c, tot, V, (c + 1) / (tot + V)))
+print("   Kneser-Ney and backoff are better versions of the same repair:")
+print("   move a little probability mass from what you saw to what you did not.")
+print()
+
+print("WALL 2 -- and this one no smoothing fixes. the model has no idea that")
+print("two words are related:")
+tri_counts = Counter(ngrams(corpus, 3))
+def times(n):
+    return "%d time%s" % (n, "" if n == 1 else "s")
+print("   it has seen 'the cat sat' %s and 'the dog sat' %s."
+      % (times(tri_counts[("the", "cat", "sat")]),
+         times(tri_counts[("the", "dog", "sat")])))
+print("   it has never seen 'the bird ate'. what does it predict?")
+print("      P(ate | the bird) = %.4f"
+      % (trigrams[("the", "bird")]["ate"]
+         / max(sum(trigrams[("the", "bird")].values()), 1)))
+print("   a human knows birds eat, because bird is like cat and dog. an")
+print("   n-gram model cannot know that: 'cat', 'dog' and 'bird' are three")
+print("   unrelated symbols with nothing in common.")
+print()
+print("that second wall is precisely what embeddings were invented to knock")
+print("down. represent a word as a vector rather than an index, and words")
+print("used in similar contexts end up nearby -- so what the model learns")
+print("about one transfers to the others.")
+print()
+print("n-grams are not obsolete, though. they are fast, need no training,")
+print("and are still used for spelling correction, language identification,")
+print("and as a baseline that neural models are expected to beat.")
+```
+
 ## Questions people ask
 
 <strong>Are n-grams obsolete?</strong> As language models, largely. As features, as evaluation metrics and for character-level tasks, no.

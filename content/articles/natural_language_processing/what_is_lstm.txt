@@ -78,6 +78,128 @@ That is the same structural idea as a residual connection: an additive path with
 
 It reduces the problem rather than eliminating it. Very long dependencies remain hard, and exploding gradients still occur, which is why gradient clipping is standard when training recurrent models.
 
+## The whole cell, one timestep at a time
+
+An LSTM cell is four small networks and one running memory. All four are computed here on a real sequence, with the cell state printed at every step so you can see what it carries.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
+H, X = 4, 3          # hidden size, input size
+Wf = rng.normal(0, 0.5, (X + H, H)); bf = np.ones(H)      # forget bias at 1
+Wi = rng.normal(0, 0.5, (X + H, H)); bi = np.zeros(H)
+Wc = rng.normal(0, 0.5, (X + H, H)); bc = np.zeros(H)
+Wo = rng.normal(0, 0.5, (X + H, H)); bo = np.zeros(H)
+
+def step(x, h, c):
+    z = np.concatenate([x, h])
+    f = sigmoid(z @ Wf + bf)          # forget:  what to drop from memory
+    i = sigmoid(z @ Wi + bi)          # input:   how much of the new to admit
+    g = np.tanh(z @ Wc + bc)          # candidate: what the new thing IS
+    o = sigmoid(z @ Wo + bo)          # output:  what to reveal this step
+    c_new = f * c + i * g
+    h_new = o * np.tanh(c_new)
+    return h_new, c_new, (f, i, g, o)
+
+print("the cell has TWO states, and the distinction is the whole design:")
+print("   c -- the cell state. long-term memory. edited by addition.")
+print("   h -- the hidden state. what the rest of the network sees.")
+print()
+print("and four gates, each a small layer over [x, h] concatenated:")
+print("   forget    sigmoid -> 0..1, multiplies the old memory")
+print("   input     sigmoid -> 0..1, multiplies the candidate")
+print("   candidate tanh    -> -1..1, the new content itself")
+print("   output    sigmoid -> 0..1, how much memory to expose as h")
+print()
+print("parameters: 4 gates x (%d + %d) x %d weights + %d biases = %d"
+      % (X, H, H, 4 * H, 4 * ((X + H) * H + H)))
+print("   four times a plain RNN of the same size, which is what the")
+print("   gating costs.")
+print()
+
+seq = rng.normal(0, 1.0, (6, X))
+h, c = np.zeros(H), np.zeros(H)
+print("run %d timesteps. watch c accumulate while h moves around:" % len(seq))
+print("%6s %30s %30s" % ("step", "cell state c", "hidden state h"))
+print("%6s %30s %30s" % ("init", np.round(c, 3), np.round(h, 3)))
+for t, x in enumerate(seq):
+    h, c, gates = step(x, h, c)
+    print("%6d %30s %30s" % (t, np.round(c, 3), np.round(h, 3)))
+print()
+
+h, c = np.zeros(H), np.zeros(H)
+print("the gate values at each step, for hidden unit 0:")
+print("%6s %10s %10s %12s %10s %14s %12s"
+      % ("step", "forget", "input", "candidate", "output", "c[0] after", "h[0]"))
+for t, x in enumerate(seq):
+    h, c, (f, i, g, o) = step(x, h, c)
+    print("%6d %10.4f %10.4f %12.4f %10.4f %14.4f %12.4f"
+          % (t, f[0], i[0], g[0], o[0], c[0], h[0]))
+print()
+print("read the update: c = forget * c_old + input * candidate.")
+print("   forget near 1 and input near 0 -> memory passes through untouched")
+print("   forget near 0 and input near 1 -> memory is replaced")
+print("   both near 1                    -> memory accumulates")
+print()
+
+print("WHY THE ADDITION MATTERS. a plain RNN multiplies its state by a")
+print("matrix at every step, so the gradient is a product of %d matrices."
+      % len(seq))
+print("an LSTM's cell state is updated by ADDITION, so the gradient through")
+print("it is a product of forget gates instead:")
+for fval, label in ((0.99, "forget gate ~0.99"), (0.9, "0.90"), (0.5, "0.50")):
+    print("   %-20s over 100 steps: %.4e" % (label, fval ** 100))
+print("   a forget gate the model has learned to keep near 1 gives an almost")
+print("   unobstructed path for the gradient. that is the entire reason an")
+print("   LSTM can learn dependencies a plain RNN cannot.")
+print()
+print("and it is why the forget bias is initialised to 1 rather than 0:")
+print("   bias 0 -> sigmoid(0) = %.4f, so memory halves at every step"
+      % sigmoid(0.0))
+print("   bias 1 -> sigmoid(1) = %.4f, so it leaks far more slowly"
+      % sigmoid(1.0))
+print("   over 20 steps: %.2e survives against %.2e -- a factor of %.0f."
+      % (sigmoid(1.0) ** 20, sigmoid(0.0) ** 20,
+         (sigmoid(1.0) / sigmoid(0.0)) ** 20))
+print("   neither is 'remembering' on its own. the bias just decides where")
+print("   the cell STARTS, before training moves it -- and starting shut is")
+print("   starting with no gradient path to learn from.")
+print()
+
+print("a concrete memory test -- can the cell hold one bit across a gap?")
+def carry_test(gap, forget_bias):
+    bf_local = np.full(H, forget_bias)
+    h2, c2 = np.zeros(H), np.zeros(H)
+    signal = np.zeros(X); signal[0] = 3.0
+    for t in range(gap + 1):
+        x = signal if t == 0 else np.zeros(X)
+        z = np.concatenate([x, h2])
+        f = sigmoid(z @ Wf + bf_local)
+        i = sigmoid(z @ Wi + bi)
+        g = np.tanh(z @ Wc + bc)
+        o = sigmoid(z @ Wo + bo)
+        c2 = f * c2 + i * g
+        h2 = o * np.tanh(c2)
+    return np.abs(c2).max()
+
+print("%12s %18s %18s" % ("gap", "forget bias 0", "forget bias 3"))
+for gap in (1, 5, 20, 60):
+    print("%12d %18.6f %18.6f" % (gap, carry_test(gap, 0.0), carry_test(gap, 3.0)))
+print("   biased shut, the trace is gone within a handful of steps. biased")
+print("   open, the state persists -- and in fact drifts upward, because the")
+print("   input gate is never fully closed either and keeps adding a little")
+print("   at every step. an untrained cell leaks in both directions.")
+print()
+print("   in a trained model both biases are learned per unit, which is how")
+print("   some units end up as long-term registers and others as fast")
+print("   scratch space. nobody assigns those roles; the gradient does.")
+```
+
 ## Experiments to try
 
 1. <strong>Count the cost of gating.</strong> Press <strong>Parameters</strong> and compare with a plain RNN of the same size. An LSTM has four weight matrices instead of one &mdash; three gates plus the candidate &mdash; so it needs roughly <strong>four times</strong> the parameters.

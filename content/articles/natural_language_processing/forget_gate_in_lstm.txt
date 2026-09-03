@@ -78,6 +78,93 @@ Compare a plain RNN, where the per-step factor is the derivative of a tanh times
 
 There is a practical corollary: <strong>the forget gate bias is often initialised to 1</strong> (rather than 0), so the gate starts open and information is preserved by default. The network then learns when to close it. Initialising it at 0 means the gate starts half-closed, memory decays from the first step, and training is measurably slower.
 
+## The gate that decides what to throw away
+
+The forget gate multiplies the old memory by a number between 0 and 1. That single multiplication is what makes an LSTM's gradient survive, and what makes it possible to clear the memory on purpose.
+
+```python-run
+import numpy as np
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
+print("the gate is one sigmoid layer over [input, previous hidden]:")
+print("    f = sigmoid(Wf @ [x, h] + bf)")
+print("    c = f * c_old + (new stuff)")
+print()
+print("sigmoid output, and what each value does to the memory:")
+for z in (-6, -3, -1, 0, 1, 3, 6):
+    f = sigmoid(z)
+    kept = "%.4f" % f
+    print("   pre-activation %+3d -> f = %s -> keeps %5.1f%% of the old memory"
+          % (z, kept, 100 * f))
+print("   it never reaches exactly 0 or 1, which matters: a hard 0 would")
+print("   also zero the gradient, and a hard 1 would let the state grow")
+print("   without bound.")
+print()
+
+print("ONE ELEMENT of memory, over 30 steps, at four fixed gate values:")
+print("%8s %12s %12s %12s %12s" % ("step", "f=0.99", "f=0.90", "f=0.70", "f=0.50"))
+states = {f: 1.0 for f in (0.99, 0.90, 0.70, 0.50)}
+for t in range(1, 31):
+    for f in states:
+        states[f] *= f
+    if t in (1, 3, 5, 10, 20, 30):
+        print("%8d %12.6f %12.6f %12.6f %12.6f"
+              % (t, states[0.99], states[0.90], states[0.70], states[0.50]))
+print()
+print("a memory's half-life is set entirely by its forget gate:")
+for f in (0.99, 0.95, 0.90, 0.70, 0.50):
+    print("   f = %.2f -> half-life %6.1f steps" % (f, np.log(0.5) / np.log(f)))
+print("   that is the knob. a unit with f near 1 is a register; a unit with")
+print("   f near 0.5 is a short-term buffer. a trained network has both.")
+print()
+
+print("WHY THE GRADIENT SURVIVES. the derivative of c_t with respect to")
+print("c_(t-1) is just f. so across k steps it is the PRODUCT of the gates:")
+print("%10s %16s %16s %16s" % ("steps back", "f=0.99", "f=0.90", "plain RNN"))
+for k in (10, 50, 100, 500):
+    rnn = 0.7 ** k          # a typical RNN Jacobian norm below 1
+    print("%10d %16.3e %16.3e %16.3e" % (k, 0.99 ** k, 0.90 ** k, rnn))
+print("   at 100 steps a gate of 0.99 still passes 37 percent of the")
+print("   gradient. an RNN has passed 3e-16, which is nothing.")
+print()
+print("   and note there is no weight matrix in that product. a plain RNN")
+print("   multiplies by W at every step, so the gradient is shaped by")
+print("   eigenvalues the model does not directly control. here it is")
+print("   multiplied by a number the model chooses, per unit, per timestep.")
+print()
+
+print("CLEARING ON PURPOSE. the useful half of the gate is that it can go")
+print("low deliberately. a sentence boundary is the classic example:")
+tokens = ["the", "cat", "sat", ".", "a", "dog", "ran"]
+c = 1.0
+print("%8s %10s %14s %s" % ("token", "f", "memory after", ""))
+for tok in tokens:
+    f = 0.05 if tok == "." else 0.95      # a learned gate would do this itself
+    c = f * c + (0.3 if tok != "." else 0.0)
+    print("%8s %10.2f %14.4f %s"
+          % (tok, f, c, "<- flushed" if tok == "." else ""))
+print("   nothing programmed that rule. a trained gate learns to drop when")
+print("   the context it was holding stops being relevant, and to hold when")
+print("   it does not.")
+print()
+
+print("the bias is initialised to 1 for a specific reason:")
+for b in (0.0, 1.0, 2.0):
+    print("   bf = %.1f -> gate starts at %.4f, and %.1f%% of the memory"
+          % (b, sigmoid(b), 100 * sigmoid(b) ** 10))
+    print("            survives 10 steps before any training happens")
+print("   starting the gate shut means starting with no gradient path")
+print("   through time, so the model cannot learn that long dependencies")
+print("   exist. starting it open gives training something to work with.")
+print()
+print("a GRU merges this gate with the input gate into one: whatever it")
+print("forgets, it replaces by exactly that much. that is one fewer thing")
+print("to learn and one fewer degree of freedom, and in practice the two")
+print("architectures perform very similarly.")
+```
+
 ## Try it yourself
 
 1. <strong>Run the simulation.</strong> Follow the highlighted route: the merged input climbs into the glowing $f_t$ box, and the gate's answer travels straight up to the $\times$ operator sitting on the cell-state conveyor.

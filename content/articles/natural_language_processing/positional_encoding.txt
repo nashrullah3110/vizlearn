@@ -65,6 +65,125 @@ That gives three practical advantages, which is why essentially every current la
 
 <strong>ALiBi</strong> is the other approach worth knowing: it adds a penalty to attention scores proportional to distance, so tokens attend less to things far away. Simple, parameter-free, and it extrapolates well &mdash; at the cost of building in a bias towards locality.
 
+## Giving attention a sense of order
+
+Attention is permutation-invariant -- this proves it, then builds the sinusoidal encoding that fixes it and checks the property that makes it work.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def softmax(z):
+    e = np.exp(z - z.max(axis=-1, keepdims=True))
+    return e / e.sum(axis=-1, keepdims=True)
+
+def attend(E, Wq, Wk, Wv):
+    Q, K, V = E @ Wq, E @ Wk, E @ Wv
+    A = softmax(Q @ K.T / np.sqrt(Q.shape[1]))
+    return A, A @ V
+
+T, D = 5, 8
+E = rng.normal(0, 1.0, (T, D))
+Wq, Wk, Wv = (rng.normal(0, 0.5, (D, D)) for _ in range(3))
+
+print("FIRST, THE PROBLEM. attention has no idea what order the tokens are in.")
+A1, out1 = attend(E, Wq, Wk, Wv)
+perm = np.array([3, 0, 4, 1, 2])
+A2, out2 = attend(E[perm], Wq, Wk, Wv)
+print("   token 3's output in the original order  :", np.round(out1[3][:4], 5))
+print("   the same token after shuffling the input:", np.round(out2[0][:4], 5))
+print("   identical:", np.allclose(out1[perm], out2))
+print()
+print("   shuffle the sentence and every token gets exactly the same answer,")
+print("   just moved. 'dog bites man' and 'man bites dog' are the same input")
+print("   to a transformer. that is not a bug to fix in the attention -- it")
+print("   is a property of a weighted sum, and the fix has to come from the")
+print("   embeddings.")
+print()
+
+D_MODEL, MAXLEN = 64, 128
+pos = np.arange(MAXLEN)[:, None]
+i = np.arange(D_MODEL // 2)[None, :]
+denom = 10000 ** (2 * i / D_MODEL)
+PE = np.zeros((MAXLEN, D_MODEL))
+PE[:, 0::2] = np.sin(pos / denom)
+PE[:, 1::2] = np.cos(pos / denom)
+
+print("THE SINUSOIDAL ENCODING. each dimension is a wave, and the")
+print("wavelengths grow geometrically across the dimensions:")
+print("%10s %16s %20s" % ("dim pair", "wavelength", "what it distinguishes"))
+for k in (0, 8, 20, 31):
+    wl = 2 * np.pi * 10000 ** (2 * k / D_MODEL)
+    print("%10d %16.1f %20s"
+          % (k, wl, "adjacent tokens" if wl < 20 else
+             ("nearby phrases" if wl < 500 else "whole document")))
+print("   fast dimensions separate neighbours; slow ones separate distant")
+print("   regions. together they give every position a unique fingerprint.")
+print()
+
+print("the first few positions, first 6 dimensions:")
+print("%8s %s" % ("pos", "".join("%9d" % d for d in range(6))))
+for p in (0, 1, 2, 3, 10, 50):
+    print("%8d %s" % (p, "".join("%9.4f" % v for v in PE[p][:6])))
+print()
+
+norms = np.linalg.norm(PE, axis=1)
+print("every position has the same magnitude: %.4f to %.4f"
+      % (norms.min(), norms.max()))
+print("   so adding it to a token embedding shifts the token without")
+print("   changing how loud it is.")
+print()
+
+print("similarity between position 0 and the rest -- it falls away with")
+print("distance, though not perfectly smoothly:")
+unit = PE / np.linalg.norm(PE, axis=1, keepdims=True)
+for p in (0, 1, 2, 5, 10, 25, 50, 100):
+    print("   pos 0 vs pos %3d: %+.4f  %s"
+          % (p, unit[0] @ unit[p], "#" * max(0, int(30 * unit[0] @ unit[p]))))
+print("   the trend is downward, with ripples -- those come from the faster")
+print("   dimensions cycling back into phase. a model can still read")
+print("   'nearby' off this, which is what matters.")
+print()
+
+print("THE PROPERTY IT WAS DESIGNED FOR: a fixed offset is a fixed linear")
+print("map. PE(pos + k) can be computed from PE(pos) by one rotation that")
+print("depends only on k, not on pos:")
+for k in (1, 5, 20):
+    sims = [unit[p] @ unit[p + k] for p in range(0, 80)]
+    print("   offset k=%2d: similarity between pos and pos+k is %.4f +/- %.6f"
+          % (k, np.mean(sims), np.std(sims)))
+print("   the standard deviation is essentially zero -- the relationship")
+print("   between two positions depends only on the GAP between them. that")
+print("   is what lets a model generalise to sentence lengths it never saw.")
+print()
+
+print("and it does solve the original problem:")
+Emb = rng.normal(0, 1.0, (T, D_MODEL))
+Wq2, Wk2, Wv2 = (rng.normal(0, 0.5, (D_MODEL, D_MODEL)) for _ in range(3))
+with_pos = Emb + PE[:T]
+A3, out3 = attend(with_pos, Wq2, Wk2, Wv2)
+A4, out4 = attend((Emb + PE[:T])[perm], Wq2, Wk2, Wv2)
+print("   with positional encoding, shuffling now changes the answer:")
+print("      max difference: %.4f" % np.abs(out3[perm] - out4).max())
+print("   (the shuffled version keeps each token's ORIGINAL position vector,")
+print("    which is why it differs -- position is now part of the input.)")
+print()
+
+print("the alternatives, briefly:")
+print("   learned absolute -- a lookup table of position vectors. simple,")
+print("      and cannot extrapolate past the longest length you trained on.")
+print("   RoPE -- rotate Q and K by an angle proportional to position, so")
+print("      the dot product depends on the gap directly. what most current")
+print("      open models use.")
+print("   ALiBi -- add a distance penalty straight to the attention scores.")
+print("      no vectors at all, and extrapolates well.")
+print()
+print("all three are answers to the same question: a weighted sum does not")
+print("know what order its inputs were in, so the order has to be encoded")
+print("into the values being summed.")
+```
+
 ## Experiments to try
 
 1. <strong>Break word order.</strong> Set the <strong>Scheme</strong> to None and tick <strong>Swap Two Words</strong>. Input Difference reads 0.000 and the two sentences are literally identical to the model. Switch the <strong>Scheme</strong> back to Sinusoidal and the difference becomes non-zero &mdash; the encoding is what makes them different inputs.

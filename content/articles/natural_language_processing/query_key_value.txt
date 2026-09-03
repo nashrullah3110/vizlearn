@@ -68,6 +68,101 @@ Row i of the 4&times;4 matrix holds token i's attention weights over all four to
 
 The `√dₖ` division is not cosmetic. Dot products of d-dimensional vectors grow with d, so without scaling the scores reach the tens or hundreds, the softmax becomes nearly one-hot, and the gradient through it approaches zero. Dividing by `√dₖ` keeps the variance of the scores near 1 regardless of dimension.
 
+## Why three projections and not one
+
+Q, K and V are three different linear maps of the same input. Collapsing any two of them breaks something specific, and this shows exactly what.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+words = ["i", "poured", "milk", "into", "the", "cup"]
+T, D = len(words), 6
+E = rng.normal(0, 1.0, (T, D))
+
+def softmax(z):
+    e = np.exp(z - z.max(axis=-1, keepdims=True))
+    return e / e.sum(axis=-1, keepdims=True)
+
+def attend(Q, K, V):
+    A = softmax(Q @ K.T / np.sqrt(Q.shape[1]))
+    return A, A @ V
+
+print("the analogy, stated once and then dropped:")
+print("   QUERY  -- what this token is looking for")
+print("   KEY    -- what each token offers, for matching purposes")
+print("   VALUE  -- what each token actually contributes if attended to")
+print()
+print("keys and values are separated because 'what makes you findable' and")
+print("'what you are worth once found' are different things. a library")
+print("catalogue card is the key; the book is the value.")
+print()
+
+Wq = rng.normal(0, 0.5, (D, D))
+Wk = rng.normal(0, 0.5, (D, D))
+Wv = rng.normal(0, 0.5, (D, D))
+A_full, out_full = attend(E @ Wq, E @ Wk, E @ Wv)
+print("full attention -- three separate projections:")
+print("%10s %s" % ("", "".join("%9s" % w for w in words)))
+for i, w in enumerate(words):
+    print("%10s %s" % (w, "".join("%9.4f" % a for a in A_full[i])))
+print()
+
+print("NOW TIE Q AND K TOGETHER (use the same matrix for both):")
+A_tied, _ = attend(E @ Wk, E @ Wk, E @ Wv)
+print("   the score matrix becomes symmetric:")
+print("      max |score[i][j] - score[j][i]| with separate Q,K: %.4f"
+      % np.abs((E @ Wq) @ (E @ Wk).T - ((E @ Wq) @ (E @ Wk).T).T).max())
+print("      with Q and K tied:                                %.4f"
+      % np.abs((E @ Wk) @ (E @ Wk).T - ((E @ Wk) @ (E @ Wk).T).T).max())
+print("   so 'milk attends to poured' and 'poured attends to milk' are now")
+print("   forced to be equally strong. in the full version they are not:")
+i, j = words.index("milk"), words.index("poured")
+print("      milk -> poured : %.4f      poured -> milk : %.4f"
+      % (A_full[i][j], A_full[j][i]))
+print("   language is full of asymmetric relations -- an adjective modifies")
+print("   a noun far more than the reverse -- and a symmetric score matrix")
+print("   cannot express one.")
+print()
+
+print("NOW TIE K AND V TOGETHER:")
+A_kv, out_kv = attend(E @ Wq, E @ Wk, E @ Wk)
+print("   attention weights are unchanged (%.2e difference) because only V"
+      % np.abs(A_kv - A_full).max())
+print("   moved -- but the OUTPUT is now forced into the same space that")
+print("   matching happens in:")
+print("      output[2] with separate V: %s" % np.round(out_full[2][:4], 4))
+print("      output[2] with V = K     : %s" % np.round(out_kv[2][:4], 4))
+print("   a token now has to be findable and useful in the same encoding.")
+print("   there is only one set of weights to satisfy both jobs.")
+print()
+
+print("and the dimensions do not all have to match. d_k and d_v are")
+print("independent, which is what makes multi-head attention affordable:")
+for dk, dv in ((6, 6), (2, 6), (6, 2)):
+    Wq2 = rng.normal(0, 0.5, (D, dk))
+    Wk2 = rng.normal(0, 0.5, (D, dk))
+    Wv2 = rng.normal(0, 0.5, (D, dv))
+    A2, o2 = attend(E @ Wq2, E @ Wk2, E @ Wv2)
+    print("   d_k=%d, d_v=%d -> scores %s, output %s"
+          % (dk, dv, A2.shape, o2.shape))
+print("   the score matrix is always T x T whatever d_k is. only the cost of")
+print("   COMPUTING it changes, which is why heads use a small d_k each.")
+print()
+
+print("cross-attention is the same three lines with Q from one sequence and")
+print("K, V from another -- which is how a decoder reads an encoder:")
+S = 4
+enc = rng.normal(0, 1.0, (S, D))
+A_cross, out_cross = attend(E @ Wq, enc @ Wk, enc @ Wv)
+print("   %d decoder queries against %d encoder positions -> weights %s"
+      % (T, S, A_cross.shape))
+print("   each decoder token distributes 1.0 of attention over the encoder:")
+print("      row sums:", np.round(A_cross.sum(1), 6))
+print("   self-attention is just the case where those two sequences are")
+print("   the same one.")
+```
+
 ## Things to try
 
 1. <strong>Follow one lookup end to end.</strong> Set the <strong>Stage</strong> slider to 1 and step it up to 4. You see the raw dot products appear, get divided by the square root of the head dimension, become weights through softmax, and finally blend the value vectors into one output.

@@ -78,6 +78,96 @@ The third row is what a GRU cannot do. Its update gate uses `z` and `1 − z`, s
 
 The `1 → 1` case matters in practice: it is how a cell accumulates evidence over several steps, such as building up a sentiment reading across a sentence rather than replacing it word by word.
 
+## The gate that decides what is worth storing
+
+The input gate is what lets a cell see something and choose to ignore it. Without it every token would be written to memory, which is the defect it exists to fix.
+
+```python-run
+import numpy as np
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
+print("    i = sigmoid(Wi @ [x, h] + bi)")
+print("    c = f * c_old + i * g")
+print()
+print("the input gate multiplies the CANDIDATE, not the input. so the cell")
+print("computes what it would store first, and then decides whether to:")
+print("%12s %12s %16s %s" % ("candidate g", "gate i", "reaches memory", ""))
+for g, i in ((0.9, 0.95), (0.9, 0.50), (0.9, 0.02), (-0.8, 0.90), (0.1, 0.99)):
+    print("%12.2f %12.2f %16.4f %s"
+          % (g, i, g * i, "<- computed, then discarded" if i < 0.1 else ""))
+print()
+
+print("WHY IT MATTERS. compare a cell with a working input gate against one")
+print("whose gate is stuck open, on a sequence where most tokens are noise:")
+rng = np.random.default_rng(0)
+T = 40
+signal_steps = {5, 22}
+c_gated, c_open = 0.0, 0.0
+print("%6s %10s %12s %14s %14s"
+      % ("step", "token", "candidate", "gated cell", "always-on cell"))
+for t in range(T):
+    important = t in signal_steps
+    g = 1.0 if important else rng.normal(0, 0.4)       # noise between signals
+    i_gated = 0.95 if important else 0.03              # what a trained gate does
+    c_gated = 0.98 * c_gated + i_gated * g
+    c_open = 0.98 * c_open + 1.0 * g                   # gate stuck at 1
+    if t in (0, 5, 12, 22, 30, 39):
+        print("%6d %10s %12.4f %14.4f %14.4f"
+              % (t, "SIGNAL" if important else "noise", g, c_gated, c_open))
+print()
+print("both cells saw exactly the same tokens. the gated one holds a clean")
+print("trace of the two signals; the always-on one has integrated 38 pieces")
+print("of noise on top of them.")
+print("   final gated cell     : %.4f" % c_gated)
+print("   final always-on cell : %.4f" % c_open)
+print()
+print("that is the whole function: a cell that cannot decline an input is a")
+print("cell whose memory is the sum of everything it has ever seen.")
+print()
+
+print("THE PARTNERSHIP WITH THE FORGET GATE. the two together give four")
+print("behaviours, and a trained unit uses all of them:")
+print("%10s %10s %28s" % ("forget", "input", "what the step does"))
+for f, i, what in ((0.99, 0.01, "hold -- ignore this token"),
+                   (0.99, 0.95, "accumulate -- add to memory"),
+                   (0.05, 0.95, "replace -- overwrite memory"),
+                   (0.05, 0.01, "clear -- flush and store nothing")):
+    print("%10.2f %10.2f %28s" % (f, i, what))
+print()
+c = 1.0
+print("   running those four in sequence from c = 1.0:")
+for f, i, label in ((0.99, 0.01, "hold"), (0.99, 0.95, "accumulate"),
+                    (0.05, 0.95, "replace"), (0.05, 0.01, "clear")):
+    c = f * c + i * 0.8
+    print("      %-12s -> c = %.4f" % (label, c))
+print()
+print("   an LSTM is those four operations, chosen per unit and per step by")
+print("   two sigmoids. nothing more exotic than that.")
+print()
+
+print("A GRU TIES THEM TOGETHER. it uses one gate z and sets")
+print("    c = (1 - z) * c_old + z * g")
+print("so whatever it forgets, it replaces by exactly that much:")
+print("%10s %14s %14s %s" % ("z", "keeps", "writes", "possible in an LSTM?"))
+for z in (0.1, 0.5, 0.9):
+    print("%10.1f %14.2f %14.2f %s" % (z, 1 - z, z, "yes"))
+print("%10s %14s %14s %s" % ("--", "0.99", "0.95", "yes -- accumulate"))
+print("%10s %14s %14s %s" % ("--", "0.05", "0.01", "yes -- clear"))
+print("   the GRU cannot do those last two: it cannot accumulate without")
+print("   also forgetting, or clear without also writing. that is one fewer")
+print("   parameter set to train and one fewer thing it can express, and in")
+print("   practice the two architectures score very close to each other.")
+print()
+
+print("the bias here is initialised at 0, not 1 like the forget gate:")
+print("   bi = 0 -> gate starts at %.4f, so the cell begins half-open to"
+      % sigmoid(0.0))
+print("   new information and learns from there. starting it near 1 would")
+print("   flood the memory before the model has learned what matters.")
+```
+
 ## Things to try
 
 1. <strong>Run the simulation.</strong> The highlighted route shows $i_t$ leaving the glowing gate, meeting the candidate at the $\times$ operator, and only then rising to the $+$ on the conveyor belt.

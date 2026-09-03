@@ -77,6 +77,132 @@ The `view` and `transpose` pair is the whole trick: project once at full width, 
 
 `F.scaled_dot_product_attention` does all of this with a FlashAttention kernel underneath, and should be preferred in real code.
 
+## Eight small attentions instead of one big one
+
+Splitting the model width across heads costs nothing in parameters and buys the ability to attend to several things at once. Here is the split, the concatenation, and a measurement of what the heads actually do differently.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+words = ["the", "tired", "cat", "quickly", "chased", "the", "small", "mouse"]
+T, D_MODEL, H = len(words), 32, 4
+D_HEAD = D_MODEL // H
+E = rng.normal(0, 1.0, (T, D_MODEL))
+
+def softmax(z):
+    e = np.exp(z - z.max(axis=-1, keepdims=True))
+    return e / e.sum(axis=-1, keepdims=True)
+
+print("%d tokens, d_model=%d, %d heads -> d_head = %d/%d = %d."
+      % (T, D_MODEL, H, D_MODEL, H, D_HEAD))
+print()
+print("the parameter count is the point. one head at full width against")
+print("%d heads at %d each:" % (H, D_HEAD))
+one = 3 * D_MODEL * D_MODEL
+per_head = 3 * D_MODEL * D_HEAD
+proj = D_MODEL * D_MODEL
+print("   single head, Q/K/V : 3 x %d x %d           = %6d"
+      % (D_MODEL, D_MODEL, one))
+print("   %d heads,    Q/K/V : %d x 3 x %d x %d       = %6d   <- the same"
+      % (H, H, D_MODEL, D_HEAD, H * per_head))
+print("   output projection  : %d x %d               = %6d"
+      % (D_MODEL, D_MODEL, proj))
+print("   %-18s %22s %6d" % ("total, multi-head", "", H * per_head + proj))
+print()
+print("   the Q/K/V projections cost EXACTLY the same either way -- %d heads"
+      % H)
+print("   of width %d is the same %d numbers as one head of width %d."
+      % (D_HEAD, one, D_MODEL))
+print("   multi-head adds only the output projection, and that is the")
+print("   entire price of being able to attend to several things at once.")
+print()
+
+Wq = rng.normal(0, 0.4, (H, D_MODEL, D_HEAD))
+Wk = rng.normal(0, 0.4, (H, D_MODEL, D_HEAD))
+Wv = rng.normal(0, 0.4, (H, D_MODEL, D_HEAD))
+Wo = rng.normal(0, 0.4, (D_MODEL, D_MODEL))
+
+heads, weights = [], []
+for h in range(H):
+    Q, K, V = E @ Wq[h], E @ Wk[h], E @ Wv[h]
+    A = softmax(Q @ K.T / np.sqrt(D_HEAD))
+    weights.append(A)
+    heads.append(A @ V)
+
+print("each head runs the same three lines on its own %d-dimensional slice:"
+      % D_HEAD)
+for h in range(H):
+    print("   head %d: Q,K,V are %s -> attention %s -> output %s"
+          % (h, (T, D_HEAD), weights[h].shape, heads[h].shape))
+print()
+
+cat = np.concatenate(heads, axis=1)
+out = cat @ Wo
+print("concatenate along the feature axis, then one linear projection:")
+print("   %d heads x %d dims = %s, projected back to %s"
+      % (H, D_HEAD, cat.shape, out.shape))
+print("   the output projection is what lets the heads talk to each other.")
+print("   without it they would be %d independent streams that never mix." % H)
+print()
+
+print("WHAT THE HEADS ACTUALLY DO. each row is 'chased', showing where that")
+print("token looked according to each head:")
+i = words.index("chased")
+print("%8s %s" % ("", "".join("%9s" % w for w in words)))
+for h in range(H):
+    print("%8s %s" % ("head %d" % h, "".join("%9.4f" % a for a in weights[h][i])))
+print("%8s %s" % ("mean", "".join("%9.4f" % a
+                                  for a in np.mean([w[i] for w in weights], 0))))
+print()
+print("the heads disagree, and that disagreement is the whole reason to have")
+print("more than one. measure it -- how similar is each pair of heads?")
+print("%8s %s" % ("", "".join("%9s" % ("head %d" % h) for h in range(H))))
+for a in range(H):
+    row = []
+    for b in range(H):
+        fa, fb = weights[a].ravel(), weights[b].ravel()
+        row.append(fa @ fb / (np.linalg.norm(fa) * np.linalg.norm(fb)))
+    print("%8s %s" % ("head %d" % a, "".join("%9.4f" % r for r in row)))
+off = [weights[a].ravel() @ weights[b].ravel()
+       / (np.linalg.norm(weights[a].ravel()) * np.linalg.norm(weights[b].ravel()))
+       for a in range(H) for b in range(H) if a != b]
+print("   average similarity between different heads: %.4f" % np.mean(off))
+print()
+print("   these are random projections, so the differences here are luck.")
+print("   in a trained model they specialise -- published analyses find")
+print("   heads that track syntactic dependencies, heads that attend to the")
+print("   previous token, heads that follow coreference, and a large number")
+print("   that do nothing identifiable at all.")
+print()
+
+print("that last group is real and worth knowing about:")
+entropies = []
+for h in range(H):
+    p = np.clip(weights[h], 1e-12, 1)
+    entropies.append(-(p * np.log(p)).sum(1).mean())
+uniform = np.log(T)
+for h in range(H):
+    print("   head %d: average attention entropy %.4f (uniform would be %.4f)"
+          % (h, entropies[h], uniform))
+print("   a head whose entropy sits at the uniform value is spreading its")
+print("   attention evenly, which is another way of saying it is doing")
+print("   nothing. pruning experiments routinely remove 20 to 40 percent of")
+print("   heads from a trained transformer with almost no loss in accuracy.")
+print()
+print("the shapes, once, because the reshaping is where implementations go")
+print("wrong:")
+print("   x            (batch, seq, d_model)")
+print("   after qkv    (batch, seq, 3 * d_model)")
+print("   reshape      (batch, seq, heads, d_head)")
+print("   transpose    (batch, heads, seq, d_head)   <- heads become a batch")
+print("   attention    (batch, heads, seq, seq)")
+print("   transpose    (batch, seq, heads, d_head)")
+print("   reshape      (batch, seq, d_model)         <- the concatenation")
+print("   the transposes matter: reshaping without them interleaves the")
+print("   heads' dimensions instead of stacking them, and the bug is silent.")
+```
+
 ## Try it yourself
 
 1. <strong>Collapse to one head.</strong> Set the <strong>Number of Heads</strong> slider to 1 and pick "drank" as the <strong>Focus Word</strong>. A single distribution has to cover subject, object and everything else at once, and Coverage drops.

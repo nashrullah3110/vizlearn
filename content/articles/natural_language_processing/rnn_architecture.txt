@@ -66,6 +66,111 @@ Two other structural choices:
 
 <strong>Where the output head goes.</strong> On the final layer, always &mdash; but note that in a stacked bidirectional model, extracting the right final states requires care, since each direction's final state corresponds to a different end of the sequence.
 
+## One weight matrix, applied over and over
+
+An RNN is a loop with shared weights. Unrolling it shows why that sharing is the whole idea and also the whole problem.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+H, X, T = 4, 3, 6
+Wx = rng.normal(0, 0.5, (X, H))
+Wh = rng.normal(0, 0.5, (H, H))
+b = np.zeros(H)
+seq = rng.normal(0, 1.0, (T, X))
+
+print("the entire architecture is one line, run in a loop:")
+print("    h = tanh(x @ Wx + h @ Wh + b)")
+print()
+print("parameters: Wx %s + Wh %s + b %s = %d numbers, and they do NOT"
+      % ((X, H), (H, H), (H,), Wx.size + Wh.size + b.size))
+print("grow with sequence length. a 5-token sequence and a 5000-token one")
+print("use exactly the same weights.")
+print()
+
+h = np.zeros(H)
+print("%6s %28s %28s" % ("step", "input x", "hidden h"))
+for t, x in enumerate(seq):
+    h = np.tanh(x @ Wx + h @ Wh + b)
+    print("%6d %28s %28s" % (t, np.round(x, 3), np.round(h, 4)))
+print()
+print("h is the only thing carried forward. everything the network knows")
+print("about the first %d tokens has to fit in those %d numbers." % (T - 1, H))
+print()
+
+print("THE SHARING IS THE POINT. compare against a feed-forward network")
+print("that takes the whole sequence at once:")
+for t in (10, 100, 1000):
+    rnn = X * H + H * H + H
+    ff = (t * X) * H + H
+    print("   %5d tokens: RNN %6d parameters, feed-forward %8d"
+          % (t, rnn, ff))
+print("   and the feed-forward version can only ever accept exactly the")
+print("   length it was built for. the RNN accepts any length, and what it")
+print("   learned about position 3 applies at position 300.")
+print()
+
+print("UNROLLED, it is a very deep network with tied weights:")
+print("   x0 -> [tanh] -> h0")
+print("   x1 -> [tanh] -> h1     each box is the SAME Wh")
+print("   x2 -> [tanh] -> h2")
+print("   ...")
+print("   a %d-token sequence is a %d-layer network. that is where the" % (T, T))
+print("   trouble starts.")
+print()
+
+print("THE PROBLEM. the gradient from a late step back to step 0 passes")
+print("through Wh once per step, so it is governed by that matrix's")
+print("eigenvalues:")
+print("   %-14s %18s %22s" % ("weight sd", "spectral radius", "after 50 steps"))
+for scale in (0.15, 0.3, 0.5, 0.8):
+    W = rng.normal(0, scale, (H, H))
+    rho = np.abs(np.linalg.eigvals(W)).max()
+    val = rho ** 50
+    print("   %-14.2f %18.4f %22s"
+          % (scale, rho, "%.3e" % val if val < 1e100 else "overflow"))
+print("   below 1 it vanishes, above 1 it explodes, and only exactly 1")
+print("   survives. tanh's derivative is at most 1 and usually less, which")
+print("   pushes the product further down.")
+print()
+LONG = 40
+long_seq = rng.normal(0, 1.0, (LONG, X))
+h = np.zeros(H)
+J = np.eye(H)
+grads = []
+for t, x in enumerate(long_seq):
+    h = np.tanh(x @ Wx + h @ Wh + b)
+    J = J @ (Wh * (1 - h ** 2))          # accumulate the Jacobian
+    grads.append(np.abs(J).max())
+print("   measured on a %d-step sequence with these actual weights --" % LONG)
+print("   how much gradient still reaches step 0 from step t:")
+for t in (0, 2, 5, 10, 20, 30, 39):
+    g = grads[t]
+    print("      from step %2d: %.3e  %s"
+          % (t, g, "#" * max(0, int(30 * min(g, 1.0)))))
+print("   by step %d it is %.1e of what it started as. no amount of"
+      % (LONG - 1, grads[-1] / grads[0]))
+print("   training fixes that -- it is a property of repeated multiplication.")
+print()
+
+print("WHAT AN RNN IS STILL GOOD FOR. it processes one token at a time in")
+print("O(1) memory per step, where attention needs the whole sequence:")
+for t in (128, 1024, 8192):
+    print("   %5d tokens: RNN state %4d numbers, attention matrix %12s"
+          % (t, H, "{:,}".format(t * t)))
+print("   that is why RNN-shaped models keep being revisited for very long")
+print("   sequences and for streaming, where you cannot hold the whole")
+print("   input at once. state-space models are the current form of that")
+print("   argument.")
+print()
+print("but for anything that fits in a context window, attention won on two")
+print("counts: it has a direct path between any two positions rather than a")
+print("chain of %d multiplications, and it is parallel across the sequence"
+      % T)
+print("where this loop is inherently sequential.")
+```
+
 ## Things to try
 
 1. <strong>See where the parameters live.</strong> Press <strong>Parameters</strong> and read the breakdown. The recurrent matrix is the largest block, because it is h &times; h while the input matrix is only d &times; h.

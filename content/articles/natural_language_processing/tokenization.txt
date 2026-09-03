@@ -118,6 +118,147 @@ model(**batch)          # attention_mask is included in batch
 
 Padding to the longest sequence in the batch rather than to a fixed maximum &mdash; dynamic padding &mdash; is meaningfully faster when lengths vary.
 
+## Four tokenisers on the same sentence, including BPE from scratch
+
+Character, word and subword tokenisation each trade vocabulary size against sequence length. Byte-pair encoding is trained here on a small corpus so you can watch the merges being learned.
+
+```python-run
+import re
+from collections import Counter
+
+text = "the unbelievable tokenizer tokenizes unbelievably fast"
+print("input: %r" % text)
+print()
+
+chars = list(text)
+print("1. CHARACTER level")
+print("   tokens: %d, vocabulary: %d" % (len(chars), len(set(chars))))
+print("   first 20: %s" % chars[:20])
+print("   a tiny vocabulary and no unknown words ever -- at the cost of long")
+print("   sequences, and attention cost grows with the SQUARE of that length.")
+print()
+
+words = text.split()
+print("2. WORD level")
+print("   tokens: %d, vocabulary: %d" % (len(words), len(set(words))))
+print("   tokens: %s" % words)
+print("   short sequences, but 'unbelievable' and 'unbelievably' are entirely")
+print("   separate entries that share nothing. and any word not in the")
+print("   vocabulary becomes <UNK>, which throws the information away.")
+print()
+
+print("3. SUBWORD -- the compromise everything modern uses.")
+print("   train byte-pair encoding on a small corpus:")
+corpus = ("low low low low low lower lower newest newest newest newest "
+          "newest newest widest widest widest lowest lowest")
+vocab = Counter(corpus.split())
+splits = {w: list(w) + ["</w>"] for w in vocab}
+
+def pair_counts(splits, vocab):
+    c = Counter()
+    for w, freq in vocab.items():
+        sym = splits[w]
+        for i in range(len(sym) - 1):
+            c[(sym[i], sym[i + 1])] += freq
+    return c
+
+merges = []
+print("%6s %18s %8s %s" % ("step", "merged pair", "count", "example word after"))
+for step in range(10):
+    counts = pair_counts(splits, vocab)
+    if not counts:
+        break
+    best, n = counts.most_common(1)[0]
+    merges.append(best)
+    for w in splits:
+        sym, out, i = splits[w], [], 0
+        while i < len(sym):
+            if i < len(sym) - 1 and (sym[i], sym[i + 1]) == best:
+                out.append(sym[i] + sym[i + 1]); i += 2
+            else:
+                out.append(sym[i]); i += 1
+        splits[w] = out
+    print("%6d %18s %8d %s"
+          % (step + 1, "%s + %s" % best, n, " ".join(splits["newest"])))
+print()
+print("   the final splits:")
+for w in ("low", "lower", "newest", "widest", "lowest"):
+    print("      %-8s -> %s" % (w, " ".join(splits[w])))
+print()
+print("   'est</w>' became a single token because it appeared often. that is")
+print("   the whole algorithm: repeatedly merge the commonest adjacent pair.")
+print("   nothing about suffixes was programmed in -- it fell out of counting.")
+print()
+
+def bpe_encode(word, merges):
+    sym = list(word) + ["</w>"]
+    for a, b in merges:
+        out, i = [], 0
+        while i < len(sym):
+            if i < len(sym) - 1 and sym[i] == a and sym[i + 1] == b:
+                out.append(a + b); i += 2
+            else:
+                out.append(sym[i]); i += 1
+        sym = out
+    return sym
+
+print("   applied to words the tokeniser has never seen:")
+for w in ("lowest", "newer", "wildest", "slowness"):
+    print("      %-10s -> %s" % (w, bpe_encode(w, merges)))
+print("   nothing became <UNK>. an unknown word decomposes into pieces the")
+print("   model does know, which is the property that makes subword")
+print("   tokenisation the default.")
+print()
+
+print("THE TRADE. our toy tokeniser learned only %d merges from a corpus of"
+      % len(merges))
+print("five words, so it can only be measured fairly on text from that")
+print("corpus. a real BPE vocabulary has 32,000 merges learned from")
+print("billions of words.")
+print()
+demo = "lowest newest widest lower low"
+d_chars = list(demo)
+d_words = demo.split()
+d_sub = [t for w in d_words for t in bpe_encode(w, merges)]
+print("   text: %r" % demo)
+print("%-18s %10s %16s %s" % ("scheme", "tokens", "vocab needed", "unknown words"))
+print("%-18s %10d %16d %s" % ("character", len(d_chars), len(set(d_chars)), "never"))
+print("%-18s %10d %16s %s" % ("word", len(d_words), "~50,000+", "common"))
+print("%-18s %10d %16s %s" % ("subword (BPE)", len(d_sub), "~32,000", "never"))
+print("      %s" % d_sub)
+print()
+print("   subword sits between the two, which is the entire point of it.")
+print()
+print("   and here is what happens on text the tokeniser has never seen:")
+away = "the unbelievable tokenizer"
+print("      %r -> %d pieces"
+      % (away, len([t for w in away.split() for t in bpe_encode(w, merges)])))
+print("      it falls back to characters, because none of those merges apply.")
+print("      that is not a failure -- it still produces valid tokens with no")
+print("      <UNK> anywhere. it is just what a 10-merge vocabulary can do.")
+print()
+
+print("things that bite in practice, with a real tokeniser:")
+print("   a leading space is usually part of the token. 'cat' and ' cat' are")
+print("   different tokens, which is why a prompt ending in a space can")
+print("   behave oddly.")
+print()
+print("   numbers fragment. '2024' may be one, two or three tokens depending")
+print("   on the vocabulary, and neighbouring numbers can split differently.")
+print("   that inconsistency is part of why models are poor at arithmetic --")
+print("   the digits are not reliably separate symbols.")
+print()
+print("   token count is not word count. English runs about 1.3 tokens per")
+print("   word; code, non-Latin scripts and unusual names run considerably")
+print("   higher. when you are billed per token that is a direct cost")
+print("   difference, and when you have a context limit it is a direct")
+print("   capacity difference.")
+print()
+print("   the vocabulary is frozen at training time. a tokeniser trained")
+print("   before a word existed will always split it, however common it")
+print("   later becomes.")
+```
+
 ## Questions people ask
 
 <strong>How many tokens is a word?</strong> About 1.3 for English prose, more for code, names and non-Latin scripts. Count with the actual tokeniser rather than estimating.

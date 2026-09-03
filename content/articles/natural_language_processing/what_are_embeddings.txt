@@ -58,6 +58,121 @@ Length in an embedding often reflects word frequency or confidence rather than m
 
 Calibrate the threshold rather than assuming. Many sentence-embedding models score unrelated text at 0.2&ndash;0.4, so a threshold of 0.5 admits a great deal of noise. Score a few hundred pairs you know to be related and a few hundred you know are not, and put the threshold where the two distributions separate.
 
+## From an index to a vector, and what that buys
+
+A one-hot vector says every word is equally unrelated to every other. An embedding does not -- and this trains one from co-occurrence counts so you can watch the relationships appear.
+
+```python-run
+import numpy as np
+from collections import Counter
+
+rng = np.random.default_rng(0)
+
+corpus = (
+    "the cat drinks milk the dog drinks water the cat eats fish "
+    "the dog eats meat the king rules the land the queen rules the land "
+    "the cat sleeps the dog sleeps the king sits the queen sits "
+    "a cat drinks water a dog eats fish the king eats meat the queen drinks milk "
+    "the man rules the land the woman rules the land the man sits the woman sits"
+).split()
+
+vocab = sorted(set(corpus))
+idx = {w: i for i, w in enumerate(vocab)}
+V = len(vocab)
+print("%d tokens, %d distinct words." % (len(corpus), V))
+print()
+
+print("ONE-HOT first, so the problem is concrete:")
+for w in ("cat", "dog", "milk"):
+    v = np.zeros(V, int); v[idx[w]] = 1
+    print("   %-6s -> %s" % (w, v))
+print()
+print("every pair of one-hot vectors has dot product exactly 0:")
+for a, b in (("cat", "dog"), ("cat", "milk"), ("king", "queen")):
+    va, vb = np.zeros(V), np.zeros(V)
+    va[idx[a]] = vb[idx[b]] = 1
+    print("   %-6s . %-6s = %.1f" % (a, b, va @ vb))
+print("   cat and dog are exactly as unrelated as cat and milk. the")
+print("   representation contains no information at all beyond identity.")
+print("   and it is %d numbers per word to say that." % V)
+print()
+
+WINDOW = 2
+C = np.zeros((V, V))
+for i, w in enumerate(corpus):
+    for j in range(max(0, i - WINDOW), min(len(corpus), i + WINDOW + 1)):
+        if i != j:
+            C[idx[w], idx[corpus[j]]] += 1
+print("CO-OCCURRENCE. count what appears within %d words of what:" % WINDOW)
+show = ["cat", "dog", "king", "queen", "milk"]
+print("%8s %s" % ("", "".join("%8s" % w for w in show)))
+for a in show:
+    print("%8s %s" % (a, "".join("%8.0f" % C[idx[a], idx[b]] for b in show)))
+print("   'cat' and 'dog' never appear next to each other -- but they appear")
+print("   next to the SAME words, and that is the signal.")
+print()
+
+logC = np.log1p(C)
+U, S, Vt = np.linalg.svd(logC - logC.mean(0), full_matrices=False)
+DIM = 5
+Emb = U[:, :DIM] * S[:DIM]
+Emb = Emb / (np.linalg.norm(Emb, axis=1, keepdims=True) + 1e-9)
+print("factorise that matrix and keep %d dimensions. that is all an" % DIM)
+print("embedding is -- a compressed co-occurrence table:")
+print("   %d x %d counts -> %d x %d vectors (%.1fx smaller)"
+      % (V, V, V, DIM, V / DIM))
+print()
+
+def sim(a, b):
+    return Emb[idx[a]] @ Emb[idx[b]]
+
+print("now ask which words ended up near which:")
+pairs = [("cat", "dog"), ("king", "queen"), ("man", "woman"),
+         ("cat", "king"), ("milk", "water"), ("cat", "rules")]
+for a, b in pairs:
+    print("   %-6s vs %-6s : %+.4f  %s"
+          % (a, b, sim(a, b), "#" * max(0, int(20 * sim(a, b)))))
+print()
+print("nothing told it that cats and dogs are both animals. it counted")
+print("neighbours, and words with similar neighbours came out close.")
+print("that is the distributional hypothesis doing all the work: a word is")
+print("characterised by the company it keeps.")
+print()
+
+print("nearest neighbours, which is the query embeddings are really for:")
+for w in ("cat", "king", "drinks"):
+    sims = [(sim(w, o), o) for o in vocab if o != w]
+    top = sorted(sims, reverse=True)[:3]
+    print("   %-8s -> %s" % (w, ", ".join("%s (%+.3f)" % (o, s) for s, o in top)))
+print()
+
+print("and the property that made these famous -- arithmetic on meaning:")
+def nearest(vec, exclude):
+    best = None
+    for w in vocab:
+        if w in exclude:
+            continue
+        s = Emb[idx[w]] @ vec / (np.linalg.norm(vec) + 1e-9)
+        if best is None or s > best[0]:
+            best = (s, w)
+    return best
+
+target = Emb[idx["king"]] - Emb[idx["man"]] + Emb[idx["woman"]]
+s, w = nearest(target, {"king", "man", "woman"})
+print("   king - man + woman = %s (%+.4f)" % (w, s))
+print("   on a corpus this small that is as much luck as linguistics --")
+print("   the real result needs billions of words. the mechanism is the")
+print("   point: directions in the space carry meaning, so you can do")
+print("   arithmetic with them.")
+print()
+print("the cost side, briefly:")
+for v, d in ((50_000, 300), (50_000, 768), (200_000, 4096)):
+    print("   vocab %7d x %4d dims = %11s parameters (%5.1f MB at float32)"
+          % (v, d, "{:,}".format(v * d), v * d * 4 / 1024 / 1024))
+print("   in a large language model this table is often the single biggest")
+print("   layer, and it is frequently tied to the output layer to halve it.")
+```
+
 ## Try it yourself
 
 1. <strong>Run the analogy.</strong> Press <strong>Run the Famous Analogy</strong> and follow the vector arithmetic. The result is a point in space, and the answer is whichever word happens to lie nearest to it.
