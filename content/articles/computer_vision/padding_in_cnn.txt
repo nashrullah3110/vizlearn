@@ -83,6 +83,121 @@ The dimension of the output feature map ($O$) can always be calculated using:
 - <strong>P</strong> = Padding amount
 - <strong>S</strong> = Stride (step size, default 1)
 
+## Why every convolution shrinks, and the three ways to stop it
+
+A 3x3 convolution loses a pixel from every edge. That compounds with depth until there is nothing left, and the padding you choose to prevent it changes what the border pixels mean.
+
+```python-run
+import numpy as np
+
+def out_size(n, k, p=0, s=1):
+    return (n + 2 * p - k) // s + 1
+
+print("the output size formula, which is the whole topic:")
+print("    out = floor((in + 2*padding - kernel) / stride) + 1")
+print()
+print("with no padding and stride 1, a 3x3 kernel costs one pixel per side:")
+print("%10s %10s %12s %10s" % ("input", "kernel", "no padding", "lost"))
+for n, k in ((32, 3), (32, 5), (32, 7), (224, 3)):
+    o = out_size(n, k)
+    print("%10d %10d %12d %10d" % (n, k, o, n - o))
+print()
+
+print("AND IT COMPOUNDS. a 32x32 image through repeated 3x3 convolutions:")
+n = 32
+print("%10s %14s" % ("layer", "size"))
+for layer in range(20):
+    if layer in (0, 1, 5, 10, 15):
+        print("%10d %14s" % (layer, "%dx%d" % (n, n)))
+    n = out_size(n, 3)
+    if n <= 0:
+        print("%10d %14s" % (layer + 1, "nothing left"))
+        break
+print("   a network cannot be deeper than the image is wide. VGG-16 has 13")
+print("   convolutions; without padding a 32x32 input would be 6x6 by the")
+print("   end, and a 224x224 one would lose %d pixels of context." % (2 * 13))
+print()
+
+img = np.arange(1, 26, dtype=float).reshape(5, 5)
+print("THE THREE PADDING MODES, on a 5x5 image:")
+print("   original:")
+for r in img:
+    print("      %s" % "".join("%5.0f" % v for v in r))
+print()
+modes = [("zero", lambda a: np.pad(a, 1, mode="constant", constant_values=0)),
+         ("edge (replicate)", lambda a: np.pad(a, 1, mode="edge")),
+         ("reflect", lambda a: np.pad(a, 1, mode="reflect"))]
+for name, fn in modes:
+    p = fn(img)
+    print("   %s padding -> %dx%d:" % (name, p.shape[0], p.shape[1]))
+    for r in p:
+        print("      %s" % "".join("%5.0f" % v for v in r))
+    print()
+
+print("WHAT EACH ONE TELLS THE NETWORK about the border:")
+print("   zero    -- 'beyond the edge everything is black'. that is a lie,")
+print("              and it creates an artificial dark edge the first layer")
+print("              will happily learn to detect.")
+print("   edge    -- 'the border continues'. no invented content, but it")
+print("              flattens the gradient at the boundary.")
+print("   reflect -- 'the image mirrors'. keeps texture statistics, which is")
+print("              why it is preferred for denoising and super-resolution.")
+print()
+
+def convolve(a, k, pad_mode):
+    kh = k.shape[0]
+    p = kh // 2
+    if pad_mode == "valid":
+        padded, oh, ow = a, a.shape[0] - kh + 1, a.shape[1] - kh + 1
+    else:
+        padded = np.pad(a, p, mode=pad_mode)
+        oh, ow = a.shape
+    out = np.zeros((oh, ow))
+    for i in range(oh):
+        for j in range(ow):
+            out[i, j] = (padded[i:i + kh, j:j + kh] * k).sum()
+    return out
+
+flat = np.full((7, 7), 100.0)
+edge_k = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], float)
+print("THE ZERO-PADDING ARTEFACT, measured. run an edge detector over an")
+print("image that is COMPLETELY FLAT -- there are no edges in it at all:")
+for mode in ("constant", "edge", "reflect"):
+    out = convolve(flat, edge_k, mode)
+    border = np.concatenate([out[0], out[-1], out[:, 0], out[:, -1]])
+    print("   %-10s padding: interior response %+8.2f, border response up to %+8.2f"
+          % (mode, np.abs(out[1:-1, 1:-1]).max(), np.abs(border).max()))
+print("   zero padding invents an edge around the entire image. the other")
+print("   two do not. that phantom border is real enough that networks have")
+print("   been shown to use it to infer absolute position.")
+print()
+
+print("'SAME' PADDING is the size you want, and the arithmetic that gets")
+print("you there. for stride 1, p = (k-1)/2:")
+print("%10s %14s %16s" % ("kernel", "padding needed", "output for 32x32"))
+for k in (1, 3, 5, 7, 9):
+    p = (k - 1) // 2
+    print("%10d %14d %16s" % (k, p, "%dx%d" % (out_size(32, k, p), out_size(32, k, p))))
+print("   which is why kernels are almost always ODD. an even kernel cannot")
+print("   be centred, so 'same' padding has to be asymmetric:")
+for k in (2, 4):
+    total = k - 1
+    print("      %dx%d kernel needs %d pixels of padding -- %d on one side and"
+          % (k, k, total, total // 2))
+    print("      %d on the other. no symmetric choice exists."
+          % (total - total // 2))
+print()
+
+print("and the cost, which is small but not zero:")
+for n, k in ((224, 3), (224, 7)):
+    p = (k - 1) // 2
+    real = n * n
+    padded = (n + 2 * p) ** 2
+    print("   %dx%d image, %dx%d kernel: %d padded pixels, %.2f%% of the"
+          % (n, n, k, k, padded - real, 100 * (padded - real) / padded))
+    print("      total are invented")
+```
+
 ## Summing up
 
 - <strong>Valid Padding (P=0):</strong> No padding. The image shrinks. Only pixels where the kernel fits entirely are computed.

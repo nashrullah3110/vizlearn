@@ -113,3 +113,124 @@ silently changes what the architecture can see.
 
 **Reading detection failures as a data problem.** If the model consistently
 misses large objects, check the receptive field before collecting more images.
+
+## How much of the image one output pixel can see
+
+A single neuron deep in a network responds to a patch of the original image. Computing that patch's size layer by layer explains most architectural choices -- kernel sizes, depth, dilation and pooling.
+
+```python-run
+import numpy as np
+
+print("the recurrence, and it is the whole calculation:")
+print("    RF_out = RF_in + (kernel - 1) * jump_in")
+print("    jump_out = jump_in * stride")
+print("where 'jump' is how far apart two adjacent output pixels are, in")
+print("input pixels.")
+print()
+
+def trace(layers, label):
+    rf, jump = 1, 1
+    print("%s" % label)
+    print("%8s %10s %8s %8s %14s %12s"
+          % ("layer", "type", "kernel", "stride", "receptive field", "jump"))
+    print("%8s %10s %8s %8s %14d %12d" % ("input", "-", "-", "-", rf, jump))
+    for i, (kind, k, s) in enumerate(layers, 1):
+        rf = rf + (k - 1) * jump
+        jump = jump * s
+        print("%8d %10s %8d %8d %14d %12d" % (i, kind, k, s, rf, jump))
+    return rf
+
+rf = trace([("conv", 3, 1)] * 8, "EIGHT 3x3 CONVOLUTIONS, stride 1:")
+print("   each layer adds exactly 2. after 8 layers a neuron sees %dx%d."
+      % (rf, rf))
+print("   growth is LINEAR in depth, which is slow -- to see a 224-pixel")
+print("   image you would need %d layers." % ((224 - 1) // 2))
+print()
+
+rf = trace([("conv", 3, 1), ("conv", 3, 1), ("pool", 2, 2),
+            ("conv", 3, 1), ("conv", 3, 1), ("pool", 2, 2),
+            ("conv", 3, 1), ("conv", 3, 1), ("pool", 2, 2)],
+           "THE VGG PATTERN -- two convs then a pool, three times:")
+print("   %dx%d from 9 layers, against %dx%d from 8 layers without pooling."
+      % (rf, rf, 17, 17))
+print("   the stride is what accelerates it: after a stride-2 layer every")
+print("   subsequent kernel step covers TWICE as much input, so growth")
+print("   becomes geometric rather than arithmetic.")
+print()
+
+print("TWO 3x3 CONVOLUTIONS vs ONE 5x5. same receptive field, and this is")
+print("why 3x3 won:")
+for label, layers in (("one 5x5", [("conv", 5, 1)]),
+                      ("two 3x3", [("conv", 3, 1), ("conv", 3, 1)])):
+    rf_, jump_ = 1, 1
+    params = 0
+    for _, k, s in layers:
+        rf_ += (k - 1) * jump_
+        jump_ *= s
+        params += k * k * 64 * 64
+    print("   %-10s receptive field %dx%d, %s parameters (64->64 channels)"
+          % (label, rf_, rf_, "{:,}".format(params)))
+print("   the same field for %.0f percent of the parameters -- and two"
+      % (100 * (2 * 9) / 25))
+print("   non-linearities instead of one, which is the other half of the")
+print("   argument.")
+print()
+for label, layers in (("one 7x7", [("conv", 7, 1)]),
+                      ("three 3x3", [("conv", 3, 1)] * 3)):
+    rf_, jump_, params = 1, 1, 0
+    for _, k, s in layers:
+        rf_ += (k - 1) * jump_
+        jump_ *= s
+        params += k * k * 64 * 64
+    print("   %-10s receptive field %dx%d, %s parameters"
+          % (label, rf_, rf_, "{:,}".format(params)))
+print()
+
+print("DILATION grows the field without adding parameters or losing")
+print("resolution. a dilated kernel has gaps:")
+for d in (1, 2, 4):
+    eff = 3 + (3 - 1) * (d - 1)
+    row = []
+    for i in range(eff):
+        row.append("x" if i % d == 0 else ".")
+    print("   dilation %d: 3 weights spanning %d pixels   %s"
+          % (d, eff, " ".join(row)))
+print()
+rf_, jump_ = 1, 1
+print("   a stack with doubling dilation, all stride 1:")
+print("%8s %10s %16s" % ("layer", "dilation", "receptive field"))
+for i, d in enumerate((1, 2, 4, 8, 16), 1):
+    eff = 3 + (3 - 1) * (d - 1)
+    rf_ += (eff - 1) * jump_
+    print("%8d %10d %16d" % (i, d, rf_))
+print("   %d pixels from 5 layers and %d weights, with no downsampling at"
+      % (rf_, 5 * 9))
+print("   all. that is why dilation is the standard tool for segmentation,")
+print("   where you need context AND per-pixel output resolution.")
+print()
+
+print("THE EFFECTIVE FIELD IS SMALLER THAN THE THEORETICAL ONE. not every")
+print("input pixel contributes equally -- the centre is reached by many")
+print("paths and the corners by one:")
+w = np.array([[1.0]])
+for layer in range(4):
+    k = np.ones((3, 3))
+    new = np.zeros((w.shape[0] + 2, w.shape[1] + 2))
+    for i in range(w.shape[0]):
+        for j in range(w.shape[1]):
+            new[i:i + 3, j:j + 3] += w[i, j] * k
+    w = new
+w = w / w.max()
+print("   contribution weight after 4 layers of 3x3 (theoretical field %dx%d):"
+      % w.shape)
+for r in w:
+    print("      " + "".join("%6.2f" % v for v in r))
+centre = w[w.shape[0] // 2, w.shape[1] // 2]
+corner = w[0, 0]
+print("   the centre pixel has weight %.2f; the corner has %.4f -- a factor"
+      % (centre, corner))
+print("   of %.0f. the field is gaussian-ish, not a flat square, so the" % (centre / corner))
+print("   EFFECTIVE field is roughly the square root of the theoretical one.")
+print("   that is a large part of why very deep networks still benefit from")
+print("   explicit long-range mechanisms rather than depth alone.")
+```

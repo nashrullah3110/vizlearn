@@ -96,3 +96,149 @@ single distribution.
 **Thresholding before denoising.** A salt-and-pepper pixel is by definition at
 an extreme value, so it survives any threshold. A median filter first costs
 almost nothing and removes them entirely.
+
+## Turning grey into black and white, and choosing where
+
+A threshold splits pixels into two classes. Otsu's method picks the split automatically, adaptive thresholding picks a different one per region, and the case where a global threshold fails is easy to construct.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+SHADE = " .:-=+*#%@"
+def show(a, label):
+    print("   %s" % label)
+    lo, hi = a.min(), a.max()
+    for row in a:
+        print("      " + "".join(SHADE[int(np.clip((v - lo) / max(hi - lo, 1e-9), 0, 1) * 9)]
+                                 for v in row))
+
+# a document-like image: dark text on a light page, with uneven lighting
+H, W = 12, 24
+page = np.full((H, W), 200.0)
+text = [(2, 3), (2, 4), (2, 5), (3, 3), (4, 3), (4, 4), (4, 5),
+        (6, 12), (6, 13), (7, 12), (8, 12), (8, 13),
+        (2, 18), (3, 18), (4, 18), (4, 19), (4, 20),
+        (8, 4), (8, 5), (9, 4), (9, 5)]
+for r, c in text:
+    page[r, c] = 40.0
+# a lighting gradient: bright on the left, dim on the right
+page = page * np.linspace(1.0, 0.13, W)[None, :]
+page = np.clip(page + rng.normal(0, 3, page.shape), 0, 255)
+
+show(page, "input: dark marks on a page, lit unevenly from the left")
+print("   note the right-hand side is genuinely darker -- the page there is")
+print("   dimmer than the INK on the left.")
+print("      brightest page pixel on the right : %.0f" % page[:, -6:].max())
+print("      darkest ink pixel on the left     : %.0f"
+      % min(page[r, c] for r, c in text if c < 8))
+print("   no single number can separate ink from page across the whole")
+print("   image, and that is the whole problem.")
+print()
+
+hist, edges = np.histogram(page, bins=16, range=(0, 256))
+print("THE HISTOGRAM, which is what a threshold is chosen from:")
+for i, count in enumerate(hist):
+    if count:
+        print("      %3.0f-%3.0f %5d %s"
+              % (edges[i], edges[i + 1], count, "#" * int(40 * count / hist.max())))
+print()
+
+def otsu(a, bins=64):
+    hist_, edges_ = np.histogram(a, bins=bins, range=(0, 256))
+    total = hist_.sum()
+    centres = (edges_[:-1] + edges_[1:]) / 2
+    best_t, best_var = 0.0, -1.0
+    for i in range(1, bins):
+        w0 = hist_[:i].sum() / total
+        w1 = 1 - w0
+        if w0 == 0 or w1 == 0:
+            continue
+        m0 = (hist_[:i] * centres[:i]).sum() / hist_[:i].sum()
+        m1 = (hist_[i:] * centres[i:]).sum() / hist_[i:].sum()
+        var = w0 * w1 * (m0 - m1) ** 2
+        if var > best_var:
+            best_var, best_t = var, centres[i]
+    return best_t
+
+t_otsu = otsu(page)
+print("OTSU'S METHOD searches every threshold and keeps the one that")
+print("maximises the variance BETWEEN the two groups -- equivalently, the")
+print("one that minimises the variance within them:")
+print("   chosen threshold: %.1f" % t_otsu)
+print()
+
+def apply_global(a, t):
+    return (a < t).astype(float)
+
+def adaptive(a, block=7, offset=8.0):
+    p = np.pad(a, block // 2, mode="edge")
+    out = np.zeros_like(a)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            local = p[i:i + block, j:j + block].mean()
+            out[i, j] = 1.0 if a[i, j] < local - offset else 0.0
+    return out
+
+truth = np.zeros((H, W))
+for r, c in text:
+    truth[r, c] = 1.0
+
+results = [("global, threshold 100", apply_global(page, 100.0)),
+           ("global, Otsu %.0f" % t_otsu, apply_global(page, t_otsu)),
+           ("adaptive, 7x7 local mean", adaptive(page))]
+for name, out in results:
+    show(out, name)
+    tp = int((out * truth).sum())
+    fp = int((out * (1 - truth)).sum())
+    fn = int(((1 - out) * truth).sum())
+    print("      found %d of %d marks, with %d false positives"
+          % (tp, int(truth.sum()), fp))
+    print()
+
+print("READ THE GLOBAL RESULTS. whatever single number you pick:")
+print("%16s %10s %10s %10s" % ("threshold", "found", "missed", "false pos"))
+for t in (15, 22, 30, 60, 100, t_otsu):
+    out = apply_global(page, t)
+    print("%16.0f %10d %10d %10d"
+          % (t, int((out * truth).sum()), int(((1 - out) * truth).sum()),
+             int((out * (1 - truth)).sum())))
+print("   read it as a trade with no good corner. a low threshold keeps the")
+print("   page clean and MISSES ink; raising it recovers the ink and starts")
+print("   calling the dim page ink too. the two classes overlap once the")
+print("   lighting is folded in:")
+ink_vals = [page[r, c] for r, c in text]
+pg = np.array([page[i, j] for i in range(H) for j in range(W)
+               if truth[i, j] == 0])
+print("      ink ranges  %.0f to %.0f" % (min(ink_vals), max(ink_vals)))
+print("      page ranges %.0f to %.0f" % (pg.min(), pg.max()))
+print("      those ranges overlap, and no threshold can undo that.")
+print()
+
+out_a = adaptive(page)
+print("ADAPTIVE THRESHOLDING compares each pixel to its own neighbourhood")
+print("rather than to a global constant:")
+print("   found %d of %d, %d false positives"
+      % (int((out_a * truth).sum()), int(truth.sum()), int((out_a * (1 - truth)).sum())))
+print("   it works because 'darker than the page around me' is true for ink")
+print("   everywhere, while 'darker than 100' is only true on the left.")
+print()
+print("   the two parameters matter:")
+for block in (3, 7, 15):
+    o = adaptive(page, block)
+    print("      block %2d: found %2d, false positives %2d"
+          % (block, int((o * truth).sum()), int((o * (1 - truth)).sum())))
+print("   the marks here are one or two pixels wide, so even a 3x3 block")
+print("   still sees page around them. with thicker strokes a small block")
+print("   sits entirely INSIDE the mark, the local mean becomes the ink")
+print("   itself, and the middle of the stroke is classified as background")
+print("   -- hollow letters. going the other way, a block large enough to")
+print("   span the whole lighting gradient degenerates back into a global")
+print("   threshold, which is what the rising false positives above show.")
+print()
+print("the general lesson is not about thresholds. it is that a global")
+print("statistic fails whenever the thing you are measuring varies across")
+print("the image -- which is also why normalisation layers exist, and why")
+print("illumination correction is a standard first step in classical vision.")
+```

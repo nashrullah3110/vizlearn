@@ -118,6 +118,138 @@ Reducing the output stride from 32 to 8 makes the last stages sixteen times more
 - <strong>Flattening a large feature map into a dense layer.</strong> That is where the parameter explosion lives; global average pooling removes it.
 - <strong>Downsampling in a segmentation network without skip connections.</strong> The boundaries will be soft and the output blocky.
 
+## Four ways to halve a feature map
+
+Max pooling, average pooling, strided convolution and blur-then-subsample, applied to the same input. Each keeps something different, and the differences are visible in the numbers.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+img = np.array([
+    [10, 12, 90, 11, 13, 14, 12, 10],
+    [11, 13, 95, 12, 14, 13, 11, 12],
+    [12, 11, 92, 13, 12, 15, 13, 11],
+    [10, 12, 88, 11, 13, 14, 12, 10],
+    [80, 82, 85, 83, 12, 13, 11, 12],
+    [81, 83, 86, 84, 13, 12, 12, 11],
+    [12, 11, 13, 12, 11, 13, 12, 10],
+    [11, 13, 12, 11, 12, 11, 13, 12],
+], float)
+
+SHADE = " .:-=+*#%@"
+def show(a, label):
+    lo, hi = a.min(), a.max()
+    print("   %s (%dx%d, %.0f to %.0f)" % (label, a.shape[0], a.shape[1], lo, hi))
+    for row in a:
+        print("      " + "".join(SHADE[int(np.clip((v - lo) / max(hi - lo, 1e-9), 0, 1) * 9)]
+                                 for v in row))
+
+show(img, "input")
+print("   a bright vertical bar and a bright horizontal bar, on dark.")
+print()
+
+def pool(a, mode, k=2):
+    h, w = a.shape[0] // k, a.shape[1] // k
+    out = np.zeros((h, w))
+    for i in range(h):
+        for j in range(w):
+            win = a[i * k:(i + 1) * k, j * k:(j + 1) * k]
+            out[i, j] = win.max() if mode == "max" else win.mean()
+    return out
+
+def strided_conv(a, k=2):
+    kern = np.array([[0.25, 0.25], [0.25, 0.25]])   # a learnable 2x2, here fixed
+    h, w = a.shape[0] // k, a.shape[1] // k
+    out = np.zeros((h, w))
+    for i in range(h):
+        for j in range(w):
+            out[i, j] = (a[i * k:i * k + 2, j * k:j * k + 2] * kern).sum()
+    return out
+
+def blur_subsample(a, k=2):
+    g = np.array([[1, 2, 1], [2, 4, 2], [1, 2, 1]], float)
+    g = g / g.sum()
+    p = np.pad(a, 1, mode="edge")
+    blurred = np.zeros_like(a)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            blurred[i, j] = (p[i:i + 3, j:j + 3] * g).sum()
+    return blurred[::k, ::k]
+
+methods = [("max pool 2x2", pool(img, "max")),
+           ("average pool 2x2", pool(img, "avg")),
+           ("strided conv 2x2", strided_conv(img)),
+           ("blur then subsample", blur_subsample(img))]
+for name, out in methods:
+    print()
+    show(out, name)
+print()
+
+print("WHAT EACH ONE KEPT. the input's brightest value is %.0f:" % img.max())
+print("%24s %12s %12s %14s" % ("method", "max kept", "mean", "std"))
+print("%24s %12.1f %12.2f %14.2f" % ("input", img.max(), img.mean(), img.std()))
+for name, out in methods:
+    print("%24s %12.1f %12.2f %14.2f" % (name, out.max(), out.mean(), out.std()))
+print()
+print("   MAX POOL keeps the peak exactly. it answers 'was this feature")
+print("   present anywhere in the window' and discards how strong the rest")
+print("   of the window was.")
+print("   AVERAGE POOL dilutes it -- %.0f became %.1f here, because the"
+      % (img.max(), pool(img, "avg").max()))
+print("   window holding the peak also held two dark pixels. the dilution")
+print("   is worse the more isolated the feature is:")
+lone = np.zeros((2, 2)); lone[0, 0] = 100.0
+print("      a lone bright pixel in a 2x2 window: max pool keeps %.0f,"
+      % lone.max())
+print("      average pool returns %.0f -- exactly a quarter." % lone.mean())
+print("   it answers 'how much of this feature was in the window on")
+print("   average', which is a different question from 'was it there'.")
+print("   note the standard deviations: max pooling preserves contrast,")
+print("   averaging destroys it.")
+print()
+
+print("THE GRADIENT. this is the part that decides which one trains well:")
+print("   max pool  -- the gradient goes to the ONE winning pixel in each")
+print("                window. the other three receive exactly zero.")
+print("   avg pool  -- the gradient is split evenly, so every pixel gets")
+print("                a quarter.")
+win = img[0:2, 0:2]
+print()
+print("   for the top-left 2x2 window %s:" % win.ravel())
+gmax = np.zeros(4); gmax[win.ravel().argmax()] = 1.0
+print("      max pool gradient : %s" % gmax)
+print("      avg pool gradient : %s" % np.full(4, 0.25))
+print("   a pixel that never wins a max-pool window never learns from it.")
+print()
+
+print("PARAMETERS AND COST:")
+print("%24s %14s %30s" % ("method", "parameters", "what it can learn"))
+rows = [("max pool", 0, "nothing -- it is a fixed rule"),
+        ("average pool", 0, "nothing -- also fixed"),
+        ("strided conv 2x2", 2 * 2 * 64 * 64, "what to keep, per channel"),
+        ("blur + subsample", 0, "nothing, but it is anti-aliased")]
+for name, p, what in rows:
+    print("%24s %14s %30s" % (name, "{:,}".format(p), what))
+print()
+
+print("AND THE ALIASING ARGUMENT for the fourth method. a fine stripe")
+print("pattern, sampled two ways:")
+stripes = np.zeros((8, 8))
+stripes[:, ::2] = 100.0
+print("   input stripe columns  : %s" % np.unique(stripes[0]))
+print("   naive subsample [::2] : %s" % np.unique(stripes[::2, ::2]))
+print("   blur then subsample   : %s"
+      % np.round(np.unique(blur_subsample(stripes)), 1))
+print("   the naive version samples the same phase every time, so a stripe")
+print("   pattern becomes a flat field -- the texture is simply gone.")
+print("   blurring first spreads each stripe into its neighbours, so the")
+print("   subsample still carries evidence that something was there.")
+print()
+print("that is why 'anti-aliased' CNNs put a blur before every stride, and")
+print("why they measurably improve robustness to small shifts of the input.")
+```
+
 ## Questions people ask
 
 <strong>Is pooling obsolete?</strong> No &mdash; global average pooling is universal, and max pooling is still common early in a network. What has changed is that mid-network downsampling is now usually strided convolution.

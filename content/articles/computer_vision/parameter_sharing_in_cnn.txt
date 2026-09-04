@@ -112,6 +112,126 @@ That is why convolutional networks are memory-light and compute-heavy, and why G
 
 It also explains <strong>depthwise separable convolutions</strong>, used in MobileNet and EfficientNet. Splitting a convolution into a per-channel spatial filter followed by a 1&times;1 channel mixer cuts both parameters and operations by roughly a factor of the kernel area &mdash; around 8&ndash;9&times; for 3&times;3 &mdash; with a small accuracy cost. On phones, that trade is usually worth making.
 
+## One kernel, applied everywhere
+
+A convolution reuses the same weights at every position. That single decision buys a parameter count independent of image size and a detector that works wherever the thing appears -- both measured here against a dense layer.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+print("THE PARAMETER COUNT. a dense layer needs one weight per input pixel")
+print("per output unit. a convolution needs one per kernel position:")
+print("%14s %20s %20s %14s"
+      % ("image", "dense (64 units)", "conv (64 filters, 3x3)", "ratio"))
+for n in (28, 64, 224, 512):
+    dense = n * n * 64
+    conv = 3 * 3 * 1 * 64
+    print("%14s %20s %20s %13.0fx"
+          % ("%dx%d" % (n, n), "{:,}".format(dense), "{:,}".format(conv),
+             dense / conv))
+print("   the conv column does not move. the same %d weights work on a"
+      % (3 * 3 * 64))
+print("   28x28 thumbnail and a 512x512 photograph, because the kernel is")
+print("   applied at every position rather than wired to specific pixels.")
+print()
+
+print("TRANSLATION EQUIVARIANCE, which is the other half. train a detector")
+print("to find a pattern at one location, then move the pattern:")
+N, SIZE = 400, 12
+pattern = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], float) * 5.0
+
+def make(n, pos):
+    X = rng.normal(0, 0.5, (n, SIZE, SIZE))
+    y = rng.integers(0, 2, n)
+    r, c = pos
+    for i in np.where(y == 1)[0]:
+        X[i, r:r + 3, c:c + 3] += pattern
+    return X, y
+
+Xtr, ytr = make(N, (2, 2))
+
+# a dense model: flatten and fit a linear classifier
+flat = Xtr.reshape(N, -1)
+A = np.column_stack([flat, np.ones(N)])
+w_dense = np.linalg.lstsq(A, ytr * 2.0 - 1, rcond=None)[0]
+
+# a convolutional model: correlate with the pattern, take the max response
+def conv_score(X):
+    k = pattern / np.linalg.norm(pattern)
+    out = np.zeros(len(X))
+    for i, img in enumerate(X):
+        best = -1e9
+        for r in range(SIZE - 2):
+            for c in range(SIZE - 2):
+                best = max(best, (img[r:r + 3, c:c + 3] * k).sum())
+        out[i] = best
+    return out
+
+thresh = np.median(conv_score(Xtr))
+print("   both models are fitted with the pattern always at (2,2).")
+print("%18s %16s %16s" % ("pattern moves to", "dense accuracy", "conv accuracy"))
+for pos in ((2, 2), (2, 5), (6, 6), (8, 3)):
+    Xte, yte = make(300, pos)
+    d = ((np.column_stack([Xte.reshape(300, -1), np.ones(300)]) @ w_dense) > 0)
+    c = conv_score(Xte) > thresh
+    print("%18s %16.4f %16.4f"
+          % (str(pos), (d == (yte == 1)).mean(), (c == (yte == 1)).mean()))
+print("   the dense model learned 'look at these specific pixels'. move the")
+print("   pattern and it is at chance. the convolution learned the pattern")
+print("   itself, and finds it anywhere.")
+print()
+
+print("WHAT SHARING ASSUMES. it is a real assumption, and it is sometimes")
+print("wrong:")
+print("   'a feature that is useful at one position is useful at every")
+print("    position'")
+print()
+print("   true for  -- natural photographs. an edge is an edge wherever it is.")
+print("   false for -- aligned faces, where the eye region is always in the")
+print("                same place and a position-specific detector would be")
+print("                better. locally-connected layers exist for exactly")
+print("                this and are rarely worth it.")
+print("   false for -- spectrograms along the frequency axis, where 200Hz")
+print("                and 4000Hz mean genuinely different things.")
+print()
+
+print("AND WHAT IT DOES NOT BUY. sharing gives EQUIVARIANCE -- move the")
+print("input, the feature map moves with it -- not INVARIANCE:")
+img = np.zeros((8, 8))
+img[2, 1] = 10.0
+# a peaked kernel, so the response has ONE maximum rather than a
+# 3x3 plateau of tied values that argmax would break arbitrarily
+k = np.array([[1.0, 2.0, 1.0], [2.0, 4.0, 2.0], [1.0, 2.0, 1.0]])
+def conv(a):
+    out = np.zeros((6, 6))
+    for i in range(6):
+        for j in range(6):
+            out[i, j] = (a[i:i + 3, j:j + 3] * k).sum()
+    return out
+SHIFT = 3
+shifted = np.zeros((8, 8))
+shifted[2, 1 + SHIFT] = 10.0
+o1, o2 = conv(img), conv(shifted)
+p1 = np.unravel_index(o1.argmax(), o1.shape)
+p2 = np.unravel_index(o2.argmax(), o2.shape)
+print("   input pixel at column 1 -> feature map peak at %s" % (p1,))
+print("   input pixel at column %d -> feature map peak at %s" % (1 + SHIFT, p2))
+print("   the peak moved %d columns for an input shift of %d. that is"
+      % (p2[1] - p1[1], SHIFT))
+print("   equivariance: the map does not stay the same, it TRANSLATES.")
+print("   the two maps are not equal:", np.allclose(o1, o2))
+print()
+print("   invariance -- the same ANSWER regardless of position -- comes from")
+print("   pooling and from the global average at the end:")
+print("      max over the whole map, original : %.1f" % o1.max())
+print("      max over the whole map, shifted  : %.1f" % o2.max())
+print("      equal:", o1.max() == o2.max())
+print("   that is the division of labour: convolution finds the thing")
+print("   anywhere, pooling forgets where it was.")
+```
+
 ## Questions people ask
 
 <strong>Do all positions really need the same filter?</strong> For natural images, yes &mdash; and the empirical evidence is overwhelming. For centred, aligned images where position is meaningful, less so.

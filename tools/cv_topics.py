@@ -239,6 +239,119 @@ see further you either use a larger kernel, which costs quadratically more
 multiplications, or stack several small ones, which is what modern
 architectures do and why [receptive field](feature_map_in_cnn.html) is a
 concept worth having.
+
+## Slide a 3x3 grid over an image and watch what each one finds
+
+A convolution is a weighted sum repeated at every position. Six classic kernels are applied to the same small image here, with the arithmetic for one output pixel written out in full.
+
+```python-run
+import numpy as np
+
+# a small image: a bright square on a dark background, with a diagonal edge
+img = np.zeros((9, 9))
+img[2:7, 2:7] = 200.0
+img[0:3, 6:9] = 120.0
+img += np.random.default_rng(0).normal(0, 4, img.shape)
+img = np.clip(img, 0, 255)
+
+SHADE = " .:-=+*#%@"
+def show(a, label, lo=None, hi=None):
+    lo = a.min() if lo is None else lo
+    hi = a.max() if hi is None else hi
+    rng_ = max(hi - lo, 1e-9)
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(SHADE[int(np.clip((v - lo) / rng_, 0, 1) * 9)]
+                                 for v in row))
+
+show(img, "the image (%dx%d, values 0-255):" % img.shape)
+print()
+
+def convolve(a, k):
+    kh, kw = k.shape
+    ph, pw = kh // 2, kw // 2
+    padded = np.pad(a, ((ph, ph), (pw, pw)), mode="edge")
+    out = np.zeros_like(a, dtype=float)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            out[i, j] = (padded[i:i + kh, j:j + kw] * k).sum()
+    return out
+
+print("ONE OUTPUT PIXEL, written out. take the 3x3 patch at (4,4) and a")
+print("simple averaging kernel:")
+patch = img[3:6, 3:6]
+box = np.ones((3, 3)) / 9
+print("   patch:")
+for r in patch:
+    print("      %s" % np.round(r, 1))
+print("   kernel:")
+for r in box:
+    print("      %s" % np.round(r, 4))
+print("   multiply elementwise and sum:")
+terms = (patch * box).ravel()
+print("      %s" % "  ".join("%.1f" % t for t in terms[:5]))
+print("      + ... = %.4f" % terms.sum())
+print("   that one number is the output at (4,4). repeat for every pixel.")
+print()
+
+kernels = {
+    "identity":        np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]], float),
+    "box blur":        np.ones((3, 3)) / 9,
+    "sharpen":         np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], float),
+    "sobel x (vert.)": np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], float),
+    "sobel y (horiz.)": np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], float),
+    "laplacian":       np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], float),
+}
+
+print("SIX KERNELS on the same image:")
+for name, k in kernels.items():
+    out = convolve(img, k)
+    print()
+    print("   %-18s kernel sum %+.1f   output range %+8.1f to %+8.1f"
+          % (name, k.sum(), out.min(), out.max()))
+    show(np.abs(out) if k.sum() == 0 else out, "")
+print()
+
+print("READ THE KERNEL SUMS. that one number tells you what a kernel does:")
+for name, k in kernels.items():
+    s = k.sum()
+    kind = ("preserves brightness" if abs(s - 1) < 1e-9
+            else "detects change (flat areas -> 0)" if abs(s) < 1e-9
+            else "scales brightness by %.1f" % s)
+    print("   %-18s sum %+5.1f  %s" % (name, s, kind))
+print()
+flat = np.full((9, 9), 100.0)
+print("   proof: run each kernel on a completely flat image of 100s:")
+for name, k in kernels.items():
+    print("      %-18s -> centre pixel %+8.2f" % (name, convolve(flat, k)[4, 4]))
+print("   the edge detectors return 0 because there is no edge. that is not")
+print("   a coincidence -- a kernel summing to zero cannot respond to a")
+print("   constant, only to a difference.")
+print()
+
+print("THE TWO SOBELS TOGETHER give gradient magnitude, which is edge")
+print("strength regardless of direction:")
+gx = convolve(img, kernels["sobel x (vert.)"])
+gy = convolve(img, kernels["sobel y (horiz.)"])
+mag = np.sqrt(gx ** 2 + gy ** 2)
+show(mag, "gradient magnitude:")
+print("   the bright ring is the boundary of the square. the interior is")
+print("   dark because the interior is flat.")
+print()
+print("and the angle tells you which way the edge runs:")
+ang = np.degrees(np.arctan2(gy, gx))
+strong = mag > mag.max() * 0.5
+print("   strongest edge pixels and their orientations:")
+for (i, j) in list(zip(*np.where(strong)))[:6]:
+    print("      (%d,%d) magnitude %7.1f, angle %+7.1f degrees"
+          % (i, j, mag[i, j], ang[i, j]))
+print()
+print("a CNN does not use these. it LEARNS its kernels -- but the early")
+print("layers of a trained network reliably rediscover edge and blob")
+print("detectors that look very much like the ones above, because those are")
+print("what the data rewards.")
+```
+
 """,
     [
         {"q": "A kernel's nine weights sum to zero. What does its output look like on a flat, uniform region?",
@@ -397,6 +510,153 @@ single distribution.
 **Thresholding before denoising.** A salt-and-pepper pixel is by definition at
 an extreme value, so it survives any threshold. A median filter first costs
 almost nothing and removes them entirely.
+
+## Turning grey into black and white, and choosing where
+
+A threshold splits pixels into two classes. Otsu's method picks the split automatically, adaptive thresholding picks a different one per region, and the case where a global threshold fails is easy to construct.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+SHADE = " .:-=+*#%@"
+def show(a, label):
+    print("   %s" % label)
+    lo, hi = a.min(), a.max()
+    for row in a:
+        print("      " + "".join(SHADE[int(np.clip((v - lo) / max(hi - lo, 1e-9), 0, 1) * 9)]
+                                 for v in row))
+
+# a document-like image: dark text on a light page, with uneven lighting
+H, W = 12, 24
+page = np.full((H, W), 200.0)
+text = [(2, 3), (2, 4), (2, 5), (3, 3), (4, 3), (4, 4), (4, 5),
+        (6, 12), (6, 13), (7, 12), (8, 12), (8, 13),
+        (2, 18), (3, 18), (4, 18), (4, 19), (4, 20),
+        (8, 4), (8, 5), (9, 4), (9, 5)]
+for r, c in text:
+    page[r, c] = 40.0
+# a lighting gradient: bright on the left, dim on the right
+page = page * np.linspace(1.0, 0.13, W)[None, :]
+page = np.clip(page + rng.normal(0, 3, page.shape), 0, 255)
+
+show(page, "input: dark marks on a page, lit unevenly from the left")
+print("   note the right-hand side is genuinely darker -- the page there is")
+print("   dimmer than the INK on the left.")
+print("      brightest page pixel on the right : %.0f" % page[:, -6:].max())
+print("      darkest ink pixel on the left     : %.0f"
+      % min(page[r, c] for r, c in text if c < 8))
+print("   no single number can separate ink from page across the whole")
+print("   image, and that is the whole problem.")
+print()
+
+hist, edges = np.histogram(page, bins=16, range=(0, 256))
+print("THE HISTOGRAM, which is what a threshold is chosen from:")
+for i, count in enumerate(hist):
+    if count:
+        print("      %3.0f-%3.0f %5d %s"
+              % (edges[i], edges[i + 1], count, "#" * int(40 * count / hist.max())))
+print()
+
+def otsu(a, bins=64):
+    hist_, edges_ = np.histogram(a, bins=bins, range=(0, 256))
+    total = hist_.sum()
+    centres = (edges_[:-1] + edges_[1:]) / 2
+    best_t, best_var = 0.0, -1.0
+    for i in range(1, bins):
+        w0 = hist_[:i].sum() / total
+        w1 = 1 - w0
+        if w0 == 0 or w1 == 0:
+            continue
+        m0 = (hist_[:i] * centres[:i]).sum() / hist_[:i].sum()
+        m1 = (hist_[i:] * centres[i:]).sum() / hist_[i:].sum()
+        var = w0 * w1 * (m0 - m1) ** 2
+        if var > best_var:
+            best_var, best_t = var, centres[i]
+    return best_t
+
+t_otsu = otsu(page)
+print("OTSU'S METHOD searches every threshold and keeps the one that")
+print("maximises the variance BETWEEN the two groups -- equivalently, the")
+print("one that minimises the variance within them:")
+print("   chosen threshold: %.1f" % t_otsu)
+print()
+
+def apply_global(a, t):
+    return (a < t).astype(float)
+
+def adaptive(a, block=7, offset=8.0):
+    p = np.pad(a, block // 2, mode="edge")
+    out = np.zeros_like(a)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            local = p[i:i + block, j:j + block].mean()
+            out[i, j] = 1.0 if a[i, j] < local - offset else 0.0
+    return out
+
+truth = np.zeros((H, W))
+for r, c in text:
+    truth[r, c] = 1.0
+
+results = [("global, threshold 100", apply_global(page, 100.0)),
+           ("global, Otsu %.0f" % t_otsu, apply_global(page, t_otsu)),
+           ("adaptive, 7x7 local mean", adaptive(page))]
+for name, out in results:
+    show(out, name)
+    tp = int((out * truth).sum())
+    fp = int((out * (1 - truth)).sum())
+    fn = int(((1 - out) * truth).sum())
+    print("      found %d of %d marks, with %d false positives"
+          % (tp, int(truth.sum()), fp))
+    print()
+
+print("READ THE GLOBAL RESULTS. whatever single number you pick:")
+print("%16s %10s %10s %10s" % ("threshold", "found", "missed", "false pos"))
+for t in (15, 22, 30, 60, 100, t_otsu):
+    out = apply_global(page, t)
+    print("%16.0f %10d %10d %10d"
+          % (t, int((out * truth).sum()), int(((1 - out) * truth).sum()),
+             int((out * (1 - truth)).sum())))
+print("   read it as a trade with no good corner. a low threshold keeps the")
+print("   page clean and MISSES ink; raising it recovers the ink and starts")
+print("   calling the dim page ink too. the two classes overlap once the")
+print("   lighting is folded in:")
+ink_vals = [page[r, c] for r, c in text]
+pg = np.array([page[i, j] for i in range(H) for j in range(W)
+               if truth[i, j] == 0])
+print("      ink ranges  %.0f to %.0f" % (min(ink_vals), max(ink_vals)))
+print("      page ranges %.0f to %.0f" % (pg.min(), pg.max()))
+print("      those ranges overlap, and no threshold can undo that.")
+print()
+
+out_a = adaptive(page)
+print("ADAPTIVE THRESHOLDING compares each pixel to its own neighbourhood")
+print("rather than to a global constant:")
+print("   found %d of %d, %d false positives"
+      % (int((out_a * truth).sum()), int(truth.sum()), int((out_a * (1 - truth)).sum())))
+print("   it works because 'darker than the page around me' is true for ink")
+print("   everywhere, while 'darker than 100' is only true on the left.")
+print()
+print("   the two parameters matter:")
+for block in (3, 7, 15):
+    o = adaptive(page, block)
+    print("      block %2d: found %2d, false positives %2d"
+          % (block, int((o * truth).sum()), int((o * (1 - truth)).sum())))
+print("   the marks here are one or two pixels wide, so even a 3x3 block")
+print("   still sees page around them. with thicker strokes a small block")
+print("   sits entirely INSIDE the mark, the local mean becomes the ink")
+print("   itself, and the middle of the stroke is classified as background")
+print("   -- hollow letters. going the other way, a block large enough to")
+print("   span the whole lighting gradient degenerates back into a global")
+print("   threshold, which is what the rising false positives above show.")
+print()
+print("the general lesson is not about thresholds. it is that a global")
+print("statistic fails whenever the thing you are measuring varies across")
+print("the image -- which is also why normalisation layers exist, and why")
+print("illumination correction is a standard first step in classical vision.")
+```
+
 """,
     [
         {"q": "What does Otsu's method maximise when choosing a threshold?",
@@ -1610,6 +1870,128 @@ silently changes what the architecture can see.
 
 **Reading detection failures as a data problem.** If the model consistently
 misses large objects, check the receptive field before collecting more images.
+
+## How much of the image one output pixel can see
+
+A single neuron deep in a network responds to a patch of the original image. Computing that patch's size layer by layer explains most architectural choices -- kernel sizes, depth, dilation and pooling.
+
+```python-run
+import numpy as np
+
+print("the recurrence, and it is the whole calculation:")
+print("    RF_out = RF_in + (kernel - 1) * jump_in")
+print("    jump_out = jump_in * stride")
+print("where 'jump' is how far apart two adjacent output pixels are, in")
+print("input pixels.")
+print()
+
+def trace(layers, label):
+    rf, jump = 1, 1
+    print("%s" % label)
+    print("%8s %10s %8s %8s %14s %12s"
+          % ("layer", "type", "kernel", "stride", "receptive field", "jump"))
+    print("%8s %10s %8s %8s %14d %12d" % ("input", "-", "-", "-", rf, jump))
+    for i, (kind, k, s) in enumerate(layers, 1):
+        rf = rf + (k - 1) * jump
+        jump = jump * s
+        print("%8d %10s %8d %8d %14d %12d" % (i, kind, k, s, rf, jump))
+    return rf
+
+rf = trace([("conv", 3, 1)] * 8, "EIGHT 3x3 CONVOLUTIONS, stride 1:")
+print("   each layer adds exactly 2. after 8 layers a neuron sees %dx%d."
+      % (rf, rf))
+print("   growth is LINEAR in depth, which is slow -- to see a 224-pixel")
+print("   image you would need %d layers." % ((224 - 1) // 2))
+print()
+
+rf = trace([("conv", 3, 1), ("conv", 3, 1), ("pool", 2, 2),
+            ("conv", 3, 1), ("conv", 3, 1), ("pool", 2, 2),
+            ("conv", 3, 1), ("conv", 3, 1), ("pool", 2, 2)],
+           "THE VGG PATTERN -- two convs then a pool, three times:")
+print("   %dx%d from 9 layers, against %dx%d from 8 layers without pooling."
+      % (rf, rf, 17, 17))
+print("   the stride is what accelerates it: after a stride-2 layer every")
+print("   subsequent kernel step covers TWICE as much input, so growth")
+print("   becomes geometric rather than arithmetic.")
+print()
+
+print("TWO 3x3 CONVOLUTIONS vs ONE 5x5. same receptive field, and this is")
+print("why 3x3 won:")
+for label, layers in (("one 5x5", [("conv", 5, 1)]),
+                      ("two 3x3", [("conv", 3, 1), ("conv", 3, 1)])):
+    rf_, jump_ = 1, 1
+    params = 0
+    for _, k, s in layers:
+        rf_ += (k - 1) * jump_
+        jump_ *= s
+        params += k * k * 64 * 64
+    print("   %-10s receptive field %dx%d, %s parameters (64->64 channels)"
+          % (label, rf_, rf_, "{:,}".format(params)))
+print("   the same field for %.0f percent of the parameters -- and two"
+      % (100 * (2 * 9) / 25))
+print("   non-linearities instead of one, which is the other half of the")
+print("   argument.")
+print()
+for label, layers in (("one 7x7", [("conv", 7, 1)]),
+                      ("three 3x3", [("conv", 3, 1)] * 3)):
+    rf_, jump_, params = 1, 1, 0
+    for _, k, s in layers:
+        rf_ += (k - 1) * jump_
+        jump_ *= s
+        params += k * k * 64 * 64
+    print("   %-10s receptive field %dx%d, %s parameters"
+          % (label, rf_, rf_, "{:,}".format(params)))
+print()
+
+print("DILATION grows the field without adding parameters or losing")
+print("resolution. a dilated kernel has gaps:")
+for d in (1, 2, 4):
+    eff = 3 + (3 - 1) * (d - 1)
+    row = []
+    for i in range(eff):
+        row.append("x" if i % d == 0 else ".")
+    print("   dilation %d: 3 weights spanning %d pixels   %s"
+          % (d, eff, " ".join(row)))
+print()
+rf_, jump_ = 1, 1
+print("   a stack with doubling dilation, all stride 1:")
+print("%8s %10s %16s" % ("layer", "dilation", "receptive field"))
+for i, d in enumerate((1, 2, 4, 8, 16), 1):
+    eff = 3 + (3 - 1) * (d - 1)
+    rf_ += (eff - 1) * jump_
+    print("%8d %10d %16d" % (i, d, rf_))
+print("   %d pixels from 5 layers and %d weights, with no downsampling at"
+      % (rf_, 5 * 9))
+print("   all. that is why dilation is the standard tool for segmentation,")
+print("   where you need context AND per-pixel output resolution.")
+print()
+
+print("THE EFFECTIVE FIELD IS SMALLER THAN THE THEORETICAL ONE. not every")
+print("input pixel contributes equally -- the centre is reached by many")
+print("paths and the corners by one:")
+w = np.array([[1.0]])
+for layer in range(4):
+    k = np.ones((3, 3))
+    new = np.zeros((w.shape[0] + 2, w.shape[1] + 2))
+    for i in range(w.shape[0]):
+        for j in range(w.shape[1]):
+            new[i:i + 3, j:j + 3] += w[i, j] * k
+    w = new
+w = w / w.max()
+print("   contribution weight after 4 layers of 3x3 (theoretical field %dx%d):"
+      % w.shape)
+for r in w:
+    print("      " + "".join("%6.2f" % v for v in r))
+centre = w[w.shape[0] // 2, w.shape[1] // 2]
+corner = w[0, 0]
+print("   the centre pixel has weight %.2f; the corner has %.4f -- a factor"
+      % (centre, corner))
+print("   of %.0f. the field is gaussian-ish, not a flat square, so the" % (centre / corner))
+print("   EFFECTIVE field is roughly the square root of the theoretical one.")
+print("   that is a large part of why very deep networks still benefit from")
+print("   explicit long-range mechanisms rather than depth alone.")
+```
+
 """,
     [
         {"q": "With stride 1, how does the receptive field grow as layers are added?",

@@ -115,6 +115,16 @@ SPECS = {
         "label": "NumPy",
         "filename": "example_%02d.py",
     },
+    "computer_vision": {
+        # numpy only. convolution, pooling, thresholding and the colour
+        # conversions are all small array arithmetic, and a printed grid of
+        # numbers or ASCII shading shows what is happening far better than a
+        # rendered image would in a text pane. matplotlib would add ~20MB and
+        # a plot the output area cannot display anyway.
+        "packages": "numpy",
+        "label": "NumPy",
+        "filename": "example_%02d.py",
+    },
     "deep_learning": {
         # numpy only, on purpose. Every idea in this track is clearer built
         # from scratch than called from a framework: a backward pass you can
