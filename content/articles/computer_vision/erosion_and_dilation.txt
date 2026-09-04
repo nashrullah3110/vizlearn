@@ -108,3 +108,150 @@ together. Thin structures are lost first and cannot be recovered.
 **Opening when you meant closing.** The mnemonic is that opening removes
 *bright* things and closing removes *dark* ones. If your foreground is dark
 against a light background, they swap.
+
+## Shrinking and growing shapes with min and max
+
+Erosion takes the minimum over a neighbourhood, dilation the maximum. Two operations, and every other morphological tool is a composition of them -- which this builds one at a time, then measures on a shape designed to have something for each of them to catch.
+
+```python-run
+import numpy as np
+
+W, H = 26, 11
+img = np.zeros((H, W), int)
+img[2:8, 2:9] = 1                      # block one
+img[4:6, 5:9] = 0                      # a notch cut into its right side
+img[4:6, 9:14] = 1                     # a thin bridge, only 2 pixels tall
+img[2:8, 14:21] = 1                    # block two
+img[5, 17] = 0                         # a 1-pixel hole inside block two
+for r, c in ((0, 23), (9, 3), (1, 12), (6, 22)):
+    img[r, c] = 1                      # isolated specks
+
+SPECKS = [(0, 23), (9, 3), (1, 12), (6, 22)]
+HOLE = (5, 17)
+BLOCK2 = (slice(2, 8), slice(14, 21))
+
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join("#" if v else "." for v in row))
+
+show(img, "input: two blocks joined by a 2-pixel-tall bridge")
+print("      block one has a notch, block two has a 1-pixel hole,")
+print("      and there are 4 isolated specks. %d foreground pixels." % img.sum())
+print()
+
+def erode(a, k=3):
+    p = k // 2
+    q = np.pad(a, p, mode="constant", constant_values=1)
+    return np.array([[q[i:i + k, j:j + k].min()
+                      for j in range(a.shape[1])] for i in range(a.shape[0])])
+
+def dilate(a, k=3):
+    p = k // 2
+    q = np.pad(a, p, mode="constant", constant_values=0)
+    return np.array([[q[i:i + k, j:j + k].max()
+                      for j in range(a.shape[1])] for i in range(a.shape[0])])
+
+print("EROSION -- each pixel becomes the MINIMUM of its 3x3 neighbourhood,")
+print("so it survives only if every one of its 8 neighbours is foreground:")
+e = erode(img)
+show(e, "eroded once")
+print("      %d -> %d pixels (%.0f%% removed)"
+      % (img.sum(), e.sum(), 100 * (1 - e.sum() / img.sum())))
+print("      every speck is gone. the bridge is gone too, and not because")
+print("      it was thinned -- it is 2 pixels tall, so a 3x3 element cannot")
+print("      fit inside it ANYWHERE. erosion deletes whatever is narrower")
+print("      than the structuring element, in one pass.")
+print("      block one is eaten from its outer edge AND from the notch at")
+print("      once, which leaves a single surviving column.")
+print()
+
+print("DILATION -- the MAXIMUM instead. a pixel turns on if ANY neighbour")
+print("is foreground:")
+d = dilate(img)
+show(d, "dilated once")
+print("      %d -> %d pixels (%.0f%% added)"
+      % (img.sum(), d.sum(), 100 * (d.sum() / img.sum() - 1)))
+print("      the specks became 3x3 blobs, the hole and the notch are")
+print("      filled, and the two blocks now touch solidly.")
+print()
+
+print("THEY ARE NOT INVERSES. running one after the other does not return")
+print("the input -- it returns something more useful.")
+opened = dilate(erode(img))
+closed = erode(dilate(img))
+show(opened, "OPENING (erode, then dilate)")
+print("      %d pixels, against %d in the input" % (opened.sum(), img.sum()))
+print("      the specks are gone for good: erosion deleted them and")
+print("      dilation has nothing left to grow them back from.")
+print("      block one loses far more than its outline: the 2-pixel-tall")
+print("      arms above and below the notch were thin, so they went the")
+print("      way of the specks. that is the whole point of opening -- it")
+print("      keeps whatever the element fits inside and discards the rest.")
+print("      block two survives nearly whole, %d pixels of its original %d,"
+      % (int(opened[BLOCK2].sum()), int(img[BLOCK2].sum())))
+print("      and the 2 it lost are worth chasing down. they are at the")
+print("      hole: erosion cleared a 3x3 patch around it, and dilation")
+print("      could only grow back from what survived, so a 1-pixel hole")
+print("      reopened as a 3-pixel slit. opening does not leave holes")
+print("      alone -- it WIDENS them. which is precisely why closing has")
+print("      to exist as a separate operation.")
+print()
+show(closed, "CLOSING (dilate, then erode)")
+print("      %d pixels" % closed.sum())
+print("      the hole and the notch are filled and stay filled, and all")
+print("      4 specks survived -- dilation grew them, erosion shrank them")
+print("      again. the specks near the frame edge come back as short")
+print("      streaks rather than single pixels, because erosion here pads")
+print("      the outside with foreground: a pixel on the last row has no")
+print("      neighbour below to be eroded against. every library makes")
+print("      some choice here, and it is always visible at the border.")
+print()
+
+print("MEASURED on the specks and the hole specifically:")
+print("%-12s %18s %16s" % ("", "specks remaining", "hole filled?"))
+for name, out in (("input", img), ("erosion", e), ("dilation", d),
+                  ("opening", opened), ("closing", closed)):
+    n = sum(int(out[r, c]) for r, c in SPECKS)
+    print("%-12s %18d %16s" % (name, n, "yes" if out[HOLE] else "no"))
+print("   opening is the speck remover, closing is the hole filler, and")
+print("   neither does the other's job. erosion and dilation each do half")
+print("   of one job while wrecking the size of everything else.")
+print()
+
+print("%-10s %-44s %s" % ("operation", "what it removes", "shape size"))
+for r in (("erosion", "specks, thin parts, 1 pixel of every edge", "smaller"),
+          ("dilation", "holes, gaps, notches", "larger"),
+          ("opening", "specks and thin protrusions", "preserved"),
+          ("closing", "holes and thin gaps", "preserved")):
+    print("%-10s %-44s %s" % r)
+print()
+
+print("THE STRUCTURING ELEMENT decides what 'neighbourhood' means, and it")
+print("does not have to be a square:")
+print("      3x3 square      3x3 cross       1x5 horizontal")
+for r in range(3):
+    cross = "# # #" if r == 1 else ". # ."
+    horiz = "# # # # #" if r == 1 else ""
+    print("      %-16s%-16s%s" % ("# # #", cross, horiz))
+print()
+
+wide = np.zeros_like(img)
+padded = np.pad(img, ((0, 0), (2, 2)), mode="constant", constant_values=1)
+for i in range(H):
+    for j in range(W):
+        wide[i, j] = padded[i, j:j + 5].min()
+show(wide, "eroded with a 1x5 horizontal element")
+print("      %d pixels survive, and the bridge is among them." % wide.sum())
+print("      the bridge is 2 tall and 5 wide, so a 1x5 horizontal window")
+print("      fits inside it where a 3x3 square could not. the same image,")
+print("      the same operation, a different element, opposite answer.")
+print("      that is how you strip vertical rules off a scanned table")
+print("      while keeping the horizontal ones -- the element, not the")
+print("      operation, is where you encode what you are looking for.")
+print()
+print("and the reason this still earns its place next to a segmentation")
+print("network: these are exact, fast, and need no training. an opening")
+print("followed by a closing removes most of the obvious defects in a")
+print("binary mask in two lines, whatever produced the mask.")
+```

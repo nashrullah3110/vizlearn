@@ -104,6 +104,172 @@ This is exactly what happens when you use the "Brightness" slider and click "App
 - <strong>Ignoring Data Types:</strong> Pixel values are almost always stored as 8-bit unsigned integers (0-255). If an operation results in a value like 300 or -50, it must be "clamped" to 255 or 0, respectively. Forgetting this leads to visual artifacts.
 - <strong>Thinking Filters "See" Objects:</strong> A blur or brightness filter doesn't know it's looking at a car or a face. It's just a simple mathematical rule applied to a grid of numbers. The "intelligence" of computer vision comes from more complex models that learn patterns from these numbers.
 
+## What the three channels actually hold
+
+An RGB image is three greyscale images stacked, and almost every colour operation is a question about how they relate. This works through channel arithmetic, the difference between per-channel and joint operations, and the two mistakes that cause most colour bugs.
+
+```python-run
+import numpy as np
+
+H, W = 8, 16
+img = np.zeros((H, W, 3), np.uint8)
+img[:, 0:4] = (200, 40, 40)            # red patch
+img[:, 4:8] = (40, 170, 60)            # green patch
+img[:, 8:12] = (230, 225, 60)          # yellow patch
+img[:, 12:16] = (120, 120, 120)        # grey patch
+rng = np.random.default_rng(3)
+img = np.clip(img.astype(int) + rng.integers(-12, 13, img.shape), 0, 255)
+
+print("SHAPE %s -- height, width, CHANNEL. the channel axis is last in"
+      % str(img.shape))
+print("numpy, OpenCV and PIL, and FIRST in PyTorch (N,C,H,W). worse,")
+print("OpenCV stores the channels in the ORDER blue, green, red, so the")
+print("same three bytes mean different colours depending on which library")
+print("last touched them. between those two conventions sits most of the")
+print("colour bugs anyone ever writes.")
+print("   img[3, 1] = %s   <- one pixel, three numbers" % str(tuple(img[3, 1])))
+print("   img[:, :, 0]  is the whole red channel, an %s array"
+      % str(img[:, :, 0].shape))
+print()
+
+names = ["red", "green", "blue"]
+print("THE THREE CHANNELS, as separate greyscale images:")
+ramp = " .:-=+*#%@"
+for c in range(3):
+    print("   %s channel" % names[c])
+    for r in range(0, H, 2):
+        print("      " + "".join(ramp[min(9, v * 9 // 255)]
+                                 for v in img[r, :, c]))
+print("   the red patch is bright in RED and dark elsewhere. the yellow")
+print("   patch is bright in red AND green and dark in blue -- yellow is")
+print("   not a channel, it is a RATIO between two of them.")
+print()
+
+print("MEAN OF EACH CHANNEL, per patch:")
+patches = [("red patch", 0, 4), ("green patch", 4, 8),
+           ("yellow patch", 8, 12), ("grey patch", 12, 16)]
+print("%-16s %8s %8s %8s" % ("", "R", "G", "B"))
+for name, a, b in patches:
+    m = img[:, a:b].reshape(-1, 3).mean(axis=0)
+    print("%-16s %8.0f %8.0f %8.0f" % (name, m[0], m[1], m[2]))
+print()
+
+print("MISTAKE ONE -- uint8 WRAPS AROUND. brighten by adding 80:")
+u8 = img.astype(np.uint8)
+wrong = (u8 + np.uint8(80))
+right = np.clip(img.astype(int) + 80, 0, 255)
+print("%-24s %8s %8s %8s" % ("the yellow patch", "R", "G", "B"))
+print("%-24s %8d %8d %8d" % ("original", u8[3, 9, 0], u8[3, 9, 1], u8[3, 9, 2]))
+print("%-24s %8d %8d %8d" % ("+80 in uint8", wrong[3, 9, 0], wrong[3, 9, 1],
+                             wrong[3, 9, 2]))
+print("%-24s %8d %8d %8d" % ("+80 with clipping", right[3, 9, 0],
+                             right[3, 9, 1], right[3, 9, 2]))
+print("   the bright channels went DARK. %d + 80 does not saturate at 255,"
+      % u8[3, 9, 0])
+print("   it wraps to %d, and a bright yellow becomes a dark blue-ish"
+      % wrong[3, 9, 0])
+print("   colour. numpy does not warn. the rule is to convert to a wider")
+print("   type before any arithmetic and clip on the way back.")
+wrapped = int((wrong.astype(int) < img.astype(int)).sum())
+print("      %d of the %d channel values in this image wrapped."
+      % (wrapped, img.size))
+print()
+
+print("MISTAKE TWO -- PER-CHANNEL OPERATIONS SHIFT THE HUE. run a contrast")
+print("stretch on each channel independently:")
+sep = np.zeros_like(img)
+for c in range(3):
+    ch = img[:, :, c].astype(float)
+    sep[:, :, c] = np.round((ch - ch.min()) * 255 / (ch.max() - ch.min()))
+scale = 255.0 / img.max()   # chosen so that NOTHING clips
+joint = np.clip(np.round(img * scale), 0, 255).astype(int)
+
+def ratio(a, r, c):
+    p = a[r, c].astype(float) + 1e-9
+    return p / p.sum()
+
+print("%-28s %22s" % ("", "R:G:B proportions"))
+for label, a in (("original grey patch", img), ("per-channel stretch", sep),
+                 ("single joint scale", joint)):
+    p = ratio(a, 3, 13)
+    print("%-28s   %.3f %.3f %.3f" % (label, p[0], p[1], p[2]))
+print("   a neutral pixel has roughly equal proportions -- exactly equal")
+print("   before the noise was added. after stretching each channel by its")
+print("   OWN min and max, blue has taken half the pixel: the grey patch")
+print("   is not grey any more. a single scale factor applied to all three")
+print("   preserves the ratios, and ratios are what hue is.")
+print()
+print("   how far each patch's hue moved, as the largest change in any")
+print("   channel's proportion:")
+print("%-16s %20s %20s" % ("", "per-channel", "joint scale"))
+for name, a, b in patches:
+    o = ratio(img, 3, (a + b) // 2)
+    print("%-16s %20.4f %20.4f"
+          % (name, np.abs(ratio(sep, 3, (a + b) // 2) - o).max(),
+             np.abs(ratio(joint, 3, (a + b) // 2) - o).max()))
+print("   the joint column is essentially 0 -- what is left is integer")
+print("   rounding, because the result still has to land on whole numbers.")
+print("   the per-channel column is two orders of magnitude larger, and")
+print("   that is a visible colour shift, not a rounding artefact.")
+print("   one caveat worth knowing: the joint scale above was chosen so")
+print("   that nothing clips. clipping is itself a per-channel operation,")
+print("   so a joint scale that pushes any channel past 255 breaks the")
+print("   guarantee at exactly the pixels that saturate.")
+print()
+
+print("WHEN PER-CHANNEL IS THE RIGHT ANSWER: white balance. the whole POINT")
+print("there is to move the ratios, because the camera got them wrong.")
+print("assume the grey patch really is neutral and divide each channel by")
+print("its measured mean over that patch:")
+# shoot the same scene under warm tungsten light
+CAST = np.array([1.18, 1.00, 0.62])
+lit = np.clip(np.round(img * CAST), 0, 255).astype(int)
+ref = lit[:, 12:16].reshape(-1, 3).mean(axis=0)
+gains = ref.mean() / ref
+print("   the neutral patch, shot under warm light:")
+print("      R %.1f  G %.1f  B %.1f   (spread %.1f)"
+      % (ref[0], ref[1], ref[2], ref.max() - ref.min()))
+print("   it should be neutral, so whatever gains make it neutral are the")
+print("   correction for the whole frame:")
+print("      R %.3f  G %.3f  B %.3f" % (gains[0], gains[1], gains[2]))
+bal = np.clip(np.round(lit * gains), 0, 255).astype(int)
+after = bal[:, 12:16].reshape(-1, 3).mean(axis=0)
+print("   the patch afterwards:")
+print("      R %.1f  G %.1f  B %.1f   (spread %.1f)"
+      % (after[0], after[1], after[2], after.max() - after.min()))
+print("   and the correction carries to every other patch, which is the")
+print("   part that makes it useful:")
+print("%-16s %26s %26s" % ("", "under warm light", "after balancing"))
+for name, a, b in patches:
+    w = lit[:, a:b].reshape(-1, 3).mean(axis=0)
+    f = bal[:, a:b].reshape(-1, 3).mean(axis=0)
+    t = img[:, a:b].reshape(-1, 3).mean(axis=0)
+    print("%-16s %26.1f %26.1f"
+          % (name + " err", np.abs(w - t).max(), np.abs(f - t).max()))
+print("   the numbers are the largest channel error against the original,")
+print("   unlit image. one measurement on one patch fixed three of them --")
+print("   and made yellow very slightly worse. that is not noise, and it")
+print("   is the caveat above arriving in person:")
+print("      yellow's red channel was %.0f. the warm light multiplied it to"
+      % img[:, 8:12, 0].reshape(-1).mean())
+print("      %.0f, past 255, so it was CLIPPED to 255 and the excess is"
+      % (img[:, 8:12, 0].reshape(-1).mean() * CAST[0]))
+print("      gone. dividing by %.3f afterwards recovers %.0f, not %.0f."
+      % (1 / gains[0], 255 * gains[0], img[:, 8:12, 0].reshape(-1).mean()))
+print("   white balance can undo a gain. it cannot undo a clip, because a")
+print("   clip is not a gain -- it is a deletion. this is the entire")
+print("   argument for shooting raw and for balancing before, not after,")
+print("   anything saturates.")
+print("   note also that every patch keeps a residual error even where")
+print("   nothing clipped: the gains normalise to the patch's MEAN level,")
+print("   so they correct the colour cast and leave a small exposure")
+print("   difference behind. white balance is not an exposure control.")
+print("   this is grey-world / grey-patch white balance in three lines, and")
+print("   it is per-channel ON PURPOSE. the test for whether a per-channel")
+print("   operation is a bug is simply whether you intended the colours to")
+print("   change.")
+```
+
 ## Summing up
 
 - A color image is a 3D array of numbers: <code>(Height x Width x 3)</code>.

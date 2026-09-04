@@ -97,6 +97,130 @@ Medical imaging uses 12 or 16 bits, giving 4,096 or 65,536 levels, because subtl
 
 When working with such data, two habits matter: do not casually convert to 8 bits for convenience, and normalise using the actual data range rather than assuming 0&ndash;255. A 16-bit medical image divided by 255 produces values in the thousands, and a network fed those will not train.
 
+## Why grey is not the average of R, G and B
+
+Converting to greyscale looks like the most trivial operation in vision, and the obvious way to do it is wrong. This shows what the standard weights are for, what they cost you, and the one place the naive average is actually the right answer.
+
+```python-run
+import numpy as np
+
+# a few colours, as (name, R, G, B)
+swatches = [
+    ("pure red",     255,   0,   0),
+    ("pure green",     0, 255,   0),
+    ("pure blue",      0,   0, 255),
+    ("yellow",       255, 255,   0),
+    ("cyan",           0, 255, 255),
+    ("magenta",      255,   0, 255),
+    ("mid grey",     128, 128, 128),
+    ("sky",           90, 150, 235),
+    ("skin",         222, 172, 140),
+    ("foliage",       60, 110,  45),
+]
+
+W_REC709 = np.array([0.2126, 0.7152, 0.0722])
+W_REC601 = np.array([0.299, 0.587, 0.114])
+W_MEAN = np.array([1 / 3, 1 / 3, 1 / 3])
+
+print("THREE WAYS to collapse 3 channels into 1:")
+print("   average    (1/3,    1/3,    1/3   )")
+print("   Rec.601    (0.299,  0.587,  0.114 )   -- old TV, still everywhere")
+print("   Rec.709    (0.2126, 0.7152, 0.0722)   -- sRGB / HD, the modern one")
+print("   all three sum to 1, so a grey stays the same grey. they differ")
+print("   only in how they split the budget between the channels.")
+print()
+
+print("%-12s %5s %5s %5s %9s %9s %9s" %
+      ("colour", "R", "G", "B", "average", "Rec.601", "Rec.709"))
+for name, r, g, b in swatches:
+    c = np.array([r, g, b], float)
+    print("%-12s %5d %5d %5d %9.1f %9.1f %9.1f"
+          % (name, r, g, b, c @ W_MEAN, c @ W_REC601, c @ W_REC709))
+print()
+
+print("LOOK AT THE FIRST THREE ROWS. under the average, pure red, green")
+print("and blue are all exactly 85 -- IDENTICAL. a red stop sign and a")
+print("green traffic light become the same shade of grey.")
+print("under Rec.709 they are 54, 182 and 18 -- green reads about %.0fx"
+      % (np.array([0, 255., 0]) @ W_REC709 / (np.array([0, 0, 255.]) @ W_REC709)))
+print("brighter than blue. that is not arbitrary: it is a summary of the")
+print("eye's luminous efficiency curve, which peaks in the green and falls")
+print("off steeply toward the blue end. the weights encode how bright a")
+print("colour LOOKS, not how much light is physically there.")
+print()
+
+print("THE CONSEQUENCE -- CONTRAST THAT VANISHES. take two colours that")
+print("look obviously different and check whether the grey survives:")
+pairs = [(("pure red", 255, 0, 0), ("pure blue", 0, 0, 255)),
+         (("foliage", 60, 110, 45), ("brick", 150, 70, 55)),
+         (("sky", 90, 150, 235), ("cloud", 225, 228, 232))]
+print("%-22s %11s %11s %11s" % ("pair", "avg gap", "601 gap", "709 gap"))
+for (n1, r1, g1, b1), (n2, r2, g2, b2) in pairs:
+    a1, a2 = np.array([r1, g1, b1], float), np.array([r2, g2, b2], float)
+    print("%-22s %11.1f %11.1f %11.1f"
+          % (n1 + " / " + n2,
+             abs(a1 @ W_MEAN - a2 @ W_MEAN),
+             abs(a1 @ W_REC601 - a2 @ W_REC601),
+             abs(a1 @ W_REC709 - a2 @ W_REC709)))
+print("   red against blue: the average gives a gap of 0.0. two of the")
+print("   most different colours available become literally the same")
+print("   number, and any threshold, edge detector or classifier reading")
+print("   that greyscale sees a flat field.")
+print("   this is not a small numerical difference between the methods.")
+print("   it is the difference between an edge existing and not existing.")
+print()
+print("   but read the SECOND row before concluding that Rec.709 is simply")
+print("   better. green foliage and red brick are far apart to the eye, and")
+print("   709 gives them a gap of only %.1f -- WORSE than the naive"
+      % abs(np.array([60., 110, 45]) @ W_REC709
+            - np.array([150., 70, 55]) @ W_REC709))
+print("   average's %.1f. they have similar perceived LIGHTNESS, so a"
+      % abs(np.array([60., 110, 45]) @ W_MEAN
+            - np.array([150., 70, 55]) @ W_MEAN))
+print("   perceptual weighting is precisely what collapses them together.")
+print("   709 is not the weighting that best separates colours. it is the")
+print("   weighting that best predicts how bright a human says they are,")
+print("   and those are different goals that happen to agree most of the")
+print("   time.")
+print()
+
+print("EVERY GREYSCALE CONVERSION IS A PROJECTION. 3 numbers -> 1 number,")
+print("so you are throwing away a 2-dimensional space of colours, and")
+print("every weighting picks a different 2D plane to discard:")
+for wname, w in (("average", W_MEAN), ("Rec.709", W_REC709)):
+    # find colours in the 0..255 cube that map to the same grey
+    print("   under %s, all of these are grey 128:" % wname)
+    found = []
+    for r in range(0, 256, 15):
+        for g in range(0, 256, 15):
+            b = (128 - w[0] * r - w[1] * g) / w[2]
+            if 0 <= b <= 255 and len(found) < 4:
+                found.append((r, g, int(round(b))))
+    print("      " + "   ".join("(%3d,%3d,%3d)" % c for c in found))
+print("   an infinite family of colours per grey value, in both cases.")
+print("   the question is never whether you lose information -- it is")
+print("   which information you choose to lose.")
+print()
+
+print("WHERE THE NAIVE AVERAGE IS RIGHT. the perceptual weights assume you")
+print("are approximating a HUMAN. if the three channels are not red, green")
+print("and blue at all, they are wrong:")
+print("%-40s %s" % ("channels", "correct collapse"))
+for chans, how in (
+        ("R, G, B from a consumer camera", "Rec.709 weights"),
+        ("near-infrared, red, green (satellite)", "task-specific, not 709"),
+        ("three exposures of the same scene", "average, or a merge"),
+        ("R, G, B feeding a CNN", "do not convert at all")):
+    print("%-40s %s" % (chans, how))
+print()
+print("that last row is the one that matters most in practice. a network")
+print("takes 3 input channels as happily as 1, and greyscale conversion")
+print("is an irreversible 3:1 projection chosen by a committee in 1990 to")
+print("match human vision. if the network is allowed to learn its own")
+print("first-layer weights, it will find a projection suited to the task --")
+print("and unlike Rec.709, it can use more than one.")
+```
+
 ## Questions people ask
 
 <strong>Why not just average the channels?</strong> Because human brightness perception is not uniform across colours. The weighted formula matches perception; the average does not.

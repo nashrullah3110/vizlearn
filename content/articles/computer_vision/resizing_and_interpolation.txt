@@ -97,3 +97,178 @@ rather than in steps.
 
 **Ignoring aspect ratio.** Stretching to a square distorts every shape in the
 frame. Pad to the target aspect ratio, then resize.
+
+## Nearest, bilinear, and why downscaling needs a blur first
+
+Resizing asks for pixel values at coordinates that do not exist, so every method is a guess. This measures three guesses against a known ground truth, and then shows the failure that catches everyone -- that shrinking an image correctly is not an interpolation problem at all.
+
+```python-run
+import numpy as np
+
+# a smooth ground truth we can sample at any real coordinate, which is
+# what lets us score every method instead of just eyeballing it
+def f(y, x):
+    return (128 + 90 * np.sin(x * 0.55) * np.cos(y * 0.42)
+            + 20 * np.sin(x * 0.2 + y * 0.3))
+
+H, W = 8, 10
+src = f(*np.mgrid[0:H, 0:W])
+print("SOURCE %dx%d, sampled from a function we can evaluate anywhere," % (H, W))
+print("which means we can score every method against the truth.")
+print("   " + " ".join("%5.0f" % v for v in src[3]) + "   <- row 3")
+print()
+
+SY, SX = 3, 3                          # upscale factor
+OH, OW = H * SY, W * SX
+
+# output index -> source coordinate, aligning pixel CENTRES
+def coords(o, s, scale):
+    return (np.arange(o) + 0.5) / scale - 0.5
+
+def nearest(a, oh, ow):
+    yy = np.clip(np.round(coords(oh, a.shape[0], SY)).astype(int), 0, a.shape[0] - 1)
+    xx = np.clip(np.round(coords(ow, a.shape[1], SX)).astype(int), 0, a.shape[1] - 1)
+    return a[np.ix_(yy, xx)]
+
+def bilinear(a, oh, ow):
+    cy = np.clip(coords(oh, a.shape[0], SY), 0, a.shape[0] - 1)
+    cx = np.clip(coords(ow, a.shape[1], SX), 0, a.shape[1] - 1)
+    y0 = np.floor(cy).astype(int); y1 = np.minimum(y0 + 1, a.shape[0] - 1)
+    x0 = np.floor(cx).astype(int); x1 = np.minimum(x0 + 1, a.shape[1] - 1)
+    wy = (cy - y0)[:, None]; wx = (cx - x0)[None, :]
+    top = a[np.ix_(y0, x0)] * (1 - wx) + a[np.ix_(y0, x1)] * wx
+    bot = a[np.ix_(y1, x0)] * (1 - wx) + a[np.ix_(y1, x1)] * wx
+    return top * (1 - wy) + bot * wy
+
+# Catmull-Rom: passes through the samples, and is C1 continuous
+def cubic_w(t):
+    t = np.abs(t)
+    return np.where(t <= 1, 1.5 * t ** 3 - 2.5 * t ** 2 + 1,
+                    np.where(t < 2, -0.5 * t ** 3 + 2.5 * t ** 2 - 4 * t + 2, 0))
+
+def bicubic(a, oh, ow):
+    def axis(a, o, scale, ax):
+        c = coords(o, a.shape[ax], scale)
+        base = np.floor(c).astype(int)
+        out = np.zeros([o if i == ax else a.shape[i] for i in range(2)])
+        for k in range(-1, 3):
+            idx = np.clip(base + k, 0, a.shape[ax] - 1)
+            w = cubic_w(c - (base + k))
+            taken = np.take(a, idx, axis=ax)
+            out += taken * (w[:, None] if ax == 0 else w[None, :])
+        return out
+    return axis(axis(a, oh, SY, 0), ow, SX, 1)
+
+truth = f(*np.meshgrid(coords(OH, H, SY), coords(OW, W, SX), indexing="ij"))
+
+print("UPSCALING %dx%d -> %dx%d. every output pixel lands between source"
+      % (H, W, OH, OW))
+print("samples, so every method has to invent something. scored against the")
+print("function that generated the source:")
+print("%-16s %12s %12s %14s" % ("method", "mean err", "worst err", "cost/pixel"))
+results, errs = {}, {}
+for name, fn, cost in (("nearest", nearest, "1 read"),
+                       ("bilinear", bilinear, "4 reads"),
+                       ("bicubic", bicubic, "16 reads")):
+    out = fn(src, OH, OW)
+    results[name] = out
+    e = np.abs(out - truth)
+    errs[name] = e
+    print("%-16s %12.2f %12.2f %14s" % (name, e.mean(), e.max(), cost))
+print("   bilinear cuts nearest's MEAN error by about %.0fx; bicubic halves"
+      % (errs["nearest"].mean() / errs["bilinear"].mean()))
+print("   it again, for 4x the memory reads. big gain then diminishing --")
+print("   which is why bilinear is the default almost everywhere.")
+print()
+print("   but look at the WORST errors: nearest and bilinear tie at %.2f."
+      % errs["bilinear"].max())
+wr, wc = np.unravel_index(errs["bilinear"].argmax(), errs["bilinear"].shape)
+print("   that is output pixel (%d, %d), which maps to source coordinate"
+      % (wr, wc))
+print("   (%.2f, %.2f) -- outside the source grid entirely, beyond the"
+      % (coords(OH, H, SY)[wr], coords(OW, W, SX)[wc]))
+print("   outermost sample centres. there is no second sample on that side")
+print("   to interpolate WITH, so bilinear clamps and degenerates to")
+print("   nearest exactly there. every resize has a one-pixel border where")
+print("   it is really doing extrapolation, and no scheme fixes that.")
+print()
+
+print("WHAT NEAREST ACTUALLY DOES. one output row, upscaled 3x:")
+print("   nearest:  " + " ".join("%4.0f" % v for v in results["nearest"][9][:12]))
+print("   bilinear: " + " ".join("%4.0f" % v for v in results["bilinear"][9][:12]))
+print("   truth:    " + " ".join("%4.0f" % v for v in truth[9][:12]))
+print("   nearest repeats each value 3 times -- those flat runs are the")
+print("   blocky squares you see when a thumbnail is blown up. bilinear")
+print("   ramps between them.")
+print()
+
+print("A PROPERTY WORTH KNOWING: bilinear is not linear in the coordinates.")
+print("along either axis alone it is a straight line, but the wx*wy term")
+print("curves the surface in between. evaluate it directly at any real")
+print("coordinate to see this:")
+
+def bilerp_at(a, y, x):
+    y0, x0 = int(np.floor(y)), int(np.floor(x))
+    wy, wx = y - y0, x - x0
+    return ((a[y0, x0] * (1 - wx) + a[y0, x0 + 1] * wx) * (1 - wy)
+            + (a[y0 + 1, x0] * (1 - wx) + a[y0 + 1, x0 + 1] * wx) * wy)
+
+corners = (src[2, 3], src[2, 4], src[3, 3], src[3, 4])
+print("   the 4 corners of one source square: %.1f %.1f %.1f %.1f" % corners)
+print("   at the exact centre (2.5, 3.5):")
+print("      mean of the 4 corners:  %.3f" % np.mean(corners))
+print("      bilinear:               %.3f" % bilerp_at(src, 2.5, 3.5))
+print("   identical, as it must be -- all four weights are 1/4 there.")
+print("   now walk the diagonal from corner (2,3) to corner (3,4), and")
+print("   compare bilinear against the straight line joining those two:")
+print("%8s %14s %14s %10s" % ("t", "bilinear", "straight line", "gap"))
+for t in (0.0, 0.25, 0.5, 0.75, 1.0):
+    b = bilerp_at(src, 2 + t, 3 + t)
+    line = src[2, 3] * (1 - t) + src[3, 4] * t
+    print("%8.2f %14.3f %14.3f %10.3f" % (t, b, line, b - line))
+print("   the endpoints agree and the middle does not. a plane through")
+print("   4 arbitrary corners does not exist unless they happen to be")
+print("   coplanar -- 'bilinear' means linear in each variable SEPARATELY,")
+print("   which is a curved surface, not a flat one.")
+print()
+
+print("NOW THE FAILURE. DOWNSCALING. take a fine stripe pattern:")
+FH, FW = 6, 48
+stripes = np.where((np.arange(FW) // 2) % 2 == 0, 220.0, 40.0)
+stripes = np.tile(stripes, (FH, 1))
+print("   input row (every 2 columns alternate light/dark):")
+print("   " + "".join("#" if v > 128 else "." for v in stripes[0]))
+print("   the true average brightness is %.0f." % stripes.mean())
+print()
+print("   shrink 4x by just taking every 4th column -- what 'nearest' is:")
+sub = stripes[:, ::4]
+print("   " + "".join("#" if v > 128 else "." for v in sub[0]))
+print("   mean %.0f, and every stripe is GONE -- the result is a flat" % sub.mean())
+print("   field of the wrong colour. the pattern repeats every 4 columns")
+print("   and we sampled every 4 columns, so we hit the same phase each")
+print("   time. that is ALIASING, and no interpolation between the")
+print("   surviving samples can recover what was never sampled.")
+print()
+print("   now average each 4-wide block instead -- BLUR, THEN SAMPLE:")
+area = stripes.reshape(FH, FW // 4, 4).mean(axis=2)
+print("   " + " ".join("%3.0f" % v for v in area[0][:12]))
+print("   mean %.0f, matching the input's %.0f. the stripes are gone here"
+      % (area.mean(), stripes.mean()))
+print("   too -- they have to be, there is no room for them -- but their")
+print("   ENERGY is preserved as the correct grey.")
+print()
+print("%-34s %12s" % ("4x downscale of the stripes", "result mean"))
+print("%-34s %12.1f" % ("true input mean", stripes.mean()))
+print("%-34s %12.1f" % ("subsample (nearest)", sub.mean()))
+print("%-34s %12.1f" % ("area-average (blur first)", area.mean()))
+print()
+print("SO THE RULE SPLITS IN TWO:")
+print("   UPSCALING is an interpolation problem -- use bilinear or bicubic.")
+print("   DOWNSCALING is a filtering problem -- low-pass first, THEN")
+print("   sample, which is what area averaging does in one step. reaching")
+print("   for bilinear to shrink an image by 4x still reads only 4 of every")
+print("   16 pixels and still aliases. this is the single most common")
+print("   resizing bug, and it silently corrupts training data: your")
+print("   augmentation pipeline shrinks images, the fine texture aliases")
+print("   into false patterns, and the model learns them.")
+```

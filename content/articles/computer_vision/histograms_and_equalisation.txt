@@ -104,3 +104,144 @@ brightness channel, equalise that one channel, and convert back.
 **Comparing histograms across images to judge similarity.** Two completely
 different photographs can share a histogram. It describes the palette, not the
 picture.
+
+## The histogram, and the CDF that flattens it
+
+A histogram throws away every bit of spatial information and keeps only how often each brightness occurs. That sounds like a loss, and it is -- but it is exactly what you need to fix exposure, and equalisation turns out to be nothing more than applying the image's own cumulative distribution as a lookup table.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(11)
+H, W = 40, 60
+yy, xx = np.mgrid[0:H, 0:W]
+scene = (90 + 40 * np.sin(xx / 7.0) * np.cos(yy / 9.0)
+         + 25 * ((xx // 12 + yy // 10) % 2))
+scene += rng.normal(0, 4, (H, W))
+# a badly exposed camera: everything squeezed into a narrow band
+img = np.clip(60 + (scene - scene.mean()) * 0.28, 0, 255).astype(int)
+
+def hist(a, bins=16):
+    h, _ = np.histogram(a, bins=bins, range=(0, 256))
+    return h
+
+def draw(h, label, width=44):
+    print("   %s" % label)
+    top = h.max()
+    for b in range(len(h)):
+        lo = b * 256 // len(h)
+        n = int(round(width * h[b] / top)) if top else 0
+        print("      %3d-%3d |%-44s %5d" % (lo, lo + 255 // len(h),
+                                            "#" * n, h[b]))
+
+print("THE IMAGE is under-exposed: %d..%d out of 0..255."
+      % (img.min(), img.max()))
+print("   mean %.1f, std %.1f" % (img.mean(), img.std()))
+draw(hist(img), "histogram, 16 bins")
+used = int((hist(img, 256) > 0).sum())
+print("      only %d of the 256 available levels are used at all." % used)
+print("      the picture is fine -- the camera wasted %.0f%% of its range."
+      % (100 * (1 - used / 256.0)))
+print()
+
+print("FIRST TRY -- CONTRAST STRETCHING. a straight line that maps the")
+print("darkest pixel to 0 and the brightest to 255:")
+lo, hi = img.min(), img.max()
+stretched = np.round((img - lo) * 255.0 / (hi - lo)).astype(int)
+draw(hist(stretched), "after stretching")
+print("      range %d..%d, std %.1f (was %.1f)."
+      % (stretched.min(), stretched.max(), stretched.std(), img.std()))
+print("      better. but look at the SHAPE -- it is the same lumpy curve,")
+print("      just wider. the levels are spread out but still bunched in the")
+print("      middle, because a linear map cannot change a distribution's")
+print("      shape, only its scale.")
+print("      distinct levels used: %d of 256."
+      % int((hist(stretched, 256) > 0).sum()))
+print()
+
+print("SECOND TRY -- EQUALISATION. the goal is a FLAT histogram: every")
+print("brightness equally common. the trick is a fact from probability --")
+print("if you push any random variable through its own CDF, the result is")
+print("uniform. so the lookup table IS the cumulative histogram:")
+counts = hist(img, 256)
+cdf = np.cumsum(counts).astype(float)
+cdf_min = cdf[cdf > 0][0]
+lut = np.round((cdf - cdf_min) / (img.size - cdf_min) * 255).astype(int)
+lut = np.clip(lut, 0, 255)
+eq = lut[img]
+print("      a few entries of the lookup table:")
+print("%14s %14s %14s" % ("input level", "cumulative count", "output level"))
+for v in range(img.min(), img.max() + 1, max(1, (img.max() - img.min()) // 6)):
+    print("%14d %14d %14d" % (v, int(cdf[v]), lut[v]))
+print("      steep where pixels are common, flat where they are rare. the")
+print("      table spends output range in proportion to how many pixels")
+print("      actually need it.")
+draw(hist(eq), "after equalisation")
+print("      range %d..%d, std %.1f." % (eq.min(), eq.max(), eq.std()))
+print()
+
+print("HOW FLAT IS FLAT? measure the spread of the 16 bin counts --")
+print("perfectly flat would be 0:")
+print("%-24s %14s %14s" % ("", "bin std", "levels used"))
+for name, a in (("original", img), ("stretched", stretched),
+                ("equalised", eq)):
+    h = hist(a).astype(float)
+    print("%-24s %14.1f %14d"
+          % (name, h.std(), int((hist(a, 256) > 0).sum())))
+print("   equalisation flattens the histogram that stretching only widened.")
+print()
+
+print("BUT NOTICE THE LEVEL COUNT: %d after equalisation against %d after"
+      % (int((hist(eq, 256) > 0).sum()), int((hist(stretched, 256) > 0).sum())))
+print("stretching. equalisation cannot ADD levels -- it only redistributes")
+print("the ones already there, and it can LOSE some, because the lookup")
+print("table is a function on integers and two nearby inputs can round to")
+print("the same output:")
+collisions = [v for v in range(255) if counts[v] > 0 and counts[v + 1] > 0
+              and lut[v] == lut[v + 1]]
+if collisions:
+    v = collisions[0]
+    print("      %d such collision%s here -- levels %d and %d both become %d,"
+          % (len(collisions), "" if len(collisions) == 1 else "s", v, v + 1,
+             lut[v]))
+    print("      and no inverse can separate them again.")
+else:
+    print("      none happened to occur here, but they are common in")
+    print("      images with a strong peak.")
+print("   so equalisation is not free. it is a one-way map that trades")
+print("   fidelity in the crowded part of the range for visibility in the")
+print("   empty part -- which is a good trade for looking at a picture and")
+print("   a bad one if you intend to measure the pixel values afterwards.")
+print()
+
+print("AND THE REAL FAILURE MODE. equalisation is global -- ONE table for")
+print("the whole frame -- so a large dark region drags the table for")
+print("everything else. paste a dark strip over a third of the frame and")
+print("re-equalise, then look only at the part that did not change:")
+bordered = img.copy()
+bordered[:, :20] = np.clip(rng.normal(12, 5, (H, 20)), 0, 255).astype(int)
+c2 = hist(bordered, 256)
+cd2 = np.cumsum(c2).astype(float)
+m2 = cd2[cd2 > 0][0]
+lut2 = np.clip(np.round((cd2 - m2) / (bordered.size - m2) * 255), 0, 255).astype(int)
+eq2 = lut2[bordered]
+region = (slice(None), slice(20, None))
+print("%-30s %12s %12s" % ("", "std, no border", "std, border"))
+print("%-30s %12.1f %12.1f"
+      % ("the subject region only", eq[region].std(), eq2[region].std()))
+print("%-30s %12d %12d"
+      % ("output range it occupies",
+         int(eq[region].max() - eq[region].min()),
+         int(eq2[region].max() - eq2[region].min())))
+print("      the same pixels, the same operation, %.0f%% less contrast."
+      % (100 * (1 - eq2[region].std() / eq[region].std())))
+print("      the subject did not change at all -- the DISTRIBUTION did. a")
+print("      third of the frame now sits at the bottom of the histogram, so")
+print("      the CDF has already climbed a third of the way up before it")
+print("      reaches the first subject pixel, and the subject is left with")
+print("      only the top of the output range to spread across.")
+print("      the fix is CLAHE: equalise small tiles independently, clip the")
+print("      histogram before accumulating so no single level can dominate,")
+print("      and interpolate between neighbouring tiles' tables. same idea,")
+print("      applied locally, which is what almost every real pipeline uses.")
+```

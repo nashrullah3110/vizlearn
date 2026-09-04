@@ -55,6 +55,139 @@ Because ReLU outputs exactly 0 for any negative input, its gradient (slope) for 
 
 To solve this, variants like <strong>Leaky ReLU</strong> were invented, which allow a tiny, non-zero gradient for negative numbers (e.g., $f(x) = 0.01x$ when $x < 0$).
 
+## What ReLU does to a feature map
+
+ReLU is one line -- max(x, 0) -- and it is the only reason a deep stack of convolutions is worth building. This shows what it does to real feature-map values, why the alternative is not a deeper network but a pointless one, and the failure mode it brings with it.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(5)
+
+# a small image with a bright bar, and two edge kernels
+img = np.full((7, 12), 50.0)
+img[:, 5:8] = 200.0
+img += rng.normal(0, 5, (7, 12))
+
+K_left = np.array([[-1., 0, 1]] * 3) / 3.0     # responds + to a dark->light edge
+K_right = -K_left                               # the mirror image
+
+def conv(a, k):
+    p = np.pad(a, ((1, 1), (1, 1)), mode="edge")
+    return np.array([[float((p[i:i + 3, j:j + 3] * k).sum())
+                      for j in range(a.shape[1])] for i in range(a.shape[0])])
+
+fm = conv(img, K_left)
+print("A FEATURE MAP from one edge kernel, row 3:")
+print("   " + " ".join("%6.1f" % v for v in fm[3]))
+print("   positive at the LEFT edge of the bar (dark to light) and negative")
+print("   at the right edge (light to dark). same kernel, opposite signs.")
+print()
+print("AFTER ReLU -- max(x, 0):")
+print("   " + " ".join("%6.1f" % v for v in np.maximum(fm[3], 0)))
+print("   the right edge is gone. not attenuated -- gone, exactly zero.")
+print("   this feature now means 'dark-to-light edge here', a claim that")
+print("   is either made or not made. before ReLU it meant 'dark-to-light")
+print("   by this much, OR light-to-dark by this much', which is two")
+print("   different things sharing one number.")
+print()
+print("   the network's answer to losing the other edge is not to recover")
+print("   it -- it is to learn a SECOND kernel that is the mirror image:")
+fm2 = conv(img, K_right)
+print("   mirrored kernel + ReLU, row 3:")
+print("   " + " ".join("%6.1f" % v for v in np.maximum(fm2[3], 0)))
+print("   this is why filter counts are what they are. a linear layer needs")
+print("   one filter per direction of variation; a ReLU layer needs one per")
+print("   DIRECTED half of it, so a ReLU network needs roughly twice the")
+print("   channels to represent the same variation -- a real cost, paid")
+print("   because the resulting features are far easier to build on.")
+print()
+
+print("SPARSITY -- how much of a feature map survives:")
+print("%-30s %12s %12s" % ("", "nonzero", "fraction"))
+for label, a in (("before ReLU", fm), ("after ReLU", np.maximum(fm, 0))):
+    nz = int((np.abs(a) > 1e-9).sum())
+    print("%-30s %12d %11.1f%%" % (label, nz, 100.0 * nz / a.size))
+print()
+
+print("NOW THE POINT THAT MATTERS. WITHOUT a nonlinearity, stacking layers")
+print("buys you nothing at all. two convolutions in a row, no activation:")
+A = rng.normal(0, 1, (3, 3))
+B = rng.normal(0, 1, (3, 3))
+x = rng.normal(0, 1, (9, 9))
+two_layers = conv(conv(x, A), B)
+# the composition of two convolutions is a single convolution with the
+# kernels convolved together -- build that 5x5 kernel explicitly
+C = np.zeros((5, 5))
+for i in range(3):
+    for j in range(3):
+        C[i:i + 3, j:j + 3] += B[i, j] * A
+
+def conv5(a, k):
+    p = np.pad(a, ((2, 2), (2, 2)), mode="edge")
+    return np.array([[float((p[i:i + 5, j:j + 5] * k).sum())
+                      for j in range(a.shape[1])] for i in range(a.shape[0])])
+
+one_layer = conv5(x, C)
+inner = slice(3, 6)
+print("   two 3x3 convolutions, interior values:")
+print("      " + " ".join("%8.4f" % v for v in two_layers[4][inner]))
+print("   ONE 5x5 convolution with the combined kernel:")
+print("      " + " ".join("%8.4f" % v for v in one_layer[4][inner]))
+print("      max difference in the interior: %.2e"
+      % np.abs(two_layers[2:-2, 2:-2] - one_layer[2:-2, 2:-2]).max())
+print("   identical. a hundred stacked linear layers collapse into ONE")
+print("   linear layer, exactly, always. depth without a nonlinearity is")
+print("   not a deep model -- it is an expensive way to write a shallow one.")
+print()
+print("   now put a ReLU between them and try to collapse it:")
+relu_stack = conv(np.maximum(conv(x, A), 0), B)
+print("      with ReLU:  " + " ".join("%8.4f" % v for v in relu_stack[4][inner]))
+print("      difference from the single 5x5: %.4f"
+      % np.abs(relu_stack[2:-2, 2:-2] - one_layer[2:-2, 2:-2]).max())
+print("   no 5x5 kernel reproduces it, because the function is no longer")
+print("   linear. THAT is what the activation buys: it makes depth mean")
+print("   something.")
+print()
+
+print("WHY ReLU AND NOT A SMOOTH CURVE. compare gradients:")
+print("%-16s %14s %14s %14s" % ("input x", "sigmoid'(x)", "tanh'(x)", "ReLU'(x)"))
+
+for v in (-6.0, -2.0, 0.0, 2.0, 6.0):
+    sg = 1 / (1 + np.exp(-v))
+    print("%-16.1f %14.6f %14.6f %14.0f"
+          % (v, sg * (1 - sg), 1 - np.tanh(v) ** 2, 1.0 if v > 0 else 0.0))
+print("   ReLU is not differentiable at exactly 0; every framework simply")
+print("   picks 0 there, and it has never mattered in practice.")
+print("   sigmoid's gradient at x=6 is %.6f. multiply ten of those together"
+      % (1 / (1 + np.exp(-6.0)) * (1 - 1 / (1 + np.exp(-6.0)))))
+print("   for a ten-layer network and the gradient reaching layer 1 is")
+print("   %.2e -- the vanishing gradient, and it is why nothing deep"
+      % (1 / (1 + np.exp(-6.0)) * (1 - 1 / (1 + np.exp(-6.0)))) ** 10)
+print("   trained before ReLU. ReLU's gradient is exactly 1 wherever the")
+print("   unit is active, so it passes gradient through unchanged, however")
+print("   many layers deep.")
+print()
+
+print("AND THE FAILURE IT INTRODUCES -- DEAD UNITS. ReLU's gradient is")
+print("exactly 0 on the other side. a unit whose bias drifts far negative")
+print("outputs 0 for every input, so it gets 0 gradient, so it can never")
+print("recover:")
+z = rng.normal(0, 1, 2000)
+print("%-24s %14s %14s" % ("bias", "fraction active", "gradient flow"))
+for bias in (0.5, 0.0, -1.0, -3.0, -6.0):
+    act = (z + bias) > 0
+    print("%-24.1f %14.3f %14s"
+          % (bias, act.mean(), "dead" if act.mean() == 0 else "ok"))
+print("   at bias -6 not one of %d inputs activates the unit. it is a" % z.size)
+print("   constant 0 that will stay a constant 0 forever, and it still")
+print("   costs memory and multiplications on every forward pass.")
+print("   the fixes all keep a little slope on the left: LeakyReLU uses")
+print("   0.01x, ELU and GELU curve smoothly through the origin. all of")
+print("   them trade a little of ReLU's exact sparsity for the guarantee")
+print("   that no unit is ever permanently unreachable.")
+```
+
 ## Worth remembering
 
 - ReLU stands for Rectified Linear Unit.

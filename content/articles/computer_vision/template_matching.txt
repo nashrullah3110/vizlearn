@@ -97,3 +97,178 @@ peaks.
 
 **Expecting invariance it does not have.** If the object can rotate or change
 size, this is the wrong method, not a method that needs tuning.
+
+## Sliding a patch, and the correlation that lies
+
+Template matching is the simplest possible detector: slide a patch over the image and score every position. Building it exposes exactly why raw correlation fails, why normalised cross-correlation is the fix, and the limits that no amount of normalising repairs.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(7)
+H, W = 16, 34
+img = rng.normal(70, 6, (H, W))
+
+# the thing we are looking for: a small plus sign
+tpl = np.array([[20., 90., 20.],
+                [90., 140., 90.],
+                [20., 90., 20.]])
+
+def paste(a, t, r, c, gain=1.0, offset=0.0):
+    a[r:r + t.shape[0], c:c + t.shape[1]] = t * gain + offset
+
+paste(img, tpl, 3, 5)                      # the exact target
+paste(img, tpl, 9, 20, gain=0.45, offset=85)   # same shape, dimmer + brighter
+img[6:11, 27:32] = 240.0                   # a big bright blob: no plus at all
+img = np.clip(img, 0, 255)
+
+def show(a, label, hi=255):
+    ramp = " .:-=+*#%@"
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(ramp[min(9, int(9 * max(0, v) / hi))] for v in row))
+
+show(img, "the image")
+print("      there are TWO plus signs: an exact copy at (3,5), and a low")
+print("      contrast one at (9,20). there is also a big bright blob at")
+print("      (6,27) which is not a plus at all.")
+print()
+
+th, tw = tpl.shape
+positions = [(r, c) for r in range(H - th + 1) for c in range(W - tw + 1)]
+
+def score_map(fn):
+    m = np.full((H - th + 1, W - tw + 1), -np.inf)
+    for r, c in positions:
+        m[r, c] = fn(img[r:r + th, c:c + tw])
+    return m
+
+print("METHOD 1 -- RAW CORRELATION: sum(patch * template).")
+raw = score_map(lambda p: float((p * tpl).sum()))
+best = np.unravel_index(raw.argmax(), raw.shape)
+print("      best match at %s, score %.0f" % (str(best), raw.max()))
+print("      scores at the three interesting places:")
+for label, (r, c) in (("exact plus", (3, 5)), ("faint plus", (9, 20)),
+                      ("bright blob", (6, 28))):
+    print("%20s  %12.0f" % (label, raw[r, c]))
+print("      the blob WINS, and it is not even the right shape. raw")
+print("      correlation rewards brightness: the blob is 240 everywhere,")
+print("      so multiplying it by anything positive gives a big number.")
+print("      a matched filter with no normalisation is a brightness")
+print("      detector with extra steps.")
+print()
+
+print("METHOD 2 -- SUM OF SQUARED DIFFERENCES: sum((patch - template)^2),")
+print("and now SMALL is good.")
+ssd = score_map(lambda p: -float(((p - tpl) ** 2).sum()))
+print("      scores (negated, so bigger is still better):")
+for label, (r, c) in (("exact plus", (3, 5)), ("faint plus", (9, 20)),
+                      ("bright blob", (6, 28))):
+    print("%20s  %12.0f" % (label, ssd[r, c]))
+bg_mask = np.ones_like(ssd, bool)
+bg_mask[2:5, 4:7] = False
+bg_mask[8:11, 19:22] = False
+bg_mask[5:12, 26:33] = False
+best_bg = ssd[bg_mask].max()
+print("%20s  %12.0f" % ("best background", best_bg))
+print("      the exact copy wins, correctly -- its SSD is essentially 0,")
+print("      and the blob is rejected hard. so SSD fixed the brightness")
+print("      bug. but look at the faint plus: %.0f, which is WORSE than"
+      % ssd[9, 20])
+print("      the best patch of pure background at %.0f. a real target" % best_bg)
+print("      now ranks below noise.")
+print("      SSD compares absolute values, so it is asking 'are these the")
+print("      same pixels?' rather than 'are these the same shape?'. the")
+print("      faint plus is the identical shape at 0.45x contrast on a")
+print("      brighter background -- exactly what a different exposure")
+print("      produces -- and SSD scores it as a non-match. that is the")
+print("      same failure as raw correlation, seen from the other side.")
+print()
+
+print("METHOD 3 -- NORMALISED CROSS-CORRELATION. subtract each patch's own")
+print("mean, divide by its own standard deviation, and do the same to the")
+print("template. what is left is pure SHAPE:")
+t0 = (tpl - tpl.mean()) / tpl.std()
+
+def ncc(p):
+    s = p.std()
+    if s < 1e-9:
+        return 0.0
+    return float((((p - p.mean()) / s) * t0).sum() / t0.size)
+
+nc = score_map(ncc)
+print("%20s  %12s" % ("", "NCC"))
+for label, (r, c) in (("exact plus", (3, 5)), ("faint plus", (9, 20)),
+                      ("bright blob", (6, 28))):
+    print("%20s  %12.3f" % (label, nc[r, c]))
+print("      both plus signs score %.3f -- not approximately, EXACTLY,"
+      % min(nc[3, 5], nc[9, 20]))
+print("      to floating-point precision.")
+print("      the blob scores %.3f, but for a duller reason than you might"
+      % nc[6, 28])
+print("      hope: it is perfectly uniform, so its standard deviation is 0")
+print("      and the correlation is undefined. the convention is to return")
+print("      0, which is the right answer -- a patch with no variation has")
+print("      no shape to match.")
+print("      the faint plus was pasted at 0.45x contrast with +85 added,")
+print("      and NCC does not care: subtracting the patch's own mean")
+print("      cancels the +85, dividing by its own std cancels the 0.45. it is")
+print("      invariant to any change of the form a*x + b, which is exactly")
+print("      the set of changes a camera's exposure and gain produce.")
+print()
+
+show((nc > 0.75).astype(float) * 255, "everywhere NCC > 0.75")
+print("      %d positions, and here are their scores:"
+      % int((nc > 0.75).sum()))
+for r, c in zip(*np.where(nc > 0.75)):
+    tag = "  <- a real plus" if (r, c) in ((3, 5), (9, 20)) else ""
+    print("         (%2d,%2d)  %.3f%s" % (r, c, nc[r, c], tag))
+bg_nc = nc[bg_mask]
+print("      the two real ones score 1.000 and the false positives sit")
+print("      around 0.78 -- a wide margin, but they are THERE, on nothing")
+print("      but noise. %.1f%% of pure-background positions clear 0.75."
+      % (100.0 * (bg_nc > 0.75).mean()))
+print("      that is the cost of a 3x3 template: it has only 9 numbers, so")
+print("      random noise reproduces its shape by chance often enough to")
+print("      matter. NCC's reliability comes from template SIZE -- a 15x15")
+print("      template has 225 constraints and false positives at 0.78")
+print("      become vanishingly rare. small templates are fast and")
+print("      untrustworthy, and that trade is the whole tuning problem.")
+print()
+
+print("NOW THE LIMITS, which no normalisation fixes. transform the")
+print("template and re-score it against the exact match at (3,5):")
+print("%-34s %10s" % ("template variant", "NCC"))
+variants = [("as given", tpl),
+            ("rotated 90 degrees", np.rot90(tpl)),
+            ("transposed", tpl.T),
+            ("inverted (dark on light)", 160 - tpl)]
+patch = img[3:6, 5:8]
+for name, t in variants:
+    tt = (t - t.mean()) / (t.std() + 1e-9)
+    pp = (patch - patch.mean()) / (patch.std() + 1e-9)
+    print("%-34s %10.3f" % (name, float((pp * tt).sum() / tt.size)))
+print("   the plus is 4-fold symmetric, so rotating it changes nothing --")
+print("   that is a property of THIS template, not of the method.")
+print("   inverting it flips the sign to exactly -1: NCC measures")
+print("   correlation, and a perfect negative is as informative as a")
+print("   perfect positive, if you remember to take the absolute value.")
+print()
+print("%-34s %10s" % ("what changes in the image", "does NCC survive it?"))
+for k, v in (("brightness / exposure", "yes, exactly"),
+             ("contrast / gain", "yes, exactly"),
+             ("additive noise", "degrades smoothly"),
+             ("rotation", "no -- unless symmetric"),
+             ("scale", "no"),
+             ("perspective", "no"),
+             ("non-rigid deformation", "no")):
+    print("%-34s %10s" % (k, v))
+print()
+print("and that table is the whole reason the field moved on. template")
+print("matching is exact, needs no training, and runs in microseconds, so")
+print("it still owns the jobs where the appearance really is fixed --")
+print("factory inspection, GUI automation, aligning two frames from a")
+print("locked-down camera. the moment the object can turn, or move nearer,")
+print("you need features that survive those changes, which is what SIFT")
+print("was built for and what a convolutional network learns.")
+```

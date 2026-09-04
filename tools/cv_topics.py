@@ -821,6 +821,148 @@ brightness channel, equalise that one channel, and convert back.
 **Comparing histograms across images to judge similarity.** Two completely
 different photographs can share a histogram. It describes the palette, not the
 picture.
+
+## The histogram, and the CDF that flattens it
+
+A histogram throws away every bit of spatial information and keeps only how often each brightness occurs. That sounds like a loss, and it is -- but it is exactly what you need to fix exposure, and equalisation turns out to be nothing more than applying the image's own cumulative distribution as a lookup table.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(11)
+H, W = 40, 60
+yy, xx = np.mgrid[0:H, 0:W]
+scene = (90 + 40 * np.sin(xx / 7.0) * np.cos(yy / 9.0)
+         + 25 * ((xx // 12 + yy // 10) % 2))
+scene += rng.normal(0, 4, (H, W))
+# a badly exposed camera: everything squeezed into a narrow band
+img = np.clip(60 + (scene - scene.mean()) * 0.28, 0, 255).astype(int)
+
+def hist(a, bins=16):
+    h, _ = np.histogram(a, bins=bins, range=(0, 256))
+    return h
+
+def draw(h, label, width=44):
+    print("   %s" % label)
+    top = h.max()
+    for b in range(len(h)):
+        lo = b * 256 // len(h)
+        n = int(round(width * h[b] / top)) if top else 0
+        print("      %3d-%3d |%-44s %5d" % (lo, lo + 255 // len(h),
+                                            "#" * n, h[b]))
+
+print("THE IMAGE is under-exposed: %d..%d out of 0..255."
+      % (img.min(), img.max()))
+print("   mean %.1f, std %.1f" % (img.mean(), img.std()))
+draw(hist(img), "histogram, 16 bins")
+used = int((hist(img, 256) > 0).sum())
+print("      only %d of the 256 available levels are used at all." % used)
+print("      the picture is fine -- the camera wasted %.0f%% of its range."
+      % (100 * (1 - used / 256.0)))
+print()
+
+print("FIRST TRY -- CONTRAST STRETCHING. a straight line that maps the")
+print("darkest pixel to 0 and the brightest to 255:")
+lo, hi = img.min(), img.max()
+stretched = np.round((img - lo) * 255.0 / (hi - lo)).astype(int)
+draw(hist(stretched), "after stretching")
+print("      range %d..%d, std %.1f (was %.1f)."
+      % (stretched.min(), stretched.max(), stretched.std(), img.std()))
+print("      better. but look at the SHAPE -- it is the same lumpy curve,")
+print("      just wider. the levels are spread out but still bunched in the")
+print("      middle, because a linear map cannot change a distribution's")
+print("      shape, only its scale.")
+print("      distinct levels used: %d of 256."
+      % int((hist(stretched, 256) > 0).sum()))
+print()
+
+print("SECOND TRY -- EQUALISATION. the goal is a FLAT histogram: every")
+print("brightness equally common. the trick is a fact from probability --")
+print("if you push any random variable through its own CDF, the result is")
+print("uniform. so the lookup table IS the cumulative histogram:")
+counts = hist(img, 256)
+cdf = np.cumsum(counts).astype(float)
+cdf_min = cdf[cdf > 0][0]
+lut = np.round((cdf - cdf_min) / (img.size - cdf_min) * 255).astype(int)
+lut = np.clip(lut, 0, 255)
+eq = lut[img]
+print("      a few entries of the lookup table:")
+print("%14s %14s %14s" % ("input level", "cumulative count", "output level"))
+for v in range(img.min(), img.max() + 1, max(1, (img.max() - img.min()) // 6)):
+    print("%14d %14d %14d" % (v, int(cdf[v]), lut[v]))
+print("      steep where pixels are common, flat where they are rare. the")
+print("      table spends output range in proportion to how many pixels")
+print("      actually need it.")
+draw(hist(eq), "after equalisation")
+print("      range %d..%d, std %.1f." % (eq.min(), eq.max(), eq.std()))
+print()
+
+print("HOW FLAT IS FLAT? measure the spread of the 16 bin counts --")
+print("perfectly flat would be 0:")
+print("%-24s %14s %14s" % ("", "bin std", "levels used"))
+for name, a in (("original", img), ("stretched", stretched),
+                ("equalised", eq)):
+    h = hist(a).astype(float)
+    print("%-24s %14.1f %14d"
+          % (name, h.std(), int((hist(a, 256) > 0).sum())))
+print("   equalisation flattens the histogram that stretching only widened.")
+print()
+
+print("BUT NOTICE THE LEVEL COUNT: %d after equalisation against %d after"
+      % (int((hist(eq, 256) > 0).sum()), int((hist(stretched, 256) > 0).sum())))
+print("stretching. equalisation cannot ADD levels -- it only redistributes")
+print("the ones already there, and it can LOSE some, because the lookup")
+print("table is a function on integers and two nearby inputs can round to")
+print("the same output:")
+collisions = [v for v in range(255) if counts[v] > 0 and counts[v + 1] > 0
+              and lut[v] == lut[v + 1]]
+if collisions:
+    v = collisions[0]
+    print("      %d such collision%s here -- levels %d and %d both become %d,"
+          % (len(collisions), "" if len(collisions) == 1 else "s", v, v + 1,
+             lut[v]))
+    print("      and no inverse can separate them again.")
+else:
+    print("      none happened to occur here, but they are common in")
+    print("      images with a strong peak.")
+print("   so equalisation is not free. it is a one-way map that trades")
+print("   fidelity in the crowded part of the range for visibility in the")
+print("   empty part -- which is a good trade for looking at a picture and")
+print("   a bad one if you intend to measure the pixel values afterwards.")
+print()
+
+print("AND THE REAL FAILURE MODE. equalisation is global -- ONE table for")
+print("the whole frame -- so a large dark region drags the table for")
+print("everything else. paste a dark strip over a third of the frame and")
+print("re-equalise, then look only at the part that did not change:")
+bordered = img.copy()
+bordered[:, :20] = np.clip(rng.normal(12, 5, (H, 20)), 0, 255).astype(int)
+c2 = hist(bordered, 256)
+cd2 = np.cumsum(c2).astype(float)
+m2 = cd2[cd2 > 0][0]
+lut2 = np.clip(np.round((cd2 - m2) / (bordered.size - m2) * 255), 0, 255).astype(int)
+eq2 = lut2[bordered]
+region = (slice(None), slice(20, None))
+print("%-30s %12s %12s" % ("", "std, no border", "std, border"))
+print("%-30s %12.1f %12.1f"
+      % ("the subject region only", eq[region].std(), eq2[region].std()))
+print("%-30s %12d %12d"
+      % ("output range it occupies",
+         int(eq[region].max() - eq[region].min()),
+         int(eq2[region].max() - eq2[region].min())))
+print("      the same pixels, the same operation, %.0f%% less contrast."
+      % (100 * (1 - eq2[region].std() / eq[region].std())))
+print("      the subject did not change at all -- the DISTRIBUTION did. a")
+print("      third of the frame now sits at the bottom of the histogram, so")
+print("      the CDF has already climbed a third of the way up before it")
+print("      reaches the first subject pixel, and the subject is left with")
+print("      only the top of the output range to spread across.")
+print("      the fix is CLAHE: equalise small tiles independently, clip the")
+print("      histogram before accumulating so no single level can dominate,")
+print("      and interpolate between neighbouring tiles' tables. same idea,")
+print("      applied locally, which is what almost every real pipeline uses.")
+```
+
 """,
     [
         {"q": "What does a histogram tell you nothing about?",
@@ -996,6 +1138,160 @@ removes them along with the noise.
 **Reaching for bilateral by default.** It is far more expensive than the other
 two and has two parameters instead of one. If the edges do not need protecting,
 it is a slow Gaussian.
+
+## Three blurs, and the one that keeps edges
+
+Gaussian, median and bilateral filtering on the same noisy image. Each removes a different kind of noise and damages something different, and the numbers show exactly which.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+H, W = 11, 22
+clean = np.full((H, W), 60.0)
+clean[:, 11:] = 200.0                      # a hard vertical edge
+noisy = clean + rng.normal(0, 12, (H, W))  # gaussian sensor noise
+sp = noisy.copy()                          # plus salt-and-pepper
+for _ in range(14):
+    r, c = rng.integers(0, H), rng.integers(0, W)
+    sp[r, c] = 255.0 if rng.random() < 0.5 else 0.0
+
+SHADE = " .:-=+*#%@"
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(SHADE[int(np.clip(v / 255.0, 0, 1) * 9)] for v in row))
+
+show(clean, "the clean image: dark left, bright right")
+show(sp, "with gaussian noise AND salt-and-pepper specks")
+print()
+
+def neighbourhood(a, i, j, k):
+    p = k // 2
+    r0, r1 = max(0, i - p), min(a.shape[0], i + p + 1)
+    c0, c1 = max(0, j - p), min(a.shape[1], j + p + 1)
+    return a[r0:r1, c0:c1]
+
+def gaussian_blur(a, k=5, sigma=1.5):
+    ax = np.arange(k) - k // 2
+    g = np.exp(-(ax ** 2) / (2 * sigma ** 2))
+    g = np.outer(g, g); g /= g.sum()
+    p = np.pad(a, k // 2, mode="edge")
+    out = np.zeros_like(a)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            out[i, j] = (p[i:i + k, j:j + k] * g).sum()
+    return out
+
+def median_blur(a, k=5):
+    out = np.zeros_like(a)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            out[i, j] = np.median(neighbourhood(a, i, j, k))
+    return out
+
+def bilateral(a, k=5, sigma_s=1.5, sigma_r=25.0):
+    ax = np.arange(k) - k // 2
+    gs = np.exp(-(ax ** 2) / (2 * sigma_s ** 2))
+    gs = np.outer(gs, gs)
+    p = np.pad(a, k // 2, mode="edge")
+    out = np.zeros_like(a)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            win = p[i:i + k, j:j + k]
+            gr = np.exp(-((win - a[i, j]) ** 2) / (2 * sigma_r ** 2))
+            w = gs * gr
+            out[i, j] = (win * w).sum() / w.sum()
+    return out
+
+results = [("gaussian 5x5", gaussian_blur(sp)),
+           ("median 5x5", median_blur(sp)),
+           ("bilateral 5x5", bilateral(sp))]
+for name, out in results:
+    show(out, name)
+print()
+
+def edge_sharpness(a):
+    # how abrupt is the transition across the boundary at column 11
+    return abs(a[:, 12].mean() - a[:, 9].mean())
+
+def flat_noise(a):
+    # residual noise in the two flat regions
+    return (a[:, 1:9].std() + a[:, 14:21].std()) / 2
+
+print("MEASURED, on TWO different noises -- because the filters disagree")
+print("about which is which.")
+print()
+for src, label in ((noisy, "gaussian noise only"), (sp, "gaussian + specks")):
+    print("   %s" % label)
+    print("%22s %16s %16s %18s"
+          % ("", "noise in flat", "worst speck", "edge sharpness"))
+    print("%22s %16.3f %16.1f %18.1f"
+          % ("input", flat_noise(src), abs(src[:, 1:9] - 60).max(),
+             edge_sharpness(src)))
+    for name, fn in (("gaussian 5x5", gaussian_blur),
+                     ("median 5x5", median_blur),
+                     ("bilateral 5x5", bilateral)):
+        o = fn(src)
+        print("%22s %16.3f %16.1f %18.1f"
+              % (name, flat_noise(o), abs(o[:, 1:9] - 60).max(),
+                 edge_sharpness(o)))
+    print("%22s %16.3f %16.1f %18.1f"
+          % ("(clean original)", flat_noise(clean), 0.0, edge_sharpness(clean)))
+    print()
+
+print("READ IT COLUMN BY COLUMN.")
+print()
+print("   NOISE IN FLAT AREAS -- all three reduce it. gaussian is a weighted")
+print("   average, so averaging %d samples cuts random noise by about"
+      % 25)
+print("   sqrt(%d) = %.1f, which is what it is for." % (25, np.sqrt(25)))
+print()
+print("   WORST SPECK -- this is where they separate. a salt speck of 255")
+print("   among neighbours of 60:")
+win = np.array([60., 62., 255., 58., 61., 59., 60., 63., 57.])
+print("      window %s" % win.astype(int))
+print("      mean   %.1f  <- the speck pulled it up by %.1f"
+      % (win.mean(), win.mean() - 60))
+print("      median %.1f  <- the speck is simply not the middle value"
+      % np.median(win))
+print("   a median is a RANK statistic. an outlier changes which value is")
+print("   in the middle by at most one position; it cannot drag the answer")
+print("   toward itself the way a mean can. that is why median filtering is")
+print("   the standard tool for impulse noise.")
+print()
+print("   AND LOOK AT BILATERAL IN THE SECOND TABLE. it barely touches the")
+print("   specks -- its worst speck is almost unchanged. that is not a bug,")
+print("   it is the same mechanism that preserves edges: a speck of 255")
+print("   among neighbours of 60 differs by 195, so the range weights of")
+print("   all its neighbours collapse to")
+print("      exp(-195^2 / (2*25^2)) = %.2e" % np.exp(-195 ** 2 / (2 * 25 ** 2)))
+print("   and the pixel is averaged with essentially nothing but itself.")
+print("   bilateral filtering cannot distinguish 'an impulse' from 'a very")
+print("   small object', so it keeps both. run a median first if you have")
+print("   impulse noise, then a bilateral pass.")
+print()
+print("   EDGE SHARPNESS -- gaussian blurs the edge because it averages")
+print("   across it without knowing it is there. bilateral does not:")
+i, j = 5, 11
+p = np.pad(sp, 2, mode="edge")
+win = p[i:i + 5, j:j + 5]
+gr = np.exp(-((win - sp[i, j]) ** 2) / (2 * 25.0 ** 2))
+print("      at a pixel ON the edge, the bilateral RANGE weights are:")
+for r in np.round(gr, 3):
+    print("         %s" % r)
+print("      neighbours with a similar value get weight near 1; those on")
+print("      the other side of the edge get near 0. so the average is taken")
+print("      only over pixels that were probably the same surface.")
+print()
+print("that is the whole idea of an edge-preserving filter: weight by")
+print("distance AND by similarity, so smoothing never crosses a boundary.")
+print("the cost is that it is far slower -- the weights depend on the pixel")
+print("values, so they must be recomputed at every position rather than")
+print("applied as one fixed kernel.")
+```
+
 """,
     [
         {"q": "Why does a Gaussian blur fail to remove salt-and-pepper noise?",
@@ -1175,6 +1471,154 @@ together. Thin structures are lost first and cannot be recovered.
 **Opening when you meant closing.** The mnemonic is that opening removes
 *bright* things and closing removes *dark* ones. If your foreground is dark
 against a light background, they swap.
+
+## Shrinking and growing shapes with min and max
+
+Erosion takes the minimum over a neighbourhood, dilation the maximum. Two operations, and every other morphological tool is a composition of them -- which this builds one at a time, then measures on a shape designed to have something for each of them to catch.
+
+```python-run
+import numpy as np
+
+W, H = 26, 11
+img = np.zeros((H, W), int)
+img[2:8, 2:9] = 1                      # block one
+img[4:6, 5:9] = 0                      # a notch cut into its right side
+img[4:6, 9:14] = 1                     # a thin bridge, only 2 pixels tall
+img[2:8, 14:21] = 1                    # block two
+img[5, 17] = 0                         # a 1-pixel hole inside block two
+for r, c in ((0, 23), (9, 3), (1, 12), (6, 22)):
+    img[r, c] = 1                      # isolated specks
+
+SPECKS = [(0, 23), (9, 3), (1, 12), (6, 22)]
+HOLE = (5, 17)
+BLOCK2 = (slice(2, 8), slice(14, 21))
+
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join("#" if v else "." for v in row))
+
+show(img, "input: two blocks joined by a 2-pixel-tall bridge")
+print("      block one has a notch, block two has a 1-pixel hole,")
+print("      and there are 4 isolated specks. %d foreground pixels." % img.sum())
+print()
+
+def erode(a, k=3):
+    p = k // 2
+    q = np.pad(a, p, mode="constant", constant_values=1)
+    return np.array([[q[i:i + k, j:j + k].min()
+                      for j in range(a.shape[1])] for i in range(a.shape[0])])
+
+def dilate(a, k=3):
+    p = k // 2
+    q = np.pad(a, p, mode="constant", constant_values=0)
+    return np.array([[q[i:i + k, j:j + k].max()
+                      for j in range(a.shape[1])] for i in range(a.shape[0])])
+
+print("EROSION -- each pixel becomes the MINIMUM of its 3x3 neighbourhood,")
+print("so it survives only if every one of its 8 neighbours is foreground:")
+e = erode(img)
+show(e, "eroded once")
+print("      %d -> %d pixels (%.0f%% removed)"
+      % (img.sum(), e.sum(), 100 * (1 - e.sum() / img.sum())))
+print("      every speck is gone. the bridge is gone too, and not because")
+print("      it was thinned -- it is 2 pixels tall, so a 3x3 element cannot")
+print("      fit inside it ANYWHERE. erosion deletes whatever is narrower")
+print("      than the structuring element, in one pass.")
+print("      block one is eaten from its outer edge AND from the notch at")
+print("      once, which leaves a single surviving column.")
+print()
+
+print("DILATION -- the MAXIMUM instead. a pixel turns on if ANY neighbour")
+print("is foreground:")
+d = dilate(img)
+show(d, "dilated once")
+print("      %d -> %d pixels (%.0f%% added)"
+      % (img.sum(), d.sum(), 100 * (d.sum() / img.sum() - 1)))
+print("      the specks became 3x3 blobs, the hole and the notch are")
+print("      filled, and the two blocks now touch solidly.")
+print()
+
+print("THEY ARE NOT INVERSES. running one after the other does not return")
+print("the input -- it returns something more useful.")
+opened = dilate(erode(img))
+closed = erode(dilate(img))
+show(opened, "OPENING (erode, then dilate)")
+print("      %d pixels, against %d in the input" % (opened.sum(), img.sum()))
+print("      the specks are gone for good: erosion deleted them and")
+print("      dilation has nothing left to grow them back from.")
+print("      block one loses far more than its outline: the 2-pixel-tall")
+print("      arms above and below the notch were thin, so they went the")
+print("      way of the specks. that is the whole point of opening -- it")
+print("      keeps whatever the element fits inside and discards the rest.")
+print("      block two survives nearly whole, %d pixels of its original %d,"
+      % (int(opened[BLOCK2].sum()), int(img[BLOCK2].sum())))
+print("      and the 2 it lost are worth chasing down. they are at the")
+print("      hole: erosion cleared a 3x3 patch around it, and dilation")
+print("      could only grow back from what survived, so a 1-pixel hole")
+print("      reopened as a 3-pixel slit. opening does not leave holes")
+print("      alone -- it WIDENS them. which is precisely why closing has")
+print("      to exist as a separate operation.")
+print()
+show(closed, "CLOSING (dilate, then erode)")
+print("      %d pixels" % closed.sum())
+print("      the hole and the notch are filled and stay filled, and all")
+print("      4 specks survived -- dilation grew them, erosion shrank them")
+print("      again. the specks near the frame edge come back as short")
+print("      streaks rather than single pixels, because erosion here pads")
+print("      the outside with foreground: a pixel on the last row has no")
+print("      neighbour below to be eroded against. every library makes")
+print("      some choice here, and it is always visible at the border.")
+print()
+
+print("MEASURED on the specks and the hole specifically:")
+print("%-12s %18s %16s" % ("", "specks remaining", "hole filled?"))
+for name, out in (("input", img), ("erosion", e), ("dilation", d),
+                  ("opening", opened), ("closing", closed)):
+    n = sum(int(out[r, c]) for r, c in SPECKS)
+    print("%-12s %18d %16s" % (name, n, "yes" if out[HOLE] else "no"))
+print("   opening is the speck remover, closing is the hole filler, and")
+print("   neither does the other's job. erosion and dilation each do half")
+print("   of one job while wrecking the size of everything else.")
+print()
+
+print("%-10s %-44s %s" % ("operation", "what it removes", "shape size"))
+for r in (("erosion", "specks, thin parts, 1 pixel of every edge", "smaller"),
+          ("dilation", "holes, gaps, notches", "larger"),
+          ("opening", "specks and thin protrusions", "preserved"),
+          ("closing", "holes and thin gaps", "preserved")):
+    print("%-10s %-44s %s" % r)
+print()
+
+print("THE STRUCTURING ELEMENT decides what 'neighbourhood' means, and it")
+print("does not have to be a square:")
+print("      3x3 square      3x3 cross       1x5 horizontal")
+for r in range(3):
+    cross = "# # #" if r == 1 else ". # ."
+    horiz = "# # # # #" if r == 1 else ""
+    print("      %-16s%-16s%s" % ("# # #", cross, horiz))
+print()
+
+wide = np.zeros_like(img)
+padded = np.pad(img, ((0, 0), (2, 2)), mode="constant", constant_values=1)
+for i in range(H):
+    for j in range(W):
+        wide[i, j] = padded[i, j:j + 5].min()
+show(wide, "eroded with a 1x5 horizontal element")
+print("      %d pixels survive, and the bridge is among them." % wide.sum())
+print("      the bridge is 2 tall and 5 wide, so a 1x5 horizontal window")
+print("      fits inside it where a 3x3 square could not. the same image,")
+print("      the same operation, a different element, opposite answer.")
+print("      that is how you strip vertical rules off a scanned table")
+print("      while keeping the horizontal ones -- the element, not the")
+print("      operation, is where you encode what you are looking for.")
+print()
+print("and the reason this still earns its place next to a segmentation")
+print("network: these are exact, fast, and need no training. an opening")
+print("followed by a closing removes most of the obvious defects in a")
+print("binary mask in two lines, whatever produced the mask.")
+```
+
 """,
     [
         {"q": "Under erosion, when does a foreground pixel survive?",
@@ -1622,6 +2066,182 @@ rather than in steps.
 
 **Ignoring aspect ratio.** Stretching to a square distorts every shape in the
 frame. Pad to the target aspect ratio, then resize.
+
+## Nearest, bilinear, and why downscaling needs a blur first
+
+Resizing asks for pixel values at coordinates that do not exist, so every method is a guess. This measures three guesses against a known ground truth, and then shows the failure that catches everyone -- that shrinking an image correctly is not an interpolation problem at all.
+
+```python-run
+import numpy as np
+
+# a smooth ground truth we can sample at any real coordinate, which is
+# what lets us score every method instead of just eyeballing it
+def f(y, x):
+    return (128 + 90 * np.sin(x * 0.55) * np.cos(y * 0.42)
+            + 20 * np.sin(x * 0.2 + y * 0.3))
+
+H, W = 8, 10
+src = f(*np.mgrid[0:H, 0:W])
+print("SOURCE %dx%d, sampled from a function we can evaluate anywhere," % (H, W))
+print("which means we can score every method against the truth.")
+print("   " + " ".join("%5.0f" % v for v in src[3]) + "   <- row 3")
+print()
+
+SY, SX = 3, 3                          # upscale factor
+OH, OW = H * SY, W * SX
+
+# output index -> source coordinate, aligning pixel CENTRES
+def coords(o, s, scale):
+    return (np.arange(o) + 0.5) / scale - 0.5
+
+def nearest(a, oh, ow):
+    yy = np.clip(np.round(coords(oh, a.shape[0], SY)).astype(int), 0, a.shape[0] - 1)
+    xx = np.clip(np.round(coords(ow, a.shape[1], SX)).astype(int), 0, a.shape[1] - 1)
+    return a[np.ix_(yy, xx)]
+
+def bilinear(a, oh, ow):
+    cy = np.clip(coords(oh, a.shape[0], SY), 0, a.shape[0] - 1)
+    cx = np.clip(coords(ow, a.shape[1], SX), 0, a.shape[1] - 1)
+    y0 = np.floor(cy).astype(int); y1 = np.minimum(y0 + 1, a.shape[0] - 1)
+    x0 = np.floor(cx).astype(int); x1 = np.minimum(x0 + 1, a.shape[1] - 1)
+    wy = (cy - y0)[:, None]; wx = (cx - x0)[None, :]
+    top = a[np.ix_(y0, x0)] * (1 - wx) + a[np.ix_(y0, x1)] * wx
+    bot = a[np.ix_(y1, x0)] * (1 - wx) + a[np.ix_(y1, x1)] * wx
+    return top * (1 - wy) + bot * wy
+
+# Catmull-Rom: passes through the samples, and is C1 continuous
+def cubic_w(t):
+    t = np.abs(t)
+    return np.where(t <= 1, 1.5 * t ** 3 - 2.5 * t ** 2 + 1,
+                    np.where(t < 2, -0.5 * t ** 3 + 2.5 * t ** 2 - 4 * t + 2, 0))
+
+def bicubic(a, oh, ow):
+    def axis(a, o, scale, ax):
+        c = coords(o, a.shape[ax], scale)
+        base = np.floor(c).astype(int)
+        out = np.zeros([o if i == ax else a.shape[i] for i in range(2)])
+        for k in range(-1, 3):
+            idx = np.clip(base + k, 0, a.shape[ax] - 1)
+            w = cubic_w(c - (base + k))
+            taken = np.take(a, idx, axis=ax)
+            out += taken * (w[:, None] if ax == 0 else w[None, :])
+        return out
+    return axis(axis(a, oh, SY, 0), ow, SX, 1)
+
+truth = f(*np.meshgrid(coords(OH, H, SY), coords(OW, W, SX), indexing="ij"))
+
+print("UPSCALING %dx%d -> %dx%d. every output pixel lands between source"
+      % (H, W, OH, OW))
+print("samples, so every method has to invent something. scored against the")
+print("function that generated the source:")
+print("%-16s %12s %12s %14s" % ("method", "mean err", "worst err", "cost/pixel"))
+results, errs = {}, {}
+for name, fn, cost in (("nearest", nearest, "1 read"),
+                       ("bilinear", bilinear, "4 reads"),
+                       ("bicubic", bicubic, "16 reads")):
+    out = fn(src, OH, OW)
+    results[name] = out
+    e = np.abs(out - truth)
+    errs[name] = e
+    print("%-16s %12.2f %12.2f %14s" % (name, e.mean(), e.max(), cost))
+print("   bilinear cuts nearest's MEAN error by about %.0fx; bicubic halves"
+      % (errs["nearest"].mean() / errs["bilinear"].mean()))
+print("   it again, for 4x the memory reads. big gain then diminishing --")
+print("   which is why bilinear is the default almost everywhere.")
+print()
+print("   but look at the WORST errors: nearest and bilinear tie at %.2f."
+      % errs["bilinear"].max())
+wr, wc = np.unravel_index(errs["bilinear"].argmax(), errs["bilinear"].shape)
+print("   that is output pixel (%d, %d), which maps to source coordinate"
+      % (wr, wc))
+print("   (%.2f, %.2f) -- outside the source grid entirely, beyond the"
+      % (coords(OH, H, SY)[wr], coords(OW, W, SX)[wc]))
+print("   outermost sample centres. there is no second sample on that side")
+print("   to interpolate WITH, so bilinear clamps and degenerates to")
+print("   nearest exactly there. every resize has a one-pixel border where")
+print("   it is really doing extrapolation, and no scheme fixes that.")
+print()
+
+print("WHAT NEAREST ACTUALLY DOES. one output row, upscaled 3x:")
+print("   nearest:  " + " ".join("%4.0f" % v for v in results["nearest"][9][:12]))
+print("   bilinear: " + " ".join("%4.0f" % v for v in results["bilinear"][9][:12]))
+print("   truth:    " + " ".join("%4.0f" % v for v in truth[9][:12]))
+print("   nearest repeats each value 3 times -- those flat runs are the")
+print("   blocky squares you see when a thumbnail is blown up. bilinear")
+print("   ramps between them.")
+print()
+
+print("A PROPERTY WORTH KNOWING: bilinear is not linear in the coordinates.")
+print("along either axis alone it is a straight line, but the wx*wy term")
+print("curves the surface in between. evaluate it directly at any real")
+print("coordinate to see this:")
+
+def bilerp_at(a, y, x):
+    y0, x0 = int(np.floor(y)), int(np.floor(x))
+    wy, wx = y - y0, x - x0
+    return ((a[y0, x0] * (1 - wx) + a[y0, x0 + 1] * wx) * (1 - wy)
+            + (a[y0 + 1, x0] * (1 - wx) + a[y0 + 1, x0 + 1] * wx) * wy)
+
+corners = (src[2, 3], src[2, 4], src[3, 3], src[3, 4])
+print("   the 4 corners of one source square: %.1f %.1f %.1f %.1f" % corners)
+print("   at the exact centre (2.5, 3.5):")
+print("      mean of the 4 corners:  %.3f" % np.mean(corners))
+print("      bilinear:               %.3f" % bilerp_at(src, 2.5, 3.5))
+print("   identical, as it must be -- all four weights are 1/4 there.")
+print("   now walk the diagonal from corner (2,3) to corner (3,4), and")
+print("   compare bilinear against the straight line joining those two:")
+print("%8s %14s %14s %10s" % ("t", "bilinear", "straight line", "gap"))
+for t in (0.0, 0.25, 0.5, 0.75, 1.0):
+    b = bilerp_at(src, 2 + t, 3 + t)
+    line = src[2, 3] * (1 - t) + src[3, 4] * t
+    print("%8.2f %14.3f %14.3f %10.3f" % (t, b, line, b - line))
+print("   the endpoints agree and the middle does not. a plane through")
+print("   4 arbitrary corners does not exist unless they happen to be")
+print("   coplanar -- 'bilinear' means linear in each variable SEPARATELY,")
+print("   which is a curved surface, not a flat one.")
+print()
+
+print("NOW THE FAILURE. DOWNSCALING. take a fine stripe pattern:")
+FH, FW = 6, 48
+stripes = np.where((np.arange(FW) // 2) % 2 == 0, 220.0, 40.0)
+stripes = np.tile(stripes, (FH, 1))
+print("   input row (every 2 columns alternate light/dark):")
+print("   " + "".join("#" if v > 128 else "." for v in stripes[0]))
+print("   the true average brightness is %.0f." % stripes.mean())
+print()
+print("   shrink 4x by just taking every 4th column -- what 'nearest' is:")
+sub = stripes[:, ::4]
+print("   " + "".join("#" if v > 128 else "." for v in sub[0]))
+print("   mean %.0f, and every stripe is GONE -- the result is a flat" % sub.mean())
+print("   field of the wrong colour. the pattern repeats every 4 columns")
+print("   and we sampled every 4 columns, so we hit the same phase each")
+print("   time. that is ALIASING, and no interpolation between the")
+print("   surviving samples can recover what was never sampled.")
+print()
+print("   now average each 4-wide block instead -- BLUR, THEN SAMPLE:")
+area = stripes.reshape(FH, FW // 4, 4).mean(axis=2)
+print("   " + " ".join("%3.0f" % v for v in area[0][:12]))
+print("   mean %.0f, matching the input's %.0f. the stripes are gone here"
+      % (area.mean(), stripes.mean()))
+print("   too -- they have to be, there is no room for them -- but their")
+print("   ENERGY is preserved as the correct grey.")
+print()
+print("%-34s %12s" % ("4x downscale of the stripes", "result mean"))
+print("%-34s %12.1f" % ("true input mean", stripes.mean()))
+print("%-34s %12.1f" % ("subsample (nearest)", sub.mean()))
+print("%-34s %12.1f" % ("area-average (blur first)", area.mean()))
+print()
+print("SO THE RULE SPLITS IN TWO:")
+print("   UPSCALING is an interpolation problem -- use bilinear or bicubic.")
+print("   DOWNSCALING is a filtering problem -- low-pass first, THEN")
+print("   sample, which is what area averaging does in one step. reaching")
+print("   for bilinear to shrink an image by 4x still reads only 4 of every")
+print("   16 pixels and still aliases. this is the single most common")
+print("   resizing bug, and it silently corrupts training data: your")
+print("   augmentation pipeline shrinks images, the fine texture aliases")
+print("   into false patterns, and the model learns them.")
+```
+
 """,
     [
         {"q": "Why must a segmentation mask be resized with nearest neighbour?",
@@ -3417,6 +4037,182 @@ peaks.
 
 **Expecting invariance it does not have.** If the object can rotate or change
 size, this is the wrong method, not a method that needs tuning.
+
+## Sliding a patch, and the correlation that lies
+
+Template matching is the simplest possible detector: slide a patch over the image and score every position. Building it exposes exactly why raw correlation fails, why normalised cross-correlation is the fix, and the limits that no amount of normalising repairs.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(7)
+H, W = 16, 34
+img = rng.normal(70, 6, (H, W))
+
+# the thing we are looking for: a small plus sign
+tpl = np.array([[20., 90., 20.],
+                [90., 140., 90.],
+                [20., 90., 20.]])
+
+def paste(a, t, r, c, gain=1.0, offset=0.0):
+    a[r:r + t.shape[0], c:c + t.shape[1]] = t * gain + offset
+
+paste(img, tpl, 3, 5)                      # the exact target
+paste(img, tpl, 9, 20, gain=0.45, offset=85)   # same shape, dimmer + brighter
+img[6:11, 27:32] = 240.0                   # a big bright blob: no plus at all
+img = np.clip(img, 0, 255)
+
+def show(a, label, hi=255):
+    ramp = " .:-=+*#%@"
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(ramp[min(9, int(9 * max(0, v) / hi))] for v in row))
+
+show(img, "the image")
+print("      there are TWO plus signs: an exact copy at (3,5), and a low")
+print("      contrast one at (9,20). there is also a big bright blob at")
+print("      (6,27) which is not a plus at all.")
+print()
+
+th, tw = tpl.shape
+positions = [(r, c) for r in range(H - th + 1) for c in range(W - tw + 1)]
+
+def score_map(fn):
+    m = np.full((H - th + 1, W - tw + 1), -np.inf)
+    for r, c in positions:
+        m[r, c] = fn(img[r:r + th, c:c + tw])
+    return m
+
+print("METHOD 1 -- RAW CORRELATION: sum(patch * template).")
+raw = score_map(lambda p: float((p * tpl).sum()))
+best = np.unravel_index(raw.argmax(), raw.shape)
+print("      best match at %s, score %.0f" % (str(best), raw.max()))
+print("      scores at the three interesting places:")
+for label, (r, c) in (("exact plus", (3, 5)), ("faint plus", (9, 20)),
+                      ("bright blob", (6, 28))):
+    print("%20s  %12.0f" % (label, raw[r, c]))
+print("      the blob WINS, and it is not even the right shape. raw")
+print("      correlation rewards brightness: the blob is 240 everywhere,")
+print("      so multiplying it by anything positive gives a big number.")
+print("      a matched filter with no normalisation is a brightness")
+print("      detector with extra steps.")
+print()
+
+print("METHOD 2 -- SUM OF SQUARED DIFFERENCES: sum((patch - template)^2),")
+print("and now SMALL is good.")
+ssd = score_map(lambda p: -float(((p - tpl) ** 2).sum()))
+print("      scores (negated, so bigger is still better):")
+for label, (r, c) in (("exact plus", (3, 5)), ("faint plus", (9, 20)),
+                      ("bright blob", (6, 28))):
+    print("%20s  %12.0f" % (label, ssd[r, c]))
+bg_mask = np.ones_like(ssd, bool)
+bg_mask[2:5, 4:7] = False
+bg_mask[8:11, 19:22] = False
+bg_mask[5:12, 26:33] = False
+best_bg = ssd[bg_mask].max()
+print("%20s  %12.0f" % ("best background", best_bg))
+print("      the exact copy wins, correctly -- its SSD is essentially 0,")
+print("      and the blob is rejected hard. so SSD fixed the brightness")
+print("      bug. but look at the faint plus: %.0f, which is WORSE than"
+      % ssd[9, 20])
+print("      the best patch of pure background at %.0f. a real target" % best_bg)
+print("      now ranks below noise.")
+print("      SSD compares absolute values, so it is asking 'are these the")
+print("      same pixels?' rather than 'are these the same shape?'. the")
+print("      faint plus is the identical shape at 0.45x contrast on a")
+print("      brighter background -- exactly what a different exposure")
+print("      produces -- and SSD scores it as a non-match. that is the")
+print("      same failure as raw correlation, seen from the other side.")
+print()
+
+print("METHOD 3 -- NORMALISED CROSS-CORRELATION. subtract each patch's own")
+print("mean, divide by its own standard deviation, and do the same to the")
+print("template. what is left is pure SHAPE:")
+t0 = (tpl - tpl.mean()) / tpl.std()
+
+def ncc(p):
+    s = p.std()
+    if s < 1e-9:
+        return 0.0
+    return float((((p - p.mean()) / s) * t0).sum() / t0.size)
+
+nc = score_map(ncc)
+print("%20s  %12s" % ("", "NCC"))
+for label, (r, c) in (("exact plus", (3, 5)), ("faint plus", (9, 20)),
+                      ("bright blob", (6, 28))):
+    print("%20s  %12.3f" % (label, nc[r, c]))
+print("      both plus signs score %.3f -- not approximately, EXACTLY,"
+      % min(nc[3, 5], nc[9, 20]))
+print("      to floating-point precision.")
+print("      the blob scores %.3f, but for a duller reason than you might"
+      % nc[6, 28])
+print("      hope: it is perfectly uniform, so its standard deviation is 0")
+print("      and the correlation is undefined. the convention is to return")
+print("      0, which is the right answer -- a patch with no variation has")
+print("      no shape to match.")
+print("      the faint plus was pasted at 0.45x contrast with +85 added,")
+print("      and NCC does not care: subtracting the patch's own mean")
+print("      cancels the +85, dividing by its own std cancels the 0.45. it is")
+print("      invariant to any change of the form a*x + b, which is exactly")
+print("      the set of changes a camera's exposure and gain produce.")
+print()
+
+show((nc > 0.75).astype(float) * 255, "everywhere NCC > 0.75")
+print("      %d positions, and here are their scores:"
+      % int((nc > 0.75).sum()))
+for r, c in zip(*np.where(nc > 0.75)):
+    tag = "  <- a real plus" if (r, c) in ((3, 5), (9, 20)) else ""
+    print("         (%2d,%2d)  %.3f%s" % (r, c, nc[r, c], tag))
+bg_nc = nc[bg_mask]
+print("      the two real ones score 1.000 and the false positives sit")
+print("      around 0.78 -- a wide margin, but they are THERE, on nothing")
+print("      but noise. %.1f%% of pure-background positions clear 0.75."
+      % (100.0 * (bg_nc > 0.75).mean()))
+print("      that is the cost of a 3x3 template: it has only 9 numbers, so")
+print("      random noise reproduces its shape by chance often enough to")
+print("      matter. NCC's reliability comes from template SIZE -- a 15x15")
+print("      template has 225 constraints and false positives at 0.78")
+print("      become vanishingly rare. small templates are fast and")
+print("      untrustworthy, and that trade is the whole tuning problem.")
+print()
+
+print("NOW THE LIMITS, which no normalisation fixes. transform the")
+print("template and re-score it against the exact match at (3,5):")
+print("%-34s %10s" % ("template variant", "NCC"))
+variants = [("as given", tpl),
+            ("rotated 90 degrees", np.rot90(tpl)),
+            ("transposed", tpl.T),
+            ("inverted (dark on light)", 160 - tpl)]
+patch = img[3:6, 5:8]
+for name, t in variants:
+    tt = (t - t.mean()) / (t.std() + 1e-9)
+    pp = (patch - patch.mean()) / (patch.std() + 1e-9)
+    print("%-34s %10.3f" % (name, float((pp * tt).sum() / tt.size)))
+print("   the plus is 4-fold symmetric, so rotating it changes nothing --")
+print("   that is a property of THIS template, not of the method.")
+print("   inverting it flips the sign to exactly -1: NCC measures")
+print("   correlation, and a perfect negative is as informative as a")
+print("   perfect positive, if you remember to take the absolute value.")
+print()
+print("%-34s %10s" % ("what changes in the image", "does NCC survive it?"))
+for k, v in (("brightness / exposure", "yes, exactly"),
+             ("contrast / gain", "yes, exactly"),
+             ("additive noise", "degrades smoothly"),
+             ("rotation", "no -- unless symmetric"),
+             ("scale", "no"),
+             ("perspective", "no"),
+             ("non-rigid deformation", "no")):
+    print("%-34s %10s" % (k, v))
+print()
+print("and that table is the whole reason the field moved on. template")
+print("matching is exact, needs no training, and runs in microseconds, so")
+print("it still owns the jobs where the appearance really is fixed --")
+print("factory inspection, GUI automation, aligning two frames from a")
+print("locked-down camera. the moment the object can turn, or move nearer,")
+print("you need features that survive those changes, which is what SIFT")
+print("was built for and what a convolutional network learns.")
+```
+
 """,
     [
         {"q": "Why is normalised cross-correlation preferred over sum of squared differences?",
