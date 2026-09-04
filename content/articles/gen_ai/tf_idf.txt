@@ -119,6 +119,185 @@ That is a strong text classifier in eight lines. It trains in seconds on tens of
 
 <strong>`ngram_range=(1, 2)`</strong> adds bigrams, which is what lets the model represent "not good" &mdash; the single most valuable addition for sentiment tasks.
 
+## Counting words, then discounting the common ones
+
+TF-IDF is two ideas multiplied together, and both of them are visible in a handful of documents. This builds the matrix by hand, shows what each half contributes, and finds the case where the whole thing collapses.
+
+```python-run
+import numpy as np
+
+DOCS = [
+    "the cat sat on the mat",
+    "the dog sat on the log",
+    "the cat and the dog were friends",
+    "the quantum entanglement links two particles",
+    "the quantum cat is both alive and dead",
+]
+tok = [d.split() for d in DOCS]
+vocab = sorted({w for d in tok for w in d})
+V, N = len(vocab), len(DOCS)
+vi = {w: i for i, w in enumerate(vocab)}
+
+print("%d documents, %d distinct words." % (N, V))
+for i, d in enumerate(DOCS):
+    print("   doc %d: %s" % (i, d))
+print()
+
+tf = np.zeros((N, V))
+for i, d in enumerate(tok):
+    for w in d:
+        tf[i, vi[w]] += 1
+
+print("TERM FREQUENCY -- how often each word appears in each document.")
+show = ["the", "cat", "dog", "quantum", "sat", "friends"]
+print("%-14s %s" % ("word", "  ".join("doc %d" % i for i in range(N))))
+for w in show:
+    print("%-14s %s" % (w, "  ".join("%5.0f" % tf[i, vi[w]] for i in range(N))))
+print("   'the' is the most common word in the collection and tells you")
+print("   nothing about any document. that is the problem TF alone has,")
+print("   and it is why raw counts are a bad retrieval score.")
+print()
+
+df = (tf > 0).sum(axis=0)
+idf = np.log(N / df)                          # the textbook form
+idf_s = np.log((1 + N) / (1 + df)) + 1.0      # the form scikit-learn uses
+print("INVERSE DOCUMENT FREQUENCY -- how many documents contain the word,")
+print("inverted, so rare words score high:")
+print("%-14s %10s %14s %14s %14s"
+      % ("word", "in N docs", "N/df", "log(N/df)", "sklearn idf"))
+for w in show:
+    d = int(df[vi[w]])
+    print("%-14s %10d %14.4f %14.4f %14.4f"
+          % (w, d, N / float(d), idf[vi[w]], idf_s[vi[w]]))
+print("   'the' appears in all %d documents, so log(N/df) = log(1) = 0" % N)
+print("   EXACTLY. it contributes nothing to any score, and no stopword")
+print("   list was needed to arrive at that.")
+print("   'friends' appears in %d, so it scores highest." % int(df[vi["friends"]]))
+print()
+print("   NOTE THE LAST COLUMN, because it will surprise you in practice.")
+print("   scikit-learn smooths: log((1+N)/(1+df)) + 1. that +1 is a FLOOR")
+print("   -- it makes the smallest possible idf %.1f, not 0 -- so a word" % 1.0)
+print("   in every document still contributes %.4f x its count."
+      % idf_s[vi["the"]])
+print("   in a large corpus that hardly matters, because rare words score")
+print("   log(N) + 1 and dwarf it. in a SMALL corpus it matters a lot: a")
+print("   word appearing twice in a short document can outrank a genuinely")
+print("   rare one, purely because of the floor. this is the single most")
+print("   common surprise when TF-IDF is tried on a few dozen documents,")
+print("   and it is a property of the smoothing, not of TF-IDF.")
+print("   the log matters too: without it, a word in 1 document of a")
+print("   million would outweigh a word in 10 by a factor of 100,000. the")
+print("   log turns that into a factor of about %.1f, a difference you can"
+      % (np.log(1000000.0 / 1) / np.log(1000000.0 / 10)))
+print("   still act on without it swamping everything else.")
+print()
+
+tfidf = tf * idf
+norms = np.linalg.norm(tfidf, axis=1, keepdims=True)
+tfidf_n = tfidf / np.where(norms == 0, 1, norms)
+
+print("TF-IDF = TF x IDF, then normalise each row to unit length.")
+print("the top-scoring words in each document:")
+for i in range(N):
+    top = np.argsort(-tfidf_n[i])[:3]
+    print("   doc %d: %s" % (i, "   ".join("%s %.3f" % (vocab[j], tfidf_n[i, j])
+                                           for j in top)))
+print("   'the' does not appear in any list, and no stopword file was")
+print("   involved. that is the point: TF-IDF DISCOVERS which words carry")
+print("   no information, from the collection itself, so the same code")
+print("   adapts to a legal corpus or a medical one without being told")
+print("   which words to ignore.")
+print("   for comparison, the same documents scored with scikit-learn's")
+print("   smoothed idf:")
+tfidf_s = tf * idf_s
+ns = np.linalg.norm(tfidf_s, axis=1, keepdims=True)
+tfidf_sn = tfidf_s / np.where(ns == 0, 1, ns)
+for i in range(3):
+    top = np.argsort(-tfidf_sn[i])[:3]
+    print("      doc %d: %s"
+          % (i, "   ".join("%s %.3f" % (vocab[j], tfidf_sn[i, j]) for j in top)))
+ranks = [int(np.where(np.argsort(-tfidf_sn[i]) == vi["the"])[0][0]) + 1
+         for i in range(3)]
+print("   'the' is back, ranking %s in those three documents -- and it"
+      % ", ".join(str(r) for r in ranks))
+print("   ranks NOWHERE under log(N/df), where it scores an exact 0.")
+print("   the floor is doing precisely what it was designed to do, which")
+print("   on five short documents is the wrong thing. on a million it")
+print("   would be invisible. worth knowing which regime you are in.")
+print()
+
+print("WHY NORMALISE. a long document has bigger counts, so without it")
+print("length alone would decide the ranking:")
+print("%-10s %10s %16s %16s" % ("doc", "words", "raw tf-idf norm", "after norm"))
+for i in range(N):
+    print("%-10d %10d %16.4f %16.4f"
+          % (i, len(tok[i]), np.linalg.norm(tfidf[i]),
+             np.linalg.norm(tfidf_n[i])))
+print("   every row is now length 1, so a dot product between two rows is")
+print("   exactly their cosine similarity.")
+print()
+
+def query(q):
+    v = np.zeros(V)
+    for w in q.split():
+        if w in vi:
+            v[vi[w]] += 1
+    v = v * idf
+    n = np.linalg.norm(v)
+    return v / n if n else v
+
+print("RETRIEVAL. score a query against every document:")
+for q in ("quantum cat", "the the the", "dog friends"):
+    qv = query(q)
+    scores = tfidf_n @ qv
+    order = np.argsort(-scores)
+    print("   query: %r" % q)
+    for r in order[:3]:
+        print("      %.4f  doc %d: %s" % (scores[r], r, DOCS[r]))
+print("   the middle query is the interesting one. 'the the the' is three")
+print("   copies of a word that appears in all %d documents, so its idf is" % N)
+print("   0, so the query vector is all zeros and every score is exactly")
+print("   %.4f. the query carries no information and the arithmetic says"
+      % float((tfidf_n @ query("the the the")).max()))
+print("   so, without a rule anywhere that mentions 'the'.")
+print()
+
+print("NOW WHERE IT FAILS, which is the part worth remembering:")
+print("   four single-word queries, in synonym pairs:")
+print("%-14s %12s   %s" % ("query", "best score", "best document"))
+for q in ("cat", "feline", "dog", "canine"):
+    qv = query(q)
+    scores = tfidf_n @ qv
+    bi = int(np.argmax(scores))
+    print("%-14s %12.4f   %s"
+          % (q, scores[bi],
+             DOCS[bi] if scores[bi] > 0 else "(nothing matches at all)"))
+print("   'feline' means the same thing as 'cat' and shares no characters")
+print("   with it, so it scores exactly %.1f against every document in the"
+      % 0.0)
+print("   collection, including the %d that actually mention a cat."
+      % int((tf[:, vi["cat"]] > 0).sum()))
+print("   every word is an independent dimension with no relationship to")
+print("   any other -- the model has no idea that cat and feline, or dog")
+print("   and canine, are connected.")
+print("   that single limitation is the entire reason dense embeddings")
+print("   exist. they map cat and feline to nearby VECTORS, so similarity")
+print("   survives a change of wording.")
+print()
+print("   and the reason TF-IDF and BM25 are still in production anyway:")
+print("%-30s %-22s %s" % ("", "TF-IDF / BM25", "dense embeddings"))
+for row in (("exact term match", "perfect", "approximate"),
+            ("synonyms", "no", "yes"),
+            ("rare words, product codes", "excellent", "often poor"),
+            ("needs training", "no", "yes"),
+            ("cost to index", "cheap", "a GPU pass per document"),
+            ("explains its score", "yes, per term", "not really")):
+    print("%-30s %-22s %s" % row)
+print("   the two fail in different places, which is why hybrid search --")
+print("   run both, fuse the rankings -- beats either one alone and is")
+print("   what most serious retrieval systems actually ship.")
+```
+
 ## Things to try
 
 1. Turn <strong>idf</strong> off and query <em>the</em>. Every document scores, and the ranking is driven by a word that distinguishes nothing.

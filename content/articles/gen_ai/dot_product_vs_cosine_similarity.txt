@@ -68,6 +68,142 @@ scores = vecs @ q          # dot product == cosine, because both are unit length
 top = np.argsort(-scores)[:5]
 ```
 
+## The one difference, and when it bites
+
+Cosine similarity is the dot product with the lengths divided out, so the two agree exactly when vectors are normalised and disagree in a specific, predictable way when they are not. This shows which retrieval bugs come from that gap.
+
+```python-run
+import numpy as np
+
+q = np.array([1.0, 1.0, 0.0])
+docs = {
+    "same direction, short": np.array([1.0, 1.0, 0.0]),
+    "same direction, LONG":  np.array([5.0, 5.0, 0.0]),
+    "45 deg off, long":      np.array([4.0, 0.0, 0.0]),
+    "orthogonal":            np.array([0.0, 0.0, 3.0]),
+    "opposite":              np.array([-1.0, -1.0, 0.0]),
+}
+
+def cos(a, b):
+    return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+print("QUERY VECTOR: %s   (length %.4f)" % (str(q), np.linalg.norm(q)))
+print()
+print("%-26s %10s %10s %12s %12s"
+      % ("document vector", "length", "dot", "cosine", "angle"))
+for name, d in docs.items():
+    c = cos(q, d)
+    print("%-26s %10.4f %10.4f %12.4f %11.1f deg"
+          % (name, np.linalg.norm(d), float(q @ d), c,
+             np.degrees(np.arccos(np.clip(c, -1, 1)))))
+print()
+print("READ THE FIRST TWO ROWS. they point in the SAME DIRECTION -- the")
+print("angle between them is 0 -- and the dot product ranks the long one")
+print("%.0fx higher. cosine gives them the identical score of %.4f,"
+      % (float(q @ docs["same direction, LONG"]) / float(q @ docs["same direction, short"]),
+         cos(q, docs["same direction, LONG"])))
+print("because it divides the length out.")
+print()
+print("AND THE THIRD ROW IS THE ONE THAT MATTERS. it is 45 degrees off --")
+print("genuinely less relevant -- but it is long, so the dot product")
+print("scores it %.4f against the short exact match's %.4f. by dot"
+      % (float(q @ docs["45 deg off, long"]),
+         float(q @ docs["same direction, short"])))
+print("product the WRONG DOCUMENT WINS. by cosine, %.4f against %.4f,"
+      % (cos(q, docs["45 deg off, long"]), cos(q, docs["same direction, short"])))
+print("and the right one wins.")
+print()
+
+print("THE ALGEBRA, so this is not a coincidence:")
+print("      dot(a, b)    = |a| |b| cos(theta)")
+print("      cosine(a, b) = dot(a, b) / (|a| |b|) = cos(theta)")
+print("   cosine is the dot product with the magnitudes cancelled, so it")
+print("   depends on DIRECTION ONLY. the dot product mixes direction and")
+print("   magnitude into one number, and once mixed you cannot tell which")
+print("   contributed what.")
+print()
+
+print("SO IF EVERYTHING IS NORMALISED, THEY ARE THE SAME OPERATION:")
+qn = q / np.linalg.norm(q)
+print("%-26s %14s %14s %12s" % ("document (normalised)", "dot", "cosine",
+                                "difference"))
+for name, d in docs.items():
+    dn = d / np.linalg.norm(d)
+    print("%-26s %14.6f %14.6f %12.1e"
+          % (name, float(qn @ dn), cos(qn, dn), abs(float(qn @ dn) - cos(qn, dn))))
+print("   identical to floating-point precision. that is why so much")
+print("   retrieval code normalises once at index time and then uses the")
+print("   dot product: same answer as cosine, no division per comparison,")
+print("   and a dot product is a single fused matrix multiply on a GPU.")
+print()
+
+print("WHICH TO CHOOSE, and the honest answer is that it depends on what")
+print("your vector's LENGTH means:")
+print("%-34s %s" % ("if length means...", "then use"))
+for k, v in (("nothing (a direction only)", "either -- normalise and dot"),
+             ("confidence or signal strength", "dot product, deliberately"),
+             ("document length", "cosine, or you rank by length"),
+             ("you have no idea", "cosine -- the safe default")):
+    print("%-34s %s" % (k, v))
+print()
+
+print("A CONCRETE FAILURE, because this one appears in real systems. some")
+print("embedding models produce longer vectors for longer text:")
+short = np.array([0.6, 0.8, 0.0])                  # exactly on topic
+long_off = np.array([0.5, 0.2, 0.84]) * 2.6        # partly on topic, long
+query = np.array([0.6, 0.8, 0.0])
+print("%-30s %10s %12s %12s" % ("", "length", "dot", "cosine"))
+for name, v in (("a short, exact answer", short),
+                ("a long, rambling page", long_off)):
+    print("%-30s %10.4f %12.4f %12.4f"
+          % (name, np.linalg.norm(v), float(query @ v), cos(query, v)))
+print("   the dot product prefers %s."
+      % ("the rambling page" if query @ long_off > query @ short
+         else "the exact answer"))
+print("   cosine prefers %s."
+      % ("the rambling page" if cos(query, long_off) > cos(query, short)
+         else "the exact answer"))
+print("   if your index was built with the dot product and your embedding")
+print("   model does not normalise its output, your retriever has a")
+print("   systematic bias toward long documents, and it will not look")
+print("   like a bug -- it will look like the model preferring detailed")
+print("   pages. check whether your vectors are unit length before you")
+print("   conclude anything about your embeddings:")
+for name, v in (("query", query), ("short", short), ("long", long_off)):
+    n = np.linalg.norm(v)
+    print("      |%s| = %.4f  %s"
+          % (name, n, "unit" if abs(n - 1) < 1e-6 else "NOT UNIT"))
+print()
+
+print("ONE LAST DISTINCTION people conflate: cosine SIMILARITY versus")
+print("cosine DISTANCE, and versus euclidean distance on unit vectors.")
+print("%-26s %14s %14s %16s"
+      % ("pair", "cos sim", "cos dist", "euclidean"))
+pairs = [("identical", qn, qn),
+         ("45 degrees apart", qn, np.array([1.0, 0, 0])),
+         ("orthogonal", qn, np.array([0.0, 0, 1.0])),
+         ("opposite", qn, -qn)]
+for name, a, b in pairs:
+    b = b / np.linalg.norm(b)
+    c = cos(a, b)
+    print("%-26s %14.4f %14.4f %16.4f"
+          % (name, c, (1 - c) + 0.0, float(np.linalg.norm(a - b))))
+print("   cosine distance is 1 - similarity, so it runs 0 to 2 and is NOT")
+print("   a metric you can hand to a k-d tree.")
+print("   but look at the last column against the first: on UNIT vectors,")
+print("   euclidean^2 = 2 - 2*cos, so ranking by euclidean distance and")
+print("   ranking by cosine give the identical order. check it:")
+for name, a, b in pairs:
+    b = b / np.linalg.norm(b)
+    print("      %-22s 2 - 2cos = %6.4f,  euclid^2 = %6.4f"
+          % (name, (2 - 2 * cos(a, b)) + 0.0,
+             float(np.linalg.norm(a - b) ** 2)))
+print("   that identity is why a vector database can offer 'cosine' as an")
+print("   option on an index that only really implements L2: for")
+print("   normalised vectors they are the same ranking, and it normalises")
+print("   your vectors for you on the way in.")
+```
+
 ## Guided tour
 
 1. <strong>Start at 1x with cosine ranking.</strong> Doc A, the concise on-topic passage, ranks first.

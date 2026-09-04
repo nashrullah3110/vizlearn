@@ -115,6 +115,18 @@ SPECS = {
         "label": "NumPy",
         "filename": "example_%02d.py",
     },
+    "gen_ai": {
+        # numpy alone. this track is retrieval, tokenisation and the
+        # arithmetic inside an LLM -- attention, BM25, cosine similarity,
+        # quantisation, LoRA's low-rank factorisation. every one of those is
+        # small dense linear algebra that is far clearer written out than
+        # called. no embedding model is downloaded: the vectors here are
+        # constructed so you can see why a retrieval succeeds or fails,
+        # which a real 384-dimensional embedding would hide.
+        "packages": "numpy",
+        "label": "NumPy",
+        "filename": "example_%02d.py",
+    },
     "computer_vision": {
         # numpy only. convolution, pooling, thresholding and the colour
         # conversions are all small array arithmetic, and a printed grid of
