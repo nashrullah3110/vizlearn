@@ -103,6 +103,174 @@ chunks = splitter.split_text(document)
 
 One detail that catches people: <strong>character count is not token count</strong>. `chunk_size=1000` in characters is roughly 250 tokens for English prose and considerably fewer for code or non-Latin scripts. If the downstream constraint is a token budget, measure in tokens &mdash; most splitters accept a token-counting length function.
 
+## The separator list, and what overlap actually costs
+
+Recursive splitting is entirely configured by its separator list and two numbers. This runs the algorithm on text with real structure, shows what each separator in the list is doing, and prices the overlap that everyone turns on without measuring.
+
+```python-run
+import numpy as np
+
+DOC = (
+    "# Billing\n"
+    "\n"
+    "Invoices are issued monthly. Payment is due within 14 days. "
+    "Late payments incur a 2 percent fee.\n"
+    "\n"
+    "# Support\n"
+    "\n"
+    "Support is available on weekdays. Response times are under 4 hours "
+    "for urgent issues and under 24 hours otherwise.\n"
+)
+
+SEPS = ["\n\n", "\n", ". ", " ", ""]
+
+# returns (chunk, depth) where depth is the index in SEPS of the
+# separator that produced it -- so the table below can report what the
+# algorithm actually did rather than what we assume it did
+def split(text, limit, seps, depth=0):
+    if len(text) <= limit:
+        return [(text, depth)]
+    if not seps or seps[0] == "":
+        return [(text[i:i + limit], len(SEPS) - 1)
+                for i in range(0, len(text), limit)]
+    sep, rest = seps[0], seps[1:]
+    out, buf = [], ""
+    for part in text.split(sep):
+        cand = (buf + sep + part) if buf else part
+        if len(cand) <= limit:
+            buf = cand
+        elif len(part) <= limit:
+            if buf:
+                out.append((buf, depth))
+            buf = part
+        else:
+            if buf:
+                out.append((buf, depth))
+                buf = ""
+            out.extend(split(part, limit, rest, depth + 1))
+    if buf:
+        out.append((buf, depth))
+    return [(c, d) for c, d in out if c.strip()]
+
+NAMES = {"\n\n": "paragraph break", "\n": "line break",
+         ". ": "sentence end", " ": "word gap", "": "hard cut"}
+
+print("A %d-CHARACTER DOCUMENT with paragraphs, sentences and words:" % len(DOC))
+for line in DOC.strip().split("\n"):
+    print("   %s" % (line if line else "(blank line)"))
+print()
+
+print("THE SEPARATOR LIST IS THE WHOLE CONFIGURATION. it is tried in")
+print("order, largest natural boundary first:")
+for i, sp in enumerate(SEPS):
+    name = {"\n\n": "paragraph break", "\n": "line break",
+            ". ": "sentence end", " ": "word gap",
+            "": "give up, cut anywhere"}[sp]
+    print("   %d. %-10r %s" % (i + 1, sp, name))
+print()
+
+print("WATCH WHICH SEPARATOR ACTUALLY GETS USED, by varying the limit:")
+print("%-10s %8s %-28s %s"
+      % ("limit", "chunks", "sizes", "deepest separator it needed"))
+for limit in (400, 160, 90, 40, 12):
+    ch = split(DOC, limit, SEPS)
+    deepest = max(d for _, d in ch)
+    label = "none -- it all fit" if len(ch) == 1 else NAMES[SEPS[deepest]]
+    print("%-10d %8d %-28s %s"
+          % (limit, len(ch), str([len(c) for c, _ in ch])[:26], label))
+print("   at 400 no separator is needed at all -- the document fits. at")
+print("   160 the paragraph breaks are enough. only as the limit tightens")
+print("   does it work down the list to sentences and then to words.")
+print("   and note that it never reaches the hard cut, even at a %d-"
+      % 12)
+print("   character limit: this document has a word gap often enough that")
+print("   the algorithm always finds a legitimate boundary. the hard cut")
+print("   at the end of the list is a backstop for text that does not --")
+print("   a long URL, a base64 blob, a language that does not use spaces.")
+print("   that ordering is the entire idea: break at the largest boundary")
+print("   the author gave you that still fits.")
+print()
+
+LIMIT = 90
+chunks = split(DOC, LIMIT, SEPS)
+print("AT limit=%d, the chunks themselves, with the separator each one" % LIMIT)
+print("was cut on:")
+for i, (c, d) in enumerate(chunks):
+    print("   [%d] %-16s %r" % (i, NAMES[SEPS[d]], c.replace("\n", " / ")[:48]))
+print("   note that chunk 1 ends 'within 14 days' with no full stop. the")
+print("   separator is CONSUMED by the split, so a '. ' boundary eats the")
+print("   punctuation. most libraries offer a keep-separator option and")
+print("   most people leave it off without noticing.")
+print()
+
+print("NOW OVERLAP, which is on by default in most libraries. it repeats")
+print("the tail of each chunk at the head of the next:")
+def with_overlap(text, limit, ov):
+    step = limit - ov
+    return [text[i:i + limit] for i in range(0, len(text), step) if text[i:i + limit].strip()]
+
+print("%-14s %10s %16s %18s %14s"
+      % ("overlap", "chunks", "total chars", "vs the document", "duplicated"))
+for ov in (0, 10, 20, 40, 60):
+    ch = with_overlap(DOC, LIMIT, ov)
+    tot = sum(len(c) for c in ch)
+    print("%-14d %10d %16d %17.0f%% %13.0f%%"
+          % (ov, len(ch), tot, 100.0 * tot / len(DOC),
+             100.0 * (tot - len(DOC)) / max(tot, 1)))
+print("   overlap is not free and the cost is not linear. at %d characters"
+      % 60)
+print("   of overlap on a %d-character chunk you are storing %.1fx the"
+      % (LIMIT, sum(len(c) for c in with_overlap(DOC, LIMIT, 60)) / float(len(DOC))))
+print("   document -- every one of those characters is embedded, indexed,")
+print("   stored and searched.")
+print("   the rule of thumb is overlap = 10 to 20 percent of chunk size,")
+print("   and the arithmetic above is why: the duplication ratio is")
+print("   roughly limit/(limit - overlap), which climbs slowly and then")
+print("   very fast.")
+print("%-20s %20s" % ("overlap as % of limit", "storage multiplier"))
+for ov in (0, 10, 20, 40, 60, 80):
+    o = int(LIMIT * ov / 100.0)
+    print("%-20d %20.2fx" % (ov, LIMIT / float(LIMIT - o) if o < LIMIT else float("inf")))
+print()
+
+print("AND THE CONSEQUENCE OF OVERLAP THAT IS EASY TO MISS: the same")
+print("sentence now lives in two chunks, so it can be returned twice.")
+OV = 40
+ch = with_overlap(DOC, LIMIT, OV)
+step = LIMIT - OV
+# chunk 0 covers [0, LIMIT) and chunk 1 covers [step, step+LIMIT), so
+# anything in [step, LIMIT) is in both by construction
+probe = DOC[step + 2:LIMIT - 2]
+holders = [i for i, c in enumerate(ch) if probe in c]
+print("   with chunk size %d and overlap %d, consecutive chunks start %d"
+      % (LIMIT, OV, step))
+print("   characters apart, so the region from %d to %d belongs to two of"
+      % (step, LIMIT))
+print("   them. take a passage from inside it:")
+print("      %r" % probe.replace("\n", " / ")[:52])
+print("   it appears in %d chunk%s: %s"
+      % (len(holders), "" if len(holders) == 1 else "s",
+         ", ".join("[%d]" % i for i in holders)))
+print("   if both rank well, the model receives it twice and reads the")
+print("   repetition as emphasis. a deduplication step after retrieval is")
+print("   not optional once overlap is on -- and the natural key for it is")
+print("   the chunk's source span, not its text, because the two copies")
+print("   are not character-identical.")
+print()
+
+print("WHERE RECURSIVE SPLITTING SITS AMONG THE OPTIONS:")
+print("%-24s %-26s %s" % ("strategy", "uses", "fails when"))
+for row in (("fixed size", "nothing", "always cuts mid-sentence"),
+            ("recursive", "the separator list", "the text has no structure"),
+            ("structure-aware", "headings, tags", "there are no headings"),
+            ("semantic", "an embedding model", "adjacent topics repeat")):
+    print("%-24s %-26s %s" % row)
+print("   recursive is the default in every framework for a good reason:")
+print("   it degrades to fixed-size splitting when there is no structure,")
+print("   and uses whatever structure exists when there is. it is the only")
+print("   one of the four that cannot do worse than the naive method.")
+```
+
 ## Things to try
 
 1. Drop the <strong>chunk size</strong> to 60. More pieces fall through to sentence and then word level, and chunks start ending mid-sentence.

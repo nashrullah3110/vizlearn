@@ -144,6 +144,121 @@ Three things worth knowing when fine-tuning one:
 
 <strong>512 tokens is the usual limit.</strong> Longer documents need chunking, or a long-context variant such as Longformer.
 
+## Why 15 percent, and what the 80/10/10 split is really for
+
+Masked language modelling has two numbers in it that look arbitrary -- a 15 percent masking rate and an 80/10/10 split of what to do with each masked token. Both are answers to specific problems, and both are visible in the arithmetic.
+
+```python-run
+import numpy as np
+
+SENT = ["the", "cat", "sat", "on", "the", "soft", "mat", "by", "the", "fire",
+        "and", "slept", "for", "an", "hour", "or", "so", "quietly", "all",
+        "afternoon"]
+T = len(SENT)
+
+print("A SENTENCE OF %d TOKENS. masked language modelling hides some and" % T)
+print("asks the model to restore them, using BOTH sides as context:")
+print("   %s" % " ".join(SENT))
+print()
+
+print("THE MASKING RATE IS A TRADE-OFF between two things that pull in")
+print("opposite directions:")
+print("%-10s %14s %20s %22s"
+      % ("rate", "tokens masked", "training signal", "context left intact"))
+for r in (0.05, 0.15, 0.30, 0.50, 0.80):
+    m = int(round(T * r))
+    print("%-10s %14d %20s %20.0f%%"
+          % ("%.0f%%" % (100 * r), m,
+             "%d prediction%s" % (m, "" if m == 1 else "s"), 100 * (1 - r)))
+print("   more masking means more predictions per sentence, so more")
+print("   learning signal per forward pass. it also means less context")
+print("   left to predict FROM.")
+print("   at 80 percent the model is being asked to reconstruct a sentence")
+print("   from almost nothing, which is not a language task, it is a")
+print("   guessing game. 15 percent is where the two curves cross in")
+print("   practice, and it is empirical rather than derived.")
+print()
+
+print("AND THE EFFICIENCY COST NOBODY MENTIONS. compare with causal")
+print("language modelling, which gets a prediction at EVERY position:")
+print("%-34s %16s %20s"
+      % ("objective", "predictions", "per 1000 tokens"))
+print("%-34s %16s %20d"
+      % ("causal LM", "%d of %d" % (T - 1, T), int(1000 * (T - 1) / T)))
+for r in (0.15, 0.30):
+    print("%-34s %16s %20d"
+          % ("masked LM at %.0f%%" % (100 * r),
+             "%d of %d" % (int(round(T * r)), T), int(1000 * r)))
+print("   a causal model learns from %d of every %d tokens; a masked model"
+      % (T - 1, T))
+print("   at 15 percent learns from %d. that is roughly %.1fx more"
+      % (int(round(T * 0.15)), (T - 1) / float(T) / 0.15))
+print("   training signal per token of data, and it is the main reason the")
+print("   large models everyone uses are causal rather than masked -- not")
+print("   because bidirectionality is bad, but because it is expensive.")
+print()
+
+rng = np.random.default_rng(3)
+print("THE 80/10/10 SPLIT. of the tokens chosen for masking:")
+print("%-30s %10s %s" % ("what happens to it", "share", "why"))
+print("%-30s %10s %s" % ("replaced with [MASK]", "80%", "the actual task"))
+print("%-30s %10s %s" % ("replaced with a RANDOM token", "10%", "see below"))
+print("%-30s %10s %s" % ("left unchanged", "10%", "see below"))
+print()
+print("   the last two are the interesting ones, and both exist to fix a")
+print("   MISMATCH between training and use:")
+print("      during training, the model sees [MASK] tokens.")
+print("      during use, it never does -- [MASK] appears in no real text.")
+print("   if 100 percent of masked positions were [MASK], the model could")
+print("   learn a shortcut: 'only bother building a real representation")
+print("   where I see [MASK], and copy the input everywhere else'. that")
+print("   model would score well on the training objective and be useless")
+print("   as a feature extractor, which is the only thing it is for.")
+print()
+print("   the 10 percent RANDOM replacement is what forbids the shortcut:")
+chosen = [1, 5, 9]
+print("%-8s %-12s %-16s %s" % ("position", "original", "model sees", "must predict"))
+for i, (pos, action) in enumerate(zip(chosen, ["[MASK]", "random", "unchanged"])):
+    seen = {"[MASK]": "[MASK]", "random": "banana",
+            "unchanged": SENT[pos]}[action]
+    print("%-8d %-12s %-16s %s" % (pos, SENT[pos], seen, SENT[pos]))
+print("   the model cannot tell, from the input alone, whether the token")
+print("   in front of it is correct. so it has to build a real")
+print("   representation of EVERY position, on the chance that this one is")
+print("   the corrupted one.")
+print("   the 10 percent unchanged does the same job from the other side:")
+print("   sometimes the answer is 'this token is already right', so")
+print("   'predict something different' is not a safe default either.")
+print()
+
+print("WHAT THE BIDIRECTIONALITY BUYS. a token's representation can use")
+print("both sides, which a causal model cannot do at all:")
+print("      the ___ sat on the mat        <- left context only")
+print("      the ___ sat on the mat, purring and licking its paws")
+print("   a causal model predicting position 1 sees only 'the'. a masked")
+print("   model sees the entire rest of the sentence, including 'purring',")
+print("   which is what actually identifies the animal.")
+print("   that is why masked models are better at classification and")
+print("   retrieval encoding, and cannot generate text at all: generation")
+print("   needs the guarantee that position i never saw i+1, and masked")
+print("   language modelling is built on breaking exactly that guarantee.")
+print()
+
+print("SO THE TWO OBJECTIVES ARE FOR DIFFERENT JOBS:")
+print("%-26s %-22s %s" % ("", "causal LM", "masked LM"))
+for row in (("sees", "the left only", "both sides"),
+            ("predictions per token", "1.0", "0.15"),
+            ("can generate", "yes", "no"),
+            ("good for", "generation, chat", "embeddings, classification"),
+            ("typical example", "GPT, Llama", "BERT, and every")):
+    print("%-26s %-22s %s" % row)
+print("   and the last row explains something that looks odd from a")
+print("   distance: almost every EMBEDDING model in a RAG pipeline is a")
+print("   masked model, while the thing that writes the answer is a causal")
+print("   one. a retrieval system usually runs both, for the reasons in")
+print("   the two middle rows.")
+```
+
 ## Questions people ask
 
 <strong>Why can BERT not generate text?</strong> It has no notion of "next" &mdash; its objective assumes surrounding context exists. Iterative mask-filling works poorly.

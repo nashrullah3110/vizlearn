@@ -74,6 +74,127 @@ To predict text well a model must track syntax, resolve pronouns, hold facts, ma
 
 Two things it does not produce, and both follow from the objective. <strong>Truthfulness</strong>, because likelihood is not truth: a plausible falsehood scores well. And <strong>calibrated uncertainty</strong>, because the model outputs a distribution over tokens rather than a belief about the world.
 
+## One pass, every position, and the mask that makes it work
+
+The claim that a single forward pass trains every position at once is the reason causal language modelling scales. This builds the mask that makes it true, checks that it actually prevents the model from reading ahead, and counts what the alternative would have cost.
+
+```python-run
+import numpy as np
+
+TOKENS = ["the", "cat", "sat", "on", "the", "mat"]
+T = len(TOKENS)
+
+print("A SEQUENCE OF %d TOKENS. training means predicting each one from" % T)
+print("everything before it -- which is %d separate prediction problems:" % (T - 1))
+for i in range(1, T):
+    print("   given %-26s predict %r"
+          % ("'" + " ".join(TOKENS[:i]) + "'", TOKENS[i]))
+print()
+print("THE NAIVE READING is that these are %d forward passes. they are"
+      % (T - 1))
+print("not -- they are ONE, and the causal mask is what makes that")
+print("legitimate.")
+print()
+
+mask = np.tril(np.ones((T, T)))
+print("THE MASK: position i may attend to positions 0..i and no further.")
+print("      %s" % "  ".join("%5s" % t for t in TOKENS))
+for i in range(T):
+    print("%-6s %s" % (TOKENS[i],
+                       "  ".join("%5s" % ("YES" if mask[i, j] else ".")
+                                 for j in range(T))))
+print("   the upper triangle is the future, and it is switched off. in")
+print("   the implementation the masked scores are set to -infinity")
+print("   BEFORE the softmax, so they receive exactly zero weight rather")
+print("   than a small one:")
+scores = np.array([2.0, 1.0, 3.0, 0.5])
+for name, m in (("no mask", np.array([1, 1, 1, 1])),
+                ("masked after softmax", None),
+                ("masked before (correct)", np.array([1, 1, 0, 0]))):
+    if m is None:
+        e = np.exp(scores - scores.max()); p = e / e.sum()
+        p = p * np.array([1, 1, 0, 0])
+        print("      %-26s %s   sums to %.4f"
+              % (name, "  ".join("%.4f" % v for v in p), p.sum()))
+    else:
+        s = np.where(m == 1, scores, -np.inf)
+        e = np.exp(s - np.nanmax(s[np.isfinite(s)])); p = e / e.sum()
+        print("      %-26s %s   sums to %.4f"
+              % (name, "  ".join("%.4f" % v for v in p), p.sum()))
+print("   zeroing after the softmax leaves the row summing to less than 1,")
+print("   so the surviving weights are wrong as well as incomplete. the")
+print("   -infinity has to go in first.")
+print()
+
+print("NOW CHECK THAT IT ACTUALLY WORKS. run a toy attention twice --")
+print("once on the real sequence, once with a LATER token replaced --")
+print("and see which outputs move:")
+rng = np.random.default_rng(2)
+D = 8
+E = rng.normal(0, 1, (T, D))
+
+def attend(X, causal):
+    s = X @ X.T / np.sqrt(D)
+    if causal:
+        s = np.where(np.tril(np.ones((T, T))) == 1, s, -np.inf)
+    s = s - s.max(axis=1, keepdims=True)
+    w = np.exp(s)
+    w = w / w.sum(axis=1, keepdims=True)
+    return w @ X
+
+E2 = E.copy()
+E2[4] = rng.normal(0, 1, D)          # change token 4 only
+print("%-10s %20s %20s" % ("position", "causal: output moved", "no mask: moved"))
+a1, a2 = attend(E, True), attend(E2, True)
+b1, b2 = attend(E, False), attend(E2, False)
+for i in range(T):
+    print("%-10d %20.2e %20.2e"
+          % (i, np.abs(a1[i] - a2[i]).max(), np.abs(b1[i] - b2[i]).max()))
+print("   with the causal mask, positions 0 to 3 are BIT-IDENTICAL after a")
+print("   later token changed. without it, every position moved.")
+print("   that is the property the whole scheme rests on: position i's")
+print("   prediction cannot have seen token i+1, so all %d predictions can"
+      % (T - 1))
+print("   be computed in the same pass and scored against the same")
+print("   sequence, honestly.")
+print()
+
+print("WHAT THAT SAVES. suppose you did it the naive way instead:")
+print("%-16s %18s %18s %14s"
+      % ("sequence length", "naive passes", "with the mask", "speedup"))
+for n in (6, 128, 1024, 8192):
+    print("%-16s %18s %18d %13dx"
+          % ("{:,}".format(n), "{:,}".format(n - 1), 1, n - 1))
+print("   the mask turns training from O(sequence length) forward passes")
+print("   into ONE. that is not an optimisation -- at %s tokens per"
+      % "{:,}".format(8192))
+print("   sequence it is the difference between possible and not.")
+print()
+
+print("AND THE LOSS IS AN AVERAGE OVER ALL OF THEM. one number per")
+print("sequence, from %d predictions:" % (T - 1))
+probs = [0.62, 0.31, 0.88, 0.45, 0.07]
+print("%-30s %14s %14s" % ("predicting", "P(correct)", "-log P"))
+for (i, p) in zip(range(1, T), probs):
+    print("%-30s %14.4f %14.4f" % (repr(TOKENS[i]), p, -np.log(p)))
+loss = float(np.mean([-np.log(p) for p in probs]))
+print("%-30s %14s %14.4f" % ("mean cross-entropy loss", "", loss))
+print("%-30s %14s %14.4f" % ("perplexity = exp(loss)", "", np.exp(loss)))
+print("   perplexity %.2f means the model was, on average, as uncertain as"
+      % np.exp(loss))
+print("   if it had been choosing uniformly among %.2f options. that is"
+      % np.exp(loss))
+print("   the whole interpretation, and it is why perplexity is quoted")
+print("   rather than the raw loss -- it has units you can picture.")
+print("   note also that the WORST prediction here (%r at %.2f) dominates"
+      % (TOKENS[5], probs[-1]))
+print("   the average: -log(%.2f) = %.2f against -log(%.2f) = %.2f."
+      % (probs[-1], -np.log(probs[-1]), max(probs), -np.log(max(probs))))
+print("   cross-entropy punishes confident mistakes far harder than it")
+print("   rewards confident successes, which is exactly what you want")
+print("   from a training signal.")
+```
+
 ## Things to try
 
 Use the controls to build intuition for how these models behave.

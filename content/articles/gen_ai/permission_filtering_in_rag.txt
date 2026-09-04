@@ -87,6 +87,142 @@ Two hard parts:
 
 <strong>Permission changes.</strong> When someone leaves a group, or a document is reclassified, the index is stale and will over-share until it is updated. Permissions change far more often than document content, so they need their own refresh path &mdash; ideally event-driven, and at minimum on a short schedule.
 
+## Post-filtering, measured, and why it fails quietly
+
+The article says post-filtering quietly fails. That is a claim with a number, and the number is worse than most people expect. This measures it, then measures the pre-filtering approach that fixes it and the new problem that one creates.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(9)
+N = 5000
+K = 10
+
+# a corpus where each document is visible to some fraction of users
+print("A CORPUS OF %s DOCUMENTS. a given user can see some fraction of it:"
+      % "{:,}".format(N))
+print()
+print("POST-FILTERING: retrieve the top %d by similarity, then drop the" % K)
+print("ones the user may not see. what the user actually receives:")
+print("%-22s %16s %16s %16s"
+      % ("user sees", "results returned", "empty results", "fewer than %d" % K))
+sims = rng.normal(0, 1, N)
+order = np.argsort(-sims)
+for frac in (0.90, 0.50, 0.20, 0.05, 0.01):
+    trials, empties, short, total = 400, 0, 0, 0
+    for _ in range(trials):
+        allowed = rng.random(N) < frac
+        got = sum(1 for i in order[:K] if allowed[i])
+        total += got
+        if got == 0:
+            empties += 1
+        if got < K:
+            short += 1
+    print("%-22s %16.2f %15.0f%% %15.0f%%"
+          % ("%.0f%% of the corpus" % (100 * frac), total / float(trials),
+             100.0 * empties / trials, 100.0 * short / trials))
+print("   read the 5 percent row. that user asks a question and receives")
+print("   about half a result on average, and gets NOTHING at all on most")
+print("   of their queries -- not an error, not an empty page with an")
+print("   explanation, just a thin and arbitrary subset of what they were")
+print("   entitled to see.")
+print("   and the failure is INVISIBLE from inside the system: the")
+print("   retriever did its job, the filter did its job, every log line")
+print("   says success, and nothing anywhere knows that the document the")
+print("   user needed was sitting at rank 200.")
+print()
+
+print("HOW FAR DOWN WOULD YOU HAVE HAD TO GO? for a user who can see f of")
+print("the corpus, reaching %d visible documents needs roughly %d/f:" % (K, K))
+print("%-22s %20s %20s"
+      % ("user sees", "needed k (expected)", "measured median"))
+for frac in (0.90, 0.50, 0.20, 0.05, 0.01):
+    needed = []
+    for _ in range(200):
+        allowed = rng.random(N) < frac
+        c = 0
+        for pos, i in enumerate(order):
+            if allowed[i]:
+                c += 1
+                if c == K:
+                    needed.append(pos + 1)
+                    break
+        else:
+            needed.append(N)
+    print("%-22s %20.0f %20.0f"
+          % ("%.0f%% of the corpus" % (100 * frac), K / frac,
+             float(np.median(needed))))
+print("   'just retrieve more and then filter' is the obvious patch, and")
+print("   the table shows what it costs: the required k is inversely")
+print("   proportional to what the user can see, so the least privileged")
+print("   users -- usually the most numerous -- pay the most.")
+print("   worse, k has to be chosen in advance, and you do not know f")
+print("   until you know the user.")
+print()
+
+print("PRE-FILTERING: restrict the search to what the user may see, THEN")
+print("rank. the result is always %d documents and always the right %d:" % (K, K))
+print("%-22s %16s %16s" % ("user sees", "results returned", "empty results"))
+for frac in (0.90, 0.50, 0.20, 0.05, 0.01):
+    trials, empties, total = 200, 0, 0
+    for _ in range(trials):
+        allowed = rng.random(N) < frac
+        idx = np.where(allowed)[0]
+        got = min(K, len(idx))
+        total += got
+        if got == 0:
+            empties += 1
+    print("%-22s %16.2f %15.0f%%"
+          % ("%.0f%% of the corpus" % (100 * frac), total / float(trials),
+             100.0 * empties / trials))
+print("   correct at every privilege level, which is the whole argument.")
+print()
+
+print("SO WHY IS ANYONE STILL POST-FILTERING? because pre-filtering fights")
+print("the index. an ANN index navigates a graph or visits clusters, and")
+print("a filter removes nodes from underneath it:")
+print("%-26s %14s %20s"
+      % ("fraction visible", "candidates seen", "of which visible"))
+NPROBE_SCAN = 400
+for frac in (0.90, 0.50, 0.20, 0.05, 0.01):
+    print("%-26s %14d %20.0f"
+          % ("%.0f%%" % (100 * frac), NPROBE_SCAN, NPROBE_SCAN * frac))
+print("   the index still visits about %d candidates -- that is what its"
+      % NPROBE_SCAN)
+print("   parameters say -- and at 1 percent visibility only %d of them are"
+      % (NPROBE_SCAN * 0.01))
+print("   eligible. the search degrades toward returning whatever it")
+print("   happened to touch, so recall falls even though the answer is")
+print("   'correct' in the permissions sense.")
+print("   the three real answers, and none is free:")
+print("%-30s %s" % ("raise ef_search / nprobe", "slower, per query"))
+print("%-30s %s" % ("a partitioned index per group", "duplicated storage"))
+print("%-30s %s" % ("filter inside the index walk", "needs store support"))
+print()
+
+print("AND THE PART THAT IS NOT ABOUT RANKING AT ALL. permissions change,")
+print("and the index does not notice:")
+print("%-40s %s" % ("a user is removed from a group", "at 09:00"))
+print("%-40s %s" % ("your ACL snapshot was built", "at 03:00"))
+print("%-40s %s" % ("what they can retrieve until re-index", "everything"))
+print("   this is why permissions are resolved at QUERY time from the")
+print("   source of truth, not baked into the index at write time. an")
+print("   index is a cache, and a cache of an access-control decision is")
+print("   a stale access-control decision.")
+print()
+print("   and the last one, which is easy to forget: FAIL CLOSED.")
+print("%-34s %-14s %s" % ("if the permission service is", "post-filter", "pre-filter"))
+for row in (("up", "correct", "correct"),
+            ("down, failing open", "LEAKS", "LEAKS"),
+            ("down, failing closed", "no results", "no results")):
+    print("%-34s %-14s %s" % row)
+print("   an empty result page is a bad afternoon. a leak is an incident,")
+print("   and it will not appear in any latency graph or error rate --")
+print("   which is why this is the one path in a RAG system that deserves")
+print("   an explicit test that a user CANNOT retrieve a document, run on")
+print("   every deploy.")
+```
+
 ## Things to try
 
 1. Drop <strong>corpus visible</strong> to 5%. Post-filtering returns almost nothing while pre-filtering still returns k &mdash; the control fails worst for the most restricted user.

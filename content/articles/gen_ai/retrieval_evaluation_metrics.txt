@@ -148,6 +148,136 @@ Frameworks such as RAGAS and TruLens implement these with a model as judge. Mode
 
 Work top to bottom. Fixing retrieval before generation, and finding before ranking, is the ordering that avoids wasted effort.
 
+## Five metrics, one result list, five different answers
+
+The sections above define each metric. Putting them side by side on the SAME ranking is what shows why they disagree -- and which disagreements are telling you something you need to act on.
+
+```python-run
+import numpy as np
+
+# one query. True where the retrieved document is relevant.
+RESULTS = [False, True, False, True, True, False, False, False, True, False]
+TOTAL_RELEVANT = 6
+K = 5
+
+print("ONE QUERY, %d results, %d relevant documents exist in the corpus:"
+      % (len(RESULTS), TOTAL_RELEVANT))
+print("   rank:     " + " ".join("%2d" % (i + 1) for i in range(len(RESULTS))))
+print("   relevant: " + " ".join(" #" if r else " ." for r in RESULTS))
+print()
+
+def prec(k):
+    return sum(RESULTS[:k]) / float(k)
+def rec(k):
+    return sum(RESULTS[:k]) / float(TOTAL_RELEVANT)
+def hit(k):
+    return 1.0 if any(RESULTS[:k]) else 0.0
+def rr():
+    for i, r in enumerate(RESULTS):
+        if r:
+            return 1.0 / (i + 1)
+    return 0.0
+def dcg(rels):
+    return sum((1.0 if r else 0.0) / np.log2(i + 2) for i, r in enumerate(rels))
+def ndcg(k):
+    ideal = dcg(sorted(RESULTS[:k], reverse=True))
+    return dcg(RESULTS[:k]) / ideal if ideal else 0.0
+
+print("ALL FIVE AT k=%d:" % K)
+print("%-22s %12s %s" % ("metric", "value", "the question it answers"))
+rows = [("hit rate@%d" % K, hit(K), "was ANY of it useful"),
+        ("precision@%d" % K, prec(K), "how much of what I sent is noise"),
+        ("recall@%d" % K, rec(K), "how much of the evidence I found"),
+        ("reciprocal rank", rr(), "how far down the first good one was"),
+        ("NDCG@%d" % K, ndcg(K), "how well the whole list is ordered")]
+for n, v, q in rows:
+    print("%-22s %12.4f %s" % (n, v, q))
+print("   five numbers between %.2f and %.2f from ONE ranking. none of"
+      % (min(v for _, v, _ in rows), max(v for _, v, _ in rows)))
+print("   them is wrong -- they are answers to five different questions,")
+print("   and quoting one as 'retrieval quality' picks a question without")
+print("   saying so.")
+print()
+
+print("HOW EACH ONE MOVES WITH k, which is where the disagreements are:")
+print("%-8s %12s %12s %12s %12s"
+      % ("k", "hit rate", "precision", "recall", "NDCG"))
+for k in (1, 2, 3, 5, 10):
+    print("%-8d %12.4f %12.4f %12.4f %12.4f"
+          % (k, hit(k), prec(k), rec(k), ndcg(k)))
+print("   precision saw-tooths downward, recall only rises, hit rate")
+print("   saturates at 1 and stops, and NDCG creeps. that is not noise,")
+print("   it is the definitions:")
+print("      recall's denominator is FIXED, so it can only rise.")
+print("      precision's denominator is k, so adding junk lowers it.")
+print("      hit rate is a yes/no, so it stops moving once it is 1.")
+print("   any argument about whether retrieval 'got better' has to name")
+print("   both the metric and the k, or the two sides are not discussing")
+print("   the same thing.")
+print()
+
+print("NOW THE DISAGREEMENT THAT MATTERS. compare two retrievers on the")
+print("same query:")
+A = [True, True, False, False, False, False, False, False, False, False]
+B = [False, False, True, True, True, True, False, False, False, False]
+def m(lst, k, f):
+    return f(lst, k)
+def P(lst, k):
+    return sum(lst[:k]) / float(k)
+def R(lst, k):
+    return sum(lst[:k]) / float(TOTAL_RELEVANT)
+def RRv(lst):
+    for i, r in enumerate(lst):
+        if r:
+            return 1.0 / (i + 1)
+    return 0.0
+def ND(lst, k):
+    ideal = dcg(sorted(lst[:k], reverse=True))
+    return dcg(lst[:k]) / ideal if ideal else 0.0
+print("%-16s %-24s %10s %10s %10s %10s"
+      % ("retriever", "pattern", "prec@5", "rec@5", "RR", "NDCG@5"))
+for name, lst in (("A", A), ("B", B)):
+    print("%-16s %-24s %10.4f %10.4f %10.4f %10.4f"
+          % (name, "".join("#" if r else "." for r in lst[:10]),
+             P(lst, 5), R(lst, 5), RRv(lst), ND(lst, 5)))
+print("   A wins on reciprocal rank (%.4f against %.4f) and on NDCG@5."
+      % (RRv(A), RRv(B)))
+print("   B wins on precision@5 and recall@5 (%.4f against %.4f)."
+      % (P(B, 5), P(A, 5)))
+print("   they disagree because they are good at different things. A puts")
+print("   its two relevant documents at ranks 1 and 2 and then stops; B")
+print("   starts at rank 3 and keeps going.")
+print("      if this feeds a chatbot that cites ONE source, A is better --")
+print("         its first result is already the answer.")
+print("      if this feeds a RAG prompt with 5 chunks, B is better -- it")
+print("         supplies %d supporting passages against A's %d, and the"
+      % (sum(B[:5]), sum(A[:5])))
+print("         model reads all five either way.")
+print("   the metric you report should be the one your SYSTEM cares about,")
+print("   and the way to find out which that is, is to ask how many of the")
+print("   retrieved documents the next stage actually reads.")
+print()
+
+print("AND THE ONE THING ALL OF THEM DEPEND ON, which is not a metric at")
+print("all: the labels. every number above needs someone to have decided")
+print("which documents are relevant.")
+print("%-30s %-22s %s" % ("how the labels are made", "cost", "the bias it adds"))
+for row in (("human annotators", "high", "small, if guidelines are good"),
+            ("click logs", "free", "you only see what you ranked"),
+            ("an LLM judge", "moderate", "agrees with itself, not you"),
+            ("the pool of retrieved docs", "free", "cannot see what nobody found")):
+    print("%-30s %-22s %s" % row)
+print("   the last row is the one that quietly caps everything. if your")
+print("   relevant set is 'whatever the current system retrieved and a")
+print("   human then approved', then recall is measured against a")
+print("   denominator your own retriever chose -- and a genuinely better")
+print("   retriever that finds something new gets no credit for it, and")
+print("   may score WORSE for returning a document nobody labelled.")
+print("   that is why a serious evaluation set is built by pooling several")
+print("   retrievers, and why the effort of building one is most of the")
+print("   effort of evaluating retrieval at all.")
+```
+
 ## Questions people ask
 
 <strong>How many evaluation questions do I need?</strong> 50 catches large regressions; 200 gives reasonably stable comparisons between similar configurations.
