@@ -48,6 +48,154 @@ U-Net was designed for biomedical images, where a dataset might contain thirty a
 
 The encoder is now usually replaced with a pretrained backbone &mdash; ResNet, EfficientNet &mdash; which improves results further. That variant is what most segmentation libraries give you by default.
 
+## Why U-Net has to be a U
+
+A segmentation network needs both a wide view and a precise one, and downsampling gives you the first at the cost of the second. U-Net's answer is the skip connection, and this measures exactly what it recovers -- by building the same decoder with and without it.
+
+```python-run
+import numpy as np
+
+H = 32
+# a 1-D "image": two regions with a boundary that is exactly at 17
+EDGE = 21
+truth = np.zeros(H)
+truth[EDGE:] = 1.0
+rng = np.random.default_rng(3)
+sig = truth * 60 + 30 + rng.normal(0, 4, H)
+
+print("A 1-D EXAMPLE, %d pixels, so every array fits on a line. the label" % H)
+print("is 0 to the left of pixel %d and 1 from %d on:" % (EDGE, EDGE))
+print("   input:  " + " ".join("%3.0f" % v for v in sig[:16]))
+print("           " + " ".join("%3.0f" % v for v in sig[16:]))
+print("   label:  " + "".join(str(int(v)) for v in truth))
+print()
+
+def pool(a):
+    return a.reshape(-1, 2).mean(axis=1)
+
+def up(a):
+    return np.repeat(a, 2)
+
+print("THE ENCODER: pool by 2, four times. each step doubles the receptive")
+print("field and halves the resolution:")
+enc = [sig]
+for i in range(4):
+    enc.append(pool(enc[-1]))
+print("%-10s %10s %16s %20s" % ("level", "length", "receptive field",
+                                "pixels per cell"))
+for i, a in enumerate(enc):
+    print("%-10d %10d %16d %20d" % (i, len(a), 2 ** i, 2 ** i))
+print("   at the bottom, one cell summarises %d input pixels. that is the"
+      % (2 ** 4))
+print("   CONTEXT the network needs -- to decide whether this pixel is")
+print("   road or pavement you have to see more than the pixel.")
+print()
+
+print("BUT LOOK WHAT HAPPENED TO THE BOUNDARY. the true edge is at %d:" % EDGE)
+print("%-10s %10s %18s %18s"
+      % ("level", "length", "edge cell index", "input pixels it covers"))
+for i, a in enumerate(enc):
+    d = np.abs(np.diff(a))
+    k = int(np.argmax(d)) + 1
+    lo, hi = k * (2 ** i), (k + 1) * (2 ** i) - 1
+    print("%-10d %10d %18d %18s" % (i, len(a), k, "%d..%d" % (lo, hi)))
+print("   at level 4 the boundary is known only to within %d pixels."
+      % (2 ** 4))
+print("   the fact that it sits at %d rather than anywhere else in that" % EDGE)
+print("   16-pixel block has been averaged away. it is not attenuated or")
+print("   hidden -- it is gone, and no decoder can invent it back.")
+print()
+
+print("A PLAIN DECODER: upsample four times from the bottom, nothing else.")
+plain = enc[-1]
+for _ in range(4):
+    plain = up(plain)
+print("   output: " + " ".join("%3.0f" % v for v in plain[:16]))
+print("           " + " ".join("%3.0f" % v for v in plain[16:]))
+pred_plain = (plain > plain.mean()).astype(int)
+print("   thresholded: " + "".join(str(v) for v in pred_plain))
+print("   label:       " + "".join(str(int(v)) for v in truth))
+err_plain = int((pred_plain != truth).sum())
+print("   %d pixel%s wrong, every one of them at the boundary."
+      % (err_plain, "" if err_plain == 1 else "s"))
+print("   the region labels are right; only the EDGE is wrong, and it is")
+print("   wrong by as much as the coarsest level was uncertain.")
+print()
+
+print("A U-NET DECODER: at every upsampling step, CONCATENATE the encoder")
+print("map from the matching level before continuing. here that is a")
+print("simple average of the two, which is what a 1-filter conv over the")
+print("concatenation would compute:")
+u = enc[-1]
+for i in range(4):
+    u = up(u)
+    skip = enc[len(enc) - 2 - i]
+    u = (u + skip) / 2.0
+    d = np.abs(np.diff(u))
+    k = int(np.argmax(d)) + 1
+    print("      after skip from level %d: length %2d, sharpest change at %d"
+          % (len(enc) - 2 - i, len(u), k))
+print("   output: " + " ".join("%3.0f" % v for v in u[:16]))
+print("           " + " ".join("%3.0f" % v for v in u[16:]))
+pred_u = (u > u.mean()).astype(int)
+print("   thresholded: " + "".join(str(v) for v in pred_u))
+print("   label:       " + "".join(str(int(v)) for v in truth))
+err_u = int((pred_u != truth).sum())
+print("   %d pixel%s wrong." % (err_u, "" if err_u == 1 else "s"))
+print()
+
+print("%-34s %14s %18s" % ("decoder", "pixels wrong", "boundary found at"))
+for name, pred in (("upsample only", pred_plain), ("with skips", pred_u)):
+    idx = np.where(np.diff(pred) != 0)[0]
+    print("%-34s %14d %18s"
+          % (name, int((pred != truth).sum()),
+             str(idx[0] + 1) if len(idx) else "none"))
+print("%-34s %14d %18d" % ("truth", 0, EDGE))
+print()
+
+print("WHY THE SKIP IS THE ONLY THING THAT COULD WORK. the two halves of")
+print("the network hold different things, and neither is sufficient:")
+print("%-22s %-24s %s" % ("", "encoder, deep", "encoder, shallow"))
+for row in (("resolution", "coarse", "full"),
+            ("receptive field", "large", "tiny"),
+            ("knows WHAT", "yes", "no"),
+            ("knows WHERE", "no", "yes")):
+    print("%-22s %-24s %s" % row)
+print("   a skip connection is how the decoder gets both at once: WHAT")
+print("   from below, WHERE from the side. that is the entire idea, and")
+print("   the U shape in the diagram is just what the wiring looks like")
+print("   when you draw it.")
+print()
+
+print("ONE MORE THING THE SKIPS BUY, which is easy to miss: they are also")
+print("a gradient path. the encoder's early layers are %d stages away from"
+      % (2 * 4))
+print("the loss through the U, and 1 step away through a skip. that is the")
+print("same argument as a residual connection, and it is why U-Net trains")
+print("on a few hundred images when it was published for biomedical data")
+print("where a few hundred is all there is.")
+print()
+print("AND THE THING TO WATCH: the concatenation needs matching sizes.")
+print("%-30s %14s %14s" % ("input length", "after 4 pools", "back up"))
+for n in (32, 30, 36, 64):
+    k = n
+    ok = True
+    for _ in range(4):
+        if k % 2:
+            ok = False
+            break
+        k //= 2
+    print("%-30d %14s %14s"
+          % (n, str(k) if ok else "not divisible",
+             str(k * 16) if ok else "shapes mismatch"))
+print("   an input that is not divisible by 2^depth comes back the wrong")
+print("   size and the concatenation fails -- or worse, a library pads it")
+print("   silently and every mask is off by a pixel. that is why U-Net")
+print("   implementations insist on input sizes that are multiples of 32,")
+print("   and why the original paper cropped the encoder features before")
+print("   concatenating rather than padding them.")
+```
+
 ## Guided tour
 
 1. <strong>Read all three masks at 1 downsampling level.</strong> The no-skip reconstruction is already visibly blockier at the boundary than the ground truth circle.

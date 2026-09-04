@@ -102,3 +102,157 @@ is not an oversight.
 **Ignoring the one-label constraint.** Merging separate semantic and instance
 outputs into a panoptic one requires a conflict rule, and the rule affects the
 score.
+
+## Three tasks that all look like colouring in
+
+Semantic, instance and panoptic segmentation produce pictures that look alike and answer different questions. This builds the same scene under all three, computes their metrics, and shows the specific query each one cannot answer.
+
+```python-run
+import numpy as np
+
+H, W = 8, 22
+# ground truth: class id per pixel, and instance id per pixel
+cls = np.zeros((H, W), int)            # 0 = background
+inst = np.zeros((H, W), int)
+CLASSES = {0: "background", 1: "person", 2: "car", 3: "road"}
+
+cls[6:, :] = 3                         # road is STUFF: no instance id
+cls[2:6, 2:6] = 1; inst[2:6, 2:6] = 1  # person A
+cls[2:6, 7:11] = 1; inst[2:6, 7:11] = 2   # person B, touching-ish
+cls[3:6, 14:21] = 2; inst[3:6, 14:21] = 3  # a car
+
+def show(a, label, glyphs):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(glyphs.get(v, "?") for v in row))
+
+show(cls, "SEMANTIC: one CLASS label per pixel",
+     {0: ".", 1: "P", 2: "C", 3: "="})
+print("      . background   P person   C car   = road")
+print()
+show(inst, "INSTANCE: one OBJECT id per pixel, countable things only",
+     {0: ".", 1: "1", 2: "2", 3: "3"})
+print("      the road is BLANK here -- it is 'stuff', not a countable")
+print("      thing, and instance segmentation has nothing to say about it.")
+print()
+show(np.where(inst > 0, inst, np.where(cls == 3, 9, 0)),
+     "PANOPTIC: every pixel gets both, things numbered and stuff labelled",
+     {0: ".", 1: "1", 2: "2", 3: "3", 9: "="})
+print()
+
+print("THE QUESTION EACH ONE CAN ANSWER:")
+qs = [("what class is pixel (4, 3)?", "yes", "yes", "yes"),
+      ("how many people are there?", "NO", "yes", "yes"),
+      ("how much of the frame is road?", "yes", "NO", "yes"),
+      ("which pixels belong to person B?", "NO", "yes", "yes"),
+      ("is every pixel labelled?", "yes", "NO", "yes")]
+print("%-34s %10s %10s %10s"
+      % ("question", "semantic", "instance", "panoptic"))
+for q in qs:
+    print("%-34s %10s %10s %10s" % q)
+print("   answer the first row from the arrays: pixel (4,3) is class %d,"
+      % cls[4, 3])
+print("   which is '%s', and it belongs to instance %d."
+      % (CLASSES[cls[4, 3]], inst[4, 3]))
+print("   semantic segmentation knows the first fact and not the second.")
+print("   count the people: semantic records %d pixels labelled 'person'"
+      % int((cls == 1).sum()))
+print("   and has no field anywhere in which to write how many people")
+print("   that is. instance stores %d distinct ids, so it can."
+      % len(set(inst[cls == 1].tolist())))
+print("   and counting connected blobs in the semantic mask is not a way")
+print("   out: two people standing shoulder to shoulder form one blob,")
+print("   which is exactly the case the next section measures.")
+print()
+
+print("NOW A PREDICTION, and what each metric makes of it. a model that")
+print("finds both people but MERGES them into one blob:")
+pred_cls = cls.copy()
+pred_cls[2:6, 6] = 1                   # bridges the gap between them
+pred_inst = np.zeros((H, W), int)
+pred_inst[2:6, 2:11] = 1               # ONE instance covering both people
+pred_inst[3:6, 14:21] = 3
+show(pred_cls, "predicted classes", {0: ".", 1: "P", 2: "C", 3: "="})
+show(pred_inst, "predicted instances", {0: ".", 1: "1", 3: "3"})
+print()
+
+print("SEMANTIC METRIC -- mean IoU, computed per class then averaged:")
+print("%-16s %10s %10s %10s %10s"
+      % ("class", "truth px", "pred px", "intersect", "IoU"))
+ious = []
+for c in sorted(CLASSES):
+    t, p = (cls == c), (pred_cls == c)
+    inter = int((t & p).sum())
+    union = int((t | p).sum())
+    v = inter / float(union) if union else 1.0
+    ious.append(v)
+    print("%-16s %10d %10d %10d %10.4f"
+          % (CLASSES[c], int(t.sum()), int(p.sum()), inter, v))
+print("%-16s %43.4f" % ("mean IoU", float(np.mean(ious))))
+print("   %.4f. the merge cost it %d pixels out of %d, and semantic IoU"
+      % (np.mean(ious), int((pred_cls == 1).sum() - (cls == 1).sum()),
+         int((cls == 1).sum())))
+print("   is close to perfect -- because from its point of view the model")
+print("   was asked 'which pixels are person?' and got almost all of them")
+print("   right. it was never asked how many people there were.")
+print()
+
+print("INSTANCE METRIC -- match predicted instances to true ones by IoU,")
+print("with a 0.5 threshold, exactly as detection does:")
+true_ids = [1, 2, 3]
+pred_ids = [1, 3]
+print("%-14s %-14s %10s %12s" % ("pred inst", "best true", "IoU", "matched?"))
+matched = set()
+for pid in pred_ids:
+    pm = (pred_inst == pid)
+    best, bid = 0.0, None
+    for tid in true_ids:
+        tm = (inst == tid)
+        u = int((pm | tm).sum())
+        v = int((pm & tm).sum()) / float(u) if u else 0.0
+        if v > best:
+            best, bid = v, tid
+    ok = best >= 0.5 and bid not in matched
+    if ok:
+        matched.add(bid)
+    print("%-14d %-14s %10.4f %12s"
+          % (pid, "inst %d" % bid, best, "yes" if ok else "NO"))
+print("   found %d of the %d true instances." % (len(matched), len(true_ids)))
+missed = [t for t in true_ids if t not in matched]
+print("   missed: %s." % ", ".join("instance %d" % m for m in missed))
+blob = (pred_inst == 1)
+for tid in (1, 2):
+    tm = (inst == tid)
+    print("   the merged blob's IoU with true instance %d is %.4f"
+          % (tid, int((blob & tm).sum()) / float(int((blob | tm).sum()))))
+print("   it overlaps both and clears 0.5 against neither, so BOTH people")
+print("   count as missed AND the blob counts as a false positive. one")
+print("   merge, three errors.")
+print()
+
+print("%-30s %14s %14s" % ("", "semantic mIoU", "instance recall"))
+print("%-30s %14.4f %14.4f"
+      % ("this prediction", float(np.mean(ious)),
+         len(matched) / float(len(true_ids))))
+print("   the SAME prediction, scored two ways: %.2f and %.2f. neither"
+      % (np.mean(ious), len(matched) / float(len(true_ids))))
+print("   number is wrong. they are answers to different questions, and a")
+print("   model reported as '%.0f%% accurate' without saying which"
+      % (100 * np.mean(ious)))
+print("   question it answered has told you nothing.")
+print()
+
+print("WHICH ONE YOUR PROBLEM NEEDS, decided by one test -- does the")
+print("answer involve counting or separating individuals?")
+print("%-34s %s" % ("medical: tumour area", "semantic"))
+print("%-34s %s" % ("medical: count the cells", "instance"))
+print("%-34s %s" % ("self-driving: drivable surface", "semantic"))
+print("%-34s %s" % ("self-driving: track each car", "instance"))
+print("%-34s %s" % ("photo editing: replace the sky", "semantic"))
+print("%-34s %s" % ("scene understanding, everything", "panoptic"))
+print("   and the practical consequence: they need different LABELS. a")
+print("   semantic dataset cannot be used to train an instance model, no")
+print("   matter how much of it there is, because the information that")
+print("   separates two touching people was never recorded. that is a far")
+print("   more expensive mistake than choosing the wrong architecture.")
+```

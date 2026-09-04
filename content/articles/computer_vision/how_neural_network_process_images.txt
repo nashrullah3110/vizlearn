@@ -102,6 +102,168 @@ Convolution works because of assumptions about images, and it is worth knowing w
 
 <strong>Not all grids are images.</strong> Convolution assumes neighbouring positions are related. Applied to a table of unrelated columns, that assumption is false and the inductive bias is wasted.
 
+## From a grid of numbers to a class score
+
+A network never sees a picture -- it sees an array, and every layer is arithmetic on that array. This follows one small image all the way from pixels to a prediction, so that nothing in the pipeline is left as a metaphor.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(4)
+
+H, W = 8, 8
+img = np.full((H, W), 30.0)
+img[1:7, 3:5] = 210.0                  # a vertical bar
+img += rng.normal(0, 4, (H, W))
+img = np.clip(img, 0, 255)
+
+print("STEP 0 -- THE IMAGE IS AN ARRAY. this is the whole input:")
+for row in img:
+    print("      " + " ".join("%3.0f" % v for v in row))
+print("   %d numbers. there is no picture anywhere in the process -- the"
+      % img.size)
+print("   picture is what YOUR eye does with these numbers.")
+print()
+
+print("STEP 1 -- NORMALISE. divide by 255 and subtract the mean:")
+x = img / 255.0
+x = (x - x.mean()) / x.std()
+print("      after: range %.2f to %.2f, mean %.4f, std %.4f"
+      % (x.min(), x.max(), x.mean(), x.std()))
+print("   this is not cosmetic. gradients scale with the input, so a")
+print("   layer fed values in 0..255 gets gradients about %d times larger"
+      % 255)
+print("   than one fed 0..1, and the learning rate that works for one")
+print("   diverges for the other.")
+print()
+
+KERNELS = {
+    "vertical edge": np.array([[-1., 0, 1], [-2, 0, 2], [-1, 0, 1]]),
+    "horizontal edge": np.array([[-1., -2, -1], [0, 0, 0], [1, 2, 1]]),
+    "bright centre": np.array([[0., -1, 0], [-1, 4, -1], [0, -1, 0]]),
+}
+
+def conv(a, k):
+    out = np.zeros((a.shape[0] - 2, a.shape[1] - 2))
+    for i in range(out.shape[0]):
+        for j in range(out.shape[1]):
+            out[i, j] = (a[i:i + 3, j:j + 3] * k).sum()
+    return out
+
+print("STEP 2 -- CONVOLUTION. slide each 3x3 kernel over the array and")
+print("record the weighted sum at every position:")
+print("      one position, written out in full. the window at (1,2):")
+win = x[1:4, 2:5]
+k = KERNELS["vertical edge"]
+terms = win * k
+print("         window:  " + "  ".join("%6.2f" % v for v in win.reshape(-1)))
+print("         kernel:  " + "  ".join("%6.2f" % v for v in k.reshape(-1)))
+print("         products:" + "  ".join("%6.2f" % v for v in terms.reshape(-1)))
+print("         sum = %.4f" % terms.sum())
+print("      that is the entire operation. %d multiplies and %d adds,"
+      % (9, 8))
+print("      repeated at every position, for every kernel.")
+print()
+maps = {name: conv(x, kk) for name, kk in KERNELS.items()}
+print("%-20s %10s %10s %10s" % ("feature map", "shape", "min", "max"))
+for name, m in maps.items():
+    print("%-20s %10s %10.3f %10.3f"
+          % (name, "%dx%d" % m.shape, m.min(), m.max()))
+print("   the maps are %dx%d, not %dx%d: a 3x3 window cannot be centred on"
+      % (H - 2, W - 2, H, W))
+print("   the border, so each convolution shrinks the array by 2. stack 20")
+print("   layers without padding and a %dx%d input is gone." % (H, W))
+print()
+
+print("STEP 3 -- ReLU. keep the positive responses, zero the rest:")
+acts = {n: np.maximum(m, 0) for n, m in maps.items()}
+ramp = " .:-=+*#%@"
+for name in KERNELS:
+    m = acts[name]
+    hi = m.max() + 1e-9
+    print("   %s" % name)
+    for row in m:
+        print("      " + "".join(ramp[min(9, int(9 * v / hi))] * 2 for v in row))
+print("   the vertical-edge map fires down the left side of the bar, and")
+print("   the horizontal-edge map fires along its TOP ONLY -- not its")
+print("   bottom. that is the ReLU: before it, the kernel gave a positive")
+print("   response going dark-to-light and a negative one going")
+print("   light-to-dark, and the ReLU deleted the second. each channel")
+print("   after a ReLU means a DIRECTED edge, which is why a real layer")
+print("   carries the mirrored kernel as a separate channel to catch the")
+print("   bottom.")
+print("   nothing here was told what a bar is. these are simply the")
+print("   numbers those kernels produce on these pixels.")
+print()
+
+print("STEP 4 -- POOL. take the max in each 2x2 block:")
+def pool(a):
+    n = (a.shape[0] // 2) * 2
+    b = a[:n, :n]
+    return b.reshape(n // 2, 2, n // 2, 2).max(axis=(1, 3))
+pooled = {n: pool(a) for n, a in acts.items()}
+print("      %s -> %s per map, %d values in total instead of %d."
+      % ("%dx%d" % acts["vertical edge"].shape,
+         "%dx%d" % pooled["vertical edge"].shape,
+         sum(p.size for p in pooled.values()),
+         sum(a.size for a in acts.values())))
+print("   pooling answers 'was this feature present nearby?' instead of")
+print("   'was it exactly here?'. that is a deliberate loss of position,")
+print("   and it is what makes the answer survive the object moving a")
+print("   pixel or two.")
+print()
+
+print("STEP 5 -- FLATTEN AND CLASSIFY. concatenate everything into one")
+print("vector and multiply by a weight matrix:")
+feat = np.concatenate([p.reshape(-1) for p in pooled.values()])
+print("      feature vector: %d numbers" % feat.size)
+Wc = np.zeros((2, feat.size))
+nv = pooled["vertical edge"].size
+Wc[0, :nv] = 1.2                       # class 0 = "has a vertical bar"
+Wc[1, nv:2 * nv] = 1.2                 # class 1 = "has a horizontal bar"
+logits = Wc @ feat
+p = np.exp(logits - logits.max())
+p = p / p.sum()
+print("      logits:        %s" % "  ".join("%8.4f" % v for v in logits))
+print("      probabilities: %s" % "  ".join("%8.4f" % v for v in p))
+print("      the network says class %d ('%s') with %.1f%% confidence."
+      % (int(p.argmax()), ["vertical bar", "horizontal bar"][int(p.argmax())],
+         100 * p.max()))
+print("      and it is right -- but read that %.1f%% carefully. the weights"
+      % (100 * p.max()))
+print("      here were written by hand to be decisive, so the logit gap is")
+print("      %.1f and the softmax saturates. a trained network's"
+      % (logits.max() - logits.min()))
+print("      confidence is shaped by its loss and its data, and is a much")
+print("      more interesting number than this one.")
+print()
+
+print("EVERY STAGE, AND WHAT IT COST:")
+print("%-26s %14s %14s %s"
+      % ("stage", "values", "parameters", "what it did"))
+rows = [("input", img.size, 0, "nothing"),
+        ("normalise", img.size, 0, "rescale"),
+        ("conv, 3 kernels", sum(m.size for m in maps.values()),
+         3 * 9, "measure"),
+        ("ReLU", sum(m.size for m in maps.values()), 0, "threshold"),
+        ("pool 2x2", sum(pl.size for pl in pooled.values()), 0, "discard position"),
+        ("flatten", feat.size, 0, "reshape"),
+        ("dense -> 2", 2, Wc.size, "decide")]
+for name, n, prm, what in rows:
+    print("%-26s %14d %14d %s" % (name, n, prm, what))
+print("   %d parameters in total, %d of them in the last layer alone."
+      % (3 * 9 + Wc.size, Wc.size))
+print()
+print("THE ONLY THING THIS EXAMPLE SKIPPED IS TRAINING. the kernels here")
+print("were written by hand, and in a real network every one of those %d"
+      % (3 * 9 + Wc.size))
+print("numbers starts random and is adjusted by gradient descent until the")
+print("predictions match the labels. nothing else about the pipeline")
+print("changes -- the same convolutions, the same ReLU, the same pooling,")
+print("the same matrix multiply. learning decides WHICH kernels, never")
+print("what a kernel is.")
+```
+
 ## Questions people ask
 
 <strong>Why 3&times;3 filters almost everywhere?</strong> Two stacked 3&times;3 layers see the same region as one 5&times;5 but use fewer parameters and include an extra non-linearity. VGG established this and it stuck.

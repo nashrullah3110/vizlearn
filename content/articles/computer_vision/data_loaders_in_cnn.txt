@@ -145,6 +145,164 @@ loader = DataLoader(dataset, worker_init_fn=seed_worker, generator=torch.Generat
 - <strong>Forgetting `.convert("RGB")`</strong>, so an occasional greyscale file produces a single-channel tensor and a shape error thousands of steps into training.
 - <strong>Normalising before augmenting,</strong> so colour transforms operate on standardised values and behave unpredictably.
 
+## Getting batches to the GPU without starving it
+
+A data loader turns a folder of files into batches of tensors, and it is where a surprising share of training time goes. This measures batching, shuffling and the producer-consumer arithmetic that decides whether your expensive accelerator spends its time computing or waiting.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(5)
+N = 23                                  # deliberately not a round number
+labels = np.array([i % 3 for i in range(N)])
+
+print("A DATASET is two methods: how many items, and give me item i.")
+print("      len(dataset) -> %d" % N)
+print("      dataset[7]   -> (image tensor, label %d)" % labels[7])
+print("   that is the entire interface. everything else -- batching,")
+print("   shuffling, parallel loading, pinned memory -- is the LOADER's")
+print("   job, built on top of those two methods.")
+print()
+
+BATCH = 4
+print("BATCHING. %d items, batch size %d:" % (N, BATCH))
+order = np.arange(N)
+batches = [order[i:i + BATCH] for i in range(0, N, BATCH)]
+print("%-10s %8s %-26s" % ("batch", "size", "indices"))
+for b, idx in enumerate(batches):
+    print("%-10d %8d %-26s" % (b, len(idx), str(list(idx))))
+print("   %d full batches and one of %d. that last one is the source of a"
+      % (N // BATCH, N % BATCH))
+print("   whole family of bugs:")
+print("      - BatchNorm on a batch of 1 has zero variance to normalise by")
+print("      - a loss that divides by a hardcoded batch size is wrong")
+print("      - a fixed-shape graph or a compiled kernel may refuse it")
+print("   hence drop_last=True, which discards %d items per epoch. with"
+      % (N % BATCH))
+print("   shuffling on it is a different %d each time, so nothing is lost"
+      % (N % BATCH))
+print("   permanently -- but on the VALIDATION set, where you must not")
+print("   shuffle, drop_last silently deletes %d examples from every"
+      % (N % BATCH))
+print("   score you report.")
+print()
+
+print("SHUFFLING. why it is not optional -- suppose the folder is sorted")
+print("by class, as folders usually are:")
+sorted_labels = np.sort(labels)
+print("      sorted:   " + " ".join(str(v) for v in sorted_labels))
+print("%-10s %-24s %s" % ("batch", "labels in it", "classes present"))
+for b in range(0, min(4 * BATCH, N), BATCH):
+    chunk = sorted_labels[b:b + BATCH]
+    print("%-10d %-24s %s" % (b // BATCH, str(list(chunk)),
+                              str(sorted(set(chunk.tolist())))))
+print("   every early batch is one class. the gradient from such a batch")
+print("   says 'predict class 0 always', the next says 'predict class 1")
+print("   always', and the model oscillates instead of converging.")
+perm = rng.permutation(N)
+shuf = labels[perm]
+print("      shuffled: " + " ".join(str(v) for v in shuf))
+print("%-10s %-24s %s" % ("batch", "labels in it", "classes present"))
+for b in range(0, min(4 * BATCH, N), BATCH):
+    chunk = shuf[b:b + BATCH]
+    print("%-10d %-24s %s" % (b // BATCH, str(list(chunk)),
+                              str(sorted(set(chunk.tolist())))))
+print("   each batch is now a small sample of the whole distribution,")
+print("   which is exactly the assumption stochastic gradient descent is")
+print("   built on: that a batch gradient is an unbiased estimate of the")
+print("   full gradient. sorted batches violate it outright.")
+print()
+
+print("A SUBTLETY WORTH KNOWING: shuffling means SAMPLING WITHOUT")
+print("REPLACEMENT within an epoch. check that every item appears once:")
+counts = np.bincount(perm, minlength=N)
+print("      items seen exactly once: %d of %d" % (int((counts == 1).sum()), N))
+print("      items seen twice or more: %d" % int((counts > 1).sum()))
+print("   a loader that sampled WITH replacement would show duplicates in")
+print("   an epoch and miss about %.0f%% of the dataset entirely, which is"
+      % (100.0 / np.e))
+print("   what a WeightedRandomSampler does on purpose -- and is a bug")
+print("   when it happens by accident.")
+print()
+
+print("NOW THE PART THAT COSTS REAL MONEY. the loader and the GPU are a")
+print("producer and a consumer, and the slow one sets the pace. the two")
+print("timings below are stand-in numbers -- measure your own -- but the")
+print("arithmetic they feed is exact:")
+LOAD_MS, GPU_MS = 22.0, 30.0            # per batch, per worker
+print("      time to load and augment one batch, one worker: %.0f ms" % LOAD_MS)
+print("      time for the GPU to process one batch:          %.0f ms" % GPU_MS)
+print()
+print("%-10s %14s %16s %14s %14s"
+      % ("workers", "loader ms/b", "GPU ms/b", "actual ms/b", "GPU busy"))
+for w in (0, 1, 2, 4, 8):
+    supply = LOAD_MS / w if w else LOAD_MS + GPU_MS
+    if w == 0:
+        actual = LOAD_MS + GPU_MS       # same process: strictly sequential
+        util = GPU_MS / actual
+        supply_show = LOAD_MS
+    else:
+        actual = max(supply, GPU_MS)
+        util = GPU_MS / actual
+        supply_show = supply
+    print("%-10d %14.1f %16.1f %14.1f %13.0f%%"
+          % (w, supply_show, GPU_MS, actual, 100 * util))
+print("   with 0 workers, loading happens in the training process, so the")
+print("   GPU sits idle for every millisecond of it -- %.0f%% utilisation."
+      % (100 * GPU_MS / (LOAD_MS + GPU_MS)))
+print("   one worker overlaps the two, and by %d workers the loader is"
+      % 2)
+print("   faster than the GPU and utilisation is 100%. beyond that point")
+print("   more workers buy NOTHING and cost memory, because the consumer")
+print("   is now the bottleneck. that is the whole tuning rule: add")
+print("   workers until the GPU is saturated, then stop.")
+print()
+
+print("AND THE ARITHMETIC PEOPLE GET WRONG. suppose you raise the batch")
+print("size to make training faster. a bigger batch is more EFFICIENT per")
+print("sample -- one large matrix multiply beats several small ones -- but")
+print("that efficiency saturates. model it and look at the epoch:")
+EPOCH_N = 50000
+print("      %s samples, per-sample cost falling from 1.00 toward 0.60"
+      % "{:,}".format(EPOCH_N))
+print("      as the batch grows, which is the shape real hardware shows.")
+print("%-12s %14s %16s %16s %12s"
+      % ("batch", "batches/ep", "cost/sample", "epoch (s)", "vs batch 4"))
+base = None
+for bs in (4, 16, 64, 256, 1024):
+    per_sample = 0.60 + 0.40 * (4.0 / bs)
+    nb = int(np.ceil(EPOCH_N / float(bs)))
+    epoch = nb * bs * per_sample * (GPU_MS / 4.0) / 1000.0
+    base = epoch if base is None else base
+    print("%-12d %14s %16.3f %16.1f %11.2fx"
+          % (bs, "{:,}".format(nb), per_sample, epoch, epoch / base))
+print("   going from 4 to 1024 -- a 256-fold increase -- buys about %.0f%%."
+      % (100 * (1 - (0.60 + 0.40 * (4.0 / 1024)) / 1.0)))
+print("   most of that arrives by batch 64, and everything after it is")
+print("   nearly free of benefit. the epoch does not shrink in proportion")
+print("   to the batch, because the same number of SAMPLES still has to go")
+print("   through the network either way -- only the overhead per sample")
+print("   falls, and overhead was never the whole cost.")
+print("   what a bigger batch definitely DOES change is the gradient: it")
+print("   averages over more examples, so it is less noisy, so it usually")
+print("   needs a LARGER learning rate to make the same progress per step.")
+print("   the common rule is to scale the learning rate with the batch")
+print("   size, and forgetting it is why 'I increased the batch and")
+print("   accuracy got worse' is such a common report.")
+print()
+print("THE CHECKLIST, in the order these bite:")
+print("%-30s %s" % ("GPU utilisation below 90%", "add workers"))
+print("%-30s %s" % ("workers help no further", "the GPU is the bottleneck"))
+print("%-30s %s" % ("RAM climbing each epoch", "too many workers, or a leak"))
+print("%-30s %s" % ("val score oddly low", "check drop_last and shuffle"))
+print("%-30s %s" % ("loss spiky and slow", "check the data is shuffled"))
+print("%-30s %s" % ("results not reproducible", "seed the workers, not just numpy"))
+print("   the last one catches almost everyone: each worker process gets")
+print("   its own copy of the random state, so seeding in the main process")
+print("   is not enough, and two runs with the same seed will augment")
+print("   differently unless the loader seeds each worker explicitly.")
+```
+
 ## Questions people ask
 
 <strong>What batch size should I use?</strong> The largest that fits in memory, up to about 256 for most vision work. Then tune the learning rate accordingly.

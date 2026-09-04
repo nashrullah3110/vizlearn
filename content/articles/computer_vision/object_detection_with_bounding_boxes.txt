@@ -47,6 +47,171 @@ Detection is substantially harder than classification for reasons that are struc
 
 <strong>DETR</strong> and its successors take a third route entirely, treating detection as set prediction with a transformer and removing the need for non-maximum suppression &mdash; conceptually cleaner, and slower to train.
 
+## Four numbers, and everything that depends on them
+
+A bounding box is four numbers, and almost every detection bug comes from a disagreement about which four. This works through the formats, the conversions, IoU, non-max suppression and the loss -- all of it arithmetic you can check line by line.
+
+```python-run
+import numpy as np
+
+print("THE SAME BOX, IN FOUR CONVENTIONS. every library picks one and")
+print("every one of them is called 'the box':")
+box_xyxy = (20.0, 30.0, 80.0, 90.0)
+x1, y1, x2, y2 = box_xyxy
+w, h = x2 - x1, y2 - y1
+cx, cy = x1 + w / 2, y1 + h / 2
+IMGW, IMGH = 200.0, 150.0
+print("%-26s %-34s %s" % ("format", "values", "used by"))
+print("%-26s %-34s %s"
+      % ("xyxy (corners)", str(box_xyxy), "torchvision, COCO eval"))
+print("%-26s %-34s %s"
+      % ("xywh (top-left + size)", str((x1, y1, w, h)), "COCO annotations"))
+print("%-26s %-34s %s"
+      % ("cxcywh (centre + size)", str((cx, cy, w, h)), "YOLO, DETR"))
+print("%-26s %-34s %s"
+      % ("normalised cxcywh",
+         "(%.3f, %.3f, %.3f, %.3f)"
+         % (cx / IMGW, cy / IMGH, w / IMGW, h / IMGH), "YOLO label files"))
+print("   they describe the identical rectangle. mixing two of them")
+print("   produces boxes that are silently wrong rather than an error,")
+print("   which is why this is the first thing to check when a detector")
+print("   trains to a loss that falls but a mAP that does not.")
+print()
+print("   the conversions, both directions, so you can check them:")
+print("      xyxy -> cxcywh:  cx=(x1+x2)/2  cy=(y1+y2)/2  w=x2-x1  h=y2-y1")
+print("      cxcywh -> xyxy:  x1=cx-w/2  y1=cy-h/2  x2=cx+w/2  y2=cy+h/2")
+back = (cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
+print("      round trip: %s -- max error %.1e"
+      % (str(back), max(abs(a - b) for a, b in zip(back, box_xyxy))))
+print()
+
+print("ONE MORE DISAGREEMENT, and it is the nastiest: is the coordinate a")
+print("pixel INDEX or a pixel EDGE?")
+print("      a box covering pixel columns 0 to 9 inclusive is")
+print("         x1=0, x2=9   if coordinates are indices  -> width 9")
+print("         x1=0, x2=10  if coordinates are edges     -> width 10")
+print("   the difference is one pixel, and it changes every area, every")
+print("   IoU and every reported score by a little. modern code uses")
+print("   edges, so width is exactly x2-x1. the original Pascal VOC used")
+print("   indices and added 1, which is why VOC numbers and COCO numbers")
+print("   for the same model differ slightly.")
+print()
+
+def iou(a, b):
+    ix1, iy1 = max(a[0], b[0]), max(a[1], b[1])
+    ix2, iy2 = min(a[2], b[2]), min(a[3], b[3])
+    inter = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
+    aa = (a[2] - a[0]) * (a[3] - a[1])
+    bb = (b[2] - b[0]) * (b[3] - b[1])
+    return inter / (aa + bb - inter)
+
+print("IoU: intersection over union. the intersection is a rectangle, so")
+print("it is four max/min operations and a multiply:")
+truth = (20.0, 30.0, 80.0, 90.0)
+cases = [("exact", (20., 30., 80., 90.)),
+         ("shifted 10px right", (30., 30., 90., 90.)),
+         ("half the size, centred", (35., 45., 65., 75.)),
+         ("twice the size, centred", (-10., 0., 110., 120.)),
+         ("touching, not overlapping", (80., 30., 140., 90.)),
+         ("miles away", (150., 10., 190., 50.))]
+print("%-28s %12s %12s %12s %10s"
+      % ("prediction", "intersect", "union", "IoU", "counts?"))
+for name, b in cases:
+    ix1, iy1 = max(truth[0], b[0]), max(truth[1], b[1])
+    ix2, iy2 = min(truth[2], b[2]), min(truth[3], b[3])
+    inter = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
+    union = ((truth[2] - truth[0]) * (truth[3] - truth[1])
+             + (b[2] - b[0]) * (b[3] - b[1]) - inter)
+    v = inter / union
+    print("%-28s %12.0f %12.0f %12.4f %10s"
+          % (name, inter, union, v, "yes" if v >= 0.5 else "no"))
+print("   note the fourth row. a prediction that CONTAINS the object")
+print("   completely still scores only %.2f, because union punishes the"
+      % iou(truth, cases[3][1]))
+print("   extra area. IoU cares about agreement, not about coverage --")
+print("   a box around the whole image finds every object and scores")
+print("   almost nothing.")
+print()
+
+print("NON-MAX SUPPRESSION. a detector fires many times on one object, so")
+print("the duplicates have to be removed. sort by confidence, take the")
+print("best, delete everything that overlaps it too much, repeat:")
+DETS = [((20., 30., 80., 90.), 0.94),
+        ((24., 33., 84., 92.), 0.88),        # same object
+        ((18., 28., 76., 86.), 0.79),        # same object
+        ((110., 40., 170., 100.), 0.72),     # a second object
+        ((115., 45., 175., 104.), 0.65),     # same second object
+        ((38., 48., 98., 108.), 0.51)]      # a third, overlapping the first
+
+def nms(dets, thr):
+    order = sorted(range(len(dets)), key=lambda i: -dets[i][1])
+    keep, killed = [], {}
+    while order:
+        i = order.pop(0)
+        keep.append(i)
+        rest = []
+        for j in order:
+            v = iou(dets[i][0], dets[j][0])
+            if v > thr:
+                killed[j] = (i, v)
+            else:
+                rest.append(j)
+        order = rest
+    return keep, killed
+
+for thr in (0.5, 0.3):
+    keep, killed = nms(DETS, thr)
+    print("   threshold %.1f -> keeps %d of %d:" % (thr, len(keep), len(DETS)))
+    for i in range(len(DETS)):
+        if i in keep:
+            print("      det %d (conf %.2f)  KEPT" % (i, DETS[i][1]))
+        else:
+            j, v = killed[i]
+            print("      det %d (conf %.2f)  suppressed by det %d, IoU %.3f"
+                  % (i, DETS[i][1], j, v))
+print("   the threshold is a real trade-off and there is no safe default.")
+print("   det 5 is the interesting one: its IoU with det 0 is %.3f, so it"
+      % iou(DETS[5][0], DETS[0][0]))
+print("   survives at 0.5 and is deleted at 0.3. it is a genuinely")
+print("   different object that happens to overlap the first one, and no")
+print("   threshold can tell that apart from a duplicate -- NMS sees only")
+print("   the overlap, never what is inside the boxes.")
+print("   too high a threshold leaves duplicates; too low deletes real")
+print("   objects in crowds. this is precisely the failure that")
+print("   soft-NMS (decay the score instead of deleting) and DETR")
+print("   (predict a fixed set, no NMS at all) were designed around.")
+print()
+
+print("THE LOSS. detection needs a regression loss on the coordinates, and")
+print("the obvious choices are all subtly wrong:")
+print("%-22s %14s %14s %16s"
+      % ("prediction error", "L2 loss", "L1 loss", "smooth L1"))
+for e in (0.1, 0.5, 1.0, 3.0, 10.0):
+    sl1 = 0.5 * e * e if abs(e) < 1 else abs(e) - 0.5
+    print("%-22.1f %14.3f %14.3f %16.3f" % (e, e * e, abs(e), sl1))
+print("   L2 explodes on outliers: a 10-pixel error contributes %.0f,"
+      % (10.0 ** 2))
+print("   %.0fx as much as a 1-pixel error, so a single badly-placed box"
+      % (10.0 ** 2 / 1.0))
+print("   dominates the batch. L1 does not, but its gradient is constant,")
+print("   so it never settles down near zero. smooth L1 is L2 below 1 and")
+print("   L1 above -- fine gradients where you are close, bounded")
+print("   influence where you are far.")
+print()
+print("   AND EVEN SMOOTH L1 IS OPTIMISING THE WRONG THING. two")
+print("   predictions with the same coordinate error can have very")
+print("   different IoU:")
+for name, b in (("small object, off by 10", (20., 30., 40., 50.)),
+                ("large object, off by 10", (20., 30., 120., 130.))):
+    shifted = (b[0] + 10, b[1], b[2] + 10, b[3])
+    print("      %-28s L1 error %2.0f, IoU %.3f"
+          % (name, 10.0, iou(b, shifted)))
+print("   identical loss, very different quality. that mismatch is why")
+print("   modern detectors optimise IoU directly -- GIoU, DIoU, CIoU --")
+print("   rather than the coordinates. the metric and the loss should be")
+print("   the same thing whenever you can arrange it.")
+```
+
 ## Things to try
 
 1. <strong>Read the starting position.</strong> The predicted box is offset and undersized relative to the ground truth — overlap is low, loss is close to 1, and it does not count as a match.

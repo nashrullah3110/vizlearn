@@ -5850,6 +5850,160 @@ not a verification of it.
 
 **Choosing a layer without saying so.** The layer is a parameter, and the answer
 depends on it.
+
+## Asking the gradient which pixels mattered
+
+Grad-CAM produces a heatmap over the image for a chosen class, and every step of it is arithmetic you can follow. This builds one end to end on a small network, then checks the two things people forget to check -- whether the map changes with the class, and whether it can be trusted when the prediction is wrong.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(21)
+C, H, W = 6, 5, 5                      # last conv layer: 6 channels of 5x5
+
+# hand-built feature maps so we know what each channel means
+fmap = np.abs(rng.normal(0, 0.15, (C, H, W)))
+fmap[0, 0:2, 0:2] += 2.2               # channel 0: something in the TOP-LEFT
+fmap[1, 3:5, 3:5] += 2.0               # channel 1: something BOTTOM-RIGHT
+fmap[2, 2, :] += 1.6                   # channel 2: a horizontal band
+fmap[3, :, 2] += 1.5                   # channel 3: a vertical band
+
+NAMES = ["top-left blob", "bottom-right blob", "horizontal band",
+         "vertical band", "noise", "noise"]
+print("THE LAST CONVOLUTIONAL LAYER: %d channels of %dx%d." % (C, H, W))
+print("%-10s %-22s %10s %14s" % ("channel", "what it responds to", "max",
+                                 "where"))
+for c in range(C):
+    r, k = np.unravel_index(fmap[c].argmax(), (H, W))
+    print("%-10d %-22s %10.2f %14s" % (c, NAMES[c], fmap[c].max(),
+                                       "(%d,%d)" % (r, k)))
+print()
+
+# a linear classifier on the pooled features: 2 classes
+gap = fmap.mean(axis=(1, 2))
+Wc = np.zeros((2, C))
+Wc[0] = [5.0, -0.5, 0.3, 0.1, 0.0, 0.0]     # class A likes channel 0
+Wc[1] = [-0.4, 1.6, 0.2, 0.1, 0.0, 0.0]     # class B likes channel 1
+logits = Wc @ gap
+print("THE HEAD: global average pool, then one linear layer to 2 classes.")
+print("%-10s %10s %14s" % ("channel", "GAP value", "in the logits"))
+for c in range(C):
+    print("%-10d %10.3f   A:%+.2f  B:%+.2f" % (c, gap[c], Wc[0, c], Wc[1, c]))
+print("   logits:  class A %.4f   class B %.4f" % (logits[0], logits[1]))
+p = np.exp(logits - logits.max())
+p = p / p.sum()
+print("   softmax: class A %.4f   class B %.4f" % (p[0], p[1]))
+print("   the model says %s." % ("A" if p[0] > p[1] else "B"))
+print()
+
+print("GRAD-CAM, STEP BY STEP. pick a class, get the gradient of its logit")
+print("with respect to the feature maps, and use it to weight them.")
+print()
+print("STEP 1 -- the gradient. because the head is GAP then linear, the")
+print("gradient of logit_k with respect to every cell of channel c is the")
+print("same number: W[k,c] / (H*W). no autograd needed here, but the same")
+print("quantity is what .backward() would hand you.")
+print()
+
+def gradcam(k):
+    grads = np.zeros((C, H, W))
+    for c in range(C):
+        grads[c] = Wc[k, c] / float(H * W)
+    alpha = grads.mean(axis=(1, 2))                 # STEP 2
+    cam = np.tensordot(alpha, fmap, axes=(0, 0))    # STEP 3
+    return alpha, cam, np.maximum(cam, 0)           # STEP 4
+
+for k, cname in ((0, "A"), (1, "B")):
+    alpha, cam, cam_relu = gradcam(k)
+    print("FOR CLASS %s:" % cname)
+    print("   STEP 2 -- average each channel's gradient into ONE weight:")
+    print("      alpha = " + "  ".join("%+.4f" % v for v in alpha))
+    print("      that average is the whole reason the map is coarse. a")
+    print("      channel gets one number, so Grad-CAM can say WHICH")
+    print("      feature mattered and cannot say which part of it did.")
+    print("   STEP 3 -- weighted sum of the feature maps:")
+    for row in cam:
+        print("      " + " ".join("%7.3f" % v for v in row))
+    print("   STEP 4 -- ReLU, because negative evidence is evidence for")
+    print("   some OTHER class, not for this one:")
+    ramp = " .:-=+*#%@"
+    hi = cam_relu.max() + 1e-9
+    for row in cam_relu:
+        print("      " + "".join(ramp[min(9, int(9 * v / hi))] * 2 for v in row))
+    r, c_ = np.unravel_index(cam_relu.argmax(), (H, W))
+    print("      peak at (%d,%d), and %d of %d cells were zeroed by the ReLU."
+          % (r, c_, int((cam <= 0).sum()), cam.size))
+    print()
+
+print("THE TEST THAT MATTERS: DOES THE MAP DEPEND ON THE CLASS?")
+_, _, camA = gradcam(0)
+_, _, camB = gradcam(1)
+ra, ca = np.unravel_index(camA.argmax(), (H, W))
+rb, cb = np.unravel_index(camB.argmax(), (H, W))
+print("   class A peaks at (%d,%d) -- the %s." % (ra, ca, NAMES[0]))
+print("   class B peaks at (%d,%d) -- the %s." % (rb, cb, NAMES[1]))
+def norm(a):
+    v = a.reshape(-1) - a.mean()
+    return v / (np.linalg.norm(v) + 1e-12)
+print("   correlation between the two maps: %.4f" % float(norm(camA) @ norm(camB)))
+print("   they are genuinely different, and that is the property that")
+print("   makes Grad-CAM worth anything. a saliency method whose output")
+print("   barely moves when you change the class is telling you about the")
+print("   IMAGE, not about the DECISION -- and several published methods")
+print("   have failed exactly that test.")
+print()
+
+print("HOW BIG IS THE MAP, REALLY. it is computed at the resolution of the")
+print("last conv layer and then upsampled to the image:")
+print("%-24s %14s %16s %16s"
+      % ("backbone", "input", "last conv map", "upsample factor"))
+for name, side, grid in (("VGG-16", 224, 14), ("ResNet-50", 224, 7),
+                         ("this toy", 40, 5)):
+    print("%-24s %14s %16s %16s"
+          % (name, "%dx%d" % (side, side), "%dx%d" % (grid, grid),
+             "%dx" % (side // grid)))
+print("   a ResNet-50 Grad-CAM map has %d values, blown up to %d pixels."
+      % (7 * 7, 224 * 224))
+print("   every smooth blob you see in a published Grad-CAM figure is")
+print("   bilinear interpolation between %d numbers. it cannot localise" % (7 * 7))
+print("   to a pixel, and a figure that looks like it does is showing you")
+print("   the interpolation, not the evidence.")
+print()
+
+print("AND THE WARNING THAT USUALLY GETS LEFT OFF. Grad-CAM explains the")
+print("class you ASK for, whether or not the model predicted it:")
+print("%-30s %14s %14s" % ("", "class A", "class B"))
+print("%-30s %14.4f %14.4f" % ("model's probability", p[0], p[1]))
+print("%-30s %14s %14s"
+      % ("Grad-CAM peak",
+         "(%d,%d)" % (ra, ca), "(%d,%d)" % (rb, cb)))
+print("%-30s %14.3f %14.3f" % ("peak strength", camA.max(), camB.max()))
+loser = 1 if p[0] > p[1] else 0
+print("   the model gives class %s a probability of %.4f -- it has all"
+      % ("AB"[loser], p[loser]))
+print("   but rejected it. Grad-CAM still returns a clean, well-localised")
+print("   map for it, peaking on exactly the right feature.")
+print("   the raw peaks do differ: %.3f against %.3f. but NOBODY EVER SEES"
+      % (max(camA.max(), camB.max()), min(camA.max(), camB.max())))
+print("   THE RAW VALUES -- every Grad-CAM figure is min-max normalised to")
+print("   0..1 before it is coloured, because the raw scale is arbitrary.")
+print("   after that step:")
+for label, cam in (("class A (p=%.2f)" % p[0], camA),
+                   ("class B (p=%.2f)" % p[1], camB)):
+    nm = cam / (cam.max() + 1e-12)
+    print("      %-20s normalised peak %.3f, mean %.3f"
+          % (label, nm.max(), nm.mean()))
+print("   the two pictures are indistinguishable in intensity. every trace")
+print("   of the model's 86-to-14 preference was divided out by the")
+print("   colour mapping.")
+print("   so the heatmap is")
+print("   not a confidence measure and never was -- it answers 'if this")
+print("   were the answer, what would have supported it?', which has a")
+print("   perfectly good answer even when the model disagrees.")
+print("   so always report the class and its probability alongside the")
+print("   picture. a map without them is an illustration, not evidence.")
+```
+
 """,
     [
         {"q": "Where does a feature map's weight come from?",
@@ -6014,6 +6168,161 @@ is not an oversight.
 **Ignoring the one-label constraint.** Merging separate semantic and instance
 outputs into a panoptic one requires a conflict rule, and the rule affects the
 score.
+
+## Three tasks that all look like colouring in
+
+Semantic, instance and panoptic segmentation produce pictures that look alike and answer different questions. This builds the same scene under all three, computes their metrics, and shows the specific query each one cannot answer.
+
+```python-run
+import numpy as np
+
+H, W = 8, 22
+# ground truth: class id per pixel, and instance id per pixel
+cls = np.zeros((H, W), int)            # 0 = background
+inst = np.zeros((H, W), int)
+CLASSES = {0: "background", 1: "person", 2: "car", 3: "road"}
+
+cls[6:, :] = 3                         # road is STUFF: no instance id
+cls[2:6, 2:6] = 1; inst[2:6, 2:6] = 1  # person A
+cls[2:6, 7:11] = 1; inst[2:6, 7:11] = 2   # person B, touching-ish
+cls[3:6, 14:21] = 2; inst[3:6, 14:21] = 3  # a car
+
+def show(a, label, glyphs):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(glyphs.get(v, "?") for v in row))
+
+show(cls, "SEMANTIC: one CLASS label per pixel",
+     {0: ".", 1: "P", 2: "C", 3: "="})
+print("      . background   P person   C car   = road")
+print()
+show(inst, "INSTANCE: one OBJECT id per pixel, countable things only",
+     {0: ".", 1: "1", 2: "2", 3: "3"})
+print("      the road is BLANK here -- it is 'stuff', not a countable")
+print("      thing, and instance segmentation has nothing to say about it.")
+print()
+show(np.where(inst > 0, inst, np.where(cls == 3, 9, 0)),
+     "PANOPTIC: every pixel gets both, things numbered and stuff labelled",
+     {0: ".", 1: "1", 2: "2", 3: "3", 9: "="})
+print()
+
+print("THE QUESTION EACH ONE CAN ANSWER:")
+qs = [("what class is pixel (4, 3)?", "yes", "yes", "yes"),
+      ("how many people are there?", "NO", "yes", "yes"),
+      ("how much of the frame is road?", "yes", "NO", "yes"),
+      ("which pixels belong to person B?", "NO", "yes", "yes"),
+      ("is every pixel labelled?", "yes", "NO", "yes")]
+print("%-34s %10s %10s %10s"
+      % ("question", "semantic", "instance", "panoptic"))
+for q in qs:
+    print("%-34s %10s %10s %10s" % q)
+print("   answer the first row from the arrays: pixel (4,3) is class %d,"
+      % cls[4, 3])
+print("   which is '%s', and it belongs to instance %d."
+      % (CLASSES[cls[4, 3]], inst[4, 3]))
+print("   semantic segmentation knows the first fact and not the second.")
+print("   count the people: semantic records %d pixels labelled 'person'"
+      % int((cls == 1).sum()))
+print("   and has no field anywhere in which to write how many people")
+print("   that is. instance stores %d distinct ids, so it can."
+      % len(set(inst[cls == 1].tolist())))
+print("   and counting connected blobs in the semantic mask is not a way")
+print("   out: two people standing shoulder to shoulder form one blob,")
+print("   which is exactly the case the next section measures.")
+print()
+
+print("NOW A PREDICTION, and what each metric makes of it. a model that")
+print("finds both people but MERGES them into one blob:")
+pred_cls = cls.copy()
+pred_cls[2:6, 6] = 1                   # bridges the gap between them
+pred_inst = np.zeros((H, W), int)
+pred_inst[2:6, 2:11] = 1               # ONE instance covering both people
+pred_inst[3:6, 14:21] = 3
+show(pred_cls, "predicted classes", {0: ".", 1: "P", 2: "C", 3: "="})
+show(pred_inst, "predicted instances", {0: ".", 1: "1", 3: "3"})
+print()
+
+print("SEMANTIC METRIC -- mean IoU, computed per class then averaged:")
+print("%-16s %10s %10s %10s %10s"
+      % ("class", "truth px", "pred px", "intersect", "IoU"))
+ious = []
+for c in sorted(CLASSES):
+    t, p = (cls == c), (pred_cls == c)
+    inter = int((t & p).sum())
+    union = int((t | p).sum())
+    v = inter / float(union) if union else 1.0
+    ious.append(v)
+    print("%-16s %10d %10d %10d %10.4f"
+          % (CLASSES[c], int(t.sum()), int(p.sum()), inter, v))
+print("%-16s %43.4f" % ("mean IoU", float(np.mean(ious))))
+print("   %.4f. the merge cost it %d pixels out of %d, and semantic IoU"
+      % (np.mean(ious), int((pred_cls == 1).sum() - (cls == 1).sum()),
+         int((cls == 1).sum())))
+print("   is close to perfect -- because from its point of view the model")
+print("   was asked 'which pixels are person?' and got almost all of them")
+print("   right. it was never asked how many people there were.")
+print()
+
+print("INSTANCE METRIC -- match predicted instances to true ones by IoU,")
+print("with a 0.5 threshold, exactly as detection does:")
+true_ids = [1, 2, 3]
+pred_ids = [1, 3]
+print("%-14s %-14s %10s %12s" % ("pred inst", "best true", "IoU", "matched?"))
+matched = set()
+for pid in pred_ids:
+    pm = (pred_inst == pid)
+    best, bid = 0.0, None
+    for tid in true_ids:
+        tm = (inst == tid)
+        u = int((pm | tm).sum())
+        v = int((pm & tm).sum()) / float(u) if u else 0.0
+        if v > best:
+            best, bid = v, tid
+    ok = best >= 0.5 and bid not in matched
+    if ok:
+        matched.add(bid)
+    print("%-14d %-14s %10.4f %12s"
+          % (pid, "inst %d" % bid, best, "yes" if ok else "NO"))
+print("   found %d of the %d true instances." % (len(matched), len(true_ids)))
+missed = [t for t in true_ids if t not in matched]
+print("   missed: %s." % ", ".join("instance %d" % m for m in missed))
+blob = (pred_inst == 1)
+for tid in (1, 2):
+    tm = (inst == tid)
+    print("   the merged blob's IoU with true instance %d is %.4f"
+          % (tid, int((blob & tm).sum()) / float(int((blob | tm).sum()))))
+print("   it overlaps both and clears 0.5 against neither, so BOTH people")
+print("   count as missed AND the blob counts as a false positive. one")
+print("   merge, three errors.")
+print()
+
+print("%-30s %14s %14s" % ("", "semantic mIoU", "instance recall"))
+print("%-30s %14.4f %14.4f"
+      % ("this prediction", float(np.mean(ious)),
+         len(matched) / float(len(true_ids))))
+print("   the SAME prediction, scored two ways: %.2f and %.2f. neither"
+      % (np.mean(ious), len(matched) / float(len(true_ids))))
+print("   number is wrong. they are answers to different questions, and a")
+print("   model reported as '%.0f%% accurate' without saying which"
+      % (100 * np.mean(ious)))
+print("   question it answered has told you nothing.")
+print()
+
+print("WHICH ONE YOUR PROBLEM NEEDS, decided by one test -- does the")
+print("answer involve counting or separating individuals?")
+print("%-34s %s" % ("medical: tumour area", "semantic"))
+print("%-34s %s" % ("medical: count the cells", "instance"))
+print("%-34s %s" % ("self-driving: drivable surface", "semantic"))
+print("%-34s %s" % ("self-driving: track each car", "instance"))
+print("%-34s %s" % ("photo editing: replace the sky", "semantic"))
+print("%-34s %s" % ("scene understanding, everything", "panoptic"))
+print("   and the practical consequence: they need different LABELS. a")
+print("   semantic dataset cannot be used to train an instance model, no")
+print("   matter how much of it there is, because the information that")
+print("   separates two touching people was never recorded. that is a far")
+print("   more expensive mistake than choosing the wrong architecture.")
+```
+
 """,
     [
         {"q": "What is the difference between semantic and panoptic segmentation?",
