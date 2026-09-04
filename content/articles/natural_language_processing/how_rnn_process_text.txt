@@ -58,6 +58,113 @@ For an encoder-decoder, the encoder's final state is the "thought vector" passed
 
 The first was addressed by gating (LSTM, GRU). The second was not addressable within the recurrent framework at all &mdash; which is why the field moved to attention.
 
+## The loop, and the four shapes it can take
+
+An RNN reads one token at a time and updates one state. Where you take the output from decides whether you have a classifier, a tagger, a generator or a translator -- four architectures from the same loop.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+vocab = ["<pad>", "the", "film", "was", "not", "very", "good", "bad", "."]
+idx = {w: i for i, w in enumerate(vocab)}
+V, D, H = len(vocab), 6, 5
+
+E = rng.normal(0, 0.5, (V, D))
+Wx = rng.normal(0, 0.5, (D, H))
+Wh = rng.normal(0, 0.5, (H, H))
+b = np.zeros(H)
+Wy = rng.normal(0, 0.5, (H, 2))          # 2 outputs, for illustration
+
+def step(x, h):
+    return np.tanh(x @ Wx + h @ Wh + b)
+
+sent = "the film was not very good .".split()
+ids = [idx[w] for w in sent]
+print("the pipeline, end to end:")
+print("   text   : %r" % " ".join(sent))
+print("   tokens : %s" % sent)
+print("   ids    : %s" % ids)
+print("   vectors: %d x %d (one row per token)" % (len(ids), D))
+print()
+
+h = np.zeros(H)
+states = []
+print("then the loop. one token in, one state out, %d times:" % len(ids))
+print("%10s %8s %30s" % ("token", "id", "hidden state"))
+for w, i in zip(sent, ids):
+    h = step(E[i], h)
+    states.append(h.copy())
+    print("%10s %8d %30s" % (w, i, np.round(h, 4)))
+print()
+print("the state after the last token has seen the whole sentence. the state")
+print("after 'not' has seen only the first four words -- and that asymmetry")
+print("is what makes the four shapes below different.")
+print()
+
+print("SHAPE 1 -- MANY TO ONE. take only the final state:")
+logits = states[-1] @ Wy
+print("   final state -> %s -> class %d"
+      % (np.round(logits, 4), int(logits.argmax())))
+print("   used for: sentiment, topic classification, spam detection.")
+print("   the whole sentence is compressed into %d numbers before any" % H)
+print("   decision is made.")
+print()
+
+print("SHAPE 2 -- MANY TO MANY, aligned. take EVERY state:")
+print("%10s %26s %10s" % ("token", "state", "tag"))
+for w, s in zip(sent, states):
+    print("%10s %26s %10d" % (w, np.round(s[:3], 3), int((s @ Wy).argmax())))
+print("   used for: part-of-speech tagging, named entity recognition.")
+print("   one output per input, and each one only sees the tokens BEFORE")
+print("   it -- which is why taggers are usually bidirectional.")
+print()
+
+print("SHAPE 3 -- ONE TO MANY. one input, then feed each output back in:")
+h = step(E[idx["the"]], np.zeros(H))
+generated = ["the"]
+for _ in range(4):
+    probs = np.exp(h @ Wy - (h @ Wy).max())
+    nxt = vocab[1 + int(np.argmax(np.abs(h)) % (V - 1))]   # a stand-in decoder
+    generated.append(nxt)
+    h = step(E[idx[nxt]], h)
+print("   %s" % " ".join(generated))
+print("   (these weights are random and the decoder is a stand-in, so the")
+print("   output is gibberish. the SHAPE is the point -- output becomes")
+print("   input, and the loop keeps going as long as you let it.)")
+print("   used for: text generation, image captioning.")
+print("   note the model's own output becomes its next input, so an early")
+print("   mistake propagates -- that is exposure bias, and it is why")
+print("   generation quality degrades with length.")
+print()
+
+print("SHAPE 4 -- MANY TO MANY, unaligned (encoder-decoder). read the whole")
+print("input, then start writing:")
+print("   encoder: %s -> final state %s" % (" ".join(sent), np.round(states[-1][:3], 3)))
+print("   decoder: starts from that state and produces its own sequence")
+print("   used for: translation, summarisation.")
+print("   the input and output lengths need not match, which none of the")
+print("   first three shapes allow.")
+print()
+
+print("AND THE PROBLEM THE FIRST AND FOURTH SHARE. everything the model")
+print("knows is in %d numbers, whatever the input length:" % H)
+for L in (4, 10, 30):
+    a = [idx[vocab[1 + (i % (V - 1))]] for i in range(L)]
+    hh = np.zeros(H)
+    for i in a:
+        hh = step(E[i], hh)
+    aa = list(a); aa[0] = idx["bad"] if aa[0] != idx["bad"] else idx["good"]
+    hh2 = np.zeros(H)
+    for i in aa:
+        hh2 = step(E[i], hh2)
+    print("   length %2d: changing the FIRST token moves the final state by %.6f"
+          % (L, np.linalg.norm(hh - hh2)))
+print("   by 30 tokens the first word is gone. for classification that may")
+print("   be survivable; for translation it is not, and that is exactly the")
+print("   bottleneck attention was invented to remove.")
+```
+
 ## Experiments to try
 
 Use the simulation to see how an RNN performs sentiment analysis (classifying a sentence as positive or negative):

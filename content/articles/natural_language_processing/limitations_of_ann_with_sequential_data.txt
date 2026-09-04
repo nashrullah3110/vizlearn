@@ -55,6 +55,104 @@ An <strong>RNN</strong> processes one element at a time, carrying a state, so th
 
 A <strong>transformer</strong> makes every position one step from every other and computes them all simultaneously. Its limit is quadratic cost in length.
 
+## Four things a plain network cannot do with a sequence
+
+A feed-forward network expects a fixed-size input and treats every position as a separate feature. Each of those two facts causes a specific failure, demonstrated here on data where the right answer is known.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+print("1. FIXED INPUT SIZE. a dense layer's weight matrix has one row per")
+print("   input feature, chosen when you build it:")
+for T in (5, 20, 100):
+    print("      %3d-token input -> first layer is %3d x hidden. a %d-token"
+          % (T, T, T + 1))
+    print("      %-16s sentence does not fit." % "")
+print("   padding is the usual patch, and it wastes both compute and")
+print("   capacity on positions that carry nothing:")
+lengths = [4, 7, 31, 5, 9]
+print("      real lengths %s -> pad everything to %d" % (lengths, max(lengths)))
+print("      %.0f%% of the padded input is filler."
+      % (100 * (1 - sum(lengths) / (len(lengths) * max(lengths)))))
+print()
+
+print("2. NO WEIGHT SHARING ACROSS POSITIONS. position 3 and position 40")
+print("   have entirely separate weights, so nothing learned at one")
+print("   transfers to the other.")
+T, H = 20, 16
+dense = T * H
+rnn = 1 * H + H * H
+print("      dense layer over %d positions : %d weights" % (T, dense))
+print("      one RNN cell reused %d times   : %d weights" % (T, rnn))
+print("   and here is what that costs. train a dense model to detect a")
+print("   pattern that only ever appears at position 2, then test it when")
+print("   the pattern moves:")
+N = 600
+def make(pos):
+    X = rng.normal(0, 0.4, (N, T))
+    y = rng.integers(0, 2, N)
+    X[y == 1, pos] += 3.0                 # the signal, at one position
+    return X, y
+
+Xtr, ytr = make(2)
+w = np.linalg.lstsq(np.column_stack([Xtr, np.ones(N)]), ytr * 2.0 - 1, rcond=None)[0]
+def acc(X, y):
+    return (((np.column_stack([X, np.ones(len(X))]) @ w) > 0) == (y == 1)).mean()
+print("      trained with the signal at position 2:")
+for test_pos in (2, 3, 8, 15):
+    Xte, yte = make(test_pos)
+    print("         signal at position %2d -> accuracy %.4f"
+          % (test_pos, acc(Xte, yte)))
+print("   it learned 'look at column 2', not 'look for this pattern'. an RNN")
+print("   or a convolution applies the same weights everywhere and does not")
+print("   have to relearn the pattern per position.")
+print()
+
+print("3. NO NOTION OF ORDER BEYOND POSITION IDENTITY. the network sees")
+print("   %d independent features, not a sequence:" % T)
+a = np.zeros(T); a[3] = 1.0
+b = np.zeros(T); b[4] = 1.0
+c = np.zeros(T); c[19] = 1.0
+print("      nothing in the architecture says position 3 is adjacent to 4")
+print("      and far from 19. it has to learn that from data, per pair,")
+print("      and there are %d pairs." % (T * (T - 1) // 2))
+print()
+
+print("4. NO MEMORY BETWEEN EXAMPLES. each forward pass is independent, so")
+print("   streaming data has to be re-fed as overlapping windows:")
+stream = np.arange(10)
+W = 4
+windows = [stream[i:i + W] for i in range(len(stream) - W + 1)]
+print("      a stream of %d values, window %d:" % (len(stream), W))
+for w_ in windows[:4]:
+    print("         %s" % w_)
+print("      ...")
+total = sum(len(x) for x in windows)
+print("      %d values become %d window-values -- each one is recomputed"
+      % (len(stream), total))
+print("      %.1f times on average." % (total / len(stream)))
+print()
+
+print("WHAT EACH ARCHITECTURE FIXES:")
+rows = [("variable length", "no", "yes", "yes", "up to a limit"),
+        ("shared weights", "no", "yes", "yes", "yes"),
+        ("order built in", "no", "yes", "local only", "added explicitly"),
+        ("parallel over time", "yes", "no", "yes", "yes"),
+        ("long-range path", "direct", "O(n) steps", "O(n/k) layers", "direct")]
+print("%22s %10s %12s %14s %18s"
+      % ("", "dense", "RNN", "1-D conv", "transformer"))
+for r in rows:
+    print("%22s %10s %12s %14s %18s" % r)
+print()
+print("the dense row is not all bad -- it is parallel and has a direct path")
+print("between any two positions, which is exactly what a transformer also")
+print("has. what a transformer adds is weight sharing and variable length,")
+print("which is why it replaced both the dense model and the RNN rather")
+print("than sitting between them.")
+```
+
 ## Experiments to try
 
 1. <strong>Load the long sentence.</strong> The 9-word input overflows the 6 slots — the red strip shows words the network will simply never see.

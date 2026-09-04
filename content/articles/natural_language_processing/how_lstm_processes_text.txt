@@ -113,6 +113,112 @@ out, _ = pad_packed_sequence(out, batch_first=True)
 |On-device text classification|LSTM or a distilled transformer|
 |Anything generative at quality|Transformer|
 
+## One sentence, one token at a time, gates shown
+
+An LSTM reading a real sentence, with all four gates printed at every token and the cell state tracked alongside. The interesting part is which tokens make the gates move.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+vocab = ["the", "film", "was", "not", "very", "good", ".", "but", "acting",
+         "excellent"]
+idx = {w: i for i, w in enumerate(vocab)}
+V, D, H = len(vocab), 6, 4
+E = rng.normal(0, 0.6, (V, D))
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
+Wf = rng.normal(0, 0.5, (D + H, H)); bf = np.ones(H)
+Wi = rng.normal(0, 0.5, (D + H, H)); bi = np.zeros(H)
+Wc = rng.normal(0, 0.5, (D + H, H)); bc = np.zeros(H)
+Wo = rng.normal(0, 0.5, (D + H, H)); bo = np.zeros(H)
+
+def step(x, h, c):
+    z = np.concatenate([x, h])
+    f = sigmoid(z @ Wf + bf)
+    i = sigmoid(z @ Wi + bi)
+    g = np.tanh(z @ Wc + bc)
+    o = sigmoid(z @ Wo + bo)
+    c_new = f * c + i * g
+    return o * np.tanh(c_new), c_new, (f, i, g, o)
+
+sent = "the film was not very good . but acting excellent".split()
+print("the pipeline before the LSTM sees anything:")
+print("   text   : %r" % " ".join(sent))
+print("   ids    : %s" % [idx[w] for w in sent])
+print("   vectors: %d rows of %d numbers" % (len(sent), D))
+print()
+
+h, c = np.zeros(H), np.zeros(H)
+print("then one step per token. these are unit 0's gates:")
+print("%10s %9s %9s %11s %9s %12s %11s"
+      % ("token", "forget", "input", "candidate", "output", "cell c[0]", "h[0]"))
+for w in sent:
+    h, c, (f, i, g, o) = step(E[idx[w]], h, c)
+    print("%10s %9.4f %9.4f %11.4f %9.4f %12.4f %11.4f"
+          % (w, f[0], i[0], g[0], o[0], c[0], h[0]))
+print()
+print("read the forget column: it stays high, so the cell state carries")
+print("across the whole sentence rather than resetting at each token. that")
+print("is the default behaviour the bias of 1.0 sets up.")
+print()
+
+print("WHAT THE STATE IS DOING. track the magnitude of the whole cell:")
+h, c = np.zeros(H), np.zeros(H)
+mags = []
+for w in sent:
+    h, c, _ = step(E[idx[w]], h, c)
+    mags.append(np.linalg.norm(c))
+for w, m in zip(sent, mags):
+    print("   %-10s |c| = %.4f  %s" % (w, m, "#" * int(m * 12)))
+print("   it drifts upward without ever resetting -- rising and dipping with")
+print("   each token, but never returning to where it started. an untrained")
+print("   cell has no reason to flush, so the state wanders until the tanh")
+print("   and the gates balance it. a trained one learns when to clear.")
+print()
+
+print("THE SENTENCE-LEVEL PREDICTION comes from the FINAL state only:")
+Wy = rng.normal(0, 0.5, (H, 2))
+print("   final h = %s" % np.round(h, 4))
+print("   logits  = %s -> class %d" % (np.round(h @ Wy, 4), int((h @ Wy).argmax())))
+print("   everything the model concluded about %d tokens is in those %d"
+      % (len(sent), H))
+print("   numbers. that is the many-to-one shape.")
+print()
+
+print("AND HERE IS WHY 'not' IS HARD. compare two sentences that differ by")
+print("one word early on:")
+pairs = ("the film was not very good .".split(),
+         "the film was very very good .".split())
+finals = []
+for s in pairs:
+    hh, cc = np.zeros(H), np.zeros(H)
+    for w in s:
+        hh, cc, _ = step(E[idx[w]], hh, cc)
+    finals.append(hh)
+    print("   %-34s final h = %s" % (" ".join(s), np.round(hh, 4)))
+print("   distance between them: %.4f" % np.linalg.norm(finals[0] - finals[1]))
+print("   the difference survives to the end here, three tokens later. push")
+print("   the 'not' further back and it fades:")
+for gap in (1, 4, 10, 25):
+    base = ["the", "film", "was", "not"] + ["very"] * gap + ["good", "."]
+    alt = ["the", "film", "was", "very"] + ["very"] * gap + ["good", "."]
+    outs = []
+    for s in (base, alt):
+        hh, cc = np.zeros(H), np.zeros(H)
+        for w in s:
+            hh, cc, _ = step(E[idx[w]], hh, cc)
+        outs.append(hh)
+    print("      %2d token%s after 'not': difference %.6f"
+          % (gap, "" if gap == 1 else "s", np.linalg.norm(outs[0] - outs[1])))
+print("   an LSTM holds it longer than a plain RNN would, and not forever.")
+print("   that is the honest limit, and it is what attention removed by")
+print("   giving 'good' a direct link back to 'not' regardless of distance.")
+```
+
 ## Questions people ask
 
 <strong>Does an LSTM read left to right?</strong> Yes, unless bidirectional, in which case a second pass reads right to left and the outputs are concatenated.

@@ -121,6 +121,116 @@ Every large model uses pre-norm. It is one of the small details that made scalin
 
 For recurrent cells, layer normalisation applied to the gate pre-activations stabilises training and helps with the exploding cell states that otherwise saturate the output tanh.
 
+## Why BatchNorm loses to LayerNorm on sequences
+
+Sequences are ragged, arrive one at a time, and vary in length. Each of those breaks BatchNorm in a specific way, and this measures all three on padded batches.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+B, T, D = 4, 6, 5
+lengths = [6, 3, 5, 2]
+x = rng.normal(0, 1.0, (B, T, D)) * 2 + 1
+mask = np.zeros((B, T))
+for i, L in enumerate(lengths):
+    mask[i, :L] = 1
+    x[i, L:] = 0.0                    # padding
+print("a batch of %d sequences, padded to length %d." % (B, T))
+print("   real lengths: %s -> %d of %d positions are padding (%.0f%%)"
+      % (lengths, int((1 - mask).sum()), B * T,
+         100 * (1 - mask).sum() / (B * T)))
+print()
+
+def batchnorm(a, eps=1e-5):
+    # normalise over batch AND time, per feature -- the usual sequence variant
+    mu = a.mean(axis=(0, 1), keepdims=True)
+    sd = a.std(axis=(0, 1), keepdims=True)
+    return (a - mu) / (sd + eps)
+
+def layernorm(a, eps=1e-5):
+    mu = a.mean(axis=-1, keepdims=True)
+    sd = a.std(axis=-1, keepdims=True)
+    return (a - mu) / (sd + eps)
+
+print("PROBLEM 1 -- PADDING POLLUTES THE STATISTICS. BatchNorm averages over")
+print("the batch, and the padding is in the batch:")
+real = x[mask.astype(bool)]
+print("   mean over REAL positions only : %s" % np.round(real.mean(0), 4))
+print("   mean over everything incl. pad: %s" % np.round(x.mean(axis=(0, 1)), 4))
+print("   sd   over REAL positions only : %s" % np.round(real.std(0), 4))
+print("   sd   over everything incl. pad: %s" % np.round(x.std(axis=(0, 1)), 4))
+print("   the padding is %d of %d rows of zeros, and it drags both toward 0."
+      % (int((1 - mask).sum()), B * T))
+print("   LayerNorm never sees it -- it normalises within a position, so a")
+print("   padded position is normalised on its own and then masked away.")
+print()
+
+print("PROBLEM 2 -- THE STATISTICS DEPEND ON THE BATCH. take sequence 0 and")
+print("run it in three different batches:")
+target = x[0:1]
+for k in (1, 2, 4):
+    batch = x[:k]
+    bn = batchnorm(batch)[0, 0]
+    ln = layernorm(batch)[0, 0]
+    print("   batch of %d: BatchNorm -> %s" % (k, np.round(bn[:4], 4)))
+    print("   %-11s LayerNorm -> %s" % ("", np.round(ln[:4], 4)))
+print("   LayerNorm gives the same answer every time. BatchNorm does not,")
+print("   so the model's output for one sentence depends on which other")
+print("   sentences happened to be batched with it.")
+print()
+
+print("PROBLEM 3 -- LENGTH. BatchNorm keeps running statistics per feature,")
+print("but a sequence model applies the same layer at every timestep, and")
+print("the distribution at step 0 is not the distribution at step 50:")
+h = np.zeros(8)
+W = rng.normal(0, 0.5, (8, 8))
+print("%10s %14s %14s" % ("timestep", "state mean", "state sd"))
+for t in range(1, 51):
+    h = np.tanh(h @ W + rng.normal(0, 0.5, 8))
+    if t in (1, 2, 5, 20, 50):
+        print("%10d %14.4f %14.4f" % (t, h.mean(), h.std()))
+print("   keeping one running mean per feature across all timesteps averages")
+print("   over distributions that are genuinely different. keeping one PER")
+print("   TIMESTEP means you cannot handle a sequence longer than the")
+print("   longest one you trained on.")
+print()
+
+print("THE COMPARISON:")
+rows = [("normalises over", "batch and time", "features of one position"),
+        ("depends on batch size", "yes", "no"),
+        ("train / eval differ", "yes -- running stats", "no"),
+        ("padding pollutes it", "yes", "no"),
+        ("works at batch size 1", "no", "yes"),
+        ("variable length", "awkward", "fine")]
+print("%24s %24s %28s" % ("", "BatchNorm", "LayerNorm"))
+for r in rows:
+    print("%24s %24s %28s" % r)
+print()
+
+print("AND THE VARIANTS WORTH KNOWING:")
+print("   RMSNorm    -- LayerNorm without the mean subtraction. one fewer")
+print("                 reduction, and in practice the centring turned out")
+print("                 not to matter:")
+def rmsnorm(a, eps=1e-6):
+    return a / np.sqrt((a ** 2).mean(-1, keepdims=True) + eps)
+row = x[0, 0]
+print("                 LayerNorm(x) = %s" % np.round(layernorm(x)[0, 0][:4], 4))
+print("                 RMSNorm(x)   = %s" % np.round(rmsnorm(x)[0, 0][:4], 4))
+print()
+print("   pre-norm vs post-norm -- where the norm sits relative to the")
+print("   residual. pre-norm (normalise the sublayer's INPUT) leaves the")
+print("   skip path clean, so the gradient reaches layer 1 unattenuated.")
+print("   that is what made very deep transformers trainable without a")
+print("   long learning-rate warmup, and it is why almost everything now")
+print("   uses it.")
+print()
+print("   and always mask. whatever you normalise with, the padded positions")
+print("   must be excluded from the loss -- a model scored on predicting")
+print("   padding will happily learn to predict padding.")
+```
+
 ## Questions people ask
 
 <strong>Why not batch normalisation for sequences?</strong> It mixes statistics across positions and padding, needs a decent batch size, and differs between training and inference.

@@ -60,6 +60,121 @@ A <strong>transformer</strong> makes every position one step from every other an
 
 For most applied work today the practical answer is a pretrained transformer, fine-tuned &mdash; or, with few labels, a frozen encoder plus a small classifier on its embeddings.
 
+## The whole pipeline, from a string to a prediction
+
+Six stages sit between raw text and a number, and each one is a place things go wrong. All six are run here on one sentence, with the shape printed at every boundary.
+
+```python-run
+import numpy as np
+import re
+
+rng = np.random.default_rng(0)
+raw = "  The FILM was NOT very good!!  "
+print("STAGE 0 -- raw input: %r" % raw)
+print()
+
+clean = re.sub(r"\s+", " ", raw.strip().lower())
+clean = re.sub(r"([!?.,])", r" \1 ", clean)
+clean = re.sub(r"\s+", " ", clean).strip()
+print("STAGE 1 -- NORMALISE. lowercase, collapse whitespace, separate")
+print("punctuation so it becomes its own token:")
+print("   %r" % clean)
+print()
+
+tokens = clean.split()
+print("STAGE 2 -- TOKENISE. %d tokens:" % len(tokens))
+print("   %s" % tokens)
+print()
+
+vocab = ["<pad>", "<unk>", "the", "film", "was", "not", "very", "good", "!",
+         "bad", "acting"]
+idx = {w: i for i, w in enumerate(vocab)}
+ids = [idx.get(t, idx["<unk>"]) for t in tokens]
+print("STAGE 3 -- MAP TO IDS against a fixed vocabulary of %d:" % len(vocab))
+print("%12s %8s %s" % ("token", "id", ""))
+for t, i in zip(tokens, ids):
+    print("%12s %8d %s" % (t, i, "<- not in vocabulary" if i == 1 else ""))
+print()
+
+MAXLEN = 12
+padded = ids[:MAXLEN] + [idx["<pad>"]] * max(0, MAXLEN - len(ids))
+mask = [1] * min(len(ids), MAXLEN) + [0] * max(0, MAXLEN - len(ids))
+print("STAGE 4 -- PAD to a fixed length so a batch is rectangular:")
+print("   ids  %s" % padded)
+print("   mask %s" % mask)
+print("   the mask is not optional. %d of %d positions are padding, and"
+      % (mask.count(0), MAXLEN))
+print("   anything that averages or predicts over them will be wrong.")
+print()
+
+V, D, H = len(vocab), 8, 6
+E = rng.normal(0, 0.5, (V, D))
+X = E[padded]
+print("STAGE 5 -- EMBED. each id becomes a row of the embedding table:")
+print("   ids %s -> X %s" % ((MAXLEN,), X.shape))
+print("   the first token's vector: %s" % np.round(X[0][:5], 4))
+print("   and note the padded rows are real vectors too -- E[0] is not")
+print("   zero unless you make it so. that is the second reason for the")
+print("   mask:")
+print("      E[<pad>] = %s" % np.round(E[idx["<pad>"]][:5], 4))
+print()
+
+Wx = rng.normal(0, 0.4, (D, H))
+Wh = rng.normal(0, 0.4, (H, H))
+Wy = rng.normal(0, 0.4, (H, 2))
+h = np.zeros(H)
+for t in range(MAXLEN):
+    if mask[t]:                              # <- skip the padding
+        h = np.tanh(X[t] @ Wx + h @ Wh)
+print("STAGE 6 -- THE MODEL. run the sequence, take the final state:")
+print("   final hidden state: %s" % np.round(h, 4))
+logits = h @ Wy
+print("   logits: %s" % np.round(logits, 4))
+e = np.exp(logits - logits.max())
+print("   softmax: %s -> class %d" % (np.round(e / e.sum(), 4), int(logits.argmax())))
+print()
+
+print("WHAT HAPPENS IF YOU SKIP THE MASK. run the same model over the")
+print("padding as well:")
+h_bad = np.zeros(H)
+for t in range(MAXLEN):
+    h_bad = np.tanh(X[t] @ Wx + h_bad @ Wh)
+print("   masked   final state: %s" % np.round(h, 4))
+print("   unmasked final state: %s" % np.round(h_bad, 4))
+print("   distance: %.4f" % np.linalg.norm(h - h_bad))
+print("   the %d padding steps overwrote the state. a longer pad makes it"
+      % mask.count(0))
+print("   worse, so the model's answer would depend on the longest sentence")
+print("   in the batch -- which has nothing to do with this one.")
+print()
+
+print("THE SHAPES, end to end:")
+rows = [("raw text", "1 string"),
+        ("tokens", "%d strings" % len(tokens)),
+        ("ids", "%d integers" % len(ids)),
+        ("padded", "%d integers + a mask" % MAXLEN),
+        ("embedded", "%d x %d floats" % (MAXLEN, D)),
+        ("final state", "%d floats" % H),
+        ("logits", "%d floats" % 2)]
+for a, b in rows:
+    print("   %-14s %s" % (a, b))
+print()
+print("EVERY STAGE IS A PLACE TO GET IT WRONG, and the failures are quiet:")
+print("   normalisation  -- a step that helps one task hurts another")
+print("   vocabulary     -- built from training data only, or you leak")
+print("   <unk>          -- count them. a high rate means your vocabulary")
+print("                     does not match your data")
+print("   padding        -- mask it, everywhere, including in the loss")
+print("   truncation     -- MAXLEN silently discards the end of long inputs")
+print("   inference      -- must use the SAME vocabulary and the SAME")
+print("                     normalisation as training, or the ids mean")
+print("                     something different")
+print()
+print("that last one is the most common production bug in NLP: the")
+print("tokeniser and the model are two artefacts, and shipping one without")
+print("the other produces confident nonsense rather than an error.")
+```
+
 ## Guided experiments
 
 Use the network builder above to solidify your understanding:

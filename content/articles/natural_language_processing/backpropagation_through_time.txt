@@ -67,6 +67,131 @@ That is a hardware-utilisation limitation rather than a quality one, and gating 
 2. <strong>Backpropagate.</strong> Amber arrows sweep right to left. Watch the chain-rule product in the sidebar: 1.0, then 0.7, then 0.49... each timestep multiplies again.
 3. <strong>Set T = 7 and repeat.</strong> By the time the gradient reaches t = 1 it is 0.7&#8310; &asymp; 0.12 — barely a whisper. The bar chart makes the decay unmistakable. This shrinkage is the seed of the vanishing gradient problem, covered next.
 
+## Unrolling the loop to differentiate it
+
+Training an RNN means treating the loop as a deep network with shared weights. This runs the full backward pass by hand, checks it numerically, and shows why the gradients from every timestep are summed rather than averaged.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+X, H, T = 2, 3, 14
+Wx = rng.normal(0, 0.5, (X, H))
+Wh = rng.normal(0, 0.5, (H, H))
+Wy = rng.normal(0, 0.5, (H, 1))
+b = np.zeros(H)
+seq = rng.normal(0, 1.0, (T, X))
+target = 0.7
+
+H0 = rng.normal(0, 0.4, H)      # a non-zero initial state, so step 0 is
+                                 # not degenerate in the gradient below
+
+def forward(Wx, Wh, Wy, b):
+    h = H0.copy()
+    hs = [h.copy()]
+    for x in seq:
+        h = np.tanh(x @ Wx + h @ Wh + b)
+        hs.append(h.copy())
+    out = hs[-1] @ Wy
+    return hs, out, float((out - target) ** 2)
+
+hs, out, loss = forward(Wx, Wh, Wy, b)
+print("a %d-step RNN, one prediction from the final state." % T)
+print("   output %.6f, target %.1f, loss %.6f" % (out, target, loss))
+print()
+
+print("UNROLLED, this is a %d-layer network where every layer uses the SAME"
+      % T)
+print("Wh. so the gradient for Wh gets a contribution from every step, and")
+print("those contributions ADD:")
+print()
+
+dWy = hs[-1].reshape(-1, 1) * 2 * (out - target)
+dh = (2 * (out - target) * Wy).ravel()
+dWx = np.zeros_like(Wx)
+dWh = np.zeros_like(Wh)
+db = np.zeros_like(b)
+contributions = []
+for t in range(T - 1, -1, -1):
+    dpre = dh * (1 - hs[t + 1] ** 2)          # through the tanh
+    step_dWh = np.outer(hs[t], dpre)
+    dWh += step_dWh
+    dWx += np.outer(seq[t], dpre)
+    db += dpre
+    contributions.append((t, np.abs(step_dWh).max()))
+    dh = dpre @ Wh.T                          # one step further back
+print("%10s %26s" % ("step", "its contribution to dWh"))
+biggest = max(m for _, m in contributions)
+for t, mag in contributions:
+    if t in (T - 1, T - 2, T - 4, T - 7, T // 2, 2, 1, 0):
+        print("%10d %26.8f  %s"
+              % (t, mag, "#" * max(0, int(40 * mag / biggest))))
+print("   total dWh magnitude: %.8f" % np.abs(dWh).max())
+print()
+late = np.mean([m for t, m in contributions if t >= T - 3])
+early = np.mean([m for t, m in contributions if t <= 2])
+print("   the last three steps contribute %.6f on average; the first three"
+      % late)
+print("   contribute %.6f -- a factor of %.0f. that decay is the vanishing"
+      % (early, late / max(early, 1e-30)))
+print("   gradient, seen from the other direction: the early steps barely")
+print("   influence the update at all, so whatever happened there cannot")
+print("   be learned.")
+print()
+
+def numeric(param, i, j, h=1e-6):
+    up = [Wx.copy(), Wh.copy(), Wy.copy(), b.copy()]
+    dn = [Wx.copy(), Wh.copy(), Wy.copy(), b.copy()]
+    up[param][i, j] += h
+    dn[param][i, j] -= h
+    return (forward(*up)[2] - forward(*dn)[2]) / (2 * h)
+
+print("CHECK IT. nudge each weight and measure the loss directly:")
+print("%10s %8s %18s %18s %12s"
+      % ("param", "index", "analytic", "numeric", "difference"))
+worst = 0.0
+for name, p, grad, (i, j) in (("Wx", 0, dWx, (0, 0)), ("Wx", 0, dWx, (1, 2)),
+                              ("Wh", 1, dWh, (0, 0)), ("Wh", 1, dWh, (2, 1)),
+                              ("Wy", 2, dWy, (1, 0))):
+    a, n = grad[i, j], numeric(p, i, j)
+    worst = max(worst, abs(a - n))
+    print("%10s %8s %18.10f %18.10f %12.2e"
+          % (name, "[%d,%d]" % (i, j), a, n, abs(a - n)))
+print("   worst disagreement: %.2e -- floating point noise." % worst)
+print()
+
+print("WHY SUM AND NOT AVERAGE. Wh is one matrix used %d times. the" % T)
+print("derivative of the loss with respect to it is the sum over every use:")
+print("    dL/dWh = sum over t of (dL/dWh at step t)")
+print("   averaging would silently divide your learning rate by the sequence")
+print("   length, and it would make gradients from a 10-token sequence and a")
+print("   1000-token one incomparable.")
+print()
+
+print("TRUNCATED BPTT, because the full version is impractical:")
+print("%14s %16s %20s %s" % ("truncation k", "memory", "gradient reaches", ""))
+for k in (1, 5, 25, "full"):
+    kk = T if k == "full" else k
+    print("%14s %16s %20s %s"
+          % (k, "%d states" % min(kk, T), "%d steps back" % min(kk, T),
+             "<- exact" if k == "full" else ""))
+print("   a 10,000-step sequence would need 10,000 stored states before the")
+print("   backward pass can begin. truncation caps that at k, and accepts")
+print("   that dependencies longer than k are invisible to training.")
+print()
+print("   the usual arrangement is to carry the STATE forward across chunks")
+print("   while cutting the GRADIENT at the boundary:")
+print("      forward:  state flows through the whole sequence")
+print("      backward: stops after k steps")
+print("   so the model can still USE long context at inference; it just")
+print("   cannot LEARN dependencies longer than k.")
+print()
+print("and that is the honest limit of the architecture. an LSTM extends how")
+print("far the gradient survives; truncation caps how far it is allowed to")
+print("travel at all. attention removes the question by giving every pair of")
+print("positions a direct path.")
+```
+
 ## Worth remembering
 
 BPTT = unroll the loop, backpropagate through the chain, sum the shared-weight gradients. It makes RNNs trainable — but it also chains together T multiplications, and a long product of numbers below 1 races toward zero. That arithmetic inevitability is the vanishing gradient problem.

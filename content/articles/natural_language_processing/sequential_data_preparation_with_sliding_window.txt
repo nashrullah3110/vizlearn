@@ -76,6 +76,122 @@ Scikit-learn's `TimeSeriesSplit` implements exactly this. Add a <strong>gap</str
 
 The same rule applies to scaling: fit the scaler on the training period only. Computing a mean over the whole series leaks the future into the past.
 
+## Turning a stream into rows, and the leak that follows
+
+A sliding window is how a sequence becomes a supervised dataset. The windows overlap, which creates near-duplicate rows -- and every mistake in this article follows from that one fact.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+series = np.round(100 + np.cumsum(rng.normal(0, 1.0, 60)), 2)
+print("a series of %d values:" % len(series))
+print("   %s ..." % series[:10])
+print()
+
+def windows(s, lookback, horizon=1, stride=1):
+    X, y = [], []
+    for i in range(0, len(s) - lookback - horizon + 1, stride):
+        X.append(s[i:i + lookback])
+        y.append(s[i + lookback + horizon - 1])
+    return np.array(X), np.array(y)
+
+L, HZ = 5, 1
+X, y = windows(series, L, HZ)
+print("lookback=%d, horizon=%d:" % (L, HZ))
+print("%8s %42s %10s" % ("row", "features", "target"))
+for i in range(4):
+    print("%8d %42s %10.2f" % (i, X[i], y[i]))
+print("   ...")
+print("   %d values became %d rows." % (len(series), len(X)))
+print()
+print("look at rows 0 and 1. they share %d of their %d values:"
+      % (L - 1, L))
+print("      row 0 %s" % X[0])
+print("      row 1 %s" % X[1])
+print("   and row 0's TARGET is row 1's last feature. the rows are not")
+print("   independent, and nothing downstream knows that.")
+print()
+
+print("HOW MANY ROWS YOU ACTUALLY GET:")
+print("%10s %10s %10s %14s %s" % ("lookback", "horizon", "stride", "rows", "overlap"))
+for lb, hz, st in ((5, 1, 1), (20, 1, 1), (20, 1, 5), (20, 10, 1), (50, 1, 1)):
+    n = max(0, (len(series) - lb - hz) // st + 1)
+    print("%10d %10d %10d %14d %13.0f%%"
+          % (lb, hz, st, n, 100 * max(0, lb - st) / lb))
+print("   a longer lookback costs rows at both ends. a stride above 1 buys")
+print("   independence back by throwing rows away.")
+print()
+
+print("THE LEAK. split those rows at random and the test set is surrounded")
+print("by its own neighbours:")
+split = int(0.8 * len(X))
+perm = rng.permutation(len(X))
+Xs, ys = X[perm], y[perm]
+print("   chronological: train rows 0-%d, test rows %d-%d"
+      % (split - 1, split, len(X) - 1))
+print("   shuffled     : test row 0 was originally row %d, and rows %d and %d"
+      % (perm[split], perm[split] - 1, perm[split] + 1))
+print("                  are almost certainly in TRAINING.")
+overlap = 0
+train_idx = set(perm[:split].tolist())
+for t in perm[split:]:
+    if (t - 1) in train_idx or (t + 1) in train_idx:
+        overlap += 1
+print("   %d of %d shuffled test rows have an immediate neighbour in the"
+      % (overlap, len(X) - split))
+print("   training set -- %.0f%% of them." % (100 * overlap / (len(X) - split)))
+print("   those neighbours share %d of %d feature values and a nearly"
+      % (L - 1, L))
+print("   identical target. the model is being tested on what it memorised.")
+print()
+
+def fit_eval(Xtr, ytr, Xte, yte):
+    A = np.column_stack([Xtr, np.ones(len(Xtr))])
+    w = np.linalg.lstsq(A, ytr, rcond=None)[0]
+    P = np.column_stack([Xte, np.ones(len(Xte))])
+    return np.abs(P @ w - yte).mean()
+
+print("measured, with a k-nearest-neighbour style model that can memorise:")
+def knn_mae(Xtr, ytr, Xte, yte, k=1):
+    out = []
+    for xq, yq in zip(Xte, yte):
+        d = np.abs(Xtr - xq).sum(1)
+        out.append(abs(ytr[np.argsort(d)[:k]].mean() - yq))
+    return np.mean(out)
+
+print("   1-NN, chronological split : MAE %.4f"
+      % knn_mae(X[:split], y[:split], X[split:], y[split:]))
+print("   1-NN, shuffled split      : MAE %.4f"
+      % knn_mae(Xs[:split], ys[:split], Xs[split:], ys[split:]))
+print("   the shuffled number is better and it is not real. the nearest")
+print("   neighbour of a test window is the window one step away from it,")
+print("   which the shuffle put in training.")
+print()
+
+print("THE OTHER DECISIONS, briefly:")
+print("   HORIZON -- predicting 1 step ahead and 20 steps ahead are")
+print("   different problems, and a model trained for one is not a model")
+print("   for the other:")
+for hz in (1, 5, 20):
+    Xh, yh = windows(series, 10, hz)
+    sp = int(0.8 * len(Xh))
+    naive = np.abs(Xh[sp:, -1] - yh[sp:]).mean()
+    print("      horizon %2d: %d rows, naive 'repeat the last value' MAE %.4f"
+          % (hz, len(Xh), naive))
+print()
+print("   SCALING -- fit the scaler on the training rows only. a scaler fitted")
+print("   on the whole series has already seen the future's mean and sd.")
+print()
+print("   PADDING -- if you pad short sequences, mask the padding out of the")
+print("   loss. a model that is scored on predicting zeros will learn to")
+print("   predict zeros.")
+print()
+print("the one rule underneath all of it: rows made from overlapping windows")
+print("are not independent samples, and every technique that assumes they")
+print("are -- shuffling, random cross-validation, bootstrap -- is wrong here.")
+```
+
 ## Experiments to try
 
 1. <strong>Click "Slide One Step" a few times.</strong> Watch the green window and amber target move together along the series, and each step append one row to the training table.

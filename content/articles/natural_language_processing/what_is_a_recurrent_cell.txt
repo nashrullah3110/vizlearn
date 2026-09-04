@@ -57,6 +57,129 @@ That single derivative is the difference between failing at 20 steps and succeed
 
 The practical guidance follows directly: <strong>use an LSTM or GRU, never `nn.RNN`.</strong> The extra cost is small and the difference in what can be learned is large.
 
+## One interface, three implementations
+
+A recurrent cell is any function that takes a state and an input and returns a new state. Writing the RNN, LSTM and GRU cells against that one signature shows what they share and exactly where they differ.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+X, H = 3, 4
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
+print("the interface, and it is the whole abstraction:")
+print("    new_state = cell(input, old_state)")
+print()
+print("everything else -- how many gates, whether there is a separate")
+print("memory -- is an implementation detail behind that signature. which")
+print("is why frameworks let you swap RNN for LSTM by changing one word.")
+print()
+
+# --- the three cells, same signature
+Wx = rng.normal(0, 0.5, (X, H)); Wh = rng.normal(0, 0.5, (H, H))
+
+def rnn_cell(x, state):
+    h = state
+    return np.tanh(x @ Wx + h @ Wh)
+
+Wg = {k: rng.normal(0, 0.5, (X + H, H)) for k in "fiog"}
+bg = {k: (np.ones(H) if k == "f" else np.zeros(H)) for k in "fiog"}
+
+def lstm_cell(x, state):
+    h, c = state
+    z = np.concatenate([x, h])
+    f = sigmoid(z @ Wg["f"] + bg["f"])
+    i = sigmoid(z @ Wg["i"] + bg["i"])
+    g = np.tanh(z @ Wg["g"] + bg["g"])
+    o = sigmoid(z @ Wg["o"] + bg["o"])
+    c_new = f * c + i * g
+    return o * np.tanh(c_new), c_new
+
+Wz = rng.normal(0, 0.5, (X + H, H))
+Wr = rng.normal(0, 0.5, (X + H, H))
+Wc = rng.normal(0, 0.5, (X + H, H))
+
+def gru_cell(x, state):
+    h = state
+    zz = np.concatenate([x, h])
+    z = sigmoid(zz @ Wz)
+    r = sigmoid(zz @ Wr)
+    cand = np.tanh(np.concatenate([x, r * h]) @ Wc)
+    return (1 - z) * h + z * cand
+
+print("%14s %12s %10s %14s"
+      % ("cell", "state", "gates", "parameters"))
+print("%14s %12s %10d %14d" % ("RNN", "h", 0, Wx.size + Wh.size))
+print("%14s %12s %10d %14d" % ("LSTM", "h and c", 4, 4 * (X + H) * H))
+print("%14s %12s %10d %14d" % ("GRU", "h", 3, 3 * (X + H) * H))
+print()
+
+print("run all three over the same 5 inputs. only the LSTM's state is a")
+print("pair; the loop that drives them is otherwise identical:")
+seq = rng.normal(0, 1.0, (5, X))
+print("%8s %30s %30s %30s" % ("step", "RNN h[0:2]", "LSTM h[0:2]", "GRU h[0:2]"))
+h_r = np.zeros(H)
+s_l = (np.zeros(H), np.zeros(H))
+h_g = np.zeros(H)
+for t, x in enumerate(seq):
+    h_r = rnn_cell(x, h_r)
+    s_l = lstm_cell(x, s_l)
+    h_g = gru_cell(x, h_g)
+    print("%8d %30s %30s %30s"
+          % (t, np.round(h_r[:2], 4), np.round(s_l[0][:2], 4), np.round(h_g[:2], 4)))
+print()
+
+print("THE LOOP IS THE SAME CODE for all three:")
+print("    state = initial_state")
+print("    for x in sequence:")
+print("        state = cell(x, state)")
+print("that is what makes a cell a useful abstraction, and it is why")
+print("'RNN' loosely means both the cell and the loop around it.")
+print()
+
+print("WHAT THE STATE HAS TO DO. it is a fixed-size summary of everything")
+print("seen so far, and everything the model will ever know about the past")
+print("has to fit in it:")
+for h_size in (4, 128, 1024):
+    print("   hidden size %5d -> %5d numbers carry the entire history"
+          % (h_size, h_size))
+print("   that bound does not grow with the sequence. a 10-token sequence")
+print("   and a 10,000-token one are summarised into the same %d numbers."
+      % H)
+print()
+print("   here is that limit biting. feed a long sequence and ask how much")
+print("   of step 0 is still recoverable from the state:")
+for L in (2, 5, 10, 25, 50):
+    a = rng.normal(0, 1.0, (L, X))
+    b = a.copy(); b[0] = rng.normal(0, 1.0, X)
+    ha, hb = np.zeros(H), np.zeros(H)
+    for xa, xb in zip(a, b):
+        ha, hb = rnn_cell(xa, ha), rnn_cell(xb, hb)
+    print("      length %3d: changing step 0 moves the final state by %.6f"
+          % (L, np.linalg.norm(ha - hb)))
+print("   the LSTM and GRU exist to make that number fall more slowly. they")
+print("   do not remove the bound -- the state is still fixed size.")
+print()
+
+print("STACKING. a cell's output is a valid input to another cell, so you")
+print("can layer them:")
+Wx2 = rng.normal(0, 0.5, (H, H))
+def rnn_cell2(x, h):
+    return np.tanh(x @ Wx2 + h @ Wh)
+h1, h2 = np.zeros(H), np.zeros(H)
+print("%8s %26s %26s" % ("step", "layer 1 h[0:2]", "layer 2 h[0:2]"))
+for t, x in enumerate(seq):
+    h1 = rnn_cell(x, h1)
+    h2 = rnn_cell2(h1, h2)
+    print("%8d %26s %26s" % (t, np.round(h1[:2], 4), np.round(h2[:2], 4)))
+print("   layer 2's input at step t is layer 1's output at step t. depth in")
+print("   this direction is separate from depth through time, and both make")
+print("   the gradient path longer.")
+```
+
 ## Things to try
 
 1. <strong>Feed one token at a time.</strong> Press <strong>Feed Next Token</strong> and watch the hidden state change. Each press mixes new input into the existing memory rather than replacing it.

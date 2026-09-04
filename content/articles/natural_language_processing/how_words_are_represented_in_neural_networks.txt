@@ -62,6 +62,115 @@ The embedding table still exists in a transformer &mdash; it supplies the input 
 
 A detail worth knowing: the output projection to vocabulary size is frequently <strong>tied</strong> to the embedding matrix, using the same weights transposed. It saves a large number of parameters (50,000 × 768 is 38 million) and usually improves quality slightly, on the reasoning that the input and output spaces describe the same vocabulary.
 
+## From a string to a vector, in four steps
+
+A word becomes an index, the index becomes a static vector, and the static vector becomes a context-dependent one. Each step is run here, ending with the same word getting two different representations in two sentences.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+vocab = ["<pad>", "<unk>", "the", "river", "bank", "money", "deposit",
+         "flooded", "closed", "at", "we", "sat", "by"]
+idx = {w: i for i, w in enumerate(vocab)}
+V, D = len(vocab), 8
+
+print("STEP 1 -- the string becomes an INDEX. that is all a tokeniser")
+print("ultimately produces:")
+sent = "we sat by the river bank"
+ids = [idx.get(w, idx["<unk>"]) for w in sent.split()]
+print("   %r" % sent)
+print("   %s" % list(zip(sent.split(), ids)))
+print("   the index is arbitrary. nothing about %d means 'bank'." % idx["bank"])
+print()
+
+E = rng.normal(0, 0.5, (V, D))
+print("STEP 2 -- the index becomes a VECTOR, by looking up a row:")
+for w in ("bank", "river", "money"):
+    print("   %-8s id %2d -> %s" % (w, idx[w], np.round(E[idx[w]], 3)))
+print("   %d x %d = %d numbers, and they are learned parameters like any"
+      % (V, D, E.size))
+print("   others -- the gradient reaches them and moves them.")
+print()
+
+print("   the lookup IS a matrix multiply by a one-hot vector, skipped:")
+oh = np.zeros(V); oh[idx["bank"]] = 1
+print("      one-hot @ E == E[%d] : %s" % (idx["bank"], np.allclose(oh @ E, E[idx["bank"]])))
+print()
+
+print("STEP 3 -- but that vector is the SAME in every sentence. one row per")
+print("word means one meaning per word:")
+s1 = "we sat by the river bank".split()
+s2 = "we closed the money bank".split()
+for s in (s1, s2):
+    v = E[idx.get(s[-1], 1)]
+    print("   %-32s 'bank' -> %s" % (" ".join(s), np.round(v[:4], 3)))
+print("   identical. word2vec and GloVe stop here, and that is their limit:")
+print("   every sense of a word is averaged into one point.")
+print()
+
+def softmax(z):
+    e = np.exp(z - z.max(axis=-1, keepdims=True))
+    return e / e.sum(axis=-1, keepdims=True)
+
+Wq, Wk, Wv = (rng.normal(0, 0.4, (D, D)) for _ in range(3))
+
+def contextualise(tokens):
+    X = np.array([E[idx.get(t, 1)] for t in tokens])
+    A = softmax((X @ Wq) @ (X @ Wk).T / np.sqrt(D))
+    return A, X + A @ (X @ Wv)          # a residual, as in a real block
+
+print("STEP 4 -- mix in the neighbours, and the vector becomes")
+print("CONTEXTUAL. one attention layer is enough to show it:")
+for s in (s1, s2):
+    A, out = contextualise(s)
+    b = s.index("bank")
+    print("   %r" % " ".join(s))
+    print("      'bank' attends most to '%s' (%.4f)"
+          % (s[int(A[b].argmax())], A[b].max()))
+    print("      its output vector: %s" % np.round(out[b][:4], 3))
+A1, o1 = contextualise(s1)
+A2, o2 = contextualise(s2)
+b1, b2 = s1.index("bank"), s2.index("bank")
+print()
+print("   the same word, two sentences, two different vectors:")
+print("      distance between them: %.4f" % np.linalg.norm(o1[b1] - o2[b2]))
+print("      distance before the attention layer: %.4f"
+      % np.linalg.norm(E[idx["bank"]] - E[idx["bank"]]))
+print("   that second number is exactly 0 by construction. the first is not.")
+print("   THAT is what 'contextual embedding' means, and it is why asking")
+print("   for 'the embedding of bank' stopped being a well-posed question.")
+print()
+print("   (the projections here are random, so WHICH neighbour each token")
+print("   attends to is luck. what is not luck is that the two vectors")
+print("   differ at all -- that follows from the mechanism, and a trained")
+print("   model is the same mechanism with weights that mean something.)")
+print()
+
+print("THE FOUR REPRESENTATIONS, and where each one lives:")
+rows = [("index", "an integer", "the tokeniser's output"),
+        ("one-hot", "%d numbers, %d zeros" % (V, V - 1), "conceptual only"),
+        ("static embedding", "%d numbers per word" % D, "the embedding table"),
+        ("contextual", "%d numbers per POSITION" % D, "every layer's output")]
+print("%22s %26s %s" % ("representation", "size", "where it comes from"))
+for a, b, c in rows:
+    print("%22s %26s %s" % (a, b, c))
+print()
+print("and two practical notes. the embedding table is often the largest")
+print("single parameter block in a model, and it is frequently TIED to the")
+print("output layer -- the same matrix used to look words up is transposed")
+print("to score them, halving the count.")
+print()
+print("the special tokens at the top of the vocabulary are not decoration:")
+for t in ("<pad>", "<unk>"):
+    print("   %-8s id %d -- %s"
+          % (t, idx[t],
+             "fills short sequences, and must be masked out of the loss"
+             if t == "<pad>" else "anything outside the vocabulary"))
+print("   a model that is trained to predict <pad> will learn to predict it.")
+```
+
 ## Try it yourself
 
 1. <strong>Click "cat".</strong> Follow all four stages — note the one-hot row has a single lit cell at index 1, and the embedding is just 4 numbers.

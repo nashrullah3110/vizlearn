@@ -59,6 +59,137 @@ Neither is correct in general. For a part-of-speech task, small. For document re
 
 Other parameters that matter: dimension (100&ndash;300 for word vectors), minimum count (drop words appearing fewer than five times), and subsampling of very frequent words, which stops "the" dominating every context.
 
+## Trained by prediction, not by design
+
+Nobody writes an embedding table. It falls out of training a model on a prediction task, and this trains one with skip-gram negative sampling -- the word2vec objective -- so you can watch the geometry appear.
+
+```python-run
+import numpy as np
+from collections import Counter
+
+rng = np.random.default_rng(0)
+
+corpus = (
+    "the cat drinks milk the dog drinks water the cat eats fish "
+    "the dog eats meat the cat chases the mouse the dog chases the cat "
+    "the king rules the land the queen rules the land the king wears a crown "
+    "the queen wears a crown the cat sleeps the dog sleeps a cat drinks water "
+    "a dog eats fish the king sits the queen sits the man rules the land "
+    "the woman rules the land the man sits the woman sits the man wears a crown"
+).split()
+
+vocab = sorted(set(corpus))
+idx = {w: i for i, w in enumerate(vocab)}
+V, D, WINDOW = len(vocab), 12, 2
+print("%d tokens, %d distinct words, %d embedding dimensions."
+      % (len(corpus), V, D))
+print()
+
+pairs = []
+for i, centre in enumerate(corpus):
+    for j in range(max(0, i - WINDOW), min(len(corpus), i + WINDOW + 1)):
+        if i != j:
+            pairs.append((idx[centre], idx[corpus[j]]))
+pairs = np.array(pairs)
+print("STEP 1 -- build the training task. for every word, its neighbours")
+print("within %d positions become POSITIVE examples:" % WINDOW)
+for centre, ctx in pairs[:5]:
+    print("   centre %-8s -> context %-8s  (label 1)" % (vocab[centre], vocab[ctx]))
+print("   ... %d pairs in total." % len(pairs))
+print()
+print("   the task is: given a centre word, is this other word a real")
+print("   neighbour of it? that is a binary classification the corpus")
+print("   answers for free -- no labels, no annotation.")
+print()
+
+freq = Counter(corpus)
+noise = np.array([freq[w] for w in vocab], float) ** 0.75
+noise /= noise.sum()
+print("STEP 2 -- NEGATIVE SAMPLING. real neighbours alone are not enough:")
+print("   a model could score everything 1 and be right every time.")
+print("   so draw fake pairs from the word distribution, raised to 0.75:")
+top = np.argsort(-noise)[:5]
+print("%12s %12s %14s" % ("word", "raw count", "sampling prob"))
+for i in top:
+    print("%12s %12d %14.4f" % (vocab[i], freq[vocab[i]], noise[i]))
+print("   the 0.75 exponent flattens the distribution, so common words are")
+print("   still drawn most often but do not swamp everything else.")
+print()
+
+W_in = rng.normal(0, 0.3, (V, D))
+W_out = rng.normal(0, 0.3, (V, D))
+K, LR = 5, 0.08
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
+print("STEP 3 -- train. for each pair, push the centre and its real")
+print("neighbour together, and push it away from %d random words:" % K)
+order = rng.permutation(len(pairs))
+losses = []
+for epoch in range(30):
+    total = 0.0
+    for p in order:
+        c, ctx = pairs[p]
+        negs = rng.choice(V, K, p=noise)
+        targets = np.concatenate([[ctx], negs])
+        labels = np.concatenate([[1.0], np.zeros(K)])
+        v = W_in[c]
+        u = W_out[targets]
+        pred = sigmoid(u @ v)
+        err = pred - labels
+        total += -np.log(np.clip(np.where(labels > 0, pred, 1 - pred), 1e-9, 1)).sum()
+        W_out[targets] -= LR * np.outer(err, v)
+        W_in[c] -= LR * (err @ u)
+    losses.append(total / len(pairs))
+    if epoch in (0, 1, 4, 9, 19, 29):
+        print("   epoch %2d: average loss %.4f" % (epoch, losses[-1]))
+print("   it falls steeply and then flattens, wobbling a little because the")
+print("   negative samples are redrawn every epoch -- a later epoch can")
+print("   simply draw a harder set, which is why the last number is not")
+print("   the smallest. what matters is the drop from %.2f to about %.2f:"
+      % (losses[0], min(losses)))
+print("   the model has learned to tell a real neighbour from a random word.")
+print()
+
+E = W_in / (np.linalg.norm(W_in, axis=1, keepdims=True) + 1e-9)
+def sim(a, b):
+    return float(E[idx[a]] @ E[idx[b]])
+
+print("STEP 4 -- and the embedding is a SIDE EFFECT. we wanted a neighbour")
+print("classifier; what we keep is the input matrix:")
+for a, b in (("cat", "dog"), ("king", "queen"), ("man", "woman"),
+             ("cat", "king"), ("milk", "water"), ("cat", "rules")):
+    print("   %-6s vs %-6s %+.4f  %s"
+          % (a, b, sim(a, b), "#" * max(0, int(18 * sim(a, b)))))
+print()
+same = np.mean([sim(a, b) for a, b in
+                (("cat", "dog"), ("king", "queen"), ("man", "woman"),
+                 ("milk", "water"))])
+diff = np.mean([sim(a, b) for a, b in
+                (("cat", "king"), ("cat", "rules"), ("milk", "sits"),
+                 ("dog", "crown"))])
+print("   average similarity, words used alike : %+.4f" % same)
+print("   average similarity, words used apart : %+.4f" % diff)
+print()
+print("nothing in the loss mentioned meaning, categories or similarity. the")
+print("model was only ever asked 'is this a real neighbour?', and words used")
+print("in the same contexts ended up with the same answer -- so they ended")
+print("up with the same vector.")
+print()
+print("that is how every embedding is generated, including the ones inside a")
+print("transformer. the task differs -- next token, masked token, neighbour")
+print("prediction -- but the shape is identical: train on a task built from")
+print("unlabelled text, then keep an intermediate layer and throw the rest")
+print("of the model away.")
+print()
+print("(this corpus is only %d words, and deliberately regular -- which is"
+      % len(corpus))
+print("why the separation above is so clean. real text is far messier and")
+print("needs billions of words to reach the same clarity. the mechanism is")
+print("identical; only the amount of evidence differs.)")
+```
+
 ## Guided experiments
 
 1. <strong>Start from noise.</strong> Press <strong>Re-randomize</strong> and look at the layout. Vectors are random, so the arrangement is meaningless &mdash; no structure exists before training.

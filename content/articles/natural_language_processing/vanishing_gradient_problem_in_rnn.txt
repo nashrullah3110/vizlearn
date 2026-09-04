@@ -66,6 +66,139 @@ Exploding gradients are, in one sense, the easier problem: they are loud and imm
 |Fix|Gating, architecture|Gradient clipping|
 |Onset|From the start|Often within a few steps|
 
+## The five fixes, measured against each other
+
+The problem is a product of terms that is almost never exactly 1. Each standard remedy attacks a different factor in that product, and this measures how much each one buys.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+H, T = 16, 60
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
+print("the gradient from step %d back to step 0 is a product of %d terms."
+      % (T, T))
+print("each term is  W.T  times the activation's derivative:")
+print("    dh_t/dh_(t-1) = W.T * f'(pre_t)")
+print()
+print("so the whole thing is governed by two numbers -- the weight matrix's")
+print("spectral radius and the activation's slope -- multiplied %d times."
+      % T)
+print()
+print("%14s %20s %20s" % ("per-step factor", "after 20 steps", "after 60 steps"))
+for f in (0.5, 0.9, 0.99, 1.0, 1.01, 1.1):
+    print("%14.2f %20.3e %20.3e" % (f, f ** 20, f ** 60))
+print("   only 1.00 survives. everything below vanishes and everything above")
+print("   explodes, and the gap between 0.99 and 1.01 is the whole design")
+print("   space.")
+print()
+
+def measure(mode, depth=T, width=H, scale=None):
+    r = np.random.default_rng(1)
+    # every non-orthogonal mode uses `scale`, so runs are comparable
+    if mode == "orthogonal":
+        A = r.normal(size=(width, width))
+        W, _ = np.linalg.qr(A)                       # spectral radius exactly 1
+    else:
+        W = r.normal(0, scale if scale else 1.0 / np.sqrt(width), (width, width))
+    h = r.normal(0, 0.5, width)
+    J = np.eye(width)
+    sizes = []
+    for t in range(depth):
+        pre = h @ W
+        if mode in ("tanh", "orthogonal", "small", "large"):
+            h = np.tanh(pre)
+            D = np.diag(1 - h ** 2)
+        elif mode == "relu":
+            h = np.maximum(0, pre)
+            D = np.diag((pre > 0).astype(float))
+        elif mode == "clipped":
+            h = np.tanh(pre)
+            D = np.diag(1 - h ** 2)
+        else:
+            raise ValueError(mode)
+        J = J @ (W @ D)
+        n = np.abs(J).max()
+        if mode == "clipped" and n > 1.0:            # renormalise, as clipping does
+            J = J / n
+            n = 1.0
+        sizes.append(n)
+    return sizes
+
+print("MEASURED. gradient magnitude reaching step 0, over %d steps:" % T)
+setups = [
+    ("tanh, sd 1/sqrt(n)", dict(mode="tanh")),
+    ("tanh, sd 0.5 (small)", dict(mode="small", scale=0.5 / np.sqrt(H))),
+    ("tanh, sd 2.0 (large)", dict(mode="large", scale=2.0 / np.sqrt(H))),
+    ("relu, sd 1/sqrt(n)", dict(mode="relu")),
+    ("orthogonal W, tanh", dict(mode="orthogonal")),
+]
+print("%24s %14s %14s %14s" % ("setup", "step 40", "step 20", "step 0"))
+for name, kw in setups:
+    s = measure(**kw)
+    print("%24s %14.3e %14.3e %14.3e"
+          % (name, s[T - 40], s[T - 20], s[-1]))
+print()
+print("   read the last column. the orthogonal initialisation is the only")
+print("   one that keeps the gradient anywhere near its starting size, and")
+print("   that is exactly what it was designed for: a spectral radius of")
+print("   precisely 1, so the W part of the product contributes nothing.")
+print("   tanh's derivative still shrinks it, which is why orthogonal init")
+print("   helps and does not solve.")
+print()
+print("   and note the relu row -- it vanishes as badly as anything else.")
+print("   relu's derivative is exactly 1 where a unit is active, but it is")
+print("   exactly 0 where the unit is not, and roughly half of them are not")
+print("   at any step. so the product still collapses. relu fixes the")
+print("   vanishing gradient in a FEED-FORWARD stack, where each layer has")
+print("   its own weights; in a recurrent one, where the same W is applied")
+print("   %d times, it is not enough on its own." % T)
+print()
+
+print("THE FIVE FIXES, and which factor each attacks:")
+rows = [
+    ("orthogonal init", "the W factor", "sets spectral radius to 1"),
+    ("relu / leaky relu", "the f' factor", "derivative is 1 where active --"),
+    ("", "", "but see the caveat below"),
+    ("gradient clipping", "explosion only", "caps the norm, keeps direction"),
+    ("gating (LSTM/GRU)", "replaces the product", "additive state, gradient"),
+    ("", "", "passes through a forget gate"),
+    ("skip connections", "adds a path of 1", "gradient has a route that"),
+    ("", "", "is never multiplied"),
+]
+print("%22s %22s %s" % ("fix", "what it attacks", "how"))
+for a, b, c in rows:
+    print("%22s %22s %s" % (a, b, c))
+print()
+
+print("GATING IS THE ONE THAT CHANGED THINGS, because it replaces the")
+print("matrix product with a product of scalars the model chooses:")
+print("%18s %18s %18s" % ("mechanism", "per-step factor", "after 60 steps"))
+print("%18s %18s %18.3e" % ("plain RNN", "W.T * tanh'", measure(mode="tanh")[-1]))
+for f in (0.9, 0.99, 0.999):
+    print("%18s %18.3f %18.3e" % ("LSTM forget gate", f, f ** T))
+print("   the LSTM's number is a single scalar per unit per step, learned,")
+print("   and nothing stops it sitting at 0.999. the RNN's is an eigenvalue")
+print("   it does not control.")
+print()
+
+print("EXPLOSION IS THE EASY HALF. it is loud, and one line fixes it:")
+big = measure(mode="large", scale=2.0 / np.sqrt(H))
+print("   unclipped, large weights: gradient reaches %.3e" % big[-1])
+clipped = measure(mode="clipped", scale=2.0 / np.sqrt(H))
+print("   with the norm clipped to 1 at every step: %.3e" % clipped[-1])
+print("   clipping bounds how far one update can move the weights, whatever")
+print("   the data does. there is no equivalent trick for vanishing --")
+print("   you cannot scale a gradient of 1e-30 back up, because the")
+print("   direction information in it is already gone to rounding.")
+print()
+print("that asymmetry is why the architectures changed. exploding gradients")
+print("were patched; vanishing ones needed the LSTM, and then attention.")
+```
+
 ## Guided experiments
 
 1. <strong>Start at w = 0.70, T = 20.</strong> The bars die out about a third of the way back — most of the sentence is unreachable by the learning signal.

@@ -59,6 +59,112 @@ That last point is the one that catches people in practice. Sequence data needs 
 
 Each row fixes the previous row's main problem. The transformer's dominance comes from two structural wins &mdash; constant path length between any two positions, and full parallelism across the sequence &mdash; at the cost of quadratic attention.
 
+## What makes data sequential, and how to check
+
+Order matters or it does not, and that single question decides your whole architecture. Here is a test that measures it rather than assuming, run on data where the answer is known both ways.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+print("a sequence is data where the ORDER carries information. the test is")
+print("simple: shuffle it and see whether the answer changes.")
+print()
+
+N, T = 400, 12
+X_seq = rng.normal(size=(N, T))
+# the label depends on the ORDER: is the second half larger than the first?
+y_seq = (X_seq[:, T // 2:].mean(1) > X_seq[:, :T // 2].mean(1)).astype(int)
+# and one where it does not: is the total positive?
+y_bag = (X_seq.sum(1) > 0).astype(int)
+
+def shuffled_agreement(X, y_fn):
+    perm = rng.permutation(T)
+    return (y_fn(X) == y_fn(X[:, perm])).mean()
+
+print("two labels over the SAME %d x %d data:" % (N, T))
+print("   'second half larger than the first'  -- depends on order")
+print("   'the total is positive'              -- does not")
+print()
+print("shuffle the columns and see how often the label survives:")
+for name, fn in (("order-dependent",
+                  lambda X: (X[:, T // 2:].mean(1) > X[:, :T // 2].mean(1)).astype(int)),
+                 ("order-free",
+                  lambda X: (X.sum(1) > 0).astype(int))):
+    agree = np.mean([shuffled_agreement(X_seq, fn) for _ in range(20)])
+    print("   %-20s label unchanged after shuffling: %.4f" % (name, agree))
+print("   the second is exactly 1.0 -- a sum does not care about order.")
+print("   the first is near chance, which is what 'sequential' means.")
+print()
+
+print("THAT TEST IS WORTH RUNNING ON REAL DATA, because the answer is not")
+print("always obvious:")
+cases = [
+    ("words in a sentence", "yes", "'dog bites man' vs 'man bites dog'"),
+    ("pixels in an image", "sort of", "2-D neighbourhood, not a 1-D order"),
+    ("rows in a customer table", "no", "each row is independent"),
+    ("daily sales", "yes", "trend, seasonality, autocorrelation"),
+    ("items in a shopping basket", "no", "a set, not a sequence"),
+    ("clicks in a session", "yes", "what you looked at before matters"),
+    ("DNA bases", "yes", "codons are read in triples, in order"),
+    ("bag of words", "no", "by construction -- the name says so"),
+]
+print("%30s %10s %s" % ("data", "sequential", "why"))
+for a, b, c in cases:
+    print("%30s %10s %s" % (a, b, c))
+print()
+
+print("THE PROPERTIES THAT COME WITH IT, and what each one breaks:")
+print()
+print("   1. VARIABLE LENGTH. sentences are not all the same length.")
+lengths = [len(s.split()) for s in
+           ("hi", "the cat sat", "the quick brown fox jumps over the lazy dog")]
+print("      %s -> a fixed-input model needs one shape and these are %s"
+      % (lengths, "different"))
+print("      that is why you pad, mask, or use an architecture that loops.")
+print()
+print("   2. LONG-RANGE DEPENDENCE. the useful signal can be far away:")
+sent = "the keys that i left on the kitchen table are missing"
+print("      %r" % sent)
+w = sent.split()
+print("      'are' agrees with 'keys' -- %d words earlier, across a clause"
+      % (w.index("are") - w.index("keys")))
+print("      that has its own singular noun ('table') sitting closer.")
+print()
+print("   3. AUTOCORRELATION. neighbouring values are not independent, so")
+print("      the usual statistics quietly stop applying:")
+walk = np.cumsum(rng.normal(size=500))
+iid = rng.normal(size=500)
+for name, s in (("random walk", walk), ("independent draws", iid)):
+    r1 = np.corrcoef(s[:-1], s[1:])[0, 1]
+    print("      %-20s correlation with itself one step back: %+.4f"
+          % (name, r1))
+print("      a shuffled train/test split on the first row leaks the answer:")
+print("      neighbouring points are nearly identical, so a test point sits")
+print("      between two training points that already tell you its value.")
+print()
+
+print("HOW EACH ARCHITECTURE HANDLES ORDER:")
+rows = [("bag of words", "discards it", "fixed", "no"),
+        ("n-gram", "local window only", "fixed", "no"),
+        ("RNN / LSTM", "built in, sequentially", "any", "yes"),
+        ("1-D convolution", "local window, learned", "any", "no"),
+        ("transformer", "added, via positions", "up to a limit", "yes")]
+print("%18s %26s %16s %14s"
+      % ("model", "how it sees order", "input length", "long range?"))
+for a, b, c, d in rows:
+    print("%18s %26s %16s %14s" % (a, b, c, d))
+print()
+print("the transformer row is the odd one: attention is order-blind by")
+print("construction, so position has to be ADDED to the input. every other")
+print("row gets order from its structure.")
+print()
+print("so the first question about any dataset is the shuffle test above.")
+print("if the label survives a shuffle, you do not have sequential data and")
+print("a sequence model will only cost you parameters.")
+```
+
 ## Experiments to try
 
 1. <strong>Shuffle the default sentence.</strong> Watch the top panel: the words get amber borders and the read-out sentence becomes gibberish, while the "bag" panel below is completely unchanged. The bag never noticed.
