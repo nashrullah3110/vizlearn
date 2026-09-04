@@ -80,6 +80,155 @@ The cost is efficiency for non-Latin scripts. A Chinese character is three UTF-8
 
 That table is a real cost and latency difference when calling an API, and it is why multilingual models often use larger vocabularies to compensate.
 
+## Learning a vocabulary by merging the commonest pair
+
+BPE starts from single characters and repeatedly merges whichever adjacent pair is commonest, until the vocabulary is the size you asked for. This trains one on a small corpus, tokenises with it, and shows why token counts are the thing that actually costs you money.
+
+```python-run
+import numpy as np
+from collections import Counter
+
+CORPUS = ("low low low low low lower lower newest newest newest newest "
+          "newest newest widest widest widest")
+
+# each word is a tuple of symbols; </w> marks the end so 'low' and the
+# 'low' inside 'lower' can be told apart
+words = Counter(CORPUS.split())
+vocab = {tuple(list(w) + ["</w>"]): c for w, c in words.items()}
+
+print("THE TRAINING CORPUS, as word counts:")
+for w, c in sorted(words.items(), key=lambda kv: -kv[1]):
+    print("   %-10s x%d" % (w, c))
+print()
+print("EVERY WORD STARTS AS SINGLE CHARACTERS. </w> marks a word boundary,")
+print("so the model can tell 'low' the word from 'low' inside 'lower':")
+for w, c in list(vocab.items())[:3]:
+    print("   %s" % " ".join(w))
+print()
+
+def pair_counts(vocab):
+    p = Counter()
+    for word, c in vocab.items():
+        for i in range(len(word) - 1):
+            p[(word[i], word[i + 1])] += c
+    return p
+
+def merge(vocab, pair):
+    out = {}
+    for word, c in vocab.items():
+        w, i = [], 0
+        while i < len(word):
+            if i < len(word) - 1 and (word[i], word[i + 1]) == pair:
+                w.append(word[i] + word[i + 1])
+                i += 2
+            else:
+                w.append(word[i])
+                i += 1
+        out[tuple(w)] = c
+    return out
+
+MERGES = 10
+learned = []
+print("NOW MERGE THE COMMONEST ADJACENT PAIR, %d times:" % MERGES)
+print("%-8s %-16s %8s %s" % ("step", "pair merged", "count", "runners-up"))
+for step in range(MERGES):
+    p = pair_counts(vocab)
+    if not p:
+        break
+    best, cnt = p.most_common(1)[0]
+    rest = ", ".join("%s%s:%d" % (a, b, n) for (a, b), n in p.most_common(4)[1:])
+    learned.append(best)
+    print("%-8d %-16s %8d %s" % (step + 1, "'%s' + '%s'" % best, cnt, rest))
+    vocab = merge(vocab, best)
+print()
+print("THE WORDS NOW, after those merges:")
+for word, c in sorted(vocab.items(), key=lambda kv: -kv[1]):
+    print("   %-30s x%d  (%d token%s)"
+          % (" | ".join(word), c, len(word), "" if len(word) == 1 else "s"))
+print("   the two commonest words collapsed to a SINGLE token each. the")
+print("   rarer ones did not, and that is the entire design: BPE spends")
+print("   its vocabulary budget where the text actually is.")
+print("   'lower' is the interesting row. it appears only twice, so no")
+print("   merge ever fired for its ending -- and it still costs 4 tokens")
+print("   even though 'low' became a token at step 5. the merges are")
+print("   learned in frequency order, and a word that never wins a round")
+print("   simply never gets shorter.")
+print()
+
+print("THE LEARNED MERGES, IN ORDER. this ordered list IS the tokenizer --")
+print("applying it to new text is just replaying these rules:")
+for i, (a, b) in enumerate(learned):
+    print("   %2d. %s + %s -> %s" % (i + 1, a, b, a + b))
+print()
+
+def tokenize(word):
+    sym = list(word) + ["</w>"]
+    for a, b in learned:                       # in the order they were learned
+        i = 0
+        while i < len(sym) - 1:
+            if sym[i] == a and sym[i + 1] == b:
+                sym[i:i + 2] = [a + b]
+            else:
+                i += 1
+    return sym
+
+print("TOKENISING NEW WORDS with those rules:")
+print("%-14s %8s   %s" % ("word", "tokens", "split"))
+for w in ["low", "lower", "lowest", "newest", "wider", "slowest", "zebra"]:
+    t = tokenize(w)
+    print("%-14s %8d   %s" % (w, len(t), " | ".join(t)))
+print("   'low' and 'newest' were in the training text and cost few tokens.")
+print("   'zebra' was not, and falls apart into characters -- but it is")
+print("   still representable. THAT is why BPE has no unknown token: the")
+print("   base vocabulary is every single character, so any string can")
+print("   always be spelled out, however badly.")
+print()
+
+print("AND THAT COSTS REAL MONEY, because you are billed per token:")
+SAMPLES = [("common English", "low lower newest widest"),
+           ("rare words", "zebra xylophone quixotic"),
+           ("a made-up identifier", "getUserByIdAsync")]
+print("%-26s %10s %10s %14s"
+      % ("text", "chars", "tokens", "chars/token"))
+for label, text in SAMPLES:
+    toks = [t for w in text.split() for t in tokenize(w)]
+    nchar = len(text.replace(" ", ""))
+    print("%-26s %10d %10d %14.2f"
+          % (label, nchar, len(toks), nchar / float(len(toks))))
+print("   the same number of CHARACTERS costs very different numbers of")
+print("   TOKENS depending on whether the tokenizer has seen that kind of")
+print("   text before. this is not a curiosity:")
+print("      - a language under-represented in training costs several")
+print("        times more per sentence than English, for identical")
+print("        meaning, and fits several times less into a context window")
+print("      - code, JSON and base64 tokenise badly for the same reason")
+print("      - counting characters or words to estimate cost or context")
+print("        usage will be wrong, sometimes by a factor of 3")
+print()
+
+print("WHY BPE RATHER THAN WORDS OR CHARACTERS:")
+print("%-22s %14s %-22s %s"
+      % ("scheme", "vocab size", "unknown words", "sequence length"))
+for row in (("characters", "~100", "impossible", "very long"),
+            ("whole words", "500k+", "constant problem", "short"),
+            ("BPE / subword", "30k-100k", "impossible", "in between")):
+    print("%-22s %14s %-22s %s" % row)
+print("   whole-word vocabularies need an <UNK> token for everything they")
+print("   have not seen, and <UNK> destroys information permanently -- a")
+print("   model cannot reason about a word it was handed as 'unknown'.")
+print("   character models never have that problem but need far more")
+print("   steps per sentence, and attention is quadratic in that length.")
+print("   BPE sits between: frequent things are one token, everything else")
+print("   degrades gracefully into pieces, and nothing is ever unknown.")
+print()
+print("one last property worth knowing: the merge list is ORDERED and must")
+print("be replayed in order. the tokenizer is not a dictionary lookup, it")
+print("is a deterministic replay of the training procedure -- which is why")
+print("a model and its tokenizer are inseparable, and why using the wrong")
+print("tokenizer with a model produces fluent nonsense rather than an")
+print("error.")
+```
+
 ## Experiments to try
 
 1. <strong>Set merges to 0.</strong> Every word shatters into individual characters &mdash; the tokens-per-word figure is at its worst.

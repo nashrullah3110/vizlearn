@@ -63,6 +63,223 @@ That is the mechanism in one table: <strong>agreement between different retrieve
 
 The constant k controls how much rank position matters. Small k sharply favours top ranks; large k flattens the differences. 60 is the value from the original paper and is a reasonable default.
 
+## Fusing two rankings without comparing their scores
+
+Hybrid search runs a keyword retriever and a vector retriever and combines the results. The hard part is that their scores are not on the same scale and never will be, which is exactly the problem reciprocal rank fusion sidesteps.
+
+```python-run
+import numpy as np
+
+DOCS = ["A", "B", "C", "D", "E", "F", "G", "H"]
+
+# what each retriever returns for one query: (doc, score), best first
+BM25 = [("C", 18.4), ("A", 12.1), ("F", 9.7), ("B", 4.2), ("H", 1.1)]
+VEC = [("D", 0.91), ("G", 0.88), ("B", 0.86), ("C", 0.71), ("E", 0.64)]
+RELEVANT = {"B", "C", "D"}
+
+print("TWO RETRIEVERS, ONE QUERY. keyword search returns:")
+for r, (d, s) in enumerate(BM25):
+    print("   %d. doc %s   score %6.2f  %s"
+          % (r + 1, d, s, "(relevant)" if d in RELEVANT else ""))
+print("vector search returns:")
+for r, (d, s) in enumerate(VEC):
+    print("   %d. doc %s   score %6.2f  %s"
+          % (r + 1, d, s, "(relevant)" if d in RELEVANT else ""))
+print()
+print("   they disagree, and neither is complete. BM25 put C first and")
+print("   buried B at rank 4. vectors put D first and never returned F or")
+print("   A at all. each one missed something the other found, which is")
+print("   the entire reason to run both.")
+print()
+
+print("THE OBVIOUS APPROACH, AND WHY IT FAILS. just add the scores:")
+naive = {}
+for d, s in BM25:
+    naive[d] = naive.get(d, 0.0) + s
+for d, s in VEC:
+    naive[d] = naive.get(d, 0.0) + s
+print("%-8s %12s %12s %12s %s" % ("doc", "bm25", "vector", "sum", ""))
+for d in sorted(naive, key=lambda x: -naive[x]):
+    b = dict(BM25).get(d, 0.0)
+    v = dict(VEC).get(d, 0.0)
+    print("%-8s %12.2f %12.2f %12.2f %s"
+          % (d, b, v, naive[d], "(relevant)" if d in RELEVANT else ""))
+print("   BM25 scores run to %.1f and cosine scores run to 1.0, so the sum"
+      % max(s for _, s in BM25))
+print("   is just the BM25 ranking with a rounding error added. the vector")
+print("   retriever contributed nothing at all: doc D, its top result, is")
+print("   ranked %d of %d."
+      % (sorted(naive, key=lambda x: -naive[x]).index("D") + 1, len(naive)))
+print()
+
+print("NORMALISING FIRST DOES NOT REALLY FIX IT. min-max each list to 0..1:")
+def minmax(pairs):
+    s = np.array([x[1] for x in pairs], float)
+    lo, hi = s.min(), s.max()
+    rng = hi - lo if hi > lo else 1.0
+    return {d: (v - lo) / rng for (d, _), v in zip(pairs, s)}
+
+nb, nv = minmax(BM25), minmax(VEC)
+norm = {}
+for d in set(nb) | set(nv):
+    norm[d] = nb.get(d, 0.0) + nv.get(d, 0.0)
+print("%-8s %12s %12s %12s %s" % ("doc", "bm25 norm", "vector norm", "sum", ""))
+for d in sorted(norm, key=lambda x: -norm[x]):
+    print("%-8s %12.4f %12.4f %12.4f %s"
+          % (d, nb.get(d, 0.0), nv.get(d, 0.0), norm[d],
+             "(relevant)" if d in RELEVANT else ""))
+print("   better, but look at what min-max normalisation just did: the")
+print("   LAST result in each list is now scored exactly 0.0, and the")
+print("   first exactly 1.0, regardless of whether the query was answered")
+print("   well or badly. it destroys the one thing the raw scores knew --")
+print("   how good the results actually were -- and it is unstable: add")
+print("   one more result to either list and every number changes.")
+print()
+
+print("RECIPROCAL RANK FUSION ignores the scores entirely and uses only")
+print("the POSITION:")
+print("      RRF(d) = sum over retrievers of  1 / (k + rank(d))")
+K = 60
+print("with k = %d, the value everyone uses. the contribution by rank:" % K)
+print("%-10s %16s %16s" % ("rank", "1/(60+rank)", "share of rank 1"))
+for r in (1, 2, 3, 5, 10, 20, 100):
+    print("%-10d %16.6f %15.0f%%"
+          % (r, 1.0 / (K + r), 100 * (1.0 / (K + r)) / (1.0 / (K + 1))))
+print("   the curve is deliberately FLAT. rank 10 is still worth %.0f%% of"
+      % (100 * (1.0 / (K + 10)) / (1.0 / (K + 1))))
+print("   rank 1. that is the point of k: without it (k=0) rank 1 would be")
+print("   worth %.0fx rank 10 and a single retriever's top hit would" % 10)
+print("   dominate every fusion. k flattens the curve so that AGREEMENT")
+print("   across retrievers matters more than any one retriever's")
+print("   confidence.")
+print()
+
+def rrf(lists, k=60):
+    out = {}
+    for lst in lists:
+        for r, (d, _) in enumerate(lst):
+            out[d] = out.get(d, 0.0) + 1.0 / (k + r + 1)
+    return out
+
+fused = rrf([BM25, VEC], K)
+print("FUSED:")
+print("%-8s %12s %12s %14s %s"
+      % ("doc", "bm25 rank", "vec rank", "RRF score", ""))
+br = {d: i + 1 for i, (d, _) in enumerate(BM25)}
+vr = {d: i + 1 for i, (d, _) in enumerate(VEC)}
+for d in sorted(fused, key=lambda x: -fused[x]):
+    print("%-8s %12s %12s %14.6f %s"
+          % (d, br.get(d, "-"), vr.get(d, "-"), fused[d],
+             "(relevant)" if d in RELEVANT else ""))
+print("   doc C is first because BOTH retrievers ranked it highly. that is")
+print("   the behaviour RRF is designed for: a document two independent")
+print("   methods agree on is a better bet than one that either method")
+print("   loves alone.")
+print()
+
+print("SCORING THE THREE APPROACHES on this query:")
+def prec_at(order, k):
+    return sum(1 for d in order[:k] if d in RELEVANT) / float(k)
+def rec_at(order, k):
+    return sum(1 for d in order[:k] if d in RELEVANT) / float(len(RELEVANT))
+orders = {
+    "BM25 alone": [d for d, _ in BM25],
+    "vectors alone": [d for d, _ in VEC],
+    "raw score sum": sorted(naive, key=lambda x: -naive[x]),
+    "min-max sum": sorted(norm, key=lambda x: -norm[x]),
+    "RRF": sorted(fused, key=lambda x: -fused[x]),
+}
+print("%-18s %14s %14s %s" % ("method", "precision@3", "recall@3", "top 3"))
+for name, o in orders.items():
+    print("%-18s %14.4f %14.4f %s"
+          % (name, prec_at(o, 3), rec_at(o, 3), " ".join(o[:3])))
+print()
+
+print("AND THE PROPERTIES THAT MATTER IN PRODUCTION:")
+print("%-34s %s" % ("no score calibration needed", "ranks are comparable"))
+print("%-34s %s" % ("no per-retriever tuning", "one constant, k"))
+print("%-34s %s" % ("works with any number of lists", "just add more terms"))
+print("%-34s %s" % ("robust to one bad retriever", "it contributes rank only"))
+print("%-34s %s" % ("cannot express confidence", "the cost of ignoring scores"))
+print("   that last row is the honest limitation. if one retriever returns")
+print("   a result it is certain about and the other returns junk, RRF")
+print("   cannot tell -- it sees rank 1 and rank 1. a learned reranker can")
+print("   use the scores, and does better when you have training data to")
+print("   fit one. RRF's appeal is that it needs none and works")
+print("   immediately.")
+print()
+print("   IT IS ALSO WIDELY SAID to be very hard to make worse than its")
+print("   inputs. that claim is worth testing rather than repeating -- add")
+print("   a third retriever that is pure noise and see what survives:")
+NOISE = [("H", 0.9), ("G", 0.8), ("F", 0.7), ("E", 0.6), ("A", 0.5)]
+with_noise = rrf([BM25, VEC, NOISE], K)
+o2 = sorted(with_noise, key=lambda x: -with_noise[x])
+print("      without noise: %s   precision@3 %.4f"
+      % (" ".join(orders["RRF"][:3]), prec_at(orders["RRF"], 3)))
+print("      with noise:    %s   precision@3 %.4f"
+      % (" ".join(o2[:3]), prec_at(o2, 3)))
+print("   and that is NOT the resilience the previous paragraph promised.")
+print("   precision fell from %.4f to %.4f. look at why: the noise list is"
+      % (prec_at(orders["RRF"], 3), prec_at(o2, 3)))
+print("   not disjoint from the real ones. it ranks G second, and the")
+print("   vector retriever also ranks G second, so two votes accumulate on")
+print("   a document neither relevant nor agreed upon for any good reason.")
+print("   the honest statement is narrower than the folklore: RRF is")
+print("   robust to a retriever that returns UNRELATED documents, because")
+print("   those votes never meet. it is NOT robust to a bad retriever that")
+print("   returns plausible ones, because RRF cannot tell a coincidence")
+print("   from a corroboration -- it has no notion of how much any")
+print("   retriever should be trusted. that is the same limitation as the")
+print("   row above, arriving with consequences: every list you fuse gets")
+print("   an equal vote, so add a list only when you would be willing to")
+print("   act on its top result.")
+print()
+
+print("ONE LAST HONEST POINT, because a single query proves very little.")
+print("fusion is not guaranteed to beat the best single retriever -- what")
+print("it guarantees is that you need not know which one that is. four")
+print("queries where the winner is different each time:")
+QUERIES = [
+    ("Q1 keyword-friendly", ["C", "A", "F", "B", "H"],
+     ["D", "G", "B", "C", "E"], {"B", "C", "D"}),
+    ("Q2 paraphrased", ["E", "H", "G", "B", "F"],
+     ["B", "A", "C", "G", "D"], {"A", "B", "C"}),
+    ("Q3 exact product code", ["F", "B", "A", "C", "G"],
+     ["G", "E", "H", "D", "B"], {"A", "B", "F"}),
+    ("Q4 both work", ["B", "C", "A", "F", "H"],
+     ["C", "B", "D", "G", "E"], {"B", "C"}),
+]
+print("%-24s %10s %10s %10s" % ("query", "BM25", "vectors", "RRF"))
+tot = {"BM25": [], "vectors": [], "RRF": []}
+for name, bl, vl, rel in QUERIES:
+    def p3(order, rel=rel):
+        return sum(1 for d in order[:3] if d in rel) / 3.0
+    f = rrf([[(d, 0) for d in bl], [(d, 0) for d in vl]], K)
+    fo = sorted(f, key=lambda x: -f[x])
+    row = (p3(bl), p3(vl), p3(fo))
+    tot["BM25"].append(row[0])
+    tot["vectors"].append(row[1])
+    tot["RRF"].append(row[2])
+    print("%-24s %10.4f %10.4f %10.4f" % (name, row[0], row[1], row[2]))
+print("%-24s %10.4f %10.4f %10.4f"
+      % ("MEAN", float(np.mean(tot["BM25"])), float(np.mean(tot["vectors"])),
+         float(np.mean(tot["RRF"]))))
+print("%-24s %10.4f %10.4f %10.4f"
+      % ("WORST QUERY", float(np.min(tot["BM25"])),
+         float(np.min(tot["vectors"])), float(np.min(tot["RRF"]))))
+wins = sum(1 for i in range(len(QUERIES))
+           if tot["RRF"][i] >= max(tot["BM25"][i], tot["vectors"][i]))
+print("   RRF matched or beat the better of the two on %d of %d queries."
+      % (wins, len(QUERIES)))
+print("   read the WORST QUERY row, though -- that is where fusion earns")
+print("   its place. each single retriever has a query it fails badly, and")
+print("   fusion's floor is higher than either, because a query has to")
+print("   defeat BOTH methods before it defeats the combination.")
+print("   in production you never know which query is coming next, so the")
+print("   floor and the mean are what you are buying. the price is two")
+print("   retrievals and two indexes on every query instead of one.")
+```
+
 ## Try it yourself
 
 1. <strong>Compare the two lists.</strong> They do not agree on the #1 result — dense and sparse are weighting the same five documents by genuinely different criteria.

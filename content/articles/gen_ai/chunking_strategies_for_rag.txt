@@ -58,6 +58,199 @@ So documents are split into chunks, each embedded separately. The chunk becomes 
 
 The number that matters is not the token count in isolation but whether a chunk can <strong>answer a question on its own</strong>. A chunk beginning "This means that the limit is 30 days" is useless without knowing what "this" refers to &mdash; which is the argument for prepending the heading path, or for the parent-child pattern.
 
+## Cutting documents up without cutting answers in half
+
+Chunking decides what a retriever can ever return, and the default of a fixed character count fails in a specific way. This measures four strategies against the same document, and scores them on the only thing that matters -- whether a complete answer survives in one piece.
+
+```python-run
+import numpy as np
+
+DOC = (
+    "# Refund Policy\n"
+    "Refunds are available within 30 days of purchase. "
+    "To request one, email support with your order number.\n"
+    "\n"
+    "# Shipping\n"
+    "Standard shipping takes 5 to 7 business days. "
+    "Express shipping takes 2 days and costs an extra 12 dollars.\n"
+    "\n"
+    "# Warranty\n"
+    "Hardware is covered for 24 months from the date of delivery. "
+    "The warranty does not cover accidental damage.\n"
+)
+
+# the facts a user might ask about, each as the phrase that must survive
+FACTS = {
+    "refund window": "within 30 days of purchase",
+    "how to refund": "email support with your order number",
+    "express cost": "Express shipping takes 2 days and costs an extra 12 dollars",
+    "warranty length": "covered for 24 months from the date of delivery",
+    "warranty limit": "does not cover accidental damage",
+}
+
+print("A %d-CHARACTER DOCUMENT with three sections:" % len(DOC))
+for line in DOC.strip().split("\n"):
+    print("   %s" % (line if line else "(blank)"))
+print()
+
+def score(chunks, label):
+    intact = []
+    for name, phrase in FACTS.items():
+        ok = any(phrase in c for c in chunks)
+        intact.append(ok)
+    return intact
+
+def report(chunks, label):
+    sizes = [len(c) for c in chunks]
+    intact = score(chunks, label)
+    print("   %s" % label)
+    print("      %d chunks, sizes %s" % (len(chunks), str(sizes)))
+    for i, c in enumerate(chunks):
+        flat = c.replace("\n", " / ").strip()
+        print("      [%d] %s%s" % (i, flat[:62], "..." if len(flat) > 62 else ""))
+    for (name, phrase), ok in zip(FACTS.items(), intact):
+        print("      %-18s %s" % (name, "intact" if ok else "SPLIT ACROSS CHUNKS"))
+    print("      %d of %d facts survived in one piece."
+          % (sum(intact), len(intact)))
+    print()
+    return sum(intact), len(chunks), float(np.mean(sizes))
+
+results = {}
+
+print("STRATEGY 1 -- FIXED SIZE. cut every N characters, no exceptions.")
+N = 100
+fixed = [DOC[i:i + N] for i in range(0, len(DOC), N)]
+results["fixed, no overlap"] = report(fixed, "chunk_size=%d, overlap=0" % N)
+
+print("STRATEGY 2 -- FIXED SIZE WITH OVERLAP. same cuts, but each chunk")
+print("repeats the tail of the one before it:")
+OV = 30
+over = [DOC[i:i + N] for i in range(0, len(DOC), N - OV)]
+over = [c for c in over if c.strip()]
+results["fixed, overlap 30"] = report(over, "chunk_size=%d, overlap=%d" % (N, OV))
+print("      overlap is a blunt instrument: it does not know where the")
+print("      boundaries SHOULD be, it just makes sure every position")
+print("      appears in some chunk with %d characters of context on each" % OV)
+print("      side. it costs storage and retrieval slots in proportion.")
+print()
+
+print("STRATEGY 3 -- RECURSIVE. try to split on the biggest separator that")
+print("keeps chunks under the limit, and only fall back to smaller ones:")
+SEPS = ["\n\n", "\n", ". ", " "]
+
+def recursive(text, limit, seps):
+    if len(text) <= limit or not seps:
+        return [text]
+    sep, rest = seps[0], seps[1:]
+    parts, out, buf = text.split(sep), [], ""
+    for p in parts:
+        candidate = (buf + sep + p) if buf else p
+        if len(candidate) <= limit:
+            buf = candidate
+        else:
+            if buf:
+                out.append(buf)
+            buf = p if len(p) <= limit else ""
+            if not buf:
+                out.extend(recursive(p, limit, rest))
+    if buf:
+        out.append(buf)
+    return [c for c in out if c.strip()]
+
+rec = recursive(DOC, N, SEPS)
+results["recursive"] = report(rec, "recursive, limit=%d, separators %s"
+                              % (N, [s.replace("\n", "\\n") for s in SEPS]))
+print("      it tries paragraph breaks first, then lines, then sentences,")
+print("      then words, so it only breaks mid-sentence when a single")
+print("      sentence exceeds the limit -- and every fact survived.")
+print("      but look at the chunk COUNT and the sizes. each section is")
+print("      longer than the %d-character limit, so recursive splitting" % N)
+print("      kept subdividing until everything fit, and produced %d small"
+      % len(rec))
+print("      pieces averaging %.0f characters. nothing is broken, and a lot"
+      % float(np.mean([len(c) for c in rec])))
+print("      of context has been scattered: the sentence about express")
+print("      shipping no longer sits beside the one about standard")
+print("      shipping. a limit set below your document's natural section")
+print("      size turns recursive splitting into fixed-size splitting with")
+print("      better manners.")
+print()
+
+print("STRATEGY 4 -- STRUCTURE AWARE. split on the document's own headings")
+print("and ignore the character limit entirely:")
+struct = [("#" + p).strip() for p in DOC.split("#") if p.strip()]
+results["by heading"] = report(struct, "split on markdown headings")
+print("      every chunk is now one complete topic. no fact is split,")
+print("      because the document's author already decided where the")
+print("      boundaries are and the splitter simply agreed with them.")
+print()
+
+print("THE COMPARISON:")
+print("%-24s %10s %14s %16s"
+      % ("strategy", "chunks", "mean size", "facts intact"))
+for name, (intact, n, mean) in results.items():
+    print("%-24s %10d %14.0f %13d/%d"
+          % (name, n, mean, intact, len(FACTS)))
+print()
+
+print("WHAT THE NUMBERS SAY:")
+print("   fixed-size chunking lost %d of the %d facts. it needs nothing"
+      % (len(FACTS) - results["fixed, no overlap"][0], len(FACTS)))
+print("   from the document and knows nothing about it, so its cuts land")
+print("   wherever the arithmetic says. every fact it splits is a fact the")
+print("   retriever can never return whole, however good the embeddings --")
+print("   this is a ceiling imposed before retrieval is even attempted.")
+print("   overlap recovered all of them, and that is genuinely what it is")
+print("   for. it costs %d chunks instead of %d for the same document, so"
+      % (results["fixed, overlap 30"][1], results["fixed, no overlap"][1]))
+print("   storage, embedding cost and retrieval slots all rise, and the")
+print("   duplicated text can return twice for one query.")
+print("   recursive splitting also kept everything, but fragmented the")
+print("   document into %d pieces because the limit was below the natural"
+      % results["recursive"][1])
+print("   section size. it is still the sensible default -- it respects")
+print("   structure when there is any and degrades gracefully when there")
+print("   is not -- as long as the limit is set with the document in mind.")
+print("   structure-aware splitting produced %d clean chunks and lost"
+      % results["by heading"][1])
+print("   nothing, because the author had already marked the boundaries.")
+print("   it is the best option when the structure is real -- markdown,")
+print("   HTML, code -- and unavailable on a scanned PDF or a transcript,")
+print("   which is most of the documents anyone actually has.")
+print()
+
+print("AND THE TENSION NOBODY ESCAPES -- chunk size trades two failures")
+print("against each other:")
+print("%-16s %-26s %s" % ("chunk size", "the risk", "what it feels like"))
+for row in (("very small", "context is missing", "answers lack the 'why'"),
+            ("small", "facts get separated", "retriever finds half"),
+            ("large", "embedding is diluted", "relevant chunk ranks low"),
+            ("very large", "the whole doc is one vector",
+             "everything matches equally")):
+    print("%-16s %-26s %s" % row)
+print("   the dilution point is the one people miss. an embedding is a")
+print("   single vector for the whole chunk, so a chunk covering three")
+print("   topics has a vector that is near none of them:")
+topics = {"refund": np.array([1.0, 0, 0]),
+          "shipping": np.array([0, 1.0, 0]),
+          "warranty": np.array([0, 0, 1.0])}
+q = np.array([1.0, 0, 0])                  # a question about refunds
+def cos(a, b):
+    return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
+print("%-34s %16s" % ("chunk covering", "similarity to a refund question"))
+for label, v in (("refund only", topics["refund"]),
+                 ("refund + shipping",
+                  topics["refund"] + topics["shipping"]),
+                 ("all three topics", sum(topics.values()))):
+    print("%-34s %16.4f" % (label, cos(q, v)))
+print("   the same refund information, in a chunk that also covers two")
+print("   other topics, scores %.4f instead of %.4f. it is still in there"
+      % (cos(q, sum(topics.values())), cos(q, topics["refund"])))
+print("   -- the retriever just will not rank it highly enough to return.")
+print("   that is why 'put the whole document in one chunk' fails even")
+print("   though it never splits a fact.")
+```
+
 ## Experiments to try
 
 1. <strong>Start at 30 words, fixed-size.</strong> Several chunks end mid-sentence — the cut counter is not zero.

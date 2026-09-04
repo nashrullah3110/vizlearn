@@ -73,6 +73,157 @@ The cost is memory: two tensors per layer per token. For a long context and a la
 
 This also explains a visible asymmetry in API pricing and latency. Processing the prompt is one parallel pass over all its tokens; generating the output is one sequential step per token. Input is cheap and fast, output is expensive and slow.
 
+## One distribution over the vocabulary, sampled
+
+A language model outputs one number per token in its vocabulary and nothing else. Everything that looks like personality, creativity or caution is a choice about how that list of numbers is turned into a single pick -- which this builds knob by knob.
+
+```python-run
+import numpy as np
+
+VOCAB = ["mat", "floor", "chair", "table", "moon", "idea", "purple",
+         "elephant", "quickly", "the"]
+# raw model outputs for "the cat sat on the ___"
+LOGITS = np.array([8.2, 6.9, 5.4, 5.1, 1.8, 0.9, 0.4, -0.3, -1.2, -2.0])
+
+print("THE MODEL'S ACTUAL OUTPUT for 'the cat sat on the ___' is one")
+print("number per vocabulary entry. these are LOGITS -- unnormalised,")
+print("unbounded, not probabilities:")
+print("%-12s %10s" % ("token", "logit"))
+for t, l in zip(VOCAB, LOGITS):
+    print("%-12s %10.2f" % (t, l))
+print("   a real vocabulary has 50,000 to 200,000 of these, and the model")
+print("   produces the whole list on every single step.")
+print()
+
+def softmax(z, T=1.0):
+    z = np.asarray(z, float) / T
+    z = z - z.max()
+    e = np.exp(z)
+    return e / e.sum()
+
+p = softmax(LOGITS)
+print("SOFTMAX turns them into a probability distribution -- exponentiate,")
+print("then divide by the total:")
+print("%-12s %10s %14s %12s" % ("token", "logit", "exp(logit)", "probability"))
+ex = np.exp(LOGITS - LOGITS.max())
+for t, l, e, pr in zip(VOCAB, LOGITS, ex, p):
+    print("%-12s %10.2f %14.4f %12.4f" % (t, l, e, pr))
+print("%-12s %10s %14.4f %12.4f" % ("total", "", ex.sum(), p.sum()))
+print("   the exponential is what makes this SHARP. a logit gap of %.1f"
+      % (LOGITS[0] - LOGITS[1]))
+print("   between the top two becomes a probability ratio of %.2f, because"
+      % (p[0] / p[1]))
+print("   exp turns differences into ratios: exp(%.1f) = %.2f."
+      % (LOGITS[0] - LOGITS[1], np.exp(LOGITS[0] - LOGITS[1])))
+print()
+
+print("TEMPERATURE divides the logits before the softmax. that is all it")
+print("does, and it changes everything:")
+print("%-12s %s" % ("token", "  ".join("%9s" % ("T=%.1f" % T)
+                                       for T in (0.1, 0.5, 1.0, 1.5, 3.0))))
+for i, t in enumerate(VOCAB):
+    print("%-12s %s" % (t, "  ".join("%9.4f" % softmax(LOGITS, T)[i]
+                                     for T in (0.1, 0.5, 1.0, 1.5, 3.0))))
+print("%-12s %s" % ("entropy", "  ".join(
+    "%9.4f" % float(-(softmax(LOGITS, T) * np.log(softmax(LOGITS, T))).sum())
+    for T in (0.1, 0.5, 1.0, 1.5, 3.0))))
+print("   T -> 0 makes the distribution a spike on the argmax: at T=0.1")
+print("   the top token already has %.4f of the mass, and the output is"
+      % softmax(LOGITS, 0.1)[0])
+print("   deterministic in practice.")
+print("   T -> infinity makes it uniform: at T=3.0 'elephant' has %.4f,"
+      % softmax(LOGITS, 3.0)[VOCAB.index("elephant")])
+print("   up from %.4f, and the model will occasionally say it."
+      % p[VOCAB.index("elephant")])
+print("   entropy measures exactly that spread, and it is the honest way")
+print("   to describe what temperature does: it does not make the model")
+print("   more creative, it makes the model's own ranking count for less.")
+print()
+
+print("BUT TEMPERATURE ALONE HAS A PROBLEM. raising it to get variety also")
+print("raises the chance of tokens that are simply wrong:")
+GOOD = {"mat", "floor", "chair", "table"}
+print("%-10s %16s %18s %18s"
+      % ("T", "P(sensible word)", "P(nonsense word)", "tokens over 5%"))
+for T in (0.1, 0.5, 1.0, 1.5, 3.0):
+    q = softmax(LOGITS, T)
+    good = sum(q[i] for i, t in enumerate(VOCAB) if t in GOOD)
+    print("%-10.1f %16.4f %18.4f %18d"
+          % (T, good, max(0.0, 1 - good), int((q > 0.05).sum())))
+print("   at T=3.0 there is a %.0f%% chance of a word that does not belong"
+      % (100 * (1 - sum(softmax(LOGITS, 3.0)[i]
+                        for i, t in enumerate(VOCAB) if t in GOOD))))
+print("   in the sentence at all. temperature cannot separate 'unlikely")
+print("   but fine' from 'unlikely because wrong' -- it only knows the")
+print("   ranking, and it flattens the whole thing.")
+print()
+
+print("SO CUT THE TAIL OFF FIRST. TOP-k keeps the k highest and")
+print("renormalises:")
+for k in (1, 3, 5):
+    idx = np.argsort(-p)[:k]
+    q = np.zeros_like(p)
+    q[idx] = p[idx]
+    q = q / q.sum()
+    print("   k=%d  ->  %s" % (k, ", ".join(
+        "%s %.3f" % (VOCAB[i], q[i]) for i in np.argsort(-q)[:k])))
+print("   everything outside the top k becomes impossible, whatever the")
+print("   temperature does afterwards. that is the fix temperature could")
+print("   not make on its own.")
+print()
+print("   but k is FIXED, and the right k depends on the step. compare a")
+print("   confident prediction with an uncertain one:")
+CONFIDENT = np.array([9.5, 2.1, 1.8, 1.0, 0.5, 0.2, 0.0, -0.5, -1.0, -2.0])
+UNCERTAIN = np.array([3.1, 3.0, 2.9, 2.8, 2.7, 2.6, 2.4, 2.2, 2.0, 1.5])
+print("%-16s %s" % ("", "  ".join("%7s" % t for t in VOCAB[:6])))
+for name, L in (("confident", CONFIDENT), ("uncertain", UNCERTAIN)):
+    print("%-16s %s" % (name, "  ".join("%7.4f" % v for v in softmax(L)[:6])))
+print("   with k=3, the confident step keeps 2 tokens it should never")
+print("   pick, and the uncertain step throws away 7 perfectly reasonable")
+print("   ones. a single k cannot be right for both.")
+print()
+
+print("TOP-p (NUCLEUS) fixes that by keeping however many tokens it takes")
+print("to reach a cumulative probability of p:")
+def nucleus(probs, top_p):
+    order = np.argsort(-probs)
+    c = np.cumsum(probs[order])
+    keep = order[:int(np.searchsorted(c, top_p) + 1)]
+    return keep
+
+print("%-16s %10s %14s %s" % ("", "top_p", "tokens kept", "which"))
+for name, L in (("confident", CONFIDENT), ("uncertain", UNCERTAIN)):
+    q = softmax(L)
+    for tp in (0.9, 0.95):
+        keep = nucleus(q, tp)
+        print("%-16s %10.2f %14d %s"
+              % (name, tp, len(keep),
+                 ", ".join(VOCAB[i] for i in keep[:5])
+                 + (", ..." if len(keep) > 5 else "")))
+nc, nu = (len(nucleus(softmax(CONFIDENT), 0.9)),
+          len(nucleus(softmax(UNCERTAIN), 0.9)))
+print("   the SAME setting keeps %d token%s when the model is confident"
+      % (nc, "" if nc == 1 else "s"))
+print("   and %d when it is not. that is the whole argument for top-p over"
+      % nu)
+print("   top-k: the cutoff adapts to how sure the model is, which is")
+print("   information the model already computed and top-k throws away.")
+print()
+
+print("AND THE THING TO REMEMBER ABOUT ALL OF IT: none of these knobs")
+print("changes the model. the logits are identical in every row above --")
+print("the weights ran once and produced one list of numbers. temperature,")
+print("top-k and top-p are all post-processing on that list.")
+print("%-26s %s" % ("if the model is wrong", "no sampling setting fixes it"))
+print("%-26s %s" % ("if output is repetitive", "raise temperature or top_p"))
+print("%-26s %s" % ("if output goes off-topic", "lower them"))
+print("%-26s %s" % ("if you need reproducible", "temperature 0, or a fixed seed"))
+print("   and one consequence worth internalising: at temperature 0 the")
+print("   model is a deterministic function of its input. every bit of")
+print("   variability you see in a chat product is a sampling choice")
+print("   someone made, not the model 'thinking differently' this time.")
+```
+
 ## Try it yourself
 
 1. <strong>Keep the France prompt and press Sample repeatedly at T = 1.</strong> The correct answer dominates, so you nearly always get it &mdash; but not quite always.
