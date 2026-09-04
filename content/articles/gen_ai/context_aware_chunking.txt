@@ -100,6 +100,155 @@ Now the chunk is retrievable by a query about applying for parental leave, and i
 
 The reported effect on retrieval failure rates is large &mdash; substantial reductions when combined with hybrid search and reranking. The cost is one model call per chunk at indexing time, which for a large corpus is significant. Two mitigations: use a small fast model, and exploit prompt caching, since the full document is repeated across all of its chunks' prompts.
 
+## Testing whether a chunk can stand alone
+
+The problem is coreference -- a chunk that says "it" or "the policy" is meaningless once separated from what it referred to. This measures that damage directly, applies the four repairs the article names, and shows which one is worth its cost.
+
+```python-run
+import numpy as np
+
+# a document. each chunk carries the concepts it EXPLICITLY names.
+AXES = ["refund", "warranty", "days", "process"]
+
+DOC = [
+    ("C1", "Our refund policy is described below.", [0.90, 0.00, 0.05, 0.10]),
+    ("C2", "It allows returns within 30 days.",      [0.00, 0.00, 0.85, 0.20]),
+    ("C3", "To use it, email support.",              [0.00, 0.00, 0.00, 0.90]),
+    ("C4", "The hardware warranty is separate.",     [0.05, 0.90, 0.05, 0.05]),
+    ("C5", "It lasts 24 months.",                    [0.00, 0.00, 0.85, 0.00]),
+]
+QUERY = [0.85, 0.00, 0.50, 0.10]        # "how many days for a refund"
+
+def unit(v):
+    v = np.asarray(v, float)
+    return v / (np.linalg.norm(v) + 1e-12)
+
+def sim(a, b):
+    return float(unit(a) @ unit(b))
+
+print("A DOCUMENT SPLIT INTO 5 CHUNKS. read them as a reader would, in")
+print("order, and then read C2 on its own:")
+for cid, text, _ in DOC:
+    print("   %s  %s" % (cid, text))
+print()
+print("   C2 says 'It allows returns within 30 days.' In context, 'it' is")
+print("   the refund policy. Alone, in a vector index, 'it' is nothing --")
+print("   and C5 has exactly the same problem pointing at the warranty.")
+print("   the two chunks that carry the ANSWERS are the two that cannot")
+print("   say what they are about.")
+print()
+
+print("THE QUERY: 'how many days do I have for a refund'")
+print("%-6s %-40s %14s" % ("chunk", "text", "similarity"))
+base = {}
+for cid, text, v in DOC:
+    base[cid] = sim(QUERY, v)
+    print("%-6s %-40s %14.4f" % (cid, text[:38], base[cid]))
+order = sorted(base, key=lambda x: -base[x])
+print("   top result: %s -- %s"
+      % (order[0], dict((c, t) for c, t, _ in DOC)[order[0]]))
+print("   the retriever returns C1, which ANNOUNCES the policy and does")
+print("   not state it. the chunk holding '30 days' is ranked %d, and the"
+      % (order.index("C2") + 1))
+print("   chunk holding the warranty's 24 months scores %.4f -- almost as"
+      % base["C5"])
+print("   high as the correct one, because neither of them says which")
+print("   thing it is describing.")
+print("   C2 and C5 are INDISTINGUISHABLE to the index: %.4f against %.4f."
+      % (base["C2"], base["C5"]))
+print()
+
+print("FOUR REPAIRS. each one adds context to the chunk before embedding:")
+REPAIRS = {
+    "1. prepend the document title":
+        {"C2": [0.45, 0.00, 0.85, 0.20], "C5": [0.30, 0.45, 0.85, 0.00]},
+    "2. prepend the section heading":
+        {"C2": [0.70, 0.00, 0.85, 0.20], "C5": [0.05, 0.75, 0.85, 0.00]},
+    "3. overlap with the previous chunk":
+        {"C2": [0.60, 0.00, 0.85, 0.20], "C5": [0.05, 0.65, 0.85, 0.00]},
+    "4. an LLM writes a one-line context":
+        {"C2": [0.85, 0.00, 0.85, 0.20], "C5": [0.02, 0.88, 0.85, 0.00]},
+}
+print("%-40s %12s %12s %14s"
+      % ("repair", "C2 (right)", "C5 (wrong)", "separation"))
+print("%-40s %12.4f %12.4f %14.4f"
+      % ("0. no repair", base["C2"], base["C5"], base["C2"] - base["C5"]))
+for name, fix in REPAIRS.items():
+    a, b = sim(QUERY, fix["C2"]), sim(QUERY, fix["C5"])
+    print("%-40s %12.4f %12.4f %14.4f" % (name, a, b, a - b))
+print("   the SEPARATION column is the one that matters. it is the gap")
+print("   between the chunk that answers the question and the chunk that")
+print("   looks like it does, and with no repair it is %.4f -- the index"
+      % (base["C2"] - base["C5"]))
+print("   genuinely cannot tell them apart.")
+print("   every repair widens it. the LLM-written context widens it most,")
+print("   because it is the only one that can say 'this describes the")
+print("   refund policy' when the surrounding text never says so in words")
+print("   the chunk happens to contain.")
+print()
+
+print("BUT PRICE THEM BEFORE CHOOSING. for a corpus of %s chunks:"
+      % "{:,}".format(200000))
+N = 200000
+print("%-40s %16s %16s %s"
+      % ("repair", "LLM calls", "cost at $0.30/1k", "when it fails"))
+rows = [
+    ("1. document title", 0, 0.0, "all chunks look alike"),
+    ("2. section heading", 0, 0.0, "no headings in the source"),
+    ("3. overlap", 0, 0.0, "the antecedent is 3 chunks back"),
+    ("4. LLM-written context", N, N * 0.30 / 1000, "cost, and staleness"),
+]
+for name, calls, cost, fails in rows:
+    print("%-40s %16s %16s %s"
+          % (name, "{:,}".format(calls),
+             "$%.2f" % cost if cost else "free", fails))
+print("   the first three are free and mechanical. the fourth costs a")
+print("   generation per chunk, once, at indexing time -- and it has to be")
+print("   paid again for every re-index.")
+print("   the honest reading of the table above is that repair 2 gets")
+print("   %.0f%% of repair 4's separation for nothing at all, so the LLM"
+      % (100 * (sim(QUERY, REPAIRS["2. prepend the section heading"]["C2"])
+                - sim(QUERY, REPAIRS["2. prepend the section heading"]["C5"]))
+         / (sim(QUERY, REPAIRS["4. an LLM writes a one-line context"]["C2"])
+            - sim(QUERY, REPAIRS["4. an LLM writes a one-line context"]["C5"]))))
+print("   version earns its money only where there are no headings to")
+print("   use -- transcripts, scanned documents, long unstructured prose.")
+print()
+
+print("AND THE DETAIL THAT IS EASY TO GET WRONG: what you EMBED and what")
+print("you RETURN do not have to be the same text.")
+print("%-30s %s" % ("embed", "chunk + its added context"))
+print("%-30s %s" % ("return to the model", "the chunk, or its parent"))
+print("   if you return the enriched text, the model reads your generated")
+print("   context as though it were source material -- and it is not")
+print("   source material, it is a retrieval aid you wrote. a wrong or")
+print("   hallucinated context line then becomes a fact in the prompt.")
+print("   keep the enrichment on the INDEX side, where a mistake costs a")
+print("   ranking place, rather than on the ANSWER side, where it costs")
+print("   correctness.")
+print()
+print("HOW TO TELL IF A CHUNK NEEDS THIS AT ALL -- read it cold:")
+for cid, text, _ in DOC:
+    needs = text.strip().lower().startswith(("it ", "this ", "they ", "the "))
+    print("   %-6s %-40s %s"
+          % (cid, text[:38], "needs context" if needs else "stands alone"))
+print("   the rule is that a chunk opening with a pronoun or a bare")
+print("   definite article is probably pointing outside itself -- and")
+print("   look at what it got wrong on five sentences:")
+print("      C3 'To use it, email support.' -- called STANDS ALONE, and")
+print("         it contains an 'it' with no antecedent. the rule only")
+print("         looks at the first word.")
+print("      C4 'The hardware warranty is separate.' -- called NEEDS")
+print("         CONTEXT because it starts with 'The', and it names its")
+print("         own subject perfectly well.")
+print("   so it is a cheap screen with errors in both directions, useful")
+print("   for finding candidates to look at rather than for deciding")
+print("   anything. the reliable version of the same test is to hand the")
+print("   chunk to a model with no other context and ask what it refers")
+print("   to -- which costs a call per chunk, and is the same price as")
+print("   just fixing them all with repair 4.")
+```
+
 ## Things to try
 
 1. Start with everything off. The raw chunk is about refunds, never says so, and cannot be retrieved.

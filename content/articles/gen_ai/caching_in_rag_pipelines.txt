@@ -89,6 +89,169 @@ The negation row is the dangerous one, and it is a known weakness of embeddings:
 
 So semantic caching needs a high threshold (0.97 and above), and it is unsuitable wherever a wrong answer is costly. A safer variant caches only the <em>retrieval</em> stage semantically &mdash; returning similar documents for a similar query is far more defensible than returning a previous answer.
 
+## Three caches, three hit rates, three ways to serve a stale answer
+
+A RAG pipeline has several independent places to cache, and they differ in what they key on, how often they hit, and how badly they fail when the underlying data changes. This measures all three on the same traffic.
+
+```python-run
+import numpy as np
+
+# a day of traffic: the same questions asked in different words
+TRAFFIC = [
+    "what is the refund window",
+    "what is the refund window",
+    "how long do I have to return something",
+    "what is the refund window",
+    "how long do I have to return something",
+    "what is your shipping cost",
+    "what is the refund window",
+    "how much does delivery cost",
+    "what is your shipping cost",
+    "do you ship to Canada",
+    "what is the refund window",
+    "how long do I have to return something",
+]
+# which underlying question each one really is
+INTENT = {
+    "what is the refund window": "refund",
+    "how long do I have to return something": "refund",
+    "what is your shipping cost": "cost",
+    "how much does delivery cost": "cost",
+    "do you ship to Canada": "coverage",
+}
+N = len(TRAFFIC)
+
+print("%d REQUESTS over one day, %d distinct strings, %d distinct"
+      % (N, len(set(TRAFFIC)), len(set(INTENT.values()))))
+print("underlying questions:")
+from collections import Counter
+for q, c in Counter(TRAFFIC).most_common():
+    print("   %-46s x%-3d (%s)" % (q, c, INTENT[q]))
+print()
+
+print("CACHE 1 -- EXACT MATCH ON THE QUERY STRING. the whole answer,")
+print("keyed on the literal text:")
+seen, hits = set(), 0
+for q in TRAFFIC:
+    if q in seen:
+        hits += 1
+    seen.add(q)
+exact = hits / float(N)
+print("      hits %d of %d  ->  hit rate %.4f" % (hits, N, exact))
+print("   it caught every literal repeat and nothing else. 'how long do I")
+print("   have to return something' asks the same thing as 'what is the")
+print("   refund window' and shares not one character of key with it.")
+print()
+
+print("CACHE 2 -- SEMANTIC. key on the query EMBEDDING, and count a hit")
+print("when some cached query is within a similarity threshold:")
+# stand-in embeddings. every query shares a component (all of them are
+# short customer questions), then leans toward its own intent -- which is
+# how real query embeddings sit: close together, and gradedly so.
+SHARED = np.array([0.30, 0.30, 0.30])
+QVEC = {
+    "what is the refund window":              np.array([1.00, 0.05, 0.05]),
+    "how long do I have to return something": np.array([0.80, 0.20, 0.05]),
+    "what is your shipping cost":             np.array([0.05, 1.00, 0.10]),
+    "how much does delivery cost":            np.array([0.15, 0.85, 0.10]),
+    "do you ship to Canada":                  np.array([0.05, 0.30, 1.00]),
+}
+
+def embed(q):
+    return QVEC[q] + SHARED
+
+def cos(a, b):
+    return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+qs = list(QVEC)
+print("   the similarities between the 5 distinct queries:")
+print("      %s" % "  ".join("%6s" % ("Q%d" % i) for i in range(len(qs))))
+for i, a_ in enumerate(qs):
+    print("   Q%d %s   %s"
+          % (i, "  ".join("%6.3f" % cos(embed(a_), embed(b_)) for b_ in qs),
+             INTENT[a_]))
+print("   same-intent pairs sit around %.3f and different-intent pairs"
+      % cos(embed(qs[0]), embed(qs[1])))
+print("   around %.3f. the threshold has to land between those two, and"
+      % cos(embed(qs[0]), embed(qs[2])))
+print("   the gap is narrower than it looks:")
+print()
+
+print("%-14s %10s %12s %14s" % ("threshold", "hits", "hit rate", "wrong hits"))
+for t in (0.995, 0.97, 0.90, 0.70, 0.55):
+    cache, h, wrong = [], 0, 0
+    for q in TRAFFIC:
+        e = embed(q)
+        best, bq = -1.0, None
+        for ce, cq in cache:
+            sm = cos(e, ce)
+            if sm > best:
+                best, bq = sm, cq
+        if bq is not None and best >= t:
+            h += 1
+            if INTENT[bq] != INTENT[q]:
+                wrong += 1
+        else:
+            cache.append((e, q))
+    print("%-14.3f %10d %12.4f %14d" % (t, h, h / float(N), wrong))
+print("   at a tight threshold it behaves like the exact cache. loosen it")
+print("   and it starts recognising paraphrases -- and eventually starts")
+print("   serving the answer to a DIFFERENT question, which is the")
+print("   'wrong hits' column.")
+print("   that column is the whole risk of a semantic cache: a miss costs")
+print("   you a generation, and a wrong hit costs you a confidently")
+print("   incorrect answer to a question nobody asked.")
+print()
+
+print("CACHE 3 -- THE EMBEDDING CACHE. key on the query text, store its")
+print("VECTOR. this one is different in kind:")
+print("%-34s %s" % ("what it saves", "one embedding API call"))
+print("%-34s %s" % ("what it cannot save", "the retrieval and the generation"))
+print("%-34s %s" % ("risk of a wrong answer", "none -- text maps to one vector"))
+print("      hits %d of %d  ->  hit rate %.4f" % (hits, N, exact))
+print("   the same hit rate as the exact cache, because it uses the same")
+print("   key. what makes it worth having anyway is that it is SAFE: the")
+print("   embedding of a string does not change unless the model changes,")
+print("   so there is no staleness question at all.")
+print()
+
+print("WHAT EACH ONE SAVES, per hit:")
+EMB_MS, RET_MS, GEN_MS = 40.0, 60.0, 1400.0
+TOTAL = EMB_MS + RET_MS + GEN_MS
+print("%-26s %12s %14s %14s"
+      % ("cache", "saves (ms)", "of the total", "hit rate here"))
+for name, saved, hr in (("embedding cache", EMB_MS, exact),
+                        ("retrieval cache", EMB_MS + RET_MS, exact),
+                        ("full answer cache", TOTAL, exact)):
+    print("%-26s %12.0f %13.0f%% %14.4f"
+          % (name, saved, 100 * saved / TOTAL, hr))
+print("   the generation is %.0f%% of the latency, so only a cache that"
+      % (100 * GEN_MS / TOTAL))
+print("   skips generation changes the experience. caching the embedding")
+print("   saves %.0f%% and is worth doing because it is free and safe, not"
+      % (100 * EMB_MS / TOTAL))
+print("   because it is fast.")
+print()
+
+print("AND THE PART THAT DECIDES WHETHER YOU CAN CACHE AT ALL --")
+print("INVALIDATION. each cache goes stale for a different reason:")
+print("%-24s %-30s %s" % ("cache", "goes stale when", "how bad"))
+for row in (("embedding", "the embedding model changes", "rare, and total"),
+            ("retrieval", "a document is added or edited", "common"),
+            ("full answer", "any of the above, or the prompt", "common"),
+            ("full answer", "the model version changes", "silent")):
+    print("%-24s %-30s %s" % row)
+print("   the retrieval and answer caches must be invalidated whenever the")
+print("   corpus changes, and 'the corpus changed' is not usually an event")
+print("   anyone emits. the practical answers are a short TTL, or a cache")
+print("   key that includes a corpus version.")
+print("   a cached answer that is merely OLD is not the danger. the danger")
+print("   is a cached answer that was correct when the policy said 30 days")
+print("   and is now wrong because the policy says 14 -- it is confident,")
+print("   fluent, sourced, and false, and nothing in the pipeline will")
+print("   ever notice.")
+```
+
 ## Things to try
 
 1. Push <strong>exact repeats</strong> to 70%. The query cache dominates &mdash; and it is the cache that goes stale the moment a document changes.

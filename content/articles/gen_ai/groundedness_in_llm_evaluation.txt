@@ -94,6 +94,139 @@ The third row deserves emphasis because it presents as success. A system answeri
 
 Measuring groundedness is how you detect that before it reaches users.
 
+## Scoring an answer against its sources, claim by claim
+
+Groundedness asks whether every statement in an answer is supported by the retrieved context, and it is the one RAG metric that can be checked without knowing the right answer. This runs the claim-level procedure and shows why the sentence-level shortcut disagrees with it.
+
+```python-run
+import numpy as np
+
+CONTEXT = [
+    "Refunds are available within 30 days of purchase.",
+    "The item must be returned unused.",
+    "Refunds are issued to the original payment method.",
+]
+
+# an answer, broken into the claims it makes, each marked with whether
+# the context actually supports it
+ANSWER_CLAIMS = [
+    ("You have 30 days to request a refund.", True),
+    ("The item must be unused.", True),
+    ("The refund goes back to your original card.", True),
+    ("You will also receive a 10 dollar credit.", False),
+    ("Processing takes 2 business days.", False),
+]
+
+print("THE RETRIEVED CONTEXT:")
+for c in CONTEXT:
+    print("   - %s" % c)
+print()
+print("THE MODEL'S ANSWER, broken into the claims it makes:")
+print("%-46s %14s" % ("claim", "in the context?"))
+for text, ok in ANSWER_CLAIMS:
+    print("%-46s %14s" % (text, "yes" if ok else "NO"))
+supported = sum(1 for _, ok in ANSWER_CLAIMS if ok)
+g = supported / float(len(ANSWER_CLAIMS))
+print()
+print("GROUNDEDNESS = supported claims / total claims = %d / %d = %.4f"
+      % (supported, len(ANSWER_CLAIMS), g))
+print("   the last two claims are fluent, plausible, and appear nowhere in")
+print("   the context. that is what an ungrounded claim looks like -- not")
+print("   nonsense, but detail the model supplied itself.")
+print()
+
+print("WHAT THIS METRIC DOES NOT MEASURE, and the distinction matters:")
+print("%-30s %-34s %s" % ("metric", "compares", "needs a golden answer?"))
+for row in (("groundedness", "answer against the context", "no"),
+            ("correctness", "answer against the truth", "yes"),
+            ("relevance", "answer against the question", "no"),
+            ("context precision", "context against the question", "no")):
+    print("%-30s %-34s %s" % row)
+print("   groundedness is cheap precisely because it needs no golden")
+print("   answer. it can run on production traffic, continuously, on")
+print("   questions nobody has ever labelled.")
+print("   the price is that a perfectly grounded answer can be WRONG:")
+print("      if the context says 30 days and the real policy is 14, an")
+print("      answer saying 30 days is fully grounded and misinforms the")
+print("      user. groundedness measures faithfulness to the retrieved")
+print("      text, and nothing about whether that text was right.")
+print()
+
+print("NOW THE SHORTCUT PEOPLE ACTUALLY IMPLEMENT, and where it goes")
+print("wrong. instead of extracting claims, score each SENTENCE by its")
+print("similarity to the context:")
+AX = ["days", "unused", "payment", "credit", "processing"]
+CTX_VEC = np.array([
+    [0.95, 0.05, 0.05, 0.00, 0.05],
+    [0.05, 0.95, 0.00, 0.00, 0.00],
+    [0.05, 0.00, 0.95, 0.05, 0.05],
+], float)
+SENT_VEC = np.array([
+    [0.95, 0.05, 0.05, 0.00, 0.05],     # 30 days       -- supported
+    [0.05, 0.95, 0.00, 0.00, 0.00],     # unused        -- supported
+    [0.05, 0.00, 0.92, 0.05, 0.05],     # original card -- supported
+    [0.10, 0.00, 0.60, 0.75, 0.05],     # 10 dollar credit -- NOT
+    [0.92, 0.03, 0.05, 0.00, 0.30],     # 2 days        -- NOT, but close
+], float)
+
+def unit(v):
+    return v / np.linalg.norm(v)
+
+print("%-46s %14s %14s" % ("claim", "max sim", "verdict at 0.80"))
+flags = []
+for (text, truth), v in zip(ANSWER_CLAIMS, SENT_VEC):
+    s = max(float(unit(v) @ unit(c)) for c in CTX_VEC)
+    flags.append((s >= 0.80, truth))
+    print("%-46s %14.4f %14s"
+          % (text[:44], s, "grounded" if s >= 0.80 else "UNSUPPORTED"))
+agree = sum(1 for p, t in flags if p == t)
+print("   the similarity method agrees with the claim-level answer on %d"
+      % agree)
+print("   of %d claims -- and the one it gets wrong is the one that" % len(flags))
+print("   matters." if agree < len(flags) else "   claims.")
+for (text, truth), (pred, _) in zip(ANSWER_CLAIMS, flags):
+    if pred != truth:
+        print("      DISAGREES on: %s" % text)
+        print("         truth: %s, similarity says: %s"
+              % ("supported" if truth else "not supported",
+                 "grounded" if pred else "unsupported"))
+print("   similarity measures TOPIC OVERLAP, and an invented detail is")
+print("   usually on topic. '2 business days' talks about days, and the")
+print("   context talks about days -- so a threshold on similarity is")
+print("   asking a question that cannot separate 'the context says this'")
+print("   from 'the context is about this'.")
+print()
+
+print("WHY CLAIM EXTRACTION IS THE EXPENSIVE PART. one answer needs:")
+print("%-40s %s" % ("1. split the answer into claims", "one LLM call"))
+print("%-40s %s" % ("2. check each claim against the context",
+                    "one call per claim"))
+print("%-40s %s" % ("total for this answer",
+                    "%d calls" % (1 + len(ANSWER_CLAIMS))))
+print("   at %s answers a day that is %s calls, which is why groundedness"
+      % ("{:,}".format(10000), "{:,}".format(10000 * (1 + len(ANSWER_CLAIMS)))))
+print("   is usually run on a SAMPLE rather than on everything, and why")
+print("   the cheap similarity version keeps getting reached for despite")
+print("   disagreeing with the real measure.")
+print()
+
+print("A MIDDLE PATH worth knowing: use the similarity check as a FILTER,")
+print("not as the answer. it is cheap and it has few false negatives:")
+fn = sum(1 for p, t in flags if t and not p)
+fp = sum(1 for p, t in flags if p and not t)
+print("      false negatives (called it ungrounded, it was fine): %d" % fn)
+print("      false positives (called it grounded, it was not):     %d" % fp)
+print("   so send only the claims it flags to the expensive checker,")
+print("   and accept the rest. here that would be %d of %d claims sent"
+      % (sum(1 for p, _ in flags if not p), len(flags)))
+print("   on, at %.0f%% of the LLM cost, and it would still miss the %d"
+      % (100.0 * sum(1 for p, _ in flags if not p) / len(flags), fp))
+print("   claim%s the similarity check wrongly approved."
+      % ("" if fp == 1 else "s"))
+print("   that residual is the honest cost of the shortcut, and it is")
+print("   worth stating in whatever dashboard reports the number.")
+```
+
 ## Things to try
 
 1. Click the digital-goods claim, which the context does not support. Groundedness falls while correctness is unaffected &mdash; the two dimensions move independently.

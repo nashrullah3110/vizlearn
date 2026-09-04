@@ -79,6 +79,133 @@ Modern vector databases implement filtered search that navigates the index while
 
 For permissions specifically, filtering must be enforced server-side at query time. Retrieving first and filtering in the application means the vectors of documents the user cannot see have already influenced what was returned.
 
+## What the coordinates can and cannot do
+
+"Meaning as coordinates" is the right picture, and it is worth being precise about which meanings survive the trip. This does the famous vector arithmetic, then measures the two properties of real embedding spaces that decide whether a retriever works -- and one of them is the reason opposites are neighbours.
+
+```python-run
+import numpy as np
+
+# a hand-built 5-dimensional space so every coordinate is readable
+DIMS = ["royal", "male", "female", "animal", "size"]
+VOCAB = {
+    "king":    [0.90, 0.85, 0.05, 0.05, 0.60],
+    "queen":   [0.90, 0.05, 0.85, 0.05, 0.55],
+    "man":     [0.05, 0.90, 0.05, 0.10, 0.55],
+    "woman":   [0.05, 0.05, 0.90, 0.10, 0.50],
+    "prince":  [0.85, 0.80, 0.05, 0.05, 0.35],
+    "dog":     [0.02, 0.30, 0.30, 0.95, 0.35],
+    "puppy":   [0.02, 0.30, 0.30, 0.95, 0.10],
+}
+
+def unit(v):
+    v = np.asarray(v, float)
+    return v / np.linalg.norm(v)
+
+def cos(a, b):
+    return float(unit(a) @ unit(b))
+
+print("A 5-DIMENSIONAL SPACE, small enough to read every coordinate:")
+print("%-10s %s" % ("word", "  ".join("%8s" % d for d in DIMS)))
+for w, v in VOCAB.items():
+    print("%-10s %s" % (w, "  ".join("%8.2f" % x for x in v)))
+print()
+
+print("THE COORDINATES ARE DIRECTIONS, so differences between words are")
+print("directions too. king - man is whatever is left of 'king' once")
+print("'man' is removed:")
+d = np.array(VOCAB["king"], float) - np.array(VOCAB["man"], float)
+print("   king - man = %s" % "  ".join("%6.2f" % x for x in d))
+print("   the royal dimension survived (%.2f) and the male dimension" % d[0])
+print("   cancelled (%.2f). the difference IS the concept 'royalty'." % d[1])
+result = d + np.array(VOCAB["woman"], float)
+print("   king - man + woman = %s" % "  ".join("%6.2f" % x for x in result))
+print("%-14s %10s" % ("nearest words", "cosine"))
+for w in sorted(VOCAB, key=lambda x: -cos(result, VOCAB[x]))[:4]:
+    print("%-14s %10.4f" % (w, cos(result, VOCAB[w])))
+print("   'queen' comes out on top, which is the famous result -- and it")
+print("   works here because the dimensions were BUILT to be 'royal' and")
+print("   'male'. in a real embedding nobody chose those axes, they are")
+print("   whatever the training objective produced, and the arithmetic")
+print("   works far less reliably than the demonstration suggests.")
+print()
+
+print("NOW THE PROPERTY THAT DECIDES WHETHER RETRIEVAL WORKS, and it is")
+print("not similarity -- it is the SPREAD of similarities. compare a")
+print("clean space with a realistic one:")
+rng = np.random.default_rng(3)
+D = 64
+clean = rng.normal(0, 1, (400, D))
+# real sentence embeddings share a large common component: they are
+# anisotropic, all crowded into a narrow cone
+common = rng.normal(0, 1, D)
+real = rng.normal(0, 1, (400, D)) * 0.35 + common
+def pair_sims(X):
+    U = X / np.linalg.norm(X, axis=1, keepdims=True)
+    S = U @ U.T
+    iu = np.triu_indices(len(X), 1)
+    return S[iu]
+print("%-30s %12s %12s %12s %14s"
+      % ("", "mean sim", "min", "max", "spread"))
+for name, X in (("isotropic (a textbook)", clean),
+                ("anisotropic (realistic)", real)):
+    s = pair_sims(X)
+    print("%-30s %12.4f %12.4f %12.4f %14.4f"
+          % (name, s.mean(), s.min(), s.max(), s.max() - s.min()))
+print("   in the realistic space every pair of unrelated vectors already")
+print("   scores about %.2f. that is the FLOOR, not the signal -- two"
+      % pair_sims(real).mean())
+print("   documents about nothing in common look %.0f%% similar before"
+      % (100 * pair_sims(real).mean()))
+print("   any relatedness is measured.")
+print("   the consequence is practical: an absolute similarity threshold")
+print("   ('accept anything above 0.7') is meaningless without knowing")
+print("   your space's floor, and the floor differs per model. always")
+print("   calibrate the threshold against your own unrelated pairs.")
+print()
+
+print("AND THE LIMIT THAT SURPRISES PEOPLE MOST: cosine similarity")
+print("measures RELATEDNESS, not agreement. opposites are neighbours,")
+print("because they are used in the same contexts:")
+OPPOSITES = {
+    "increase":  [0.90, 0.10, 0.85, 0.05],
+    "decrease":  [0.90, 0.10, 0.15, 0.05],
+    "elephant":  [0.05, 0.90, 0.50, 0.85],
+}
+DIMS2 = ["quantity-change", "concrete-noun", "direction", "animal"]
+print("%-12s %s" % ("word", "  ".join("%16s" % d for d in DIMS2)))
+for w, v in OPPOSITES.items():
+    print("%-12s %s" % (w, "  ".join("%16.2f" % x for x in v)))
+print("%-30s %12.4f" % ("cos(increase, decrease)",
+                        cos(OPPOSITES["increase"], OPPOSITES["decrease"])))
+print("%-30s %12.4f" % ("cos(increase, elephant)",
+                        cos(OPPOSITES["increase"], OPPOSITES["elephant"])))
+print("   'increase' and 'decrease' are ANTONYMS and score %.4f, because"
+      % cos(OPPOSITES["increase"], OPPOSITES["decrease"]))
+print("   they share every property except the one that distinguishes")
+print("   them. an unrelated word scores %.4f."
+      % cos(OPPOSITES["increase"], OPPOSITES["elephant"]))
+print("   so a search for 'did sales increase' happily returns a document")
+print("   saying sales decreased. the retrieval is doing its job -- that")
+print("   document IS about the topic -- and the answer is still wrong.")
+print("   negation has the same problem, which is why 'find documents that")
+print("   do NOT mention X' cannot be expressed as a vector search at all.")
+print()
+
+print("WHAT THIS MEANS FOR A RETRIEVER, in one table:")
+print("%-38s %s" % ("vector search is good at", "and bad at"))
+for a, b in (("paraphrase and synonyms", "exact identifiers"),
+             ("topical relatedness", "distinguishing opposites"),
+             ("cross-lingual matching", "negation"),
+             ("fuzzy, natural questions", "numeric or date constraints")):
+    print("%-38s %s" % (a, b))
+print("   every item in the right column has a non-vector solution --")
+print("   keyword search for identifiers, a metadata filter for dates, a")
+print("   reranker or the model itself for negation and opposites. that")
+print("   is why a production retriever is never just a vector index, and")
+print("   why the interesting engineering is in the combination.")
+```
+
 ## Guided tour
 
 1. <strong>Look at the space.</strong> Four topics, four visible clumps. Nothing arranged them by keyword; they are grouped because their meanings are.

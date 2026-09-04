@@ -88,6 +88,139 @@ The correctness condition is easy to get wrong: <strong>each shard must return i
 
 The latency condition is different and equally important: the query takes as long as the <strong>slowest</strong> shard. With ten shards, the chance that at least one is having a slow moment is ten times higher than with one &mdash; so tail latency degrades as shard count grows. This is the standard fan-out problem, and the standard mitigations are hedged requests (send to a replica after a short delay and take whichever answers first) and a timeout with partial results.
 
+## Tail latency, and the scores that do not survive the merge
+
+Scatter-gather looks simple until you measure it. Two things bite: a query is only as fast as the slowest shard it waited for, and the per-shard scores you merge are often not comparable. Both are arithmetic, and both are here.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(6)
+
+print("SCATTER-GATHER: send the query to every shard, take the top k from")
+print("each, merge, and return the overall top k. the correctness of that")
+print("depends on one assumption -- that a document's score means the")
+print("same thing on every shard.")
+print()
+
+print("PROBLEM 1 -- TAIL LATENCY. a query waits for ALL shards, so its")
+print("latency is the MAXIMUM of theirs, not the mean:")
+N = 20000
+def shard_latency(n):
+    # a realistic shape: mostly fast, occasionally slow
+    base = rng.gamma(shape=4.0, scale=6.0, size=(N, n))
+    return base
+
+print("%-12s %14s %14s %14s %14s"
+      % ("shards", "mean of max", "p50", "p95", "p99"))
+for k in (1, 2, 4, 8, 16, 64):
+    lat = shard_latency(k).max(axis=1)
+    print("%-12d %14.1f %14.1f %14.1f %14.1f"
+          % (k, lat.mean(), np.percentile(lat, 50),
+             np.percentile(lat, 95), np.percentile(lat, 99)))
+one = shard_latency(1).max(axis=1)
+many = shard_latency(64).max(axis=1)
+print("   each shard is IDENTICAL in every row -- same distribution, same")
+print("   hardware. only the count changed, and the p50 rose from %.1f to"
+      % np.percentile(one, 50))
+print("   %.1f ms." % np.percentile(many, 50))
+print("   the reason is that a rare slow response stops being rare once")
+print("   you need all of them: if a single shard exceeds its p99 one time")
+print("   in a hundred, then with 64 shards the chance that NONE of them")
+print("   does is 0.99^64 = %.2f, so about %.0f%% of queries hit a p99"
+      % (0.99 ** 64, 100 * (1 - 0.99 ** 64)))
+print("   response from somewhere.")
+print("   this is why adding shards to make each one faster can make the")
+print("   SERVICE slower, and why it is the p99 of a shard that matters")
+print("   rather than its mean.")
+print()
+print("   the standard mitigations, and what each gives up:")
+print("%-30s %s" % ("hedged requests", "duplicate work for a shorter tail"))
+print("%-30s %s" % ("a deadline, partial results", "recall, silently"))
+print("%-30s %s" % ("fewer, larger shards", "per-shard latency"))
+print("   the middle one deserves care. returning results from 62 of 64")
+print("   shards looks like a success and is a %.1f%% loss of the corpus"
+      % (100 * 2 / 64.0))
+print("   on that query, with nothing in the response to say so.")
+print()
+
+print("PROBLEM 2 -- THE MERGE. distance scores merge fine, because a")
+print("cosine similarity means the same thing everywhere. these do not:")
+print()
+print("   BM25 scores depend on CORPUS STATISTICS -- specifically idf,")
+print("   which is computed from the documents a shard happens to hold:")
+SHARDS = {
+    "shard A (10,000 docs)": (10000, 40),
+    "shard B (10,000 docs)": (10000, 3000),
+}
+print("%-28s %12s %12s %14s"
+      % ("", "N on shard", "df on shard", "idf"))
+for name, (n, df) in SHARDS.items():
+    print("%-28s %12s %12s %14.4f"
+          % (name, "{:,}".format(n), "{:,}".format(df),
+             np.log((n - df + 0.5) / (df + 0.5) + 1.0)))
+gn = sum(n for n, _ in SHARDS.values())
+gdf = sum(df for _, df in SHARDS.values())
+print("%-28s %12s %12s %14.4f"
+      % ("the true global values", "{:,}".format(gn), "{:,}".format(gdf),
+         np.log((gn - gdf + 0.5) / (gdf + 0.5) + 1.0)))
+print("   the same term is 'rare' on shard A and 'common' on shard B, so")
+print("   a document on A gets a much larger score for containing it --")
+print("   not because it is a better match, but because of who its")
+print("   neighbours are.")
+print("   merge those scores and the ranking is decided by shard")
+print("   assignment. that is why the article says to shard RANDOMLY: it")
+print("   does not fix the problem, it makes the per-shard statistics")
+print("   converge to the global ones, so the error is small and unbiased")
+print("   instead of large and systematic.")
+print("   sharding by date or by customer -- the two most natural choices")
+print("   -- is exactly what you must not do.")
+print()
+
+print("HOW WRONG DOES IT GET? one document, scored on both shards:")
+TF = 3.0
+for name, (n, df) in SHARDS.items():
+    idf = np.log((n - df + 0.5) / (df + 0.5) + 1.0)
+    print("   %-28s score %.4f" % (name, idf * TF))
+gidf = np.log((gn - gdf + 0.5) / (gdf + 0.5) + 1.0)
+print("   %-28s score %.4f" % ("what it should have been", gidf * TF))
+a = np.log((10000 - 40 + 0.5) / (40 + 0.5) + 1.0) * TF
+b = np.log((10000 - 3000 + 0.5) / (3000 + 0.5) + 1.0) * TF
+print("   an identical document scores %.1fx higher on one shard than the"
+      % (a / b))
+print("   other. no merge that only sees the numbers can undo that.")
+print("   the fixes are to distribute global statistics to every shard, or")
+print("   to re-score the merged candidates centrally. both cost a round")
+print("   trip, which is why many systems simply accept the error and")
+print("   shard randomly so that it stays small.")
+print()
+
+print("REPLICAS ARE A DIFFERENT AXIS, and conflating them is common:")
+print("%-19s %-30s %s" % ("", "shards", "replicas"))
+for row in (("splits", "the DATA", "the TRAFFIC"),
+            ("more of them", "more capacity", "more throughput"),
+            ("one fails", "you lose that data", "you lose nothing"),
+            ("query goes to", "ALL of them", "ONE of them"),
+            ("effect on latency", "raises the tail", "no effect")):
+    print("%-19s %-30s %s" % row)
+print("   a query touches every shard and exactly one replica of each, so")
+print("   replicas do nothing for the tail-latency problem above -- they")
+print("   protect availability and add throughput, and a slow query stays")
+print("   slow.")
+print("   the arithmetic to size a cluster follows from those two rows:")
+CORPUS, PER_SHARD, QPS, PER_REPLICA = 400e6, 25e6, 4000, 900
+sh = int(np.ceil(CORPUS / PER_SHARD))
+rp = int(np.ceil(QPS / PER_REPLICA))
+print("      %s vectors at %s per shard  ->  %d shards"
+      % ("{:,.0f}".format(CORPUS), "{:,.0f}".format(PER_SHARD), sh))
+print("      %s QPS at %s per replica    ->  %d replicas"
+      % ("{:,}".format(QPS), "{:,}".format(PER_REPLICA), rp))
+print("      total machines = %d x %d = %d" % (sh, rp, sh * rp))
+print("   and every one of those %d shards is another chance to be the"
+      % sh)
+print("   slow one on any given query.")
+```
+
 ## Things to try
 
 1. Switch to <em>semantic</em> sharding. Recall collapses: every relevant document is on one shard, whose local top-k discards the rest.
