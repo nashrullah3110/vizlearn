@@ -109,6 +109,165 @@ These compose. A realistic pipeline: self-query to extract filters, multi-query 
 
 Each stage adds latency, so the order to add them in is by measured benefit. In most systems, hybrid search and reranking are the largest gains; self-query matters specifically when the corpus has metadata users refer to.
 
+## Splitting a sentence into a filter and a search
+
+A self-query retriever reads one sentence and produces two things -- a metadata filter and a semantic query. This runs both halves over a small collection, and shows what happens at each of the failure modes the article names.
+
+```python-run
+import numpy as np
+
+DOCS = [
+    # (text-axis vector, metadata)
+    ([0.9, 0.1, 0.0], {"year": 2024, "author": "Chen", "type": "paper",
+                       "title": "Retrieval augmentation at scale"}),
+    ([0.85, 0.15, 0.0], {"year": 2021, "author": "Chen", "type": "paper",
+                         "title": "Early retrieval methods"}),
+    ([0.8, 0.2, 0.0], {"year": 2024, "author": "Patel", "type": "blog",
+                       "title": "RAG in production"}),
+    ([0.1, 0.9, 0.0], {"year": 2024, "author": "Chen", "type": "paper",
+                       "title": "Image segmentation advances"}),
+    ([0.15, 0.85, 0.0], {"year": 2019, "author": "Ito", "type": "paper",
+                         "title": "Convolutional architectures"}),
+    ([0.05, 0.05, 0.95], {"year": 2023, "author": "Ito", "type": "blog",
+                          "title": "Notes on databases"}),
+]
+AXES = ["retrieval", "vision", "databases"]
+
+def unit(v):
+    v = np.asarray(v, float)
+    return v / np.linalg.norm(v)
+
+QUESTION = "papers about retrieval from 2024"
+print("THE QUESTION: %r" % QUESTION)
+print("it contains two different kinds of constraint, and they need")
+print("completely different machinery:")
+print("%-24s %-30s %s" % ("part", "what it is", "handled by"))
+print("%-24s %-30s %s" % ("'about retrieval'", "a semantic notion",
+                          "vector similarity"))
+print("%-24s %-30s %s" % ("'papers'", "an exact field value",
+                          "a metadata filter"))
+print("%-24s %-30s %s" % ("'from 2024'", "an exact field value",
+                          "a metadata filter"))
+print()
+
+# what the LLM extracts
+QUERY_VEC = [0.9, 0.1, 0.0]
+FILTER = {"type": "paper", "year": 2024}
+print("AN LLM PARSES IT INTO:")
+print("      semantic query: 'retrieval'  ->  %s" % str(QUERY_VEC))
+print("      filter:         %s" % str(FILTER))
+print()
+
+def search(qvec, flt, k=3):
+    out = []
+    for v, m in DOCS:
+        if flt and any(m.get(f) != val for f, val in flt.items()):
+            continue
+        out.append((float(unit(qvec) @ unit(v)), m))
+    return sorted(out, key=lambda x: -x[0])[:k]
+
+print("SEARCH WITHOUT THE FILTER -- similarity alone:")
+print("%-40s %8s %8s %10s %10s" % ("title", "year", "type", "author", "sim"))
+for s, m in search(QUERY_VEC, None, k=6):
+    print("%-40s %8d %8s %10s %10.4f"
+          % (m["title"][:38], m["year"], m["type"], m["author"], s))
+print("   the top hits are all about retrieval, correctly. but the 2021")
+print("   paper and the 2024 BLOG are in there too, and the question")
+print("   excluded both. no similarity threshold fixes this: 'from 2024'")
+print("   is not a direction in the embedding space, it is a fact about a")
+print("   field.")
+print()
+
+print("SEARCH WITH THE FILTER APPLIED FIRST:")
+print("%-40s %8s %8s %10s %10s" % ("title", "year", "type", "author", "sim"))
+for s, m in search(QUERY_VEC, FILTER):
+    print("%-40s %8d %8s %10s %10.4f"
+          % (m["title"][:38], m["year"], m["type"], m["author"], s))
+kept = [m for v, m in DOCS
+        if all(m.get(f) == val for f, val in FILTER.items())]
+print("   note the second row: a vision paper, at similarity %.4f, is now"
+      % search(QUERY_VEC, FILTER)[-1][0])
+print("   in the results. only %d documents passed the filter, so the"
+      % len(kept))
+print("   search had nothing better to offer -- filtering constrains WHAT")
+print("   can be returned, and never guarantees that what remains is any")
+print("   good. a relevance floor is a separate decision.")
+print("   the filter reduced the collection from %d documents to %d before"
+      % (len(DOCS), len(kept)))
+print("   any similarity was computed. that ORDER matters -- filtering")
+print("   first means the vector search only ever ranks eligible")
+print("   documents, and it can never be forced to choose between")
+print("   relevance and correctness.")
+print()
+
+print("FAILURE MODE 1 -- A FILTER THE SCHEMA CANNOT EXPRESS. suppose the")
+print("model extracts a field that does not exist:")
+for bad in ({"venue": "NeurIPS"}, {"year": 2025}, {"type": "Paper"}):
+    res = search(QUERY_VEC, bad)
+    print("      filter %-24s -> %d results"
+          % (str(bad), len(res)))
+print("   all three return NOTHING, and for three different reasons:")
+print("      'venue' is not a field in this collection at all.")
+print("      2025 is a valid field with no matching documents.")
+print("      'Paper' is the right field and the wrong CASE.")
+print("   the third is the cruel one. the user asked a reasonable")
+print("   question, the parse looks correct, and an exact-match filter")
+print("   returns an empty set with no error anywhere. that is why the")
+print("   schema handed to the LLM must list the allowed VALUES, not just")
+print("   the field names.")
+print()
+
+print("FAILURE MODE 2 -- SOMETHING FILTERABLE LEFT IN THE SEMANTIC QUERY.")
+print("if the parser misses 'from 2024' and leaves it in the text:")
+MISSED = [0.85, 0.10, 0.0]        # 'retrieval from 2024' as a vector
+print("%-40s %8s %10s" % ("title", "year", "sim"))
+for s, m in search(MISSED, None, k=4):
+    print("%-40s %8d %10.4f" % (m["title"][:38], m["year"], s))
+print("   the years in the results are whatever the similarity happened to")
+print("   rank, because '2024' contributes almost nothing to a sentence")
+print("   embedding. a date is a token like any other, and a model has no")
+print("   reason to encode it as a constraint.")
+print("   this is the failure the whole pattern exists to prevent, and it")
+print("   is invisible: the results look plausible and quietly violate the")
+print("   question.")
+print()
+
+print("FAILURE MODE 3 -- OVER-FILTERING. a filter too narrow leaves")
+print("nothing to rank:")
+print("%-52s %14s %10s" % ("filter", "eligible docs", "results"))
+for f in ({}, {"type": "paper"}, {"type": "paper", "year": 2024},
+          {"type": "paper", "year": 2024, "author": "Patel"}):
+    elig = [m for v, m in DOCS
+            if all(m.get(k2) == val for k2, val in f.items())]
+    print("%-52s %14d %10d"
+          % (str(f) if f else "(none)", len(elig), len(search(QUERY_VEC, f))))
+print("   every clause the model adds multiplies the risk of an empty")
+print("   result. the standard mitigations are to allow the filter to be")
+print("   relaxed and retried, or to give the LLM a schema with value")
+print("   counts so it can see which clauses are safe.")
+print()
+
+print("WHAT IT NEEDS TO WORK, and none of these are optional:")
+print("%-34s %s" % ("metadata actually stored", "filters read fields"))
+print("%-34s %s" % ("a schema given to the LLM", "field names AND values"))
+print("%-34s %s" % ("a vector store with filtering", "not all support it"))
+print("%-34s %s" % ("filter-then-search, not after", "post-filtering breaks k"))
+print("   that last row is worth spelling out. if the store retrieves the")
+print("   top k by similarity and THEN filters, you asked for %d and can"
+      % 3)
+print("   receive anywhere from 0 to %d:" % 3)
+top_all = search(QUERY_VEC, None, k=3)
+after = [m for s, m in top_all
+         if all(m.get(f) == val for f, val in FILTER.items())]
+n1, n2 = len(after), len(search(QUERY_VEC, FILTER))
+print("      top 3 by similarity, then filtered: %d result%s"
+      % (n1, "" if n1 == 1 else "s"))
+print("      filtered, then top 3:               %d result%s"
+      % (n2, "" if n2 == 1 else "s"))
+print("   same data, same filter, different answers -- and the first one")
+print("   silently returns fewer results as the filter gets stricter.")
+```
+
 ## Questions people ask
 
 <strong>Does it need a large model?</strong> No &mdash; extracting a filter from a question is a small structured task, and a fast, cheap model handles it well. Use structured output constraints.

@@ -80,6 +80,175 @@ Three or four rewrites is the usual range. Beyond that, the additional rewrites 
 
 Cache aggressively: at temperature 0 the rewrites are deterministic, and repeated or similar questions are common in real traffic.
 
+## What several searches recover that one does not
+
+The sections above explain why the pattern generates variants and fuses them rather than concatenating. Here it is run -- three phrasings of one question against one corpus, the union measured against each variant alone, and the case where extra queries make the result worse.
+
+```python-run
+import numpy as np
+
+# 5 axes of phrasing and subject
+# 'cost', 'price' and 'fee' are three WORDS for one idea, and the
+# shipping axis is the subject. the distractors D6-D8 use the query's
+# vocabulary about something else entirely -- which is the thing a
+# single phrasing cannot tell apart.
+AXES = ["cost-word", "price-word", "fee-word", "shipping", "other"]
+
+DOCS = {
+    "D1 delivery charges page": [0.15, 0.05, 0.92, 0.35, 0.02],
+    "D2 shipping prices table": [0.15, 0.92, 0.05, 0.35, 0.02],
+    "D3 postage cost FAQ": [0.92, 0.05, 0.05, 0.35, 0.02],
+    "D6 late-payment fee terms": [0.12, 0.05, 0.94, 0.02, 0.30],
+    "D7 software price list": [0.12, 0.94, 0.05, 0.02, 0.30],
+    "D8 cost-of-living notes": [0.94, 0.05, 0.05, 0.02, 0.30],
+}
+RELEVANT = {"D1 delivery charges page", "D2 shipping prices table",
+            "D3 postage cost FAQ"}
+
+def unit(v):
+    v = np.asarray(v, float)
+    return v / np.linalg.norm(v)
+
+def rank(q):
+    sc = {d: float(unit(q) @ unit(v)) for d, v in DOCS.items()}
+    return sorted(sc, key=lambda x: -sc[x]), sc
+
+VARIANTS = {
+    "V1 'what does shipping cost'": [0.90, 0.05, 0.05, 0.30, 0.00],
+    "V2 'delivery fee'": [0.10, 0.05, 0.90, 0.30, 0.00],
+    "V3 'postage price'": [0.10, 0.90, 0.05, 0.30, 0.00],
+}
+
+print("ONE QUESTION, THREE PHRASINGS. the corpus uses all three words --")
+print("'cost', 'fee' and 'price' -- in different documents:")
+print("%-30s %s" % ("", "  ".join("%11s" % a for a in AXES)))
+for name, v in DOCS.items():
+    print("%-30s %s" % (name, "  ".join("%11.2f" % x for x in v)))
+print()
+
+K = 3
+print("EACH VARIANT ALONE, top %d:" % K)
+print("%-30s %-38s %12s" % ("query variant", "top %d" % K, "recall of 3"))
+per = {}
+for name, q in VARIANTS.items():
+    order, sc = rank(q)
+    top = order[:K]
+    per[name] = top
+    r = len(set(top) & RELEVANT) / float(len(RELEVANT))
+    print("%-30s %-38s %12.4f"
+          % (name, " | ".join(t.split()[0] for t in top), r))
+print("   each phrasing retrieves by its own WORD, not by the subject.")
+print("   'delivery fee' finds the delivery-charges page and the")
+print("   late-payment fee terms, and misses the shipping prices table")
+print("   entirely -- three of these documents are about shipping and")
+print("   three are not, and no single variant separates them.")
+print("   which word the user happens to type decides what they see.")
+print()
+
+print("NOW FUSE THEM. reciprocal rank fusion over the three result lists:")
+def rrf(lists, k=60):
+    out = {}
+    for lst in lists:
+        for i, d in enumerate(lst):
+            out[d] = out.get(d, 0.0) + 1.0 / (k + i + 1)
+    return out
+
+lists = [rank(q)[0] for q in VARIANTS.values()]
+fused = rrf(lists)
+order = sorted(fused, key=lambda x: -fused[x])
+print("%-32s %14s %14s" % ("document", "RRF score", "relevant?"))
+for d in order:
+    print("%-32s %14.6f %14s"
+          % (d, fused[d], "YES" if d in RELEVANT else ""))
+fused_top = order[:K]
+print("   top %d after fusion: %s" % (K, " | ".join(t.split()[0] for t in fused_top)))
+print("   recall of 3 = %.4f"
+      % (len(set(fused_top) & RELEVANT) / float(len(RELEVANT))))
+print()
+print("   and at a larger k, where the point is clearer:")
+print("%-30s %10s %10s %10s" % ("", "k=1", "k=3", "k=5"))
+for name, q in VARIANTS.items():
+    o, _ = rank(q)
+    print("%-30s %10.2f %10.2f %10.2f"
+          % (name, *[len(set(o[:kk]) & RELEVANT) / 3.0 for kk in (1, 3, 5)]))
+print("%-30s %10.2f %10.2f %10.2f"
+      % ("FUSED", *[len(set(order[:kk]) & RELEVANT) / 3.0 for kk in (1, 3, 5)]))
+print("   at k=3 the fusion has all three and every single variant is")
+print("   still missing at least one. that gap is the entire product.")
+print()
+
+print("WHY FUSION AND NOT CONCATENATION. suppose you glue the three")
+print("phrasings into one long query instead:")
+CONCAT = np.mean([np.asarray(v, float) for v in VARIANTS.values()], axis=0)
+o_cat, sc_cat = rank(CONCAT)
+print("%-30s %s" % ("the averaged query", "  ".join("%11.2f" % x for x in CONCAT)))
+print("%-30s %-38s %12.4f"
+      % ("concatenated", " | ".join(t.split()[0] for t in o_cat[:K]),
+         len(set(o_cat[:K]) & RELEVANT) / 3.0))
+print("%-30s %-38s %12.4f"
+      % ("fused", " | ".join(t.split()[0] for t in fused_top),
+         len(set(fused_top) & RELEVANT) / 3.0))
+print("   concatenating AVERAGES the phrasings into one vector, and the")
+print("   average of 'fee', 'price' and 'cost' is a vector that leans")
+print("   slightly toward all three and strongly toward none:")
+for w, i in (("fee-word", 2), ("price-word", 1), ("cost", 0)):
+    print("      %-14s highest single variant %.2f, averaged %.2f"
+          % (w, max(v[i] for v in VARIANTS.values()), CONCAT[i]))
+print("   on THIS query both approaches find all three, and that is worth")
+print("   saying rather than hiding: averaging did not break it here.")
+print("   what the averaging DID do is spend the query's whole budget on")
+print("   pointing weakly at three vocabularies at once -- 0.90 down to")
+print("   0.33 on each -- and it survived only because the shipping axis")
+print("   is shared by all three phrasings and is what separates the")
+print("   relevant documents from the distractors.")
+print("   remove that shared subject signal and the averaged vector has")
+print("   nothing left to discriminate with, while each separate variant")
+print("   still matches its own vocabulary exactly. that is the case")
+print("   fusion is insurance against.")
+print("   the general principle: fusion combines RANKINGS, so no variant")
+print("   ever has to compromise. concatenation combines VECTORS, and a")
+print("   vector can only point one way.")
+print()
+
+print("THE COST, which is the reason not to switch it on everywhere:")
+print("%-34s %14s %16s %16s"
+      % ("", "LLM calls", "retrievals", "latency shape"))
+print("%-34s %14d %16d %16s" % ("plain retrieval", 0, 1, "1 search"))
+print("%-34s %14d %16d %16s"
+      % ("multi-query, 3 variants", 1, len(VARIANTS), "1 gen + 3 parallel"))
+print("   the searches are independent, so they run in parallel and cost")
+print("   little wall-clock time. the GENERATION is on the critical path")
+print("   and cannot be -- so the latency is one LLM call, not three")
+print("   searches.")
+print()
+
+print("AND WHEN IT MAKES THINGS WORSE. add a variant that drifts:")
+DRIFT = {"V4 'return shipping'": [0.10, 0.05, 0.10, 0.30, 0.90]}
+lists4 = lists + [rank(list(DRIFT.values())[0])[0]]
+f4 = rrf(lists4)
+o4 = sorted(f4, key=lambda x: -f4[x])
+print("%-34s %-30s %12s" % ("", "top 3", "recall of 3"))
+print("%-34s %-30s %12.4f"
+      % ("3 good variants", " | ".join(t.split()[0] for t in order[:3]),
+         len(set(order[:3]) & RELEVANT) / 3.0))
+print("%-34s %-30s %12.4f"
+      % ("+ 1 drifted variant", " | ".join(t.split()[0] for t in o4[:3]),
+         len(set(o4[:3]) & RELEVANT) / 3.0))
+lost = [d for d in order[:3] if d not in o4[:3]]
+gained = [d for d in o4[:3] if d not in order[:3]]
+print("   'return shipping' is a plausible thing for a model to generate")
+print("   from this question, and it is about a different subject.")
+print("   %s dropped out of the top 3 and %s took its place."
+      % (", ".join(d.split()[0] for d in lost) or "nothing",
+         ", ".join(d.split()[0] for d in gained) or "nothing"))
+print("   RRF cannot tell that this variant should not have had a vote --")
+print("   every list it is handed counts equally.")
+print("   so the quality of the pattern is the quality of the generated")
+print("   variants, and the generation is unsupervised. generate few, and")
+print("   check them: the failure is silent and looks like a retrieval")
+print("   problem rather than a prompt problem.")
+```
+
 ## Guided experiments
 
 1. <strong>Compare a single query with the set.</strong> Look at what one phrasing retrieves against the union of all of them. The union is broader, and usually includes at least one document no single query found.

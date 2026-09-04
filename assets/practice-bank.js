@@ -11945,16 +11945,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "Projection answers one question: of all the points on the line through a, which is closest to b? The answer is b's shadow, and the line from b down to that shadow is perpendicular. Those two facts — closest point, perpendicular error — are the same fact, and almost every fitting method in machine learning is built on it."
+   },
+   {
     "t": "What does this module say about “Casting a shadow onto a direction”?",
     "ans": "A projection answers: how much of vector a lies along the direction of vector b ? Picture the sun directly overhead of b and a casting a shadow onto it."
    },
    {
     "t": "What does this module say about “Least squares is a projection”?",
     "ans": "Linear regression fits a line by minimising squared residuals. Geometrically it is projecting."
-   },
-   {
-    "t": "What does this module say about “Orthogonality, and why it makes things easy”?",
-    "ans": "Two vectors are orthogonal when their dot product is zero — no shared direction at all."
    }
   ]
  },

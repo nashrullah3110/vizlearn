@@ -111,6 +111,156 @@ The corrective branch is the interesting part, and there are four responses in i
 
 A cap on retries is essential. Two attempts then refuse is a reasonable policy; without a limit, a hard query can loop.
 
+## What the grader costs, and what it buys
+
+The sections above describe the three verdicts and what correction means. The question they leave open is whether the grader is worth its latency, and that is arithmetic -- so here it is, run over a set of queries where retrieval succeeds, partly succeeds and fails outright.
+
+```python-run
+import numpy as np
+
+# 8 queries. for each: whether the retrieved set is actually good, and
+# the grader's score for it (0..1). the grader is imperfect on purpose.
+QUERIES = [
+    ("Q1 refund window", True, 0.92),
+    ("Q2 shipping cost", True, 0.88),
+    ("Q3 warranty length", True, 0.71),
+    ("Q4 obscure edge case", False, 0.34),
+    ("Q5 not in the corpus", False, 0.11),
+    ("Q6 ambiguous phrasing", False, 0.74),   # grader says ok, it is not
+    ("Q7 good but oddly worded", True, 0.30), # grader says bad, it is fine
+    ("Q8 partial coverage", False, 0.49),
+]
+
+print("EIGHT QUERIES. 'good' means the retrieved documents really do")
+print("contain the answer; 'score' is what the grader gave them:")
+print("%-28s %10s %10s" % ("query", "actually", "grader"))
+for name, good, score in QUERIES:
+    print("%-28s %10s %10.2f" % (name, "good" if good else "BAD", score))
+print()
+
+print("THE THRESHOLD DECIDES EVERYTHING. sweep it:")
+print("%-10s %10s %10s %10s %10s %14s %14s"
+      % ("threshold", "TP", "FP", "TN", "FN", "correct calls", "web searches"))
+best = None
+for t in (0.2, 0.35, 0.45, 0.55, 0.65, 0.8, 0.95):
+    tp = sum(1 for _, g, s in QUERIES if g and s >= t)
+    fp = sum(1 for _, g, s in QUERIES if not g and s >= t)
+    tn = sum(1 for _, g, s in QUERIES if not g and s < t)
+    fn = sum(1 for _, g, s in QUERIES if g and s < t)
+    acc = (tp + tn) / float(len(QUERIES))
+    searches = fn + tn
+    print("%-10.2f %10d %10d %10d %10d %13.0f%% %14d"
+          % (t, tp, fp, tn, fn, 100 * acc, searches))
+    if best is None or acc > best[1]:
+        best = (t, acc)
+print("   the two error columns are NOT symmetric, and that is the whole")
+print("   design question:")
+print("      a FALSE POSITIVE (FP) means bad documents were accepted. the")
+print("         model answers from them and hallucinates. the user gets a")
+print("         confident wrong answer.")
+print("      a FALSE NEGATIVE (FN) means good documents were rejected. the")
+print("         pipeline runs a web search it did not need, costs a second")
+print("         or two, and still probably answers correctly.")
+print("   those consequences differ by an order of magnitude, so the")
+print("   threshold should NOT be tuned for accuracy. it should be tuned")
+print("   to make false positives rare and accept the wasted searches.")
+print()
+
+print("PUT NUMBERS ON IT. suppose a wrong answer costs 20 units of harm")
+print("and an unnecessary web search costs 1 unit of latency:")
+FP_COST, FN_COST = 20.0, 1.0
+print("%-10s %10s %10s %16s" % ("threshold", "FP", "FN", "total cost"))
+for t in (0.2, 0.35, 0.45, 0.55, 0.65, 0.8, 0.95):
+    fp = sum(1 for _, g, s in QUERIES if not g and s >= t)
+    fn = sum(1 for _, g, s in QUERIES if g and s < t)
+    print("%-10.2f %10d %10d %16.1f" % (t, fp, fn, fp * FP_COST + fn * FN_COST))
+costs = [(t, sum(1 for _, g, s in QUERIES if not g and s >= t) * FP_COST
+          + sum(1 for _, g, s in QUERIES if g and s < t) * FN_COST)
+         for t in (0.2, 0.35, 0.45, 0.55, 0.65, 0.8, 0.95)]
+bt = min(costs, key=lambda x: x[1])
+print("   the cheapest threshold is %.2f. the most ACCURATE one is %.2f,"
+      % (bt[0], best[0]))
+print("   and they are not the same number.")
+fp_a = sum(1 for _, g, sc in QUERIES if not g and sc >= best[0])
+fn_a = sum(1 for _, g, sc in QUERIES if g and sc < best[0])
+fp_b = sum(1 for _, g, sc in QUERIES if not g and sc >= bt[0])
+fn_b = sum(1 for _, g, sc in QUERIES if g and sc < bt[0])
+print("      at %.2f: %d FP and %d FN -- %.0f%% of calls correct, cost %.0f"
+      % (best[0], fp_a, fn_a, 100 * best[1], fp_a * FP_COST + fn_a * FN_COST))
+acc_b = sum(1 for _, g, sc in QUERIES if (sc >= bt[0]) == g) / float(len(QUERIES))
+print("      at %.2f: %d FP and %d FN -- %.0f%% of calls correct, cost %.0f"
+      % (bt[0], fp_b, fn_b, 100 * acc_b, fp_b * FP_COST + fn_b * FN_COST))
+print("   the two thresholds get the same NUMBER of calls wrong -- %d each"
+      % (fp_a + fn_a))
+print("   -- and differ %.0fx in cost, because one of them trades its"
+      % ((fp_a * FP_COST + fn_a * FN_COST) / max(fp_b * FP_COST + fn_b * FN_COST, 1e-9)))
+print("   expensive mistake for an extra cheap one.")
+print("   that is the whole lesson, and it is invisible to accuracy: two")
+print("   settings score identically and one of them is ten times better.")
+print("   whenever your two errors cost different amounts, the")
+print("   threshold that maximises accuracy is the wrong threshold, and")
+print("   'accuracy' is the wrong thing to have measured.")
+print()
+
+print("NOW THE LATENCY, which is what actually decides adoption:")
+BASE_MS, GRADE_MS, WEB_MS = 900.0, 250.0, 1800.0
+print("      retrieve + generate:      %4.0f ms" % BASE_MS)
+print("      one grader call:          %4.0f ms  (a small model, or logprobs)"
+      % GRADE_MS)
+print("      a corrective web search:  %4.0f ms" % WEB_MS)
+print()
+print("%-26s %14s %16s %16s"
+      % ("pipeline", "mean latency", "p100 latency", "wrong answers"))
+plain_fp = sum(1 for _, g, _ in QUERIES if not g)
+print("%-26s %14.0f %16.0f %16d"
+      % ("plain RAG, no grader", BASE_MS, BASE_MS, plain_fp))
+for t in (0.55, 0.65, 0.80):
+    fp = sum(1 for _, g, s in QUERIES if not g and s >= t)
+    corrected = sum(1 for _, _, s in QUERIES if s < t)
+    mean = BASE_MS + GRADE_MS + WEB_MS * corrected / float(len(QUERIES))
+    print("%-26s %14.0f %16.0f %16d"
+          % ("corrective, t=%.2f" % t, mean, BASE_MS + GRADE_MS + WEB_MS, fp))
+print("   every query pays the grader, and only the failing ones pay for")
+print("   the web search -- so the mean rises modestly and the WORST CASE")
+print("   nearly triples. if you have a latency SLA, it is the p100 column")
+print("   that breaks it, not the mean.")
+print()
+
+print("AND THE CHEAPEST GRADER IS OFTEN NOT A MODEL AT ALL. the retriever")
+print("already produced a score, and it is free:")
+RETRIEVER_SCORES = [0.81, 0.77, 0.64, 0.39, 0.22, 0.55, 0.48, 0.51]
+print("%-28s %12s %12s %10s" % ("query", "retriever", "LLM grader", "actually"))
+for (name, good, llm), rs in zip(QUERIES, RETRIEVER_SCORES):
+    print("%-28s %12.2f %12.2f %10s"
+          % (name, rs, llm, "good" if good else "BAD"))
+def acc_at(scores, t):
+    return sum(1 for (_, g, _), s in zip(QUERIES, scores)
+               if (s >= t) == g) / float(len(QUERIES))
+print("%-28s %12s %12s" % ("", "best acc", "best acc"))
+ra = max(acc_at(RETRIEVER_SCORES, t) for t in np.arange(0.2, 0.9, 0.01))
+la = max(acc_at([s for _, _, s in QUERIES], t) for t in np.arange(0.05, 0.95, 0.01))
+print("%-28s %12.4f %12.4f" % ("thresholding on it", ra, la))
+print("   the retriever's own score reaches %.0f%% here against the LLM"
+      % (100 * ra))
+print("   grader's %.0f%%, for %.0f ms instead of %.0f."
+      % (100 * la, 0.0, GRADE_MS))
+print("   that is not an argument against LLM graders -- it is an argument")
+print("   for MEASURING the free one first. on many corpora a similarity")
+print("   threshold captures most of the benefit, and the grader is worth")
+print("   its latency only where it does not.")
+print()
+print("THE THREE VERDICTS, and what each one is really for:")
+print("%-14s %-30s %s" % ("verdict", "action", "what it protects against"))
+for row in (("CORRECT", "answer from what you have", "nothing -- the happy path"),
+            ("AMBIGUOUS", "augment with a web search", "partial coverage"),
+            ("INCORRECT", "discard and search instead", "confident hallucination")):
+    print("%-14s %-30s %s" % row)
+print("   the middle verdict is the one that earns the pattern its name.")
+print("   discarding good-but-incomplete context and starting over throws")
+print("   away work; keeping it and adding to it is why 'corrective' is a")
+print("   better description than 'a retry'.")
+```
+
 ## Things to try
 
 1. Select <em>capital of Peru</em>. Nothing clears the threshold, and the pipeline declines &mdash; the answer naive RAG cannot give.

@@ -63,6 +63,170 @@ def retrieve_parents(query, k_children=20, n_parents=5):
     return parents
 ```
 
+## Small chunks in, large chunks out
+
+The sections above lay out the chunk-size dilemma and how searching one size while returning another escapes it. Here it is measured -- the same corpus indexed both ways, the retrieval scored, and the deduplication step that is easy to leave out and changes the answer when you do.
+
+```python-run
+import numpy as np
+
+# a document as a list of sentences, with the topic each belongs to
+SENTS = [
+    ("refund", "Refunds are available within 30 days of purchase."),
+    ("refund", "The item must be unused and in its original packaging."),
+    ("refund", "Email support@example.com with your order number."),
+    ("refund", "Refunds appear on your statement in 5 to 10 days."),
+    ("ship", "Standard delivery takes 5 to 7 business days."),
+    ("ship", "Express delivery costs an extra 12 dollars."),
+    ("ship", "We currently ship to 40 countries."),
+    ("warranty", "Hardware is covered for 24 months from delivery."),
+    ("warranty", "Accidental damage is excluded from the warranty."),
+]
+AXIS = {"refund": 0, "ship": 1, "warranty": 2}
+
+def embed(texts):
+    # a stand-in embedding: the topic axes present in the text, plus a
+    # shared component, then normalised -- so longer text spreads its
+    # budget across more axes, exactly as a real embedding does
+    v = np.zeros(3)
+    for t in texts:
+        v[AXIS[t]] += 1.0
+    v = v + 0.25                     # the shared, generic component
+    return v / np.linalg.norm(v)
+
+QUERY = embed(["refund"])
+
+CHILD = 1                            # sentences per child chunk
+PARENT = 4                           # sentences per parent chunk
+
+children = [(i, SENTS[i][0], SENTS[i][1]) for i in range(len(SENTS))]
+parents = [list(range(i, min(i + PARENT, len(SENTS))))
+           for i in range(0, len(SENTS), PARENT)]
+parent_of = {}
+for p, idxs in enumerate(parents):
+    for i in idxs:
+        parent_of[i] = p
+
+print("A DOCUMENT OF %d SENTENCES, indexed two ways." % len(SENTS))
+print("   %d parent chunks of up to %d sentences:" % (len(parents), PARENT))
+for p, idxs in enumerate(parents):
+    print("      P%d: sentences %s  (topics: %s)"
+          % (p, str(idxs), ", ".join(sorted({SENTS[i][0] for i in idxs}))))
+print("   %d child chunks of %d sentence each." % (len(children), CHILD))
+print()
+
+print("SEARCH THE PARENTS DIRECTLY -- one vector per parent, and each one")
+print("has to represent everything in it:")
+print("%-8s %-30s %14s" % ("chunk", "topics inside", "sim to query"))
+for p, idxs in enumerate(parents):
+    v = embed([SENTS[i][0] for i in idxs])
+    print("%-8s %-30s %14.4f"
+          % ("P%d" % p, ", ".join(sorted({SENTS[i][0] for i in idxs})),
+             float(QUERY @ v)))
+print("   P0 is entirely about refunds and scores highest, which is")
+print("   correct. but the score is DILUTED wherever a parent mixes")
+print("   topics, and in a real document the boundaries never line up")
+print("   neatly with the subject matter.")
+print()
+
+print("SEARCH THE CHILDREN instead -- one vector per sentence, each")
+print("representing one thing:")
+print("%-8s %-52s %12s" % ("child", "sentence", "sim"))
+cs = []
+for i, topic, text in children:
+    v = embed([topic])
+    s = float(QUERY @ v)
+    cs.append((s, i))
+    print("%-8s %-52s %12.4f" % ("C%d" % i, text[:50], s))
+print("   every refund sentence scores %.4f, exactly, because each child"
+      % max(s for s, _ in cs))
+print("   is about ONE topic and nothing dilutes it. that is the whole")
+print("   argument for small chunks: precision of MATCHING.")
+print()
+
+print("BUT SMALL CHUNKS ARE BAD ANSWERS. take the top 3 children:")
+top = [i for _, i in sorted(cs, reverse=True)[:3]]
+for i in top:
+    print("      C%d: %s" % (i, SENTS[i][1]))
+print("   each is true and each is a fragment. a model asked 'how do")
+print("   refunds work' and given these has three disconnected facts and")
+print("   no idea whether they are the whole policy.")
+print()
+
+print("PARENT DOCUMENT RETRIEVAL: match on children, RETURN their parents.")
+seen, returned = set(), []
+for i in top:
+    p = parent_of[i]
+    if p not in seen:
+        seen.add(p)
+        returned.append(p)
+print("      children matched: %s" % ", ".join("C%d" % i for i in top))
+print("      their parents:    %s"
+      % ", ".join("P%d" % parent_of[i] for i in top))
+print("      after dedup:      %s" % ", ".join("P%d" % p for p in returned))
+for p in returned:
+    print("      P%d = %s" % (p, " ".join(SENTS[i][1] for i in parents[p])))
+print()
+
+print("THE DEDUPLICATION IS NOT OPTIONAL. without it:")
+print("%-30s %14s %16s" % ("", "chunks returned", "sentences of text"))
+raw = [parent_of[i] for i in top]
+print("%-30s %14d %16d"
+      % ("no dedup", len(raw), sum(len(parents[p]) for p in raw)))
+print("%-30s %14d %16d"
+      % ("deduplicated", len(returned),
+         sum(len(parents[p]) for p in returned)))
+worst = raw.count(max(set(raw), key=raw.count))
+print("   all %d children matched resolve to the SAME parent, so without"
+      % len(top))
+print("   dedup that one passage is sent to the model %d times over."
+      % worst)
+print("   it wastes context, and worse, repetition is a signal to a")
+print("   language model -- a fact")
+print("   stated three times reads as more certain than one stated once,")
+print("   which is exactly the wrong inference here since the repetition")
+print("   is an artefact of your retriever.")
+print()
+
+print("THE SIZES ARE A REAL CHOICE. what each pairing costs:")
+print("%-24s %14s %16s %18s"
+      % ("child / parent", "vectors stored", "match precision", "answer context"))
+for c, p in ((1, 4), (1, 9), (2, 4), (4, 4)):
+    nvec = int(np.ceil(len(SENTS) / c))
+    print("%-24s %14d %16s %18s"
+          % ("%d sent / %d sent" % (c, p), nvec,
+             "high" if c == 1 else "medium" if c == 2 else "low",
+             "%d sentences" % p))
+print("   the last row is child = parent, which is ordinary chunking -- so")
+print("   this technique is not a different system, it is one extra")
+print("   indirection on top of the same index.")
+print("   the child size is chosen for MATCHING and the parent size for")
+print("   ANSWERING, and the point of the method is that these two")
+print("   pressures no longer have to be resolved into one number.")
+print()
+
+print("WHERE IT COSTS YOU:")
+print("%-34s %s" % ("more vectors to store", "one per child, not per parent"))
+print("%-34s %s" % ("a second lookup", "child id -> parent text"))
+print("%-34s %s" % ("k means something different", "k children, fewer parents"))
+print("   that last one catches people. asking for k=10 children can")
+print("   return anywhere from 1 to 10 parents depending on how they")
+print("   cluster, so the amount of text you send to the model varies")
+print("   per query in a way it does not with ordinary chunking:")
+for k in (2, 3, 5, 9):
+    tk = [i for _, i in sorted(cs, reverse=True)[:k]]
+    ps = []
+    for i in tk:
+        if parent_of[i] not in ps:
+            ps.append(parent_of[i])
+    print("      k=%d children -> %d parent%s, %d sentences of context"
+          % (k, len(ps), "" if len(ps) == 1 else "s",
+             sum(len(parents[p]) for p in ps)))
+print("   budget your context by the PARENT count, not the child count,")
+print("   or a query that happens to match across several parents will")
+print("   quietly overflow it.")
+```
+
 ## Guided experiments
 
 1. <strong>Read the child list at chunk size 8.</strong> The winning chunk is a short fragment. Read it alone and ask whether it actually answers the question &mdash; it names a duration but not what the duration applies to.
