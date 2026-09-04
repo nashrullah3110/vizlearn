@@ -91,6 +91,126 @@ Diagnosing low relevance means knowing the causes, and most of them are not the 
 
 <strong>Instruction tuning bias.</strong> Models tuned on preference data tend towards longer answers, because human raters mildly prefer them. That is a systematic pull towards padding.
 
+## Measuring "answers the question" without measuring similarity
+
+The obvious way to score relevance is to compare the answer with the question, and it is the wrong way -- a restatement of the question is maximally similar to it and answers nothing. This shows that failure directly, then the two things the dimension is actually for.
+
+```python-run
+import numpy as np
+
+QUESTION = "How many days do I have to return an item for a refund?"
+
+ANSWERS = [
+    ("A: the direct answer",
+     "You have 30 days from delivery to return an item.", True),
+    ("B: restates the question",
+     "You are asking how many days you have to return an item for a "
+     "refund.", False),
+    ("C: answers a nearby question",
+     "Returns must be unused and in original packaging.", False),
+    ("D: answers, then wanders",
+     "You have 30 days. Our warehouse is in Leeds and we were founded "
+     "in 2004.", True),
+    ("E: refuses",
+     "I do not have enough information to answer that.", False),
+]
+
+# a bag-of-words similarity, which is what a naive relevance check does
+def toks(s):
+    return set(w.strip(".,?").lower() for w in s.split())
+
+Q = toks(QUESTION)
+
+def sim_to_question(a):
+    t = toks(a)
+    return len(t & Q) / float(len(t | Q)) if (t | Q) else 0.0
+
+print("THE QUESTION: %r" % QUESTION)
+print()
+print("THE NAIVE CHECK: how similar is the answer to the question?")
+print("%-34s %8s   %s" % ("answer", "sim", "does it answer?"))
+for name, text, ok in ANSWERS:
+    print("%-34s %8.4f   %s" % (name, sim_to_question(text),
+                                "ANSWERS IT" if ok else "does not"))
+print()
+best = max(ANSWERS, key=lambda x: sim_to_question(x[1]))
+print("   the highest score goes to %s, which answers nothing at all --"
+      % best[0].split(":")[0])
+print("   it is a restatement of the question, so it shares almost every")
+print("   word with it.")
+print("   and the DIRECT ANSWER scores %.4f, because a good answer uses"
+      % sim_to_question(ANSWERS[0][1]))
+print("   DIFFERENT words from the question: the question says 'how many")
+print("   days' and the answer says '30'. that is what answering IS.")
+print("   similarity to the question is not a proxy for relevance. it is")
+print("   very close to an anti-proxy.")
+print()
+
+print("SO WHAT IS THE DIMENSION ACTUALLY FOR? two failures that nothing")
+print("else in the suite catches:")
+print("%-34s %-16s %s" % ("answer", "the failure", "caught by"))
+print("%-34s %-16s %s" % ("B: restates the question", "no answer given",
+                          "relevance only"))
+print("%-34s %-16s %s" % ("C: answers a nearby question", "wrong question",
+                          "relevance only"))
+print("%-34s %-16s %s" % ("D: answers, then wanders", "padding",
+                          "relevance, weakly"))
+print("   C is the important one and the hardest to see. it is TRUE, it is")
+print("   GROUNDED in the retrieved documents, and it is about returns --")
+print("   every other metric passes it. it simply answers a question the")
+print("   user did not ask.")
+print("   correctness cannot catch it either, because there is nothing")
+print("   incorrect in it. only 'did this address the question' does.")
+print()
+
+print("HOW TO MEASURE IT WITHOUT COMPARING TO THE QUESTION. the standard")
+print("trick inverts the problem: from the ANSWER, generate the question")
+print("it would be a good answer to, and compare THOSE:")
+GENERATED = {
+    "A: the direct answer": "How long do I have to return an item?",
+    "B: restates the question": "What is the user asking about?",
+    "C: answers a nearby question": "What condition must returned items "
+                                    "be in?",
+    "D: answers, then wanders": "How long do I have to return, and where "
+                                "are you based?",
+    "E: refuses": "(none -- there is no question this answers)",
+}
+print("   (a model writes these in practice; they are written out here")
+print("   so the arithmetic below is checkable.)")
+print("%-34s %s" % ("answer", "the question it actually answers"))
+for name, _, _ in ANSWERS:
+    print("%-34s %s" % (name, GENERATED[name][:44]))
+print()
+print("%-34s %14s %12s" % ("answer", "sim to Q", "verdict"))
+for name, _, ok in ANSWERS:
+    g = GENERATED[name]
+    s = len(toks(g) & Q) / float(len(toks(g) | Q)) if toks(g) else 0.0
+    print("%-34s %14.4f %12s" % (name, s, "relevant" if ok else "not"))
+print("   now the ordering is right, and for a reason: the generated")
+print("   question for B is 'what is the user asking about', which is not")
+print("   the user's question at all. the generated question for A is a")
+print("   paraphrase of it.")
+print("   comparing question to question works where comparing question to")
+print("   answer does not, because two questions about the same thing DO")
+print("   use the same words.")
+print()
+
+print("AND THE TENSION WITH COMPLETENESS, which is real and unavoidable:")
+print("%-30s %14s %14s" % ("answer style", "relevance", "completeness"))
+for style, r, c in (("one sentence, exact", "high", "may miss caveats"),
+                    ("a full paragraph", "lower", "high"),
+                    ("everything retrieved", "low", "certainly complete"),
+                    ("a refusal", "zero", "zero")):
+    print("%-30s %14s %14s" % (style, r, c))
+print("   every caveat you add makes the answer more complete and less")
+print("   purely on-point, and answer D above is what over-optimising")
+print("   completeness looks like.")
+print("   the resolution is not to pick one. it is to score both and set")
+print("   a floor on each, so an answer cannot buy completeness with")
+print("   padding or relevance by omitting the exceptions -- which is")
+print("   exactly what a single blended 'quality' score would let it do.")
+```
+
 ## Things to try
 
 1. The 24/7 phone claim is marked correct but off topic. Relevance drops while correctness and groundedness stay put &mdash; this is the padding case, visible only here.

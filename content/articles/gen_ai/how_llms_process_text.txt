@@ -80,6 +80,114 @@ That is why input tokens are priced below output tokens, why a long prompt delay
 
 The <strong>KV cache</strong> is what keeps decode linear: previous tokens' keys and values are stored rather than recomputed. It costs memory &mdash; several gigabytes for a long context &mdash; and it is the dominant memory consumer in serving.
 
+## The shapes, end to end
+
+The stages are described above. Following the SHAPES through them is what makes the pipeline concrete -- where the parameters actually are, why prefill and decode cost such different amounts, and what the model does not have that you might assume it does.
+
+```python-run
+import numpy as np
+
+VOCAB, D, LAYERS, HEADS, T = 32000, 4096, 32, 32, 6
+TOKENS = ["The", "cat", "sat", "on", "the", "mat"]
+
+print("SIX TOKENS THROUGH A MODEL WITH %d LAYERS, %d HEADS AND"
+      % (LAYERS, HEADS))
+print("d_model = %d. the shape at every stage:" % D)
+print("%-34s %-18s %s" % ("stage", "shape", "what changed"))
+rows = [
+    ("the text", "a string", "-"),
+    ("1-3. tokenise", "(%d,) ints" % T, "text becomes integers"),
+    ("4. embedding lookup", "(%d, %d)" % (T, D), "integers become vectors"),
+    ("5. + positional encoding", "(%d, %d)" % (T, D), "order is injected"),
+    ("6. attention, per layer", "(%d, %d)" % (T, D), "tokens mix"),
+    ("   feed-forward, per layer", "(%d, %d)" % (T, D), "each token alone"),
+    ("7. after %d layers" % LAYERS, "(%d, %d)" % (T, D), "nothing, shape-wise"),
+    ("8. the output head", "(%d, %s)" % (T, "{:,}".format(VOCAB)),
+     "back to vocabulary"),
+    ("   take the last row", "(%s,)" % "{:,}".format(VOCAB), "one distribution"),
+]
+for name, shape, note in rows:
+    print("%-34s %-18s %s" % (name, shape, note))
+print("   note what does NOT change: from stage 4 to stage 7 the shape is")
+print("   (%d, %d) throughout. every layer is a function from that shape"
+      % (T, D))
+print("   to itself, which is why you can stack as many as you like and")
+print("   why they can share a residual stream.")
+print()
+
+print("WHERE THE PARAMETERS ARE. this is the table that explains the")
+print("model's size:")
+emb = VOCAB * D
+attn_per_layer = 4 * D * D
+ff_per_layer = 3 * D * (4 * D)          # SwiGLU-ish: 3 matrices
+per_layer = attn_per_layer + ff_per_layer
+total = emb + LAYERS * per_layer + emb
+print("%-34s %18s %10s" % ("component", "parameters", "share"))
+for name, n in (("embedding table", emb),
+                ("attention, all %d layers" % LAYERS, LAYERS * attn_per_layer),
+                ("feed-forward, all %d layers" % LAYERS, LAYERS * ff_per_layer),
+                ("output head", emb)):
+    print("%-34s %18s %9.1f%%"
+          % (name, "{:,}".format(n), 100.0 * n / total))
+print("%-34s %18s" % ("total", "{:,}".format(total)))
+print("   %.1f billion, which is what this configuration comes to -- the"
+      % (total / 1e9))
+print("   round numbers in model names are the configuration, not the")
+print("   parameter count.")
+print("   the FEED-FORWARD layers hold about %.0f%% of the parameters, not"
+      % (100.0 * LAYERS * ff_per_layer / total))
+print("   attention. attention gets the attention, and the majority of the")
+print("   weights are in the boring per-token part.")
+print("   note also that the embedding table and the output head are the")
+print("   same size, and in many models they are the SAME MATRIX -- tied")
+print("   weights, saving %s parameters." % "{:,}".format(emb))
+print()
+
+print("PREFILL AND DECODE ARE THE SAME ARITHMETIC AT DIFFERENT SHAPES:")
+print("%-12s %-14s %-26s %s"
+      % ("phase", "input shape", "matmul shape", "bound by"))
+print("%-12s %-14s %-26s %s"
+      % ("prefill", "(%d, %d)" % (T, D), "(%d, %d) x (%d, %d)" % (T, D, D, D),
+         "compute"))
+print("%-12s %-14s %-26s %s"
+      % ("decode", "(1, %d)" % D, "(1, %d) x (%d, %d)" % (D, D, D),
+         "memory bandwidth"))
+print("   the WEIGHTS are identical in both. what changes is how many rows")
+print("   are pushed through them -- and a matrix multiply with one row is")
+print("   a very poor use of hardware built for thousands.")
+BYTES = 2
+print("      weights read per token, decode:  %s bytes"
+      % "{:,}".format(int(total * BYTES)))
+print("      weights read per token, prefill at %d tokens: %s bytes"
+      % (T, "{:,}".format(int(total * BYTES / T))))
+print("   the same read, amortised over %d tokens instead of 1. that ratio"
+      % T)
+print("   is why a long prompt is cheap per token and generation is not,")
+print("   and why batching helps decode enormously and prefill barely.")
+print()
+
+print("AND WHAT THE MODEL DOES NOT HAVE, which the shapes make obvious:")
+print("%-38s %s" % ("no memory between calls", "the (%d, %d) is rebuilt each time" % (T, D)))
+print("%-38s %s" % ("no access to its own weights", "it cannot inspect itself"))
+print("%-38s %s" % ("no notion of 'now'", "unless a token says so"))
+print("%-38s %s" % ("no arithmetic unit", "digits are just tokens"))
+print("   the last one is worth a demonstration. a number is tokenised")
+print("   like any other text, and the split is not what you would")
+print("   choose. these are the kinds of split a BPE vocabulary produces:")
+for n, pieces in (("7", ["7"]), ("42", ["42"]), ("1234", ["123", "4"]),
+                  ("12345", ["123", "45"]), ("3.14159", ["3", ".", "141", "59"])):
+    print("      %-10s -> %-24s %d token%s"
+          % (n, " | ".join(pieces), len(pieces), "" if len(pieces) == 1 else "s"))
+print("   '1234' arriving as '123' + '4' means there is no representation")
+print("   of 'the units digit' anywhere -- there is a token '123' and a")
+print("   token '4', and the model's only handle on their relationship is")
+print("   what it has learned about which tokens follow which.")
+print("   arithmetic then has to be learned as a")
+print("   pattern over those pieces rather than computed, which is exactly")
+print("   why models are unreliable at long multiplication and reliable at")
+print("   calling a calculator.")
+```
+
 ## Try it yourself
 
 1. <strong>Walk from stage 1 to 8 with Next</strong> and keep an eye on the shape tag. Watch <span class="mono-font">n</span> integers become <span class="mono-font">n &times; d</span> and stay there until the final projection.

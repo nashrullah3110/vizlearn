@@ -61,6 +61,145 @@ Practically, RLHF is complicated: two models in memory, an RL loop that is sensi
 
 DPO's simplicity is why it became the default for open models. Variants &mdash; IPO, KTO, ORPO, SimPO &mdash; adjust the loss or remove the reference model; the family is still moving.
 
+## The one equation both preference methods share
+
+RLHF and DPO look like completely different machinery, and they optimise the same objective. Writing that objective out is the shortest route to understanding what preference training does -- and what neither method can fix.
+
+```python-run
+import numpy as np
+
+print("A PREFERENCE PAIR is the whole training signal. no correct answer,")
+print("just an ordering:")
+print("      prompt:   'explain gradient descent'")
+print("      chosen:   a clear two-paragraph explanation")
+print("      rejected: a correct but impenetrable one")
+print("   note what is NOT here: a target string. supervised fine-tuning")
+print("   needs someone to WRITE the ideal answer; preference training")
+print("   needs someone to PICK between two, which is enormously cheaper")
+print("   and much more reliable -- people are bad at writing the best")
+print("   answer and good at spotting the better one.")
+print()
+
+print("THE OBJECTIVE BOTH METHODS OPTIMISE. write the reward of an answer")
+print("as r, and the probability that a human prefers A over B is modelled")
+print("by the Bradley-Terry law:")
+print("      P(A preferred) = sigmoid(r_A - r_B)")
+print("   which says only the DIFFERENCE of rewards matters:")
+def sig(x):
+    return 1.0 / (1.0 + np.exp(-x))
+print("%-16s %-16s %14s %16s" % ("r_A", "r_B", "difference", "P(A wins)"))
+for a, b in ((1.0, 0.0), (5.0, 4.0), (0.5, 0.0), (3.0, 0.0), (0.0, 0.0)):
+    print("%-16.1f %-16.1f %14.1f %16.4f" % (a, b, a - b, sig(a - b)))
+print("   rows 1 and 2 have completely different rewards and identical")
+print("   preferences, because the difference is the same. a reward model")
+print("   is therefore only ever defined up to an additive constant --")
+print("   which is why you cannot read an absolute 'quality' off one.")
+print()
+
+print("RLHF DOES IT IN TWO STEPS:")
+print("%-10s %-34s %s" % ("step", "what it trains", "on what"))
+print("%-10s %-34s %s" % ("1", "a reward model r(x, y)", "the preference pairs"))
+print("%-10s %-34s %s" % ("2", "the policy, by RL (PPO)", "the reward model"))
+print("   the second step needs a reference model held in memory too, to")
+print("   keep the policy from drifting:")
+print("      maximise  r(x, y)  -  beta * KL(policy || reference)")
+print("%-34s %s" % ("models in memory during PPO", "policy, reference, reward,"))
+print("%-34s %s" % ("", "and the value head -- four"))
+print("   the KL term is not optional. without it the policy walks off to")
+print("   whatever the reward model scores highly, which is not the same")
+print("   as what humans like -- that is reward hacking, and it looks like")
+print("   a model that has learned to write in whatever style the reward")
+print("   model over-scores.")
+print()
+
+print("DPO SKIPS STEP 1 ENTIRELY. the insight is that the optimal policy")
+print("for that KL-constrained objective has a closed form, so the reward")
+print("can be written IN TERMS OF the policy:")
+print("      r(x, y) = beta * log( policy(y|x) / reference(y|x) )")
+print("   substitute that back into Bradley-Terry and the reward model")
+print("   cancels out. what is left is a loss you can compute from four")
+print("   numbers, all of them log-probabilities:")
+print("%-34s %s" % ("policy log-prob of the chosen", "pc"))
+print("%-34s %s" % ("policy log-prob of the rejected", "pr"))
+print("%-34s %s" % ("reference log-prob of the chosen", "rc"))
+print("%-34s %s" % ("reference log-prob of the rejected", "rr"))
+print("      loss = -log sigmoid( beta * ((pc - rc) - (pr - rr)) )")
+print()
+print("   work through what that quantity means:")
+BETA = 0.1
+CASES = [
+    ("the policy already prefers the chosen", -1.0, -3.0, -1.5, -2.0),
+    ("the policy prefers the REJECTED", -3.0, -1.0, -1.5, -2.0),
+    ("policy and reference agree exactly", -1.5, -2.0, -1.5, -2.0),
+    ("the policy strongly prefers chosen", -0.5, -6.0, -1.5, -2.0),
+]
+# d(loss)/d(margin) = -beta * sigmoid(-beta * margin), so the gradient
+# is largest exactly where the policy is most wrong
+print("%-40s %10s %10s %16s"
+      % ("situation", "margin", "loss", "|d loss/d margin|"))
+for name, pc, pr, rc, rr in CASES:
+    margin = (pc - rc) - (pr - rr)
+    loss = -np.log(sig(BETA * margin))
+    grad = BETA * sig(-BETA * margin)
+    print("%-40s %10.2f %10.4f %16.5f" % (name, margin, loss, grad))
+print("   the margin is 'how much more the policy prefers the chosen")
+print("   answer than the reference model did'. positive means the policy")
+print("   has already moved in the right direction and the loss is small.")
+print("   row 3 is the starting point: policy equals reference, margin 0,")
+print("   loss = -log(0.5) = %.4f. training begins from exactly there."
+      % -np.log(0.5))
+print("   and read the gradient column: it is largest where the policy is")
+print("   most wrong and smallest where it is already right -- but only by")
+print("   %.1fx, which is barely any self-regulation at all."
+      % ((BETA * sig(BETA * 2.5)) / (BETA * sig(-BETA * 5.0))))
+print("   THAT is what beta controls. it scales the margin before the")
+print("   sigmoid, so it decides how far into the sigmoid's flat regions")
+print("   the training ever gets:")
+print("%-10s %18s %18s %14s"
+      % ("beta", "grad, most wrong", "grad, already right", "ratio"))
+for bt in (0.05, 0.1, 0.5, 1.0, 4.0):
+    hi, lo = bt * sig(bt * 2.5), bt * sig(-bt * 5.0)
+    print("%-10.2f %18.5f %18.5f %13.1fx" % (bt, hi, lo, hi / lo))
+print("   at beta = 0.05 every pair contributes about equally and the")
+print("   policy barely moves from the reference. at beta = 4 the pairs")
+print("   the model already gets right stop mattering entirely and it")
+print("   trains almost only on its mistakes -- which is faster and drifts")
+print("   further from the reference model.")
+print("   that is the whole tuning story for DPO: beta is a leash, and")
+print("   0.1 to 0.5 is where most people end up.")
+print()
+
+print("SO WHAT DID DPO REMOVE?")
+print("%-30s %-18s %s" % ("", "RLHF", "DPO"))
+for row in (("models in memory", "4", "2"),
+            ("a separate reward model", "yes", "no"),
+            ("an RL loop", "yes", "no -- plain SGD"),
+            ("hyperparameters to tune", "many", "essentially beta"),
+            ("what it optimises", "the same objective", "the same objective")):
+    print("%-30s %-18s %s" % row)
+print("   the last row is the point. DPO is not a different goal reached")
+print("   more cheaply; it is the SAME goal with the intermediate model")
+print("   algebraically eliminated.")
+print("   RLHF keeps one real advantage: a reward model can score answers")
+print("   that were never in the preference data, so it can be reused for")
+print("   sampling, filtering and evaluation. DPO gives you a policy and")
+print("   nothing else.")
+print()
+
+print("AND WHAT NEITHER OF THEM FIXES. the three stages do different jobs:")
+print("%-24s %-30s %s" % ("stage", "teaches", "cannot fix"))
+for row in (("pretraining", "language and world knowledge", "-"),
+            ("supervised fine-tuning", "the format of a reply", "missing knowledge"),
+            ("preference training", "which reply is preferred", "missing knowledge")):
+    print("%-24s %-30s %s" % row)
+print("   preference training changes which of the answers a model could")
+print("   already produce it prefers to produce. if the right answer was")
+print("   never in that set, no amount of preference data puts it there.")
+print("   that is why a model that does not know your company's refund")
+print("   policy cannot be fine-tuned into knowing it reliably, and why")
+print("   the answer to that problem is retrieval rather than training.")
+```
+
 ## Guided tour
 
 1. <strong>Start at pretraining.</strong> With SFT at 0 and no preference method, the dense jargon answer is the most likely one. That is what "most probable continuation" looks like when the text you trained on is the internet.

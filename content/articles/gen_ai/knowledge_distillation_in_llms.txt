@@ -80,6 +80,125 @@ For generative models, three approaches are used, and they differ in what the st
 
 DistilBERT is the well-known encoder example: 40% smaller, 60% faster, retaining roughly 97% of BERT's performance on GLUE. It used logit distillation plus a hidden-state matching term and an initialisation taken from every other layer of the teacher.
 
+## The dark knowledge, and what temperature exposes
+
+Distillation trains a small model on a large one's full output distribution rather than on the correct answer alone. The extra information is in the wrong answers, and the temperature is what makes it readable -- both of which are visible in the numbers.
+
+```python-run
+import numpy as np
+
+CLASSES = ["cat", "dog", "wolf", "car", "spoon"]
+# what a well-trained teacher outputs for one image of a cat
+LOGITS = np.array([6.0, 3.2, 2.8, -1.0, -2.5])
+HARD = np.array([1.0, 0.0, 0.0, 0.0, 0.0])      # the one-hot label
+
+def softmax(z, T=1.0):
+    z = np.asarray(z, float) / T
+    z = z - z.max()
+    e = np.exp(z)
+    return e / e.sum()
+
+print("A TEACHER'S OUTPUT on one image of a cat, at T=1:")
+p = softmax(LOGITS)
+print("%-10s %10s %14s" % ("class", "logit", "probability"))
+for c, l, q in zip(CLASSES, LOGITS, p):
+    print("%-10s %10.2f %14.6f" % (c, l, q))
+print()
+print("THE HARD LABEL says only 'cat'. compare what each target contains:")
+print("%-10s %14s %16s" % ("class", "hard label", "teacher at T=1"))
+for c, h, q in zip(CLASSES, HARD, p):
+    print("%-10s %14.1f %16.6f" % (c, h, q))
+print("   the teacher's output says the image is a cat AND that it is far")
+print("   more dog-like than car-like: P(dog) is %.0fx P(car)."
+      % (p[1] / p[3]))
+print("   that ranking among the WRONG answers is the dark knowledge. it")
+print("   is a statement about the shape of the problem -- cats resemble")
+print("   dogs, and neither resembles cutlery -- and the one-hot label")
+print("   contains none of it.")
+print()
+
+print("BUT AT T=1 IT IS ALMOST INVISIBLE. the small probabilities are")
+print("crushed against zero, so a loss that averages over them barely")
+print("notices they exist:")
+print("%-10s %s" % ("class", "  ".join("%12s" % ("T=%.0f" % t)
+                                       for t in (1, 2, 4, 8))))
+for i, c in enumerate(CLASSES):
+    print("%-10s %s" % (c, "  ".join("%12.6f" % softmax(LOGITS, t)[i]
+                                     for t in (1, 2, 4, 8))))
+print("%-10s %s" % ("P(dog)/P(car)",
+                    "  ".join("%12.1f" % (softmax(LOGITS, t)[1]
+                                          / softmax(LOGITS, t)[3])
+                              for t in (1, 2, 4, 8))))
+print("   raising T flattens the distribution and lifts the tail into a")
+print("   range a gradient can act on. at T=1 the car class carries")
+print("   %.2e of the mass; at T=4 it carries %.4f."
+      % (softmax(LOGITS, 1)[3], softmax(LOGITS, 4)[3]))
+print("   the RATIOS do change, and sharply: P(dog)/P(car) falls from")
+print("   %.0f to %.1f across that sweep. what is preserved is the ORDER."
+      % (softmax(LOGITS, 1)[1] / softmax(LOGITS, 1)[3],
+         softmax(LOGITS, 8)[1] / softmax(LOGITS, 8)[3]))
+print("   temperature compresses the differences without ever reordering")
+print("   them, which is exactly the trade being made: you give up some")
+print("   of the teacher's confidence about how MUCH more dog-like the")
+print("   image is, in exchange for the tail being large enough to learn")
+print("   from at all.")
+print()
+
+print("THE PRICE OF RAISING T, and it is the reason for the 1/T^2 factor")
+print("nobody explains. the gradient of the soft loss shrinks as T grows:")
+print("%-10s %20s %22s" % ("T", "gradient scale ~1/T^2", "after correction"))
+for T in (1, 2, 4, 8):
+    print("%-10d %20.6f %22.4f" % (T, 1.0 / T ** 2, (1.0 / T ** 2) * T ** 2))
+print("   at T=4 the soft-target gradients are %.0fx smaller than the hard"
+      % (4 ** 2))
+print("   ones, so without a correction the soft term would contribute")
+print("   almost nothing to training -- exactly the opposite of what you")
+print("   raised T for.")
+print("   multiplying the soft loss by T^2 restores it, which is why every")
+print("   distillation implementation has that factor and why it looks")
+print("   arbitrary until you differentiate the softmax.")
+print()
+
+print("THE COMBINED LOSS is a weighted sum of the two targets:")
+print("      L = alpha * KL(student, teacher at T) * T^2")
+print("        + (1 - alpha) * CE(student, the hard label)")
+print("%-14s %-34s %s" % ("alpha", "what the student learns from", "risk"))
+for a, learns, risk in ((0.0, "the labels only", "no distillation at all"),
+                        (0.5, "both, equally", "the usual starting point"),
+                        (0.9, "mostly the teacher", "inherits its mistakes"),
+                        (1.0, "the teacher only", "cannot beat the teacher")):
+    print("%-14.1f %-34s %s" % (a, learns, risk))
+print("   the hard-label term is what stops the student inheriting the")
+print("   teacher's errors wholesale. keeping it is why a distilled model")
+print("   can occasionally be RIGHT where its teacher was wrong.")
+print()
+
+print("WHY THIS WORKS BETTER THAN TRAINING SMALL FROM SCRATCH. count the")
+print("information in one training example:")
+print("%-34s %18s %s" % ("target", "numbers per example", "what they say"))
+print("%-34s %18d %s" % ("one-hot label", 1, "the answer"))
+print("%-34s %18d %s"
+      % ("teacher distribution", len(CLASSES), "the answer and its neighbours"))
+print("   for a language model the second row is the vocabulary size --")
+print("   %s numbers per token instead of 1." % "{:,}".format(32000))
+print("   that is a much richer signal per example, which is why a")
+print("   distilled model reaches a given quality on far less data than")
+print("   the same architecture trained from scratch.")
+print()
+print("WHERE IT SITS AMONG THE COMPRESSION METHODS:")
+print("%-24s %-30s %s" % ("method", "what it changes", "needs retraining?"))
+for row in (("quantisation", "the precision of weights", "no"),
+            ("pruning", "which weights exist", "usually"),
+            ("distillation", "the whole architecture", "yes, fully"),
+            ("LoRA", "nothing -- it adds", "a small amount")):
+    print("%-24s %-30s %s" % row)
+print("   distillation is the most expensive of the four and the only one")
+print("   that can produce a genuinely smaller ARCHITECTURE rather than a")
+print("   cheaper copy of the same one. that is the trade: a training run")
+print("   against a model that is small by design instead of small by")
+print("   compression.")
+```
+
 ## Guided tour
 
 1. <strong>Look at T = 1.</strong> The teacher is nearly one-hot and looks almost identical to the hard label &mdash; barely any extra signal.

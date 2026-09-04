@@ -64,6 +64,109 @@ Almost never in the language model. The failures are in retrieval, and they have
 
 That distribution is why the practical advice is: <strong>measure retrieval separately from generation</strong>. Recall@k on a set of question-and-known-answer pairs tells you whether the right chunk is even reaching the model. Debugging the prompt when recall is 0.4 is wasted effort.
 
+## Where the quality actually comes from
+
+A RAG pipeline is a chain, and a chain's output is bounded by its weakest link -- which means the arithmetic of stage-by-stage success rates tells you where to spend your effort. This computes that, and then shows why the obvious first instinct is usually the wrong one.
+
+```python-run
+import numpy as np
+
+STAGES = [
+    ("chunking", "the answer survives in one chunk", 0.90),
+    ("embedding", "the chunk is findable by this query", 0.85),
+    ("retrieval", "it lands in the top k", 0.80),
+    ("generation", "the model uses it correctly", 0.95),
+]
+
+print("A RAG PIPELINE IS A CHAIN. every stage has to succeed:")
+print("%-16s %-40s %10s" % ("stage", "succeeds when", "rate"))
+for name, cond, p in STAGES:
+    print("%-16s %-40s %10.2f" % (name, cond, p))
+end_to_end = float(np.prod([p for _, _, p in STAGES]))
+print("%-16s %-40s %10.4f" % ("end to end", "all four", end_to_end))
+print()
+print("   four individually respectable numbers multiply to %.2f. that is"
+      % end_to_end)
+print("   the arithmetic everyone meets eventually: a chain of 90-percent")
+print("   stages is not a 90-percent system.")
+print()
+
+print("SO WHERE SHOULD YOU SPEND YOUR TIME? improve each stage by 5 points")
+print("in turn and see what happens end to end:")
+print("%-16s %12s %14s %14s" % ("improve", "that stage", "end to end", "gain"))
+for i, (name, _, p) in enumerate(STAGES):
+    ps = [q for _, _, q in STAGES]
+    ps[i] = min(1.0, p + 0.05)
+    new = float(np.prod(ps))
+    print("%-16s %12.2f %14.4f %+14.4f"
+          % (name, ps[i], new, new - end_to_end))
+print("   every stage gives almost the same gain, because they multiply.")
+print("   5 points on ANY factor moves the product by about the same")
+print("   proportion, so 'which stage should I improve' has no answer from")
+print("   this table alone.")
+print()
+
+print("THE QUESTION THAT DOES HAVE AN ANSWER: which stage is CHEAPEST to")
+print("improve, and which is nearest its ceiling?")
+print("%-16s %10s %14s %-22s %s"
+      % ("stage", "rate", "headroom", "typical fix", "cost"))
+FIXES = [("chunking", 0.90, "change the splitter", "an afternoon, re-index"),
+         ("embedding", 0.85, "a better model", "re-embed everything"),
+         ("retrieval", 0.80, "add a reranker", "latency, per query"),
+         ("generation", 0.95, "prompt or model", "cheap to try")]
+for (name, p, fix, cost) in FIXES:
+    print("%-16s %10.2f %14.2f %-22s %s" % (name, p, 1.0 - p, fix, cost))
+print("   now the picture is different. retrieval has the most headroom")
+print("   (%.2f) AND a well-understood fix, and generation has the least"
+      % (1.0 - 0.80))
+print("   (%.2f) while being the cheapest to fiddle with -- which is"
+      % (1.0 - 0.95))
+print("   exactly why most teams spend their first month on prompts.")
+print()
+
+print("MEASURE IT BEFORE YOU FIX IT, because the guess is usually wrong.")
+print("the cheapest diagnostic is to remove one stage's uncertainty at a")
+print("time -- feed the generator the RIGHT chunk by hand:")
+print("%-42s %14s %s" % ("experiment", "answer rate", "what it isolates"))
+print("%-42s %14.4f %s"
+      % ("the pipeline as built", end_to_end, "everything"))
+print("%-42s %14.4f %s"
+      % ("hand the generator the correct chunk", 0.95, "generation alone"))
+print("%-42s %14.4f %s"
+      % ("does the right chunk reach the model?", 0.80 * 0.85 * 0.90,
+         "everything but generation"))
+print("   if answers improve dramatically when you paste the right chunk")
+print("   in by hand, the problem is retrieval and no amount of prompt")
+print("   work will touch it. if they do NOT improve, the problem is")
+print("   generation, and a better retriever is wasted money.")
+print("   that one experiment costs an hour and routinely redirects a")
+print("   month of work.")
+print()
+
+print("AND THE DECISION THAT COMES BEFORE ALL OF IT: RAG or fine-tuning?")
+print("they solve different problems, and the confusion is common:")
+print("%-34s %-14s %s" % ("what you need", "RAG", "fine-tuning"))
+for row in (("facts that change weekly", "yes", "no"),
+            ("citations to a source", "yes", "no"),
+            ("per-user access control", "yes", "no"),
+            ("a house writing style", "weakly", "yes"),
+            ("a domain's vocabulary", "weakly", "yes"),
+            ("a new output format", "weakly", "yes"),
+            ("lower per-query cost", "no", "yes")):
+    print("%-34s %-14s %s" % row)
+print("   the split is KNOWLEDGE against BEHAVIOUR. RAG supplies facts at")
+print("   query time and can cite them; fine-tuning changes how the model")
+print("   writes and cannot be asked where it got something.")
+print("   fine-tuning a model on your documents to 'teach it the facts' is")
+print("   the expensive way to get an uncitable, undeletable, stale copy")
+print("   of a database you already have.")
+print()
+print("   and they compose: fine-tune for the format and the tone, retrieve")
+print("   for the facts. the fine-tuned model is then better at USING the")
+print("   retrieved context, which shows up as the generation row in the")
+print("   first table rather than as a replacement for any of the others.")
+```
+
 ## Guided tour
 
 1. <strong>Turn retrieval off.</strong> Set <strong>Chunks Retrieved</strong> to 0. The prompt is the bare question, and the answer is what a model does when it has nothing: something plausible and unsupported, flagged in red.

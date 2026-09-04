@@ -115,6 +115,139 @@ Structure also tells you what to keep whole, which fixed-size chunking cannot kn
 
 The general rule: <strong>any element whose meaning depends on its own completeness gets its own chunk, whatever the size budget says.</strong> Variable chunk sizes are correct here, not a compromise.
 
+## The heading path, and what it does to retrieval
+
+Structure-aware splitting uses boundaries the author already wrote. The splitting is the easy half; the two things that decide whether it is worth doing are what you carry along with each chunk, and what you refuse to split.
+
+```python-run
+import numpy as np
+
+DOC = "\n".join([
+    "# Product Guide",
+    "## Billing",
+    "### Refunds",
+    "Requests are reviewed and settled within 30 days.",
+    "## Support",
+    "### Escalation",
+    "Requests are reviewed and answered within 4 hours.",
+])
+
+print("A DOCUMENT WITH REAL STRUCTURE. the author already marked every")
+print("boundary worth having:")
+for line in DOC.split("\n"):
+    print("   %s" % line)
+print()
+
+chunks = []
+path = {}
+for line in DOC.split("\n"):
+    if line.startswith("#"):
+        level = len(line) - len(line.lstrip("#"))
+        title = line.lstrip("# ").strip()
+        path = {k: v for k, v in path.items() if k < level}
+        path[level] = title
+    elif line.strip():
+        chunks.append((" > ".join(path[k] for k in sorted(path)), line.strip()))
+
+print("SPLITTING ON THE HEADINGS gives chunks that are whole sections --")
+print("but the useful part is the PATH each one sits under:")
+print("%-46s %s" % ("heading path", "text"))
+for p, t in chunks:
+    print("%-46s %s" % (p, t[:34]))
+print("   nobody had to guess where these boundaries were. the author")
+print("   wrote them, and a markdown parser reads them exactly.")
+print()
+
+print("NOW WHAT THE PATH BUYS. embed the chunk text alone, then embed the")
+print("path plus the text, and score a query against both:")
+# a bag-of-words vector over the words that distinguish anything here
+VOCAB = ["billing", "refund", "support", "escalation", "request",
+         "review", "settle", "answer", "within", "days", "hours"]
+
+def vec(text, with_path=""):
+    full = (with_path + " " + text).lower()
+    v = np.array([1.0 if w in full else 0.0 for w in VOCAB])
+    return v + 0.15
+
+def cos(a, b):
+    return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+QUERY = vec("how long are billing requests reviewed within")
+print("%-46s %14s %14s" % ("chunk", "text only", "path + text"))
+for p, t in chunks:
+    print("%-46s %14.4f %14.4f"
+          % (p, cos(QUERY, vec(t)), cos(QUERY, vec(t, p))))
+print()
+print("   query: 'how long are billing requests reviewed within'")
+tp = [cos(QUERY, vec(t)) for _, t in chunks]
+wp = [cos(QUERY, vec(t, p)) for p, t in chunks]
+print("   on TEXT ALONE the two chunks score %.4f and %.4f -- a gap of"
+      % (tp[0], tp[1]))
+print("   %.4f, which is to say a tie. the retriever picks whichever the"
+      % abs(tp[0] - tp[1]))
+print("   sort happened to put first.")
+print("   with the PATH the scores are %.4f and %.4f, a gap of %.4f, and"
+      % (wp[0], wp[1], abs(wp[0] - wp[1])))
+print("   the Billing one wins for the right reason.")
+print("   look at the two chunk TEXTS: 'reviewed and settled within 30")
+print("   days' and 'reviewed and answered within 4 hours'. they share")
+print("   almost every word, and neither contains 'billing' or 'support'.")
+print("   on text alone the retriever is choosing between two nearly")
+print("   identical strings and has no basis for preferring either.")
+print("   the PATHS are what separate them -- one sits under Billing and")
+print("   one under Support -- and once the path is embedded with the")
+print("   text, the chunk answers a query using a word it does not")
+print("   contain.")
+print("   this is the same coreference repair that context-aware chunking")
+print("   pays an LLM for, obtained free from structure the author already")
+print("   provided.")
+print()
+
+print("AND THE PART THAT IS ACTUALLY HARD: THINGS THAT MUST NOT BE SPLIT.")
+TABLE = ["| plan    | price | seats |",
+         "|---------|-------|-------|",
+         "| starter | 10    | 3     |",
+         "| team    | 40    | 20    |",
+         "| scale   | 150   | 100   |"]
+print("   a table, split by a character limit that lands mid-way:")
+LIMIT = 60
+joined = "\n".join(TABLE)
+naive = [joined[i:i + LIMIT] for i in range(0, len(joined), LIMIT)]
+for i, c in enumerate(naive):
+    print("      [%d] %r" % (i, c.replace("\n", " / ")))
+print("   chunk 1 onward has no header row, so 'starter costs 10' is no")
+print("   longer recoverable from it -- the column names are in a")
+print("   different chunk. a table split anywhere is not a smaller table,")
+print("   it is a list of numbers with no labels.")
+print()
+print("   the same for these, and each needs its own rule:")
+print("%-24s %s" % ("element", "why splitting destroys it"))
+for row in (("a table", "the header row carries the meaning"),
+            ("a code block", "half a function does not run or parse"),
+            ("a numbered list", "step 4 of 9 means nothing alone"),
+            ("a figure and caption", "either alone is unusable")):
+    print("%-24s %s" % row)
+print("   the standard handling is to treat each as ATOMIC: never split")
+print("   it, and if it exceeds the chunk limit, let it be an oversized")
+print("   chunk rather than a broken one. a chunk that is too big costs")
+print("   context; a chunk that is cut in half costs the answer.")
+print()
+
+print("WHICH IS WHY THE EXTRACTION, NOT THE SPLITTING, IS THE WORK:")
+print("%-26s %-24s %s" % ("source format", "structure available", "effort"))
+for row in (("markdown", "headings, tables, code", "trivial to parse"),
+            ("HTML", "the full DOM", "easy, if it is clean"),
+            ("a well-made PDF", "tagged sections", "moderate"),
+            ("a scanned PDF", "none until OCR", "the whole project"),
+            ("a transcript", "speaker turns, maybe", "little to work with")):
+    print("%-26s %-24s %s" % row)
+print("   splitting markdown on headings is ten lines. getting a usable")
+print("   heading hierarchy out of a scanned PDF is a document-AI project,")
+print("   and that is where the time in a real RAG build actually goes --")
+print("   not in the chunking strategy, in the extraction that has to")
+print("   happen before any strategy can be applied.")
+```
+
 ## Things to try
 
 1. Compare <em>structure first</em> with <em>fixed size</em> at the same chunk size. The character splitter cuts through the heading; the structure-aware one does not.

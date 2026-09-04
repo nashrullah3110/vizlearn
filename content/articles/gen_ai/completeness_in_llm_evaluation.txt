@@ -87,6 +87,126 @@ The distinction between the two references matters diagnostically. If the answer
 
 That last one is worth watching for, because it is invisible in the answer: the model faithfully reports what it was given, and what it was given was a fragment that reads as whole.
 
+## Counting what the answer left out
+
+Completeness is the only dimension that scores what is ABSENT, which is why the others cannot see it. This measures it by decomposing the question, then shows the trap: the metric can be gamed by saying more, and the way out is not a better completeness score.
+
+```python-run
+import numpy as np
+
+QUESTION = ("What is your refund policy and how do I start a return?")
+# the sub-questions a complete answer has to cover
+REQUIRED = [
+    "the time window",
+    "the condition the item must be in",
+    "how to start the return",
+    "how long the refund takes",
+]
+
+ANSWERS = {
+    "A: one line": ["the time window"],
+    "B: policy only": ["the time window",
+                       "the condition the item must be in"],
+    "C: complete": REQUIRED,
+    "D: complete, plus padding": REQUIRED,
+    "E: padding, little else": ["the time window"],
+}
+LENGTH = {"A: one line": 12, "B: policy only": 34, "C: complete": 71,
+          "D: complete, plus padding": 240, "E: padding, little else": 210}
+
+print("THE QUESTION: %r" % QUESTION)
+print("it is really %d questions, and a complete answer covers all of them:"
+      % len(REQUIRED))
+for r in REQUIRED:
+    print("   - %s" % r)
+print()
+
+print("COMPLETENESS = covered sub-questions / required sub-questions:")
+print("%-30s %14s %16s %12s"
+      % ("answer", "covered", "completeness", "words"))
+for name, covered in ANSWERS.items():
+    print("%-30s %14s %16.4f %12d"
+          % (name, "%d of %d" % (len(covered), len(REQUIRED)),
+             len(covered) / float(len(REQUIRED)), LENGTH[name]))
+print()
+print("   the decomposition is the whole method, and it is also the whole")
+print("   difficulty: someone has to decide what the question REQUIRES.")
+print("   that list is a judgement call, it is where the disagreement")
+print("   between two evaluators lives, and no amount of scoring")
+print("   machinery downstream can repair a wrong one.")
+print()
+
+print("WHY NOTHING ELSE IN THE SUITE SEES THIS. score answer B, which is")
+print("missing half the question:")
+print("%-26s %14s %s" % ("dimension", "B scores", "why"))
+for dim, score, why in (("correctness", "1.00", "everything it says is true"),
+                        ("groundedness", "1.00", "all of it is in the context"),
+                        ("relevance", "1.00", "entirely on topic"),
+                        ("completeness", "0.50", "half the question unanswered")):
+    print("%-26s %14s %s" % (dim, score, why))
+print("   three dimensions out of four give a perfect score to an answer")
+print("   that ignored half the question. they are all scoring what IS")
+print("   there; completeness is the only one that looks for what is not.")
+print("   that is also why it is the only one that needs the question")
+print("   decomposed in advance -- the others can work from the answer")
+print("   and the context alone.")
+print()
+
+print("NOW THE TRAP. completeness rewards saying more, and saying more is")
+print("cheap:")
+print("%-30s %14s %14s %16s"
+      % ("answer", "completeness", "words", "useful words"))
+for name, covered in ANSWERS.items():
+    useful = len(covered) * 18          # about 18 words per sub-answer
+    print("%-30s %14.4f %14d %16d"
+          % (name, len(covered) / float(len(REQUIRED)), LENGTH[name],
+             min(useful, LENGTH[name])))
+print("   compare C and D. identical completeness, and D is %.1fx longer."
+      % (LENGTH["D: complete, plus padding"] / float(LENGTH["C: complete"])))
+print("   and compare D with E: E is nearly as long and covers %d of %d."
+      % (len(ANSWERS["E: padding, little else"]), len(REQUIRED)))
+print("   so length is not a proxy for completeness either -- but")
+print("   optimising completeness alone will push a model toward D and")
+print("   then toward E, because the cheapest way to raise the chance of")
+print("   covering a sub-question is to say more things.")
+print()
+
+print("THE RESOLUTION IS NOT A BETTER COMPLETENESS SCORE. it is to score")
+print("relevance at the same time and require both:")
+print("%-30s %14s %14s %s"
+      % ("answer", "completeness", "relevance", "passes a floor of 0.8?"))
+REL = {"A: one line": 1.0, "B: policy only": 1.0, "C: complete": 0.95,
+       "D: complete, plus padding": 0.55, "E: padding, little else": 0.30}
+for name, covered in ANSWERS.items():
+    comp = len(covered) / float(len(REQUIRED))
+    ok = comp >= 0.8 and REL[name] >= 0.8
+    print("%-30s %14.4f %14.4f %s"
+          % (name, comp, REL[name], "YES" if ok else "no"))
+print("   only C passes both. D is complete and padded; A and B are")
+print("   focused and incomplete. neither failure is visible in a single")
+print("   blended score, and a blended score is exactly what lets a model")
+print("   trade one against the other.")
+print()
+
+print("AND THE CASE WHERE INCOMPLETENESS IS A RETRIEVAL PROBLEM, not a")
+print("generation one. a multi-hop question needs facts from separate")
+print("documents:")
+HOPS = [("which plan the customer is on", "doc A"),
+        ("what that plan's refund window is", "doc B")]
+print("%-42s %s" % ("the answer needs", "which is in"))
+for h, d in HOPS:
+    print("%-42s %s" % (h, d))
+print("   retrieve doc A and not doc B and the model can produce a fluent,")
+print("   grounded, relevant, CORRECT partial answer -- it will tell you")
+print("   the plan and stop.")
+print("   completeness is the dimension that catches it, and the fix is in")
+print("   retrieval rather than in the prompt: a single query embedding")
+print("   rarely matches both hops, which is what multi-query retrieval")
+print("   and query decomposition exist to solve.")
+print("   so a low completeness score is a symptom, and its cause is in a")
+print("   different component about as often as it is in the generator.")
+```
+
 ## Things to try
 
 1. Three of the five claims are required points and the reference lists four. Completeness is 0.75 &mdash; one required point is simply absent from the answer.

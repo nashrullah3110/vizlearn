@@ -79,6 +79,117 @@ They can diverge, and the divergence is informative:
 
 The third row is the dangerous one, because it looks like success. A system that answers correctly from parametric knowledge rather than from sources will fail silently the moment the question moves outside what the model memorised.
 
+## Why a model invents things, and what actually reduces it
+
+A model hallucinates because its objective rewards a plausible next token and never rewards silence. That is a property of the training signal, not a bug, and it explains which interventions work and which cannot.
+
+```python-run
+import numpy as np
+
+VOCAB = ["1998", "2001", "2004", "2011", "I", "do", "not", "know"]
+# what the model has learned about "the company was founded in ___"
+# when it has genuinely seen the fact, and when it has not
+KNOWN = np.array([0.5, 1.2, 8.4, 0.6, -2.0, -2.5, -3.0, -2.8])
+UNKNOWN = np.array([2.1, 2.3, 2.0, 2.2, -1.9, -2.4, -2.9, -2.7])
+
+def softmax(z):
+    z = np.asarray(z, float)
+    z = z - z.max()
+    e = np.exp(z)
+    return e / e.sum()
+
+print("'THE COMPANY WAS FOUNDED IN ___'. two situations, and the model's")
+print("output in each:")
+print("%-12s %20s %20s" % ("token", "the fact was learned", "it was not"))
+pk, pu = softmax(KNOWN), softmax(UNKNOWN)
+for t, a, b in zip(VOCAB, pk, pu):
+    print("%-12s %20.6f %20.6f" % (t, a, b))
+print()
+print("   in the second column the model is genuinely uncertain -- the")
+print("   four years are nearly tied at about %.2f each. and yet the mass"
+      % pu[0])
+print("   on 'I do not know' is %.6f."
+      % sum(pu[i] for i, t in enumerate(VOCAB) if t in ("I", "do", "not", "know")))
+print("   THAT is the whole mechanism. the model is uncertain and has no")
+print("   way to SAY so, because during training every example had a")
+print("   continuation and none of them was an admission of ignorance.")
+print("   sampling from that distribution produces a year -- a specific,")
+print("   confident, fluent, wrong year -- about %.0f%% of the time."
+      % (100 * sum(pu[:4])))
+print()
+
+print("AND THE ENTROPY KNOWS, even though the output does not:")
+def H(p):
+    return float(-(p * np.log(p + 1e-12)).sum())
+print("%-24s %14s %16s" % ("", "entropy", "top probability"))
+print("%-24s %14.4f %16.4f" % ("the fact was learned", H(pk), pk.max()))
+print("%-24s %14.4f %16.4f" % ("it was not", H(pu), pu.max()))
+print("   the uncertainty is measurable, at the token that matters, for")
+print("   free. that is the basis of every confidence-based abstention")
+print("   scheme: watch the entropy at the tokens carrying the facts and")
+print("   refuse when it is high.")
+print("   it is also why those schemes are unreliable -- a model that")
+print("   confidently learned something WRONG has low entropy too, and")
+print("   this signal cannot tell the two apart.")
+print()
+
+print("WHAT REDUCES IT, and the ordering is not what most teams try first:")
+INTERVENTIONS = [
+    ("retrieve the fact and put it in context", "large", "the model no longer has to recall"),
+    ("ask for citations, then verify them", "large", "unverifiable claims become visible"),
+    ("let the model say 'I do not know'", "moderate", "gives the mass somewhere to go"),
+    ("lower the temperature", "small", "changes sampling, not the distribution"),
+    ("say 'do not hallucinate' in the prompt", "none", "it cannot detect its own ignorance"),
+]
+print("%-44s %10s %s" % ("intervention", "effect", "why"))
+for name, eff, why in INTERVENTIONS:
+    print("%-44s %10s %s" % (name, eff, why))
+print()
+print("   the last row is worth being blunt about. the model has no")
+print("   internal flag saying 'this next token is invented'. asking it")
+print("   not to hallucinate asks it to detect a state it cannot observe.")
+print("   what such a prompt DOES do is shift the style toward hedging,")
+print("   which reads like caution and is not the same thing.")
+print()
+print("   and the temperature row deserves the arithmetic, because it is")
+print("   the intervention people reach for first:")
+def soft_T(z, T):
+    z = np.asarray(z, float) / T
+    z = z - z.max()
+    e = np.exp(z)
+    return e / e.sum()
+print("%-14s %22s %22s" % ("temperature", "P(some year)", "P(the right one)"))
+for T in (0.1, 0.5, 1.0, 1.5):
+    q = soft_T(UNKNOWN, T)
+    print("%-14.1f %22.4f %22.4f" % (T, q[:4].sum(), q[2]))
+print("   at every temperature the answer is a year with probability")
+print("   %.2f or higher. temperature decides WHICH invented year you get,"
+      % min(soft_T(UNKNOWN, T)[:4].sum() for T in (0.1, 0.5, 1.0, 1.5)))
+print("   not whether you get one. at temperature 0 the model returns the")
+print("   single most likely year every time -- deterministically wrong")
+print("   rather than randomly wrong, which is worse for detection because")
+print("   asking twice no longer reveals the uncertainty.")
+print()
+
+print("GROUNDING IS THE INTERVENTION THAT WORKS, and it works by changing")
+print("the question the model is answering:")
+print("%-30s %s" % ("without context", "'what year was it founded?'"))
+print("%-30s %s" % ("with context", "'what year does this text say?'"))
+print("   the second is a reading task, and models are far better at")
+print("   reading than at recalling. that is the entire mechanism of RAG's")
+print("   effect on hallucination, and it is why it works even with a")
+print("   model that never saw your documents in training.")
+print("   what it does NOT do is eliminate the problem:")
+print("%-40s %s" % ("if retrieval returns nothing", "the model recalls again"))
+print("%-40s %s" % ("if retrieval returns the wrong thing", "grounded and wrong"))
+print("%-40s %s" % ("if the answer needs two documents", "a plausible bridge"))
+print("   that last one is the subtle failure. given two facts and a gap")
+print("   between them, a model will produce the connective tissue, and")
+print("   the invented part is the JOIN rather than any of the facts --")
+print("   which is exactly the kind of hallucination a claim-level")
+print("   groundedness check catches and a document-level one does not.")
+```
+
 ## Guided tour
 
 1. <strong>Start on thin ice.</strong> With evidence at 2.0 the correct name holds about half the mass and three plausible wrong ones hold the other half, so the hallucination rate reads 49.6%. Nothing here is broken; this is what a weak memory looks like written as a distribution.

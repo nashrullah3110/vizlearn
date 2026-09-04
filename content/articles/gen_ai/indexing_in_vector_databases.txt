@@ -96,6 +96,111 @@ The detail that catches people: <strong>deletions</strong>. When a document is r
 
 Also plan for <strong>re-embedding</strong>. Changing the embedding model invalidates the entire index, because vectors from different models are not comparable. Record which model produced the index, and treat a model upgrade as a full rebuild &mdash; ideally into a new collection, with an atomic switch.
 
+## What is stored, and what happens when it changes
+
+The ANN algorithm gets the attention, and the operational half decides whether a system survives contact with a corpus that changes. This works through what a record actually holds, what an update costs, and the staleness that follows from the answer.
+
+```python-run
+import numpy as np
+
+D = 768
+print("WHAT ONE RECORD ACTUALLY HOLDS -- the vector is the biggest field")
+print("and nowhere near the whole cost:")
+print("%-30s %16s %s" % ("field", "bytes", "why it is there"))
+rows = [("the vector, fp32", D * 4, "the similarity search"),
+        ("the id", 16, "joins back to your database"),
+        ("the source text", 1200, "so you can return it"),
+        ("metadata (dates, acl, tags)", 240, "filtering"),
+        ("index overhead (HNSW links)", 32 * 2 * 8, "the graph itself")]
+total = sum(n for _, n, _ in rows)
+for name, n, why in rows:
+    print("%-30s %16s %s" % (name, "{:,}".format(n), why))
+print("%-30s %16s" % ("total per record", "{:,}".format(total)))
+print("   the vector is %.0f%% of the record. sizing a vector database by"
+      % (100.0 * D * 4 / total))
+print("   multiplying dimensions by rows therefore under-counts by %.1fx,"
+      % (total / float(D * 4)))
+print("   and the missing %.0f%% is mostly the source text -- which you"
+      % (100.0 * (1 - D * 4 / float(total))))
+print("   store because a retriever that returns ids and no text is not")
+print("   useful.")
+print("   for %s chunks that is %.1f GB, of which %.1f GB is vectors."
+      % ("{:,}".format(10 ** 7), 10 ** 7 * total / 1e9,
+         10 ** 7 * D * 4 / 1e9))
+print()
+
+print("THE INDEXING PIPELINE, and where the time goes:")
+N = 1_000_000
+STEPS = [("extract text from the source", 8.0, "CPU, embarrassingly parallel"),
+         ("chunk it", 0.4, "CPU, trivial"),
+         ("embed each chunk", 22.0, "GPU, the expensive step"),
+         ("insert into the index", 3.5, "single-threaded in many stores")]
+print("%-34s %14s %16s %s"
+      % ("step", "ms per chunk", "for %s" % "{:,}".format(N), "note"))
+for name, ms, note in STEPS:
+    hrs = N * ms / 1000.0 / 3600.0
+    print("%-34s %14.1f %14.1f h %s" % (name, ms, hrs, note))
+tot_h = sum(N * ms / 1000.0 / 3600.0 for _, ms, _ in STEPS)
+print("%-34s %14s %14.1f h" % ("total, serial", "", tot_h))
+print("   %.0f hours to build, and %.0f%% of it is the embedding step."
+      % (tot_h, 100.0 * (N * 22.0 / 1000 / 3600) / tot_h))
+print("   that number is why re-indexing is a decision rather than a")
+print("   routine operation, and why changing your embedding model is a")
+print("   migration project.")
+print()
+
+print("NOW THE PART THAT DECIDES WHETHER THE SYSTEM STAYS CORRECT: what")
+print("happens when a document changes?")
+print("%-24s %-30s %s" % ("operation", "what the store does", "cost"))
+for row in (("add a vector", "insert into the graph", "cheap"),
+            ("update a vector", "delete, then insert", "cheap"),
+            ("delete a vector", "mark it deleted", "cheap, and it lingers"),
+            ("many deletes", "the graph degrades", "needs a rebuild")):
+    print("%-24s %-30s %s" % row)
+print("   the third row is the one that surprises people. HNSW cannot")
+print("   truly remove a node -- other nodes route through it -- so a")
+print("   delete sets a tombstone and the search skips it. the graph keeps")
+print("   the node, keeps its links, and keeps paying for it:")
+print("%-24s %16s %18s %16s"
+      % ("deleted fraction", "live vectors", "memory held", "search work"))
+for f in (0.0, 0.1, 0.3, 0.5):
+    print("%-24s %16s %16.1f GB %15.0f%%"
+          % ("%.0f%%" % (100 * f), "{:,.0f}".format(N * (1 - f)),
+             N * total / 1e9, 100.0))
+print("   the last two columns do not move. you are paying full memory")
+print("   and full search cost for a corpus that is half deleted, which is")
+print("   why every vector store has a compaction or rebuild operation and")
+print("   why somebody has to decide when to run it.")
+print()
+
+print("AND THE FRESHNESS QUESTION, which follows from all of the above:")
+LAG_MIN = 45
+print("      a document is edited at 09:00")
+print("      the re-index job runs every %d minutes" % LAG_MIN)
+print("      so the corpus is between 0 and %d minutes stale, always"
+      % LAG_MIN)
+print("%-38s %s" % ("if that is fine", "batch re-indexing"))
+print("%-38s %s" % ("if it is not", "stream updates on write"))
+print("%-38s %s" % ("if correctness depends on it", "check the source at read"))
+print("   the third option is the one people skip. for permissions and for")
+print("   anything legally binding, the index should hold an ID and the")
+print("   authoritative value should be fetched when the answer is built --")
+print("   because an index is a cache, and the question is only ever which")
+print("   staleness you can afford.")
+print()
+print("OPERATIONAL DECISIONS THAT ARE HARD TO REVERSE, worth making early:")
+print("%-34s %s" % ("the embedding model", "changing it re-embeds everything"))
+print("%-34s %s" % ("the chunk size", "changing it re-chunks and re-embeds"))
+print("%-34s %s" % ("the distance metric", "changing it rebuilds the index"))
+print("%-34s %s" % ("what metadata you store", "adding a field later means a"))
+print("%-34s %s" % ("", "backfill over every record"))
+print("   all four are cheap on day one and cost a full pipeline run")
+print("   afterwards. the metadata row is the one to act on now: store the")
+print("   source, the position, the heading path and the timestamps while")
+print("   you have them in hand, even if nothing reads them yet. finding")
+print("   them again later means going back to the original documents.")
+```
+
 ## Things to try
 
 1. Set <strong>clusters probed</strong> to 1. Recall collapses &mdash; most true neighbours live in clusters the search never opened.

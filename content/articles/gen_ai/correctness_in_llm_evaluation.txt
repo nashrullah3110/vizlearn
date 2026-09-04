@@ -103,6 +103,123 @@ The third row is the one that looks like success and is not. A system that answe
 
 Measuring both is therefore not redundant. Groundedness tells you whether the system is using its sources; correctness tells you whether the result is right.
 
+## Why string matching fails, and what the judge costs
+
+Correctness needs a reference answer, and comparing free text to a reference is harder than it sounds. This scores the same answers three ways -- exact match, token overlap, and a judge -- and shows exactly which kinds of answer each one gets wrong.
+
+```python-run
+import numpy as np
+
+REFERENCE = "Refunds are available within 30 days of purchase."
+
+ANSWERS = [
+    ("You have 30 days from purchase to request a refund.", True),
+    ("Refunds are available within 30 days of purchase.", True),
+    ("Within 30 days.", True),
+    ("Refunds are available within 60 days of purchase.", False),
+    ("Refunds are available within 30 days of purchase, and shipping "
+     "is free.", True),
+    ("The refund policy is described in section 4.", False),
+]
+
+def toks(s):
+    return set(w.strip(".,").lower() for w in s.split())
+
+REF = toks(REFERENCE)
+
+def exact(a):
+    return 1.0 if a.strip().lower() == REFERENCE.strip().lower() else 0.0
+
+def f1(a):
+    t = toks(a)
+    if not t or not REF:
+        return 0.0
+    inter = len(t & REF)
+    if not inter:
+        return 0.0
+    p, r = inter / float(len(t)), inter / float(len(REF))
+    return 2 * p * r / (p + r)
+
+print("THE REFERENCE ANSWER: %r" % REFERENCE)
+print()
+print("%-58s %8s %8s %8s" % ("candidate answer", "truth", "exact", "F1"))
+for a, truth in ANSWERS:
+    print("%-58s %8s %8.2f %8.4f"
+          % (a[:56], "right" if truth else "WRONG", exact(a), f1(a)))
+print()
+
+print("EXACT MATCH scores %d of %d correctly."
+      % (sum(1 for a, t in ANSWERS if (exact(a) >= 0.5) == t), len(ANSWERS)))
+print("   it accepts only the reference itself. every correct paraphrase")
+print("   is marked wrong, which means the metric is measuring whether")
+print("   the model reproduced your wording, not whether it answered.")
+print("   for anything but a single-token answer -- a date, a name, a")
+print("   yes/no -- exact match is not an option.")
+print()
+
+THR = 0.5
+print("TOKEN F1 at a threshold of %.1f scores %d of %d correctly."
+      % (THR, sum(1 for a, t in ANSWERS if (f1(a) >= THR) == t), len(ANSWERS)))
+print("   it handles paraphrase better, and it has two failure modes that")
+print("   are both visible above:")
+wrong_high = [(a, f1(a)) for a, t in ANSWERS if not t and f1(a) >= THR]
+right_low = [(a, f1(a)) for a, t in ANSWERS if t and f1(a) < THR]
+for a, s in wrong_high:
+    print("      SCORES HIGH AND IS WRONG (%.4f):" % s)
+    print("         %s" % a[:60])
+for a, s in right_low:
+    print("      SCORES LOW AND IS RIGHT (%.4f):" % s)
+    print("         %s" % a[:60])
+print("   the first is the serious one. '60 days' shares every word with")
+print("   the reference except the one that carries the answer, so overlap")
+print("   scores it %.4f -- higher than several correct answers."
+      % f1("Refunds are available within 60 days of purchase."))
+print("   token overlap cannot weight the token that matters, because it")
+print("   does not know which token that is.")
+print()
+
+print("A MODEL-AS-JUDGE reads both and decides. this snippet cannot run")
+print("one -- which is precisely the point, because a judge needs a model")
+print("call per example and the two metrics above need none.")
+print("a judge handles the '60 days' case that overlap could not, because")
+print("it can tell which token carried the answer. it also brings its own")
+print("problems, and they are not the obvious ones:")
+print("%-34s %s" % ("problem", "what to do about it"))
+for row in (("it is not deterministic", "temperature 0, and still sample"),
+            ("it prefers longer answers", "control for length in the prompt"),
+            ("it prefers its own family's style", "use a different family"),
+            ("it agrees with itself, not you", "calibrate against humans once"),
+            ("it costs a call per example", "sample, do not score everything")):
+    print("%-34s %s" % row)
+print("   the length bias is worth measuring on your own judge before")
+print("   trusting it. score the same correct answer padded to different")
+print("   lengths and see whether the number moves; if it does, your")
+print("   'correctness' metric is partly a verbosity metric.")
+print()
+
+print("AND THE DISTINCTION THAT MATTERS MOST -- CORRECTNESS IS NOT")
+print("GROUNDEDNESS:")
+CASES = [
+    ("the context is right, the answer follows it", "grounded", "correct"),
+    ("the context is WRONG, the answer follows it", "grounded", "WRONG"),
+    ("the context is right, the answer ignores it", "UNGROUNDED", "correct"),
+    ("the context is right, the answer invents", "UNGROUNDED", "WRONG"),
+]
+print("%-46s %14s %10s" % ("situation", "groundedness", "correctness"))
+for s, g, c in CASES:
+    print("%-46s %14s %10s" % (s, g, c))
+print("   row 2 is the one that catches teams out: a perfectly grounded")
+print("   answer that is wrong, because the retrieved document was out of")
+print("   date. groundedness cannot see it -- the answer faithfully")
+print("   reflects the context it was given.")
+print("   row 3 is the mirror: the model happened to know the answer and")
+print("   ignored your documents. it looks correct and your retrieval is")
+print("   doing nothing, which you will discover the first time the")
+print("   question is about something the model was not trained on.")
+print("   only correctness catches row 2, and only groundedness catches")
+print("   row 3, which is why both get reported.")
+```
+
 ## Things to try
 
 1. Click the digital-goods claim to mark it supported by the context. Groundedness rises to 1.0 and correctness does not move &mdash; it is still contradicted by the reference.
