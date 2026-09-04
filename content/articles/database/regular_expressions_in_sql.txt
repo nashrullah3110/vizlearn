@@ -120,6 +120,92 @@ Reach for regex when the <em>shape</em> of the text matters and LIKE cannot desc
 - <strong>Test against real data</strong>, including the rows you expect to fail. A pattern that matches everything is easy to write and hard to notice.
 - <strong>Comment non-trivial patterns</strong> in the schema or the migration. A postcode regex is unreadable six months later, including to the person who wrote it.
 
+## Pattern matching, and what it costs the index
+
+SQL has two pattern languages of very different power, and a third that is not always there at all. Which one you reach for decides whether the query can use an index, which matters far more than the syntax.
+
+```sql-run
+-- LIKE is the portable one. Two wildcards, and that is the whole
+-- language: % matches any run of characters, _ matches exactly one.
+
+SELECT 'city LIKE L%'     AS pattern, group_concat(city) AS matches
+FROM customers WHERE city LIKE 'L%'
+UNION ALL
+SELECT 'city LIKE %n',    group_concat(city) FROM customers WHERE city LIKE '%n'
+UNION ALL
+SELECT 'city LIKE _____', group_concat(city) FROM customers WHERE city LIKE '_____'
+UNION ALL
+SELECT 'city LIKE %o%',   group_concat(city) FROM customers WHERE city LIKE '%o%';
+
+-- GLOB is the same idea with shell syntax, and unlike LIKE it is
+-- case-sensitive in SQLite.
+
+SELECT 'GLOB L*'  AS pattern, group_concat(city) AS matches
+FROM customers WHERE city GLOB 'L*'
+UNION ALL
+SELECT 'GLOB l*', group_concat(city) FROM customers WHERE city GLOB 'l*'
+UNION ALL
+SELECT 'LIKE l%', group_concat(city) FROM customers WHERE city LIKE 'l%';
+
+-- Note the last two rows: GLOB finds nothing for a lowercase l, while
+-- LIKE returns both cities. That difference has surprised people into
+-- shipping a filter that works in testing and misses half the data.
+--
+-- REGEXP is the powerful one, and SQLite does not implement it -- the
+-- keyword parses and the function is not defined unless the host
+-- program supplies it. Postgres has ~ and MySQL has REGEXP built in.
+-- Portable code does not assume it exists.
+--
+-- AND HERE IS THE PART THAT MATTERS. An index on a text column is
+-- sorted by that text, so a pattern anchored at the start ought to be
+-- answerable as a range scan. Whether it actually is depends on a
+-- detail that is easy to miss.
+
+CREATE INDEX idx_city ON customers(city);
+
+EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city = 'London';
+
+EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city LIKE 'L%';
+
+EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city GLOB 'L*';
+
+EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city LIKE '%n';
+
+-- Read those four plans. Equality searches the index, as expected. So
+-- does GLOB 'L*'. But LIKE 'L%' -- the same prefix, in the operator
+-- everybody actually uses -- falls back to a full SCAN.
+--
+-- The reason is collation. LIKE is case-insensitive by default, and the
+-- index is sorted case-sensitively, so the sorted order does not group
+-- the rows LIKE considers equal and a range scan would give the wrong
+-- answer. GLOB is case-sensitive, so its range scan is valid.
+--
+-- Two ways to get the optimisation back. Either make LIKE
+-- case-sensitive:
+
+PRAGMA case_sensitive_like = ON;
+
+EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city LIKE 'L%';
+
+-- or build the index with the collation LIKE uses:
+
+PRAGMA case_sensitive_like = OFF;
+CREATE INDEX idx_city_nocase ON customers(city COLLATE NOCASE);
+
+EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city LIKE 'L%';
+
+-- Both now SEARCH. The general rule behind it is worth carrying to
+-- other engines: an index can only serve a comparison that agrees with
+-- the index's own collation, which is why a case-insensitive search on
+-- a case-sensitive index quietly scans.
+--
+-- And the last plan in the first group is the one no collation fixes.
+-- A leading wildcard means every row must be examined, for the same
+-- reason a phone book cannot find everyone whose surname ends in
+-- "son". If you need that search, the answer is a full-text or trigram
+-- index, not a bigger machine.
+```
+
 ## Questions people ask
 
 <strong>Is `REGEXP` case-sensitive?</strong> Depends on the engine and collation. PostgreSQL: `~` yes, `~*` no. MySQL: follows the column's collation, so often not.

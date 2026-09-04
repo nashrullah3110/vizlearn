@@ -460,6 +460,119 @@
                     <p>Normalisation optimises for correctness of writes. Reads pay for it in joins, and past a certain scale that cost becomes the dominant one.</p><p>Denormalising means storing something redundantly on purpose, accepting the duplication in exchange for speed. It is a legitimate engineering decision when:</p><ul><li>A report joins eight tables and runs constantly.</li><li>The redundant data does not change &mdash; the price <em>at the time of the order</em> genuinely belongs on the order, because it must not change when the product's price does.</li><li>You are building an analytics warehouse, where star schemas are deliberately denormalised for query speed.</li><li>A counter (<code>comment_count</code>) is read thousands of times per write.</li></ul><p>The cost is that you now own the consistency problem the database was solving for you. Every denormalised copy needs a plan: a trigger, an application-level update, or a scheduled rebuild. Denormalising without that plan is not a trade-off, it is a bug waiting for its first inconsistency.</p><p>The order to work in: normalise first, measure, then denormalise the specific hot paths with evidence. Starting denormalised because it might be faster is how schemas become unmaintainable.</p>
                 </div>
                 <div>
+                    <h3 id="vz-s-the-anomalies-on-a-table-that-has-them">The anomalies, on a table that has them</h3>
+                    <p>Normalisation is usually taught as a list of numbered forms. It is easier to see as three specific bugs that a badly-shaped table makes possible, and this builds such a table so you can commit each one.</p><div class="vz-db-sql" data-vz-sql><script type="text/plain" class="sql-seed">CREATE TABLE customers (
+  id         INTEGER PRIMARY KEY,
+  name       TEXT NOT NULL,
+  city       TEXT,
+  signup     TEXT NOT NULL
+);
+CREATE TABLE products (
+  id         INTEGER PRIMARY KEY,
+  name       TEXT NOT NULL,
+  category   TEXT NOT NULL,
+  price      REAL NOT NULL
+);
+CREATE TABLE orders (
+  id          INTEGER PRIMARY KEY,
+  customer_id INTEGER REFERENCES customers(id),
+  placed      TEXT NOT NULL,
+  status      TEXT NOT NULL,
+  discount    REAL
+);
+CREATE TABLE order_items (
+  order_id   INTEGER REFERENCES orders(id),
+  product_id INTEGER REFERENCES products(id),
+  qty        INTEGER NOT NULL
+);
+
+INSERT INTO customers (id, name, city, signup) VALUES
+  (1, 'Ada',    'London',     '2023-01-14'),
+  (2, 'Bala',   'Chennai',    '2023-03-02'),
+  (3, 'Chen',   'Singapore',  '2023-03-19'),
+  (4, 'Dara',   NULL,         '2024-02-08'),
+  (5, 'Eze',    'Lagos',      '2024-06-30');
+
+INSERT INTO products (id, name, category, price) VALUES
+  (1, 'Keyboard',  'peripherals', 45.00),
+  (2, 'Mouse',     'peripherals', 25.00),
+  (3, 'Monitor',   'displays',   180.00),
+  (4, 'Lamp',      'furniture',   30.00),
+  (5, 'Stand',     'furniture',   60.00);
+
+INSERT INTO orders (id, customer_id, placed, status, discount) VALUES
+  (101, 1, '2024-01-05', 'shipped',   NULL),
+  (102, 1, '2024-02-11', 'shipped',   5.00),
+  (103, 2, '2024-02-14', 'cancelled', NULL),
+  (104, 3, '2024-03-01', 'shipped',   10.00),
+  (105, 3, '2024-03-22', 'pending',   NULL),
+  (106, 1, '2024-04-02', 'shipped',   NULL);
+
+INSERT INTO order_items (order_id, product_id, qty) VALUES
+  (101, 1, 1), (101, 2, 2),
+  (102, 3, 1),
+  (103, 4, 3),
+  (104, 1, 2), (104, 5, 1),
+  (105, 2, 1),
+  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- One wide table holding everything about an order. This is what
+-- denormalised data looks like, and it is not obviously wrong.
+
+CREATE TABLE flat (
+    order_id      INTEGER,
+    customer_name TEXT,
+    customer_city TEXT,
+    product_name  TEXT,
+    product_price REAL,
+    qty           INTEGER
+);
+
+INSERT INTO flat VALUES
+    (101, &#x27;Ada&#x27;, &#x27;London&#x27;, &#x27;Keyboard&#x27;,  45.0, 1),
+    (101, &#x27;Ada&#x27;, &#x27;London&#x27;, &#x27;Mouse&#x27;,     25.0, 2),
+    (102, &#x27;Ada&#x27;, &#x27;London&#x27;, &#x27;Monitor&#x27;,  180.0, 1),
+    (104, &#x27;Chen&#x27;, &#x27;Singapore&#x27;, &#x27;Keyboard&#x27;, 45.0, 2);
+
+SELECT * FROM flat;
+
+-- ANOMALY 1, UPDATE. Ada moves to Bristol. Her city appears three
+-- times, so a partial update leaves the table disagreeing with itself.
+
+UPDATE flat SET customer_city = &#x27;Bristol&#x27; WHERE order_id = 101;
+
+SELECT DISTINCT customer_name, customer_city FROM flat WHERE customer_name = &#x27;Ada&#x27;;
+
+-- Two cities for one person. Nothing in the schema forbids it, because
+-- the schema does not know those rows describe the same customer.
+--
+-- ANOMALY 2, DELETE. Remove order 102 and something unrelated goes
+-- with it.
+
+DELETE FROM flat WHERE order_id = 102;
+
+SELECT count(*) AS monitor_rows_left FROM flat WHERE product_name = &#x27;Monitor&#x27;;
+
+-- The price of a Monitor was only recorded on that row, so deleting an
+-- order deleted a fact about a product.
+--
+-- ANOMALY 3, INSERT. A new product that nobody has ordered cannot be
+-- recorded at all without inventing an order to hang it on.
+--
+-- The normalised schema this article&#x27;s database uses has none of these:
+-- the city lives once in customers, the price lives once in products,
+-- and order_items holds only the link.
+
+SELECT &#x27;flat: rows mentioning Ada city&#x27; AS where_a_fact_lives, count(*) AS copies
+FROM flat WHERE customer_name = &#x27;Ada&#x27;
+UNION ALL
+SELECT &#x27;normalised: rows with Ada city&#x27;, count(*)
+FROM customers WHERE name = &#x27;Ada&#x27;;
+
+-- One row, one place, one update. That is the whole benefit, and the
+-- cost is that answering a question now needs joins -- which is why
+-- reporting systems often denormalise deliberately, accepting the
+-- anomalies because the data is rebuilt rather than edited.</textarea></div></div><div class="sql-controls"><button type="button" class="sql-btn sql-btn-primary sql-run-btn">Run</button><button type="button" class="sql-btn sql-reset-btn">Reset database</button><span class="sql-status" aria-live="polite"></span></div><div class="vz-console"><div class="vz-console-bar">Result</div><div class="vz-console-body sql-result" aria-live="polite" data-empty="Press Run to execute this query."></div></div><div class="sql-schema"></div></div>
+                </div>
+                <div>
                     <h3 id="vz-s-guided-tour">Guided tour</h3>
                     <ol><li><strong>Start at raw.</strong> One table, one row per order, a multi-valued products column — not even 1NF.</li><li><strong>Normalize to 1NF.</strong> Products become atomic — one row per (order, product) — but now customer, city and price all repeat across the exploded rows.</li><li><strong>Normalize to 2NF.</strong> Orders and Products split out — price no longer repeats per line item. Redundant cells fall from 8 to 2.</li><li><strong>Normalize to 3NF.</strong> Customers splits out from Orders — city no longer repeats per order for the same customer. Redundant cells hit 0.</li><li><strong>Read what is left.</strong> order_id and customer still repeat across tables — that is a normal foreign key, not redundancy. Redundancy is a *fact* stored twice; a key linking two facts is the whole point of splitting them apart.</li></ol>
                 </div>
@@ -658,7 +771,7 @@
 
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-predict" data-vz-preset="0" aria-labelledby="vz-predict-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg><h2 id="vz-predict-h">Predict, then reveal</h2><span class="vz-rule"></span></div><p class="vz-predict-q">About to run: <strong>press Normalize →</strong>. Before it does &mdash; what happens to <strong class="vz-predict-readout">the readout</strong>?</p><div class="vz-predict-opts"><button type="button" class="vz-predict-opt" data-vz-guess="up">It goes up</button><button type="button" class="vz-predict-opt" data-vz-guess="down">It goes down</button><button type="button" class="vz-predict-opt" data-vz-guess="same">It stays the same</button></div><div class="vz-predict-result" hidden></div><p class="vz-predict-hint">Committing to an answer first is the point &mdash; the reveal runs the experiment on the visualisation above and reads the real value back, so nothing here is scripted.</p></section><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Recall check</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Say the answer out loud before you reveal it &mdash; recalling it is what makes it stick, and rereading it is not.</p><ol class="vz-check-list"><li class="vz-q vz-q-card"><p class="vz-q-text">What does this module say about “Start here”?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>A denormalized table stores the same fact in more than one place, which means updating it can leave two copies disagreeing. Normalization is a sequence of rules, each one removing a specific kind of redundancy by moving data into its own table.</p></li><li class="vz-q vz-q-card"><p class="vz-q-text">What does this module say about “The three rules”?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>Put everything in one wide table and three specific problems appear. They have names, and recognising them is most of the skill.</p></li><li class="vz-q vz-q-card"><p class="vz-q-text">What does this module say about “The problem normalisation solves”?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>Put everything in one wide table and three specific problems appear. They have names, and recognising them is most of the skill.</p></li></ol></section></div>
-<script type="application/json" id="vz-lab-data">{"presets": [{"set": [], "click": ["next-btn"]}], "readouts": [{"id": "tag-1", "label": "raw"}, {"id": "tag-2", "label": "1NF"}, {"id": "tag-3", "label": "2NF"}, {"id": "tag-0", "label": "Stage"}, {"id": "tables", "label": "—"}, {"id": "note", "label": "note"}, {"id": "redundant-val", "label": "Redundant Cells"}, {"id": "tables-val", "label": "Tables"}, {"id": "state-badge", "label": "The Table(s) At This Stage"}], "viz": "", "keys": {"actions": [{"label": "← Back", "sel": "#back-btn", "i": 0}, {"label": "Normalize →", "sel": "#next-btn", "i": 0}]}}</script>
+<script type="application/json" id="vz-lab-data">{"presets": [{"set": [], "click": ["next-btn"]}], "readouts": [{"id": "tag-1", "label": "raw"}, {"id": "tag-2", "label": "1NF"}, {"id": "tag-3", "label": "2NF"}, {"id": "tag-0", "label": "Stage"}, {"id": "tables", "label": "—"}, {"id": "note", "label": "note"}, {"id": "redundant-val", "label": "Redundant Cells"}, {"id": "tables-val", "label": "Tables"}, {"id": "state-badge", "label": "The Table(s) At This Stage"}], "viz": "", "keys": {"actions": [{"label": "← Back", "sel": "#back-btn", "i": 0}, {"label": "Normalize →", "sel": "#next-btn", "i": 0}, {"label": "Run", "sel": ".sql-btn", "i": 0}, {"label": "Reset database", "sel": ".sql-btn", "i": 1}]}}</script>
 <!-- VIZLEARN:LAB:END -->
 <!-- VIZLEARN:MODULE:BEGIN (generated by tools/build_module_ui.py) -->
 <div class="vz-extras"><section class="vz-cheatsheet" aria-labelledby="vz-cheat-h"><div class="vz-cheat-top"><span class="vz-cheat-label"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg> Cheat sheet</span><button type="button" class="vz-btn" data-vz-copy><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg> Copy</button></div><h2 class="vz-cheat-title" id="vz-cheat-h">Normalization (1NF, 2NF, 3NF) in SQL</h2><p class="vz-cheat-text">A denormalized table stores the same fact in more than one place, which means updating it can leave two copies disagreeing. Normalization is a sequence of rules, each one removing a specific kind of redundancy by moving data into its own table.</p><div class="vz-cheat-foot">DATABASE &middot; vizlearn.in/database/normalization_in_sql.html</div></section><section class="vz-related" aria-labelledby="vz-rel-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><h2 id="vz-rel-h">More in Database</h2><span class="vz-rule"></span></div><div class="vz-rail"><a class="vz-card" href="../database/dml_in_sql.html" data-vz-path="database/dml_in_sql.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="30" y="16" width="100" height="14" rx="3" fill="var(--text-muted)" opacity="0.3"/><rect x="30" y="34" width="100" height="14" rx="3" fill="var(--accent-primary)" opacity="0.55"/><rect x="30" y="52" width="100" height="14" rx="3" fill="#f59e0b" opacity="0.5"/><rect x="30" y="70" width="100" height="14" rx="3" fill="#ef4444" opacity="0.4"/><text x="136" y="45" font-size="9" font-family="monospace" fill="var(--accent-primary)">+</text><text x="136" y="63" font-size="9" font-family="monospace" fill="#f59e0b">~</text><text x="136" y="81" font-size="9" font-family="monospace" fill="#ef4444">&#215;</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Database</span><span class="vz-card-title">DML in SQL</span></span></a><a class="vz-card" href="../database/transactions_and_acid.html" data-vz-path="database/transactions_and_acid.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="12" y="24" width="56" height="42" rx="6" fill="none" stroke="#60a5fa" stroke-width="2"/><rect x="92" y="24" width="56" height="42" rx="6" fill="none" stroke="var(--accent-primary)" stroke-width="2"/><text x="40" y="49" text-anchor="middle" font-size="9" font-family="monospace" fill="#60a5fa">A</text><text x="120" y="49" text-anchor="middle" font-size="9" font-family="monospace" fill="var(--accent-primary)">B</text><path d="M70 45 L90 45" stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="3 3"/></svg></span><span class="vz-card-body"><span class="vz-card-cat">Database</span><span class="vz-card-title">Transactions and ACID in SQL</span></span></a><a class="vz-card" href="../database/where_clause_in_sql.html" data-vz-path="database/where_clause_in_sql.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="22" y="14" width="42" height="11" rx="2" fill="var(--text-muted)" opacity="0.3"/><rect x="22" y="29" width="42" height="11" rx="2" fill="var(--accent-primary)" opacity="0.8"/><rect x="22" y="44" width="42" height="11" rx="2" fill="var(--text-muted)" opacity="0.3"/><rect x="22" y="59" width="42" height="11" rx="2" fill="var(--accent-primary)" opacity="0.8"/><path d="M 72 22 L 92 40 L 92 58 L 100 64 L 100 40 L 120 22 Z" fill="var(--accent-primary)" opacity="0.2" stroke="var(--accent-primary)" stroke-width="2"/><rect x="128" y="29" width="24" height="11" rx="2" fill="var(--accent-primary)" opacity="0.8"/><rect x="128" y="44" width="24" height="11" rx="2" fill="var(--accent-primary)" opacity="0.8"/><text x="96" y="84" text-anchor="middle" font-size="8" font-family="monospace" fill="var(--text-muted)">filter</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Database</span><span class="vz-card-title">Where Clause in SQL</span></span></a><a class="vz-card" href="../database/null_handling_in_sql.html" data-vz-path="database/null_handling_in_sql.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="14" y="20" width="46" height="14" rx="3" fill="var(--text-muted)" opacity="0.3"/><rect x="14" y="38" width="46" height="14" rx="3" fill="#f59e0b" opacity="0.7"/><rect x="14" y="56" width="46" height="14" rx="3" fill="var(--text-muted)" opacity="0.3"/><text x="37" y="49" text-anchor="middle" font-size="8" font-family="monospace" fill="#050505">NULL</text><path d="M70 45 L100 45" stroke="var(--accent-primary)" stroke-width="2"/><path d="M94 40 L100 45 L94 50" fill="none" stroke="var(--accent-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="106" y="38" width="34" height="14" rx="3" fill="var(--accent-primary)" opacity="0.85"/><text x="123" y="49" text-anchor="middle" font-size="8" font-family="monospace" fill="#04120a">0</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Database</span><span class="vz-card-title">NULL Handling and COALESCE in SQL</span></span></a></div></section><section class="vz-refs" aria-labelledby="vz-refs-h"><h2 id="vz-refs-h" class="vz-refs-h">Further reading</h2><ul class="vz-ref-list"><li><span class="vz-ref-title">A Relational Model of Data for Large Shared Data Banks</span><span class="vz-ref-src">Codd, Communications of the ACM 1970</span></li></ul></section><section class="vz-author" aria-labelledby="vz-author-h"><h2 id="vz-author-h" class="vz-author-h">About the author</h2><p class="vz-author-body"><strong>Ashish Jangra</strong> builds and maintains VizLearn. Every module here is written and the visualisation behind it hand-built, so the numbers in a readout come from the same code that draws the picture. Corrections are genuinely welcome and get priority over everything else &mdash; if a page states something wrong, or an animation misrepresents what the algorithm does, <a href="../contact.html">get in touch</a>.</p><p class="vz-author-links"><a href="../about.html">About VizLearn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://github.com/AshishJangra27" rel="noopener me">GitHub</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://www.linkedin.com/in/ashish-jangra/" rel="noopener me">LinkedIn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="../contact.html">Contact</a></p></section><nav class="vz-prevnext" aria-label="Module navigation"><a class="vz-pn vz-pn-prev" href="../database/constraints_in_sql.html" rel="prev"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span class="vz-pn-text"><span class="vz-pn-label">Previous</span><span class="vz-pn-title">Constraints: UNIQUE, CHECK and NOT NULL</span></span></a><a class="vz-pn vz-pn-next" href="../database/dml_in_sql.html" rel="next"><span class="vz-pn-text"><span class="vz-pn-label">Next</span><span class="vz-pn-title">DML in SQL</span></span><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a></nav></div>
@@ -695,6 +808,7 @@
     <script defer src="../assets/glossary.js"></script>
     <script defer src="../assets/vizlearn-glossary.js"></script>
     <script defer src="../assets/vizlearn-lab.js"></script>
+    <script defer src="../assets/vizlearn-sql.js"></script>
     <script defer src="../assets/vizlearn-code.js"></script>
     <script defer src="../assets/vizlearn-copy.js"></script>
 <!-- VIZLEARN:SCRIPTS:END -->

@@ -482,6 +482,109 @@
                     <ol><li><strong>Click a customer row.</strong> Their orders light up in the orders table &mdash; that is the foreign key doing its job.</li><li><strong>Click an order.</strong> The single product it references is highlighted. One value, one link, no ambiguity.</li><li><strong>Switch to the flat table</strong> and watch the cell count rise while the number of tables drops to one. Every red cell is a duplicated fact.</li><li><strong>Run the rename in both models.</strong> Normalised: one cell changes. Flat: several &mdash; and every one is an opportunity to get it wrong.</li></ol>
                 </div>
                 <div>
+                    <h3 id="vz-s-what-relational-actually-buys-you">What "relational" actually buys you</h3>
+                    <p>The relational model is a small idea -- data in tables, relationships expressed as shared values rather than as pointers -- and its consequences are large. All of them are visible in four tables.</p><div class="vz-db-sql" data-vz-sql><script type="text/plain" class="sql-seed">CREATE TABLE customers (
+  id         INTEGER PRIMARY KEY,
+  name       TEXT NOT NULL,
+  city       TEXT,
+  signup     TEXT NOT NULL
+);
+CREATE TABLE products (
+  id         INTEGER PRIMARY KEY,
+  name       TEXT NOT NULL,
+  category   TEXT NOT NULL,
+  price      REAL NOT NULL
+);
+CREATE TABLE orders (
+  id          INTEGER PRIMARY KEY,
+  customer_id INTEGER REFERENCES customers(id),
+  placed      TEXT NOT NULL,
+  status      TEXT NOT NULL,
+  discount    REAL
+);
+CREATE TABLE order_items (
+  order_id   INTEGER REFERENCES orders(id),
+  product_id INTEGER REFERENCES products(id),
+  qty        INTEGER NOT NULL
+);
+
+INSERT INTO customers (id, name, city, signup) VALUES
+  (1, 'Ada',    'London',     '2023-01-14'),
+  (2, 'Bala',   'Chennai',    '2023-03-02'),
+  (3, 'Chen',   'Singapore',  '2023-03-19'),
+  (4, 'Dara',   NULL,         '2024-02-08'),
+  (5, 'Eze',    'Lagos',      '2024-06-30');
+
+INSERT INTO products (id, name, category, price) VALUES
+  (1, 'Keyboard',  'peripherals', 45.00),
+  (2, 'Mouse',     'peripherals', 25.00),
+  (3, 'Monitor',   'displays',   180.00),
+  (4, 'Lamp',      'furniture',   30.00),
+  (5, 'Stand',     'furniture',   60.00);
+
+INSERT INTO orders (id, customer_id, placed, status, discount) VALUES
+  (101, 1, '2024-01-05', 'shipped',   NULL),
+  (102, 1, '2024-02-11', 'shipped',   5.00),
+  (103, 2, '2024-02-14', 'cancelled', NULL),
+  (104, 3, '2024-03-01', 'shipped',   10.00),
+  (105, 3, '2024-03-22', 'pending',   NULL),
+  (106, 1, '2024-04-02', 'shipped',   NULL);
+
+INSERT INTO order_items (order_id, product_id, qty) VALUES
+  (101, 1, 1), (101, 2, 2),
+  (102, 3, 1),
+  (103, 4, 3),
+  (104, 1, 2), (104, 5, 1),
+  (105, 2, 1),
+  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- The whole database, listed. Four tables and nothing else: no
+-- pointers, no nesting, no objects.
+
+SELECT name AS table_name FROM sqlite_master WHERE type = &#x27;table&#x27; ORDER BY name;
+
+-- A relationship is a VALUE that appears in two places. orders.customer_id
+-- holds the same number as customers.id, and that is the entire mechanism.
+
+SELECT o.id AS order_id, o.customer_id, c.id AS customer_id_again, c.name
+FROM orders o JOIN customers c ON c.id = o.customer_id
+ORDER BY o.id LIMIT 3;
+
+-- Because the link is a value rather than a pointer, the same data can be
+-- traversed in any direction without being stored differently. Customers
+-- to orders:
+
+SELECT c.name, count(o.id) AS orders
+FROM customers c LEFT JOIN orders o ON o.customer_id = c.id
+GROUP BY c.id, c.name ORDER BY orders DESC LIMIT 3;
+
+-- and products back to customers, through two tables the original
+-- designer never had to anticipate:
+
+SELECT p.name AS product, group_concat(DISTINCT c.name) AS bought_by
+FROM products p
+JOIN order_items i ON i.product_id = p.id
+JOIN orders      o ON o.id = i.order_id
+JOIN customers   c ON c.id = o.customer_id
+GROUP BY p.id, p.name
+ORDER BY p.name;
+
+-- THAT is the payoff. Nobody stored &quot;which customers bought a monitor&quot;;
+-- the query derived it. A design that had nested orders inside customer
+-- documents would answer the first question easily and this one only by
+-- reading everything.
+--
+-- The other half of the model is that the database enforces the rules.
+
+SELECT &#x27;declared constraints&#x27; AS what, count(*) AS n FROM pragma_foreign_key_list(&#x27;orders&#x27;)
+UNION ALL
+SELECT &#x27;columns in orders&#x27;, count(*) FROM pragma_table_info(&#x27;orders&#x27;);
+
+-- Those constraints hold for every writer -- your application, a
+-- migration script, somebody at a console at 3am. That is the guarantee
+-- being bought, and the price is a fixed schema: adding a column means
+-- changing the table, which is exactly the trade the non-relational
+-- models make differently.</textarea></div></div><div class="sql-controls"><button type="button" class="sql-btn sql-btn-primary sql-run-btn">Run</button><button type="button" class="sql-btn sql-reset-btn">Reset database</button><span class="sql-status" aria-live="polite"></span></div><div class="vz-console"><div class="vz-console-bar">Result</div><div class="vz-console-body sql-result" aria-live="polite" data-empty="Press Run to execute this query."></div></div><div class="sql-schema"></div></div>
+                </div>
+                <div>
                     <h3 id="vz-s-summing-up">Summing up</h3>
                     <p>Store each fact once, identify it with a primary key, and reference it with a foreign key. The database then enforces the relationships for you. Flattening everything looks simpler until the first time you have to change something.</p>
                 </div>
@@ -517,7 +620,7 @@
 
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-predict" data-vz-preset="0" aria-labelledby="vz-predict-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg><h2 id="vz-predict-h">Predict, then reveal</h2><span class="vz-rule"></span></div><p class="vz-predict-q">About to run: <strong>press normalised</strong>. Before it does &mdash; what happens to <strong class="vz-predict-readout">the readout</strong>?</p><div class="vz-predict-opts"><button type="button" class="vz-predict-opt" data-vz-guess="up">It goes up</button><button type="button" class="vz-predict-opt" data-vz-guess="down">It goes down</button><button type="button" class="vz-predict-opt" data-vz-guess="same">It stays the same</button></div><div class="vz-predict-result" hidden></div><p class="vz-predict-hint">Committing to an answer first is the point &mdash; the reveal runs the experiment on the visualisation above and reads the real value back, so nothing here is scripted.</p></section><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Recall check</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Say the answer out loud before you reveal it &mdash; recalling it is what makes it stick, and rereading it is not.</p><ol class="vz-check-list"><li class="vz-q vz-q-card"><p class="vz-q-text">What does this module say about “The problem it solves”?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>A relational database stores data in tables of rows and columns, where every table describes one kind of thing — customers, orders, products — and tables are connected by shared key values rather than by nesting data inside each other.</p></li><li class="vz-q vz-q-card"><p class="vz-q-text">What does this module say about “Keys are the whole trick”?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>The foreign key is what turns a pile of tables into a database. Declared properly, it makes an order pointing at a non-existent customer impossible — not unlikely, not caught by a validation function somewhere, but rejected by the engine for every client that ever connects.</p></li><li class="vz-q vz-q-card"><p class="vz-q-text">What does this module say about “Why Split the Data at All”?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>Switch this lab to one flat table and look at the red cells. The customer&#x27;s name and city now repeat on every order they ever placed. That redundancy causes three classic problems:</p></li></ol></section></div>
-<script type="application/json" id="vz-lab-data">{"presets": [{"set": [], "click": ["normBtn"]}], "readouts": [{"id": "renameResult", "label": "Ada King"}, {"id": "stTables", "label": "Tables"}, {"id": "modelNote", "label": "1. Data Model"}, {"id": "viewArea", "label": "view area"}, {"id": "stCells", "label": "Total cells"}, {"id": "stDup", "label": "Repeated values"}, {"id": "sqlOut", "label": "Equivalent SQL"}], "viz": "", "keys": {"actions": [{"label": "normalised", "sel": "#normBtn", "i": 0}, {"label": "one flat table", "sel": "#flatBtn", "i": 0}, {"label": "Clear selection", "sel": "#clearSel", "i": 0}, {"label": "Rename the customer", "sel": "#renameBtn", "i": 0}]}}</script>
+<script type="application/json" id="vz-lab-data">{"presets": [{"set": [], "click": ["normBtn"]}], "readouts": [{"id": "renameResult", "label": "Ada King"}, {"id": "stTables", "label": "Tables"}, {"id": "modelNote", "label": "1. Data Model"}, {"id": "viewArea", "label": "view area"}, {"id": "stCells", "label": "Total cells"}, {"id": "stDup", "label": "Repeated values"}, {"id": "sqlOut", "label": "Equivalent SQL"}], "viz": "", "keys": {"actions": [{"label": "normalised", "sel": "#normBtn", "i": 0}, {"label": "one flat table", "sel": "#flatBtn", "i": 0}, {"label": "Clear selection", "sel": "#clearSel", "i": 0}, {"label": "Rename the customer", "sel": "#renameBtn", "i": 0}, {"label": "Run", "sel": ".sql-btn", "i": 0}, {"label": "Reset database", "sel": ".sql-btn", "i": 1}]}}</script>
 <!-- VIZLEARN:LAB:END -->
 <!-- VIZLEARN:MODULE:BEGIN (generated by tools/build_module_ui.py) -->
 <div class="vz-extras"><section class="vz-cheatsheet" aria-labelledby="vz-cheat-h"><div class="vz-cheat-top"><span class="vz-cheat-label"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg> Cheat sheet</span><button type="button" class="vz-btn" data-vz-copy><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg> Copy</button></div><h2 class="vz-cheat-title" id="vz-cheat-h">What are Relational Databases?</h2><p class="vz-cheat-text">Data split across tables and stitched back together by keys. Click a row to follow its relationships, then flatten everything into one table to see exactly what normalisation is protecting you from.</p><div class="vz-cheat-foot">DATABASE &middot; vizlearn.in/database/what_are_relational_databases.html</div></section><section class="vz-related" aria-labelledby="vz-rel-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><h2 id="vz-rel-h">More in Database</h2><span class="vz-rule"></span></div><div class="vz-rail"><a class="vz-card" href="../database/what_are_non_relational_databases.html" data-vz-path="database/what_are_non_relational_databases.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="18" y="22" width="52" height="46" rx="6" fill="var(--input-bg)" stroke="var(--accent-primary)" stroke-width="2"/><text x="26" y="38" font-size="8" font-family="monospace" fill="var(--accent-primary)">{</text><line x1="34" y1="43" x2="60" y2="43" stroke="var(--text-muted)" stroke-width="2" opacity="0.6"/><line x1="34" y1="50" x2="54" y2="50" stroke="var(--text-muted)" stroke-width="2" opacity="0.6"/><line x1="34" y1="57" x2="58" y2="57" stroke="var(--text-muted)" stroke-width="2" opacity="0.6"/><text x="26" y="66" font-size="8" font-family="monospace" fill="var(--accent-primary)">}</text><circle cx="106" cy="30" r="7" fill="var(--accent-primary)" opacity="0.7"/><circle cx="134" cy="45" r="7" fill="var(--accent-primary)" opacity="0.5"/><circle cx="106" cy="62" r="7" fill="var(--accent-primary)" opacity="0.6"/><line x1="112" y1="34" x2="128" y2="42" stroke="var(--text-muted)" stroke-width="2"/><line x1="112" y1="58" x2="128" y2="49" stroke="var(--text-muted)" stroke-width="2"/><text x="80" y="82" text-anchor="middle" font-size="8" font-family="monospace" fill="var(--text-muted)">doc &#183; graph</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Database</span><span class="vz-card-title">What are Non Relational Databases?</span></span></a><a class="vz-card" href="../database/datatypes_in_sql.html" data-vz-path="database/datatypes_in_sql.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="16" y="20" width="40" height="20" rx="4" fill="var(--accent-primary)" opacity="0.25" stroke="var(--accent-primary)" stroke-width="2"/><text x="36" y="34" text-anchor="middle" font-size="9" font-family="monospace" fill="var(--accent-primary)">INT</text><rect x="62" y="20" width="52" height="20" rx="4" fill="var(--input-bg)" stroke="var(--text-muted)" stroke-width="2"/><text x="88" y="34" text-anchor="middle" font-size="8" font-family="monospace" fill="var(--text-muted)">VARCHAR</text><rect x="120" y="20" width="28" height="20" rx="4" fill="var(--input-bg)" stroke="var(--text-muted)" stroke-width="2"/><text x="134" y="34" text-anchor="middle" font-size="8" font-family="monospace" fill="var(--text-muted)">BOOL</text><rect x="16" y="48" width="58" height="20" rx="4" fill="var(--input-bg)" stroke="var(--text-muted)" stroke-width="2"/><text x="45" y="62" text-anchor="middle" font-size="8" font-family="monospace" fill="var(--text-muted)">DECIMAL</text><rect x="80" y="48" width="34" height="20" rx="4" fill="var(--input-bg)" stroke="var(--text-muted)" stroke-width="2"/><text x="97" y="62" text-anchor="middle" font-size="8" font-family="monospace" fill="var(--text-muted)">DATE</text><rect x="120" y="48" width="28" height="20" rx="4" fill="var(--input-bg)" stroke="var(--text-muted)" stroke-width="2"/><text x="134" y="62" text-anchor="middle" font-size="8" font-family="monospace" fill="var(--text-muted)">TEXT</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Database</span><span class="vz-card-title">Datatypes in SQL</span></span></a><a class="vz-card" href="../database/ddl_in_sql.html" data-vz-path="database/ddl_in_sql.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="34" y="20" width="92" height="52" rx="5" fill="none" stroke="var(--accent-primary)" stroke-width="2.5" stroke-dasharray="6 4"/><line x1="34" y1="34" x2="126" y2="34" stroke="var(--accent-primary)" stroke-width="2"/><line x1="66" y1="20" x2="66" y2="72" stroke="var(--accent-primary)" stroke-width="1.5" opacity="0.5"/><line x1="96" y1="20" x2="96" y2="72" stroke="var(--accent-primary)" stroke-width="1.5" opacity="0.5"/><circle cx="126" cy="20" r="10" fill="var(--card-bg)" stroke="var(--accent-primary)" stroke-width="2"/><line x1="121" y1="20" x2="131" y2="20" stroke="var(--accent-primary)" stroke-width="2"/><line x1="126" y1="15" x2="126" y2="25" stroke="var(--accent-primary)" stroke-width="2"/><text x="80" y="84" text-anchor="middle" font-size="8" font-family="monospace" fill="var(--text-muted)">CREATE &#183; ALTER</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Database</span><span class="vz-card-title">DDL in SQL</span></span></a><a class="vz-card" href="../database/primary_and_foreign_keys.html" data-vz-path="database/primary_and_foreign_keys.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="14" y="22" width="44" height="37" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><rect x="14" y="22" width="44" height="10" rx="3" fill="var(--accent-primary)" stroke="var(--border-subtle)" stroke-width="1"/><line x1="14" y1="32" x2="58" y2="32" stroke="var(--border-subtle)" stroke-width="0.8"/><line x1="14" y1="41" x2="58" y2="41" stroke="var(--border-subtle)" stroke-width="0.8"/><line x1="14" y1="50" x2="58" y2="50" stroke="var(--border-subtle)" stroke-width="0.8"/><text x="36" y="82" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">customers</text><line x1="58" y1="40" x2="100" y2="40" stroke="var(--accent-primary)" stroke-width="1.4"/><text x="79" y="34" fill="var(--accent-primary)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">FK</text><rect x="100" y="22" width="44" height="37" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><rect x="100" y="22" width="44" height="10" rx="3" fill="var(--accent-primary)" stroke="var(--border-subtle)" stroke-width="1"/><line x1="100" y1="32" x2="144" y2="32" stroke="var(--border-subtle)" stroke-width="0.8"/><line x1="100" y1="41" x2="144" y2="41" stroke="var(--border-subtle)" stroke-width="0.8"/><line x1="100" y1="50" x2="144" y2="50" stroke="var(--border-subtle)" stroke-width="0.8"/><text x="122" y="82" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">orders</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Database</span><span class="vz-card-title">Primary and Foreign Keys</span></span></a></div></section><section class="vz-refs" aria-labelledby="vz-refs-h"><h2 id="vz-refs-h" class="vz-refs-h">Further reading</h2><ul class="vz-ref-list"><li><span class="vz-ref-title">A Relational Model of Data for Large Shared Data Banks</span><span class="vz-ref-src">Codd, Communications of the ACM 1970</span></li></ul></section><section class="vz-author" aria-labelledby="vz-author-h"><h2 id="vz-author-h" class="vz-author-h">About the author</h2><p class="vz-author-body"><strong>Ashish Jangra</strong> builds and maintains VizLearn. Every module here is written and the visualisation behind it hand-built, so the numbers in a readout come from the same code that draws the picture. Corrections are genuinely welcome and get priority over everything else &mdash; if a page states something wrong, or an animation misrepresents what the algorithm does, <a href="../contact.html">get in touch</a>.</p><p class="vz-author-links"><a href="../about.html">About VizLearn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://github.com/AshishJangra27" rel="noopener me">GitHub</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://www.linkedin.com/in/ashish-jangra/" rel="noopener me">LinkedIn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="../contact.html">Contact</a></p></section><nav class="vz-prevnext" aria-label="Module navigation"><a class="vz-pn vz-pn-next" href="../database/what_are_non_relational_databases.html" rel="next"><span class="vz-pn-text"><span class="vz-pn-label">Next</span><span class="vz-pn-title">What are Non Relational Databases?</span></span><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a></nav></div>
@@ -783,6 +886,9 @@
     <script defer src="../assets/glossary.js"></script>
     <script defer src="../assets/vizlearn-glossary.js"></script>
     <script defer src="../assets/vizlearn-lab.js"></script>
+    <script defer src="../assets/vizlearn-sql.js"></script>
+    <script defer src="../assets/vizlearn-code.js"></script>
+    <script defer src="../assets/vizlearn-copy.js"></script>
 <!-- VIZLEARN:SCRIPTS:END -->
 </body>
 </html>

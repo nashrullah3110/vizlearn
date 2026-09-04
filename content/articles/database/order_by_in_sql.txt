@@ -98,6 +98,38 @@ Two ways to avoid paying:
 
 This combination &mdash; an index on `(status, created_at DESC)` serving `WHERE status = 'open' ORDER BY created_at DESC LIMIT 20` &mdash; is what makes a busy list view fast. The engine seeks to the first matching entry and reads twenty rows, touching almost nothing.
 
+## Sorting, ties, and where NULL goes
+
+ORDER BY is the one clause whose absence has no defined behaviour -- without it a database may return rows in any order it likes. This shows that, along with the two details that decide real orderings: how ties break and where NULLs land.
+
+```sql-run
+-- Sort by something with ties, and watch what happens to the tied rows.
+
+SELECT c.name,
+       c.city,
+       count(o.id) AS orders
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+GROUP BY c.id, c.name, c.city
+ORDER BY orders DESC;
+
+-- Dara and Eze both have 0 orders, so their relative order is not
+-- determined by that ORDER BY. SQLite happens to return one of them
+-- first; nothing promises it will tomorrow, or on another engine, or
+-- once the table grows and the plan changes.
+--
+-- Add ", c.name" to the ORDER BY and the tie is broken deterministically.
+-- That is the fix for every "the rows come back in a different order
+-- sometimes" bug: give the sort enough columns to be total.
+
+SELECT name, city FROM customers ORDER BY city;
+
+-- And note where Dara lands. SQLite sorts NULL first ascending; other
+-- engines put it last, and PostgreSQL lets you say NULLS FIRST or
+-- NULLS LAST. If it matters, write COALESCE(city, 'zzz') or an explicit
+-- CASE rather than relying on the default.
+```
+
 ## Try it yourself
 
 1. <strong>Sort by salary.</strong> Rows slide into place and eight of them light up amber &mdash; those are the ties. "Order is decided" reads NO, because your query has not said what should happen inside a tie.

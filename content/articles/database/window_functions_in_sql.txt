@@ -103,6 +103,55 @@ Related functions in the same family: `FIRST_VALUE` and `LAST_VALUE` return the 
 
 `LAST_VALUE` has a famous gotcha: with the default frame it means "last row up to the current row", which is the current row itself. To get the genuine last value of the partition you must state the frame: `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`.
 
+## Aggregating without collapsing the rows
+
+A window function computes an aggregate for each row while leaving the row where it is. That one difference from GROUP BY is what makes running totals, rankings and per-group comparisons expressible in a single query.
+
+```sql-run
+-- GROUP BY collapses. A window function does not.
+-- Every order stays, and each one gains its customer's totals beside it.
+
+SELECT c.name                                              AS customer,
+       o.id                                                AS order_id,
+       o.placed,
+       count(*)  OVER (PARTITION BY c.id)                  AS their_orders,
+       row_number() OVER (PARTITION BY c.id ORDER BY o.placed) AS nth,
+       min(o.placed) OVER (PARTITION BY c.id)              AS first_order
+FROM customers c
+JOIN orders o ON o.customer_id = c.id
+ORDER BY c.name, o.placed;
+
+-- PARTITION BY is the GROUP BY of the window: it says which rows are in
+-- the same bucket. ORDER BY inside OVER decides what "running" means.
+--
+-- A running total needs both, plus a frame -- the default frame for an
+-- ordered window is everything from the start of the partition up to the
+-- current row, which is exactly a running total.
+
+SELECT o.id,
+       o.placed,
+       count(*)     OVER (ORDER BY o.placed) AS orders_so_far
+FROM orders o
+ORDER BY o.placed;
+
+-- And the three ranking functions differ only in how they treat ties.
+
+SELECT p.name,
+       p.price,
+       row_number() OVER (ORDER BY p.category) AS row_number,
+       rank()       OVER (ORDER BY p.category) AS rank,
+       dense_rank() OVER (ORDER BY p.category) AS dense_rank
+FROM products p
+ORDER BY p.category, p.name;
+
+-- Read the last three columns down the page. row_number is 1..5 and
+-- never repeats. rank gives the two furniture rows 2 and 2, then jumps
+-- to 4 -- it counts how many rows came before. dense_rank gives 2 and 2
+-- and then 3 -- it counts how many distinct values came before.
+-- Pick the one whose tie-breaking you actually want; they only differ
+-- when there are ties, which is exactly when it matters.
+```
+
 ## Things to try
 
 The visualizer helps you see how the <code>PARTITION BY</code> and <code>ORDER BY</code> clauses define the calculation for each row.

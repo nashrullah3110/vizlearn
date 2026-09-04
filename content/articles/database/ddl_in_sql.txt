@@ -87,6 +87,55 @@ Constraints are the reason a database is more than a file format. Each one is a 
 
 Enforcing these in application code instead is the most common and most expensive schema mistake. There is always a second writer &mdash; a migration, a script, an admin console, a colleague's notebook &mdash; and it will not have your validation logic.
 
+## Declaring the shape, and letting the database enforce it
+
+DDL defines what a table is, and every constraint you declare is a rule the database enforces for every writer forever -- including the ones written after you leave. This creates a table, then tries to break each rule in turn.
+
+```sql-run
+-- A table with every common constraint on it.
+
+CREATE TABLE members (
+    id       INTEGER PRIMARY KEY,
+    email    TEXT    NOT NULL UNIQUE,
+    plan     TEXT    NOT NULL DEFAULT 'free',
+    age      INTEGER CHECK (age IS NULL OR age >= 18),
+    referrer INTEGER REFERENCES members(id)
+);
+
+INSERT INTO members (id, email, plan, age) VALUES
+    (1, 'ada@example.com',  'pro',  36),
+    (2, 'bala@example.com', 'free', 41);
+
+SELECT * FROM members;
+
+-- The DEFAULT fills itself in when you leave the column out.
+
+INSERT INTO members (id, email, age) VALUES (3, 'chen@example.com', 29);
+
+SELECT id, email, plan FROM members WHERE id = 3;
+
+-- Now try each rule in turn. Uncomment ONE line, run, read the error,
+-- then comment it out again.
+--
+--   INSERT INTO members (id, email) VALUES (4, 'ada@example.com');
+--        UNIQUE constraint failed: members.email
+--
+--   INSERT INTO members (id, email) VALUES (4, NULL);
+--        NOT NULL constraint failed: members.email
+--
+--   INSERT INTO members (id, email, age) VALUES (4, 'd@e.com', 12);
+--        CHECK constraint failed: age IS NULL OR age >= 18
+--
+--   INSERT INTO members (id, email) VALUES (1, 'e@f.com');
+--        UNIQUE constraint failed: members.id
+--
+-- Each of those is a bug that never reaches your data, caught by a
+-- declaration rather than by a code review. The same checks written in
+-- application code hold only for the code paths that remember them.
+
+SELECT count(*) AS members_now FROM members;
+```
+
 ## Things to try
 
 1. <strong>Build a table</strong> and mark one column as PRIMARY KEY. Watch the generated <span class="mono-font">CREATE TABLE</span> update as you type.

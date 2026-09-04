@@ -93,6 +93,40 @@ The limitation is that you can only step forward and backward, not jump to an ar
 3. <strong>Switch to "no ORDER BY" and re-run repeatedly.</strong> The returned rows change even though the query text does not.
 4. <strong>Set OFFSET beyond the table size.</strong> You get zero rows &mdash; not an error. A common cause of mysteriously blank final pages.
 
+## Paging, and the bug that ships with it
+
+LIMIT and OFFSET look like the obvious way to page through results, and they carry two problems that only appear in production: pages that skip or repeat rows, and a cost that grows with the page number.
+
+```sql-run
+-- Page 1, then page 2, of orders newest first.
+
+SELECT id, placed, status FROM orders ORDER BY placed DESC LIMIT 3 OFFSET 0;
+
+SELECT id, placed, status FROM orders ORDER BY placed DESC LIMIT 3 OFFSET 3;
+
+-- Now the same without ORDER BY. The result happens to look sensible on
+-- six rows in a fresh database, and it is not promised: LIMIT without
+-- ORDER BY takes an arbitrary slice of an arbitrary order, so page 2 can
+-- repeat a row from page 1 or skip one entirely.
+
+SELECT id, placed, status FROM orders LIMIT 3 OFFSET 3;
+
+-- The second problem is cost. OFFSET does not skip work, it does the
+-- work and throws the rows away, so OFFSET 100000 reads a hundred
+-- thousand rows to return ten. Paging deep into a large table gets
+-- slower the further you go.
+--
+-- The fix is keyset paging: remember the last row you showed and ask for
+-- what comes after it. Constant cost at any depth, and immune to rows
+-- being inserted between pages.
+
+SELECT id, placed, status
+FROM orders
+WHERE placed < '2024-03-01'
+ORDER BY placed DESC
+LIMIT 3;
+```
+
 ## Worth remembering
 
 LIMIT and OFFSET slice a result set, but only after ORDER BY has made that set deterministic. Offset pagination is fine for the first few pages and quietly quadratic beyond them &mdash; reach for keyset pagination when the data gets big.

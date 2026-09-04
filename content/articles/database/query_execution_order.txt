@@ -132,6 +132,61 @@ The logical order defines the <em>result</em>, not the physical work. The optimi
 
 This is why `EXPLAIN` output does not look like the seven steps: it shows the physical plan. The logical order is what you reason about; the plan is what actually ran.
 
+## The order it is written in is not the order it runs
+
+SQL is written SELECT first and evaluated SELECT almost last. Most of the confusing errors about aliases and aggregates follow from that -- and this engine is more forgiving than the standard, in a way worth knowing before you move the query somewhere stricter.
+
+```sql-run
+-- Written order:   SELECT  FROM  WHERE  GROUP BY  HAVING  ORDER BY  LIMIT
+-- Evaluated order: FROM  WHERE  GROUP BY  HAVING  SELECT  ORDER BY  LIMIT
+--
+-- FROM runs first and SELECT runs fifth, which is why a query can filter
+-- on a column it never selects, and why the errors below happen.
+
+SELECT c.name                    AS customer,
+       count(o.id)               AS orders
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+WHERE  c.signup < '2024-01-01'
+GROUP BY c.id, c.name
+HAVING count(o.id) > 0
+ORDER BY orders DESC
+LIMIT 2;
+
+-- Three experiments. Run each by editing the query above.
+--
+-- 1. Replace "HAVING count(o.id) > 0" with "WHERE count(o.id) > 0".
+--    SQLite answers "misuse of aggregate: count()". At the moment WHERE
+--    is evaluated the rows have not been grouped, so there is nothing to
+--    count. This is the error the evaluation order predicts.
+--
+-- 2. Replace "ORDER BY orders DESC" with "ORDER BY nonsense". You get
+--    "no such column: nonsense" -- ORDER BY is resolved after SELECT, so
+--    it can see the aliases SELECT created, and only those.
+--
+-- 3. Now the one that will surprise you. Try filtering on a plain
+--    (non-aggregate) alias in WHERE:
+
+SELECT name, upper(city) AS big
+FROM customers
+WHERE big = 'LONDON';
+
+-- That WORKS here. By the standard it should not: WHERE is evaluated
+-- before SELECT, so the alias "big" does not exist yet, and PostgreSQL
+-- and MySQL both reject it. SQLite chooses to resolve SELECT aliases in
+-- WHERE as a convenience.
+--
+-- Which makes it a portability trap rather than a feature. A query that
+-- runs in your local SQLite and fails in production is a worse outcome
+-- than one that fails in both, and this is one of the few places the two
+-- genuinely differ. Write the expression out in WHERE and it works
+-- everywhere:
+
+SELECT name, upper(city) AS big
+FROM customers
+WHERE upper(city) = 'LONDON';
+```
+
 ## Questions people ask
 
 <strong>Why can `ORDER BY` use an alias but `WHERE` cannot?</strong> Because `SELECT` (which creates aliases) runs after `WHERE` and before `ORDER BY`.

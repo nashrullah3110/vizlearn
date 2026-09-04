@@ -123,6 +123,52 @@ All three usually produce the same plan on a modern engine. The differences that
 
 Rule of thumb: `EXISTS`/`NOT EXISTS` when you only want to test for presence, a join when you need data from both tables, and `IN` for short literal lists.
 
+## The three shapes a subquery can take
+
+A subquery is a query used as a value, a set, or a table, and which of the three it is decides where it can appear and how the database runs it. Correlated subqueries are the ones worth watching, because they run once per outer row.
+
+```sql-run
+-- 1. As a VALUE: one row, one column, used where a scalar goes.
+
+SELECT name, price,
+       (SELECT round(avg(price), 2) FROM products) AS avg_price,
+       round(price - (SELECT avg(price) FROM products), 2) AS vs_avg
+FROM products
+ORDER BY price DESC;
+
+-- 2. As a SET: one column, many rows, used with IN or EXISTS.
+
+SELECT name FROM customers
+WHERE id IN (SELECT customer_id FROM orders WHERE status = 'shipped')
+ORDER BY name;
+
+-- 3. As a TABLE: many columns, given a name, joined like any other.
+
+SELECT c.name, t.orders, t.last_order
+FROM customers c
+JOIN (SELECT customer_id, count(*) AS orders, max(placed) AS last_order
+      FROM orders GROUP BY customer_id) t
+  ON t.customer_id = c.id
+ORDER BY t.orders DESC, c.name;
+
+-- The one to be careful with is a CORRELATED subquery -- one that refers
+-- to the outer query, so it cannot be evaluated once and reused.
+
+SELECT c.name,
+       (SELECT count(*) FROM orders o WHERE o.customer_id = c.id) AS orders
+FROM customers c
+ORDER BY orders DESC, c.name;
+
+-- That last query is readable and runs its inner SELECT once per
+-- customer. The JOIN version above computes the same answer in one pass.
+-- On five rows the difference is nothing; on five million it is the
+-- difference between a query that returns and one that does not.
+--
+-- Note also that the correlated version finds Dara and Eze with 0, and
+-- the IN version does not list them at all. A subquery's shape changes
+-- which rows survive, not just how fast the answer arrives.
+```
+
 ## Guided experiments
 
 1. <strong>Start with the scalar case.</strong> The inner query produces one number, the company average of 84250, and all eight rows are tested against it. Inner query runs: 1.

@@ -195,16 +195,11 @@ def page(t):
         </div>
     </section>
 """
+    # The SQL engine used to be injected here for pages without a timeline.
+    # build_seo.py now carries it in the shared block, hooked on data-vz-sql,
+    # so every page with an editor gets it -- generated or written in
+    # content/articles -- and every page without one still does not.
     out = head + shell.header(PREFIX) + main + mount + shell.close(PREFIX)
-    if not t.get("timeline"):
-        # The SQL engine is loaded per page rather than added to build_seo's
-        # shared list, the same way /sql-lab/ loads it: it pulls a wasm payload
-        # on first Run, and there is no reason to put that decision in front of
-        # the 350-odd pages that have no editor on them.
-        out = out.replace(
-            "</body>",
-            '    <script defer src="%sassets/vizlearn-sql.js"></script>\n</body>'
-            % PREFIX, 1)
     return out
 
 

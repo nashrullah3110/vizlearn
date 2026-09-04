@@ -134,6 +134,11 @@ SHARED_SCRIPTS = (
 
     # Runnable editors, one per language.
     ("vizlearn-python.js", "vz-py"),
+    # SQLite compiled to wasm. Hooked like the rest rather than injected
+    # per page: the hook already means "only pages that have an editor",
+    # which was the reason it used to be injected separately, and one
+    # mechanism is easier to reason about than two.
+    ("vizlearn-sql.js", "data-vz-sql"),
     # /notebook/ keeps its own kernel: cells share a namespace, which the
     # one-shot runner above deliberately does not do.
     ("vizlearn-notebook.js", "vz-nb"),
@@ -153,8 +158,7 @@ SHARED_SCRIPTS = (
     # The image-processing harness on the generated computer_vision/ modules.
     ("vizlearn-cv.js", "data-vz-cv"),
     # Query variants and two-transaction timelines on the database/ modules.
-    # The SQL engine itself is vizlearn-sql.js, loaded per page because it
-    # pulls a wasm payload; this only wires buttons.
+    # This only wires buttons; the SQL engine itself is vizlearn-sql.js above.
     ("vizlearn-dbq.js", "data-vz-dbq"),
     # The plotter and numeric helpers, shared by the two harnesses below.
     # Listed before them: deferred scripts run in document order, so this

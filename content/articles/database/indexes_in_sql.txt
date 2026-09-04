@@ -70,6 +70,60 @@ Indexes have a specific shape, and queries that do not fit it get no benefit:
 
 The rule underneath all of these: an index is an <em>ordered</em> structure, and it only helps when the query can be expressed as "seek to a position in that order, then read forward".
 
+## Watching the plan change
+
+An index is a sorted copy of one or more columns, and the way to know whether it is being used is to ask the database rather than to reason about it. EXPLAIN QUERY PLAN gives a direct answer, and it changes as you create and drop indexes underneath it.
+
+```sql-run
+-- Before any index: the planner has no choice but to read every row.
+
+EXPLAIN QUERY PLAN
+SELECT * FROM orders WHERE status = 'shipped';
+
+-- Now give it one, and ask again.
+
+CREATE INDEX idx_orders_status ON orders(status);
+
+EXPLAIN QUERY PLAN
+SELECT * FROM orders WHERE status = 'shipped';
+
+-- "SCAN orders" became "SEARCH orders USING INDEX". That is the whole
+-- observable difference, and it is the only reliable way to tell -- on
+-- six rows the timings are identical noise.
+--
+-- An index has to match the query. This one does not:
+
+EXPLAIN QUERY PLAN
+SELECT * FROM orders WHERE discount > 0;
+
+-- And an index on the wrong column order is nearly useless. A composite
+-- index is sorted by its first column, then its second -- like a phone
+-- book sorted by surname then forename, which cannot help you find
+-- everyone called James.
+
+CREATE INDEX idx_items_order_product ON order_items(order_id, product_id);
+
+EXPLAIN QUERY PLAN
+SELECT * FROM order_items WHERE order_id = 101;
+
+EXPLAIN QUERY PLAN
+SELECT * FROM order_items WHERE product_id = 3;
+
+-- The first uses the index. The second cannot, because product_id is
+-- the second column and there is no way to jump into the middle of a
+-- sort you do not have the prefix for.
+--
+-- Indexes are not free: every INSERT, UPDATE and DELETE must maintain
+-- them, and they occupy space. The cost is paid on every write to buy
+-- speed on some reads, which is why "add an index" is a decision rather
+-- than a default.
+
+DROP INDEX idx_orders_status;
+
+EXPLAIN QUERY PLAN
+SELECT * FROM orders WHERE status = 'shipped';
+```
+
 ## Try it yourself
 
 1. <strong>Grow the table.</strong> With the equality query and the index on, drag <strong>Table Rows</strong> from 16 to a million. Rows examined by the scan tracks the table exactly; rows examined by the index stays at 1, and the tree gains a level roughly every time the table quadruples.

@@ -60,6 +60,60 @@ This is the argument for normalisation in a sentence: <strong>each fact should b
 3. <strong>Switch to the flat table</strong> and watch the cell count rise while the number of tables drops to one. Every red cell is a duplicated fact.
 4. <strong>Run the rename in both models.</strong> Normalised: one cell changes. Flat: several &mdash; and every one is an opportunity to get it wrong.
 
+## What "relational" actually buys you
+
+The relational model is a small idea -- data in tables, relationships expressed as shared values rather than as pointers -- and its consequences are large. All of them are visible in four tables.
+
+```sql-run
+-- The whole database, listed. Four tables and nothing else: no
+-- pointers, no nesting, no objects.
+
+SELECT name AS table_name FROM sqlite_master WHERE type = 'table' ORDER BY name;
+
+-- A relationship is a VALUE that appears in two places. orders.customer_id
+-- holds the same number as customers.id, and that is the entire mechanism.
+
+SELECT o.id AS order_id, o.customer_id, c.id AS customer_id_again, c.name
+FROM orders o JOIN customers c ON c.id = o.customer_id
+ORDER BY o.id LIMIT 3;
+
+-- Because the link is a value rather than a pointer, the same data can be
+-- traversed in any direction without being stored differently. Customers
+-- to orders:
+
+SELECT c.name, count(o.id) AS orders
+FROM customers c LEFT JOIN orders o ON o.customer_id = c.id
+GROUP BY c.id, c.name ORDER BY orders DESC LIMIT 3;
+
+-- and products back to customers, through two tables the original
+-- designer never had to anticipate:
+
+SELECT p.name AS product, group_concat(DISTINCT c.name) AS bought_by
+FROM products p
+JOIN order_items i ON i.product_id = p.id
+JOIN orders      o ON o.id = i.order_id
+JOIN customers   c ON c.id = o.customer_id
+GROUP BY p.id, p.name
+ORDER BY p.name;
+
+-- THAT is the payoff. Nobody stored "which customers bought a monitor";
+-- the query derived it. A design that had nested orders inside customer
+-- documents would answer the first question easily and this one only by
+-- reading everything.
+--
+-- The other half of the model is that the database enforces the rules.
+
+SELECT 'declared constraints' AS what, count(*) AS n FROM pragma_foreign_key_list('orders')
+UNION ALL
+SELECT 'columns in orders', count(*) FROM pragma_table_info('orders');
+
+-- Those constraints hold for every writer -- your application, a
+-- migration script, somebody at a console at 3am. That is the guarantee
+-- being bought, and the price is a fixed schema: adding a column means
+-- changing the table, which is exactly the trade the non-relational
+-- models make differently.
+```
+
 ## Summing up
 
 Store each fact once, identify it with a primary key, and reference it with a foreign key. The database then enforces the relationships for you. Flattening everything looks simpler until the first time you have to change something.

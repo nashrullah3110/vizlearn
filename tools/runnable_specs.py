@@ -115,6 +115,23 @@ SPECS = {
         "label": "NumPy",
         "filename": "example_%02d.py",
     },
+    "database": {
+        # SQL, not Python. this track's editor is assets/vizlearn-sql.js --
+        # real SQLite compiled to WebAssembly -- so "engine": "sql" sends
+        # prose.py to sql_editor() instead of the Python one.
+        #
+        # One seed for the whole track. Every article's query runs against
+        # the same four tables, so a reader who has met the schema once on
+        # the joins page already knows it on the window-functions page. It
+        # is deliberately small and deliberately awkward in specific ways:
+        # Dara has a NULL city, Dara and Eze have no orders at all, and
+        # some orders have a NULL discount -- so outer joins, NULL handling
+        # and COALESCE have something real to demonstrate.
+        "engine": "sql",
+        "seed": "CREATE TABLE customers (\n  id         INTEGER PRIMARY KEY,\n  name       TEXT NOT NULL,\n  city       TEXT,\n  signup     TEXT NOT NULL\n);\nCREATE TABLE products (\n  id         INTEGER PRIMARY KEY,\n  name       TEXT NOT NULL,\n  category   TEXT NOT NULL,\n  price      REAL NOT NULL\n);\nCREATE TABLE orders (\n  id          INTEGER PRIMARY KEY,\n  customer_id INTEGER REFERENCES customers(id),\n  placed      TEXT NOT NULL,\n  status      TEXT NOT NULL,\n  discount    REAL\n);\nCREATE TABLE order_items (\n  order_id   INTEGER REFERENCES orders(id),\n  product_id INTEGER REFERENCES products(id),\n  qty        INTEGER NOT NULL\n);\n\nINSERT INTO customers (id, name, city, signup) VALUES\n  (1, 'Ada',    'London',     '2023-01-14'),\n  (2, 'Bala',   'Chennai',    '2023-03-02'),\n  (3, 'Chen',   'Singapore',  '2023-03-19'),\n  (4, 'Dara',   NULL,         '2024-02-08'),\n  (5, 'Eze',    'Lagos',      '2024-06-30');\n\nINSERT INTO products (id, name, category, price) VALUES\n  (1, 'Keyboard',  'peripherals', 45.00),\n  (2, 'Mouse',     'peripherals', 25.00),\n  (3, 'Monitor',   'displays',   180.00),\n  (4, 'Lamp',      'furniture',   30.00),\n  (5, 'Stand',     'furniture',   60.00);\n\nINSERT INTO orders (id, customer_id, placed, status, discount) VALUES\n  (101, 1, '2024-01-05', 'shipped',   NULL),\n  (102, 1, '2024-02-11', 'shipped',   5.00),\n  (103, 2, '2024-02-14', 'cancelled', NULL),\n  (104, 3, '2024-03-01', 'shipped',   10.00),\n  (105, 3, '2024-03-22', 'pending',   NULL),\n  (106, 1, '2024-04-02', 'shipped',   NULL);\n\nINSERT INTO order_items (order_id, product_id, qty) VALUES\n  (101, 1, 1), (101, 2, 2),\n  (102, 3, 1),\n  (103, 4, 3),\n  (104, 1, 2), (104, 5, 1),\n  (105, 2, 1),\n  (106, 3, 2), (106, 4, 1);",
+        "label": "SQLite",
+        "filename": "query.sql",
+    },
     "gen_ai": {
         # numpy alone. this track is retrieval, tokenisation and the
         # arithmetic inside an LLM -- attention, BM25, cosine similarity,

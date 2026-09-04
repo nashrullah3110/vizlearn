@@ -108,6 +108,39 @@ Two other habits that pay. Put the most selective condition first when readabili
 
 If you genuinely need `YEAR(order_date)` or `UPPER(email)` in a condition, create an <strong>expression index</strong> on exactly that expression, and the planner can use it.
 
+## The operators, and the one that quietly drops rows
+
+WHERE keeps rows whose condition evaluates to true. Most of it is unsurprising -- and the exception matters enough that it is worth meeting on real data rather than in the abstract.
+
+```sql-run
+-- Each row below is one filter and how many rows it keeps.
+-- Change any condition and re-run.
+
+SELECT 'signup >= 2024-01-01' AS filter, count(*) AS kept FROM customers WHERE signup >= '2024-01-01'
+UNION ALL
+SELECT 'city LIKE L%',        count(*) FROM customers WHERE city LIKE 'L%'
+UNION ALL
+SELECT 'city IN (London,Lagos)', count(*) FROM customers WHERE city IN ('London', 'Lagos')
+UNION ALL
+SELECT 'city NOT IN (London)', count(*) FROM customers WHERE city NOT IN ('London')
+UNION ALL
+SELECT 'all customers',       count(*) FROM customers
+UNION ALL
+SELECT 'discount > 0',        count(*) FROM orders WHERE discount > 0
+UNION ALL
+SELECT 'discount <= 0 OR > 0', count(*) FROM orders WHERE discount <= 0 OR discount > 0
+UNION ALL
+SELECT 'all orders',          count(*) FROM orders;
+
+-- Look at the last three rows. Only 2 of the 6 orders carry a discount;
+-- the other 4 are NULL. "discount > 0" finds 2, and so does
+-- "discount <= 0 OR discount > 0" -- a condition that looks like it must
+-- hold for every number. It does not hold for NULL, because NULL is not
+-- a number, and WHERE keeps only what is TRUE.
+--
+-- Same reason "city NOT IN (London)" does not find Dara.
+```
+
 ## Try it yourself
 
 1. <strong>Run the default predicate.</strong> The evaluation column shows TRUE or FALSE for every row &mdash; the filter is genuinely parsed and applied, so you can type your own.

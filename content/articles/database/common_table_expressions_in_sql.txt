@@ -84,6 +84,71 @@ They do not, by themselves, make anything faster. On modern engines a CTE is inl
 
 If a CTE result is used by many queries rather than one, you are looking at a view or a materialised view instead. A CTE lives and dies with its statement.
 
+## Naming the steps, and the one that names itself
+
+A CTE gives a subquery a name and puts it before the query instead of inside it. That is mostly a readability change -- and the recursive form is not, because it can express things no ordinary SELECT can.
+
+```sql-run
+-- The same query written two ways. Compare them for readability, then
+-- note that they produce identical rows.
+
+SELECT c.name, t.orders, t.gross
+FROM customers c
+JOIN (SELECT o.customer_id,
+             count(DISTINCT o.id)             AS orders,
+             round(sum(i.qty * p.price), 2)   AS gross
+      FROM orders o
+      JOIN order_items i ON i.order_id = o.id
+      JOIN products    p ON p.id = i.product_id
+      GROUP BY o.customer_id) t
+  ON t.customer_id = c.id
+ORDER BY t.gross DESC;
+
+WITH totals AS (
+    SELECT o.customer_id,
+           count(DISTINCT o.id)           AS orders,
+           round(sum(i.qty * p.price), 2) AS gross
+    FROM orders o
+    JOIN order_items i ON i.order_id = o.id
+    JOIN products    p ON p.id = i.product_id
+    GROUP BY o.customer_id
+)
+SELECT c.name, t.orders, t.gross
+FROM customers c
+JOIN totals t ON t.customer_id = c.id
+ORDER BY t.gross DESC;
+
+-- Now the part a subquery cannot do. A RECURSIVE CTE refers to itself,
+-- so it can walk a sequence or a hierarchy of unknown depth.
+
+WITH RECURSIVE months(m) AS (
+    SELECT '2024-01'
+    UNION ALL
+    SELECT CASE
+             WHEN substr(m, 6, 2) = '12'
+               THEN (CAST(substr(m, 1, 4) AS INT) + 1) || '-01'
+             ELSE substr(m, 1, 5) ||
+                  substr('0' || (CAST(substr(m, 6, 2) AS INT) + 1), -2)
+           END
+    FROM months
+    WHERE m < '2024-06'
+)
+SELECT months.m                       AS month,
+       count(o.id)                    AS orders
+FROM months
+LEFT JOIN orders o ON substr(o.placed, 1, 7) = months.m
+GROUP BY months.m
+ORDER BY months.m;
+
+-- Look at May and June: zero orders, and they still have a row.
+--
+-- That is the thing the orders table cannot do by itself. A month with
+-- no orders has no rows, so GROUP BY has nothing to group and the month
+-- simply vanishes from the report -- which is how a dashboard ends up
+-- with a gap where a quiet month should be. The recursive CTE generates
+-- the months from nothing, and the LEFT JOIN fills in the zeros.
+```
+
 ## Guided experiments
 
 1. <strong>Start with the chained CTEs.</strong> Each named step shows its own output, so you can see the data narrowing at every stage.

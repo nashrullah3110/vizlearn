@@ -200,6 +200,42 @@ def runnable_editor(code, spec, n):
          "lang": spec.get("label", "Python")}
 
 
+def sql_editor(code, spec):
+    """One `.vz-db-sql` block, wired to assets/vizlearn-sql.js.
+
+    The markup matches what build_db_topics.py emits for the generated
+    database pages, so both kinds of page use one runner and one stylesheet.
+    The seed is the whole page's database: vizlearn-sql.js looks up a single
+    `.sql-seed` and every block on the page runs against it.
+    """
+    if "</script" in code.lower():
+        raise SystemExit("a runnable block contains </script and would break out")
+    seed = spec.get("seed", "").strip()
+    return (
+        '<div class="vz-db-sql" data-vz-sql>'
+        '<script type="text/plain" class="sql-seed">%(seed)s</script>'
+        '<div class="vz-code-bar"><span class="vz-code-dot"></span>'
+        '<span>%(file)s</span><span class="vz-code-lang">%(lang)s</span></div>'
+        '<div class="vz-code" data-vz-code="sql">'
+        '<div class="vz-code-gutter" aria-hidden="true"></div>'
+        '<div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre>'
+        '<textarea class="vz-code-input sql-editor" aria-label="SQL editor"'
+        ' spellcheck="false" autocapitalize="off" autocomplete="off">%(code)s</textarea>'
+        '</div></div>'
+        '<div class="sql-controls">'
+        '<button type="button" class="sql-btn sql-btn-primary sql-run-btn">Run</button>'
+        '<button type="button" class="sql-btn sql-reset-btn">Reset database</button>'
+        '<span class="sql-status" aria-live="polite"></span></div>'
+        '<div class="vz-console"><div class="vz-console-bar">Result</div>'
+        '<div class="vz-console-body sql-result" aria-live="polite"'
+        ' data-empty="Press Run to execute this query."></div></div>'
+        '<div class="sql-schema"></div>'
+        '</div>'
+    ) % {"seed": seed, "code": html.escape(code.rstrip()),
+         "file": spec.get("filename", "query.sql"),
+         "lang": spec.get("label", "SQLite")}
+
+
 def body_html(text, spec=None, counter=None):
     """The HTML for one section's body."""
     out = []
@@ -212,7 +248,10 @@ def body_html(text, spec=None, counter=None):
                 raw = "\n".join(buf)
                 if fence.endswith("-run") and spec:
                     counter[0] += 1
-                    out.append(runnable_editor(raw, spec, counter[0]))
+                    if spec.get("engine") == "sql":
+                        out.append(sql_editor(raw, spec))
+                    else:
+                        out.append(runnable_editor(raw, spec, counter[0]))
                 else:
                     cls = ' class="language-%s"' % fence if fence else ""
                     out.append("<pre><code%s>%s</code></pre>"

@@ -149,6 +149,50 @@ An empty result means the migration is clean. Anything returned is a discrepancy
 - With `LIMIT` after a `UNION`, the engine generally has to produce both branches fully before it can apply the limit. Pushing the limit into each branch first (each with its own `ORDER BY`) is often much faster.
 - For very large `UNION ALL` sets over the same shape of data, consider whether the tables should be genuine partitions of one table instead &mdash; the planner then handles the combination itself.
 
+## Stacking result sets, and the DISTINCT you did not ask for
+
+UNION, INTERSECT and EXCEPT combine whole result sets rather than joining rows. They are simple operators with one expensive default and one strict requirement, both of which are visible immediately.
+
+```sql-run
+-- The requirement first: same number of columns, compatible types.
+-- The column NAMES come from the first SELECT and the rest are ignored.
+
+SELECT name AS label, 'customer' AS kind FROM customers
+UNION ALL
+SELECT name,          'product'        FROM products
+ORDER BY kind, label;
+
+-- Now the default. UNION removes duplicates; UNION ALL does not.
+
+SELECT 'UNION (distinct)' AS operator, count(*) AS rows_out FROM (
+    SELECT city FROM customers UNION SELECT city FROM customers
+)
+UNION ALL
+SELECT 'UNION ALL', count(*) FROM (
+    SELECT city FROM customers UNION ALL SELECT city FROM customers
+);
+
+-- Deduplicating means sorting or hashing every row, so UNION is the
+-- expensive one and it is the one people type by habit. If you know the
+-- inputs cannot overlap -- which is usually why you are stacking them --
+-- UNION ALL is both faster and more honest about your intent.
+--
+-- INTERSECT and EXCEPT answer set questions directly.
+
+SELECT 'in both'        AS relation, count(*) AS n FROM (
+    SELECT id FROM customers INTERSECT SELECT customer_id FROM orders)
+UNION ALL
+SELECT 'customers with no orders', count(*) FROM (
+    SELECT id FROM customers EXCEPT SELECT customer_id FROM orders)
+UNION ALL
+SELECT 'orders with no customer',  count(*) FROM (
+    SELECT customer_id FROM orders EXCEPT SELECT id FROM customers);
+
+-- That middle row is the anti-join written as a set difference. It finds
+-- Dara and Eze, and it reads more directly than the LEFT JOIN ... IS NULL
+-- form -- though on a large table the planner usually prefers the join.
+```
+
 ## Questions people ask
 
 <strong>Do the column names have to match?</strong> No &mdash; only the count and the types. The first query's names are used for the result.

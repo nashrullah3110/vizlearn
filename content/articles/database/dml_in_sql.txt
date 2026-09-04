@@ -90,6 +90,51 @@ The conflict target must be backed by a unique constraint or index &mdash; the e
 INSERT INTO employees (name) VALUES ('Carol') RETURNING id, hired_on;
 ```
 
+## Changing rows, and the clause you must not forget
+
+INSERT, UPDATE and DELETE are the three statements that change data, and two of them take a WHERE clause that is optional in the grammar and mandatory in practice. Everything here runs against a copy you can reset.
+
+```sql-run
+-- Start by looking at what is there.
+
+SELECT id, name, city FROM customers ORDER BY id;
+
+-- INSERT adds rows. Naming the columns is not optional style: without
+-- the list, the statement breaks silently the day someone adds a column.
+
+INSERT INTO customers (id, name, city, signup)
+VALUES (6, 'Fen', 'Oslo', '2024-08-01');
+
+SELECT id, name, city FROM customers ORDER BY id;
+
+-- UPDATE changes them. The WHERE decides how many.
+
+UPDATE customers SET city = 'Bergen' WHERE id = 6;
+
+SELECT id, name, city FROM customers WHERE id = 6;
+
+-- Now the dangerous one. UPDATE without WHERE is valid SQL and updates
+-- every row. Uncomment the next line, run it, and look at the table:
+--
+--     UPDATE customers SET city = 'nowhere';
+--
+-- Press "Reset database" afterwards to get the original data back.
+--
+-- The habit that prevents it is to write the WHERE first, run it as a
+-- SELECT, count the rows, and only then change SELECT to UPDATE.
+
+SELECT count(*) AS about_to_change FROM customers WHERE id = 6;
+
+DELETE FROM customers WHERE id = 6;
+
+SELECT count(*) AS remaining FROM customers;
+
+-- DELETE also removes rows one at a time and can be rolled back, which
+-- is what separates it from TRUNCATE. And note what happens if you try
+-- to delete a customer who has orders -- the foreign key in orders
+-- points at them, and a database with foreign keys enforced will refuse.
+```
+
 ## Guided tour
 
 1. <strong>Insert a row</strong> and watch it appear highlighted in green, with the table count rising by one.

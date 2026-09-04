@@ -79,6 +79,28 @@ Same data, same threshold, entirely different report. When someone says "these n
 
 The performance implication points the same way: `WHERE` throws rows away before the expensive grouping happens, so any condition that <em>can</em> go in `WHERE` should.
 
+## WHERE and HAVING on the same query
+
+WHERE filters rows before they are grouped and HAVING filters groups after. Running both on one query is the quickest way to see that they are not interchangeable, and to see the error you get when you reach for the wrong one.
+
+```sql-run
+-- WHERE runs first, on individual rows.
+-- HAVING runs last, on the groups WHERE left behind.
+--
+-- Move the HAVING condition into the WHERE clause and re-run. SQLite
+-- answers "misuse of aggregate: count()" -- at the moment WHERE is
+-- evaluated the groups do not exist yet, so there is nothing to count.
+
+SELECT c.name                  AS customer,
+       count(o.id)             AS shipped_orders
+FROM customers c
+JOIN orders o ON o.customer_id = c.id
+WHERE  o.status = 'shipped'      -- drops rows, before grouping
+GROUP BY c.id, c.name
+HAVING count(o.id) > 1           -- drops groups, after
+ORDER BY shipped_orders DESC;
+```
+
 ## Experiments to try
 
 1. <strong>Start with HAVING alone.</strong> WHERE is at 0, so all 14 rows are grouped into 4 regions and <span class="mono-font kw">HAVING</span> <span class="mono-font fn">SUM</span>(amount) &ge; 800 removes one of them. Note which, and note its total.

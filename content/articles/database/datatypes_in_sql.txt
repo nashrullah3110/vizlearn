@@ -78,6 +78,72 @@ In MySQL the picture is a little different: `VARCHAR` columns participate in the
 
 Two related choices worth making deliberately: the <strong>collation</strong>, which decides sorting and case sensitivity, and whether to store emails and usernames in a case-insensitive type such as PostgreSQL's `CITEXT`, which prevents "Alice@example.com" and "alice@example.com" being two different users.
 
+## What the engine does with a type you declared
+
+A column's declared type is a promise about what goes in it, and how strictly that promise is kept differs sharply between engines. SQLite is the permissive end of that range, which makes it a useful place to see what a type is actually for.
+
+```sql-run
+-- SQLite has five storage classes: NULL, INTEGER, REAL, TEXT, BLOB.
+-- The declared type is a hint it uses to decide which one to store in.
+
+CREATE TABLE t (
+    i INTEGER,
+    r REAL,
+    txt TEXT,
+    anything    -- no declared type at all, which SQLite permits
+);
+
+INSERT INTO t VALUES (42, 42, 42, 42);
+INSERT INTO t VALUES ('42', '42', '42', '42');
+INSERT INTO t VALUES ('abc', 'abc', 'abc', 'abc');
+
+SELECT i, typeof(i)   AS i_is,
+       r, typeof(r)   AS r_is,
+       txt, typeof(txt) AS txt_is,
+       anything, typeof(anything) AS any_is
+FROM t;
+
+-- Read row 2 across. The same string '42' was inserted into all four
+-- columns. In the INTEGER column it came back as an INTEGER -- SQLite
+-- converted it, because the value was convertible. In the untyped
+-- column it stayed TEXT, because nothing asked it to convert.
+-- Row 3 put 'abc' into the INTEGER column and it stayed TEXT too: the
+-- conversion is attempted, and declined when it cannot succeed.
+--
+-- That is type AFFINITY: a preference rather than a rule. PostgreSQL
+-- would have rejected row 3 outright. Neither behaviour is wrong, and
+-- code written against one surprises you on the other.
+--
+-- The practical consequences are in comparisons.
+
+SELECT '42 = 42'      AS test, (42 = 42)     AS result
+UNION ALL SELECT 'quoted 42 vs 42',      ('42' = 42)
+UNION ALL SELECT '1 = true',             (1 = TRUE)
+UNION ALL SELECT 'null = null',          (NULL = NULL)
+UNION ALL SELECT 'null is null',         (NULL IS NULL);
+
+-- Look at 'quoted 42 vs 42' in that table: it is FALSE. A TEXT '42'
+-- and an INTEGER 42 are not equal, because no column affinity applies
+-- to a comparison between two literals -- which is how a query that
+-- works against one column silently returns nothing against another.
+-- And note that null = null is neither true nor false: it is NULL.
+--
+-- Now dates, which SQLite does not have as a type at all. They are
+-- TEXT in ISO-8601 order, which sorts and compares correctly precisely
+-- because that format sorts lexicographically.
+
+SELECT placed,
+       date(placed, '+30 days')          AS due,
+       strftime('%Y-%m', placed)         AS month,
+       julianday('2024-04-02') - julianday(placed) AS days_ago
+FROM orders
+ORDER BY placed
+LIMIT 3;
+
+-- Storing dates as '02/04/2024' instead would break every one of those
+-- and the ORDER BY as well. The format is doing the work.
+```
+
 ## Experiments to try
 
 1. <strong>Select TINYINT and enter 200.</strong> Rejected &mdash; out of range. Now try 100, which fits comfortably.

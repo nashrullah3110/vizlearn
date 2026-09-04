@@ -83,6 +83,63 @@ Views earn their keep in three ways: they hide complexity behind a name, they pr
 
 Their limits are worth knowing too. A simple view can be updatable; anything with joins, aggregates or `DISTINCT` generally is not, and needs an `INSTEAD OF` trigger to accept writes. And views stack: a view built on three views built on four views is a maintenance problem and often an unpredictable query plan.
 
+## Branching inside a query, and naming one for reuse
+
+CASE is an expression, not a statement, which is why it can appear anywhere a value can -- including inside an aggregate, where it becomes a conditional count. A view then gives a query a name, and the important thing about it is what it does not do.
+
+```sql-run
+-- CASE as a value in the SELECT list.
+
+SELECT name,
+       price,
+       CASE WHEN price >= 100 THEN 'premium'
+            WHEN price >=  40 THEN 'standard'
+            ELSE                   'budget'
+       END AS tier
+FROM products
+ORDER BY price DESC;
+
+-- CASE inside an aggregate is the useful trick: it turns one pass over
+-- the table into several conditional counts, which is how you pivot.
+
+SELECT count(*)                                             AS all_orders,
+       sum(CASE WHEN status = 'shipped'   THEN 1 ELSE 0 END) AS shipped,
+       sum(CASE WHEN status = 'pending'   THEN 1 ELSE 0 END) AS pending,
+       sum(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+       count(discount)                                      AS with_discount
+FROM orders;
+
+-- Note the last column. count(discount) counts non-NULL values, while
+-- count(*) counts rows -- which is the shortest way to count how many
+-- rows have a value in a nullable column.
+--
+-- A VIEW names a query. It stores no data.
+
+CREATE VIEW order_totals AS
+SELECT o.id           AS order_id,
+       c.name         AS customer,
+       o.status,
+       sum(i.qty * p.price) AS gross
+FROM orders o
+JOIN customers   c ON c.id = o.customer_id
+JOIN order_items i ON i.order_id = o.id
+JOIN products    p ON p.id = i.product_id
+GROUP BY o.id, c.name, o.status;
+
+SELECT * FROM order_totals ORDER BY gross DESC;
+
+-- The view is re-run every time you select from it. It costs nothing to
+-- create and saves nothing at query time -- it is a name for a query,
+-- not a cache of its answer. The thing that caches is a MATERIALIZED
+-- view, which SQLite does not have and which every engine that does have
+-- one makes you decide when to refresh.
+
+SELECT customer, count(*) AS orders, round(sum(gross), 2) AS lifetime
+FROM order_totals
+GROUP BY customer
+ORDER BY lifetime DESC;
+```
+
 ## Guided experiments
 
 1. <strong>Read the bands.</strong> Each row gets a label from CASE based purely on its salary and the two thresholds.

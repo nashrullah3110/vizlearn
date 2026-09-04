@@ -66,6 +66,30 @@ The rules differ from clause to clause, which is why NULLs are confusing even to
 
 Two more places NULLs behave unexpectedly: a `UNIQUE` constraint generally allows several NULLs, because they are not equal to each other, and an outer join manufactures NULLs for the unmatched side &mdash; which is precisely how the anti-join pattern works.
 
+## Why the row you expected is missing
+
+NULL is not a value, it is the absence of one, and every comparison with it returns NULL rather than true or false. That single rule explains every surprising empty result involving nullable columns, and it is visible in four queries.
+
+```sql-run
+-- Dara has no city. Watch which queries find her.
+--
+-- Read the numbers: "not London" finds 3 customers, not 4. Dara's
+-- city is certainly not London, and she is still excluded -- because
+-- NULL <> 'London' is NULL, and WHERE keeps only rows that are TRUE.
+-- Then note that IS NULL (1) plus IS NOT NULL (4) does reach 5, which
+-- is the pair that always partitions a table properly.
+
+SELECT 'city = NULL'      AS test, count(*) AS rows_found FROM customers WHERE city = NULL
+UNION ALL
+SELECT 'city not equal London',   count(*) FROM customers WHERE city <> 'London'
+UNION ALL
+SELECT 'city IS NULL',            count(*) FROM customers WHERE city IS NULL
+UNION ALL
+SELECT 'city IS NOT NULL',        count(*) FROM customers WHERE city IS NOT NULL
+UNION ALL
+SELECT 'total customers',         count(*) FROM customers;
+```
+
 ## Try it yourself
 
 1. <strong>Look at the raw column.</strong> Three employees have no bonus recorded — NULL, not zero.

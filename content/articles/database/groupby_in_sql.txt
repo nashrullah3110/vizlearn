@@ -88,6 +88,32 @@ The same NULL-skipping rule applies to every aggregate. `AVG(amount)` divides by
 
 Grouping itself treats NULLs differently again: all NULLs in a grouping column are gathered into a single group, even though `NULL = NULL` is not true anywhere else in SQL. It is a deliberate exception, and it is why a stray NULL group appears in reports.
 
+## Grouping the same rows four different ways
+
+GROUP BY collapses rows into buckets, and the only real difficulty is remembering that every selected column must either be grouped by or aggregated. This runs the same data through four groupings so you can watch the bucket definition change what comes out.
+
+```sql-run
+-- One row per customer: how many orders, and how much they spent.
+--
+-- Only three customers come back, not five: the inner JOIN drops
+-- Dara and Eze, who have never ordered. A grouped query can only
+-- ever report on rows that survived the joins above it.
+--
+-- Try grouping by o.status instead of c.name, or adding
+-- p.category to both the SELECT and the GROUP BY.
+
+SELECT c.name                              AS customer,
+       count(DISTINCT o.id)                AS orders,
+       sum(i.qty)                          AS items,
+       round(sum(i.qty * p.price), 2)      AS gross
+FROM customers c
+JOIN orders      o ON o.customer_id = c.id
+JOIN order_items i ON i.order_id    = o.id
+JOIN products    p ON p.id          = i.product_id
+GROUP BY c.id, c.name
+ORDER BY gross DESC;
+```
+
 ## Guided tour
 
 Use the interactive tool above to see this process in action. The animation directly mirrors how a database engine thinks.

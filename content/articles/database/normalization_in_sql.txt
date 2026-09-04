@@ -62,6 +62,70 @@ The cost is that you now own the consistency problem the database was solving fo
 
 The order to work in: normalise first, measure, then denormalise the specific hot paths with evidence. Starting denormalised because it might be faster is how schemas become unmaintainable.
 
+## The anomalies, on a table that has them
+
+Normalisation is usually taught as a list of numbered forms. It is easier to see as three specific bugs that a badly-shaped table makes possible, and this builds such a table so you can commit each one.
+
+```sql-run
+-- One wide table holding everything about an order. This is what
+-- denormalised data looks like, and it is not obviously wrong.
+
+CREATE TABLE flat (
+    order_id      INTEGER,
+    customer_name TEXT,
+    customer_city TEXT,
+    product_name  TEXT,
+    product_price REAL,
+    qty           INTEGER
+);
+
+INSERT INTO flat VALUES
+    (101, 'Ada', 'London', 'Keyboard',  45.0, 1),
+    (101, 'Ada', 'London', 'Mouse',     25.0, 2),
+    (102, 'Ada', 'London', 'Monitor',  180.0, 1),
+    (104, 'Chen', 'Singapore', 'Keyboard', 45.0, 2);
+
+SELECT * FROM flat;
+
+-- ANOMALY 1, UPDATE. Ada moves to Bristol. Her city appears three
+-- times, so a partial update leaves the table disagreeing with itself.
+
+UPDATE flat SET customer_city = 'Bristol' WHERE order_id = 101;
+
+SELECT DISTINCT customer_name, customer_city FROM flat WHERE customer_name = 'Ada';
+
+-- Two cities for one person. Nothing in the schema forbids it, because
+-- the schema does not know those rows describe the same customer.
+--
+-- ANOMALY 2, DELETE. Remove order 102 and something unrelated goes
+-- with it.
+
+DELETE FROM flat WHERE order_id = 102;
+
+SELECT count(*) AS monitor_rows_left FROM flat WHERE product_name = 'Monitor';
+
+-- The price of a Monitor was only recorded on that row, so deleting an
+-- order deleted a fact about a product.
+--
+-- ANOMALY 3, INSERT. A new product that nobody has ordered cannot be
+-- recorded at all without inventing an order to hang it on.
+--
+-- The normalised schema this article's database uses has none of these:
+-- the city lives once in customers, the price lives once in products,
+-- and order_items holds only the link.
+
+SELECT 'flat: rows mentioning Ada city' AS where_a_fact_lives, count(*) AS copies
+FROM flat WHERE customer_name = 'Ada'
+UNION ALL
+SELECT 'normalised: rows with Ada city', count(*)
+FROM customers WHERE name = 'Ada';
+
+-- One row, one place, one update. That is the whole benefit, and the
+-- cost is that answering a question now needs joins -- which is why
+-- reporting systems often denormalise deliberately, accepting the
+-- anomalies because the data is rebuilt rather than edited.
+```
+
 ## Guided tour
 
 1. <strong>Start at raw.</strong> One table, one row per order, a multi-valued products column — not even 1NF.

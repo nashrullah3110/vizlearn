@@ -71,6 +71,59 @@ Read Committed is the default in PostgreSQL, Oracle and SQL Server; MySQL's Inno
 
 Serializable is the only level that guarantees the result is equivalent to running the transactions one after another. It costs throughput, either through locking or through aborting transactions that would have conflicted, so it is reserved for the parts of a system where correctness genuinely outranks speed &mdash; money, inventory, seat booking.
 
+## Making several statements into one
+
+A transaction is the promise that a group of statements happens completely or not at all. The demonstration is short because the idea is short -- and the interesting part is what the promise costs and what it does not cover.
+
+```sql-run
+-- The classic case: move money, and never lose it in transit.
+-- Two UPDATEs that must both happen.
+
+CREATE TABLE accounts (id INTEGER PRIMARY KEY, owner TEXT, balance REAL);
+INSERT INTO accounts VALUES (1, 'Ada', 500.0), (2, 'Bala', 120.0);
+
+SELECT owner, balance FROM accounts ORDER BY id;
+
+-- Committed: both halves stick.
+
+BEGIN;
+UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+COMMIT;
+
+SELECT owner, balance FROM accounts ORDER BY id;
+
+-- Rolled back: neither half survives, including the one that had
+-- already run.
+
+BEGIN;
+UPDATE accounts SET balance = balance - 400 WHERE id = 1;
+UPDATE accounts SET balance = balance + 400 WHERE id = 2;
+ROLLBACK;
+
+SELECT owner, balance FROM accounts ORDER BY id;
+
+-- That is ATOMICITY, the A. The other three:
+--
+-- CONSISTENCY  the database moves between valid states -- constraints
+--              hold before and after, never halfway.
+-- ISOLATION    concurrent transactions do not see each other's
+--              unfinished work. This is the one with settings: read
+--              committed, repeatable read, serializable, each trading
+--              strictness for concurrency.
+-- DURABILITY   once COMMIT returns, the change survives a crash.
+--
+-- Isolation is the one that leaks into application code, because the
+-- weaker levels permit specific anomalies -- a row that changes between
+-- two reads in the same transaction, or a sum that includes a row that
+-- was not there when you counted. Which anomalies you can tolerate is a
+-- decision, and the default in most engines is not the strictest one.
+--
+-- And the limit worth knowing: a transaction protects the DATABASE. If
+-- your handler charges a card and then writes a row, the rollback undoes
+-- the row and not the charge.
+```
+
 ## Guided tour
 
 1. <strong>Step through a clean transfer.</strong> BEGIN, debit Alice, credit Bob, COMMIT. Session B's balances only change at the very last step.

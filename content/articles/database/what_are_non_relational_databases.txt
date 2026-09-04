@@ -55,6 +55,72 @@ Then the product is renamed, and 40,000 order documents contain the old name. Yo
 
 The design question for every embedded copy: <em>is this a snapshot or a reference?</em> Snapshots should be embedded. References should be looked up, even when that costs a second query.
 
+## The same data, shaped the other way
+
+A document store keeps a customer and their orders together in one record. Building that shape here, out of the relational tables, makes the trade concrete -- which questions get cheaper, which get more expensive, and what the schema stops guaranteeing.
+
+```sql-run
+-- First, the relational answer to "give me a customer and their orders":
+-- a join, assembled at read time.
+
+SELECT c.name, o.id AS order_id, o.placed, o.status
+FROM customers c LEFT JOIN orders o ON o.customer_id = c.id
+WHERE c.name = 'Ada'
+ORDER BY o.placed;
+
+-- Now the document shape. A document store would hold this as ONE
+-- record per customer, orders nested inside. Built here with JSON so
+-- you can see it:
+
+SELECT json_object(
+         'id',     c.id,
+         'name',   c.name,
+         'city',   c.city,
+         'orders', json_group_array(
+                     json_object('id', o.id, 'placed', o.placed,
+                                 'status', o.status))
+       ) AS document
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+WHERE c.name = 'Ada'
+GROUP BY c.id;
+
+-- ONE read, no join, everything the customer page needs. That is the
+-- case document stores are built for, and it is a real advantage.
+--
+-- Now ask a question that cuts the other way: which customers bought a
+-- monitor? Relationally it is a join away.
+
+SELECT DISTINCT c.name
+FROM customers c
+JOIN orders o      ON o.customer_id = c.id
+JOIN order_items i ON i.order_id = o.id
+JOIN products p    ON p.id = i.product_id
+WHERE p.name = 'Monitor';
+
+-- In the document shape there is no orders collection to search -- the
+-- orders live inside customer documents. Answering it means opening
+-- every customer document and looking inside, which is why document
+-- stores grow secondary indexes, and why the shape you chose at the
+-- start decides which questions stay cheap.
+--
+-- And the guarantee that goes away: nothing checks that a nested order
+-- has the fields the next reader expects.
+
+SELECT json_object('id', 9, 'placed', '2024-09-01')     AS doc_missing_status
+UNION ALL
+SELECT json_object('id', 10, 'placed', '2024-09-02', 'status', 'shipped');
+
+-- Both are valid documents. A reader that assumes "status" exists is
+-- fine until the day it does not, and the error surfaces in the
+-- application rather than at the write. The relational version cannot
+-- get into that state: status is NOT NULL in the table definition, and
+-- the database refuses the row.
+--
+-- Neither model is the correct one. They put the same complexity in
+-- different places -- schema up front, or handling in every reader.
+```
+
 ## Try it yourself
 
 1. <strong>Step through all five models</strong> and watch the "joins needed" counter. Relational needs two joins for Ada's orders; the document model needs none.

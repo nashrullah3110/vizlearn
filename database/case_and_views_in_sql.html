@@ -503,6 +503,112 @@ GROUP  BY c.id, c.name, c.email;
 SELECT * FROM active_customers WHERE order_count &gt; 5;</code></pre><p>It stores no data. Every query against it re-runs the underlying <code>SELECT</code>, with the outer conditions merged in by the planner &mdash; so the filter above is applied efficiently rather than after materialising every active customer.</p><p>Views earn their keep in three ways: they hide complexity behind a name, they present a stable interface while the tables underneath change, and they restrict access &mdash; grant a user the view instead of the table and they see only the rows and columns it exposes.</p><p>Their limits are worth knowing too. A simple view can be updatable; anything with joins, aggregates or <code>DISTINCT</code> generally is not, and needs an <code>INSTEAD OF</code> trigger to accept writes. And views stack: a view built on three views built on four views is a maintenance problem and often an unpredictable query plan.</p>
                 </div>
                 <div>
+                    <h3 id="vz-s-branching-inside-a-query-and-naming-one-for-reus">Branching inside a query, and naming one for reuse</h3>
+                    <p>CASE is an expression, not a statement, which is why it can appear anywhere a value can -- including inside an aggregate, where it becomes a conditional count. A view then gives a query a name, and the important thing about it is what it does not do.</p><div class="vz-db-sql" data-vz-sql><script type="text/plain" class="sql-seed">CREATE TABLE customers (
+  id         INTEGER PRIMARY KEY,
+  name       TEXT NOT NULL,
+  city       TEXT,
+  signup     TEXT NOT NULL
+);
+CREATE TABLE products (
+  id         INTEGER PRIMARY KEY,
+  name       TEXT NOT NULL,
+  category   TEXT NOT NULL,
+  price      REAL NOT NULL
+);
+CREATE TABLE orders (
+  id          INTEGER PRIMARY KEY,
+  customer_id INTEGER REFERENCES customers(id),
+  placed      TEXT NOT NULL,
+  status      TEXT NOT NULL,
+  discount    REAL
+);
+CREATE TABLE order_items (
+  order_id   INTEGER REFERENCES orders(id),
+  product_id INTEGER REFERENCES products(id),
+  qty        INTEGER NOT NULL
+);
+
+INSERT INTO customers (id, name, city, signup) VALUES
+  (1, 'Ada',    'London',     '2023-01-14'),
+  (2, 'Bala',   'Chennai',    '2023-03-02'),
+  (3, 'Chen',   'Singapore',  '2023-03-19'),
+  (4, 'Dara',   NULL,         '2024-02-08'),
+  (5, 'Eze',    'Lagos',      '2024-06-30');
+
+INSERT INTO products (id, name, category, price) VALUES
+  (1, 'Keyboard',  'peripherals', 45.00),
+  (2, 'Mouse',     'peripherals', 25.00),
+  (3, 'Monitor',   'displays',   180.00),
+  (4, 'Lamp',      'furniture',   30.00),
+  (5, 'Stand',     'furniture',   60.00);
+
+INSERT INTO orders (id, customer_id, placed, status, discount) VALUES
+  (101, 1, '2024-01-05', 'shipped',   NULL),
+  (102, 1, '2024-02-11', 'shipped',   5.00),
+  (103, 2, '2024-02-14', 'cancelled', NULL),
+  (104, 3, '2024-03-01', 'shipped',   10.00),
+  (105, 3, '2024-03-22', 'pending',   NULL),
+  (106, 1, '2024-04-02', 'shipped',   NULL);
+
+INSERT INTO order_items (order_id, product_id, qty) VALUES
+  (101, 1, 1), (101, 2, 2),
+  (102, 3, 1),
+  (103, 4, 3),
+  (104, 1, 2), (104, 5, 1),
+  (105, 2, 1),
+  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- CASE as a value in the SELECT list.
+
+SELECT name,
+       price,
+       CASE WHEN price &gt;= 100 THEN &#x27;premium&#x27;
+            WHEN price &gt;=  40 THEN &#x27;standard&#x27;
+            ELSE                   &#x27;budget&#x27;
+       END AS tier
+FROM products
+ORDER BY price DESC;
+
+-- CASE inside an aggregate is the useful trick: it turns one pass over
+-- the table into several conditional counts, which is how you pivot.
+
+SELECT count(*)                                             AS all_orders,
+       sum(CASE WHEN status = &#x27;shipped&#x27;   THEN 1 ELSE 0 END) AS shipped,
+       sum(CASE WHEN status = &#x27;pending&#x27;   THEN 1 ELSE 0 END) AS pending,
+       sum(CASE WHEN status = &#x27;cancelled&#x27; THEN 1 ELSE 0 END) AS cancelled,
+       count(discount)                                      AS with_discount
+FROM orders;
+
+-- Note the last column. count(discount) counts non-NULL values, while
+-- count(*) counts rows -- which is the shortest way to count how many
+-- rows have a value in a nullable column.
+--
+-- A VIEW names a query. It stores no data.
+
+CREATE VIEW order_totals AS
+SELECT o.id           AS order_id,
+       c.name         AS customer,
+       o.status,
+       sum(i.qty * p.price) AS gross
+FROM orders o
+JOIN customers   c ON c.id = o.customer_id
+JOIN order_items i ON i.order_id = o.id
+JOIN products    p ON p.id = i.product_id
+GROUP BY o.id, c.name, o.status;
+
+SELECT * FROM order_totals ORDER BY gross DESC;
+
+-- The view is re-run every time you select from it. It costs nothing to
+-- create and saves nothing at query time -- it is a name for a query,
+-- not a cache of its answer. The thing that caches is a MATERIALIZED
+-- view, which SQLite does not have and which every engine that does have
+-- one makes you decide when to refresh.
+
+SELECT customer, count(*) AS orders, round(sum(gross), 2) AS lifetime
+FROM order_totals
+GROUP BY customer
+ORDER BY lifetime DESC;</textarea></div></div><div class="sql-controls"><button type="button" class="sql-btn sql-btn-primary sql-run-btn">Run</button><button type="button" class="sql-btn sql-reset-btn">Reset database</button><span class="sql-status" aria-live="polite"></span></div><div class="vz-console"><div class="vz-console-bar">Result</div><div class="vz-console-body sql-result" aria-live="polite" data-empty="Press Run to execute this query."></div></div><div class="sql-schema"></div></div>
+                </div>
+                <div>
                     <h3 id="vz-s-guided-experiments">Guided experiments</h3>
                     <ol><li><strong>Read the bands.</strong> Each row gets a label from CASE based purely on its salary and the two thresholds.</li><li><strong>Move a threshold.</strong> Drag Senior down and someone's label flips from mid to senior immediately — the CASE logic is re-evaluated on every row, every time.</li><li><strong>Create the view.</strong> Press the button. A second panel appears, querying pay_bands — identical to the first table, because it is the same logic under a name.</li><li><strong>Give Grace a raise.</strong> Her underlying salary changes, and pay_bands updates on the very next read — no refresh, no re-creation. The view is not a stored answer, it is the query, run again.</li></ol>
                 </div>
@@ -642,7 +748,7 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_revenue;</code></pre><p>Queries a
 
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-predict" data-vz-preset="0" aria-labelledby="vz-predict-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg><h2 id="vz-predict-h">Predict, then reveal</h2><span class="vz-rule"></span></div><p class="vz-predict-q">About to run: <strong>set Senior threshold to its maximum (110000)</strong>. Before it does &mdash; what happens to <strong class="vz-predict-readout">the readout</strong>?</p><div class="vz-predict-opts"><button type="button" class="vz-predict-opt" data-vz-guess="up">It goes up</button><button type="button" class="vz-predict-opt" data-vz-guess="down">It goes down</button><button type="button" class="vz-predict-opt" data-vz-guess="same">It stays the same</button></div><div class="vz-predict-result" hidden></div><p class="vz-predict-hint">Committing to an answer first is the point &mdash; the reveal runs the experiment on the visualisation above and reads the real value back, so nothing here is scripted.</p></section><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Recall check</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Say the answer out loud before you reveal it &mdash; recalling it is what makes it stick, and rereading it is not.</p><ol class="vz-check-list"><li class="vz-q vz-q-card"><p class="vz-q-text">What does this module say about “Start here”?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>CASE is an if/else that lives inside a SELECT list, evaluated once per row. A VIEW is a query with a name, so you can SELECT from it like a table without repeating the logic every time.</p></li><li class="vz-q vz-q-card"><p class="vz-q-text">What does this module say about “Views: a name for a query, not a copy of it”?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>A plain view stores no data. Every time you query it, the underlying SELECT runs again against the current table — which is the whole point of the raise experiment below. This is different from a materialized view , which does store a snapshot and has to be refreshed explicitly to catch up with changes underneath it.</p></li><li class="vz-q vz-q-card"><p class="vz-q-text">What does this module say about “CASE: if/else inside a query”?</p><button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button><p class="vz-q-answer" hidden>CASE is SQL&#x27;s conditional expression. It returns a value, so it can appear anywhere a value can — in SELECT , in ORDER BY , inside an aggregate, even in WHERE .</p></li></ol></section></div>
-<script type="application/json" id="vz-lab-data">{"presets": [{"set": [{"id": "hi-slider", "kind": "range", "value": "110000"}], "click": []}], "readouts": [{"id": "c-senior", "label": "senior"}, {"id": "c-mid", "label": "mid"}, {"id": "c-jr", "label": "junior"}, {"id": "sqlOut", "label": "Query"}, {"id": "note", "label": "note"}, {"id": "state-badge", "label": "employees, with a CASE column"}], "viz": "", "keys": {"primary": {"id": "hi-slider", "label": "Senior threshold", "min": 60000.0, "max": 110000.0, "step": 5000.0}, "secondary": {"id": "lo-slider", "label": "Mid threshold", "min": 40000.0, "max": 85000.0, "step": 5000.0}, "actions": [{"label": "CREATE VIEW pay_bands AS ...", "sel": "#create-btn", "i": 0}]}}</script>
+<script type="application/json" id="vz-lab-data">{"presets": [{"set": [{"id": "hi-slider", "kind": "range", "value": "110000"}], "click": []}], "readouts": [{"id": "c-senior", "label": "senior"}, {"id": "c-mid", "label": "mid"}, {"id": "c-jr", "label": "junior"}, {"id": "sqlOut", "label": "Query"}, {"id": "note", "label": "note"}, {"id": "state-badge", "label": "employees, with a CASE column"}], "viz": "", "keys": {"primary": {"id": "hi-slider", "label": "Senior threshold", "min": 60000.0, "max": 110000.0, "step": 5000.0}, "secondary": {"id": "lo-slider", "label": "Mid threshold", "min": 40000.0, "max": 85000.0, "step": 5000.0}, "actions": [{"label": "CREATE VIEW pay_bands AS ...", "sel": "#create-btn", "i": 0}, {"label": "Run", "sel": ".sql-btn", "i": 0}, {"label": "Reset database", "sel": ".sql-btn", "i": 1}]}}</script>
 <!-- VIZLEARN:LAB:END -->
 <!-- VIZLEARN:MODULE:BEGIN (generated by tools/build_module_ui.py) -->
 <div class="vz-extras"><section class="vz-cheatsheet" aria-labelledby="vz-cheat-h"><div class="vz-cheat-top"><span class="vz-cheat-label"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg> Cheat sheet</span><button type="button" class="vz-btn" data-vz-copy><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg> Copy</button></div><h2 class="vz-cheat-title" id="vz-cheat-h">CASE and Views in SQL</h2><p class="vz-cheat-text">CASE is an if/else that lives inside a SELECT list, evaluated once per row. A VIEW is a query with a name, so you can SELECT from it like a table without repeating the logic every time.</p><div class="vz-cheat-foot">DATABASE &middot; vizlearn.in/database/case_and_views_in_sql.html</div></section><section class="vz-related" aria-labelledby="vz-rel-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><h2 id="vz-rel-h">More in Database</h2><span class="vz-rule"></span></div><div class="vz-rail"><a class="vz-card" href="../database/aggregate_functions_in_sql.html" data-vz-path="database/aggregate_functions_in_sql.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="18" y="30" width="11" height="26" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><rect x="33" y="30" width="11" height="26" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><rect x="48" y="30" width="11" height="26" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><rect x="63" y="30" width="11" height="26" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><rect x="78" y="30" width="11" height="26" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><text x="80" y="70" fill="var(--text-muted)" font-size="8" font-family="monospace" text-anchor="middle" font-weight="normal">many rows &#8594; one value</text><text x="80" y="22" fill="var(--accent-primary)" font-size="9" font-family="monospace" text-anchor="middle" font-weight="normal">SUM  AVG  COUNT</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Database</span><span class="vz-card-title">Aggregate Functions and the NULL Trap</span></span></a><a class="vz-card" href="../database/groupby_in_sql.html" data-vz-path="database/groupby_in_sql.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="26" y="20" width="36" height="9" rx="2" fill="var(--text-muted)" opacity="0.4"/><rect x="26" y="33" width="36" height="9" rx="2" fill="var(--accent-primary)" opacity="0.5"/><rect x="26" y="46" width="36" height="9" rx="2" fill="var(--text-muted)" opacity="0.4"/><rect x="26" y="59" width="36" height="9" rx="2" fill="var(--accent-primary)" opacity="0.5"/><path d="M 68 45 L 88 45" stroke="var(--text-main)" stroke-width="2.5" stroke-dasharray="3 3"/><rect x="94" y="26" width="40" height="14" rx="3" fill="var(--text-muted)" opacity="0.6"/><rect x="94" y="48" width="40" height="14" rx="3" fill="var(--accent-primary)" opacity="0.85"/></svg></span><span class="vz-card-body"><span class="vz-card-cat">Database</span><span class="vz-card-title">SQL GroupBy Visualizer</span></span></a><a class="vz-card" href="../database/having_in_sql.html" data-vz-path="database/having_in_sql.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="14" y="20" width="34" height="9" rx="2" fill="var(--text-muted)" opacity="0.35"/><rect x="14" y="33" width="34" height="9" rx="2" fill="var(--text-muted)" opacity="0.35"/><rect x="14" y="46" width="34" height="9" rx="2" fill="var(--text-muted)" opacity="0.35"/><rect x="14" y="59" width="34" height="9" rx="2" fill="var(--text-muted)" opacity="0.35"/><path d="M54 44 L68 44" stroke="var(--text-muted)" stroke-width="1.5"/><rect x="72" y="24" width="30" height="18" rx="3" fill="var(--accent-primary)" opacity="0.85"/><rect x="72" y="48" width="30" height="18" rx="3" fill="var(--text-muted)" opacity="0.3"/><path d="M108 44 L122 44" stroke="var(--text-muted)" stroke-width="1.5"/><rect x="126" y="24" width="30" height="18" rx="3" fill="var(--accent-primary)" opacity="0.95"/><text x="141" y="62" text-anchor="middle" font-size="9" font-family="monospace" fill="#ef4444">cut</text></svg></span><span class="vz-card-body"><span class="vz-card-cat">Database</span><span class="vz-card-title">HAVING in SQL</span></span></a><a class="vz-card" href="../database/query_execution_order.html" data-vz-path="database/query_execution_order.html"><span class="vz-card-art"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="14" y="16" width="46" height="12" rx="3" fill="#60a5fa" opacity="0.85"/><rect x="14" y="32" width="60" height="12" rx="3" fill="var(--text-muted)" opacity="0.3"/><rect x="14" y="48" width="70" height="12" rx="3" fill="var(--text-muted)" opacity="0.3"/><rect x="14" y="64" width="38" height="12" rx="3" fill="var(--accent-primary)" opacity="0.9"/><text x="122" y="26" font-size="9" font-family="monospace" fill="#60a5fa">1</text><text x="122" y="60" font-size="9" font-family="monospace" fill="var(--accent-primary)">5</text><path d="M100 22 L140 22 M100 58 L140 58" stroke="var(--border-subtle)" stroke-width="1" stroke-dasharray="3 3"/></svg></span><span class="vz-card-body"><span class="vz-card-cat">Database</span><span class="vz-card-title">Query Execution Order in SQL</span></span></a></div></section><section class="vz-author" aria-labelledby="vz-author-h"><h2 id="vz-author-h" class="vz-author-h">About the author</h2><p class="vz-author-body"><strong>Ashish Jangra</strong> builds and maintains VizLearn. Every module here is written and the visualisation behind it hand-built, so the numbers in a readout come from the same code that draws the picture. Corrections are genuinely welcome and get priority over everything else &mdash; if a page states something wrong, or an animation misrepresents what the algorithm does, <a href="../contact.html">get in touch</a>.</p><p class="vz-author-links"><a href="../about.html">About VizLearn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://github.com/AshishJangra27" rel="noopener me">GitHub</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="https://www.linkedin.com/in/ashish-jangra/" rel="noopener me">LinkedIn</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><a href="../contact.html">Contact</a></p></section><nav class="vz-prevnext" aria-label="Module navigation"><a class="vz-pn vz-pn-prev" href="../database/limit_and_offset_in_sql.html" rel="prev"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span class="vz-pn-text"><span class="vz-pn-label">Previous</span><span class="vz-pn-title">Limit and Offset in SQL</span></span></a><a class="vz-pn vz-pn-next" href="../database/aggregate_functions_in_sql.html" rel="next"><span class="vz-pn-text"><span class="vz-pn-label">Next</span><span class="vz-pn-title">Aggregate Functions and the NULL Trap</span></span><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a></nav></div>
@@ -679,6 +785,7 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_revenue;</code></pre><p>Queries a
     <script defer src="../assets/glossary.js"></script>
     <script defer src="../assets/vizlearn-glossary.js"></script>
     <script defer src="../assets/vizlearn-lab.js"></script>
+    <script defer src="../assets/vizlearn-sql.js"></script>
     <script defer src="../assets/vizlearn-code.js"></script>
     <script defer src="../assets/vizlearn-copy.js"></script>
 <!-- VIZLEARN:SCRIPTS:END -->
