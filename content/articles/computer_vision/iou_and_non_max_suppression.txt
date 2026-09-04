@@ -61,6 +61,138 @@ The failure mode is genuinely overlapping objects: two people standing close tog
 
 Note also that NMS is applied <em>per class</em> in most implementations &mdash; a dog box and a person box overlapping heavily are not duplicates of each other.
 
+## Scoring box overlap, then removing the duplicates
+
+Intersection over union is four max/min operations. Non-max suppression is a sort and a loop. Both are written out here, along with the two cases where each one behaves badly.
+
+```python-run
+import numpy as np
+
+def iou(a, b):
+    # boxes are (x1, y1, x2, y2)
+    ix1, iy1 = max(a[0], b[0]), max(a[1], b[1])
+    ix2, iy2 = min(a[2], b[2]), min(a[3], b[3])
+    iw, ih = max(0.0, ix2 - ix1), max(0.0, iy2 - iy1)
+    inter = iw * ih
+    area_a = (a[2] - a[0]) * (a[3] - a[1])
+    area_b = (b[2] - b[0]) * (b[3] - b[1])
+    return inter / (area_a + area_b - inter)
+
+A = (10.0, 10.0, 50.0, 50.0)
+print("IOU, step by step. box A = %s, area %.0f" % (A, (A[2] - A[0]) * (A[3] - A[1])))
+print()
+print("%28s %10s %10s %10s %8s" % ("box B", "intersect", "union", "IoU", "verdict"))
+for B, label in (((10, 10, 50, 50), "identical"),
+                 ((20, 20, 60, 60), "shifted"),
+                 ((30, 30, 70, 70), "corner touch"),
+                 ((10, 10, 30, 30), "B inside A"),
+                 ((60, 60, 90, 90), "no overlap")):
+    B = tuple(float(v) for v in B)
+    ix1, iy1 = max(A[0], B[0]), max(A[1], B[1])
+    ix2, iy2 = min(A[2], B[2]), min(A[3], B[3])
+    inter = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
+    union = (A[2] - A[0]) * (A[3] - A[1]) + (B[2] - B[0]) * (B[3] - B[1]) - inter
+    v = iou(A, B)
+    print("%28s %10.0f %10.0f %10.4f %8s"
+          % (str(tuple(int(x) for x in B)), inter, union, v,
+             "match" if v >= 0.5 else "reject"))
+print()
+print("   the max/min pair is the whole trick: the intersection's left edge")
+print("   is the RIGHTMOST of the two left edges, and its right edge is the")
+print("   LEFTMOST of the two right edges. if that gives a negative width,")
+print("   the boxes do not overlap and the clamp to 0 handles it.")
+print()
+
+print("WHAT 0.5 ACTUALLY LOOKS LIKE. two boxes of equal size, slid apart:")
+print("%14s %10s %s" % ("offset", "IoU", ""))
+for off in (0, 5, 10, 13, 20, 30, 40):
+    B = (10.0 + off, 10.0, 50.0 + off, 50.0)
+    v = iou(A, B)
+    print("%14d %10.4f %s" % (off, v, "#" * int(v * 40)))
+print("   a 40-pixel box shifted 13 pixels -- a third of its width -- still")
+print("   scores about 0.5. the standard threshold is more forgiving than")
+print("   it sounds, which is why COCO reports mAP averaged over 0.5 to")
+print("   0.95 rather than at 0.5 alone.")
+print()
+
+boxes = np.array([
+    [12, 12, 52, 52], [14, 15, 54, 55], [11, 9, 49, 47],   # three on object 1
+    [80, 80, 130, 130], [82, 78, 128, 132],                # two on object 2
+    [200, 40, 240, 80],                                    # one on object 3
+    [36, 20, 76, 60],                                      # object 4, overlapping 1
+], float)
+scores = np.array([0.92, 0.88, 0.75, 0.95, 0.71, 0.66, 0.80])
+names = ["A", "B", "C", "D", "E", "F", "G"]
+
+print("NON-MAX SUPPRESSION. seven detections. objects 1, 2 and 3 are well")
+print("separated; a fourth object G genuinely overlaps object 1:")
+print("%6s %28s %8s" % ("box", "coords", "score"))
+for n, b, s in zip(names, boxes, scores):
+    print("%6s %28s %8.2f" % (n, str(tuple(int(x) for x in b)), s))
+print()
+
+def nms(boxes, scores, thresh):
+    order = list(np.argsort(-scores))
+    keep, log = [], []
+    while order:
+        i = order.pop(0)
+        keep.append(i)
+        survivors = []
+        for j in order:
+            v = iou(boxes[i], boxes[j])
+            if v > thresh:
+                log.append((names[i], names[j], v, "suppressed"))
+            else:
+                log.append((names[i], names[j], v, "kept"))
+                survivors.append(j)
+        order = survivors
+    return keep, log
+
+keep, log = nms(boxes, scores, 0.5)
+print("   the algorithm: take the highest-scoring box, suppress everything")
+print("   that overlaps it too much, repeat with what is left.")
+print()
+print("%10s %10s %10s %14s" % ("winner", "compared", "IoU", "outcome"))
+for w, c, v, out in log:
+    print("%10s %10s %10.4f %14s" % (w, c, v, out))
+print()
+print("   kept: %s" % ", ".join(names[i] for i in keep))
+print("   IoU between A (object 1) and G (object 4): %.4f" % iou(boxes[0], boxes[6]))
+print("   they are different objects that happen to overlap, and whether")
+print("   NMS keeps both depends entirely on where the threshold sits.")
+print()
+
+print("THE THRESHOLD IS A REAL DIAL:")
+print("%14s %30s %10s" % ("IoU threshold", "kept", "count"))
+for t in (0.05, 0.2, 0.3, 0.5, 0.7, 0.95):
+    k, _ = nms(boxes, scores, t)
+    print("%14.2f %30s %10d" % (t, ", ".join(names[i] for i in k), len(k)))
+print("   at a low threshold G is deleted -- a real object lost because it")
+print("   overlapped a more confident one. at a high threshold the")
+print("   duplicates B, C and E survive. no single value is right for both.")
+print()
+
+print("WHERE IT FAILS. two people standing close together:")
+crowd = np.array([[10, 10, 40, 70], [18, 10, 48, 70]], float)
+crowd_scores = np.array([0.9, 0.85])
+v = iou(crowd[0], crowd[1])
+print("   two genuinely separate objects, IoU %.4f" % v)
+for t in (0.3, 0.5, 0.7):
+    k, _ = nms(crowd, crowd_scores, t)
+    print("      threshold %.1f -> keeps %d box(es)%s"
+          % (t, len(k), "  <- a real person deleted" if len(k) < 2 else ""))
+print("   NMS cannot tell 'a duplicate of one object' from 'two objects")
+print("   that overlap'. it only sees the IoU.")
+print()
+print("   SOFT-NMS is the usual repair: instead of deleting an overlapping")
+print("   box, multiply its score down and let it compete again:")
+for v_ in (0.3, 0.5, 0.7, 0.9):
+    print("      IoU %.1f -> score x %.3f (gaussian, sigma 0.5)"
+          % (v_, np.exp(-v_ ** 2 / 0.5)))
+print("   a heavily overlapping box is nearly removed; a marginal one keeps")
+print("   most of its score and survives if it was confident enough.")
+```
+
 ## Try it yourself
 
 1. <strong>Read the stage at the default threshold.</strong> Box A (confidence 0.95) is kept. Box D, a separate object with no real overlap with A, is also kept. Boxes B and C overlap A too heavily and are suppressed as duplicates.

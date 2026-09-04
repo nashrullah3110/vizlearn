@@ -106,3 +106,116 @@ scene.
 
 **Reading OpenCV's hue as degrees.** OpenCV stores hue in 0-179 so it fits in a
 byte, not 0-359. Half of every published threshold is wrong for this reason.
+
+## The same colour, described two ways
+
+RGB says how much of each light; HSV says which colour, how vivid, how bright. Converting between them by hand shows why one is right for displays and the other for finding a coloured object.
+
+```python-run
+import numpy as np
+
+def rgb_to_hsv(r, g, b):
+    r, g, b = r / 255.0, g / 255.0, b / 255.0
+    mx, mn = max(r, g, b), min(r, g, b)
+    d = mx - mn
+    if d == 0:
+        h = 0.0
+    elif mx == r:
+        h = (60 * ((g - b) / d)) % 360
+    elif mx == g:
+        h = 60 * ((b - r) / d) + 120
+    else:
+        h = 60 * ((r - g) / d) + 240
+    s = 0.0 if mx == 0 else d / mx
+    return h, s, mx
+
+swatches = [("pure red", (255, 0, 0)), ("dark red", (128, 0, 0)),
+            ("pink", (255, 128, 128)), ("pure green", (0, 255, 0)),
+            ("sky blue", (100, 180, 255)), ("white", (255, 255, 255)),
+            ("grey", (128, 128, 128)), ("black", (0, 0, 0))]
+
+print("%12s %18s %10s %10s %10s"
+      % ("colour", "RGB", "hue (deg)", "sat", "value"))
+for name, (r, g, b) in swatches:
+    h, s, v = rgb_to_hsv(r, g, b)
+    print("%12s %18s %9.0f %10.3f %10.3f" % (name, str((r, g, b)), h, s, v))
+print()
+print("read the three reds. pure red, dark red and pink have completely")
+print("different RGB triples, and the SAME hue of 0 degrees. they differ")
+print("only in saturation and value:")
+for name in ("pure red", "dark red", "pink"):
+    r, g, b = dict(swatches)[name]
+    h, s, v = rgb_to_hsv(r, g, b)
+    print("   %-10s hue %3.0f, saturation %.2f, value %.2f" % (name, h, s, v))
+print("   that is the property the whole colour space exists for.")
+print()
+
+print("HUE IS AN ANGLE, so the colours wrap:")
+for deg, name in ((0, "red"), (60, "yellow"), (120, "green"),
+                  (180, "cyan"), (240, "blue"), (300, "magenta"), (360, "red again")):
+    print("   %3d degrees -> %s" % (deg, name))
+print("   which means hue arithmetic is circular. the distance between 350")
+print("   and 10 degrees is 20, not 340, and code that forgets this splits")
+print("   red into two separate ranges:")
+for a, b in ((350, 10), (10, 350), (100, 200)):
+    naive = abs(a - b)
+    circ = min(naive, 360 - naive)
+    print("      |%3d - %3d|: naive %3d, circular %3d %s"
+          % (a, b, naive, circ, "  <- wrong" if naive != circ else ""))
+print()
+
+print("WHY THIS MATTERS FOR SEGMENTING BY COLOUR. take a red object")
+print("photographed under three lighting conditions:")
+lit = [("bright sun", (255, 40, 40)), ("indoors", (150, 25, 25)),
+       ("shadow", (70, 12, 12))]
+print("%14s %18s %28s" % ("condition", "RGB", "HSV"))
+for name, (r, g, b) in lit:
+    h, s, v = rgb_to_hsv(r, g, b)
+    print("%14s %18s %10.0f %8.3f %8.3f" % (name, str((r, g, b)), h, s, v))
+print()
+rgbs = np.array([c for _, c in lit], float)
+hsvs = np.array([rgb_to_hsv(*c) for _, c in lit])
+print("   spread across the three, per channel:")
+print("      RGB: R varies by %3.0f, G by %3.0f, B by %3.0f"
+      % tuple(rgbs.max(0) - rgbs.min(0)))
+print("      HSV: H varies by %.1f, S by %.3f, V by %.3f"
+      % tuple(hsvs.max(0) - hsvs.min(0)))
+print("   the hue barely moves. an RGB threshold has to cover a large")
+print("   3-D box to catch all three; a hue threshold is one narrow band.")
+print()
+
+print("   a red detector in each space, tested on the three lit versions")
+print("   plus some things that are NOT the object:")
+others = [("skin", (230, 180, 150)), ("orange", (255, 140, 0)),
+          ("grey wall", (150, 150, 150)), ("dark blue", (20, 20, 90))]
+print("%14s %18s %14s %14s" % ("sample", "RGB", "RGB rule", "hue rule"))
+for name, (r, g, b) in lit + others:
+    h, s, v = rgb_to_hsv(r, g, b)
+    rgb_hit = r > 120 and g < 80 and b < 80          # tuned for bright sun
+    hue_hit = (h < 15 or h > 345) and s > 0.5 and v > 0.03
+    print("%14s %18s %14s %14s"
+          % (name, str((r, g, b)),
+             "MATCH" if rgb_hit else "-", "MATCH" if hue_hit else "-"))
+print("   the RGB rule was tuned on the bright sample. it survives the")
+print("   indoor one and loses the object entirely in shadow, because its")
+print("   'R > 120' test is really a brightness test wearing a colour")
+print("   costume. the hue rule catches all three appearances of the same")
+print("   object and still rejects skin, orange, grey and blue.")
+print()
+
+print("THE PRACTICAL SPLIT:")
+print("   RGB  -- what a display emits and a sensor records. correct for")
+print("           storage, transmission and as a neural network's input.")
+print("   HSV  -- separates WHAT COLOUR from HOW BRIGHT, which is what you")
+print("           want for thresholding, chroma keying and colour tracking.")
+print("   and one caveat: hue is undefined when saturation is 0. a grey")
+print("   pixel has no colour to name:")
+for name in ("white", "grey", "black"):
+    r, g, b = dict(swatches)[name]
+    h, s, v = rgb_to_hsv(r, g, b)
+    print("      %-8s saturation %.2f -> hue reported as %.0f, and it means"
+          % (name, s, h))
+    print("      %-8s nothing" % "")
+print("   so always gate a hue test on a minimum saturation, or grey pixels")
+print("   will match whatever colour you were looking for.")
+```

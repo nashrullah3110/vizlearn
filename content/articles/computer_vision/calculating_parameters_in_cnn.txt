@@ -135,6 +135,145 @@ Storage follows directly: 4 bytes per parameter in 32-bit precision, 2 in half p
 - <strong>Batch normalisation is nearly free</strong> in parameters and considerably improves trainability.
 - <strong>1&times;1 convolutions are the cheap way to change channel count,</strong> which is why bottleneck blocks use them either side of the expensive 3&times;3.
 
+## Count every weight in a real architecture
+
+The formula is one line per layer type. Applying it to a whole network shows that almost all the parameters sit somewhere people rarely look, and almost all the compute sits somewhere else entirely.
+
+```python-run
+import numpy as np
+
+print("the two formulas, and there are only two:")
+print("    conv  : (kernel_h * kernel_w * in_channels + 1) * out_channels")
+print("    dense : (in_features + 1) * out_features")
+print("the +1 is the bias, one per output.")
+print()
+
+def conv_params(kh, kw, cin, cout, bias=True):
+    return (kh * kw * cin + (1 if bias else 0)) * cout
+
+def dense_params(fin, fout):
+    return (fin + 1) * fout
+
+print("WHY THE INPUT SIZE IS ABSENT from the conv formula:")
+for n in (32, 224, 1024):
+    print("   a 3x3, 64->128 conv on a %4dx%-4d input: %s parameters"
+          % (n, n, "{:,}".format(conv_params(3, 3, 64, 128))))
+print("   identical. the kernel is reused at every position, so image size")
+print("   changes the COMPUTE and never the parameter count.")
+print()
+
+# a VGG-ish network on 224x224x3
+layers = [
+    ("conv3-64",   "conv", (3, 3, 3, 64),      224),
+    ("conv3-64",   "conv", (3, 3, 64, 64),     224),
+    ("maxpool",    "pool", None,               112),
+    ("conv3-128",  "conv", (3, 3, 64, 128),    112),
+    ("conv3-128",  "conv", (3, 3, 128, 128),   112),
+    ("maxpool",    "pool", None,                56),
+    ("conv3-256",  "conv", (3, 3, 128, 256),    56),
+    ("conv3-256",  "conv", (3, 3, 256, 256),    56),
+    ("maxpool",    "pool", None,                28),
+    ("conv3-512",  "conv", (3, 3, 256, 512),    28),
+    ("conv3-512",  "conv", (3, 3, 512, 512),    28),
+    ("maxpool",    "pool", None,                14),
+    ("flatten",    "flat", None,                14),
+    ("dense-4096", "dense", (14 * 14 * 512, 4096), 1),
+    ("dense-4096", "dense", (4096, 4096),        1),
+    ("dense-1000", "dense", (4096, 1000),        1),
+]
+
+print("A VGG-STYLE NETWORK on 224x224x3:")
+print("%14s %20s %16s %18s"
+      % ("layer", "output shape", "parameters", "multiply-adds"))
+total_p, total_m = 0, 0
+rows = []
+for name, kind, spec, out_hw in layers:
+    if kind == "conv":
+        kh, kw, cin, cout = spec
+        p = conv_params(kh, kw, cin, cout)
+        m = out_hw * out_hw * kh * kw * cin * cout
+        shape = "%dx%dx%d" % (out_hw, out_hw, cout)
+    elif kind == "dense":
+        fin, fout = spec
+        p = dense_params(fin, fout)
+        m = fin * fout
+        shape = "%d" % fout
+    elif kind == "flat":
+        p, m = 0, 0
+        shape = "%d" % (14 * 14 * 512)
+    else:
+        p, m = 0, 0
+        shape = "%dx%dx%s" % (out_hw, out_hw, "-")
+    total_p += p
+    total_m += m
+    rows.append((name, kind, p, m))
+    print("%14s %20s %16s %18s"
+          % (name, shape, "{:,}".format(p), "{:,}".format(m)))
+print("%14s %20s %16s %18s"
+      % ("TOTAL", "", "{:,}".format(total_p), "{:,}".format(total_m)))
+print()
+
+conv_p = sum(p for _, k, p, _ in rows if k == "conv")
+dense_p = sum(p for _, k, p, _ in rows if k == "dense")
+conv_m = sum(m for _, k, _, m in rows if k == "conv")
+dense_m = sum(m for _, k, _, m in rows if k == "dense")
+print("AND HERE IS THE POINT:")
+print("%22s %18s %10s %18s %10s"
+      % ("", "parameters", "share", "multiply-adds", "share"))
+print("%22s %18s %9.1f%% %18s %9.1f%%"
+      % ("convolutions", "{:,}".format(conv_p), 100 * conv_p / total_p,
+         "{:,}".format(conv_m), 100 * conv_m / total_m))
+print("%22s %18s %9.1f%% %18s %9.1f%%"
+      % ("dense layers", "{:,}".format(dense_p), 100 * dense_p / total_p,
+         "{:,}".format(dense_m), 100 * dense_m / total_m))
+print()
+print("   the dense layers hold %.0f%% of the parameters and do %.1f%% of the"
+      % (100 * dense_p / total_p, 100 * dense_m / total_m))
+print("   arithmetic. the convolutions are the opposite.")
+print()
+first_dense = [p for n, k, p, _ in rows if k == "dense"][0]
+print("   and ONE layer dominates. the first dense layer alone:")
+print("      %s parameters -- %.0f%% of the entire network"
+      % ("{:,}".format(first_dense), 100 * first_dense / total_p))
+print("      because flattening 14x14x512 gives %s inputs, and every one of"
+      % "{:,}".format(14 * 14 * 512))
+print("      them connects to all 4096 outputs.")
+print()
+
+print("WHICH IS WHY GLOBAL AVERAGE POOLING REPLACED IT. average each")
+print("channel down to a single number instead of flattening:")
+gap_in = 512
+gap_dense = dense_params(gap_in, 1000)
+print("      flatten + dense-4096 + dense-4096 + dense-1000 : %s"
+      % "{:,}".format(dense_p))
+print("      global average pool + dense-1000               : %s"
+      % "{:,}".format(gap_dense))
+print("      a %.0fx reduction, and the network gets BETTER at generalising"
+      % (dense_p / gap_dense))
+print("      because there is far less capacity available to memorise.")
+print()
+
+print("TWO THINGS THAT CHANGE THE COUNT and are easy to forget:")
+print("   BatchNorm adds 2 learnable parameters per channel (plus 2 running")
+print("   statistics that are saved but not trained):")
+for c in (64, 256, 512):
+    print("      %3d channels -> %d trainable, %d buffers" % (c, 2 * c, 2 * c))
+bn_total = sum(2 * spec[3] for _, k, spec, _ in layers if k == "conv")
+print("      across this network: %s trainable BatchNorm parameters --"
+      % "{:,}".format(bn_total))
+print("      about 1 in every %s of the total. negligible in count,"
+      % "{:,}".format(int(total_p / bn_total)))
+print("      and essential in effect.")
+print()
+print("   BIAS is often disabled before a BatchNorm, because BatchNorm's")
+print("   shift parameter does the same job:")
+with_bias = conv_params(3, 3, 512, 512, True)
+without = conv_params(3, 3, 512, 512, False)
+print("      3x3, 512->512 with bias %s, without %s -- a difference of %d"
+      % ("{:,}".format(with_bias), "{:,}".format(without), with_bias - without))
+print("      small, but it is free and it removes a redundant parameter.")
+```
+
 ## Questions people ask
 
 <strong>Why does my model have more parameters than I calculated?</strong> Biases, batch normalisation, and any auxiliary heads. Also check whether an embedding or a large final classifier is included.

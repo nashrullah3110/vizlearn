@@ -100,3 +100,127 @@ afford it.
 **Forgetting the non-linearity.** The depthwise and pointwise steps need an
 activation between them, or the pair is closer to a single linear map than the
 two-stage decomposition it is supposed to be.
+
+## Splitting one convolution into two cheaper ones
+
+A normal convolution mixes space and channels at once. Doing those separately costs a fraction as much, which is the whole idea behind MobileNet -- and this measures both the saving and what it gives up.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def standard(kh, cin, cout):
+    return kh * kh * cin * cout
+
+def depthwise(kh, cin):
+    return kh * kh * cin          # one kernel per input channel, no mixing
+
+def pointwise(cin, cout):
+    return 1 * 1 * cin * cout     # mixes channels, no spatial extent
+
+print("a standard convolution does two jobs in one operation:")
+print("   1. combine a spatial neighbourhood  (the kxk window)")
+print("   2. combine the channels             (sum over c_in)")
+print("and it pays kh*kw*cin*cout weights to do both together.")
+print()
+print("separating them:")
+print("   DEPTHWISE   -- one kxk kernel per input channel, applied to that")
+print("                  channel only. no channel mixing at all.")
+print("   POINTWISE   -- a 1x1 convolution. all the channel mixing, no")
+print("                  spatial extent.")
+print()
+
+print("THE SAVING. a 3x3 convolution, various channel counts:")
+print("%12s %12s %16s %16s %12s %10s"
+      % ("in", "out", "standard", "depthwise+point", "ratio", "1/ratio"))
+for cin, cout in ((3, 32), (32, 64), (64, 128), (256, 256), (512, 512)):
+    s = standard(3, cin, cout)
+    d = depthwise(3, cin) + pointwise(cin, cout)
+    print("%12d %12d %16s %16s %12.2fx %10.3f"
+          % (cin, cout, "{:,}".format(s), "{:,}".format(d), s / d, d / s))
+print()
+print("   the ratio converges on 1/(kh*kw) + 1/cout. for a 3x3 with many")
+print("   channels that is close to 1/9:")
+for cout in (32, 128, 512, 4096):
+    r = 1 / 9 + 1 / cout
+    print("      cout=%5d -> %.4f of the standard cost (limit %.4f)"
+          % (cout, r, 1 / 9))
+print("   so a 3x3 depthwise-separable convolution costs roughly one ninth")
+print("   of a normal one, and a 5x5 roughly one twenty-fifth.")
+print()
+
+H, W, CIN, COUT = 5, 5, 4, 3
+x = rng.normal(0, 1.0, (H, W, CIN))
+
+def conv_standard(x, k):
+    # k: (3, 3, cin, cout)
+    p = np.pad(x, ((1, 1), (1, 1), (0, 0)), mode="constant")
+    out = np.zeros((x.shape[0], x.shape[1], k.shape[3]))
+    for i in range(x.shape[0]):
+        for j in range(x.shape[1]):
+            win = p[i:i + 3, j:j + 3, :]
+            for o in range(k.shape[3]):
+                out[i, j, o] = (win * k[:, :, :, o]).sum()
+    return out
+
+def conv_depthwise(x, kd):
+    # kd: (3, 3, cin) -- one kernel per channel
+    p = np.pad(x, ((1, 1), (1, 1), (0, 0)), mode="constant")
+    out = np.zeros_like(x)
+    for c in range(x.shape[2]):
+        for i in range(x.shape[0]):
+            for j in range(x.shape[1]):
+                out[i, j, c] = (p[i:i + 3, j:j + 3, c] * kd[:, :, c]).sum()
+    return out
+
+k_std = rng.normal(0, 0.3, (3, 3, CIN, COUT))
+k_dw = rng.normal(0, 0.3, (3, 3, CIN))
+k_pw = rng.normal(0, 0.3, (CIN, COUT))
+
+out_std = conv_standard(x, k_std)
+out_sep = conv_depthwise(x, k_dw) @ k_pw
+print("RUN BOTH on a %dx%dx%d input, %d output channels:" % (H, W, CIN, COUT))
+print("   standard          -> %s, %d weights" % (out_std.shape, k_std.size))
+print("   depthwise + 1x1   -> %s, %d + %d = %d weights"
+      % (out_sep.shape, k_dw.size, k_pw.size, k_dw.size + k_pw.size))
+print("   same output shape, %.1fx fewer weights."
+      % (k_std.size / (k_dw.size + k_pw.size)))
+print()
+
+print("WHAT IT GIVES UP. a standard convolution has an independent kxk")
+print("kernel for EVERY (input channel, output channel) pair:")
+print("   standard 3x3, %d->%d: %d distinct spatial kernels"
+      % (CIN, COUT, CIN * COUT))
+print("   depthwise 3x3, %d channels: %d distinct spatial kernels"
+      % (CIN, CIN))
+print("   so the separable version cannot learn 'detect a horizontal edge in")
+print("   channel 2 but a vertical one in channel 2 for a different output'.")
+print("   each input channel gets ONE spatial filter, and the pointwise layer")
+print("   can only reweight the results.")
+print()
+print("   measured directly. for ONE input channel, collect the 3x3 kernel")
+print("   it uses toward each output channel, as a 9 x %d matrix:" % COUT)
+print("%22s %14s %14s" % ("input channel", "standard rank", "separable rank"))
+for c in range(CIN):
+    m_std = k_std[:, :, c, :].reshape(9, COUT)
+    m_sep = k_dw[:, :, c].reshape(9, 1) * k_pw[c][None, :]
+    print("%22d %14d %14d"
+          % (c, np.linalg.matrix_rank(m_std), np.linalg.matrix_rank(m_sep)))
+print("   the separable column is 1 every time, and that is the constraint")
+print("   stated exactly: every output channel sees the SAME spatial")
+print("   pattern from a given input channel, scaled by a single number.")
+print("   the standard version gets an independent pattern for each pair.")
+print()
+print("SO THE TRADE IS CAPACITY FOR COST, and in practice it is a good one:")
+print("   MobileNetV1 traded about %.0f%% of the parameters for a few points"
+      % 90)
+print("   of ImageNet accuracy, which is exactly the deal you want on a")
+print("   phone. the usual repair is to make the network WIDER with the")
+print("   savings, which buys much of the accuracy back:")
+for width in (1.0, 1.5, 2.0):
+    cin, cout = int(256 * width), int(256 * width)
+    d = depthwise(3, cin) + pointwise(cin, cout)
+    print("      width x%.1f: %s parameters against a standard 256->256's %s"
+          % (width, "{:,}".format(d), "{:,}".format(standard(3, 256, 256))))
+```

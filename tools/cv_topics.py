@@ -1347,6 +1347,120 @@ scene.
 
 **Reading OpenCV's hue as degrees.** OpenCV stores hue in 0-179 so it fits in a
 byte, not 0-359. Half of every published threshold is wrong for this reason.
+
+## The same colour, described two ways
+
+RGB says how much of each light; HSV says which colour, how vivid, how bright. Converting between them by hand shows why one is right for displays and the other for finding a coloured object.
+
+```python-run
+import numpy as np
+
+def rgb_to_hsv(r, g, b):
+    r, g, b = r / 255.0, g / 255.0, b / 255.0
+    mx, mn = max(r, g, b), min(r, g, b)
+    d = mx - mn
+    if d == 0:
+        h = 0.0
+    elif mx == r:
+        h = (60 * ((g - b) / d)) % 360
+    elif mx == g:
+        h = 60 * ((b - r) / d) + 120
+    else:
+        h = 60 * ((r - g) / d) + 240
+    s = 0.0 if mx == 0 else d / mx
+    return h, s, mx
+
+swatches = [("pure red", (255, 0, 0)), ("dark red", (128, 0, 0)),
+            ("pink", (255, 128, 128)), ("pure green", (0, 255, 0)),
+            ("sky blue", (100, 180, 255)), ("white", (255, 255, 255)),
+            ("grey", (128, 128, 128)), ("black", (0, 0, 0))]
+
+print("%12s %18s %10s %10s %10s"
+      % ("colour", "RGB", "hue (deg)", "sat", "value"))
+for name, (r, g, b) in swatches:
+    h, s, v = rgb_to_hsv(r, g, b)
+    print("%12s %18s %9.0f %10.3f %10.3f" % (name, str((r, g, b)), h, s, v))
+print()
+print("read the three reds. pure red, dark red and pink have completely")
+print("different RGB triples, and the SAME hue of 0 degrees. they differ")
+print("only in saturation and value:")
+for name in ("pure red", "dark red", "pink"):
+    r, g, b = dict(swatches)[name]
+    h, s, v = rgb_to_hsv(r, g, b)
+    print("   %-10s hue %3.0f, saturation %.2f, value %.2f" % (name, h, s, v))
+print("   that is the property the whole colour space exists for.")
+print()
+
+print("HUE IS AN ANGLE, so the colours wrap:")
+for deg, name in ((0, "red"), (60, "yellow"), (120, "green"),
+                  (180, "cyan"), (240, "blue"), (300, "magenta"), (360, "red again")):
+    print("   %3d degrees -> %s" % (deg, name))
+print("   which means hue arithmetic is circular. the distance between 350")
+print("   and 10 degrees is 20, not 340, and code that forgets this splits")
+print("   red into two separate ranges:")
+for a, b in ((350, 10), (10, 350), (100, 200)):
+    naive = abs(a - b)
+    circ = min(naive, 360 - naive)
+    print("      |%3d - %3d|: naive %3d, circular %3d %s"
+          % (a, b, naive, circ, "  <- wrong" if naive != circ else ""))
+print()
+
+print("WHY THIS MATTERS FOR SEGMENTING BY COLOUR. take a red object")
+print("photographed under three lighting conditions:")
+lit = [("bright sun", (255, 40, 40)), ("indoors", (150, 25, 25)),
+       ("shadow", (70, 12, 12))]
+print("%14s %18s %28s" % ("condition", "RGB", "HSV"))
+for name, (r, g, b) in lit:
+    h, s, v = rgb_to_hsv(r, g, b)
+    print("%14s %18s %10.0f %8.3f %8.3f" % (name, str((r, g, b)), h, s, v))
+print()
+rgbs = np.array([c for _, c in lit], float)
+hsvs = np.array([rgb_to_hsv(*c) for _, c in lit])
+print("   spread across the three, per channel:")
+print("      RGB: R varies by %3.0f, G by %3.0f, B by %3.0f"
+      % tuple(rgbs.max(0) - rgbs.min(0)))
+print("      HSV: H varies by %.1f, S by %.3f, V by %.3f"
+      % tuple(hsvs.max(0) - hsvs.min(0)))
+print("   the hue barely moves. an RGB threshold has to cover a large")
+print("   3-D box to catch all three; a hue threshold is one narrow band.")
+print()
+
+print("   a red detector in each space, tested on the three lit versions")
+print("   plus some things that are NOT the object:")
+others = [("skin", (230, 180, 150)), ("orange", (255, 140, 0)),
+          ("grey wall", (150, 150, 150)), ("dark blue", (20, 20, 90))]
+print("%14s %18s %14s %14s" % ("sample", "RGB", "RGB rule", "hue rule"))
+for name, (r, g, b) in lit + others:
+    h, s, v = rgb_to_hsv(r, g, b)
+    rgb_hit = r > 120 and g < 80 and b < 80          # tuned for bright sun
+    hue_hit = (h < 15 or h > 345) and s > 0.5 and v > 0.03
+    print("%14s %18s %14s %14s"
+          % (name, str((r, g, b)),
+             "MATCH" if rgb_hit else "-", "MATCH" if hue_hit else "-"))
+print("   the RGB rule was tuned on the bright sample. it survives the")
+print("   indoor one and loses the object entirely in shadow, because its")
+print("   'R > 120' test is really a brightness test wearing a colour")
+print("   costume. the hue rule catches all three appearances of the same")
+print("   object and still rejects skin, orange, grey and blue.")
+print()
+
+print("THE PRACTICAL SPLIT:")
+print("   RGB  -- what a display emits and a sensor records. correct for")
+print("           storage, transmission and as a neural network's input.")
+print("   HSV  -- separates WHAT COLOUR from HOW BRIGHT, which is what you")
+print("           want for thresholding, chroma keying and colour tracking.")
+print("   and one caveat: hue is undefined when saturation is 0. a grey")
+print("   pixel has no colour to name:")
+for name in ("white", "grey", "black"):
+    r, g, b = dict(swatches)[name]
+    h, s, v = rgb_to_hsv(r, g, b)
+    print("      %-8s saturation %.2f -> hue reported as %.0f, and it means"
+          % (name, s, h))
+    print("      %-8s nothing" % "")
+print("   so always gate a hue test on a minimum saturation, or grey pixels")
+print("   will match whatever colour you were looking for.")
+```
+
 """,
     [
         {"q": "Why is selecting 'anything red' easier in HSV than in RGB?",
@@ -2145,6 +2259,107 @@ computation and can cost more accuracy than it is worth.
 **Forgetting the activation.** A 1&#215;1 with no non-linearity after it,
 stacked on another linear layer, collapses into a single linear map. Two
 matrices multiplied together are one matrix.
+
+## A convolution that looks at one pixel
+
+A 1x1 kernel has no spatial extent at all, which sounds useless. It is a per-pixel linear layer across channels, and it is what makes bottleneck blocks and depthwise-separable convolutions affordable.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+H, W, C = 4, 4, 6
+x = rng.normal(0, 1.0, (H, W, C))
+print("a feature map: %dx%d positions, %d channels each." % (H, W, C))
+print("   the vector at position (0,0): %s" % np.round(x[0, 0], 3))
+print()
+
+COUT = 3
+W1 = rng.normal(0, 0.4, (C, COUT))
+out = x @ W1                     # that is the entire operation
+print("a 1x1 convolution with %d output channels is a %dx%d matrix applied"
+      % (COUT, C, COUT))
+print("to every position independently:")
+print("   output at (0,0): %s" % np.round(out[0, 0], 3))
+print("   by hand:         %s" % np.round(x[0, 0] @ W1, 3))
+print("   shape %s -> %s" % (x.shape, out.shape))
+print("   the spatial dimensions are untouched. only the channel count")
+print("   changed, which is the whole purpose.")
+print()
+
+print("IT IS A DENSE LAYER, SHARED ACROSS POSITIONS. proof -- shuffle the")
+print("positions and the outputs follow exactly:")
+flat = x.reshape(-1, C)
+perm = rng.permutation(H * W)
+a = (flat @ W1)[perm]
+b = flat[perm] @ W1
+print("   identical: %s" % np.allclose(a, b))
+print("   so it cannot mix information between positions. a 3x3 convolution")
+print("   can; this cannot. it only mixes CHANNELS.")
+print()
+
+print("USE 1 -- CHANGING THE CHANNEL COUNT CHEAPLY. compare the cost of")
+print("reducing 256 channels to 64:")
+for kh in (1, 3, 5):
+    p = kh * kh * 256 * 64
+    print("   %dx%d conv, 256->64 : %12s parameters" % (kh, kh, "{:,}".format(p)))
+print("   the 1x1 does the same job for a ninth of a 3x3's cost, because")
+print("   there is no spatial window to weight.")
+print()
+
+print("USE 2 -- THE BOTTLENECK BLOCK, which is what ResNet-50 is built from.")
+print("a 3x3 convolution on 256 channels, done two ways:")
+direct = 3 * 3 * 256 * 256
+print("   direct 3x3, 256->256                    : %12s"
+      % "{:,}".format(direct))
+squeeze = 1 * 1 * 256 * 64
+middle = 3 * 3 * 64 * 64
+expand = 1 * 1 * 64 * 256
+total = squeeze + middle + expand
+print("   1x1 256->64  (squeeze)                  : %12s" % "{:,}".format(squeeze))
+print("   3x3 64->64   (the actual spatial work)  : %12s" % "{:,}".format(middle))
+print("   1x1 64->256  (expand)                   : %12s" % "{:,}".format(expand))
+print("   %-40s: %12s" % ("bottleneck total", "{:,}".format(total)))
+print("   %.1fx fewer parameters, and the expensive 3x3 now runs on 64"
+      % (direct / total))
+print("   channels instead of 256 -- a %.0fx saving on that layer alone."
+      % ((3 * 3 * 256 * 256) / (3 * 3 * 64 * 64)))
+print()
+print("   and it is still non-linear: there is a ReLU after each of the")
+print("   three, so the block is not equivalent to one big convolution.")
+print()
+
+print("USE 3 -- CROSS-CHANNEL MIXING. each output channel is a learned")
+print("combination of all input channels. here is what one output channel")
+print("is made of:")
+for j in range(COUT):
+    contrib = np.abs(W1[:, j])
+    order = np.argsort(-contrib)
+    print("   output channel %d draws most on input channels %s"
+          % (j, ", ".join("%d (%.2f)" % (i, W1[i, j]) for i in order[:3])))
+print("   a 3x3 convolution also mixes channels, but it spends 9 weights per")
+print("   pair doing it. if the mixing is all you need, 8 of those 9 are")
+print("   wasted.")
+print()
+
+print("USE 4 -- MAKING A NETWORK FULLY CONVOLUTIONAL. a dense layer needs a")
+print("fixed input size; a 1x1 convolution does not:")
+for size in (7, 14, 28):
+    feat = rng.normal(size=(size, size, 512))
+    logits = feat @ rng.normal(0, 0.1, (512, 10))
+    print("   %2dx%-2d input -> logits %s -- one prediction PER POSITION"
+          % (size, size, logits.shape))
+print("   that is how a classifier becomes a segmenter: replace the final")
+print("   dense layer with a 1x1 convolution and it outputs a class map")
+print("   instead of a class, at whatever resolution you feed it.")
+print()
+
+print("the summary in one line: a 1x1 convolution is the cheapest way to")
+print("change how many channels you have, and the only convolution that")
+print("does nothing spatial at all.")
+```
+
 """,
     [
         {"q": "What does a 1x1 convolution actually combine?",
@@ -2309,6 +2524,131 @@ afford it.
 **Forgetting the non-linearity.** The depthwise and pointwise steps need an
 activation between them, or the pair is closer to a single linear map than the
 two-stage decomposition it is supposed to be.
+
+## Splitting one convolution into two cheaper ones
+
+A normal convolution mixes space and channels at once. Doing those separately costs a fraction as much, which is the whole idea behind MobileNet -- and this measures both the saving and what it gives up.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+def standard(kh, cin, cout):
+    return kh * kh * cin * cout
+
+def depthwise(kh, cin):
+    return kh * kh * cin          # one kernel per input channel, no mixing
+
+def pointwise(cin, cout):
+    return 1 * 1 * cin * cout     # mixes channels, no spatial extent
+
+print("a standard convolution does two jobs in one operation:")
+print("   1. combine a spatial neighbourhood  (the kxk window)")
+print("   2. combine the channels             (sum over c_in)")
+print("and it pays kh*kw*cin*cout weights to do both together.")
+print()
+print("separating them:")
+print("   DEPTHWISE   -- one kxk kernel per input channel, applied to that")
+print("                  channel only. no channel mixing at all.")
+print("   POINTWISE   -- a 1x1 convolution. all the channel mixing, no")
+print("                  spatial extent.")
+print()
+
+print("THE SAVING. a 3x3 convolution, various channel counts:")
+print("%12s %12s %16s %16s %12s %10s"
+      % ("in", "out", "standard", "depthwise+point", "ratio", "1/ratio"))
+for cin, cout in ((3, 32), (32, 64), (64, 128), (256, 256), (512, 512)):
+    s = standard(3, cin, cout)
+    d = depthwise(3, cin) + pointwise(cin, cout)
+    print("%12d %12d %16s %16s %12.2fx %10.3f"
+          % (cin, cout, "{:,}".format(s), "{:,}".format(d), s / d, d / s))
+print()
+print("   the ratio converges on 1/(kh*kw) + 1/cout. for a 3x3 with many")
+print("   channels that is close to 1/9:")
+for cout in (32, 128, 512, 4096):
+    r = 1 / 9 + 1 / cout
+    print("      cout=%5d -> %.4f of the standard cost (limit %.4f)"
+          % (cout, r, 1 / 9))
+print("   so a 3x3 depthwise-separable convolution costs roughly one ninth")
+print("   of a normal one, and a 5x5 roughly one twenty-fifth.")
+print()
+
+H, W, CIN, COUT = 5, 5, 4, 3
+x = rng.normal(0, 1.0, (H, W, CIN))
+
+def conv_standard(x, k):
+    # k: (3, 3, cin, cout)
+    p = np.pad(x, ((1, 1), (1, 1), (0, 0)), mode="constant")
+    out = np.zeros((x.shape[0], x.shape[1], k.shape[3]))
+    for i in range(x.shape[0]):
+        for j in range(x.shape[1]):
+            win = p[i:i + 3, j:j + 3, :]
+            for o in range(k.shape[3]):
+                out[i, j, o] = (win * k[:, :, :, o]).sum()
+    return out
+
+def conv_depthwise(x, kd):
+    # kd: (3, 3, cin) -- one kernel per channel
+    p = np.pad(x, ((1, 1), (1, 1), (0, 0)), mode="constant")
+    out = np.zeros_like(x)
+    for c in range(x.shape[2]):
+        for i in range(x.shape[0]):
+            for j in range(x.shape[1]):
+                out[i, j, c] = (p[i:i + 3, j:j + 3, c] * kd[:, :, c]).sum()
+    return out
+
+k_std = rng.normal(0, 0.3, (3, 3, CIN, COUT))
+k_dw = rng.normal(0, 0.3, (3, 3, CIN))
+k_pw = rng.normal(0, 0.3, (CIN, COUT))
+
+out_std = conv_standard(x, k_std)
+out_sep = conv_depthwise(x, k_dw) @ k_pw
+print("RUN BOTH on a %dx%dx%d input, %d output channels:" % (H, W, CIN, COUT))
+print("   standard          -> %s, %d weights" % (out_std.shape, k_std.size))
+print("   depthwise + 1x1   -> %s, %d + %d = %d weights"
+      % (out_sep.shape, k_dw.size, k_pw.size, k_dw.size + k_pw.size))
+print("   same output shape, %.1fx fewer weights."
+      % (k_std.size / (k_dw.size + k_pw.size)))
+print()
+
+print("WHAT IT GIVES UP. a standard convolution has an independent kxk")
+print("kernel for EVERY (input channel, output channel) pair:")
+print("   standard 3x3, %d->%d: %d distinct spatial kernels"
+      % (CIN, COUT, CIN * COUT))
+print("   depthwise 3x3, %d channels: %d distinct spatial kernels"
+      % (CIN, CIN))
+print("   so the separable version cannot learn 'detect a horizontal edge in")
+print("   channel 2 but a vertical one in channel 2 for a different output'.")
+print("   each input channel gets ONE spatial filter, and the pointwise layer")
+print("   can only reweight the results.")
+print()
+print("   measured directly. for ONE input channel, collect the 3x3 kernel")
+print("   it uses toward each output channel, as a 9 x %d matrix:" % COUT)
+print("%22s %14s %14s" % ("input channel", "standard rank", "separable rank"))
+for c in range(CIN):
+    m_std = k_std[:, :, c, :].reshape(9, COUT)
+    m_sep = k_dw[:, :, c].reshape(9, 1) * k_pw[c][None, :]
+    print("%22d %14d %14d"
+          % (c, np.linalg.matrix_rank(m_std), np.linalg.matrix_rank(m_sep)))
+print("   the separable column is 1 every time, and that is the constraint")
+print("   stated exactly: every output channel sees the SAME spatial")
+print("   pattern from a given input channel, scaled by a single number.")
+print("   the standard version gets an independent pattern for each pair.")
+print()
+print("SO THE TRADE IS CAPACITY FOR COST, and in practice it is a good one:")
+print("   MobileNetV1 traded about %.0f%% of the parameters for a few points"
+      % 90)
+print("   of ImageNet accuracy, which is exactly the deal you want on a")
+print("   phone. the usual repair is to make the network WIDER with the")
+print("   savings, which buys much of the accuracy back:")
+for width in (1.0, 1.5, 2.0):
+    cin, cout = int(256 * width), int(256 * width)
+    d = depthwise(3, cin) + pointwise(cin, cout)
+    print("      width x%.1f: %s parameters against a standard 256->256's %s"
+          % (width, "{:,}".format(d), "{:,}".format(standard(3, 256, 256))))
+```
+
 """,
     [
         {"q": "What does the depthwise step mix?",
