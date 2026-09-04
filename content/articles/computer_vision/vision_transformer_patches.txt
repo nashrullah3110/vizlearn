@@ -98,3 +98,170 @@ and interpolation is required.
 
 **Assuming patches must be square and non-overlapping.** Overlapping patches
 help; several later architectures use them.
+
+## Cutting an image into tokens
+
+A vision transformer starts by chopping the image into patches and flattening each one into a vector. That single step decides the model's cost, its resolution limit, and everything it does not know about geometry -- which it then has to be told.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+IMG, P = 12, 4                          # 12x12 image, 4x4 patches
+img = np.arange(IMG * IMG).reshape(IMG, IMG) % 10
+
+print("THE IMAGE, %dx%d, with a %dx%d patch grid drawn on it:" % (IMG, IMG, P, P))
+for i in range(IMG):
+    if i % P == 0:
+        print("   " + "+----" * (IMG // P) + "+")
+    row = ""
+    for j in range(IMG):
+        row += ("|" if j % P == 0 else "") + str(img[i, j])
+    print("   " + row + "|")
+print("   " + "+----" * (IMG // P) + "+")
+n = (IMG // P) ** 2
+print("   %d patches of %dx%d = %d pixels each." % (n, P, P, P * P))
+print()
+
+patches = []
+for i in range(0, IMG, P):
+    for j in range(0, IMG, P):
+        patches.append(img[i:i + P, j:j + P].reshape(-1))
+patches = np.array(patches, float)
+print("EACH PATCH IS FLATTENED INTO A VECTOR of %d numbers:" % (P * P))
+print("   patch 0: %s" % " ".join("%.0f" % v for v in patches[0]))
+print("   patch 1: %s" % " ".join("%.0f" % v for v in patches[1]))
+print("   the sequence is now %s -- %d tokens of %d dimensions, exactly"
+      % (str(patches.shape), n, P * P))
+print("   the shape a text transformer expects. that is the whole trick:")
+print("   turn the image into a sentence and the rest of the architecture")
+print("   is unchanged.")
+print()
+
+D = 8
+E = rng.normal(0, 0.3, (P * P, D))
+tokens = patches @ E
+print("A LINEAR PROJECTION maps each %d-vector to the model width D=%d:"
+      % (P * P, D))
+print("   tokens = patches @ E, with E of shape %s -> %s"
+      % (str(E.shape), str(tokens.shape)))
+print("   and here is a fact worth pausing on: 'cut into patches, flatten,")
+print("   multiply by E' is EXACTLY a convolution with kernel size %d and"
+      % P)
+print("   stride %d. check it against a real convolution:" % P)
+K = E.T.reshape(D, P, P)
+conv_out = np.zeros((D, IMG // P, IMG // P))
+for d in range(D):
+    for a, i in enumerate(range(0, IMG, P)):
+        for b, j in enumerate(range(0, IMG, P)):
+            conv_out[d, a, b] = (img[i:i + P, j:j + P] * K[d]).sum()
+print("      max difference: %.2e"
+      % np.abs(conv_out.reshape(D, -1).T - tokens).max())
+print("   identical, and every ViT implementation does it that way --")
+print("   nn.Conv2d(3, D, kernel_size=%d, stride=%d) IS the patch embedding."
+      % (P, P))
+print()
+
+print("NOW THE PROBLEM. a transformer's attention is PERMUTATION")
+print("EQUIVARIANT: shuffle the tokens and the outputs shuffle with them,")
+print("unchanged. that is right for a set and wrong for an image. check")
+print("what the token set knows about position:")
+perm = rng.permutation(n)
+print("   original token order:  %s" % " ".join(str(i) for i in range(n)))
+print("   shuffled token order:  %s" % " ".join(str(i) for i in perm))
+print("   as SETS these are identical, so any function that treats them as")
+print("   a set gives the same answer for the image and for the image cut")
+print("   up and rearranged. the model literally cannot tell them apart.")
+print()
+
+print("SO POSITION IS ADDED, not inferred. the standard sinusoidal scheme:")
+pos = np.zeros((n, D))
+for k in range(n):
+    for d in range(0, D, 2):
+        w = 1.0 / (10000 ** (d / float(D)))
+        pos[k, d] = np.sin(k * w)
+        pos[k, d + 1] = np.cos(k * w)
+print("%-10s %s" % ("token", "  ".join("dim %d" % d for d in range(D))))
+for k in (0, 1, 2, 8):
+    print("%-10d %s" % (k, "  ".join("%5.2f" % v for v in pos[k])))
+print("   every token gets a different vector, so after adding it the")
+print("   tokens are no longer interchangeable. the shuffle test now:")
+def as_multiset(M):
+    # sort the ROWS, so two arrays match only if they hold the same vectors
+    return M[np.lexsort(M.T[::-1])]
+
+def same(A, B):
+    return "identical" if np.allclose(as_multiset(A), as_multiset(B)) else "DIFFERENT"
+
+print("   shuffle the patches and compare what the model receives.")
+print("   note that the position vectors stay attached to the SLOT, not to")
+print("   the patch -- slot 0 always gets pos[0]:")
+print("%-42s %s" % ("without position: tokens vs tokens[perm]",
+                    same(tokens, tokens[perm])))
+print("%-42s %s" % ("with position:    t+pos vs t[perm]+pos",
+                    same(tokens + pos, tokens[perm] + pos)))
+print("   without position the two are the same multiset of vectors, so")
+print("   nothing downstream can distinguish them. with position added")
+print("   they are not, because each patch now carries where it sat.")
+print("   that is the whole job of a position embedding: it is the only")
+print("   thing standing between a vision transformer and a bag of")
+print("   patches.")
+print()
+print("   most modern ViTs use a LEARNED position embedding instead -- a")
+print("   plain lookup table, one vector per patch index, trained with the")
+print("   rest. which means the model has to learn from data that patch 0")
+print("   is next to patch 1 and above patch 3. a CNN never learns that;")
+print("   it is built into the shape of the convolution.")
+print()
+
+print("WHAT THE PATCH SIZE COSTS. attention is quadratic in the token")
+print("count, and the token count is quadratic in 1/patch_size:")
+print("%-14s %10s %14s %20s"
+      % ("patch size", "tokens", "attention ops", "relative cost"))
+base = None
+for p in (32, 16, 14, 8, 4):
+    t = (224 // p) ** 2
+    ops = t * t
+    base = ops if base is None else base
+    print("%-14d %10d %14s %19.1fx"
+          % (p, t, "{:,}".format(ops), ops / float((224 // 32) ** 4)))
+print("   for a 224x224 image. going from 32x32 patches to 4x4 multiplies")
+print("   the attention cost by %d. THAT is why ViT-B/16 exists and"
+      % int(((224 // 4) ** 4) / ((224 // 32) ** 4)))
+print("   ViT-B/2 does not, and why every efficient variant since --")
+print("   Swin's windows, hierarchical pooling, linear attention -- is an")
+print("   attempt to escape this table.")
+print()
+
+print("AND WHAT IT COSTS IN RESOLUTION. a %dx%d patch is ONE token: the" % (P, P))
+print("model has no representation of anything smaller.")
+flat = patches[0].copy()
+scrambled = flat.copy()
+rng.shuffle(scrambled)
+print("   patch 0 as given:    %s" % " ".join("%.0f" % v for v in flat))
+print("   its pixels shuffled: %s" % " ".join("%.0f" % v for v in scrambled))
+pa = patches[0] @ E
+pb = scrambled @ E
+print("   these are different images, and after the projection they do")
+print("   give different vectors -- the two differ by %.2f in norm, so"
+      % np.linalg.norm(pa - pb))
+print("   nothing was lost. the limit is not information, it is ADDRESSING:")
+print("   attention operates on tokens, so a patch is the smallest thing")
+print("   the model can attend TO, point at, or reason about separately.")
+print("   whatever structure exists inside a patch has to survive as a")
+print("   single vector among %d others." % (n - 1))
+print("   real ViTs make D large enough that the projection loses nothing")
+print("   -- ViT-B/16 maps 16*16*3 = 768 inputs to D = 768, an exactly")
+print("   square matrix. the resolution limit is the patch grid itself,")
+print("   not the width of the embedding, which is why halving the patch")
+print("   size is the only way to see finer detail, and why the table")
+print("   above is the wall every ViT variant runs into.")
+print()
+print("which is the honest summary of the whole design: a ViT trades the")
+print("CNN's built-in assumption that nearby pixels belong together for")
+print("the freedom to relate any patch to any other in one step. it gives")
+print("up a prior and buys reach. that trade is why ViTs need far more")
+print("data than CNNs to reach the same accuracy -- with enough of it they")
+print("learn the prior, and beyond that point they exceed what the prior")
+print("would have allowed.")
+```

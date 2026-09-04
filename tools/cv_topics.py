@@ -4146,6 +4146,216 @@ background everywhere and the loss looks fine.
 **Too many anchors.** Each one costs memory and computation at every position of
 every feature map, and past a point they overlap so much that extra ones add
 nothing.
+
+## Guessing boxes so the network only has to correct them
+
+An anchor is a box the detector guesses before seeing the image, so the network predicts a small correction instead of raw coordinates. This builds an anchor grid, measures which real objects it can and cannot reach, and finds that the thing limiting coverage is not always the thing you would reach for first.
+
+```python-run
+import numpy as np
+
+IMG = 64
+
+def build(stride, scales, ratios):
+    shapes = [(s * np.sqrt(r), s / np.sqrt(r)) for s in scales for r in ratios]
+    n = IMG // stride
+    out = []
+    for i in range(n):
+        for j in range(n):
+            cy, cx = stride * (i + 0.5), stride * (j + 0.5)
+            for w, h in shapes:
+                out.append((cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2))
+    return np.array(out), shapes, n * n
+
+def iou_many(box, boxes):
+    x1 = np.maximum(box[0], boxes[:, 0]); y1 = np.maximum(box[1], boxes[:, 1])
+    x2 = np.minimum(box[2], boxes[:, 2]); y2 = np.minimum(box[3], boxes[:, 3])
+    inter = np.clip(x2 - x1, 0, None) * np.clip(y2 - y1, 0, None)
+    a = (box[2] - box[0]) * (box[3] - box[1])
+    b = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+    return inter / (a + b - inter)
+
+A0, shapes0, nc0 = build(16, [16.0, 32.0], [0.5, 1.0, 2.0])
+print("THE GRID: a %dx%d image, one anchor centre every 16 pixels, and at"
+      % (IMG, IMG))
+print("each centre a fixed set of %d shapes:" % len(shapes0))
+print("%-24s %9s %9s %9s %9s" % ("", "width", "height", "area", "aspect"))
+for (w, h), (s, r) in zip(shapes0,
+                          [(s, r) for s in [16, 32] for r in [0.5, 1.0, 2.0]]):
+    print("%-24s %9.1f %9.1f %9.0f %9.2f"
+          % ("scale %d, ratio %.1f" % (s, r), w, h, w * h, w / h))
+print("   %d centres x %d shapes = %d anchors, every one of them fixed"
+      % (nc0, len(shapes0), len(A0)))
+print("   BEFORE any image is seen. they depend on the architecture alone.")
+print()
+
+OBJECTS = [("a mid-size square", (20., 20., 50., 50.)),
+           ("a wide, flat object", (10., 22., 54., 44.)),
+           ("a tall, thin object", (26., 10., 42., 54.)),
+           ("a very small object", (30., 30., 38., 38.)),
+           ("an extreme 6:1 letterbox", (2., 30., 62., 40.))]
+
+print("ASSIGNMENT: an anchor is a POSITIVE for an object if their IoU is at")
+print("least 0.5. below 0.4 it is trained as background; in between it is")
+print("ignored entirely, because it is genuinely ambiguous.")
+print()
+
+CONFIGS = [("stride 16, 6 shapes", 16, [16.0, 32.0], [0.5, 1.0, 2.0]),
+           ("stride 8, 6 shapes", 8, [16.0, 32.0], [0.5, 1.0, 2.0]),
+           ("stride 8, 15 shapes", 8, [8.0, 16.0, 32.0],
+            [0.25, 0.5, 1.0, 2.0, 4.0])]
+
+best = {}
+for label, st, sc, ra in CONFIGS:
+    A, sh, nc = build(st, sc, ra)
+    best[label] = {name: iou_many(np.array(b), A).max()
+                   for name, b in OBJECTS}
+    best[label]["__n"] = len(A)
+
+print("%-28s %14s %14s %14s"
+      % ("object", "stride 16", "stride 8", "stride 8"))
+print("%-28s %14s %14s %14s" % ("", "6 shapes", "6 shapes", "15 shapes"))
+for name, _ in OBJECTS:
+    print("%-28s %14.3f %14.3f %14.3f"
+          % (name, best[CONFIGS[0][0]][name], best[CONFIGS[1][0]][name],
+             best[CONFIGS[2][0]][name]))
+print("%-28s %14d %14d %14d"
+      % ("total anchors", best[CONFIGS[0][0]]["__n"],
+         best[CONFIGS[1][0]]["__n"], best[CONFIGS[2][0]]["__n"]))
+print()
+
+c0, c1, c2 = (c[0] for c in CONFIGS)
+m0 = [n for n, _ in OBJECTS if best[c0][n] >= 0.5]
+m1 = [n for n, _ in OBJECTS if best[c1][n] >= 0.5]
+m2 = [n for n, _ in OBJECTS if best[c2][n] >= 0.5]
+print("   matched at 0.5:  %d, then %d, then %d of %d objects."
+      % (len(m0), len(m1), len(m2), len(OBJECTS)))
+print()
+# which object gained most from centres alone, with the shapes unchanged?
+gains = sorted(((best[c1][n] - best[c0][n], n) for n, _ in OBJECTS),
+               reverse=True)
+gain, who = gains[0]
+wbox = dict(OBJECTS)[who]
+print("   READ THE FIRST TWO COLUMNS TOGETHER. they use the IDENTICAL %d"
+      % len(shapes0))
+print("   shapes. the only difference between them is how many centres")
+print("   there are, and %s gained %.3f IoU from that alone:" % (who, gain))
+print("      it is %.0f x %.0f, centred at (%.0f, %.0f)."
+      % (wbox[2] - wbox[0], wbox[3] - wbox[1],
+         (wbox[0] + wbox[2]) / 2, (wbox[1] + wbox[3]) / 2))
+print("      at stride 16 the centres sit at 8, 24, 40, 56 -- the nearest")
+print("      is %.0f pixels away. at stride 8 they sit at 4, 12, 20, 28,"
+      % min(abs((wbox[0] + wbox[2]) / 2 - c) for c in (8, 24, 40, 56)))
+print("      36, ... and the nearest is %.0f away."
+      % min(abs((wbox[0] + wbox[2]) / 2 - c) for c in range(4, 64, 8)))
+print("      no width and no height can repair being in the wrong PLACE.")
+print("   matched at 0.5 went from %d to %d on centres alone."
+      % (len(m0), len(m1)))
+print("   anchor coverage is three-dimensional -- POSITION, scale, aspect")
+print("   ratio -- and when coverage is poor the instinct is to add")
+print("   shapes, while the answer is often a finer grid.")
+print()
+newly = [n for n in m2 if n not in m1]
+still = [n for n, _ in OBJECTS if best[c2][n] < 0.5]
+print("   THE THIRD COLUMN is where extra shapes do earn their place:")
+if newly:
+    for n in newly:
+        print("      %-28s %.3f -> %.3f" % (n, best[c1][n], best[c2][n]))
+    print("      those needed a scale or a ratio the 6-shape set simply did")
+    print("      not contain, and no number of extra centres would have")
+    print("      produced one.")
+else:
+    print("      nothing new matched, so on these objects the shape set was")
+    print("      never the binding constraint.")
+print()
+if still:
+    shapes2 = [(sc * np.sqrt(r), sc / np.sqrt(r))
+               for sc in [8.0, 16.0, 32.0]
+               for r in [0.25, 0.5, 1.0, 2.0, 4.0]]
+    print("   AND ONE IS STILL UNMATCHED: %s." % ", ".join(still))
+    print("   is that the shapes, or the grid again? test it directly --")
+    print("   place the best available shape EXACTLY on the object's centre")
+    print("   and see what IoU is achievable in principle:")
+    print("%-28s %14s %16s" % ("object", "best actual", "best if centred"))
+    for n in still:
+        bx = dict(OBJECTS)[n]
+        ccx, ccy = (bx[0] + bx[2]) / 2, (bx[1] + bx[3]) / 2
+        ideal = np.array([(ccx - w / 2, ccy - h / 2, ccx + w / 2, ccy + h / 2)
+                          for w, h in shapes2])
+        v = iou_many(np.array(bx), ideal).max()
+        print("%-28s %14.3f %16.3f" % (n, best[c2][n], v))
+        if v >= 0.5:
+            print("      the shape set CAN cover it -- %.3f if an anchor were" % v)
+            print("      centred on it. so this is a position failure too, and")
+            print("      it is worth seeing why it hits the small object")
+            print("      hardest: the object is %.0f x %.0f, and the grid can"
+                  % (bx[2] - bx[0], bx[3] - bx[1]))
+            print("      be off by up to 4 pixels. four pixels is a rounding")
+            print("      error for a 45-pixel box and half the width of this")
+            print("      one. the SAME absolute misalignment is a far larger")
+            print("      relative error for small objects, which is most of")
+            print("      why small-object detection is hard, and why feature")
+            print("      pyramids put the small-object head on a")
+            print("      high-resolution feature map with a fine stride.")
+        else:
+            print("      even perfectly centred it only reaches %.3f, so this" % v)
+            print("      one really is outside what the shapes can express.")
+    print("   either way, an object you cannot assign is an object you")
+    print("   cannot learn: it contributes no positive example, and the")
+    print("   detector will never find one like it however long you train.")
+print()
+print("NOW THE COST. every anchor that is not a positive is a negative:")
+print("%-28s %12s %12s %14s"
+      % ("configuration", "anchors", "positives", "ratio"))
+for label, st, sc, ra in CONFIGS:
+    A, _, _ = build(st, sc, ra)
+    pos = sum(int((iou_many(np.array(b), A) >= 0.5).sum())
+              for _, b in OBJECTS)
+    print("%-28s %12d %12d %14s"
+          % (label, len(A), pos,
+             "1 : %.0f" % (len(A) / max(pos, 1))))
+print("   the finer grid that fixed coverage also multiplied the negatives.")
+print("   train on that directly with plain cross-entropy and the model")
+print("   learns to answer 'background' to everything, because that answer")
+print("   is right almost every time. the three standard repairs:")
+print("%-26s %s" % ("hard negative mining", "keep only the worst negatives"))
+print("%-26s %s" % ("fixed 1:3 sampling", "3 negatives per positive"))
+print("%-26s %s" % ("focal loss", "down-weight easy examples smoothly"))
+print("   RetinaNet's contribution was the last one, and its finding was")
+print("   that a one-stage detector matches a two-stage one as soon as the")
+print("   imbalance is handled -- so the accuracy gap had never really")
+print("   been about one stage versus two.")
+print()
+
+print("WHAT THE NETWORK ACTUALLY PREDICTS: not the box, the OFFSET from its")
+print("anchor, in a parameterisation that does not depend on scale:")
+anchor = (16., 16., 48., 48.)
+truth = (20., 24., 52., 40.)
+aw, ah = anchor[2] - anchor[0], anchor[3] - anchor[1]
+acx, acy = anchor[0] + aw / 2, anchor[1] + ah / 2
+gw, gh = truth[2] - truth[0], truth[3] - truth[1]
+gcx, gcy = truth[0] + gw / 2, truth[1] + gh / 2
+t = ((gcx - acx) / aw, (gcy - acy) / ah, np.log(gw / aw), np.log(gh / ah))
+print("   anchor:  %s" % str(anchor))
+print("   truth:   %s" % str(truth))
+print("   targets: tx %.4f  ty %.4f  tw %.4f  th %.4f" % t)
+print("      tx and ty are shifts measured in ANCHOR WIDTHS, so the same")
+print("      target number means the same thing for an 8px anchor and a")
+print("      32px one -- one head can serve every scale.")
+print("      tw and th are LOGS of the size ratio. that makes doubling and")
+print("      halving symmetric (+0.69 and -0.69) and makes a negative")
+print("      width impossible whatever the network outputs.")
+bcx, bcy = t[0] * aw + acx, t[1] * ah + acy
+bw, bh = np.exp(t[2]) * aw, np.exp(t[3]) * ah
+rec = (bcx - bw / 2, bcy - bh / 2, bcx + bw / 2, bcy + bh / 2)
+print("   decoding those targets returns (%.1f, %.1f, %.1f, %.1f)," % rec)
+print("   with a maximum error of %.1e against the truth. the encoding"
+      % max(abs(a - b) for a, b in zip(rec, truth)))
+print("   loses nothing, and all the network has to learn is a small")
+print("   correction to a guess that was already close -- a far easier")
+print("   regression than producing four coordinates out of nothing.")
+```
+
 """,
     [
         {"q": "What does the network predict for each anchor?",
@@ -4299,6 +4509,195 @@ information is.
 **Tuning NMS to raise mAP.** Easy to do and often makes the deployed detector
 worse, because the operating point that maximises an integral over all
 thresholds is not the one you ship.
+
+## From one PR curve to a single number
+
+mAP is the standard score for detection, and it is assembled from parts that each discard something. This builds it from raw detections upward -- ranking, matching, precision and recall, interpolation, the class average -- so that when a number comes back low you know which stage to look at.
+
+```python-run
+import numpy as np
+
+# ground truth boxes, per image: (image_id, x1, y1, x2, y2)
+GT = [(0, 10, 10, 50, 50), (0, 60, 60, 90, 90), (1, 20, 20, 60, 60),
+      (1, 70, 10, 95, 40), (2, 30, 30, 70, 70)]
+# detections: (image_id, x1, y1, x2, y2, confidence)
+DETS = [(0, 12, 12, 52, 48, 0.95),     # good match, gt 0
+        (1, 22, 18, 58, 62, 0.91),     # good match, gt 2
+        (0, 15, 15, 45, 45, 0.88),     # ALSO overlaps gt 0 -- duplicate
+        (2, 33, 28, 68, 72, 0.80),     # good match, gt 4
+        (1, 10, 70, 40, 95, 0.75),     # nothing there -- false positive
+        (0, 58, 62, 88, 92, 0.62),     # good match, gt 1
+        (2, 60, 10, 80, 30, 0.55),     # false positive
+        (1, 68, 12, 92, 38, 0.40)]     # good match, gt 3 -- low confidence
+
+def iou(a, b):
+    x1, y1 = max(a[0], b[0]), max(a[1], b[1])
+    x2, y2 = min(a[2], b[2]), min(a[3], b[3])
+    inter = max(0, x2 - x1) * max(0, y2 - y1)
+    aa = (a[2] - a[0]) * (a[3] - a[1])
+    bb = (b[2] - b[0]) * (b[3] - b[1])
+    return inter / float(aa + bb - inter)
+
+print("%d ground-truth boxes and %d detections." % (len(GT), len(DETS)))
+print()
+print("STEP 1 -- SORT BY CONFIDENCE, HIGHEST FIRST. this is not a detail:")
+print("every number below depends on the order, and a detector that ranks")
+print("its own outputs badly scores badly even if it found everything.")
+print()
+
+def evaluate(thresh):
+    order = sorted(range(len(DETS)), key=lambda i: -DETS[i][5])
+    used = set()
+    rows = []
+    for rank, i in enumerate(order):
+        d = DETS[i]
+        best, best_j = 0.0, -1
+        for j, g in enumerate(GT):
+            if g[0] != d[0]:
+                continue
+            v = iou(d[1:5], g[1:5])
+            if v > best:
+                best, best_j = v, j
+        if best >= thresh and best_j not in used:
+            used.add(best_j)
+            verdict, note = "TP", "matches gt %d" % best_j
+        elif best >= thresh:
+            verdict, note = "FP", "gt %d already taken" % best_j
+        else:
+            verdict, note = "FP", "best IoU only %.2f" % best
+        rows.append((rank + 1, d[5], best, verdict, note))
+    return rows
+
+THR = 0.5
+rows = evaluate(THR)
+print("STEP 2 -- MATCH EACH DETECTION TO GROUND TRUTH, IN THAT ORDER.")
+print("a detection is a true positive if its IoU with some unclaimed box is")
+print("at least %.1f. once a box is claimed it cannot be claimed again:" % THR)
+print("%-6s %8s %10s %8s  %s"
+      % ("rank", "conf", "best IoU", "result", "why"))
+for rank, conf, best, verdict, note in rows:
+    print("%-6d %8.2f %10.2f %8s  %s" % (rank, conf, best, verdict, note))
+print("   rank 3 is the one to look at. it overlaps a real object well, and")
+print("   it is still counted as a FALSE POSITIVE, because the higher-")
+print("   confidence detection at rank 1 already claimed that box.")
+print("   that rule is what makes duplicate boxes cost you, and it is why")
+print("   non-max suppression runs before evaluation rather than after.")
+print()
+
+print("STEP 3 -- WALK DOWN THE LIST ACCUMULATING PRECISION AND RECALL.")
+print("both are recomputed after every single detection:")
+print("      precision = TP / (TP + FP)   -- of what I said, how much was right")
+print("      recall    = TP / (all GT)    -- of what exists, how much I found")
+tp = fp = 0
+P, R = [], []
+print("%-6s %6s %8s %8s %12s %12s"
+      % ("rank", "type", "TP", "FP", "precision", "recall"))
+for rank, conf, best, verdict, note in rows:
+    if verdict == "TP":
+        tp += 1
+    else:
+        fp += 1
+    p, r = tp / float(tp + fp), tp / float(len(GT))
+    P.append(p)
+    R.append(r)
+    print("%-6d %6s %8d %8d %12.4f %12.4f" % (rank, verdict, tp, fp, p, r))
+print("   recall only ever rises. precision jitters -- it falls at every")
+print("   false positive and recovers at every true one. that saw-tooth is")
+print("   the reason the curve has to be interpolated before anyone")
+print("   computes an area under it.")
+print()
+
+print("STEP 4 -- INTERPOLATE. replace precision at each recall by the BEST")
+print("precision achieved at that recall OR ANY HIGHER ONE:")
+Pi = np.array(P, float).copy()
+for i in range(len(Pi) - 2, -1, -1):
+    Pi[i] = max(Pi[i], Pi[i + 1])
+print("%-10s %12s %14s %12s" % ("recall", "precision", "interpolated", "change"))
+for i in range(len(P)):
+    print("%-10.4f %12.4f %14.4f %12s"
+          % (R[i], P[i], Pi[i], "" if abs(Pi[i] - P[i]) < 1e-9 else "raised"))
+print("   this removes the dips. the justification is operational: you")
+print("   would never deploy at a threshold whose precision is beaten by a")
+print("   MORE permissive threshold, so those points are not choices any")
+print("   sensible person would make, and the curve should not be scored")
+print("   on them.")
+print()
+
+print("STEP 5 -- AREA UNDER THE INTERPOLATED CURVE. that area is AP:")
+ap = 0.0
+prev_r = 0.0
+for i in range(len(R)):
+    ap += (R[i] - prev_r) * Pi[i]
+    prev_r = R[i]
+print("      AP at IoU %.1f = %.4f" % (THR, ap))
+print("   the 'all-points' method, which is what COCO and modern VOC use.")
+print("   older VOC sampled 11 fixed recall points instead:")
+ap11 = 0.0
+for t in np.arange(0, 1.01, 0.1):
+    at = [Pi[i] for i in range(len(R)) if R[i] >= t]
+    ap11 += (max(at) if at else 0.0) / 11.0
+print("      AP, 11-point method       = %.4f" % ap11)
+print("   %.4f against %.4f on identical detections. AP numbers from"
+      % (ap11, ap))
+print("   different papers are not comparable unless they used the same")
+print("   method, the same IoU threshold and the same dataset.")
+print()
+
+print("STEP 6 -- THE THRESHOLD IS A CHOICE, SO SWEEP IT. COCO averages AP")
+print("over IoU thresholds from 0.50 to 0.95 in steps of 0.05:")
+print("%-14s %10s %10s %12s" % ("IoU thresh", "TP", "FP", "AP"))
+aps = []
+for t in np.arange(0.5, 0.96, 0.05):
+    rs = evaluate(t)
+    ntp = sum(1 for r in rs if r[3] == "TP")
+    t_, f_, PP, RR = 0, 0, [], []
+    for _, _, _, v, _ in rs:
+        if v == "TP":
+            t_ += 1
+        else:
+            f_ += 1
+        PP.append(t_ / float(t_ + f_))
+        RR.append(t_ / float(len(GT)))
+    Q = np.array(PP)
+    for i in range(len(Q) - 2, -1, -1):
+        Q[i] = max(Q[i], Q[i + 1])
+    a, pr = 0.0, 0.0
+    for i in range(len(RR)):
+        a += (RR[i] - pr) * Q[i]
+        pr = RR[i]
+    aps.append(a)
+    print("%-14.2f %10d %10d %12.4f"
+          % (t, ntp, len(rs) - ntp, a))
+print("      COCO AP (the average of that column) = %.4f" % np.mean(aps))
+print("   the column collapses as the threshold rises: boxes that were")
+print("   'correct' at 0.5 are wrong at 0.8. a headline AP@0.5 of %.2f"
+      % aps[0])
+print("   becomes %.2f once you demand tight boxes, and the gap between"
+      % np.mean(aps))
+print("   those two numbers is a direct measure of how well the model")
+print("   localises rather than merely detects.")
+print()
+
+print("STEP 7 -- THE 'm'. everything above was ONE class. mAP is the plain")
+print("unweighted mean of AP over classes:")
+print("%-16s %10s %14s" % ("class", "instances", "AP"))
+demo = [("person", 10777, 0.62), ("car", 1918, 0.55), ("toaster", 9, 0.05)]
+for name, n, a in demo:
+    print("%-16s %10d %14.2f" % (name, n, a))
+print("%-16s %10s %14.4f"
+      % ("mAP", "--", np.mean([a for _, _, a in demo])))
+weighted = (sum(n * a for _, n, a in demo) / sum(n for _, n, _ in demo))
+print("   note that mAP is UNWEIGHTED: toaster, with %d instances, counts"
+      % demo[2][1])
+print("   as much as person with %d. weighting by instance count would"
+      % demo[0][1])
+print("   give %.4f instead of %.4f." % (weighted, np.mean([a for _, _, a in demo])))
+print("   that is deliberate -- it stops a model looking good by being")
+print("   excellent at the common classes alone -- but it does mean a")
+print("   single rare, hard class can dominate your headline number, and")
+print("   that chasing mAP can send you optimising for toasters.")
+```
+
 """,
     [
         {"q": "Why must a matched ground-truth box be excluded from later matches?",
@@ -5123,6 +5522,174 @@ and interpolation is required.
 
 **Assuming patches must be square and non-overlapping.** Overlapping patches
 help; several later architectures use them.
+
+## Cutting an image into tokens
+
+A vision transformer starts by chopping the image into patches and flattening each one into a vector. That single step decides the model's cost, its resolution limit, and everything it does not know about geometry -- which it then has to be told.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+IMG, P = 12, 4                          # 12x12 image, 4x4 patches
+img = np.arange(IMG * IMG).reshape(IMG, IMG) % 10
+
+print("THE IMAGE, %dx%d, with a %dx%d patch grid drawn on it:" % (IMG, IMG, P, P))
+for i in range(IMG):
+    if i % P == 0:
+        print("   " + "+----" * (IMG // P) + "+")
+    row = ""
+    for j in range(IMG):
+        row += ("|" if j % P == 0 else "") + str(img[i, j])
+    print("   " + row + "|")
+print("   " + "+----" * (IMG // P) + "+")
+n = (IMG // P) ** 2
+print("   %d patches of %dx%d = %d pixels each." % (n, P, P, P * P))
+print()
+
+patches = []
+for i in range(0, IMG, P):
+    for j in range(0, IMG, P):
+        patches.append(img[i:i + P, j:j + P].reshape(-1))
+patches = np.array(patches, float)
+print("EACH PATCH IS FLATTENED INTO A VECTOR of %d numbers:" % (P * P))
+print("   patch 0: %s" % " ".join("%.0f" % v for v in patches[0]))
+print("   patch 1: %s" % " ".join("%.0f" % v for v in patches[1]))
+print("   the sequence is now %s -- %d tokens of %d dimensions, exactly"
+      % (str(patches.shape), n, P * P))
+print("   the shape a text transformer expects. that is the whole trick:")
+print("   turn the image into a sentence and the rest of the architecture")
+print("   is unchanged.")
+print()
+
+D = 8
+E = rng.normal(0, 0.3, (P * P, D))
+tokens = patches @ E
+print("A LINEAR PROJECTION maps each %d-vector to the model width D=%d:"
+      % (P * P, D))
+print("   tokens = patches @ E, with E of shape %s -> %s"
+      % (str(E.shape), str(tokens.shape)))
+print("   and here is a fact worth pausing on: 'cut into patches, flatten,")
+print("   multiply by E' is EXACTLY a convolution with kernel size %d and"
+      % P)
+print("   stride %d. check it against a real convolution:" % P)
+K = E.T.reshape(D, P, P)
+conv_out = np.zeros((D, IMG // P, IMG // P))
+for d in range(D):
+    for a, i in enumerate(range(0, IMG, P)):
+        for b, j in enumerate(range(0, IMG, P)):
+            conv_out[d, a, b] = (img[i:i + P, j:j + P] * K[d]).sum()
+print("      max difference: %.2e"
+      % np.abs(conv_out.reshape(D, -1).T - tokens).max())
+print("   identical, and every ViT implementation does it that way --")
+print("   nn.Conv2d(3, D, kernel_size=%d, stride=%d) IS the patch embedding."
+      % (P, P))
+print()
+
+print("NOW THE PROBLEM. a transformer's attention is PERMUTATION")
+print("EQUIVARIANT: shuffle the tokens and the outputs shuffle with them,")
+print("unchanged. that is right for a set and wrong for an image. check")
+print("what the token set knows about position:")
+perm = rng.permutation(n)
+print("   original token order:  %s" % " ".join(str(i) for i in range(n)))
+print("   shuffled token order:  %s" % " ".join(str(i) for i in perm))
+print("   as SETS these are identical, so any function that treats them as")
+print("   a set gives the same answer for the image and for the image cut")
+print("   up and rearranged. the model literally cannot tell them apart.")
+print()
+
+print("SO POSITION IS ADDED, not inferred. the standard sinusoidal scheme:")
+pos = np.zeros((n, D))
+for k in range(n):
+    for d in range(0, D, 2):
+        w = 1.0 / (10000 ** (d / float(D)))
+        pos[k, d] = np.sin(k * w)
+        pos[k, d + 1] = np.cos(k * w)
+print("%-10s %s" % ("token", "  ".join("dim %d" % d for d in range(D))))
+for k in (0, 1, 2, 8):
+    print("%-10d %s" % (k, "  ".join("%5.2f" % v for v in pos[k])))
+print("   every token gets a different vector, so after adding it the")
+print("   tokens are no longer interchangeable. the shuffle test now:")
+def as_multiset(M):
+    # sort the ROWS, so two arrays match only if they hold the same vectors
+    return M[np.lexsort(M.T[::-1])]
+
+def same(A, B):
+    return "identical" if np.allclose(as_multiset(A), as_multiset(B)) else "DIFFERENT"
+
+print("   shuffle the patches and compare what the model receives.")
+print("   note that the position vectors stay attached to the SLOT, not to")
+print("   the patch -- slot 0 always gets pos[0]:")
+print("%-42s %s" % ("without position: tokens vs tokens[perm]",
+                    same(tokens, tokens[perm])))
+print("%-42s %s" % ("with position:    t+pos vs t[perm]+pos",
+                    same(tokens + pos, tokens[perm] + pos)))
+print("   without position the two are the same multiset of vectors, so")
+print("   nothing downstream can distinguish them. with position added")
+print("   they are not, because each patch now carries where it sat.")
+print("   that is the whole job of a position embedding: it is the only")
+print("   thing standing between a vision transformer and a bag of")
+print("   patches.")
+print()
+print("   most modern ViTs use a LEARNED position embedding instead -- a")
+print("   plain lookup table, one vector per patch index, trained with the")
+print("   rest. which means the model has to learn from data that patch 0")
+print("   is next to patch 1 and above patch 3. a CNN never learns that;")
+print("   it is built into the shape of the convolution.")
+print()
+
+print("WHAT THE PATCH SIZE COSTS. attention is quadratic in the token")
+print("count, and the token count is quadratic in 1/patch_size:")
+print("%-14s %10s %14s %20s"
+      % ("patch size", "tokens", "attention ops", "relative cost"))
+base = None
+for p in (32, 16, 14, 8, 4):
+    t = (224 // p) ** 2
+    ops = t * t
+    base = ops if base is None else base
+    print("%-14d %10d %14s %19.1fx"
+          % (p, t, "{:,}".format(ops), ops / float((224 // 32) ** 4)))
+print("   for a 224x224 image. going from 32x32 patches to 4x4 multiplies")
+print("   the attention cost by %d. THAT is why ViT-B/16 exists and"
+      % int(((224 // 4) ** 4) / ((224 // 32) ** 4)))
+print("   ViT-B/2 does not, and why every efficient variant since --")
+print("   Swin's windows, hierarchical pooling, linear attention -- is an")
+print("   attempt to escape this table.")
+print()
+
+print("AND WHAT IT COSTS IN RESOLUTION. a %dx%d patch is ONE token: the" % (P, P))
+print("model has no representation of anything smaller.")
+flat = patches[0].copy()
+scrambled = flat.copy()
+rng.shuffle(scrambled)
+print("   patch 0 as given:    %s" % " ".join("%.0f" % v for v in flat))
+print("   its pixels shuffled: %s" % " ".join("%.0f" % v for v in scrambled))
+pa = patches[0] @ E
+pb = scrambled @ E
+print("   these are different images, and after the projection they do")
+print("   give different vectors -- the two differ by %.2f in norm, so"
+      % np.linalg.norm(pa - pb))
+print("   nothing was lost. the limit is not information, it is ADDRESSING:")
+print("   attention operates on tokens, so a patch is the smallest thing")
+print("   the model can attend TO, point at, or reason about separately.")
+print("   whatever structure exists inside a patch has to survive as a")
+print("   single vector among %d others." % (n - 1))
+print("   real ViTs make D large enough that the projection loses nothing")
+print("   -- ViT-B/16 maps 16*16*3 = 768 inputs to D = 768, an exactly")
+print("   square matrix. the resolution limit is the patch grid itself,")
+print("   not the width of the embedding, which is why halving the patch")
+print("   size is the only way to see finer detail, and why the table")
+print("   above is the wall every ViT variant runs into.")
+print()
+print("which is the honest summary of the whole design: a ViT trades the")
+print("CNN's built-in assumption that nearby pixels belong together for")
+print("the freedom to relate any patch to any other in one step. it gives")
+print("up a prior and buys reach. that trade is why ViTs need far more")
+print("data than CNNs to reach the same accuracy -- with enough of it they")
+print("learn the prior, and beyond that point they exceed what the prior")
+print("would have allowed.")
+```
+
 """,
     [
         {"q": "What does the projection step applied to each patch amount to?",

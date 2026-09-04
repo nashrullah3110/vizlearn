@@ -45,6 +45,167 @@ The bottleneck exists for cost. Doing a 3&times;3 convolution on 256 channels is
 
 Two details worth knowing. The addition happens <em>before</em> the final ReLU, so the identity path is not passed through a non-linearity. And when a block changes the channel count or the spatial size, the shortcut cannot be a plain identity &mdash; a 1&times;1 convolution with matching stride is used to project `x` to the right shape.
 
+## Why adding the input back makes depth trainable
+
+ResNet's change is one addition per block, and the reason it works shows up in the gradient. This measures a 40-layer plain stack against the same weights with shortcuts, finds that the naive shortcut has a problem of its own, and arrives at why a real residual block always has a normalisation inside it.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(12)
+D, N = 40, 64
+
+Ws = [rng.normal(0, 1.0 / np.sqrt(N), (N, N)) for _ in range(D)]
+x0 = rng.normal(0, 1, N)
+
+def relu(v):
+    return np.maximum(v, 0)
+
+def forward(x, alpha, residual):
+    # alpha scales the residual BRANCH. residual=False is the plain stack.
+    acts = [x]
+    for Wl in Ws:
+        h = relu(Wl @ x)
+        x = (x + alpha * h) if residual else h
+        acts.append(x)
+    return acts
+
+def grad_norms(acts, alpha, residual):
+    # backpropagate a vector of ones and record its size at every depth
+    g = np.ones(N)
+    out = [np.linalg.norm(g)]
+    for d in range(D - 1, -1, -1):
+        mask = (Ws[d] @ acts[d] > 0).astype(float)
+        step = Ws[d].T @ (mask * g)
+        g = (g + alpha * step) if residual else step
+        out.append(np.linalg.norm(g))
+    return out[::-1]
+
+print("A PLAIN STACK vs A RESIDUAL STACK: %d layers, %d units, the SAME"
+      % (D, N))
+print("weights in both. the only difference is one addition:")
+print("      plain:     x = relu(W @ x)")
+print("      residual:  x = x + relu(W @ x)")
+print()
+
+ap = forward(x0, 1.0, False)
+ar = forward(x0, 1.0, True)
+print("%-8s %18s %18s" % ("layer", "plain |x|", "residual |x|"))
+for d in (0, 10, 20, 30, 40):
+    print("%-8d %18.4g %18.4g"
+          % (d, np.linalg.norm(ap[d]), np.linalg.norm(ar[d])))
+print("   the plain stack decays to %.1e of the input. that is the"
+      % (np.linalg.norm(ap[D]) / np.linalg.norm(ap[0])))
+print("   vanishing-signal problem, and it is what motivated shortcuts.")
+print()
+print("   BUT LOOK AT THE OTHER COLUMN BEFORE CELEBRATING. the residual")
+print("   stack grew to %.1e times its input. it did not preserve the"
+      % (np.linalg.norm(ar[D]) / np.linalg.norm(ar[0])))
+print("   signal, it exploded. the naive shortcut trades one failure for")
+print("   the opposite one -- every block ADDS to x without ever removing")
+print("   anything, so the norm compounds layer after layer.")
+print()
+
+print("THE GRADIENT SHOWS THE SAME THING FROM THE OTHER END. one block")
+print("differentiates to:")
+print("      plain:     d out/d in  =  W^T * relu'")
+print("      residual:  d out/d in  =  I + W^T * relu'")
+print("   backprop multiplies %d of those together. in the plain case that" % D)
+print("   is a product of %d shrinking matrices. in the residual case" % D)
+print("   every factor contains I, so nothing can multiply the gradient")
+print("   down to zero -- and nothing caps it either:")
+gp = grad_norms(ap, 1.0, False)
+gr = grad_norms(ar, 1.0, True)
+print("%-8s %18s %18s" % ("layer", "plain |grad|", "residual |grad|"))
+for d in (40, 30, 20, 10, 0):
+    print("%-8d %18.4g %18.4g" % (d, gp[d], gr[d]))
+print("   reading down the table is reading BACKWARD through the network.")
+print("   the plain gradient reaching layer 0 is %.1e -- layer 0 is" % gp[0])
+print("   effectively frozen. the residual one is %.1e, which is not" % gr[0])
+print("   frozen but is not usable either.")
+print()
+
+print("SO SCALE THE BRANCH. keep the identity at full strength and put a")
+print("factor on what gets added to it:  x = x + alpha * relu(W @ x)")
+print("%-10s %18s %20s %18s"
+      % ("alpha", "|x| ratio, in->out", "|grad| at layer 0", "verdict"))
+for alpha in (0.0, 0.05, 0.1, 0.2, 0.5, 1.0):
+    a = forward(x0, alpha, True)
+    g = grad_norms(a, alpha, True)
+    ratio = np.linalg.norm(a[D]) / np.linalg.norm(a[0])
+    if alpha == 0:
+        verdict = "pure skip"
+    elif 0.2 < ratio < 50 and 0.2 < g[0] / g[D] < 50:
+        verdict = "healthy"
+    else:
+        verdict = "exploding"
+    print("%-10.2f %18.4g %20.4g %18s" % (alpha, ratio, g[0], verdict))
+print("   at alpha = 0 the network is a pure identity: signal and gradient")
+print("   both pass through untouched, and it computes nothing. at")
+print("   alpha = 1 both explode. in between is a band where the signal")
+print("   survives %d layers AND the gradient reaches layer 0 intact." % D)
+print()
+print("   that band is not something you tune by hand. a real residual")
+print("   block is")
+print("      x = x + BN(conv(relu(BN(conv(x)))))")
+print("   and the BatchNorm on the branch forces its output to unit")
+print("   variance whatever the weights do, which is the same job alpha is")
+print("   doing here, done adaptively and per channel. ReZero and")
+print("   LayerScale make it literal: an explicit learned alpha per block,")
+print("   initialised at 0, so the network starts as an exact identity and")
+print("   opens each block only as far as training needs.")
+print()
+
+print("WHY THE IDENTITY IS THE RIGHT THING TO ADD. suppose the best thing a")
+print("block could do is nothing at all. what must each one learn?")
+print("%-28s %s" % ("plain block", "W such that relu(Wx) = x"))
+print("%-28s %s" % ("residual block", "W such that relu(Wx) = 0"))
+print("   the second is trivial -- W = 0 does it, and weight decay is")
+print("   already pulling every weight that way. doing nothing is the")
+print("   DEFAULT for a residual block, and the weights only encode the")
+print("   difference from it. hence the name: the block learns a residual.")
+zero = np.zeros((N, N))
+xz = rng.normal(0, 1, N)
+xr, xp = xz.copy(), xz.copy()
+for _ in range(5):
+    xr = xr + relu(zero @ xr)
+    xp = relu(zero @ xp)
+print("   five blocks with W = 0 exactly:")
+print("      residual: max |out - in| = %.1e   (a perfect identity)"
+      % np.abs(xr - xz).max())
+print("      plain:    |out| = %.1e            (the input is gone)"
+      % np.linalg.norm(xp))
+print()
+
+print("THE PROBLEM THIS ACTUALLY SOLVED. before ResNet, adding layers made")
+print("TRAINING error worse -- not test error, training error:")
+print("%-22s %16s %18s" % ("network", "train error", "diagnosis"))
+for row in (("plain 20-layer", "lower", "fine"),
+            ("plain 56-layer", "HIGHER", "not overfitting"),
+            ("ResNet 20-layer", "lower", "fine"),
+            ("ResNet 56-layer", "lower still", "fine"),
+            ("ResNet 152-layer", "lower still", "fine")):
+    print("%-22s %16s %18s" % row)
+print("   a 56-layer plain net fitting the TRAINING set worse than a")
+print("   20-layer one cannot be overfitting. the deeper network can")
+print("   express everything the shallower one can -- set the extra 36")
+print("   layers to the identity -- so capacity was never the issue.")
+print("   gradient descent simply could not FIND those identity layers.")
+print("   shortcuts hand them over at initialisation, and depth went from")
+print("   22 layers to 152 in one paper.")
+print()
+
+print("ONE PRACTICAL DETAIL: the addition needs matching shapes.")
+print("%-34s %s" % ("shapes match", "identity -- 0 parameters"))
+print("%-34s %s" % ("channel count changes", "1x1 conv on the shortcut"))
+print("%-34s %s" % ("stride 2", "1x1 conv, stride 2"))
+print("   those projection shortcuts are a small minority of blocks, and")
+print("   that matters: if EVERY shortcut carried weights, the gradient")
+print("   would have to pass through them too, and the clean identity path")
+print("   from the loss back to layer 0 -- the entire point -- would be")
+print("   gone.")
+```
+
 ## Guided tour
 
 1. <strong>Read the norms at depth 10.</strong> The plain stack's signal has shrunk to a small fraction of where it started; the version with the shortcut is larger than where it started, not smaller.

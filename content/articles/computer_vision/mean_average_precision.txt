@@ -93,3 +93,191 @@ information is.
 **Tuning NMS to raise mAP.** Easy to do and often makes the deployed detector
 worse, because the operating point that maximises an integral over all
 thresholds is not the one you ship.
+
+## From one PR curve to a single number
+
+mAP is the standard score for detection, and it is assembled from parts that each discard something. This builds it from raw detections upward -- ranking, matching, precision and recall, interpolation, the class average -- so that when a number comes back low you know which stage to look at.
+
+```python-run
+import numpy as np
+
+# ground truth boxes, per image: (image_id, x1, y1, x2, y2)
+GT = [(0, 10, 10, 50, 50), (0, 60, 60, 90, 90), (1, 20, 20, 60, 60),
+      (1, 70, 10, 95, 40), (2, 30, 30, 70, 70)]
+# detections: (image_id, x1, y1, x2, y2, confidence)
+DETS = [(0, 12, 12, 52, 48, 0.95),     # good match, gt 0
+        (1, 22, 18, 58, 62, 0.91),     # good match, gt 2
+        (0, 15, 15, 45, 45, 0.88),     # ALSO overlaps gt 0 -- duplicate
+        (2, 33, 28, 68, 72, 0.80),     # good match, gt 4
+        (1, 10, 70, 40, 95, 0.75),     # nothing there -- false positive
+        (0, 58, 62, 88, 92, 0.62),     # good match, gt 1
+        (2, 60, 10, 80, 30, 0.55),     # false positive
+        (1, 68, 12, 92, 38, 0.40)]     # good match, gt 3 -- low confidence
+
+def iou(a, b):
+    x1, y1 = max(a[0], b[0]), max(a[1], b[1])
+    x2, y2 = min(a[2], b[2]), min(a[3], b[3])
+    inter = max(0, x2 - x1) * max(0, y2 - y1)
+    aa = (a[2] - a[0]) * (a[3] - a[1])
+    bb = (b[2] - b[0]) * (b[3] - b[1])
+    return inter / float(aa + bb - inter)
+
+print("%d ground-truth boxes and %d detections." % (len(GT), len(DETS)))
+print()
+print("STEP 1 -- SORT BY CONFIDENCE, HIGHEST FIRST. this is not a detail:")
+print("every number below depends on the order, and a detector that ranks")
+print("its own outputs badly scores badly even if it found everything.")
+print()
+
+def evaluate(thresh):
+    order = sorted(range(len(DETS)), key=lambda i: -DETS[i][5])
+    used = set()
+    rows = []
+    for rank, i in enumerate(order):
+        d = DETS[i]
+        best, best_j = 0.0, -1
+        for j, g in enumerate(GT):
+            if g[0] != d[0]:
+                continue
+            v = iou(d[1:5], g[1:5])
+            if v > best:
+                best, best_j = v, j
+        if best >= thresh and best_j not in used:
+            used.add(best_j)
+            verdict, note = "TP", "matches gt %d" % best_j
+        elif best >= thresh:
+            verdict, note = "FP", "gt %d already taken" % best_j
+        else:
+            verdict, note = "FP", "best IoU only %.2f" % best
+        rows.append((rank + 1, d[5], best, verdict, note))
+    return rows
+
+THR = 0.5
+rows = evaluate(THR)
+print("STEP 2 -- MATCH EACH DETECTION TO GROUND TRUTH, IN THAT ORDER.")
+print("a detection is a true positive if its IoU with some unclaimed box is")
+print("at least %.1f. once a box is claimed it cannot be claimed again:" % THR)
+print("%-6s %8s %10s %8s  %s"
+      % ("rank", "conf", "best IoU", "result", "why"))
+for rank, conf, best, verdict, note in rows:
+    print("%-6d %8.2f %10.2f %8s  %s" % (rank, conf, best, verdict, note))
+print("   rank 3 is the one to look at. it overlaps a real object well, and")
+print("   it is still counted as a FALSE POSITIVE, because the higher-")
+print("   confidence detection at rank 1 already claimed that box.")
+print("   that rule is what makes duplicate boxes cost you, and it is why")
+print("   non-max suppression runs before evaluation rather than after.")
+print()
+
+print("STEP 3 -- WALK DOWN THE LIST ACCUMULATING PRECISION AND RECALL.")
+print("both are recomputed after every single detection:")
+print("      precision = TP / (TP + FP)   -- of what I said, how much was right")
+print("      recall    = TP / (all GT)    -- of what exists, how much I found")
+tp = fp = 0
+P, R = [], []
+print("%-6s %6s %8s %8s %12s %12s"
+      % ("rank", "type", "TP", "FP", "precision", "recall"))
+for rank, conf, best, verdict, note in rows:
+    if verdict == "TP":
+        tp += 1
+    else:
+        fp += 1
+    p, r = tp / float(tp + fp), tp / float(len(GT))
+    P.append(p)
+    R.append(r)
+    print("%-6d %6s %8d %8d %12.4f %12.4f" % (rank, verdict, tp, fp, p, r))
+print("   recall only ever rises. precision jitters -- it falls at every")
+print("   false positive and recovers at every true one. that saw-tooth is")
+print("   the reason the curve has to be interpolated before anyone")
+print("   computes an area under it.")
+print()
+
+print("STEP 4 -- INTERPOLATE. replace precision at each recall by the BEST")
+print("precision achieved at that recall OR ANY HIGHER ONE:")
+Pi = np.array(P, float).copy()
+for i in range(len(Pi) - 2, -1, -1):
+    Pi[i] = max(Pi[i], Pi[i + 1])
+print("%-10s %12s %14s %12s" % ("recall", "precision", "interpolated", "change"))
+for i in range(len(P)):
+    print("%-10.4f %12.4f %14.4f %12s"
+          % (R[i], P[i], Pi[i], "" if abs(Pi[i] - P[i]) < 1e-9 else "raised"))
+print("   this removes the dips. the justification is operational: you")
+print("   would never deploy at a threshold whose precision is beaten by a")
+print("   MORE permissive threshold, so those points are not choices any")
+print("   sensible person would make, and the curve should not be scored")
+print("   on them.")
+print()
+
+print("STEP 5 -- AREA UNDER THE INTERPOLATED CURVE. that area is AP:")
+ap = 0.0
+prev_r = 0.0
+for i in range(len(R)):
+    ap += (R[i] - prev_r) * Pi[i]
+    prev_r = R[i]
+print("      AP at IoU %.1f = %.4f" % (THR, ap))
+print("   the 'all-points' method, which is what COCO and modern VOC use.")
+print("   older VOC sampled 11 fixed recall points instead:")
+ap11 = 0.0
+for t in np.arange(0, 1.01, 0.1):
+    at = [Pi[i] for i in range(len(R)) if R[i] >= t]
+    ap11 += (max(at) if at else 0.0) / 11.0
+print("      AP, 11-point method       = %.4f" % ap11)
+print("   %.4f against %.4f on identical detections. AP numbers from"
+      % (ap11, ap))
+print("   different papers are not comparable unless they used the same")
+print("   method, the same IoU threshold and the same dataset.")
+print()
+
+print("STEP 6 -- THE THRESHOLD IS A CHOICE, SO SWEEP IT. COCO averages AP")
+print("over IoU thresholds from 0.50 to 0.95 in steps of 0.05:")
+print("%-14s %10s %10s %12s" % ("IoU thresh", "TP", "FP", "AP"))
+aps = []
+for t in np.arange(0.5, 0.96, 0.05):
+    rs = evaluate(t)
+    ntp = sum(1 for r in rs if r[3] == "TP")
+    t_, f_, PP, RR = 0, 0, [], []
+    for _, _, _, v, _ in rs:
+        if v == "TP":
+            t_ += 1
+        else:
+            f_ += 1
+        PP.append(t_ / float(t_ + f_))
+        RR.append(t_ / float(len(GT)))
+    Q = np.array(PP)
+    for i in range(len(Q) - 2, -1, -1):
+        Q[i] = max(Q[i], Q[i + 1])
+    a, pr = 0.0, 0.0
+    for i in range(len(RR)):
+        a += (RR[i] - pr) * Q[i]
+        pr = RR[i]
+    aps.append(a)
+    print("%-14.2f %10d %10d %12.4f"
+          % (t, ntp, len(rs) - ntp, a))
+print("      COCO AP (the average of that column) = %.4f" % np.mean(aps))
+print("   the column collapses as the threshold rises: boxes that were")
+print("   'correct' at 0.5 are wrong at 0.8. a headline AP@0.5 of %.2f"
+      % aps[0])
+print("   becomes %.2f once you demand tight boxes, and the gap between"
+      % np.mean(aps))
+print("   those two numbers is a direct measure of how well the model")
+print("   localises rather than merely detects.")
+print()
+
+print("STEP 7 -- THE 'm'. everything above was ONE class. mAP is the plain")
+print("unweighted mean of AP over classes:")
+print("%-16s %10s %14s" % ("class", "instances", "AP"))
+demo = [("person", 10777, 0.62), ("car", 1918, 0.55), ("toaster", 9, 0.05)]
+for name, n, a in demo:
+    print("%-16s %10d %14.2f" % (name, n, a))
+print("%-16s %10s %14.4f"
+      % ("mAP", "--", np.mean([a for _, _, a in demo])))
+weighted = (sum(n * a for _, n, a in demo) / sum(n for _, n, _ in demo))
+print("   note that mAP is UNWEIGHTED: toaster, with %d instances, counts"
+      % demo[2][1])
+print("   as much as person with %d. weighting by instance count would"
+      % demo[0][1])
+print("   give %.4f instead of %.4f." % (weighted, np.mean([a for _, _, a in demo])))
+print("   that is deliberate -- it stops a model looking good by being")
+print("   excellent at the common classes alone -- but it does mean a")
+print("   single rare, hard class can dominate your headline number, and")
+print("   that chasing mAP can send you optimising for toasters.")
+```
