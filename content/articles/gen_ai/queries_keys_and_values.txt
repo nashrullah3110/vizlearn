@@ -89,6 +89,171 @@ def attention(x, Wq, Wk, Wv, mask=None):
 
 Setting a score to negative infinity makes its softmax weight exactly zero &mdash; which is how both causal masking and padding masks work.
 
+## Three projections, and why you need all three
+
+Attention gives every token a query, a key and a value, and the usual explanation stops at a database analogy. This builds the mechanism from vectors you can read, then removes each projection in turn to show what breaks -- which is the only way to see why three are needed rather than one.
+
+```python-run
+import numpy as np
+
+TOKENS = ["the", "cat", "that", "sat", "purred"]
+n = len(TOKENS)
+D = 4
+
+# hand-built embeddings so the numbers mean something
+E = np.array([
+    [0.1, 0.0, 0.1, 0.0],    # the      -- a determiner, little content
+    [0.9, 0.2, 0.0, 0.1],    # cat      -- a noun, an entity
+    [0.1, 0.1, 0.9, 0.0],    # that     -- a relative pronoun
+    [0.0, 0.9, 0.0, 0.2],    # sat      -- a verb
+    [0.0, 0.9, 0.1, 0.3],    # purred   -- a verb
+])
+
+print("FIVE TOKENS, %d dimensions each. dimension 0 carries 'is a noun'," % D)
+print("dimension 1 carries 'is a verb', dimension 2 'is a pronoun':")
+print("%-10s %s" % ("token", "  ".join("%5s" % ("d%d" % i) for i in range(D))))
+for t, e in zip(TOKENS, E):
+    print("%-10s %s" % (t, "  ".join("%5.1f" % v for v in e)))
+print()
+
+print("EACH TOKEN IS PROJECTED THREE WAYS. same input, three matrices:")
+print("      Q = E @ Wq    what this token is LOOKING FOR")
+print("      K = E @ Wk    what this token OFFERS to be found by")
+print("      V = E @ Wv    what this token CONTRIBUTES if attended to")
+# Wq maps a verb to "look for nouns"; Wk maps a noun to "I am a noun"
+# scaled by 3 so the softmax actually separates -- a real Wq is learned
+# and its scale is learned with it
+Wq = 3 * np.array([[0., 0, 0, 0], [1., 0, 0, 0], [0., 0, 0, 0], [0., 0, 0, 0]])
+Wk = 3 * np.array([[1., 0, 0, 0], [0., 0, 0, 0], [0., 0, 0, 0], [0., 0, 0, 0]])
+Wv = np.eye(D)
+Q, K, V = E @ Wq, E @ Wk, E @ Wv
+print("%-10s %14s %14s %s" % ("token", "query[0]", "key[0]", "value"))
+for i, t in enumerate(TOKENS):
+    print("%-10s %14.2f %14.2f  %s"
+          % (t, Q[i, 0], K[i, 0], " ".join("%4.1f" % v for v in V[i])))
+print("   Wq reads the VERB dimension into the query, so verbs ask a")
+print("   loud question and other words ask a quiet one.")
+print("   Wk reads the NOUN dimension into the key, so nouns advertise")
+print("   themselves loudly.")
+print("   nothing here was hand-set per token: the same two matrices are")
+print("   applied to every token, and the differences come entirely from")
+print("   the embeddings.")
+print()
+
+def attend(Q, K, V, scale=True):
+    s = Q @ K.T
+    if scale:
+        s = s / np.sqrt(K.shape[1])
+    s = s - s.max(axis=1, keepdims=True)
+    w = np.exp(s)
+    w = w / w.sum(axis=1, keepdims=True)
+    return w, w @ V
+
+W, OUT = attend(Q, K, V)
+print("SCORES = Q @ K.T, then softmax over each row:")
+print("%-10s %s" % ("", "  ".join("%7s" % t for t in TOKENS)))
+for i, t in enumerate(TOKENS):
+    print("%-10s %s" % (t, "  ".join("%7.4f" % v for v in W[i])))
+print("   read row 'sat': it is a verb, so its query is large, so its")
+print("   scores separate. it puts %.4f of its attention on 'cat', the"
+      % W[TOKENS.index("sat"), TOKENS.index("cat")])
+print("   only strong noun, against %.4f on 'the'."
+      % W[TOKENS.index("sat"), TOKENS.index("the")])
+print("   read row 'the': its query is %.2f, so every score is 0 and the"
+      % Q[0, 0])
+print("   softmax returns a FLAT distribution -- %.4f on everything."
+      % W[0, 0])
+print("   a token with nothing to ask attends to everything equally, which")
+print("   is the same as attending to nothing in particular. that")
+print("   behaviour falls out of the softmax; nobody coded it.")
+print()
+
+print("NOW REMOVE ONE PROJECTION AT A TIME. this is the part that explains")
+print("why there are three.")
+print()
+print("CASE 1 -- Q and K are the SAME (drop Wq, use K for both):")
+Wsym, _ = attend(K, K, V)
+print("%-10s %s" % ("", "  ".join("%7s" % t for t in TOKENS)))
+for i, t in enumerate(TOKENS):
+    print("%-10s %s" % (t, "  ".join("%7.4f" % v for v in Wsym[i])))
+sym = np.abs(Wsym @ np.diag(np.ones(n)) - Wsym.T).max()
+raw = K @ K.T
+print("   the SCORE matrix is now symmetric: score(i,j) == score(j,i),")
+print("   max asymmetry %.1e." % np.abs(raw - raw.T).max())
+si, ci = TOKENS.index("sat"), TOKENS.index("cat")
+print("   and look at what that cost, in this table against the one above:")
+print("%-24s %16s %16s" % ("row 'sat' attends to", "with Wq and Wk", "shared"))
+for j, t in enumerate(TOKENS):
+    print("%-24s %16.4f %16.4f" % (t, W[si, j], Wsym[si, j]))
+print("   'sat' went from putting %.4f on 'cat' -- a verb finding its"
+      % W[si, ci])
+print("   subject -- to a FLAT %.4f on everything." % Wsym[si, si])
+print("   the reason is exactly the symmetry. with one matrix, what a")
+print("   token asks for is forced to be the same as what it offers, and")
+print("   'sat' offers nothing on the noun dimension, so it can no longer")
+print("   ask for one either. a verb looking for a subject is a directed")
+print("   relationship, and almost every relationship in language is.")
+print("   (the attention WEIGHTS are not symmetric even so, because the")
+print("   softmax normalises each row separately -- but the underlying")
+print("   compatibility scores are, and that is where the information is")
+print("   lost.)")
+print()
+
+print("CASE 2 -- V is the same as K (drop Wv, use K as the value):")
+_, out_kv = attend(Q, K, K)
+print("%-10s %s" % ("token", "output vector"))
+for i, t in enumerate(TOKENS):
+    print("%-10s %s" % (t, "  ".join("%6.3f" % v for v in out_kv[i])))
+print("   every output now lives in the space Wk projects into, which here")
+print("   is one dimension wide -- %d of the %d output dimensions are"
+      % (int((np.abs(out_kv).max(axis=0) < 1e-12).sum()), D))
+print("   exactly zero for every token.")
+print("   the key's job is to be MATCHED against; the value's job is to be")
+print("   PASSED ON. tying them forces one vector to do both, so anything")
+print("   the token should contribute but not be found by has nowhere to")
+print("   live. with separate Wv, 'cat' can advertise 'I am a noun' and")
+print("   deliver its full meaning:")
+print("      'cat' as a key:   %s" % " ".join("%5.2f" % v for v in K[1]))
+print("      'cat' as a value: %s" % " ".join("%5.2f" % v for v in V[1]))
+print()
+
+print("AND THE SCALING BY sqrt(d). as the dimension grows, the dot product")
+print("of two random vectors grows with it, and softmax saturates:")
+print("%-10s %16s %18s %16s"
+      % ("d", "typical |q.k|", "max softmax, raw", "after /sqrt(d)"))
+rng = np.random.default_rng(3)
+for d in (4, 16, 64, 256, 1024):
+    a = rng.normal(0, 1, (200, d))
+    b = rng.normal(0, 1, (200, d))
+    dots = np.einsum("ij,ij->i", a, b)
+    row = a[0] @ b.T
+    def maxsoft(x):
+        x = x - x.max()
+        e = np.exp(x)
+        return float((e / e.sum()).max())
+    print("%-10d %16.2f %18.4f %16.4f"
+          % (d, float(np.abs(dots).mean()), maxsoft(row),
+             maxsoft(row / np.sqrt(d))))
+print("   the dot product's spread grows like sqrt(d), so at d = 1024 the")
+print("   raw softmax puts almost all its mass on ONE token before any")
+print("   learning has happened. that is a vanishing gradient for every")
+print("   other token, at initialisation.")
+print("   dividing by sqrt(d) cancels exactly that growth, which is why")
+print("   the constant is sqrt(d) and not something tuned.")
+print()
+
+print("SO THE THREE PROJECTIONS ARE THREE DIFFERENT QUESTIONS:")
+print("%-10s %-30s %s" % ("", "answers", "used as"))
+print("%-10s %-30s %s" % ("Q", "what am I looking for?", "the row of the score"))
+print("%-10s %-30s %s" % ("K", "what can I be found by?", "the column"))
+print("%-10s %-30s %s" % ("V", "what do I pass on?", "the thing averaged"))
+print("   and they are three matrices rather than one because those are")
+print("   three genuinely different things about a token. the database")
+print("   analogy is right as far as it goes -- query, key, value -- but")
+print("   the reason it needs all three is that a lookup is DIRECTED and")
+print("   what you match on is not what you retrieve.")
+```
+
 ## Things to try
 
 1. Attend from <em>sat</em>. It puts most of its weight on <em>cat</em>, its subject &mdash; which a token searching with its own embedding could never do.

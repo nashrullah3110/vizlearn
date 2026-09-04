@@ -87,6 +87,159 @@ So the target is high recall in stage one and high precision in what finally rea
 
 In those cases the trade runs the other way: favour precision, accept lower recall, and give the user a way to ask for more.
 
+## Of what you showed, how much was right
+
+Precision@k is the simplest retrieval metric and the easiest to misread. This computes it on a small result list, shows the three things it deliberately ignores, and puts it beside the metrics that cover for each one.
+
+```python-run
+import numpy as np
+
+# 8 retrieved documents, in rank order. True = actually relevant.
+RESULTS = [True, True, False, True, False, False, True, False]
+TOTAL_RELEVANT = 6          # how many relevant documents exist in the corpus
+
+print("A RESULT LIST, in the order the retriever returned it:")
+print("%-8s %12s %s" % ("rank", "relevant?", ""))
+for i, r in enumerate(RESULTS):
+    print("%-8d %12s %s" % (i + 1, "YES" if r else "no", "#" if r else "."))
+print("   %d of the %d returned are relevant, and the corpus contains %d"
+      % (sum(RESULTS), len(RESULTS), TOTAL_RELEVANT))
+print("   relevant documents in total.")
+print()
+
+print("PRECISION@k = (relevant in the top k) / k")
+print("%-8s %16s %14s %14s" % ("k", "relevant in top k", "precision@k",
+                               "recall@k"))
+for k in range(1, len(RESULTS) + 1):
+    hits = sum(RESULTS[:k])
+    print("%-8d %16d %14.4f %14.4f"
+          % (k, hits, hits / float(k), hits / float(TOTAL_RELEVANT)))
+print("   precision does not fall smoothly -- it saw-tooths, rising at")
+print("   every relevant result and dropping at every irrelevant one. the")
+print("   TREND is downward, and that is the normal shape: a good")
+print("   retriever puts its best guesses first, so the deeper you go the")
+print("   more junk you accumulate.")
+print("   recall only ever rises, because the numerator can only grow.")
+print("   the two always trade off, which is why a bare 'precision' with")
+print("   no k attached is not a number you can act on.")
+print()
+
+print("BLIND SPOT ONE -- ORDER WITHIN THE TOP k. these three lists all")
+print("have precision@4 = %.2f:" % 0.5)
+variants = [("best first", [True, True, False, False]),
+            ("alternating", [True, False, True, False]),
+            ("worst first", [False, False, True, True])]
+print("%-16s %-14s %14s" % ("list", "pattern", "precision@4"))
+for name, v in variants:
+    print("%-16s %-14s %14.4f"
+          % (name, "".join("#" if x else "." for x in v),
+             sum(v) / 4.0))
+print("   identical scores. but a user reading top-down meets a relevant")
+print("   result at rank 1 in the first list and rank 3 in the last, and")
+print("   those are very different experiences.")
+print("   precision@k is a SET metric: it asks what is in the top k, never")
+print("   in what order. MRR and NDCG exist precisely to fix this.")
+def dcg(v):
+    return sum((1.0 if x else 0.0) / np.log2(i + 2) for i, x in enumerate(v))
+
+print("      but not every order-aware metric separates all three:")
+print("%-18s %14s %14s" % ("list", "recip. rank", "NDCG@4"))
+for name, v in variants:
+    first = next((i + 1 for i, x in enumerate(v) if x), None)
+    ideal = dcg(sorted(v, reverse=True))
+    print("%-18s %14.4f %14.4f"
+          % (name, 1.0 / first if first else 0.0,
+             dcg(v) / ideal if ideal else 0.0))
+print("      reciprocal rank gives the first two lists the IDENTICAL score")
+print("      of 1.0000, because it only looks at where the first relevant")
+print("      result landed and stops. it catches 'worst first' and is")
+print("      blind to everything after rank 1.")
+print("      NDCG separates all three, because it discounts every position")
+print("      by log2(rank+1) and so keeps counting all the way down.")
+print("      three metrics, three different questions: what is IN the top")
+print("      k, where the FIRST good one is, and how well the whole list")
+print("      is ordered.")
+print()
+
+print("BLIND SPOT TWO -- IT IGNORES WHAT IT DID NOT RETURN. precision@5")
+print("cannot see past rank 5:")
+k = 5
+print("      precision@%d = %.4f" % (k, sum(RESULTS[:k]) / float(k)))
+print("      recall@%d    = %.4f" % (k, sum(RESULTS[:k]) / float(TOTAL_RELEVANT)))
+print("   the same precision is achievable whether the corpus holds %d"
+      % TOTAL_RELEVANT)
+print("   relevant documents or 500:")
+print("%-24s %14s %14s" % ("relevant in corpus", "precision@5", "recall@5"))
+for total in (3, 6, 50, 500):
+    print("%-24d %14.4f %14.4f"
+          % (total, sum(RESULTS[:k]) / float(k),
+             min(1.0, sum(RESULTS[:k]) / float(total))))
+print("   precision does not move at all. recall collapses. if your job is")
+print("   'find me everything about X' -- legal discovery, a literature")
+print("   review, a compliance audit -- precision is nearly useless on its")
+print("   own and recall is the number that matters.")
+print()
+
+print("BLIND SPOT THREE -- SHORT LISTS FLATTER YOU. precision@1 is the")
+print("easiest number in retrieval to make look good:")
+print("%-10s %14s %s" % ("k", "precision@k", "what it really tells you"))
+notes = {1: "did rank 1 happen to be right",
+         3: "is the top of the list usable",
+         5: "typical for a RAG context window",
+         8: "everything this list has"}
+for k in (1, 3, 5, 8):
+    print("%-10d %14.4f %s" % (k, sum(RESULTS[:k]) / float(k),
+                               notes.get(k, "")))
+print("   reporting precision@1 alone is the retrieval equivalent of")
+print("   quoting your best day. pick k from what the SYSTEM does: if you")
+print("   stuff 5 chunks into a prompt, precision@5 is the number that")
+print("   predicts how much of that prompt is noise.")
+print()
+
+print("THE ONE THAT ACTUALLY MATTERS FOR RAG. every irrelevant chunk in")
+print("the context window is not merely wasted -- it is a distraction the")
+print("model has to ignore:")
+print("%-16s %12s %14s %16s"
+      % ("k chunks", "precision@k", "useful chunks", "distractors"))
+for k in (1, 3, 5, 8):
+    kk = min(k, len(RESULTS))
+    hits = sum(RESULTS[:kk])
+    print("%-16d %12.4f %14d %16d" % (k, hits / float(kk), hits, kk - hits))
+print("   going from 3 chunks to 8 adds %d useful ones and %d distractors."
+      % (sum(RESULTS[:8]) - sum(RESULTS[:3]),
+         (8 - sum(RESULTS[:8])) - (3 - sum(RESULTS[:3]))))
+print("   'just retrieve more' trades a little recall for a lot of noise,")
+print("   and past some k it makes answers worse rather than better. that")
+print("   is the whole argument for reranking: retrieve widely, then throw")
+print("   most of it away before the model ever sees it.")
+print()
+
+print("AND A WARNING ABOUT AVERAGING. precision@k is defined per query, so")
+print("a system-level number is a mean over queries, and means hide things:")
+QUERIES = {
+    "easy query": [True, True, True, True, True],
+    "typical query": [True, False, True, False, False],
+    "hard query": [False, False, False, False, False],
+    "another typical": [True, True, False, False, False],
+}
+print("%-22s %14s" % ("query", "precision@5"))
+vals = []
+for name, r in QUERIES.items():
+    v = sum(r) / 5.0
+    vals.append(v)
+    print("%-22s %14.4f" % (name, v))
+print("%-22s %14.4f" % ("MEAN", float(np.mean(vals))))
+print("%-22s %14.4f" % ("MEDIAN", float(np.median(vals))))
+print("%-22s %14.4f" % ("worst query", float(np.min(vals))))
+print("   the mean of %.2f describes no query in the set. one query"
+      % np.mean(vals))
+print("   returned NOTHING useful, and the average hides it completely.")
+print("   report the distribution, or at least the fraction of queries")
+print("   below some floor: %.0f%% of these scored under 0.5, which is the"
+      % (100 * np.mean([v < 0.5 for v in vals])))
+print("   number a user would recognise as 'it often does not work'.")
+```
+
 ## Things to try
 
 1. Drag <strong>k</strong> up from 1. Precision generally falls while recall rises &mdash; that opposition is the whole reason both numbers are quoted together.

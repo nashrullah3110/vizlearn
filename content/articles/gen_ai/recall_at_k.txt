@@ -88,6 +88,152 @@ That said, precision is not free. Irrelevant context measurably degrades answers
 |Reranking|Precision|Reduces to 3&ndash;10|
 |Generation|Uses what it is given|3&ndash;10|
 
+## Of what exists, how much you found
+
+Recall@k is the ceiling on everything downstream: a RAG system cannot answer from a document it never retrieved. This measures where that ceiling sits, what raising k costs, and why recall is the metric to optimise first and report last.
+
+```python-run
+import numpy as np
+
+# where the relevant documents landed in a 20-long result list
+RANKS = {
+    "query A": [1, 2, 5],
+    "query B": [3, 11],
+    "query C": [1, 4, 7, 18],
+    "query D": [14],
+    "query E": [],            # nothing relevant was retrieved at all
+}
+TOTAL = {"query A": 3, "query B": 3, "query C": 4, "query D": 2, "query E": 2}
+LIST_LEN = 20
+
+print("FIVE QUERIES. for each, the RANKS at which relevant documents were")
+print("found in a %d-document result list, and how many exist in total:" % LIST_LEN)
+print("%-12s %-24s %14s" % ("query", "relevant found at ranks", "exist in corpus"))
+for q in RANKS:
+    print("%-12s %-24s %14d"
+          % (q, str(RANKS[q]) if RANKS[q] else "(none retrieved)", TOTAL[q]))
+print()
+
+print("RECALL@k = (relevant found in the top k) / (relevant that exist)")
+print("%-12s %s" % ("query", "  ".join("%7s" % ("k=%d" % k)
+                                       for k in (1, 3, 5, 10, 20))))
+for q in RANKS:
+    row = []
+    for k in (1, 3, 5, 10, 20):
+        row.append(sum(1 for r in RANKS[q] if r <= k) / float(TOTAL[q]))
+    print("%-12s %s" % (q, "  ".join("%7.3f" % v for v in row)))
+means = []
+for k in (1, 3, 5, 10, 20):
+    means.append(np.mean([sum(1 for r in RANKS[q] if r <= k) / float(TOTAL[q])
+                          for q in RANKS]))
+print("%-12s %s" % ("MEAN", "  ".join("%7.3f" % v for v in means)))
+print("   recall can only rise with k -- the numerator grows, the")
+print("   denominator is fixed. that monotonicity is what makes it a")
+print("   CEILING rather than a trade-off.")
+print()
+
+print("WHY THAT CEILING IS THE ONE NUMBER TO WATCH IN A RAG SYSTEM.")
+print("suppose the generator is perfect: it answers correctly whenever the")
+print("answer is in its context, and cannot otherwise.")
+K = 5
+print("%-12s %14s %20s" % ("query", "recall@%d" % K, "can it be answered?"))
+for q in RANKS:
+    r = sum(1 for x in RANKS[q] if x <= K) / float(TOTAL[q])
+    print("%-12s %14.3f %20s"
+          % (q, r, "yes" if r > 0 else "NO -- impossible"))
+answerable = sum(1 for q in RANKS
+                 if any(x <= K for x in RANKS[q])) / float(len(RANKS))
+print("   %.0f%% of queries have at least one relevant document in the top"
+      % (100 * answerable))
+print("   %d. that is a HARD CEILING on end-to-end accuracy: no prompt," % K)
+print("   no model upgrade and no amount of temperature tuning raises it,")
+print("   because for two of these queries the information is not in the")
+print("   context at all.")
+print("   and those two fail for DIFFERENT reasons, which matters a great")
+print("   deal when you go to fix them:")
+print("      query D: relevant document found, at rank %d. the retriever"
+      % RANKS["query D"][0])
+print("               DID find it and ranked it too low. that is a ranking")
+print("               problem -- a reranker or a larger k fixes it.")
+print("      query E: nothing relevant anywhere in %d results. the" % LIST_LEN)
+print("               document was never retrieved, and may not be indexed")
+print("               at all. no amount of reranking touches this; it is a")
+print("               chunking, embedding or coverage problem.")
+print("   recall@k alone scores both as 0.000 and tells you nothing about")
+print("   which you have. compare recall@k with recall at a much larger k")
+print("   to separate them -- that gap IS the ranking problem, and what is")
+print("   left is the retrieval problem.")
+print("   this is why retrieval is debugged before generation. an answer")
+print("   quality problem that is really a recall problem will absorb")
+print("   unlimited effort on the wrong component.")
+print()
+
+print("SO WHY NOT SET k VERY LARGE? because k is a context window:")
+CHUNK_TOKENS = 220
+print("%-8s %14s %16s %16s %14s"
+      % ("k", "mean recall", "tokens of context", "relevant tokens",
+         "wasted"))
+for k in (1, 3, 5, 10, 20):
+    rec = np.mean([sum(1 for r in RANKS[q] if r <= k) / float(TOTAL[q])
+                   for q in RANKS])
+    found = np.mean([sum(1 for r in RANKS[q] if r <= k) for q in RANKS])
+    print("%-8d %14.3f %16d %16d %13.0f%%"
+          % (k, rec, k * CHUNK_TOKENS, int(found * CHUNK_TOKENS),
+             100 * (1 - found / float(k))))
+print("   going from k=5 to k=20 raises mean recall by %.3f and quadruples"
+      % (means[4] - means[2]))
+print("   the context. at k=20, %.0f%% of what you paid for and asked the"
+      % (100 * (1 - np.mean([len([r for r in RANKS[q] if r <= 20])
+                             for q in RANKS]) / 20.0)))
+print("   model to read is irrelevant.")
+print("   and it is not merely wasted money: long contexts measurably")
+print("   degrade answer quality -- the 'lost in the middle' effect, where")
+print("   a fact placed in the centre of a long context is used less")
+print("   reliably than the same fact near either end.")
+print()
+
+print("WHICH LEADS TO THE STANDARD ARCHITECTURE. use a big k to get recall")
+print("from a cheap retriever, then a reranker to get precision back:")
+print("%-34s %10s %12s %14s"
+      % ("stage", "k", "recall", "sent to model"))
+big = 20
+rec_big = np.mean([sum(1 for r in RANKS[q] if r <= big) / float(TOTAL[q])
+                   for q in RANKS])
+print("%-34s %10d %12.3f %14s" % ("cheap retriever (BM25/vectors)", big,
+                                  rec_big, "no"))
+print("%-34s %10d %12.3f %14s"
+      % ("a PERFECT reranker keeps 5", 5, rec_big, "yes, 5 chunks"))
+print("   the reranker cannot RAISE recall -- it only reorders what it was")
+print("   handed, so the retriever's %.3f is its ceiling. the second row"
+      % rec_big)
+print("   assumes it is perfect and loses nothing on the way down to 5;")
+print("   a real one loses a little, and that loss is what you measure")
+print("   when you compare recall@5 before and after reranking.")
+print("   what it buys, even so, is the only route to high recall AND a")
+print("   short context at the same time.")
+print("   that is also why the retriever's k, not the reranker's, is the")
+print("   parameter that determines whether an answer is possible.")
+print()
+
+print("A TRAP IN MEASURING IT. recall's denominator is 'relevant documents")
+print("that exist', and in a real corpus nobody knows that number:")
+print("%-30s %14s %14s" % ("assumed relevant total", "recall@5", "looks")) 
+found5 = sum(1 for r in RANKS["query C"] if r <= 5)
+for total in (2, 4, 10, 40):
+    r = min(1.0, found5 / float(total))
+    print("%-30d %14.3f %14s"
+          % (total, r, "great" if r > 0.8 else "poor" if r < 0.3 else "ok"))
+print("   the SAME retrieval, judged against four different beliefs about")
+print("   the corpus, scores anywhere from %.2f to %.2f."
+      % (min(1.0, found5 / 40.0), min(1.0, found5 / 2.0)))
+print("   labelled benchmarks fix the denominator by fiat and are honest")
+print("   about it. on your own data the usual approach is POOLING: run")
+print("   several retrievers, judge the union of what they return, and")
+print("   treat that union as the relevant set. it undercounts -- anything")
+print("   no retriever found is invisible -- so pooled recall is an")
+print("   optimistic bound, and worth reporting as one.")
+```
+
 ## Things to try
 
 1. Drag <strong>k</strong> from 1 to 10 and watch recall climb and never fall. That monotonicity is why a recall figure without its k means nothing.

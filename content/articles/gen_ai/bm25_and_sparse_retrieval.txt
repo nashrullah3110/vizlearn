@@ -57,6 +57,193 @@ Preprocessing matters more here than for dense retrieval, because matching is li
 
 That last point is the one that goes wrong most often in practice, and it is worth testing explicitly with a few known identifiers.
 
+## The two knobs TF-IDF was missing
+
+BM25 is TF-IDF with two corrections -- term frequency saturates, and document length is discounted by a tunable amount. This implements it beside TF-IDF on the same documents so you can see exactly which ranking each correction changes.
+
+```python-run
+import numpy as np
+
+DOCS = [
+    "python is a language",
+    " ".join(["python"] * 30),
+    "python is a language and python is popular for python scripting",
+    "java is a language",
+    "a short note about python and python again",
+    "the python programming language was created by guido van rossum and "
+    "python is now among the most widely used languages anywhere at all",
+]
+LABEL = ["brief and on topic", "keyword stuffing", "genuine, medium",
+         "no mention at all", "SHORT, mentions it twice",
+         "LONG, mentions it twice"]
+tok = [d.split() for d in DOCS]
+N = len(DOCS)
+lens = np.array([len(t) for t in tok], float)
+avgdl = lens.mean()
+
+print("%d documents, average length %.1f words:" % (N, avgdl))
+print("%-6s %6s %6s  %-26s %s" % ("doc", "words", "'python'", "what it is", ""))
+for i, d in enumerate(DOCS):
+    print("%-6d %6d %6d  %-26s %s%s"
+          % (i, len(tok[i]), tok[i].count("python"), LABEL[i],
+             d[:34], "..." if len(d) > 34 else ""))
+print()
+print("docs 4 and 5 are the pair to watch. they contain the query term")
+print("the SAME number of times and differ only in length, so TF-IDF")
+print("cannot tell them apart at all.")
+print()
+
+def tf(term, i):
+    return float(tok[i].count(term))
+
+def df(term):
+    return sum(1 for t in tok if term in t)
+
+print("PROBLEM ONE -- UNBOUNDED TERM FREQUENCY. in TF-IDF, tf enters the")
+print("score linearly, so the tenth occurrence counts as much as the")
+print("second. BM25 saturates it:")
+print("      saturated(tf) = tf * (k1 + 1) / (tf + k1)")
+print()
+print("%-8s %12s %14s %14s %14s"
+      % ("tf", "linear", "k1 = 0.5", "k1 = 1.2", "k1 = 3.0"))
+for t in (0, 1, 2, 3, 5, 8, 20, 100):
+    row = [t * (k + 1) / (t + k) if t else 0.0 for k in (0.5, 1.2, 3.0)]
+    print("%-8d %12d %14.4f %14.4f %14.4f" % (t, t, row[0], row[1], row[2]))
+print("   every column flattens. at k1 = 1.2 the curve reaches %.2f of its"
+      % ((20 * 2.2 / (20 + 1.2)) / 2.2))
+print("   ceiling of %.2f by tf = 20, and the ceiling is k1 + 1 no matter"
+      % 2.2)
+print("   how large tf gets. so a document repeating a word 100 times")
+print("   cannot out-score one that says it 5 times by a factor of 20 --")
+print("   it gets at most %.0f%% more."
+      % (100 * ((100 * 2.2 / 101.2) / (5 * 2.2 / 6.2) - 1)))
+print("   k1 controls how fast that happens: k1 = 0 makes tf binary")
+print("   (present or not), large k1 approaches the linear behaviour.")
+print("   1.2 is the usual default and is close to binary in practice.")
+print()
+
+print("PROBLEM TWO -- DOCUMENT LENGTH. a long document contains more of")
+print("everything, so it wins on raw counts without being more relevant.")
+print("BM25 divides tf by a length factor:")
+print("      norm = 1 - b + b * (len / avgdl)")
+print("%-10s %10s %14s %14s %14s"
+      % ("doc", "length", "b = 0 (off)", "b = 0.75", "b = 1 (full)"))
+for i in range(N):
+    r = lens[i] / avgdl
+    print("%-10d %10d %14.4f %14.4f %14.4f"
+          % (i, int(lens[i]), 1.0, 1 - 0.75 + 0.75 * r, r))
+print("   at b = 0 length is ignored entirely -- back to TF-IDF's")
+print("   behaviour. at b = 1 the tf is divided by the full length ratio,")
+print("   which over-penalises long documents that are long because they")
+print("   are thorough. 0.75 splits the difference and is the default")
+print("   everywhere for that reason.")
+print()
+
+def bm25(term, i, k1=1.2, b=0.75):
+    n = df(term)
+    idf = np.log((N - n + 0.5) / (n + 0.5) + 1.0)
+    f = tf(term, i)
+    denom = f + k1 * (1 - b + b * lens[i] / avgdl)
+    return idf * (f * (k1 + 1) / denom) if denom else 0.0
+
+def tfidf(term, i):
+    n = df(term)
+    return tf(term, i) * np.log(N / n) if n else 0.0
+
+print("PUT THEM TOGETHER and score the query 'python':")
+print("%-6s %6s %6s %12s %12s %8s %8s  %s"
+      % ("doc", "len", "tf", "tf-idf", "BM25", "tfidf#", "bm25#", "what it is"))
+ti = np.array([tfidf("python", i) for i in range(N)])
+bm = np.array([bm25("python", i) for i in range(N)])
+tr = {d: r + 1 for r, d in enumerate(np.argsort(-ti))}
+br = {d: r + 1 for r, d in enumerate(np.argsort(-bm))}
+for i in range(N):
+    print("%-6d %6d %6d %12.4f %12.4f %8d %8d  %s"
+          % (i, int(lens[i]), int(tf("python", i)), ti[i], bm[i],
+             tr[i], br[i], LABEL[i]))
+print()
+
+print("   FIRST, WHAT SATURATION DID. compare the stuffed document with")
+print("   the genuine one:")
+print("%-26s %14s %14s" % ("", "tf-idf", "BM25"))
+print("%-26s %14.4f %14.4f" % ("doc 1 (stuffed, tf=%d)" % tf("python", 1),
+                               ti[1], bm[1]))
+print("%-26s %14.4f %14.4f" % ("doc 2 (genuine, tf=%d)" % tf("python", 2),
+                               ti[2], bm[2]))
+print("%-26s %13.1fx %13.1fx" % ("stuffed doc's advantage",
+                                 ti[1] / ti[2], bm[1] / bm[2]))
+print("   and note what did NOT happen: the stuffed document is still")
+print("   ranked first under both. saturation is monotonic in tf, so a")
+print("   document with far more occurrences still scores higher -- BM25")
+print("   does not reorder this pair, it COLLAPSES THE MARGIN from %.1fx"
+      % (ti[1] / ti[2]))
+print("   to %.1fx. that matters because a real query has several terms"
+      % (bm[1] / bm[2]))
+print("   and a real ranker has other signals: a %.0fx advantage on one"
+      % (ti[1] / ti[2]))
+print("   term swamps every other signal there is, and a %.1fx advantage"
+      % (bm[1] / bm[2]))
+print("   sits down among them where it can be outvoted.")
+print("   if you want stuffing actually demoted, that is a spam classifier")
+print("   or a link signal's job, not BM25's.")
+print()
+
+print("   SECOND, WHAT LENGTH NORMALISATION DID -- and here BM25 CAN do")
+print("   something TF-IDF cannot express at all:")
+print("%-30s %8s %8s %12s %12s"
+      % ("", "len", "tf", "tf-idf", "BM25"))
+for i in (4, 5):
+    print("%-30s %8d %8d %12.4f %12.4f"
+          % (LABEL[i], int(lens[i]), int(tf("python", i)), ti[i], bm[i]))
+print("   identical tf, identical idf, so TF-IDF gives them the SAME score")
+print("   -- %.4f each, a tie it has no way to break." % ti[4])
+print("   BM25 separates them by %.4f and ranks the short one %s. the"
+      % (abs(bm[4] - bm[5]), "higher" if bm[4] > bm[5] else "lower"))
+print("   reasoning is a real one: two mentions in %d words is a document"
+      % int(lens[4]))
+print("   about python; two mentions in %d words is a document that merely"
+      % int(lens[5]))
+print("   happens to say it.")
+print("   THAT is the ranking TF-IDF could not produce, and it is what b")
+print("   buys you.")
+print()
+
+print("WATCH b DO ITS WORK. the score of the short and the long document")
+print("that both mention the term twice, as b goes from off to full:")
+print("%-10s %14s %14s %14s" % ("b", "doc 4 (short)", "doc 5 (long)", "gap"))
+for bv in (0.0, 0.25, 0.5, 0.75, 1.0):
+    a4 = bm25("python", 4, b=bv)
+    a5 = bm25("python", 5, b=bv)
+    print("%-10.2f %14.4f %14.4f %14.4f" % (bv, a4, a5, a4 - a5))
+print("   at b = 0 the gap is exactly 0: length is ignored, and BM25 has")
+print("   reproduced TF-IDF's tie. every step of b opens the gap wider.")
+print("   that is worth tuning on your own data rather than accepting the")
+print("   default -- a corpus of short product titles and one of long")
+print("   support articles want very different values, and b = 0.75 is a")
+print("   compromise chosen for neither.")
+print()
+
+print("ONE MORE DIFFERENCE, in the IDF itself:")
+print("%-16s %10s %16s %16s"
+      % ("term appears in", "df", "TF-IDF log(N/df)", "BM25 idf"))
+for n in range(1, N + 1):
+    print("%-16s %10d %16.4f %16.4f"
+          % ("%d of %d docs" % (n, N), n, np.log(N / n),
+             np.log((N - n + 0.5) / (n + 0.5) + 1.0)))
+print("   BM25's idf keeps the +1 inside the log so it can never go")
+print("   negative. the classic form without it goes negative once a term")
+print("   is in more than half the documents, which would mean a document")
+print("   scores HIGHER for not containing a query term -- a real bug that")
+print("   the +1 exists to prevent.")
+print()
+print("and that is the whole of BM25: the same idf idea as TF-IDF, a")
+print("saturating tf, and a length correction, with two constants you can")
+print("tune. it has been the default in Lucene, Elasticsearch and")
+print("OpenSearch for years, it needs no training, and dense retrievers")
+print("still struggle to beat it on exact-term queries -- which is why")
+print("hybrid search runs both.")
+```
+
 ## Things to try
 
 1. <strong>Read the default ranking.</strong> D2 leads — it repeats "list" four times and mentions every query term at least twice, and that repetition still wins even after the default length normalization is applied.
