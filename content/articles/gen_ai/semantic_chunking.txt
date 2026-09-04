@@ -104,6 +104,178 @@ threshold = np.percentile(sims, 10)         # lowest 10% of similarities
 boundaries = [i+1 for i, s in enumerate(sims) if s < threshold]
 ```
 
+## The similarity curve, and where it dips
+
+Semantic chunking splits where consecutive sentences stop resembling each other. That description leaves the important question open -- how big a dip counts -- so here is the actual signal from a passage, and the boundaries each threshold produces.
+
+```python-run
+import numpy as np
+
+SENTENCES = [
+    "Our refund policy allows returns within 30 days.",
+    "Refunds are issued to the original payment method.",
+    "Processing a refund takes 5 to 10 business days.",
+    "Standard shipping arrives in 5 to 7 business days.",
+    "Express shipping costs an extra 12 dollars.",
+    "We ship to 40 countries worldwide.",
+    "The hardware warranty runs for 24 months.",
+    "Accidental damage is not covered by the warranty.",
+]
+# stand-in embeddings: three topic axes plus two "generic" axes that
+# every sentence in the document shares. real sentence embeddings behave
+# this way -- they are anisotropic, all crowded into a narrow cone -- and
+# that is exactly what makes thresholding hard.
+TOPIC = np.array([
+    [0.62, 0.04, 0.02],
+    [0.55, 0.08, 0.02],
+    [0.48, 0.14, 0.03],
+    [0.09, 0.60, 0.03],
+    [0.05, 0.54, 0.02],
+    [0.04, 0.50, 0.06],
+    [0.03, 0.05, 0.58],
+    [0.02, 0.04, 0.52],
+])
+SHARED = np.array([0.62, 0.55])
+EMB = np.hstack([TOPIC, np.tile(SHARED, (len(TOPIC), 1))])
+
+def unit(v):
+    return v / np.linalg.norm(v)
+
+print("EIGHT SENTENCES. embed each one, then compare each to the next:")
+print("%-5s %-50s %14s" % ("i", "sentence", "sim to next"))
+sims = []
+for i, s in enumerate(SENTENCES):
+    if i < len(SENTENCES) - 1:
+        v = float(unit(EMB[i]) @ unit(EMB[i + 1]))
+        sims.append(v)
+        print("%-5d %-50s %14.4f" % (i, s[:48], v))
+    else:
+        print("%-5d %-50s %14s" % (i, s[:48], "--"))
+sims = np.array(sims)
+print()
+print("THE CURVE, drawn:")
+for i, v in enumerate(sims):
+    bar = "#" * int(round(50 * v))
+    print("   %d-%d  %.4f  %s" % (i, i + 1, v, bar))
+print("   the dips are at %s -- exactly where the topic changes."
+      % ", ".join("%d-%d" % (i, i + 1)
+                  for i in np.argsort(sims)[:2]))
+print("   note that the signal is BETWEEN sentences, not on them. there")
+print("   are %d sentences and %d gaps, and it is the gaps that get"
+      % (len(SENTENCES), len(sims)))
+print("   classified.")
+print()
+
+def split_at(threshold):
+    out, cur = [], [0]
+    for i, v in enumerate(sims):
+        if v < threshold:
+            out.append(cur)
+            cur = [i + 1]
+        else:
+            cur.append(i + 1)
+    out.append(cur)
+    return out
+
+print("NOW THE THRESHOLD. an absolute cutoff, swept:")
+print("%-12s %10s %-34s %s" % ("threshold", "chunks", "sizes", "boundaries at"))
+for t in (0.60, 0.80, 0.90, 0.93, 0.96, 0.99):
+    ch = split_at(t)
+    cuts = [i for i, v in enumerate(sims) if v < t]
+    print("%-12.2f %10d %-34s %s"
+          % (t, len(ch), str([len(c) for c in ch]),
+             ", ".join("%d-%d" % (i, i + 1) for i in cuts) or "none"))
+print("   LOOK AT THE RANGE the similarities occupy: %.4f to %.4f. every"
+      % (sims.min(), sims.max()))
+print("   value is high, including the topic changes, because every")
+print("   sentence in a document shares vocabulary, style and subject")
+print("   matter. real sentence embeddings are ANISOTROPIC in exactly this")
+print("   way -- they crowd into a narrow cone and nothing is ever near")
+print("   orthogonal to anything.")
+print("   so the whole decision is made inside a band of width %.2f, and a"
+      % (sims.max() - sims.min()))
+print("   threshold that works here is worthless on another corpus with a")
+print("   different model, language or sentence length. an absolute cutoff")
+print("   is tuning to a coincidence.")
+print()
+
+print("SO USE A RELATIVE ONE. split where the similarity drops into the")
+print("bottom few percent of gaps in THIS document:")
+print("%-14s %14s %10s %-30s %s"
+      % ("percentile", "cutoff", "chunks", "sizes", "boundaries at"))
+for p in (5, 15, 25, 40, 60):
+    cut = float(np.percentile(sims, p))
+    ch, cur = [], [0]
+    cuts = []
+    for i, v in enumerate(sims):
+        if v < cut:
+            ch.append(cur); cur = [i + 1]; cuts.append(i)
+        else:
+            cur.append(i + 1)
+    ch.append(cur)
+    print("%-14s %14.4f %10d %-30s %s"
+          % ("bottom %d%%" % p, cut, len(ch), str([len(c) for c in ch]),
+             ", ".join("%d-%d" % (i, i + 1) for i in cuts) or "none"))
+print("   the percentile adapts to the document, so the same setting")
+print("   works on a technical manual and a transcript. that is why every")
+print("   real implementation uses a percentile or a standard-deviation")
+print("   threshold rather than an absolute number.")
+print()
+
+print("AND THE FAILURE THIS METHOD HAS THAT FIXED-SIZE DOES NOT. it")
+print("assumes a topic change shows up as a similarity DIP between")
+print("ADJACENT sentences. consider a passage that returns to an earlier")
+print("topic:")
+def with_shared(topic):
+    return np.concatenate([np.array(topic), SHARED])
+
+INTERLEAVED = [
+    ("refunds take 30 days", with_shared([0.62, 0.04, 0.02])),
+    ("shipping takes 7 days", with_shared([0.09, 0.60, 0.03])),
+    ("refunds go to the original card", with_shared([0.55, 0.08, 0.02])),
+    ("shipping to 40 countries", with_shared([0.04, 0.50, 0.06])),
+]
+isims = [float(unit(INTERLEAVED[i][1]) @ unit(INTERLEAVED[i + 1][1]))
+         for i in range(len(INTERLEAVED) - 1)]
+print("%-36s %14s" % ("sentence", "sim to next"))
+for i, (t, _) in enumerate(INTERLEAVED):
+    print("%-36s %14s"
+          % (t, "%.4f" % isims[i] if i < len(isims) else "--"))
+print("   every one of the %d gaps is a dip -- %.4f, %.4f, %.4f -- so any"
+      % (len(isims), isims[0], isims[1], isims[2]))
+print("   threshold that catches a real topic change splits here after")
+print("   every sentence, producing %d chunks of one sentence each."
+      % len(INTERLEAVED))
+print("   it has correctly detected %d topic changes and completely failed"
+      % len(isims))
+print("   at the actual job, which was to put the two refund sentences")
+print("   together.")
+print("   the method only looks at CONSECUTIVE pairs, so it can find")
+print("   boundaries and can never group non-adjacent text. that is a")
+print("   clustering problem, and semantic chunking is not a clustering")
+print("   algorithm.")
+print()
+
+print("WHAT IT COSTS, against the alternatives:")
+print("%-24s %-24s %s" % ("strategy", "embedding calls", "when it wins"))
+n = len(SENTENCES)
+print("%-24s %-24s %s" % ("fixed size", "0 at split time", "always cheap"))
+print("%-24s %-24s %s" % ("recursive", "0 at split time", "structured text"))
+print("%-24s %-24s %s"
+      % ("semantic", "%d, one per sentence" % n, "flowing prose, no headings"))
+print("   the cost is paid once at indexing, not per query, so it is")
+print("   usually affordable. the question is whether it BUYS anything,")
+print("   and the honest answer is that it beats recursive splitting")
+print("   mainly on documents with no structure to recurse on -- a")
+print("   transcript, a scanned report, a long unbroken article.")
+print("   on markdown or HTML, splitting on the headings is cheaper, more")
+print("   reliable, and uses a signal the author put there deliberately.")
+print("   measure before adopting: chunk your corpus both ways, run your")
+print("   evaluation queries, and compare recall@k. semantic chunking is")
+print("   the kind of idea that sounds obviously better and frequently")
+print("   is not.")
+```
+
 ## Things to try
 
 1. Raise the <strong>split percentile</strong> to 70. It splits almost everywhere, producing chunks too small to carry an idea.

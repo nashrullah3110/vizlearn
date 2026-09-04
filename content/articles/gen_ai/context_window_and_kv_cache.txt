@@ -66,6 +66,144 @@ Generation has two phases with entirely different characteristics, and understan
 
 That is why input tokens are priced well below output tokens, why a long prompt adds latency before the first word appears, and why generating 500 tokens takes far longer than reading 5,000.
 
+## Counting the cache, token by token
+
+The sections above explain what the cache holds and why prefill and decode behave differently. Here is the arithmetic -- how much memory the cache costs at each sequence length, why it and not the weights decides your batch size, and exactly how much work caching saves.
+
+```python-run
+import numpy as np
+
+# a 7B-class model
+LAYERS, HEADS, HEAD_DIM, VOCAB = 32, 32, 128, 32000
+D_MODEL = HEADS * HEAD_DIM
+BYTES = 2                               # fp16
+
+print("A 7B-CLASS MODEL: %d layers, %d heads of %d dims, d_model = %d."
+      % (LAYERS, HEADS, HEAD_DIM, D_MODEL))
+print()
+print("WITHOUT A CACHE, generating token n means re-running attention over")
+print("all n tokens. the keys and values for tokens 1..n-1 are recomputed")
+print("every single step, and they are IDENTICAL every time:")
+print("%-14s %16s %14s %18s"
+      % ("generating", "K,V this step", "of them new", "cumulative"))
+for n in (1, 2, 3, 10, 100):
+    print("%-14s %16s %14d %18s"
+          % ("token %d" % n, "{:,}".format(n), 1,
+             "{:,}".format(sum(range(1, n + 1)))))
+print("   to produce %d tokens without a cache you compute %s key-value"
+      % (100, "{:,}".format(sum(range(1, 101)))))
+print("   pairs, of which %d are new. that is %.0f%% waste, and it grows"
+      % (100, 100 * (1 - 100.0 / sum(range(1, 101)))))
+print("   with the square of the length.")
+print()
+
+print("THE CACHE IS THE OBVIOUS FIX: keep them. what it costs, per token:")
+per_token = 2 * LAYERS * D_MODEL * BYTES
+print("      2 (K and V) x %d layers x %d dims x %d bytes = %s bytes"
+      % (LAYERS, D_MODEL, BYTES, "{:,}".format(per_token)))
+print("   note what is NOT in that formula: the batch size and the")
+print("   sequence length. it is a per-token constant, so the total is")
+print("   simply linear in both.")
+print()
+print("%-16s %16s %16s %16s"
+      % ("context length", "1 sequence", "batch of 8", "batch of 32"))
+for n in (512, 2048, 8192, 32768, 131072):
+    g = n * per_token / 1e9
+    print("%-16s %14.2f GB %14.2f GB %14.2f GB"
+          % ("{:,}".format(n), g, g * 8, g * 32))
+print("   a %s-token context for ONE sequence is %.1f GB of cache. the"
+      % ("{:,}".format(131072), 131072 * per_token / 1e9))
+print("   model weights are about %.0f GB. at long context the cache is"
+      % (7e9 * BYTES / 1e9))
+print("   the larger allocation, and it is the thing that actually limits")
+print("   how many users you can serve at once.")
+print()
+print("   work out the batch size a 80 GB card allows, weights first:")
+FREE = 80 - 7e9 * BYTES / 1e9 - 4      # minus weights and activations
+print("%-18s %18s %18s" % ("context length", "cache per seq", "max batch"))
+for n in (2048, 8192, 32768, 131072):
+    per_seq = n * per_token / 1e9
+    print("%-18s %16.2f GB %18d"
+          % ("{:,}".format(n), per_seq, int(FREE / per_seq)))
+print("   the same card serves %d concurrent users at a %s-token context."
+      % (int(FREE / (2048 * per_token / 1e9)), "{:,}".format(2048)))
+print("   at %s tokens the answer is ZERO: one sequence needs %.1f GB of"
+      % ("{:,}".format(131072), 131072 * per_token / 1e9))
+print("   cache plus %.0f GB of weights, which is more than the card has."
+      % (7e9 * BYTES / 1e9))
+print("   a 128k context is not a setting you switch on -- without GQA or")
+print("   a quantised cache it does not fit at all, and with them it still")
+print("   costs most of your throughput. long context is a capacity")
+print("   decision wearing a feature's clothes.")
+print()
+
+print("PREFILL AND DECODE, in the numbers. prefill processes the whole")
+print("prompt at once; decode produces one token at a time:")
+print("%-16s %16s %18s %20s"
+      % ("phase", "tokens per step", "FLOPs per step", "bound by"))
+P = 2000
+print("%-16s %16s %18s %20s"
+      % ("prefill", "{:,}".format(P), "~%s" % "{:,.0f}".format(2 * 7e9 * P / 1e9)
+         + " GFLOP", "compute"))
+print("%-16s %16d %18s %20s"
+      % ("decode", 1, "~%s" % "{:,.0f}".format(2 * 7e9 / 1e9) + " GFLOP",
+         "memory bandwidth"))
+print("   the same weights are read in both cases. prefill amortises that")
+print("   read across %s tokens; decode amortises it across ONE." % "{:,}".format(P))
+print("   so decode moves %s bytes of weights to produce a single token,"
+      % "{:,}".format(int(7e9 * BYTES)))
+print("   and on a card with 2 TB/s of bandwidth that alone sets a floor")
+print("   of %.1f ms per token -- about %d tokens a second, before any"
+      % (7e9 * BYTES / 2e12 * 1000, int(1 / (7e9 * BYTES / 2e12))))
+print("   arithmetic is done.")
+print("   that is why batching helps decode so much: %d sequences read the"
+      % 32)
+print("   same weights once and produce %d tokens from that read." % 32)
+print()
+
+print("MAKING THE CACHE SMALLER. every production trick attacks one factor")
+print("of that per-token formula:")
+print("%-30s %-26s %14s" % ("technique", "what it changes", "cache size"))
+base = per_token
+rows = [
+    ("baseline, multi-head", "-", base),
+    ("grouped-query, 8 groups", "K,V heads 32 -> 8", base * 8 // HEADS),
+    ("multi-query attention", "K,V heads 32 -> 1", base * 1 // HEADS),
+    ("fp8 cache", "bytes 2 -> 1", base // 2),
+    ("GQA-8 + fp8", "both", base * 8 // HEADS // 2),
+]
+for name, what, v in rows:
+    print("%-30s %-26s %11.2f MB" % (name, what, v * 8192 / 1e6))
+print("   (for an 8192-token context.) read the table before concluding")
+print("   that multi-query attention is the answer: it shrinks the cache")
+print("   %.0fx, far more than GQA's %.0fx, and it is NOT what most models"
+      % (base / (base * 1 // HEADS), base / (base * 8 // HEADS)))
+print("   use. collapsing 32 key-value heads to 1 costs measurable quality,")
+print("   because every query head is then forced to attend against the")
+print("   same keys.")
+print("   grouped-query attention is the compromise that stuck: several")
+print("   query heads share one key-value head, so the cache shrinks by the")
+print("   sharing factor while the query side -- which is not cached at all")
+print("   -- keeps its full width. almost every model released since 2023")
+print("   uses it, and the choice of 8 groups rather than 1 is a quality")
+print("   decision, not a memory one.")
+print()
+print("AND THE ONE THAT IS NOT ABOUT SIZE: PagedAttention. the cache for a")
+print("sequence grows as it generates, so a contiguous allocation must")
+print("reserve the MAXIMUM length up front:")
+print("%-34s %16s %16s" % ("", "reserved", "actually used"))
+for used in (200, 800, 3000):
+    print("%-34s %14.2f GB %14.2f GB"
+          % ("a reply of %s tokens" % "{:,}".format(used),
+             32768 * per_token / 1e9, used * per_token / 1e9))
+print("   a request that reserves %s tokens and generates %d wastes %.0f%%"
+      % ("{:,}".format(32768), 200, 100 * (1 - 200.0 / 32768)))
+print("   of its allocation. paging the cache into fixed blocks, exactly")
+print("   as an operating system pages memory, removes that waste -- and")
+print("   it is why vLLM reports several times the throughput of a naive")
+print("   server on identical hardware and an identical model.")
+```
+
 ## Things to try
 
 1. <strong>Fill the window.</strong> Push <strong>Retrieved Documents</strong> up until the bar turns red. The overflow readout tells you how much does not fit; in a real system that is where a request either errors or silently drops the oldest turns.

@@ -92,6 +92,97 @@ The second row is the common and fixable one. High recall with low MRR means the
 
 The third row points the other way: no reranker can help, and the work is in chunking, the embedding model, or adding keyword search.
 
+## Scoring by where the first good answer landed
+
+The sections above describe what MRR measures and what it ignores. Here it is as arithmetic on a concrete result set, along with the two numeric traps the description cannot show you: what the zeros do to the average, and why the mean of reciprocal ranks behaves nothing like the reciprocal of the mean rank.
+
+```python-run
+import numpy as np
+
+QUERIES = {
+    "how do I reset my password": [False, True, False, True],
+    "what are your opening hours": [True, True, False, False],
+    "do you ship to Canada": [False, False, False, True],
+    "refund policy": [False, False, False, False],
+    "contact support": [True, False, False, False],
+}
+
+print("FIVE QUERIES, each showing which of the top 4 results were relevant:")
+print("%-32s %-12s %10s %14s"
+      % ("query", "results", "first hit", "reciprocal rank"))
+rrs = []
+for q, res in QUERIES.items():
+    first = next((i + 1 for i, r in enumerate(res) if r), None)
+    rr = 1.0 / first if first else 0.0
+    rrs.append(rr)
+    print("%-32s %-12s %10s %14.4f"
+          % (q[:30], "".join("#" if r else "." for r in res),
+             str(first) if first else "none", rr))
+print("%-32s %-12s %10s %14.4f"
+      % ("MEAN RECIPROCAL RANK", "", "", float(np.mean(rrs))))
+print()
+
+print("WHAT MRR CANNOT SEE. compare two result lists for the same query:")
+LISTS = {
+    "one good result, at rank 1": [True, False, False, False],
+    "four good results, from 1": [True, True, True, True],
+    "one good result, at rank 3": [False, False, True, False],
+    "three good, starting at 3": [False, False, True, True],
+}
+print("%-32s %-10s %10s %14s %16s"
+      % ("list", "pattern", "RR", "precision@4", "relevant found"))
+for name, res in LISTS.items():
+    first = next((i + 1 for i, r in enumerate(res) if r), None)
+    print("%-32s %-10s %10.4f %14.4f %16d"
+          % (name, "".join("#" if r else "." for r in res),
+             1.0 / first if first else 0.0, sum(res) / 4.0, sum(res)))
+print("   the first two lists score IDENTICALLY under MRR -- 1.0000 each")
+print("   -- and one of them found four times as much. MRR stops looking")
+print("   after the first hit, by construction.")
+print("   that is a feature when one answer is all anyone wants, and a")
+print("   serious flaw when the user needs several.")
+print()
+
+print("THE ZERO PROBLEM. a query with no relevant result in the list gets")
+print("RR = 0, and zeros pull an average hard:")
+print("%-30s %14s %14s" % ("", "MRR", "MRR, excl. zeros"))
+nonzero = [r for r in rrs if r > 0]
+print("%-30s %14.4f %14.4f"
+      % ("all %d queries" % len(rrs), float(np.mean(rrs)),
+         float(np.mean(nonzero))))
+print("   %.4f against %.4f, from the same system. the second number"
+      % (np.mean(rrs), np.mean(nonzero)))
+print("   answers 'when it works, how well does it work' and the first")
+print("   answers 'how well does it work'. both are legitimate; quoting")
+print("   one and meaning the other is not.")
+print("   report the failure rate separately: %d of %d queries (%.0f%%)"
+      % (len(rrs) - len(nonzero), len(rrs),
+         100.0 * (len(rrs) - len(nonzero)) / len(rrs)))
+print("   returned nothing relevant at all, and that number is invisible")
+print("   inside an MRR of %.4f." % np.mean(rrs))
+print()
+
+print("AND A SUBTLETY IN THE AVERAGE ITSELF. reciprocal rank is a")
+print("nonlinear function of rank, so the MEAN of reciprocal ranks is not")
+print("the reciprocal of the mean rank:")
+ranks = [1, 2, 10]
+print("      first hits at ranks %s" % str(ranks))
+print("      mean rank            = %.4f  -> 1/mean = %.4f"
+      % (np.mean(ranks), 1.0 / np.mean(ranks)))
+print("      mean reciprocal rank = %.4f" % np.mean([1.0 / r for r in ranks]))
+print("   %.4f against %.4f. MRR is dominated by the good queries; the"
+      % (np.mean([1.0 / r for r in ranks]), 1.0 / np.mean(ranks)))
+print("   mean rank is dominated by the bad ones. a single result at rank")
+print("   1000 barely moves MRR and wrecks the mean rank:")
+for tail in (10, 100, 1000):
+    rs = [1, 2, tail]
+    print("      worst rank %5d ->  MRR %.4f   mean rank %8.1f"
+          % (tail, np.mean([1.0 / r for r in rs]), np.mean(rs)))
+print("   neither is wrong. they answer different questions, and MRR's")
+print("   answer -- 'how quickly does a user usually succeed' -- is the")
+print("   one that matches how search is actually used.")
+```
+
 ## Things to try
 
 1. Click result #1 on and off. MRR swings between 1.0 and 0.33 on a single change, while recall moves a fraction &mdash; MRR is by far the most position-sensitive of the four.

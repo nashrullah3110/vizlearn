@@ -72,6 +72,146 @@ The methods that work all address this:
 
 <strong>NF4</strong> (used by QLoRA) uses quantisation levels spaced according to a normal distribution, which fits weight distributions better than uniform spacing.
 
+## Measuring the outlier collapse
+
+The section above says one outlier forces the scale to cover its range and collapses every other value into a handful of levels. That is a claim with a number attached, so here is the number -- along with the error at each bit width and the exact cost of the group-wise fix.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(7)
+W = rng.normal(0, 0.05, 4096)          # a typical layer's weights
+
+print("A LAYER'S WEIGHTS: %d values, mean %.5f, std %.5f, range %.4f to %.4f"
+      % (W.size, W.mean(), W.std(), W.min(), W.max()))
+print()
+# symmetric linear quantisation: one scale, levels centred on zero
+def quantize(w, bits, per_channel_max=None):
+    qmax = 2 ** (bits - 1) - 1
+    amax = np.abs(w).max() if per_channel_max is None else per_channel_max
+    scale = amax / qmax if amax > 0 else 1.0
+    q = np.clip(np.round(w / scale), -qmax - 1, qmax)
+    return q, scale
+
+def dequantize(q, scale):
+    return q * scale
+
+print("THE OPERATION ITSELF is two lines. pick a scale so the largest")
+print("weight maps to the largest integer, then round:")
+q8, s8 = quantize(W, 8)
+print("      scale = max|w| / 127 = %.4f / 127 = %.8f"
+      % (np.abs(W).max(), s8))
+print("      q     = round(w / scale)")
+print("%-14s %14s %14s %14s" % ("weight", "w / scale", "rounded", "recovered"))
+for i in (0, 1, 2, 3):
+    print("%-14.6f %14.4f %14d %14.6f"
+          % (W[i], W[i] / s8, int(q8[i]), q8[i] * s8))
+print("   the integers are what gets stored. the scale is one float per")
+print("   tensor, so the overhead is negligible.")
+print()
+
+print("ERROR AT EACH BIT WIDTH:")
+print("%-10s %14s %16s %18s %14s"
+      % ("bits", "levels", "mean abs err", "max err", "err / std"))
+for bits in (8, 6, 5, 4, 3, 2):
+    q, sc = quantize(W, bits)
+    r = dequantize(q, sc)
+    e = np.abs(W - r)
+    print("%-10d %14d %16.6f %18.6f %14.4f"
+          % (bits, 2 ** bits, e.mean(), e.max(), e.mean() / W.std()))
+print("   the error roughly doubles for every bit removed, which is what")
+print("   you would expect: half as many levels, twice the gap between")
+print("   them, twice the average rounding distance.")
+print("   at 8 bits the error is %.1f%% of the weight std -- invisible. at"
+      % (100 * np.abs(W - dequantize(*quantize(W, 8))).mean() / W.std()))
+print("   2 bits it is %.0f%%, which is not a small perturbation of the"
+      % (100 * np.abs(W - dequantize(*quantize(W, 2))).mean() / W.std()))
+print("   model, it is a different model.")
+print()
+
+print("NOW THE THING THAT ACTUALLY BREAKS QUANTISATION: OUTLIERS.")
+print("real transformer activations and some weight channels contain a")
+print("few values orders of magnitude larger than the rest. add three:")
+Wo = W.copy()
+Wo[100], Wo[2000], Wo[3500] = 2.5, -3.1, 2.9
+print("      %d of %d values are outliers (%.4f%% of the tensor)"
+      % (3, Wo.size, 100 * 3.0 / Wo.size))
+print("      max |w| goes from %.4f to %.4f -- a %.0fx increase"
+      % (np.abs(W).max(), np.abs(Wo).max(),
+         np.abs(Wo).max() / np.abs(W).max()))
+print()
+print("%-24s %16s %16s" % ("", "without outliers", "with outliers"))
+for bits in (8, 4):
+    a = np.abs(W - dequantize(*quantize(W, bits))).mean()
+    qb, sb = quantize(Wo, bits)
+    b = np.abs(Wo - dequantize(qb, sb))[np.abs(Wo) < 1.0].mean()
+    print("%-24s %16.6f %16.6f" % ("mean err at %d bits" % bits, a, b))
+print("   the error on the ORDINARY weights got %.0fx worse, and those"
+      % (np.abs(Wo - dequantize(*quantize(Wo, 4)))[np.abs(Wo) < 1.0].mean()
+         / np.abs(W - dequantize(*quantize(W, 4))).mean()))
+print("   weights did not change at all. the outliers stretched the scale,")
+print("   so every level is now spaced %.0fx further apart and 99.9%% of"
+      % (np.abs(Wo).max() / np.abs(W).max()))
+print("   the tensor is quantised into a handful of levels near zero.")
+qb4, _ = quantize(Wo, 4)
+print("      distinct integer levels used by the ordinary weights: %d of %d"
+      % (len(np.unique(qb4[np.abs(Wo) < 1.0])), 16))
+print("   three values out of four thousand collapsed the representation")
+print("   of everything else. THAT is why naive quantisation of a large")
+print("   model produces gibberish, and why every serious method is")
+print("   fundamentally an outlier strategy.")
+print()
+
+print("THE FIXES, and each one is a different answer to that same problem:")
+print()
+print("1. GROUPWISE SCALES -- one scale per block of N weights, so an")
+print("   outlier only stretches its own block:")
+def grouped_err(w, bits, g):
+    out = np.zeros_like(w)
+    for i in range(0, w.size, g):
+        qq, ss = quantize(w[i:i + g], bits)
+        out[i:i + g] = dequantize(qq, ss)
+    ordinary = np.abs(w) < 1.0
+    return float(np.abs(w - out)[ordinary].mean())
+
+print("%-20s %16s %18s" % ("group size", "extra floats", "mean err (4-bit)"))
+errs = {}
+for g in (Wo.size, 512, 128, 64, 32):
+    errs[g] = grouped_err(Wo, 4, g)
+    print("%-20s %16d %18.6f"
+          % ("whole tensor" if g == Wo.size else str(g), Wo.size // g, errs[g]))
+print("   at group size 64 the error on ordinary weights is %.1f%% of what"
+      % (100 * errs[64] / errs[Wo.size]))
+print("   the single whole-tensor scale gave, and it cost %d extra floats"
+      % (Wo.size // 64))
+print("   -- about %.2f of an extra bit per weight. this is exactly what"
+      % (32.0 / 64))
+print("   'group size 128' means in a quantised model's name, and why")
+print("   those names carry a number at all.")
+print()
+print("2. KEEP THE OUTLIERS IN HIGH PRECISION. store almost all weights")
+print("   in 4 bits and the handful of outliers in fp16 -- that is")
+print("   LLM.int8() and the mixed-precision family.")
+print()
+print("3. SMOOTH THEM AWAY FIRST. an outlier in the activations can be")
+print("   moved into the weights by rescaling both, since a linear layer")
+print("   does not care where a scale factor lives:")
+print("      (X / s) @ (s * W)  ==  X @ W")
+x = rng.normal(0, 1, (3, 4)); Wm = rng.normal(0, 1, (4, 3)); sc = 4.0
+print("      max difference: %.2e"
+      % np.abs((x / sc) @ (sc * Wm) - x @ Wm).max())
+print("   that identity is exact, so you can trade an activation outlier")
+print("   for a weight outlier and quantise whichever is easier. that is")
+print("   SmoothQuant, and it is the whole idea.")
+print()
+print("AND ONE NUMBER TO CARRY AWAY from all of this: the difference")
+print("between a 4-bit model that works and one that produces gibberish is")
+print("not the bit width. it is whether anything was done about the")
+print("outliers -- naive and grouped 4-bit differ by %.0fx on exactly the"
+      % (errs[Wo.size] / errs[64]))
+print("same weights, at a cost of half a bit each.")
+```
+
 ## Try it yourself
 
 1. <strong>Step from FP32 down to INT4.</strong> Levels fall from billions to 16, the horizontal grid lines thin out, and the green dots drift visibly away from the grey ones.

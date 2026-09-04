@@ -66,6 +66,158 @@ Note the shapes: the bi-encoder embeds once and compares against a precomputed m
 
 Rough latency for 50 candidates with a small cross-encoder on a GPU: 20&ndash;50ms. On a CPU, several hundred milliseconds &mdash; which is why reranker size is a real deployment decision.
 
+## Why one vector per document is not enough
+
+The code above shows the two-stage API. What it cannot show is the reason the second stage helps at all -- that a bi-encoder commits to one vector per document before it knows the question. This builds both scorers from scratch on a case where that commitment is exactly the problem.
+
+```python-run
+import numpy as np
+
+# 4 concept dimensions: price, battery, camera, screen
+DIMS = ["price", "battery", "camera", "screen"]
+
+# the numbers are how much each document actually SAYS about each topic
+DOCS = {
+    "D1 full review": np.array([0.90, 0.90, 0.90, 0.90]),
+    "D2 battery deep-dive": np.array([0.05, 1.00, 0.05, 0.00]),
+    "D3 camera deep-dive": np.array([0.05, 0.00, 1.00, 0.00]),
+    "D4 pricing page": np.array([1.00, 0.00, 0.00, 0.00]),
+    "D5 one battery sentence": np.array([0.00, 0.35, 0.00, 0.00]),
+}
+QUERIES = {
+    "how long does the battery last": np.array([0.0, 1.0, 0.0, 0.0]),
+    "how good is the camera": np.array([0.0, 0.0, 1.0, 0.0]),
+}
+
+def unit(v):
+    return v / (np.linalg.norm(v) + 1e-12)
+
+print("HOW MUCH EACH DOCUMENT ACTUALLY SAYS about each topic, and then")
+print("the unit vector a bi-encoder would store for it:")
+print("%-26s %s   |  %s"
+      % ("document", "  ".join("%7s" % d for d in DIMS),
+         "  ".join("%7s" % d for d in DIMS)))
+for name, v in DOCS.items():
+    print("%-26s %s   |  %s"
+          % (name, "  ".join("%7.2f" % x for x in v),
+             "  ".join("%7.2f" % x for x in unit(v))))
+print("   NORMALISING IS THE STEP THAT MATTERS. D1 says 0.90 about every")
+print("   topic and is stored as 0.50 on each, because a unit vector has a")
+print("   fixed budget to spread across its dimensions. D5 says 0.35 about")
+print("   one topic and is stored as 1.00 on it, because all of its very")
+print("   small budget points one way.")
+print("   after normalisation, the thin document looks MORE on-topic than")
+print("   the thorough one. that is not a bug in the embedding, it is what")
+print("   'direction only' means -- and it is the whole reason a second")
+print("   stage exists.")
+print()
+print("at query time it embeds the query and takes a dot product:")
+print("%-34s %s" % ("", "  ".join("%22s" % q[:22] for q in QUERIES)))
+bi = {}
+for name, v in DOCS.items():
+    row = [float(unit(v) @ unit(q)) for q in QUERIES.values()]
+    bi[name] = row
+    print("%-34s %s" % (name, "  ".join("%22.4f" % x for x in row)))
+print("   read the battery column top to bottom. D5 -- a single sentence")
+print("   mentioning the battery -- scores %.4f, the HIGHEST of all five,"
+      % bi["D5 one battery sentence"][0])
+print("   ahead of the deep-dive at %.4f and far ahead of the full review"
+      % bi["D2 battery deep-dive"][0])
+print("   at %.4f. the retriever has ranked the least informative document"
+      % bi["D1 full review"][0])
+print("   first, and it is not malfunctioning: D5's direction is exactly")
+print("   the query's direction, and direction is all cosine sees.")
+print()
+
+print("A CROSS-ENCODER never builds a document vector. it takes the PAIR")
+print("and scores it jointly, so it can look at what the query asked about")
+print("and read only that part of the document:")
+def cross(q, d):
+    # attend to the dimensions the query cares about, then read the
+    # document's content there -- something no fixed vector can do
+    attn = q / (q.sum() + 1e-12)
+    return float((attn * d).sum())
+
+ce = {}
+print("%-34s %s" % ("", "  ".join("%22s" % q[:22] for q in QUERIES)))
+for name, v in DOCS.items():
+    row = [cross(q, v) for q in QUERIES.values()]
+    ce[name] = row
+    print("%-34s %s" % (name, "  ".join("%22.4f" % x for x in row)))
+print("   now the order is by CONTENT. D5 drops to %.4f, which is what it"
+      % ce["D5 one battery sentence"][0])
+print("   actually says about batteries, and D1 rises to %.4f."
+      % ce["D1 full review"][0])
+print("   the cross-encoder never normalised anything, because it never")
+print("   built a document vector to normalise. it looked at the query,")
+print("   picked out the dimensions asked about, and read the document")
+print("   there -- which it can only do because it has both in hand at")
+print("   once.")
+print()
+
+print("THE RANKINGS THAT PRODUCES:")
+for i, q in enumerate(QUERIES):
+    print("   query: %s" % q)
+    b = sorted(DOCS, key=lambda d: -bi[d][i])
+    c = sorted(DOCS, key=lambda d: -ce[d][i])
+    print("      bi-encoder:    %s" % "  >  ".join(x.split()[0] for x in b))
+    print("      cross-encoder: %s" % "  >  ".join(x.split()[0] for x in c))
+print("   they disagree at the TOP, not just below it. the bi-encoder's")
+print("   first pick is a one-line mention; the cross-encoder's is the")
+print("   deep-dive, with the full review second.")
+print("   this is the everyday version of a well-known problem: short,")
+print("   narrowly-worded chunks punch above their weight in a vector")
+print("   index, because normalisation rewards them for having nothing")
+print("   else to say. reranking is what puts them back in their place.")
+print()
+
+print("SO WHY NOT USE THE CROSS-ENCODER FOR EVERYTHING? because of when")
+print("the work happens:")
+N = 1_000_000
+print("%-28s %26s %26s" % ("", "bi-encoder", "cross-encoder"))
+for label, b, c in (
+        ("document vectors stored", "%s" % "{:,}".format(N), "0"),
+        ("work done offline", "%s encodes" % "{:,}".format(N), "none possible"),
+        ("work done per query", "1 encode + a dot product",
+         "%s forward passes" % "{:,}".format(N)),
+        ("can use an ANN index", "yes", "no -- no vectors to index")):
+    print("%-28s %26s %26s" % (label, b, c))
+print("   the last row is the fatal one. an ANN index works by comparing")
+print("   PRECOMPUTED vectors, and a cross-encoder has none to compare --")
+print("   its score only exists once a specific query and a specific")
+print("   document are put in together. there is nothing to build an index")
+print("   over, so it must look at every document, every time.")
+print()
+
+print("HENCE THE TWO STAGES. numbers for a %s-document corpus:"
+      % "{:,}".format(N))
+BI_MS_PER_DOC, CE_MS_PER_DOC = 0.0000, 1.0
+print("%-40s %16s %14s" % ("design", "cross-encoder calls", "latency"))
+print("%-40s %16s %14s"
+      % ("cross-encoder on everything", "{:,}".format(N),
+         "%.0f minutes" % (N * CE_MS_PER_DOC / 1000 / 60)))
+for k in (10, 50, 200):
+    print("%-40s %16d %14s"
+          % ("bi-encoder, then rerank the top %d" % k, k,
+             "%.0f ms" % (k * CE_MS_PER_DOC + 5)))
+print("   the same cross-encoder, applied to %d candidates instead of a" % 50)
+print("   million, is %s times cheaper and sees every document that had"
+      % "{:,}".format(N // 50))
+print("   a serious chance. the bi-encoder's job is not to rank well -- it")
+print("   is to be CHEAP and to not lose anything, and that is why it is")
+print("   evaluated on recall@k and never on precision@1.")
+print()
+print("   and it sets the ceiling. anything the first stage misses is")
+print("   invisible to the reranker, whatever the reranker's quality:")
+missed = "D2 battery deep-dive"
+print("      if the top-%d misses %s, the reranker cannot recover it."
+      % (3, missed.split()[0]))
+print("      so tune k by watching recall@k of stage one, not by watching")
+print("      the final answer -- the final answer cannot tell you the")
+print("      difference between a bad reranker and a first stage that")
+print("      never handed it the right document.")
+```
+
 ## Try it yourself
 
 1. <strong>Read Stage 1.</strong> Pure cosine similarity over word overlap. One candidate about python <em>the snake</em> ranks deceptively high — it shares the words "python" and "memory" with the query, and a bi-encoder scoring query and document independently has no way to notice they mean something different in context.
