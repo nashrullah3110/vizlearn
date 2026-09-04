@@ -2431,6 +2431,167 @@ together.
 **Losing the corners.** A rotated rectangle does not fit in the original frame.
 Either accept the clipping or compute the bounding box of the transformed
 corners and enlarge the canvas first.
+
+## Rotation, scale and shear as one matrix
+
+Every geometric transform that keeps straight lines straight is one 2x3 matrix, and knowing that turns six separate operations into one. This builds the matrices, composes them, and works through the two things that trip everyone up -- composition order, and the fact that you have to run the transform backwards.
+
+```python-run
+import numpy as np
+
+def affine(a=0.0, sx=1.0, sy=1.0, shx=0.0, tx=0.0, ty=0.0):
+    # rotation by a (radians), then scale, then shear, then translate
+    c, s = np.cos(a), np.sin(a)
+    R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+    S = np.array([[sx, 0, 0], [0, sy, 0], [0, 0, 1]])
+    H = np.array([[1, shx, 0], [0, 1, 0], [0, 0, 1]])
+    T = np.array([[1, 0, tx], [0, 1, ty], [0, 0, 1]])
+    return T @ H @ S @ R
+
+print("A POINT BECOMES THREE NUMBERS: (x, y) -> (x, y, 1). that third 1 is")
+print("the whole trick -- it lets TRANSLATION be a matrix multiply too,")
+print("which a 2x2 matrix can never express, because a linear map always")
+print("fixes the origin.")
+print()
+
+print("THE FIVE BUILDING BLOCKS, applied to the unit square's corners:")
+square = np.array([[0., 1, 1, 0], [0, 0, 1, 1], [1, 1, 1, 1]])
+cases = [("identity", affine()),
+         ("translate (2, 1)", affine(tx=2, ty=1)),
+         ("scale x2, y0.5", affine(sx=2, sy=0.5)),
+         ("rotate 30 deg", affine(a=np.radians(30))),
+         ("shear x by 0.5", affine(shx=0.5)),
+         ("scale x2 uniformly", affine(sx=2, sy=2))]
+for name, M in cases:
+    p = M @ square
+    print("%-22s %s" % (name, "  ".join("(%5.2f,%5.2f)" % (p[0, i], p[1, i])
+                                        for i in range(4))))
+print("   parallel edges stay parallel in every one of them. that is what")
+print("   'affine' means, and it is why an affine transform can never")
+print("   produce perspective -- railway tracks converging needs the")
+print("   bottom row of the matrix to stop being [0 0 1].")
+print()
+
+print("PROPERTIES EACH ONE PRESERVES:")
+print("%-18s %8s %8s %8s %8s" % ("transform", "lengths", "angles", "areas",
+                                 "parallel"))
+for name, M in cases:
+    A = M[:2, :2]
+    det = np.linalg.det(A)
+    lengths = np.allclose(A.T @ A, np.eye(2))
+    angles = np.allclose(A.T @ A, (A.T @ A)[0, 0] * np.eye(2))
+    print("%-18s %8s %8s %8s %8s"
+          % (name, "yes" if lengths else "no", "yes" if angles else "no",
+             "yes" if abs(abs(det) - 1) < 1e-9 else "no", "yes"))
+print("   the determinant IS the area scale factor, exactly:")
+for name, M in cases:
+    print("      %-22s det = %6.2f" % (name, np.linalg.det(M[:2, :2])))
+print("   'scale x2, y0.5' has determinant 1, so it preserves area while")
+print("   changing every length -- stretched one way and squashed the")
+print("   other by compensating amounts. 'scale x2 uniformly' has")
+print("   determinant 4 and preserves shape while quadrupling area. that")
+print("   is why 'preserves area' and 'preserves shape' have to be")
+print("   separate columns: neither one implies the other.")
+print()
+
+print("COMPOSITION IS MATRIX MULTIPLICATION, AND IT DOES NOT COMMUTE:")
+Rot = affine(a=np.radians(90))
+Tr = affine(tx=3, ty=0)
+pt = np.array([1.0, 0.0, 1.0])
+print("   the point (1, 0)")
+print("   rotate 90, THEN translate x+3:  (%.2f, %.2f)"
+      % tuple((Tr @ Rot @ pt)[:2]))
+print("   translate x+3, THEN rotate 90:  (%.2f, %.2f)"
+      % tuple((Rot @ Tr @ pt)[:2]))
+print("   different answers. and note the ORDER in the expression: the")
+print("   matrix applied FIRST is written on the RIGHT, next to the point.")
+print("   'rotate then translate' is written T @ R. reading these")
+print("   right-to-left is not a convention you can opt out of.")
+print()
+print("   this is also how you rotate about a point that is not the")
+print("   origin: translate the centre to the origin, rotate, translate")
+print("   back. three matrices, one product, one pass over the image:")
+cx, cy = 4.0, 3.0
+about = affine(tx=cx, ty=cy) @ affine(a=np.radians(90)) @ affine(tx=-cx, ty=-cy)
+centre = np.array([cx, cy, 1.0])
+print("      the centre maps to (%.2f, %.2f) -- it does not move."
+      % tuple((about @ centre)[:2]))
+print("      a point 2 to its right maps to (%.2f, %.2f)."
+      % tuple((about @ np.array([cx + 2, cy, 1.0]))[:2]))
+print()
+
+print("NOW THE PART THAT SURPRISES PEOPLE: TO APPLY A TRANSFORM TO AN")
+print("IMAGE, YOU RUN IT BACKWARDS.")
+H, W = 7, 11
+img = np.zeros((H, W))
+img[1:4, 1:5] = 1.0
+img[5, 7:10] = 1.0
+
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join("#" if v > 0.5 else "." for v in row))
+
+show(img, "input")
+M = affine(a=np.radians(20), tx=1.0)
+forward = np.zeros_like(img)
+for y in range(H):
+    for x in range(W):
+        if img[y, x] > 0.5:
+            p = M @ np.array([x, y, 1.0])
+            xi, yi = int(round(p[0])), int(round(p[1]))
+            if 0 <= xi < W and 0 <= yi < H:
+                forward[yi, xi] = 1.0
+show(forward, "FORWARD mapping: push each input pixel to its new place")
+print("      %d pixels went in and %d came out."
+      % (int((img > 0.5).sum()), int((forward > 0.5).sum())))
+print("      look at the gaps inside the block. two input pixels can round")
+print("      to the SAME output pixel, and some output pixels are hit by")
+print("      none at all -- so the result comes out with holes in it.")
+print("      there is no way to avoid this: the map is continuous and the")
+print("      grid is not.")
+print()
+Minv = np.linalg.inv(M)
+backward = np.zeros_like(img)
+for y in range(H):
+    for x in range(W):
+        p = Minv @ np.array([x, y, 1.0])
+        xi, yi = int(round(p[0])), int(round(p[1]))
+        if 0 <= xi < W and 0 <= yi < H:
+            backward[y, x] = img[yi, xi]
+show(backward, "BACKWARD mapping: for each OUTPUT pixel, ask where it came from")
+print("      %d pixels this time, and the block is solid: no holes, because"
+      % int((backward > 0.5).sum()))
+print("      every output pixel is visited exactly once and asks a question")
+print("      that always has an answer.")
+print("      both versions lost the short bar that was at row 5. that is")
+print("      not a mapping artefact -- the rotation genuinely carried it")
+print("      past the bottom edge, to y = %.2f in a %d-row image. rotating"
+      % ((M @ np.array([8.0, 5.0, 1.0]))[1], H))
+print("      an image about its origin moves content out of frame, which")
+print("      is why real code rotates about the CENTRE and often enlarges")
+print("      the canvas to fit the result.")
+print("      this is why every library's warpAffine takes the INVERSE")
+print("      internally, and why the interpolation happens on the input")
+print("      side: the fractional coordinate lands in the source image,")
+print("      where there are real neighbours to interpolate between.")
+print()
+
+print("SIX NUMBERS, AND WHAT THEY BUY:")
+print("%-24s %10s %s" % ("family", "params", "what it can do"))
+for name, n, what in (("translation", 2, "shift only"),
+                      ("rigid (Euclidean)", 3, "+ rotation"),
+                      ("similarity", 4, "+ uniform scale"),
+                      ("affine", 6, "+ shear, non-uniform scale"),
+                      ("homography", 8, "+ perspective")):
+    print("%-24s %10d %s" % (name, n, what))
+print("   each row adds freedom and needs more point correspondences to")
+print("   solve for: affine needs 3 matched points, a homography needs 4.")
+print("   in a spatial transformer network those 6 numbers are the output")
+print("   of a small subnetwork, so the model learns which crop and")
+print("   rotation to apply -- the transform becomes a layer.")
+```
+
 """,
     [
         {"q": "What does the determinant ad - bc of an affine transform tell you?",
@@ -3413,6 +3574,129 @@ maps cost memory at every layer.
 **Assuming it is free.** The parameters are free; the memory is not. A network
 that never downsamples holds full-resolution activations throughout, which is
 often the binding constraint on segmentation models.
+
+## Skipping pixels to see further for the same price
+
+A dilated convolution reads the same number of weights from a wider spread of positions. That one change buys receptive field growth that is exponential rather than linear -- and brings a gridding artefact that the fix for it is named after.
+
+```python-run
+import numpy as np
+
+print("A 3x3 KERNEL reads 9 positions. WHERE those positions are is set by")
+print("the dilation rate:")
+for d in (1, 2, 3):
+    span = 2 * d + 1
+    grid = [["." for _ in range(span)] for _ in range(span)]
+    for i in range(3):
+        for j in range(3):
+            grid[i * d][j * d] = "#"
+    print("   dilation %d -- 9 weights spread over %dx%d:" % (d, span, span))
+    for row in grid:
+        print("      " + " ".join(row))
+print("   the weight count never changes. the SPAN does.")
+print()
+
+print("RECEPTIVE FIELD -- how much of the input one output cell depends on.")
+print("stack layers and track it. for 3x3 kernels, stride 1:")
+print("%-10s %14s %16s %18s"
+      % ("layer", "dilation", "RF (stacked 3x3)", "RF (doubling)"))
+rf_plain, rf_dil, d = 1, 1, 1
+for layer in range(1, 7):
+    rf_plain += 2                       # each plain 3x3 adds 2
+    rf_dil += 2 * d                      # a dilated 3x3 adds 2*d
+    print("%-10d %14d %16d %18d" % (layer, d, rf_plain, rf_dil))
+    d *= 2
+print("   six plain layers reach %d pixels; six doubling-dilation layers"
+      % rf_plain)
+print("   reach %d, using exactly the same %d weights per layer." % (rf_dil, 9))
+print("   the plain stack grows LINEARLY in depth, the dilated stack grows")
+print("   EXPONENTIALLY, and neither one costs a parameter more than the")
+print("   other.")
+print()
+
+print("THE ALTERNATIVE WAYS to get a big receptive field, and what each")
+print("one costs:")
+print("%-30s %14s %14s %16s" % ("method", "RF", "params", "output size"))
+print("%-30s %14d %14d %16s" % ("one 3x3", 3, 9, "unchanged"))
+print("%-30s %14d %14d %16s" % ("one 9x9", 9, 81, "unchanged"))
+print("%-30s %14d %14d %16s" % ("4 stacked 3x3", 9, 36, "unchanged"))
+print("%-30s %14d %14d %16s" % ("3x3, dilation 4", 9, 9, "unchanged"))
+print("%-30s %14d %14d %16s" % ("3x3 after 2 poolings", 12, 9, "quartered"))
+print("   pooling gets there cheaply too, but it throws the resolution")
+print("   away, and for segmentation the output has to be per-pixel. that")
+print("   single constraint -- big context, full resolution -- is what")
+print("   dilation was invented for.")
+print()
+
+print("NOW WATCH IT WORK. a signal with one spike, convolved with a 3-tap")
+print("averaging kernel at several dilations:")
+N = 25
+sig = np.zeros(N)
+sig[12] = 9.0
+k = np.ones(3) / 3.0
+
+def dconv(x, k, d):
+    out = np.zeros_like(x)
+    r = (len(k) - 1) * d // 2
+    for i in range(len(x)):
+        acc = 0.0
+        for t, w in enumerate(k):
+            j = i + (t - len(k) // 2) * d
+            if 0 <= j < len(x):
+                acc += w * x[j]
+        out[i] = acc
+    return out
+
+print("   input:        " + "".join("#" if v > 0 else "." for v in sig))
+for d in (1, 2, 4):
+    o = dconv(sig, k, d)
+    print("   dilation %d:   " % d
+          + "".join("#" if v > 0 else "." for v in o)
+          + "   touches %d positions" % int((o > 0).sum()))
+print("   at dilation 4 the response appears at positions 8, 12 and 16 --")
+print("   and NOTHING at 9, 10, 11. the kernel never looked there.")
+print()
+
+print("THAT IS THE GRIDDING ARTEFACT, and stacking makes it worse. two")
+print("layers both at dilation 2 only ever touch even offsets:")
+two_same = dconv(dconv(sig, k, 2), k, 2)
+print("   d=2 then d=2:  " + "".join("#" if v > 1e-9 else "." for v in two_same))
+covered = set(np.where(two_same > 1e-9)[0])
+gaps = [i for i in range(min(covered), max(covered) + 1) if i not in covered]
+print("      reaches %d..%d but MISSES %s"
+      % (min(covered), max(covered), str(gaps)))
+print("      every missed index is odd. the two layers share a common")
+print("      factor of 2, so no path through them can ever land on an odd")
+print("      offset. in 2D the reachable offsets are (even, even), which")
+print("      is one cell in four -- so THREE QUARTERS of the input inside")
+print("      the receptive field is not merely down-weighted, it is never")
+print("      read at all.")
+print()
+print("   now make the rates COPRIME -- 1, then 2, then 3:")
+mixed = dconv(dconv(dconv(sig, k, 1), k, 2), k, 3)
+cov2 = set(np.where(mixed > 1e-9)[0])
+gaps2 = [i for i in range(min(cov2), max(cov2) + 1) if i not in cov2]
+print("   d=1,2,3:       " + "".join("#" if v > 1e-9 else "." for v in mixed))
+print("      reaches %d..%d and misses %s"
+      % (min(cov2), max(cov2), str(gaps2) if gaps2 else "nothing"))
+print("      full coverage, same 9 weights per layer, same cost. the fix")
+print("      for gridding is arithmetic, not architecture: choose rates")
+print("      with no common factor. this is why real designs use rate")
+print("      sequences like 1,2,5 or 1,2,3 rather than 2,4,8.")
+print()
+
+print("WHERE YOU MEET IT:")
+print("%-26s %s" % ("DeepLab (ASPP)", "parallel branches at 6, 12, 18"))
+print("%-26s %s" % ("WaveNet", "1,2,4,...,512 over raw audio"))
+print("%-26s %s" % ("dilated residual nets", "replaces the last poolings"))
+print("   the common thread is a task where downsampling is unacceptable:")
+print("   per-pixel labels, or a waveform where every sample is an output.")
+print("   for plain classification, pooling is cheaper and dilation buys")
+print("   little -- which is why you will not find it in a plain ResNet")
+print("   classifier, and will find it in almost every segmentation")
+print("   network built since 2016.")
+```
+
 """,
     [
         {"q": "How wide does a 3x3 kernel at dilation 3 reach?",
@@ -3559,6 +3843,146 @@ nothing to average and the two are identical.
 **Forgetting global max pooling exists.** It takes the maximum instead of the
 mean, and for tasks where one strong local response matters more than an average
 &mdash; some detection and audio tasks &mdash; it can be the better choice.
+
+## Replacing the flatten layer with one number per channel
+
+Global average pooling collapses a whole feature map to a single number per channel. It looks like it throws away almost everything -- and that is exactly what makes it work, in a way this measures against the flatten-and-dense alternative it replaced.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(2)
+C, H, W = 8, 6, 6                      # 8 channels of 6x6
+
+def make(kind):
+    a = np.zeros((C, H, W))
+    for c in range(C):
+        a[c] = rng.normal(0.2, 0.15, (H, W)).clip(0)
+    return a
+
+fmap = make("x")
+fmap[2, 1:3, 1:3] = 3.4                # channel 2 fires strongly, top-left
+fmap[5, 4:6, 3:5] = 3.1                # channel 5 fires strongly, bottom-right
+
+print("A FEATURE MAP with %d channels of %dx%d." % (C, H, W))
+print("GAP takes the mean over the two SPATIAL axes and leaves the channel")
+print("axis alone: (%d, %d, %d) -> (%d,)." % (C, H, W, C))
+gap = fmap.mean(axis=(1, 2))
+print("%-12s %12s %12s %12s" % ("channel", "GAP", "max", "where max is"))
+for c in range(C):
+    r, cc = np.unravel_index(fmap[c].argmax(), (H, W))
+    print("%-12d %12.4f %12.4f %12s" % (c, gap[c], fmap[c].max(),
+                                        "(%d,%d)" % (r, cc)))
+print("   channels 2 and 5 stand out. the vector says WHAT was found and")
+print("   says nothing whatsoever about WHERE -- that column is printed")
+print("   from the feature map, not from the GAP output.")
+print()
+
+print("THE PARAMETER ARGUMENT, which is the one usually given:")
+NCLASS = 10
+flat_params = C * H * W * NCLASS + NCLASS
+gap_params = C * NCLASS + NCLASS
+print("%-40s %14s" % ("head design", "parameters"))
+print("%-40s %14d" % ("flatten (%d) -> dense(%d)" % (C * H * W, NCLASS),
+                      flat_params))
+print("%-40s %14d" % ("GAP (%d) -> dense(%d)" % (C, NCLASS), gap_params))
+print("%-40s %14.1fx" % ("ratio", flat_params / gap_params))
+print("   and that is a toy. for a real backbone the gap is enormous:")
+print("%-24s %10s %14s %14s" % ("backbone", "final map", "flatten head",
+                                "GAP head"))
+for name, c, h, w in (("VGG-16", 512, 7, 7), ("ResNet-50", 2048, 7, 7),
+                      ("MobileNetV2", 1280, 7, 7)):
+    print("%-24s %10s %14s %14s"
+          % (name, "%dx%dx%d" % (c, h, w),
+             "{:,}".format(c * h * w * 1000 + 1000),
+             "{:,}".format(c * 1000 + 1000)))
+print("   VGG-16's FIRST dense layer alone is 25088 x 4096, about 103")
+print("   million parameters. its three dense layers together come to")
+print("   roughly 124 million of the network's 138 million total: the")
+print("   classifier head outweighed every convolution in the network")
+print("   put together. GAP deletes almost all of it.")
+print()
+
+print("THE ARGUMENT THAT MATTERS MORE -- INPUT SIZE. a flatten head is")
+print("wired to one exact spatial size. feed it anything else and the")
+print("matrix multiply does not typecheck:")
+print("%-22s %14s %18s %14s" % ("input image", "final map", "flatten gives",
+                                "GAP gives"))
+for side in (192, 224, 288, 384):
+    h = side // 32
+    print("%-22s %14s %18d %14d"
+          % ("%dx%d" % (side, side), "%dx%dx%d" % (C, h, h), C * h * h, C))
+print("   the flatten column changes with every input size; the GAP column")
+print("   never does. that single fact is why GAP is in every modern")
+print("   backbone: the same trained head works on any input resolution,")
+print("   which is what makes multi-scale training and test-time resizing")
+print("   possible at all.")
+print()
+
+print("AND THE ARGUMENT THAT IS EASIEST TO MISS -- WHAT IT DOES TO")
+print("TRAINING. a flatten head can memorise position. build two examples")
+print("of the SAME class where the evidence sits in different corners:")
+a_left = np.zeros((C, H, W)); a_left[2, 0:2, 0:2] = 3.0
+a_right = np.zeros((C, H, W)); a_right[2, 4:6, 4:6] = 3.0
+print("   example A: channel 2 fires in the top-left corner")
+print("   example B: channel 2 fires in the bottom-right corner")
+fa, fb = a_left.reshape(-1), a_right.reshape(-1)
+ga, gb = a_left.mean(axis=(1, 2)), a_right.mean(axis=(1, 2))
+def cos(u, v):
+    return float(u @ v / (np.linalg.norm(u) * np.linalg.norm(v) + 1e-12))
+print("%-34s %14s" % ("representation", "cosine similarity"))
+print("%-34s %14.4f" % ("flattened (%d numbers)" % fa.size, cos(fa, fb)))
+print("%-34s %14.4f" % ("after GAP (%d numbers)" % ga.size, cos(ga, gb)))
+print("   to a flatten head these two examples are ORTHOGONAL -- as")
+print("   unrelated as two random inputs. it has to learn the class twice,")
+print("   once per position, and it needs training examples in every")
+print("   corner to do it.")
+print("   after GAP they are identical. translation invariance is not")
+print("   something GAP encourages; it is something GAP enforces, for")
+print("   free, before any weight is learned. that is a strong structural")
+print("   prior, and it is why GAP heads generalise from less data.")
+print()
+
+print("THE PRICE, stated plainly. GAP cannot represent position, so it")
+print("cannot be used where position is the answer:")
+print("%-36s %s" % ("task", "GAP as the head?"))
+for task, ok in (("image classification", "yes -- the standard choice"),
+                 ("object detection", "no -- boxes need coordinates"),
+                 ("semantic segmentation", "no -- output is per-pixel"),
+                 ("counting objects", "no -- mean, not sum"),
+                 ("pose estimation", "no -- position IS the label")):
+    print("%-36s %s" % (task, ok))
+print()
+print("that counting row is the subtle one, and the obvious argument for")
+print("it is actually wrong. GAP is a mean, so you might expect two")
+print("objects to give the same value as one. watch what really happens:")
+one = np.zeros((C, H, W)); one[2, 1:3, 1:3] = 3.0
+two = np.zeros((C, H, W)); two[2, 1:3, 1:3] = 3.0; two[2, 4:6, 3:5] = 3.0
+print("   one object  -> channel 2 GAP = %.4f" % one.mean(axis=(1, 2))[2])
+print("   two objects -> channel 2 GAP = %.4f" % two.mean(axis=(1, 2))[2])
+print("   it DOUBLES. the mean rose because the denominator -- %d cells --"
+      % (H * W))
+print("   is fixed while the numerator grew, so GAP does carry some count")
+print("   information after all.")
+print("   the reason you still cannot count with it is worse than 'the")
+print("   information is gone'. make one object twice as large instead:")
+big = np.zeros((C, H, W)); big[2, 1:3, 1:5] = 3.0
+print("      one object, %d cells   -> %.4f"
+      % (int((one[2] > 0).sum()), one.mean(axis=(1, 2))[2]))
+print("      two objects, %d cells  -> %.4f"
+      % (int((two[2] > 0).sum()), two.mean(axis=(1, 2))[2]))
+print("      ONE object, %d cells   -> %.4f"
+      % (int((big[2] > 0).sum()), big.mean(axis=(1, 2))[2]))
+print("   the last two are identical, and they are different scenes. count")
+print("   is confounded with SIZE, and no downstream layer can separate")
+print("   them, because the distinction was destroyed before the layer saw")
+print("   the number. that is the real failure: not lost precision, but an")
+print("   ambiguity baked into the representation.")
+print("   if the task needs a count or a location, the spatial axes have to")
+print("   survive to the output -- which is exactly what detection and")
+print("   segmentation architectures are built to do.")
+```
+
 """,
     [
         {"q": "How many times fewer weights does GAP need than flatten, for a 7x7 feature map?",
@@ -4387,6 +4811,164 @@ scale-invariant detector.
 
 **Corners on a blurred image.** Blur destroys the gradients the whole method
 depends on, so denoise gently or not at all before detecting.
+
+## Two eigenvalues that tell an edge from a corner
+
+A corner is a place where the image changes in two independent directions, and that sentence turns directly into linear algebra. This builds the structure tensor, reads its eigenvalues, and shows why Harris uses a determinant-and-trace shortcut instead of computing them.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(6)
+H, W = 14, 20
+img = np.full((H, W), 50.0)
+img[3:10, 3:9] = 200.0                 # a square: 4 corners
+img[:, 14:16] = 200.0                  # a vertical strip: edges, no corners
+img += rng.normal(0, 2.0, (H, W))
+
+ramp = " .:-=+*#%@"
+def show(a, label, hi=None):
+    hi = a.max() if hi is None else hi
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(ramp[min(9, int(9 * max(0.0, v) / (hi + 1e-9)))]
+                                 for v in row))
+
+show(img, "the image", 255)
+print("      a solid square (4 corners) and a vertical strip (edges only).")
+print()
+
+def sobel(a):
+    KX = np.array([[-1., 0, 1], [-2, 0, 2], [-1, 0, 1]]) / 8.0
+    p = np.pad(a, 1, mode="edge")
+    gx = np.array([[float((p[i:i + 3, j:j + 3] * KX).sum())
+                    for j in range(W)] for i in range(H)])
+    gy = np.array([[float((p[i:i + 3, j:j + 3] * KX.T).sum())
+                    for j in range(W)] for i in range(H)])
+    return gx, gy
+
+gx, gy = sobel(img)
+
+print("THE IDEA. slide a small window over the image and ask: as the window")
+print("moves, how much does the content inside it change? that depends on")
+print("the DIRECTION you move it, and the answer for all directions at once")
+print("is packed into a 2x2 matrix -- the structure tensor:")
+print("      M = sum over the window of  [ gx*gx   gx*gy ]")
+print("                                  [ gx*gy   gy*gy ]")
+print("   it is a sum of outer products, so it is symmetric and positive")
+print("   semi-definite. that guarantees two real, non-negative eigenvalues.")
+print()
+
+def tensor(r, c, win=3):
+    h = win // 2
+    r0, r1 = max(0, r - h), min(H, r + h + 1)
+    c0, c1 = max(0, c - h), min(W, c + h + 1)
+    a, b = gx[r0:r1, c0:c1].reshape(-1), gy[r0:r1, c0:c1].reshape(-1)
+    return np.array([[float(a @ a), float(a @ b)], [float(a @ b), float(b @ b)]])
+
+probes = [("flat interior", 6, 5),
+          ("flat background", 12, 10),
+          ("a straight vertical edge", 6, 3),
+          ("a straight horizontal edge", 3, 6),
+          ("the strip's edge", 6, 14),
+          ("the square's top-left corner", 3, 3),
+          ("the square's bottom-right", 9, 8)]
+
+print("%-30s %10s %10s %14s" % ("location", "lambda1", "lambda2",
+                                "interpretation"))
+for label, r, c in probes:
+    ev = np.sort(np.linalg.eigvalsh(tensor(r, c)))[::-1]
+    if ev[0] < 200:
+        kind = "flat"
+    elif ev[1] < ev[0] * 0.15:
+        kind = "edge"
+    else:
+        kind = "CORNER"
+    print("%-30s %10.0f %10.0f %14s" % (label, ev[0], ev[1], kind))
+print()
+print("   READ THE TWO NUMBERS AS A SHAPE:")
+print("      both small          -> nothing here. the window can slide")
+print("                             anywhere without the content changing.")
+print("      one large, one tiny -> an edge. sliding ALONG it changes")
+print("                             nothing; sliding across it changes a")
+print("                             lot. one direction of variation.")
+print("      both large          -> a corner. every direction changes the")
+print("                             content, so the window is pinned.")
+print("   that last property is exactly what 'trackable' means, which is")
+print("   why corners and not edges are what optical flow and structure-")
+print("   from-motion track.")
+print()
+
+print("HARRIS'S SHORTCUT. computing eigenvalues per pixel was expensive in")
+print("1988, and it turns out you never need them. for a 2x2 matrix:")
+print("      det(M)   = lambda1 * lambda2")
+print("      trace(M) = lambda1 + lambda2")
+print("   det is two multiplies and a subtraction; trace is one addition.")
+print("   no square roots, no iteration -- which is what an eigenvalue")
+print("   solver needs even for a 2x2. so score each pixel with")
+print("      R = det(M) - k * trace(M)^2,      k about 0.04 to 0.06")
+K = 0.05
+print("   check that the shortcut agrees with the eigenvalues:")
+print("%-30s %14s %14s %14s" % ("location", "l1*l2", "det(M)", "R"))
+for label, r, c in probes[2:]:
+    M = tensor(r, c)
+    ev = np.sort(np.linalg.eigvalsh(M))[::-1]
+    R = np.linalg.det(M) - K * np.trace(M) ** 2
+    print("%-30s %14.4g %14.4g %14.4g" % (label, ev[0] * ev[1],
+                                          np.linalg.det(M), R))
+print("   det matches the eigenvalue product to full precision, because it")
+print("   IS the product -- no approximation anywhere.")
+print()
+print("   and R has the sign structure you want:")
+print("      an edge has one eigenvalue near 0, so det is near 0 while")
+print("      trace^2 is large -- R goes strongly NEGATIVE.")
+print("      a corner has both large, so det grows faster than k*trace^2")
+print("      -- R goes strongly POSITIVE.")
+print("      flat has both near 0, so R is near 0.")
+print("   one number, three cases, distinguished by SIGN. that is the")
+print("   whole of the Harris response.")
+print()
+
+Rmap = np.zeros((H, W))
+for r in range(H):
+    for c in range(W):
+        M = tensor(r, c)
+        Rmap[r, c] = np.linalg.det(M) - K * np.trace(M) ** 2
+print("THE RESPONSE MAP. positive values only:")
+show(np.maximum(Rmap, 0), "R where R > 0")
+print("      the four corners of the square light up and the long edges do")
+print("      not -- neither the square's sides nor the strip, which has no")
+print("      corners at all inside the frame.")
+thr = Rmap.max() * 0.25
+peaks = []
+for r in range(1, H - 1):
+    for c in range(1, W - 1):
+        if Rmap[r, c] > thr and Rmap[r, c] >= Rmap[r - 1:r + 2, c - 1:c + 2].max():
+            peaks.append((r, c, Rmap[r, c]))
+print("      after thresholding at %.0f%% of the maximum and keeping only"
+      % 25)
+print("      local maxima, %d points survive:" % len(peaks))
+for r, c, v in peaks:
+    print("         (%2d,%2d)  R = %.4g" % (r, c, v))
+print("      the square's corners are at (3,3), (3,8), (9,3) and (9,8).")
+print()
+
+print("WHAT IT IS AND IS NOT INVARIANT TO:")
+print("%-28s %s" % ("change", "does R survive?"))
+for k, v in (("translation", "yes -- it is computed locally"),
+             ("rotation", "yes -- det and trace are rotation invariant"),
+             ("brightness (+b)", "yes -- gradients ignore a constant"),
+             ("contrast (*a)", "NO -- R scales as a^4"),
+             ("scale (zoom)", "NO -- a corner becomes a curve")):
+    print("%-28s %s" % (k, v))
+print("   the contrast row is why R is always thresholded relative to the")
+print("   image's own maximum rather than at a fixed value.")
+print("   the scale row is the serious one, and it is what SIFT was")
+print("   invented to fix: search over scales as well as positions, and")
+print("   keep the scale at which the response peaks. Harris finds WHERE;")
+print("   scale-space finds where AND how big.")
+```
+
 """,
     [
         {"q": "What distinguishes a corner from an edge in the structure tensor?",

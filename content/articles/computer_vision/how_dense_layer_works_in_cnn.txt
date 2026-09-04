@@ -72,6 +72,127 @@ Softmax is then applied to turn $Z$ into probabilities ($P$):
 
 <code class="block p-2 bg-black/50 rounded mono-font text-center mt-2 text-[13px]" style="color: var(--accent-primary)">P<sub>j</sub> = e<sup>Z<sub>j</sub></sup> / Σ(e<sup>Z</sup>)</code>
 
+## The layer that finally forgets where things were
+
+After the convolutions comes a dense layer, and it is the first part of the network with no notion of position at all. This builds one by hand, shows exactly what flatten does to the geometry, and measures the parameter blow-up that made everyone stop using them.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(8)
+C, H, W = 4, 3, 3                      # a tiny final feature map
+fmap = np.round(rng.uniform(0, 1, (C, H, W)), 2)
+
+print("THE FINAL FEATURE MAP: %d channels of %dx%d = %d numbers."
+      % (C, H, W, C * H * W))
+for c in range(C):
+    print("   channel %d" % c)
+    for row in fmap[c]:
+        print("      " + " ".join("%5.2f" % v for v in row))
+print()
+
+print("STEP 1 -- FLATTEN. the same numbers, in a line:")
+flat = fmap.reshape(-1)
+print("   " + " ".join("%5.2f" % v for v in flat))
+print("   nothing was computed. no parameters, no arithmetic -- flatten is")
+print("   purely a change of shape.")
+print()
+print("   but look at what it did to the NEIGHBOURS. in the map, cell")
+print("   (0,0,0) sits beside (0,0,1) and above (0,1,0). after flatten:")
+def idx(c, r, k):
+    return c * H * W + r * W + k
+print("%-26s %10s %10s" % ("cell", "flat index", "distance"))
+base = idx(0, 0, 0)
+for label, (c, r, k) in (("(0,0,0) itself", (0, 0, 0)),
+                         ("(0,0,1) its right neighbour", (0, 0, 1)),
+                         ("(0,1,0) the cell below it", (0, 1, 0)),
+                         ("(1,0,0) same place, next channel", (1, 0, 0))):
+    print("%-34s %6d %10d" % (label, idx(c, r, k), abs(idx(c, r, k) - base)))
+print("   the right neighbour is 1 away, the cell BELOW is %d away, and the"
+      % W)
+print("   same position in the next channel is %d away. the 2D adjacency"
+      % (H * W))
+print("   that every convolution depended on is now an arbitrary numbering.")
+print("   the dense layer will not recover it -- and does not try to.")
+print()
+
+print("STEP 2 -- THE DENSE LAYER: out = W @ x + b. that is the whole thing.")
+NOUT = 3
+Wm = np.round(rng.normal(0, 0.4, (NOUT, flat.size)), 2)
+bias = np.round(rng.normal(0, 0.1, NOUT), 2)
+out = Wm @ flat + bias
+print("   weight matrix: %s     bias: %s" % (str(Wm.shape), str(bias.shape)))
+print("   every output touches every input. output 0, term by term:")
+terms = Wm[0] * flat
+print("      " + "  ".join("%.2f*%.2f" % (Wm[0, i], flat[i])
+                           for i in range(5)) + "  ...")
+print("      sum of all %d terms: %.4f, plus bias %.2f = %.4f"
+      % (flat.size, terms.sum(), bias[0], out[0]))
+print("   outputs: " + "  ".join("%.4f" % v for v in out))
+print()
+
+print("STEP 3 -- WHY POSITION IS GONE. move the whole feature map one cell")
+print("to the right and re-run the SAME dense layer:")
+shifted = np.zeros_like(fmap)
+shifted[:, :, 1:] = fmap[:, :, :-1]
+out_shift = Wm @ shifted.reshape(-1) + bias
+print("%-22s %s" % ("original", "  ".join("%8.4f" % v for v in out)))
+print("%-22s %s" % ("shifted by 1", "  ".join("%8.4f" % v for v in out_shift)))
+print("%-22s %s" % ("difference",
+                    "  ".join("%8.4f" % v for v in (out_shift - out))))
+print("   completely different answers for a picture of the same thing")
+print("   moved one pixel. a convolution would have produced the same")
+print("   feature map, shifted. the dense layer has no such property and")
+print("   cannot acquire one -- it would have to learn every weight")
+print("   pattern again at every offset.")
+print()
+
+print("STEP 4 -- THE COST. dense layers are where the parameters go:")
+print("%-34s %16s %16s" % ("layer", "parameters", "share"))
+conv_params = [("conv 3x3, 3->64", 3 * 64 * 9 + 64),
+               ("conv 3x3, 64->128", 64 * 128 * 9 + 128),
+               ("conv 3x3, 128->256", 128 * 256 * 9 + 256)]
+dense_params = [("flatten(256*7*7) -> 4096", 256 * 7 * 7 * 4096 + 4096),
+                ("dense 4096 -> 4096", 4096 * 4096 + 4096),
+                ("dense 4096 -> 1000", 4096 * 1000 + 1000)]
+total = sum(n for _, n in conv_params + dense_params)
+for name, n in conv_params + dense_params:
+    print("%-34s %16s %15.1f%%" % (name, "{:,}".format(n), 100.0 * n / total))
+print("%-34s %16s" % ("total", "{:,}".format(total)))
+cn = sum(n for _, n in conv_params)
+dn = sum(n for _, n in dense_params)
+print("   convolutions: %s (%.1f%%).  dense: %s (%.1f%%)."
+      % ("{:,}".format(cn), 100.0 * cn / total,
+         "{:,}".format(dn), 100.0 * dn / total))
+print("   the first dense layer alone is %.0fx the size of all three"
+      % (dense_params[0][1] / cn))
+print("   convolutions combined, and it is doing far less: one matrix")
+print("   multiply, no weight sharing, no reuse of any parameter anywhere.")
+print()
+
+print("WHY IT IS SO EXPENSIVE: a convolution reuses EVERY ONE of its")
+print("weights at all %d positions of the map. a dense layer uses each" % (7 * 7))
+print("weight exactly once. that is the entire difference, and it explains")
+print("both")
+print("the parameter count and the loss of translation invariance -- they")
+print("are the same fact stated twice.")
+print()
+print("%-28s %-24s %s" % ("", "convolution", "dense"))
+for row in (("weights per output", "k*k*Cin", "the whole input"),
+            ("reused across positions", "yes", "no"),
+            ("shift the input", "output shifts", "output changes"),
+            ("input size must be fixed", "no", "yes"),
+            ("knows about geometry", "yes", "no")):
+    print("%-28s %-24s %s" % row)
+print()
+print("modern classifiers keep exactly ONE dense layer, right at the end,")
+print("after global average pooling has already reduced the map to one")
+print("number per channel. at that point the input is %d numbers instead" % C)
+print("of %d, the parameter count is trivial, and there is nothing spatial" % (C * H * W))
+print("left to destroy -- the dense layer's job is only to turn a list of")
+print("'what was found' into a list of class scores.")
+```
+
 ## Summing up
 
 - Dense layers sit at the very end of a CNN to perform classification.

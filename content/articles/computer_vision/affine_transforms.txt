@@ -118,3 +118,163 @@ together.
 **Losing the corners.** A rotated rectangle does not fit in the original frame.
 Either accept the clipping or compute the bounding box of the transformed
 corners and enlarge the canvas first.
+
+## Rotation, scale and shear as one matrix
+
+Every geometric transform that keeps straight lines straight is one 2x3 matrix, and knowing that turns six separate operations into one. This builds the matrices, composes them, and works through the two things that trip everyone up -- composition order, and the fact that you have to run the transform backwards.
+
+```python-run
+import numpy as np
+
+def affine(a=0.0, sx=1.0, sy=1.0, shx=0.0, tx=0.0, ty=0.0):
+    # rotation by a (radians), then scale, then shear, then translate
+    c, s = np.cos(a), np.sin(a)
+    R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+    S = np.array([[sx, 0, 0], [0, sy, 0], [0, 0, 1]])
+    H = np.array([[1, shx, 0], [0, 1, 0], [0, 0, 1]])
+    T = np.array([[1, 0, tx], [0, 1, ty], [0, 0, 1]])
+    return T @ H @ S @ R
+
+print("A POINT BECOMES THREE NUMBERS: (x, y) -> (x, y, 1). that third 1 is")
+print("the whole trick -- it lets TRANSLATION be a matrix multiply too,")
+print("which a 2x2 matrix can never express, because a linear map always")
+print("fixes the origin.")
+print()
+
+print("THE FIVE BUILDING BLOCKS, applied to the unit square's corners:")
+square = np.array([[0., 1, 1, 0], [0, 0, 1, 1], [1, 1, 1, 1]])
+cases = [("identity", affine()),
+         ("translate (2, 1)", affine(tx=2, ty=1)),
+         ("scale x2, y0.5", affine(sx=2, sy=0.5)),
+         ("rotate 30 deg", affine(a=np.radians(30))),
+         ("shear x by 0.5", affine(shx=0.5)),
+         ("scale x2 uniformly", affine(sx=2, sy=2))]
+for name, M in cases:
+    p = M @ square
+    print("%-22s %s" % (name, "  ".join("(%5.2f,%5.2f)" % (p[0, i], p[1, i])
+                                        for i in range(4))))
+print("   parallel edges stay parallel in every one of them. that is what")
+print("   'affine' means, and it is why an affine transform can never")
+print("   produce perspective -- railway tracks converging needs the")
+print("   bottom row of the matrix to stop being [0 0 1].")
+print()
+
+print("PROPERTIES EACH ONE PRESERVES:")
+print("%-18s %8s %8s %8s %8s" % ("transform", "lengths", "angles", "areas",
+                                 "parallel"))
+for name, M in cases:
+    A = M[:2, :2]
+    det = np.linalg.det(A)
+    lengths = np.allclose(A.T @ A, np.eye(2))
+    angles = np.allclose(A.T @ A, (A.T @ A)[0, 0] * np.eye(2))
+    print("%-18s %8s %8s %8s %8s"
+          % (name, "yes" if lengths else "no", "yes" if angles else "no",
+             "yes" if abs(abs(det) - 1) < 1e-9 else "no", "yes"))
+print("   the determinant IS the area scale factor, exactly:")
+for name, M in cases:
+    print("      %-22s det = %6.2f" % (name, np.linalg.det(M[:2, :2])))
+print("   'scale x2, y0.5' has determinant 1, so it preserves area while")
+print("   changing every length -- stretched one way and squashed the")
+print("   other by compensating amounts. 'scale x2 uniformly' has")
+print("   determinant 4 and preserves shape while quadrupling area. that")
+print("   is why 'preserves area' and 'preserves shape' have to be")
+print("   separate columns: neither one implies the other.")
+print()
+
+print("COMPOSITION IS MATRIX MULTIPLICATION, AND IT DOES NOT COMMUTE:")
+Rot = affine(a=np.radians(90))
+Tr = affine(tx=3, ty=0)
+pt = np.array([1.0, 0.0, 1.0])
+print("   the point (1, 0)")
+print("   rotate 90, THEN translate x+3:  (%.2f, %.2f)"
+      % tuple((Tr @ Rot @ pt)[:2]))
+print("   translate x+3, THEN rotate 90:  (%.2f, %.2f)"
+      % tuple((Rot @ Tr @ pt)[:2]))
+print("   different answers. and note the ORDER in the expression: the")
+print("   matrix applied FIRST is written on the RIGHT, next to the point.")
+print("   'rotate then translate' is written T @ R. reading these")
+print("   right-to-left is not a convention you can opt out of.")
+print()
+print("   this is also how you rotate about a point that is not the")
+print("   origin: translate the centre to the origin, rotate, translate")
+print("   back. three matrices, one product, one pass over the image:")
+cx, cy = 4.0, 3.0
+about = affine(tx=cx, ty=cy) @ affine(a=np.radians(90)) @ affine(tx=-cx, ty=-cy)
+centre = np.array([cx, cy, 1.0])
+print("      the centre maps to (%.2f, %.2f) -- it does not move."
+      % tuple((about @ centre)[:2]))
+print("      a point 2 to its right maps to (%.2f, %.2f)."
+      % tuple((about @ np.array([cx + 2, cy, 1.0]))[:2]))
+print()
+
+print("NOW THE PART THAT SURPRISES PEOPLE: TO APPLY A TRANSFORM TO AN")
+print("IMAGE, YOU RUN IT BACKWARDS.")
+H, W = 7, 11
+img = np.zeros((H, W))
+img[1:4, 1:5] = 1.0
+img[5, 7:10] = 1.0
+
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join("#" if v > 0.5 else "." for v in row))
+
+show(img, "input")
+M = affine(a=np.radians(20), tx=1.0)
+forward = np.zeros_like(img)
+for y in range(H):
+    for x in range(W):
+        if img[y, x] > 0.5:
+            p = M @ np.array([x, y, 1.0])
+            xi, yi = int(round(p[0])), int(round(p[1]))
+            if 0 <= xi < W and 0 <= yi < H:
+                forward[yi, xi] = 1.0
+show(forward, "FORWARD mapping: push each input pixel to its new place")
+print("      %d pixels went in and %d came out."
+      % (int((img > 0.5).sum()), int((forward > 0.5).sum())))
+print("      look at the gaps inside the block. two input pixels can round")
+print("      to the SAME output pixel, and some output pixels are hit by")
+print("      none at all -- so the result comes out with holes in it.")
+print("      there is no way to avoid this: the map is continuous and the")
+print("      grid is not.")
+print()
+Minv = np.linalg.inv(M)
+backward = np.zeros_like(img)
+for y in range(H):
+    for x in range(W):
+        p = Minv @ np.array([x, y, 1.0])
+        xi, yi = int(round(p[0])), int(round(p[1]))
+        if 0 <= xi < W and 0 <= yi < H:
+            backward[y, x] = img[yi, xi]
+show(backward, "BACKWARD mapping: for each OUTPUT pixel, ask where it came from")
+print("      %d pixels this time, and the block is solid: no holes, because"
+      % int((backward > 0.5).sum()))
+print("      every output pixel is visited exactly once and asks a question")
+print("      that always has an answer.")
+print("      both versions lost the short bar that was at row 5. that is")
+print("      not a mapping artefact -- the rotation genuinely carried it")
+print("      past the bottom edge, to y = %.2f in a %d-row image. rotating"
+      % ((M @ np.array([8.0, 5.0, 1.0]))[1], H))
+print("      an image about its origin moves content out of frame, which")
+print("      is why real code rotates about the CENTRE and often enlarges")
+print("      the canvas to fit the result.")
+print("      this is why every library's warpAffine takes the INVERSE")
+print("      internally, and why the interpolation happens on the input")
+print("      side: the fractional coordinate lands in the source image,")
+print("      where there are real neighbours to interpolate between.")
+print()
+
+print("SIX NUMBERS, AND WHAT THEY BUY:")
+print("%-24s %10s %s" % ("family", "params", "what it can do"))
+for name, n, what in (("translation", 2, "shift only"),
+                      ("rigid (Euclidean)", 3, "+ rotation"),
+                      ("similarity", 4, "+ uniform scale"),
+                      ("affine", 6, "+ shear, non-uniform scale"),
+                      ("homography", 8, "+ perspective")):
+    print("%-24s %10d %s" % (name, n, what))
+print("   each row adds freedom and needs more point correspondences to")
+print("   solve for: affine needs 3 matched points, a homography needs 4.")
+print("   in a spatial transformer network those 6 numbers are the output")
+print("   of a small subnetwork, so the model learns which crop and")
+print("   rotation to apply -- the transform becomes a layer.")
+```

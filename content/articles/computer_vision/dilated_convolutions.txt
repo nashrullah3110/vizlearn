@@ -85,3 +85,125 @@ maps cost memory at every layer.
 **Assuming it is free.** The parameters are free; the memory is not. A network
 that never downsamples holds full-resolution activations throughout, which is
 often the binding constraint on segmentation models.
+
+## Skipping pixels to see further for the same price
+
+A dilated convolution reads the same number of weights from a wider spread of positions. That one change buys receptive field growth that is exponential rather than linear -- and brings a gridding artefact that the fix for it is named after.
+
+```python-run
+import numpy as np
+
+print("A 3x3 KERNEL reads 9 positions. WHERE those positions are is set by")
+print("the dilation rate:")
+for d in (1, 2, 3):
+    span = 2 * d + 1
+    grid = [["." for _ in range(span)] for _ in range(span)]
+    for i in range(3):
+        for j in range(3):
+            grid[i * d][j * d] = "#"
+    print("   dilation %d -- 9 weights spread over %dx%d:" % (d, span, span))
+    for row in grid:
+        print("      " + " ".join(row))
+print("   the weight count never changes. the SPAN does.")
+print()
+
+print("RECEPTIVE FIELD -- how much of the input one output cell depends on.")
+print("stack layers and track it. for 3x3 kernels, stride 1:")
+print("%-10s %14s %16s %18s"
+      % ("layer", "dilation", "RF (stacked 3x3)", "RF (doubling)"))
+rf_plain, rf_dil, d = 1, 1, 1
+for layer in range(1, 7):
+    rf_plain += 2                       # each plain 3x3 adds 2
+    rf_dil += 2 * d                      # a dilated 3x3 adds 2*d
+    print("%-10d %14d %16d %18d" % (layer, d, rf_plain, rf_dil))
+    d *= 2
+print("   six plain layers reach %d pixels; six doubling-dilation layers"
+      % rf_plain)
+print("   reach %d, using exactly the same %d weights per layer." % (rf_dil, 9))
+print("   the plain stack grows LINEARLY in depth, the dilated stack grows")
+print("   EXPONENTIALLY, and neither one costs a parameter more than the")
+print("   other.")
+print()
+
+print("THE ALTERNATIVE WAYS to get a big receptive field, and what each")
+print("one costs:")
+print("%-30s %14s %14s %16s" % ("method", "RF", "params", "output size"))
+print("%-30s %14d %14d %16s" % ("one 3x3", 3, 9, "unchanged"))
+print("%-30s %14d %14d %16s" % ("one 9x9", 9, 81, "unchanged"))
+print("%-30s %14d %14d %16s" % ("4 stacked 3x3", 9, 36, "unchanged"))
+print("%-30s %14d %14d %16s" % ("3x3, dilation 4", 9, 9, "unchanged"))
+print("%-30s %14d %14d %16s" % ("3x3 after 2 poolings", 12, 9, "quartered"))
+print("   pooling gets there cheaply too, but it throws the resolution")
+print("   away, and for segmentation the output has to be per-pixel. that")
+print("   single constraint -- big context, full resolution -- is what")
+print("   dilation was invented for.")
+print()
+
+print("NOW WATCH IT WORK. a signal with one spike, convolved with a 3-tap")
+print("averaging kernel at several dilations:")
+N = 25
+sig = np.zeros(N)
+sig[12] = 9.0
+k = np.ones(3) / 3.0
+
+def dconv(x, k, d):
+    out = np.zeros_like(x)
+    r = (len(k) - 1) * d // 2
+    for i in range(len(x)):
+        acc = 0.0
+        for t, w in enumerate(k):
+            j = i + (t - len(k) // 2) * d
+            if 0 <= j < len(x):
+                acc += w * x[j]
+        out[i] = acc
+    return out
+
+print("   input:        " + "".join("#" if v > 0 else "." for v in sig))
+for d in (1, 2, 4):
+    o = dconv(sig, k, d)
+    print("   dilation %d:   " % d
+          + "".join("#" if v > 0 else "." for v in o)
+          + "   touches %d positions" % int((o > 0).sum()))
+print("   at dilation 4 the response appears at positions 8, 12 and 16 --")
+print("   and NOTHING at 9, 10, 11. the kernel never looked there.")
+print()
+
+print("THAT IS THE GRIDDING ARTEFACT, and stacking makes it worse. two")
+print("layers both at dilation 2 only ever touch even offsets:")
+two_same = dconv(dconv(sig, k, 2), k, 2)
+print("   d=2 then d=2:  " + "".join("#" if v > 1e-9 else "." for v in two_same))
+covered = set(np.where(two_same > 1e-9)[0])
+gaps = [i for i in range(min(covered), max(covered) + 1) if i not in covered]
+print("      reaches %d..%d but MISSES %s"
+      % (min(covered), max(covered), str(gaps)))
+print("      every missed index is odd. the two layers share a common")
+print("      factor of 2, so no path through them can ever land on an odd")
+print("      offset. in 2D the reachable offsets are (even, even), which")
+print("      is one cell in four -- so THREE QUARTERS of the input inside")
+print("      the receptive field is not merely down-weighted, it is never")
+print("      read at all.")
+print()
+print("   now make the rates COPRIME -- 1, then 2, then 3:")
+mixed = dconv(dconv(dconv(sig, k, 1), k, 2), k, 3)
+cov2 = set(np.where(mixed > 1e-9)[0])
+gaps2 = [i for i in range(min(cov2), max(cov2) + 1) if i not in cov2]
+print("   d=1,2,3:       " + "".join("#" if v > 1e-9 else "." for v in mixed))
+print("      reaches %d..%d and misses %s"
+      % (min(cov2), max(cov2), str(gaps2) if gaps2 else "nothing"))
+print("      full coverage, same 9 weights per layer, same cost. the fix")
+print("      for gridding is arithmetic, not architecture: choose rates")
+print("      with no common factor. this is why real designs use rate")
+print("      sequences like 1,2,5 or 1,2,3 rather than 2,4,8.")
+print()
+
+print("WHERE YOU MEET IT:")
+print("%-26s %s" % ("DeepLab (ASPP)", "parallel branches at 6, 12, 18"))
+print("%-26s %s" % ("WaveNet", "1,2,4,...,512 over raw audio"))
+print("%-26s %s" % ("dilated residual nets", "replaces the last poolings"))
+print("   the common thread is a task where downsampling is unacceptable:")
+print("   per-pixel labels, or a waveform where every sample is an output.")
+print("   for plain classification, pooling is cheaper and dilation buys")
+print("   little -- which is why you will not find it in a plain ResNet")
+print("   classifier, and will find it in almost every segmentation")
+print("   network built since 2016.")
+```

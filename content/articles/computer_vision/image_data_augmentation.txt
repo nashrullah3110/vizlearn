@@ -70,6 +70,153 @@ For detection and segmentation, the transformation must be applied to the annota
 - <strong>Over-augmenting:</strong> Applying transformations that are too extreme can make the image unrecognizable, teaching the model incorrect features. For example, rotating a '6' by 180 degrees makes it a '9'.
 - <strong>Augmenting Test Data:</strong> Augmentation should only be applied to the training set. The validation and test sets must remain untouched to provide an unbiased evaluation of the model's performance.
 
+## Inventing training data, and the labels that break
+
+Augmentation makes new training examples out of old ones by applying transforms the label is supposed to survive. The whole craft is in that phrase -- and this measures what happens on the transforms where it is not true.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(1)
+
+H, W = 7, 11
+img = np.full((H, W), 30.0)
+img[1:6, 2:5] = 200.0                  # a bright blob, left of centre
+img[3, 6:10] = 160.0                   # a horizontal bar to its right
+img += rng.normal(0, 3, (H, W))
+
+ramp = " .:-=+*#%@"
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(ramp[min(9, int(9 * max(0.0, v) / 255))]
+                                 for v in row))
+
+show(img, "the original")
+print()
+
+print("GEOMETRIC TRANSFORMS -- the same pixels, rearranged:")
+flips = [("horizontal flip", img[:, ::-1]),
+         ("vertical flip", img[::-1, :]),
+         ("rotate 180", img[::-1, ::-1]),
+         ("shift right by 2", np.roll(img, 2, axis=1))]
+for name, a in flips:
+    show(a, name)
+same = all(np.allclose(np.sort(a.reshape(-1)), np.sort(img.reshape(-1)))
+           for _, a in flips)
+print("   every one of these holds exactly the same multiset of pixel")
+print("   values as the original -- checked, and the answer is %s."
+      % ("True" if same else "False"))
+print("   mean %.1f and std %.1f are unchanged by all four. nothing was"
+      % (img.mean(), img.std()))
+print("   created; only the correspondence between pixels and POSITIONS")
+print("   changed, and that correspondence is the only thing a convolution")
+print("   reads.")
+print()
+
+print("PHOTOMETRIC TRANSFORMS -- the same positions, different values:")
+print("%-26s %10s %10s %10s" % ("", "mean", "std", "range"))
+photo = [("original", img),
+         ("brightness +40", img + 40),
+         ("contrast x1.6", (img - img.mean()) * 1.6 + img.mean()),
+         ("gaussian noise s=12", img + rng.normal(0, 12, img.shape)),
+         ("gamma 0.6", 255 * (np.clip(img, 0, 255) / 255) ** 0.6)]
+for name, a in photo:
+    a = np.clip(a, 0, 255)
+    print("%-26s %10.1f %10.1f %10s"
+          % (name, a.mean(), a.std(), "%.0f-%.0f" % (a.min(), a.max())))
+print("   these change what the network sees at every pixel while leaving")
+print("   the geometry untouched. between the two families you can build")
+print("   thousands of distinct examples from one photograph.")
+print()
+
+print("HOW MANY, exactly. multiply the choices:")
+opts = [("horizontal flip", 2), ("rotation, 4 quarter turns", 4),
+        ("crop offset, 5x5 positions", 25), ("brightness, 5 levels", 5),
+        ("contrast, 5 levels", 5)]
+total = 1
+print("%-34s %10s %14s" % ("choice", "options", "running total"))
+for name, n in opts:
+    total *= n
+    print("%-34s %10d %14s" % (name, n, "{:,}".format(total)))
+print("   %s variants of ONE image. that is the appeal, and it is also"
+      % "{:,}".format(total))
+print("   the trap: they are not %s independent examples."
+      % "{:,}".format(total))
+print()
+
+print("WHY NOT. measure how similar the augmented versions actually are:")
+def cos(a, b):
+    u, v = a.reshape(-1) - a.mean(), b.reshape(-1) - b.mean()
+    return float(u @ v / (np.linalg.norm(u) * np.linalg.norm(v)))
+print("%-30s %16s" % ("augmented version", "corr. with original"))
+for name, a in (("brightness +40", np.clip(img + 40, 0, 255)),
+                ("contrast x1.6", (img - img.mean()) * 1.6 + img.mean()),
+                ("noise s=12", img + rng.normal(0, 12, img.shape)),
+                ("shift right by 2", np.roll(img, 2, axis=1)),
+                ("horizontal flip", img[:, ::-1]),
+                ("a genuinely new image", rng.normal(60, 40, (H, W)))):
+    print("%-30s %16.4f" % (name, cos(img, a)))
+print("   brightness and contrast changes correlate at essentially 1.0 --")
+print("   they carry almost no new information, because the very")
+print("   normalisation your network applies first will undo them.")
+print("   the geometric ones correlate far less, and a genuinely different")
+print("   image correlates around 0. augmentation moves you along the")
+print("   first row, not the last: it teaches INVARIANCE, it does not add")
+print("   examples.")
+print()
+
+print("NOW THE PART THAT ACTUALLY BITES -- LABELS THAT DO NOT SURVIVE.")
+print("a transform is only valid if the label is unchanged by it:")
+print("%-26s %-30s %s" % ("task", "horizontal flip", "vertical flip"))
+for task, hf, vf in (
+        ("cat vs dog", "fine", "fine-ish"),
+        ("handwritten digit", "BREAKS: not a digit at all", "BREAKS"),
+        ("the letter b vs d", "BREAKS COMPLETELY", "BREAKS: b <-> p"),
+        ("road sign 'turn left'", "BREAKS: becomes right", "BREAKS"),
+        ("chest x-ray, heart side", "BREAKS: dextrocardia", "BREAKS"),
+        ("satellite land cover", "fine", "fine")):
+    print("%-26s %-30s %s" % (task, hf, vf))
+print("   'flip is a safe default' is the single most expensive piece of")
+print("   received wisdom in this area. for a digit classifier a")
+print("   horizontal flip does not produce a harder 2 -- it produces a")
+print("   shape that is not any digit, carrying the label 2. that is not")
+print("   regularisation, it is injecting mislabelled data at exactly the")
+print("   rate you set, and it will show up as a validation score that")
+print("   stops improving for no visible reason.")
+print("   the test is always the same question, asked about YOUR labels:")
+print("   after this transform, is the correct answer still the correct")
+print("   answer? for cats it is. for the letter b it is not.")
+print()
+
+print("AND THE LABEL THAT HAS TO MOVE WITH THE IMAGE. for detection, the")
+print("box is part of the label:")
+box = (2.0, 1.0, 5.0, 6.0)             # x1, y1, x2, y2
+print("   original box:            x %.0f..%.0f   y %.0f..%.0f"
+      % (box[0], box[2], box[1], box[3]))
+fx1, fx2 = W - box[2], W - box[0]
+print("   after a horizontal flip: x %.0f..%.0f   y %.0f..%.0f"
+      % (fx1, fx2, box[1], box[3]))
+print("   the transform is x -> %d - x, and note that it SWAPS x1 and x2," % W)
+print("   so a naive implementation that maps each coordinate in place")
+print("   produces a box with x1 > x2. that box is silently invalid: its")
+print("   width is negative, its IoU with everything is 0, and it trains")
+print("   the model to predict nothing there.")
+print("   the same applies to segmentation masks, keypoints and depth")
+print("   maps. every one of them has to be transformed alongside the")
+print("   image, with the same random parameters, in the same call --")
+print("   which is precisely why augmentation libraries take the image and")
+print("   the targets together rather than letting you transform them")
+print("   separately.")
+print()
+print("%-30s %s" % ("augmentation is applied", "on the fly, per epoch"))
+print("%-30s %s" % ("so the model sees", "a different variant each epoch"))
+print("%-30s %s" % ("at validation time", "none of it -- centre crop only"))
+print("   that last line is the one people get wrong most often. augmenting")
+print("   the validation set makes the score noisy and optimistic and")
+print("   means it no longer measures what you think it measures.")
+```
+
 ## Worth remembering
 
 - Augmentation creates "fake" data to expand your training set for free.

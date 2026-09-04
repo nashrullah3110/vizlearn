@@ -56,6 +56,137 @@ This progression is exactly what makes <strong>transfer learning</strong> work. 
 - <strong>"It's just matrix multiplication."</strong> Not quite. It's a series of smaller, element-wise multiplications and sums, not one large matrix multiplication.
 - <strong>"The output is always smaller."</strong> Not necessarily. Techniques like "padding" (adding a border of zeros to the input) can be used to keep the output the same size, as is done in this interactive.
 
+## Reading a feature map like a map
+
+A feature map is not a picture and not a vector -- it is a grid that keeps the answer to one question at every position. This builds several from the same image and shows what each cell means, how the meaning changes with depth, and why the channel axis and the spatial axes are read completely differently.
+
+```python-run
+import numpy as np
+
+H, W = 9, 18
+img = np.full((H, W), 40.0)
+img[2:7, 3:6] = 200.0                  # a solid block
+img[1:8, 10] = 200.0                   # a thin vertical line
+img[4, 13:17] = 200.0                  # a thin horizontal line
+
+ramp = " .:-=+*#%@"
+def show(a, label, hi=None, prefix="      "):
+    hi = a.max() if hi is None else hi
+    print("   %s" % label)
+    for row in a:
+        print(prefix + "".join(
+            ramp[min(9, int(9 * max(0.0, v) / (hi + 1e-9)))] for v in row))
+
+show(img, "the input, %dx%d" % (H, W), 255)
+print()
+
+KERNELS = {
+    "vertical edge": np.array([[-1., 0, 1], [-2, 0, 2], [-1, 0, 1]]),
+    "horizontal edge": np.array([[-1., -2, -1], [0, 0, 0], [1, 2, 1]]),
+    "blob / centre": np.array([[-1., -1, -1], [-1, 8, -1], [-1, -1, -1]]),
+}
+
+def conv(a, k):
+    p = np.pad(a, 1, mode="edge")
+    return np.array([[float((p[i:i + 3, j:j + 3] * k).sum())
+                      for j in range(a.shape[1])] for i in range(a.shape[0])])
+
+maps = {name: np.maximum(conv(img, k), 0) for name, k in KERNELS.items()}
+print("THREE FILTERS, THREE FEATURE MAPS, all the same %dx%d shape:" % (H, W))
+for name, m in maps.items():
+    show(m, "channel '%s'  (max %.0f)" % (name, m.max()))
+print()
+
+print("EVERY CELL ANSWERS ONE QUESTION AT ONE PLACE. read a single")
+print("position across all three channels and you get a description:")
+print("%-30s %14s %16s %14s"
+      % ("position", "vertical", "horizontal", "blob"))
+probes = [("left side of the block", 4, 3),
+          ("top of the block", 2, 4),
+          ("the thin vertical line", 4, 10),
+          ("the thin horizontal line", 4, 14),
+          ("empty background", 7, 1)]
+for label, r, c in probes:
+    print("%-30s %14.0f %16.0f %14.0f"
+          % (label, maps["vertical edge"][r, c],
+             maps["horizontal edge"][r, c], maps["blob / centre"][r, c]))
+print("   the block's left side fires the vertical filter and not the")
+print("   horizontal one. its top fires the horizontal filter. the thin")
+print("   lines fire the blob filter hardest, because a 1-pixel-wide line")
+print("   IS a centre surrounded by background as far as a 3x3 window can")
+print("   tell -- the filter cannot see far enough to know it is a line.")
+print()
+
+print("SO THE THREE AXES ARE NOT INTERCHANGEABLE:")
+print("%-14s %-18s %s" % ("axis", "size here", "what moving along it means"))
+print("%-14s %-18s %s" % ("height", H, "moving DOWN the image"))
+print("%-14s %-18s %s" % ("width", W, "moving ACROSS the image"))
+print("%-14s %-18s %s" % ("channel", len(maps), "asking a DIFFERENT question"))
+print("   the two spatial axes have a geometry: cell (4,10) is next to")
+print("   (4,11), and a convolution exploits that. the channel axis has")
+print("   none -- channel 0 is not 'next to' channel 1, and shuffling the")
+print("   channels changes nothing as long as the filters move with them.")
+print("   that is exactly why convolution slides over height and width but")
+print("   is fully connected across channels.")
+print()
+
+print("A SECOND LAYER SEES THE MAPS, NOT THE IMAGE. a 1x1 filter over the")
+print("channel axis is the simplest case -- a weighted sum of the channels")
+print("at each position, a bias, and a ReLU. give it equal weight on the")
+print("vertical and horizontal channels and a bias that only a large SUM")
+print("can overcome:")
+V, Hm = maps["vertical edge"], maps["horizontal edge"]
+w, bias = 0.5, 400.0
+both = np.maximum(w * V + w * Hm - bias, 0)
+print("      out = ReLU(%.1f*vertical + %.1f*horizontal - %.0f)"
+      % (w, w, bias))
+print("      one channel alone at its maximum gives %.1f*%.0f - %.0f = %.0f,"
+      % (w, V.max(), bias, w * V.max() - bias))
+print("      which ReLU clamps to 0. at the block's top-left corner both")
+print("      channels read %.0f, so the sum clears the bias with %.0f to"
+      % (V[2, 3], w * (V[2, 3] + Hm[2, 3]) - bias))
+print("      spare. only both together get through.")
+print("      that is an AND gate, built out of nothing but a weighted sum")
+print("      and a threshold -- no special machinery.")
+show(both, "the output")
+r, c = np.unravel_index(both.argmax(), both.shape)
+n = int((both > 0).sum())
+print("      %d position%s survives, at (%d, %d)."
+      % (n, "" if n == 1 else "s", r, c))
+print()
+print("      NOW LOOK AT WHICH CORNER THAT IS. the block has four, and only")
+print("      the TOP-LEFT one fires. that is not a bug, it is the ReLU from")
+print("      the previous layer showing through: after ReLU the vertical")
+print("      channel means 'dark-to-light going right', which is the LEFT")
+print("      side only, and the horizontal channel means 'dark-to-light")
+print("      going down', which is the TOP only. their AND can only ever be")
+print("      the top-left corner.")
+print("      a real layer carries the mirrored filters too, so all four")
+print("      directional channels exist, and a corner detector for each")
+print("      corner is a different pair of them. the number of channels a")
+print("      layer needs is set by how many such combinations the next")
+print("      layer will want -- which is the honest answer to 'why 64")
+print("      filters?'")
+print("      the point stands either way: 'corner' is a relationship")
+print("      BETWEEN channels. neither input channel contains it, and only")
+print("      a layer that sees both at once can ask the question. that is")
+print("      the whole reason for depth -- edges, then corners, then shapes")
+print("      made of corners, none of it designed by hand.")
+print()
+print("WHAT A FEATURE MAP IS NOT: it is not an image. its values are")
+print("unbounded and signed before ReLU, its channels have no colour")
+print("meaning, and rendering one as a picture is a visualisation choice,")
+print("not a reading of the data. what it IS, is a grid of answers that")
+print("has kept the geometry of the question:")
+print("%-34s %s" % ("if you flatten it to a vector", "position is lost"))
+print("%-34s %s" % ("if you global-average-pool it", "position is discarded"))
+print("%-34s %s" % ("if you convolve it again", "position is used"))
+print("   and that is the choice every architecture makes at the end: the")
+print("   spatial axes exist to be exploited by more convolution, right up")
+print("   to the moment the network decides the answer is about the whole")
+print("   image rather than about any place in it.")
+```
+
 ## Worth remembering
 
 - A <strong>kernel</strong> is a small filter that detects a specific feature.

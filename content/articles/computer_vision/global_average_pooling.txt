@@ -84,3 +84,142 @@ nothing to average and the two are identical.
 **Forgetting global max pooling exists.** It takes the maximum instead of the
 mean, and for tasks where one strong local response matters more than an average
 &mdash; some detection and audio tasks &mdash; it can be the better choice.
+
+## Replacing the flatten layer with one number per channel
+
+Global average pooling collapses a whole feature map to a single number per channel. It looks like it throws away almost everything -- and that is exactly what makes it work, in a way this measures against the flatten-and-dense alternative it replaced.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(2)
+C, H, W = 8, 6, 6                      # 8 channels of 6x6
+
+def make(kind):
+    a = np.zeros((C, H, W))
+    for c in range(C):
+        a[c] = rng.normal(0.2, 0.15, (H, W)).clip(0)
+    return a
+
+fmap = make("x")
+fmap[2, 1:3, 1:3] = 3.4                # channel 2 fires strongly, top-left
+fmap[5, 4:6, 3:5] = 3.1                # channel 5 fires strongly, bottom-right
+
+print("A FEATURE MAP with %d channels of %dx%d." % (C, H, W))
+print("GAP takes the mean over the two SPATIAL axes and leaves the channel")
+print("axis alone: (%d, %d, %d) -> (%d,)." % (C, H, W, C))
+gap = fmap.mean(axis=(1, 2))
+print("%-12s %12s %12s %12s" % ("channel", "GAP", "max", "where max is"))
+for c in range(C):
+    r, cc = np.unravel_index(fmap[c].argmax(), (H, W))
+    print("%-12d %12.4f %12.4f %12s" % (c, gap[c], fmap[c].max(),
+                                        "(%d,%d)" % (r, cc)))
+print("   channels 2 and 5 stand out. the vector says WHAT was found and")
+print("   says nothing whatsoever about WHERE -- that column is printed")
+print("   from the feature map, not from the GAP output.")
+print()
+
+print("THE PARAMETER ARGUMENT, which is the one usually given:")
+NCLASS = 10
+flat_params = C * H * W * NCLASS + NCLASS
+gap_params = C * NCLASS + NCLASS
+print("%-40s %14s" % ("head design", "parameters"))
+print("%-40s %14d" % ("flatten (%d) -> dense(%d)" % (C * H * W, NCLASS),
+                      flat_params))
+print("%-40s %14d" % ("GAP (%d) -> dense(%d)" % (C, NCLASS), gap_params))
+print("%-40s %14.1fx" % ("ratio", flat_params / gap_params))
+print("   and that is a toy. for a real backbone the gap is enormous:")
+print("%-24s %10s %14s %14s" % ("backbone", "final map", "flatten head",
+                                "GAP head"))
+for name, c, h, w in (("VGG-16", 512, 7, 7), ("ResNet-50", 2048, 7, 7),
+                      ("MobileNetV2", 1280, 7, 7)):
+    print("%-24s %10s %14s %14s"
+          % (name, "%dx%dx%d" % (c, h, w),
+             "{:,}".format(c * h * w * 1000 + 1000),
+             "{:,}".format(c * 1000 + 1000)))
+print("   VGG-16's FIRST dense layer alone is 25088 x 4096, about 103")
+print("   million parameters. its three dense layers together come to")
+print("   roughly 124 million of the network's 138 million total: the")
+print("   classifier head outweighed every convolution in the network")
+print("   put together. GAP deletes almost all of it.")
+print()
+
+print("THE ARGUMENT THAT MATTERS MORE -- INPUT SIZE. a flatten head is")
+print("wired to one exact spatial size. feed it anything else and the")
+print("matrix multiply does not typecheck:")
+print("%-22s %14s %18s %14s" % ("input image", "final map", "flatten gives",
+                                "GAP gives"))
+for side in (192, 224, 288, 384):
+    h = side // 32
+    print("%-22s %14s %18d %14d"
+          % ("%dx%d" % (side, side), "%dx%dx%d" % (C, h, h), C * h * h, C))
+print("   the flatten column changes with every input size; the GAP column")
+print("   never does. that single fact is why GAP is in every modern")
+print("   backbone: the same trained head works on any input resolution,")
+print("   which is what makes multi-scale training and test-time resizing")
+print("   possible at all.")
+print()
+
+print("AND THE ARGUMENT THAT IS EASIEST TO MISS -- WHAT IT DOES TO")
+print("TRAINING. a flatten head can memorise position. build two examples")
+print("of the SAME class where the evidence sits in different corners:")
+a_left = np.zeros((C, H, W)); a_left[2, 0:2, 0:2] = 3.0
+a_right = np.zeros((C, H, W)); a_right[2, 4:6, 4:6] = 3.0
+print("   example A: channel 2 fires in the top-left corner")
+print("   example B: channel 2 fires in the bottom-right corner")
+fa, fb = a_left.reshape(-1), a_right.reshape(-1)
+ga, gb = a_left.mean(axis=(1, 2)), a_right.mean(axis=(1, 2))
+def cos(u, v):
+    return float(u @ v / (np.linalg.norm(u) * np.linalg.norm(v) + 1e-12))
+print("%-34s %14s" % ("representation", "cosine similarity"))
+print("%-34s %14.4f" % ("flattened (%d numbers)" % fa.size, cos(fa, fb)))
+print("%-34s %14.4f" % ("after GAP (%d numbers)" % ga.size, cos(ga, gb)))
+print("   to a flatten head these two examples are ORTHOGONAL -- as")
+print("   unrelated as two random inputs. it has to learn the class twice,")
+print("   once per position, and it needs training examples in every")
+print("   corner to do it.")
+print("   after GAP they are identical. translation invariance is not")
+print("   something GAP encourages; it is something GAP enforces, for")
+print("   free, before any weight is learned. that is a strong structural")
+print("   prior, and it is why GAP heads generalise from less data.")
+print()
+
+print("THE PRICE, stated plainly. GAP cannot represent position, so it")
+print("cannot be used where position is the answer:")
+print("%-36s %s" % ("task", "GAP as the head?"))
+for task, ok in (("image classification", "yes -- the standard choice"),
+                 ("object detection", "no -- boxes need coordinates"),
+                 ("semantic segmentation", "no -- output is per-pixel"),
+                 ("counting objects", "no -- mean, not sum"),
+                 ("pose estimation", "no -- position IS the label")):
+    print("%-36s %s" % (task, ok))
+print()
+print("that counting row is the subtle one, and the obvious argument for")
+print("it is actually wrong. GAP is a mean, so you might expect two")
+print("objects to give the same value as one. watch what really happens:")
+one = np.zeros((C, H, W)); one[2, 1:3, 1:3] = 3.0
+two = np.zeros((C, H, W)); two[2, 1:3, 1:3] = 3.0; two[2, 4:6, 3:5] = 3.0
+print("   one object  -> channel 2 GAP = %.4f" % one.mean(axis=(1, 2))[2])
+print("   two objects -> channel 2 GAP = %.4f" % two.mean(axis=(1, 2))[2])
+print("   it DOUBLES. the mean rose because the denominator -- %d cells --"
+      % (H * W))
+print("   is fixed while the numerator grew, so GAP does carry some count")
+print("   information after all.")
+print("   the reason you still cannot count with it is worse than 'the")
+print("   information is gone'. make one object twice as large instead:")
+big = np.zeros((C, H, W)); big[2, 1:3, 1:5] = 3.0
+print("      one object, %d cells   -> %.4f"
+      % (int((one[2] > 0).sum()), one.mean(axis=(1, 2))[2]))
+print("      two objects, %d cells  -> %.4f"
+      % (int((two[2] > 0).sum()), two.mean(axis=(1, 2))[2]))
+print("      ONE object, %d cells   -> %.4f"
+      % (int((big[2] > 0).sum()), big.mean(axis=(1, 2))[2]))
+print("   the last two are identical, and they are different scenes. count")
+print("   is confounded with SIZE, and no downstream layer can separate")
+print("   them, because the distinction was destroyed before the layer saw")
+print("   the number. that is the real failure: not lost precision, but an")
+print("   ambiguity baked into the representation.")
+print("   if the task needs a count or a location, the spatial axes have to")
+print("   survive to the output -- which is exactly what detection and")
+print("   segmentation architectures are built to do.")
+```

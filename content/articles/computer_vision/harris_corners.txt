@@ -111,3 +111,160 @@ scale-invariant detector.
 
 **Corners on a blurred image.** Blur destroys the gradients the whole method
 depends on, so denoise gently or not at all before detecting.
+
+## Two eigenvalues that tell an edge from a corner
+
+A corner is a place where the image changes in two independent directions, and that sentence turns directly into linear algebra. This builds the structure tensor, reads its eigenvalues, and shows why Harris uses a determinant-and-trace shortcut instead of computing them.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(6)
+H, W = 14, 20
+img = np.full((H, W), 50.0)
+img[3:10, 3:9] = 200.0                 # a square: 4 corners
+img[:, 14:16] = 200.0                  # a vertical strip: edges, no corners
+img += rng.normal(0, 2.0, (H, W))
+
+ramp = " .:-=+*#%@"
+def show(a, label, hi=None):
+    hi = a.max() if hi is None else hi
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(ramp[min(9, int(9 * max(0.0, v) / (hi + 1e-9)))]
+                                 for v in row))
+
+show(img, "the image", 255)
+print("      a solid square (4 corners) and a vertical strip (edges only).")
+print()
+
+def sobel(a):
+    KX = np.array([[-1., 0, 1], [-2, 0, 2], [-1, 0, 1]]) / 8.0
+    p = np.pad(a, 1, mode="edge")
+    gx = np.array([[float((p[i:i + 3, j:j + 3] * KX).sum())
+                    for j in range(W)] for i in range(H)])
+    gy = np.array([[float((p[i:i + 3, j:j + 3] * KX.T).sum())
+                    for j in range(W)] for i in range(H)])
+    return gx, gy
+
+gx, gy = sobel(img)
+
+print("THE IDEA. slide a small window over the image and ask: as the window")
+print("moves, how much does the content inside it change? that depends on")
+print("the DIRECTION you move it, and the answer for all directions at once")
+print("is packed into a 2x2 matrix -- the structure tensor:")
+print("      M = sum over the window of  [ gx*gx   gx*gy ]")
+print("                                  [ gx*gy   gy*gy ]")
+print("   it is a sum of outer products, so it is symmetric and positive")
+print("   semi-definite. that guarantees two real, non-negative eigenvalues.")
+print()
+
+def tensor(r, c, win=3):
+    h = win // 2
+    r0, r1 = max(0, r - h), min(H, r + h + 1)
+    c0, c1 = max(0, c - h), min(W, c + h + 1)
+    a, b = gx[r0:r1, c0:c1].reshape(-1), gy[r0:r1, c0:c1].reshape(-1)
+    return np.array([[float(a @ a), float(a @ b)], [float(a @ b), float(b @ b)]])
+
+probes = [("flat interior", 6, 5),
+          ("flat background", 12, 10),
+          ("a straight vertical edge", 6, 3),
+          ("a straight horizontal edge", 3, 6),
+          ("the strip's edge", 6, 14),
+          ("the square's top-left corner", 3, 3),
+          ("the square's bottom-right", 9, 8)]
+
+print("%-30s %10s %10s %14s" % ("location", "lambda1", "lambda2",
+                                "interpretation"))
+for label, r, c in probes:
+    ev = np.sort(np.linalg.eigvalsh(tensor(r, c)))[::-1]
+    if ev[0] < 200:
+        kind = "flat"
+    elif ev[1] < ev[0] * 0.15:
+        kind = "edge"
+    else:
+        kind = "CORNER"
+    print("%-30s %10.0f %10.0f %14s" % (label, ev[0], ev[1], kind))
+print()
+print("   READ THE TWO NUMBERS AS A SHAPE:")
+print("      both small          -> nothing here. the window can slide")
+print("                             anywhere without the content changing.")
+print("      one large, one tiny -> an edge. sliding ALONG it changes")
+print("                             nothing; sliding across it changes a")
+print("                             lot. one direction of variation.")
+print("      both large          -> a corner. every direction changes the")
+print("                             content, so the window is pinned.")
+print("   that last property is exactly what 'trackable' means, which is")
+print("   why corners and not edges are what optical flow and structure-")
+print("   from-motion track.")
+print()
+
+print("HARRIS'S SHORTCUT. computing eigenvalues per pixel was expensive in")
+print("1988, and it turns out you never need them. for a 2x2 matrix:")
+print("      det(M)   = lambda1 * lambda2")
+print("      trace(M) = lambda1 + lambda2")
+print("   det is two multiplies and a subtraction; trace is one addition.")
+print("   no square roots, no iteration -- which is what an eigenvalue")
+print("   solver needs even for a 2x2. so score each pixel with")
+print("      R = det(M) - k * trace(M)^2,      k about 0.04 to 0.06")
+K = 0.05
+print("   check that the shortcut agrees with the eigenvalues:")
+print("%-30s %14s %14s %14s" % ("location", "l1*l2", "det(M)", "R"))
+for label, r, c in probes[2:]:
+    M = tensor(r, c)
+    ev = np.sort(np.linalg.eigvalsh(M))[::-1]
+    R = np.linalg.det(M) - K * np.trace(M) ** 2
+    print("%-30s %14.4g %14.4g %14.4g" % (label, ev[0] * ev[1],
+                                          np.linalg.det(M), R))
+print("   det matches the eigenvalue product to full precision, because it")
+print("   IS the product -- no approximation anywhere.")
+print()
+print("   and R has the sign structure you want:")
+print("      an edge has one eigenvalue near 0, so det is near 0 while")
+print("      trace^2 is large -- R goes strongly NEGATIVE.")
+print("      a corner has both large, so det grows faster than k*trace^2")
+print("      -- R goes strongly POSITIVE.")
+print("      flat has both near 0, so R is near 0.")
+print("   one number, three cases, distinguished by SIGN. that is the")
+print("   whole of the Harris response.")
+print()
+
+Rmap = np.zeros((H, W))
+for r in range(H):
+    for c in range(W):
+        M = tensor(r, c)
+        Rmap[r, c] = np.linalg.det(M) - K * np.trace(M) ** 2
+print("THE RESPONSE MAP. positive values only:")
+show(np.maximum(Rmap, 0), "R where R > 0")
+print("      the four corners of the square light up and the long edges do")
+print("      not -- neither the square's sides nor the strip, which has no")
+print("      corners at all inside the frame.")
+thr = Rmap.max() * 0.25
+peaks = []
+for r in range(1, H - 1):
+    for c in range(1, W - 1):
+        if Rmap[r, c] > thr and Rmap[r, c] >= Rmap[r - 1:r + 2, c - 1:c + 2].max():
+            peaks.append((r, c, Rmap[r, c]))
+print("      after thresholding at %.0f%% of the maximum and keeping only"
+      % 25)
+print("      local maxima, %d points survive:" % len(peaks))
+for r, c, v in peaks:
+    print("         (%2d,%2d)  R = %.4g" % (r, c, v))
+print("      the square's corners are at (3,3), (3,8), (9,3) and (9,8).")
+print()
+
+print("WHAT IT IS AND IS NOT INVARIANT TO:")
+print("%-28s %s" % ("change", "does R survive?"))
+for k, v in (("translation", "yes -- it is computed locally"),
+             ("rotation", "yes -- det and trace are rotation invariant"),
+             ("brightness (+b)", "yes -- gradients ignore a constant"),
+             ("contrast (*a)", "NO -- R scales as a^4"),
+             ("scale (zoom)", "NO -- a corner becomes a curve")):
+    print("%-28s %s" % (k, v))
+print("   the contrast row is why R is always thresholded relative to the")
+print("   image's own maximum rather than at a fixed value.")
+print("   the scale row is the serious one, and it is what SIFT was")
+print("   invented to fix: search over scales as well as positions, and")
+print("   keep the scale at which the response peaks. Harris finds WHERE;")
+print("   scale-space finds where AND how big.")
+```
