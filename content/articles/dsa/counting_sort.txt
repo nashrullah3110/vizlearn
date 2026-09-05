@@ -160,6 +160,97 @@ It degrades to O(n²) when the distribution is skewed and everything lands in on
 
 Note the histogram point: computing the count array is frequently useful in itself, and the sorting is a bonus.
 
+## Where the k in O(n + k) starts to hurt
+
+Counting sort beats the comparison lower bound by not comparing anything, and the price is a second term in the complexity that depends on the range of the values rather than how many there are. That term is easy to ignore until it is the whole cost, so it is worth watching it grow.
+
+```python-run
+def counting_sort(a, stats):
+    if not a:
+        return a
+    lo, hi = min(a), max(a)
+    k = hi - lo + 1
+    stats["k"] = k
+    counts = [0] * k
+    stats["ops"] += k                      # allocating the count array
+    for x in a:
+        counts[x - lo] += 1
+        stats["ops"] += 1                  # pass 1: count
+    out, pos = [0] * len(a), 0
+    for i, c in enumerate(counts):
+        stats["ops"] += 1                  # pass 2: walk every bucket
+        for _ in range(c):
+            out[pos] = i + lo
+            pos += 1
+            stats["ops"] += 1              # pass 3: write out
+    return out
+
+
+import random
+rng = random.Random(2)
+n = 1000
+print("n = %d in every row; only the RANGE of the values changes" % n)
+print("%14s %10s %12s %14s" % ("value range", "k", "operations", "ops per item"))
+for hi in (10, 100, 1000, 10 ** 4, 10 ** 6):
+    data = [rng.randrange(hi) for _ in range(n)]
+    st = {"ops": 0, "k": 0}
+    out = counting_sort(data, st)
+    assert out == sorted(data)
+    print("%14s %10d %12d %14.1f" % (
+        "0..%d" % hi, st["k"], st["ops"], st["ops"] / n))
+
+# The first rows are the case counting sort is for: a thousand items with
+# values under a thousand, sorted in a few operations each, no comparisons
+# at all. The last row is the same thousand items with values up to a
+# million -- and the cost per item is now in the thousands, because the
+# algorithm walks a million empty buckets to find them.
+#
+# The rule that falls out: counting sort is O(n + k), and it is a good
+# idea only while k is comparable to n. Sorting a thousand 32-bit integers
+# by this method would allocate four billion counters.
+#
+# Comparison sorts do not care about the range at all:
+
+import math
+print()
+print("a comparison sort would need about n log2 n = %.0f comparisons," % (
+    n * math.log2(n)))
+print("for any of the rows above.")
+
+# The other property worth having is stability, and the naive version
+# above threw it away -- it rebuilt the values from the counts rather than
+# moving the original records. With records that carry a payload you need
+# the prefix-sum version, which places each item by looking up where its
+# bucket ends and walking the input BACKWARDS.
+
+records = [("Ada", 2), ("Bala", 1), ("Chen", 2), ("Dara", 1), ("Eze", 0)]
+
+
+def stable_counting(recs):
+    k = max(r[1] for r in recs) + 1
+    counts = [0] * k
+    for _, key in recs:
+        counts[key] += 1
+    for i in range(1, k):
+        counts[i] += counts[i - 1]         # prefix sums: end position of each bucket
+    out = [None] * len(recs)
+    for rec in reversed(recs):             # backwards is what makes it stable
+        counts[rec[1]] -= 1
+        out[counts[rec[1]]] = rec
+    return out
+
+
+print()
+print("input: ", [r[0] for r in records])
+print("sorted:", [r[0] for r in stable_counting(records)])
+
+# Ada and Chen both have key 2 and come out in that order; Bala and Dara
+# both have key 1 and come out in that order. Walk the input forwards
+# instead and every group comes out reversed -- which is the bug that
+# breaks radix sort, since radix sort is counting sort applied repeatedly
+# and depends on each pass preserving the last one's work.
+```
+
 ## Questions people ask
 
 <strong>Why is counting sort not O(n log n)-bound?</strong> The lower bound applies to comparison-based sorts. Counting sort never compares two elements.

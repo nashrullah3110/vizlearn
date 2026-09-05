@@ -184,6 +184,99 @@ total = sum(x * x for x in range(10_000_000))    # no list built
 
 For a large intermediate that is consumed once, a generator expression is both faster and dramatically lighter.
 
+## The costs behind the operations you use every day
+
+A Python list is a dynamic array, and almost every surprising thing about its performance follows from that one fact. Measuring the operations side by side turns a table of complexities into something you can predict from.
+
+```python-run
+import time
+
+
+def timed(fn, reps=5):
+    best = None
+    for _ in range(reps):
+        t0 = time.time(); fn(); dt = time.time() - t0
+        best = dt if best is None else min(best, dt)
+    return best * 1000
+
+
+n = 30000            # kept modest: the O(n^2) row runs in the browser
+base = list(range(n))
+set_base = set(base)
+
+
+def front_insert(k):
+    a = []
+    for i in range(k):
+        a.insert(0, i)          # every element shifts one slot right
+
+
+print("%-34s %12s" % ("operation, repeated %d times" % n, "ms"))
+print("%-34s %12.1f" % ("append to the end",
+                        timed(lambda: [x for x in range(n)])))
+print("%-34s %12.1f" % ("insert(0, x) at the front",
+                        timed(lambda: front_insert(n))))
+print("%-34s %12.1f" % ("index a[i]",
+                        timed(lambda: [base[i] for i in range(n)])))
+print("%-34s %12.1f" % ("x in list (linear scan, x200)",
+                        timed(lambda: [(n - 1) in base for _ in range(200)])))
+print("%-34s %12.1f" % ("x in set (hash lookup, x200)",
+                        timed(lambda: [(n - 1) in set_base for _ in range(200)])))
+
+# Indexing is one address calculation, so it does not care where in the
+# list you look. Inserting at the FRONT has to move every element right,
+# which is why it is the one to avoid -- and `in` on a list is the same
+# problem in a different costume: a scan, not a lookup.
+#
+# The famous one is append, which is amortised O(1). Python over-allocates
+# so most appends are free and occasional ones copy everything. You can
+# see the over-allocation directly:
+
+import sys
+print()
+print("%8s %14s %10s" % ("length", "bytes", "grew?"))
+a = []
+last = sys.getsizeof(a)          # so row 0 is the starting size, not a jump
+for i in range(17):
+    size = sys.getsizeof(a)
+    print("%8d %14d %10s" % (len(a), size, "yes" if size != last else ""))
+    last = size
+    a.append(i)
+
+# The size jumps at a few lengths and is flat between them. Each jump
+# copies the whole list, but the new capacity is proportional to the
+# current size, so the copies get rarer exactly as fast as they get more
+# expensive. Averaged over n appends, that is a constant per append.
+#
+# The aliasing trap, which is a consequence of lists being references:
+
+grid = [[0] * 3] * 3            # three references to ONE row
+grid[0][0] = 9
+print()
+print("[[0]*3]*3 after setting grid[0][0] = 9:", grid)
+
+grid = [[0] * 3 for _ in range(3)]
+grid[0][0] = 9
+print("the comprehension version:             ", grid)
+
+# The first form copied the REFERENCE three times, so every row is the
+# same object and writing through one writes through all of them. This is
+# the single most common bug when building a grid, and the fix is the
+# comprehension, which evaluates [0]*3 afresh each time.
+
+import copy
+outer = [[1, 2], [3, 4]]
+shallow = outer[:]
+deep = copy.deepcopy(outer)
+outer[0][0] = 99
+print()
+print("original mutated ->  shallow copy sees it:", shallow[0][0] == 99)
+print("                     deep copy does not:  ", deep[0][0] == 1)
+
+# Slicing gives a new outer list holding the SAME inner lists. For nested
+# data that is usually not the copy you meant.
+```
+
 ## Questions people ask
 
 <strong>Is a Python list a linked list?</strong> No &mdash; it is a dynamic array of pointers, contiguous, with O(1) indexing.

@@ -91,6 +91,95 @@ The distinction is one word: <strong>independence</strong>.
 
 Recursive Fibonacci written as divide and conquer is O(2ⁿ) precisely because the subproblems overlap and nothing is cached. Adding `@lru_cache` converts it to dynamic programming and O(n). Recognising which situation you are in decides whether caching is the fix.
 
+## Where the log comes from, and which step decides the total
+
+Divide and conquer splits a problem, solves the pieces and combines them. The complexity is decided almost entirely by the combine step, and the Master Theorem is a way of reading that off. It is easier to believe after counting the work at each level of an actual recursion.
+
+```python-run
+def merge_sort(a, level=0, work=None):
+    work = {} if work is None else work
+    work[level] = work.get(level, 0) + len(a)
+    if len(a) <= 1:
+        return a, work
+    mid = len(a) // 2
+    left, _ = merge_sort(a[:mid], level + 1, work)
+    right, _ = merge_sort(a[mid:], level + 1, work)
+    out, i, j = [], 0, 0
+    while i < len(left) and j < len(right):
+        if left[i] <= right[j]:
+            out.append(left[i]); i += 1
+        else:
+            out.append(right[j]); j += 1
+    return out + left[i:] + right[j:], work
+
+
+import random
+n = 64
+_, work = merge_sort(random.Random(3).sample(range(n), n))
+print("merge sort on %d elements" % n)
+print("%7s %12s %16s" % ("level", "subproblems", "elements seen"))
+total = 0
+for lvl in sorted(work):
+    count = 2 ** lvl
+    total += work[lvl]
+    print("%7d %12d %16d" % (lvl, count, work[lvl]))
+print("%7s %12s %16d" % ("", "total", total))
+
+# Every level touches all n elements, and there are log2(n) + 1 levels.
+# n per level times log n levels is where n log n comes from -- not from
+# the recursion itself, but from the combine step being linear.
+#
+# Change what the combine step costs and the total changes with it. The
+# Master Theorem for T(n) = a*T(n/b) + f(n) says the answer is decided by
+# whether f(n) is smaller, equal, or larger than n^(log_b a):
+
+import math
+print()
+print("%-34s %-14s %-16s %s" % ("algorithm", "a, b", "combine f(n)", "total"))
+rows = [
+    ("binary search",           1, 2, "O(1)",     "O(log n)"),
+    ("merge sort",              2, 2, "O(n)",     "O(n log n)"),
+    ("naive matrix multiply",   8, 2, "O(n^2)",   "O(n^3)"),
+    ("Strassen",                7, 2, "O(n^2)",   "O(n^2.81)"),
+]
+for name, a, b, f, total_s in rows:
+    crit = math.log(a, b)
+    print("%-34s a=%d b=%d       %-16s %s   (n^%.2f)" % (
+        name, a, b, f, total_s, crit))
+
+# Read the last column. Strassen is famous for one reason visible right
+# there: it does SEVEN multiplications instead of eight on the same split,
+# and that single change to `a` moves the exponent from 3 to 2.81. The
+# combine step got messier and the total still improved, because the
+# exponent is set by how many subproblems you make, not by how tidy the
+# combining is.
+#
+# And binary search is the degenerate case worth noticing: it makes ONE
+# subproblem, not two. Half the input is discarded rather than solved, so
+# there is no combine step at all -- which is why it is log n and not n.
+
+def bsearch(a, target, depth=0):
+    if not a:
+        return depth
+    mid = len(a) // 2
+    if a[mid] == target:
+        return depth + 1
+    if a[mid] < target:
+        return bsearch(a[mid + 1:], target, depth + 1)
+    return bsearch(a[:mid], target, depth + 1)
+
+
+data = list(range(1000))
+print()
+print("binary search recursion depth on 1000 items:",
+      bsearch(data, 777), "  log2(1000) = %.1f" % math.log2(1000))
+
+# One branch taken, one discarded, at every level. When both branches must
+# be solved you get n log n or worse; when one can be thrown away you get
+# log n. That distinction, not the splitting, is what the technique is
+# really about.
+```
+
 ## Experiments to try
 
 1. <strong>Step through merge sort at n = 8.</strong> Watch the tree split down to single elements, then merge back upward.

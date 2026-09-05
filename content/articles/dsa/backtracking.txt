@@ -114,6 +114,116 @@ The signals:
 
 If the problem instead asks for a maximum or a count computable from overlapping subproblems, dynamic programming is usually the better tool &mdash; it reuses work where backtracking re-derives it.
 
+## What pruning is worth, counted
+
+Backtracking is brute force that gives up early, and "gives up early" is doing all the work. N-Queens is the standard example because the saving is enormous and easy to count: the same search, with and without the check that rejects a partial placement.
+
+```python-run
+def solve(n, prune=True):
+    stats = {"nodes": 0, "solutions": 0}
+    cols = []
+
+    def safe(row, col):
+        for r, c in enumerate(cols):
+            if c == col or abs(c - col) == row - r:
+                return False
+        return True
+
+    def place(row):
+        stats["nodes"] += 1
+        if row == n:
+            stats["solutions"] += 1
+            return
+        for col in range(n):
+            if prune and not safe(row, col):
+                continue                 # abandon this branch immediately
+            cols.append(col)
+            if not prune and row == n - 1:
+                # without pruning, only check at the very bottom
+                ok = all(cols[i] != cols[j] and
+                         abs(cols[i] - cols[j]) != j - i
+                         for i in range(n) for j in range(i + 1, n))
+                if ok:
+                    stats["solutions"] += 1
+                stats["nodes"] += 1
+            else:
+                place(row + 1)
+            cols.pop()
+
+    place(0)
+    return stats
+
+
+print("%5s %14s %18s %12s %10s" % (
+    "n", "with pruning", "without pruning", "solutions", "saved"))
+for n in range(4, 9):
+    a = solve(n, True)
+    b = solve(n, False)
+    print("%5d %14d %18d %12d %9.0f%%" % (
+        n, a["nodes"], b["nodes"], a["solutions"],
+        100 * (1 - a["nodes"] / b["nodes"])))
+
+# The solution counts agree, so both searches are correct. The node counts
+# do not: without pruning the search builds every one of the n^n possible
+# placements and tests each at the bottom. With pruning it abandons a
+# branch the moment two queens attack, and by n = 8 it has skipped over
+# 99% of the tree.
+#
+# The saving grows with n, which is the important part. Pruning is not a
+# constant-factor optimisation here -- it changes the shape of the search.
+
+print()
+print("%5s %16s" % ("n", "n^n (all placements)"))
+for n in range(4, 9):
+    print("%5d %16d" % (n, n ** n))
+
+# Note what pruning does NOT do: this is still exponential. Backtracking
+# makes an intractable search merely expensive, and the win comes entirely
+# from testing the constraint as early as it can be tested. A check that
+# can only run on a complete candidate prunes nothing.
+#
+# The template, which is the part worth carrying away:
+#
+#   choose a candidate
+#   if it violates a constraint -> reject, try the next
+#   if the solution is complete -> record it
+#   otherwise recurse, then UNDO the choice and try the next
+#
+# The undo is the line people forget. Here it is cols.pop(), and without
+# it the partial state leaks into sibling branches:
+
+print()
+print("one solution for n=6:", end=" ")
+
+
+def first_solution(n):
+    cols = []
+
+    def safe(row, col):
+        return all(c != col and abs(c - col) != row - r
+                   for r, c in enumerate(cols))
+
+    def place(row):
+        if row == n:
+            return list(cols)
+        for col in range(n):
+            if safe(row, col):
+                cols.append(col)
+                got = place(row + 1)
+                if got:
+                    return got
+                cols.pop()               # the undo
+        return None
+
+    return place(0)
+
+
+sol = first_solution(6)
+print(sol)
+for row, col in enumerate(sol):
+    print("  " + " ".join("Q" if c == col else "." for c in range(6)))
+```
+
 ## Things to try
 
 1. <strong>Watch a path get committed.</strong> Press <strong>Step</strong> repeatedly. The search extends along a single route, taking the first available direction each time &mdash; the same depth-first commitment as DFS.

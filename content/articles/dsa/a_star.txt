@@ -96,6 +96,120 @@ The practical rule: <strong>use the tightest admissible estimate that is cheap t
 
 For road networks the straight-line distance is admissible but weak, because roads are not straight. Production routing engines use landmark-based heuristics: precompute distances from a few hundred landmark nodes, and use the triangle inequality to derive much tighter bounds. That is one of the techniques that makes continental route planning interactive.
 
+## What the heuristic buys, and the condition it must satisfy
+
+A* is Dijkstra's algorithm plus a guess about how far the goal still is. The guess decides everything: a good one cuts the search enormously, a merely plausible one makes it return the wrong path. Both are visible on a grid you can print.
+
+```python-run
+import heapq
+
+GRID = [
+    "..........",
+    ".####.###.",
+    ".#........",
+    ".#.#####.#",
+    "...#...#..",
+    ".###.#.##.",
+    ".....#....",
+    "####.#.##.",
+    "......#...",
+    ".####.....",
+]
+START, GOAL = (0, 0), (9, 9)
+
+
+def neighbours(p):
+    r, c = p
+    for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        nr, nc = r + dr, c + dc
+        if 0 <= nr < len(GRID) and 0 <= nc < len(GRID[0]) and GRID[nr][nc] != "#":
+            yield (nr, nc)
+
+
+def search(h):
+    # h = None gives Dijkstra: no guess at all
+    openq = [(0, 0, START, [START])]
+    best = {START: 0}
+    expanded = 0
+    while openq:
+        _, g, node, path = heapq.heappop(openq)
+        if node == GOAL:
+            return path, expanded
+        if g > best.get(node, float("inf")):
+            continue
+        expanded += 1
+        for nxt in neighbours(node):
+            ng = g + 1
+            if ng < best.get(nxt, float("inf")):
+                best[nxt] = ng
+                f = ng + (h(nxt) if h else 0)
+                heapq.heappush(openq, (f, ng, nxt, path + [nxt]))
+    return None, expanded
+
+
+def manhattan(p):
+    return abs(p[0] - GOAL[0]) + abs(p[1] - GOAL[1])
+
+
+def overestimate(p):
+    return manhattan(p) * 4          # never admissible: it exaggerates
+
+
+print("%-28s %10s %14s" % ("heuristic", "expanded", "path length"))
+for name, h in (("none (Dijkstra)", None),
+                ("Manhattan (admissible)", manhattan),
+                ("Manhattan x 4 (not)", overestimate)):
+    path, expanded = search(h)
+    print("%-28s %10d %14d" % (name, expanded, len(path) - 1))
+
+# Three runs, same grid, same goal. Dijkstra expands the most cells
+# because it explores outward in all directions equally. Manhattan
+# distance points the search at the goal and cuts the work, and it still
+# returns a shortest path.
+#
+# The third one is the warning. Multiplying the heuristic makes it
+# ADMISSIBLE no longer -- it can claim the remaining distance is larger
+# than it really is -- and A* will then happily commit to a route it
+# should have kept open. It expands fewer cells still, and that speed is
+# bought with correctness.
+#
+# Admissible means: never overestimate the true remaining cost. Manhattan
+# distance on a 4-connected grid qualifies, because you must make at least
+# that many moves and obstacles can only make it worse.
+
+print()
+print("checking admissibility against the true cost from each cell:")
+true_cost = {}
+frontier = [(0, GOAL)]
+while frontier:
+    d, node = heapq.heappop(frontier)
+    if node in true_cost:
+        continue
+    true_cost[node] = d
+    for nxt in neighbours(node):
+        if nxt not in true_cost:
+            heapq.heappush(frontier, (d + 1, nxt))
+
+bad_manhattan = [p for p, d in true_cost.items() if manhattan(p) > d]
+bad_scaled = [p for p, d in true_cost.items() if overestimate(p) > d]
+print("  cells where Manhattan overestimates:   %d" % len(bad_manhattan))
+print("  cells where Manhattan x 4 overestimates: %d of %d" % (
+    len(bad_scaled), len(true_cost)))
+
+# Zero against most of the grid. That is the whole condition, checked
+# directly, and it is the reason one of those heuristics is safe to use
+# and the other is not.
+#
+# The path itself:
+
+path, _ = search(manhattan)
+on_path = set(path)
+print()
+for r, row in enumerate(GRID):
+    print("  " + "".join("o" if (r, c) in on_path else ch
+                         for c, ch in enumerate(row)))
+```
+
 ## Guided experiments
 
 1. <strong>See the search become directional.</strong> Press <strong>Run Algorithm</strong> and watch the explored region. It stretches toward the goal rather than spreading in a circle &mdash; that elongation is h doing its job.

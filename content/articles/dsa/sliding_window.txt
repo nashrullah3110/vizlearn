@@ -117,6 +117,92 @@ Two variants of the middle block distinguish the two families of question:
 
 Getting that inversion wrong is the most common sliding-window bug, and the symptom is an answer that is consistently too long or too short.
 
+## Recomputing versus updating, and the bug that hides in the shrink
+
+A sliding window turns a nested loop into a single pass by updating a running answer instead of rebuilding it. The fixed-size version is easy. The variable-size one has a subtlety in when you shrink, and getting it wrong produces answers that are almost right.
+
+```python-run
+def max_sum_naive(a, k):
+    best, work = None, 0
+    for i in range(len(a) - k + 1):
+        s = 0
+        for j in range(i, i + k):
+            s += a[j]
+            work += 1
+        best = s if best is None else max(best, s)
+    return best, work
+
+
+def max_sum_window(a, k):
+    s, work = 0, 0
+    for i in range(k):
+        s += a[i]
+        work += 1
+    best = s
+    for i in range(k, len(a)):
+        s += a[i] - a[i - k]      # one add, one subtract, whatever k is
+        work += 2
+        best = max(best, s)
+    return best, work
+
+
+import random
+a = [random.Random(8).randrange(100) for _ in range(1000)]
+print("%6s %14s %16s %10s" % ("k", "naive adds", "window adds", "same answer"))
+for k in (3, 10, 100, 500):
+    n_best, n_work = max_sum_naive(a, k)
+    w_best, w_work = max_sum_window(a, k)
+    print("%6d %14d %16d %10s" % (k, n_work, w_work, n_best == w_best))
+
+# The window column does not grow with k at all -- it is 2n - k, so it
+# actually falls slightly as the window widens -- while the naive column
+# is k times longer for every k. That is the whole
+# technique: the overlap between consecutive windows is everything except
+# one element at each end, so recomputing it is redundant work.
+#
+# Now the variable-size version: the longest substring with no repeated
+# character. Here the window grows on every step and shrinks only when
+# the invariant breaks.
+
+def longest_unique(s, shrink_all=True):
+    seen = {}
+    left, best, best_at = 0, 0, (0, 0)
+    for right, ch in enumerate(s):
+        if ch in seen and seen[ch] >= left:
+            if shrink_all:
+                left = seen[ch] + 1      # jump past the previous copy
+            else:
+                left += 1                # BUG: move one step and hope
+        seen[ch] = right
+        if right - left + 1 > best:
+            best = right - left + 1
+            best_at = (left, right + 1)
+    return best, s[best_at[0]:best_at[1]]
+
+
+for text in ("abcabcbb", "bbbbb", "pwwkew", "abba"):
+    good = longest_unique(text, True)
+    bad = longest_unique(text, False)
+    flag = "" if good == bad else "   <-- differs"
+    print()
+    print("%-10r correct: %d %r    one-step shrink: %d %r%s" % (
+        text, good[0], good[1], bad[0], bad[1], flag))
+
+# Two of the four inputs separate them, and in both the one-step version
+# reports a LONGER answer -- "wwke" and "bba", each of which contains the
+# repeat it was supposed to exclude. That is the tell: a window bug of
+# this kind overreports, because the window it measured was never valid.
+#
+# The reason is that one step is not always enough. When the duplicate
+# sits several positions inside the window, left has to jump past it in
+# one move; nudging left by one leaves the earlier copy inside.
+#
+# The general rule for the variable window: grow unconditionally, and
+# shrink until the invariant is restored -- not once, and not by a fixed
+# amount. Whenever the shrink is a single step, check whether one step is
+# actually enough.
+```
+
 ## Try it yourself
 
 1. <strong>Run max-sum with k = 3.</strong> Watch each slide subtract one value and add one &mdash; two operations, never three.

@@ -115,6 +115,122 @@ Structurally this is Dijkstra's algorithm with one change: the priority is the e
 
 For dense graphs, Prim with an adjacency matrix and a linear scan is O(V²), which beats the heap version when E approaches V².
 
+## Two algorithms, one answer, and the property that guarantees it
+
+Kruskal and Prim look nothing alike -- one sorts all the edges globally, the other grows a single tree outward -- and they return trees of the same total weight every time. That is not a coincidence, and the cut property is what makes it inevitable.
+
+```python-run
+import heapq
+
+EDGES = [
+    ("A", "B", 4), ("A", "C", 8), ("B", "C", 11), ("B", "D", 8),
+    ("C", "E", 7), ("C", "F", 1), ("D", "E", 2), ("D", "G", 7),
+    ("E", "F", 6), ("F", "G", 2), ("G", "H", 9), ("D", "H", 4),
+]
+NODES = sorted({n for a, b, _ in EDGES for n in (a, b)})
+
+
+def kruskal(edges):
+    parent = {n: n for n in NODES}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    chosen, total = [], 0
+    for w, a, b in sorted((w, a, b) for a, b, w in edges):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+            chosen.append((a, b, w))
+            total += w
+    return chosen, total
+
+
+def prim(edges, start):
+    adj = {n: [] for n in NODES}
+    for a, b, w in edges:
+        adj[a].append((w, b))
+        adj[b].append((w, a))
+    seen = {start}
+    pq = [(w, start, to) for w, to in adj[start]]
+    heapq.heapify(pq)
+    chosen, total = [], 0
+    while pq and len(seen) < len(NODES):
+        w, frm, to = heapq.heappop(pq)
+        if to in seen:
+            continue
+        seen.add(to)
+        chosen.append((frm, to, w))
+        total += w
+        for w2, nxt in adj[to]:
+            if nxt not in seen:
+                heapq.heappush(pq, (w2, to, nxt))
+    return chosen, total
+
+
+k_edges, k_total = kruskal(EDGES)
+print("Kruskal picks, in order:")
+for a, b, w in k_edges:
+    print("   %s-%s  weight %d" % (a, b, w))
+print("   total %d" % k_total)
+
+print()
+print("Prim from A picks, in order:")
+p_edges, p_total = prim(EDGES, "A")
+for a, b, w in p_edges:
+    print("   %s-%s  weight %d" % (a, b, w))
+print("   total %d" % p_total)
+
+print()
+print("same total:", k_total == p_total)
+print("same edge set:", sorted(tuple(sorted((a, b))) for a, b, _ in k_edges)
+      == sorted(tuple(sorted((a, b))) for a, b, _ in p_edges))
+
+# The orders are completely different -- Kruskal takes the globally
+# cheapest edge anywhere, Prim only ever takes an edge touching the tree
+# it has built. They still agree.
+#
+# The CUT PROPERTY is why. Split the nodes into any two groups; the
+# cheapest edge crossing that split must be in some minimum spanning
+# tree. If it were not, adding it would create a cycle, and removing any
+# other crossing edge of that cycle would give a tree that weighs less --
+# a contradiction.
+#
+# Both algorithms are just different ways of choosing which cut to apply
+# it to. Check the property directly:
+
+print()
+print("cheapest edge across a few random cuts, and whether the MST has it:")
+import random
+rng = random.Random(4)
+in_mst = {tuple(sorted((a, b))) for a, b, _ in k_edges}
+for _ in range(5):
+    group = set(rng.sample(NODES, rng.randrange(1, len(NODES))))
+    crossing = [(w, a, b) for a, b, w in EDGES
+                if (a in group) != (b in group)]
+    if not crossing:
+        continue
+    w, a, b = min(crossing)
+    ties = sum(1 for cw, _, _ in crossing if cw == w)
+    mark = "yes" if tuple(sorted((a, b))) in in_mst else "no"
+    print("   |group| = %d: cheapest crossing %s-%s (%d), tied with %d other"
+          " -> in MST: %s" % (len(group), a, b, w, ties - 1, mark))
+
+# Every one of them is in the tree, which is the cut property holding on
+# five arbitrary splits of the graph.
+#
+# The tie column is the fine print. The property forces the cheapest
+# crossing edge into EVERY minimum spanning tree only when it is uniquely
+# cheapest; where another edge of equal weight crosses the same cut,
+# either may be chosen and there is more than one minimum spanning tree,
+# all of the same total weight. Re-run the cuts with a different seed and
+# a tied edge will eventually come up "no" for that reason -- the tree is
+# still minimum, it is just not the only one.
+```
+
 ## Things to try
 
 1. <strong>Run Kruskal.</strong> Watch it consider edges in weight order and reject any that would close a cycle.

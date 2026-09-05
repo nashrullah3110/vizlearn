@@ -100,6 +100,98 @@ heapq.heappush(h, (priority, next(counter), task))   # never compares task
 
 That counter pattern is worth memorising; the alternative is an occasional `TypeError` in production when two priorities happen to match.
 
+## Partial order is the point, not a compromise
+
+A heap is often introduced as a tree that is only sort-of sorted, which sounds like a weaker version of something better. It is the opposite: the ordering it does NOT maintain is exactly the work it does not have to do, and that shows up the moment you compare it with keeping a list sorted.
+
+```python-run
+import heapq
+import random
+import time
+
+# A heap only guarantees parent <= child. Siblings are unordered, and
+# the array is emphatically not sorted:
+h = []
+for x in [5, 3, 8, 1, 9, 2, 7]:
+    heapq.heappush(h, x)
+print("heap array:", h)
+print("sorted:    ", sorted(h))
+print("smallest is at index 0:", h[0] == min(h))
+
+# Every level down is a valid heap too, which is the invariant:
+def check(a):
+    return all(a[p] <= a[c]
+               for c in range(1, len(a))
+               for p in [(c - 1) // 2])
+
+
+print("parent <= child everywhere:", check(h))
+
+# The array IS the tree. Node i has children 2i+1 and 2i+2 -- no pointers,
+# no nodes, no allocation:
+print()
+for i in range(len(h) // 2):
+    kids = [h[j] for j in (2 * i + 1, 2 * i + 2) if j < len(h)]
+    print("  h[%d] = %d  ->  children %s" % (i, h[i], kids))
+
+# Now the comparison that matters. A sorted list also gives you the
+# minimum in O(1) -- it is just list[0]. The difference is what INSERT
+# costs, and that is where the partial order pays.
+
+def timed(f, n):
+    t0 = time.time(); f(n); return (time.time() - t0) * 1000
+
+
+def with_heap(n):
+    q, rng = [], random.Random(1)
+    for _ in range(n):
+        heapq.heappush(q, rng.random())
+    while q:
+        heapq.heappop(q)
+
+
+def with_sorted_list(n):
+    import bisect
+    q, rng = [], random.Random(1)
+    for _ in range(n):
+        bisect.insort(q, rng.random())    # O(log n) to find, O(n) to shift
+    while q:
+        q.pop(0)
+
+
+print()
+print("%8s %14s %18s" % ("n", "heap (ms)", "sorted list (ms)"))
+for n in (2000, 4000, 8000):
+    print("%8d %14.1f %18.1f" % (n, timed(with_heap, n),
+                                 timed(with_sorted_list, n)))
+
+# The sorted list has to keep a total order it was never asked for. The
+# heap maintains only the parent-child relation, which is one path from
+# the insertion point to the root -- log n comparisons and no shifting.
+#
+# The classic use is scheduling: always take the most urgent job, and
+# keep adding jobs while you work.
+
+jobs = [(3, "write report"), (1, "server on fire"), (2, "review PR"),
+        (5, "reorganise inbox"), (1, "customer down")]
+pq = []
+for pri, name in jobs:
+    heapq.heappush(pq, (pri, name))
+print()
+print("handling in priority order:")
+while pq:
+    pri, name = heapq.heappop(pq)
+    print("  [p%d] %s" % (pri, name))
+    if name == "server on fire":
+        heapq.heappush(pq, (1, "write incident postmortem"))
+        print("        (a new p1 job arrived mid-queue)")
+
+# The new p1 job jumped ahead of everything with a lower priority, and
+# nothing had to be re-sorted to make that happen. A sorted list would
+# have shifted every element after the insertion point; the heap moved
+# one item up one short path.
+```
+
 ## Try it yourself
 
 1. <strong>Insert a value smaller than the root.</strong> Watch it bubble all the way to the top &mdash; one swap per level, never more.

@@ -128,6 +128,83 @@ That parallel variant is the honest exception to "never use bubble sort": on har
 - <strong>Off-by-one in the inner range,</strong> reading `arr[j+1]` past the end.
 - <strong>Using it on real data.</strong> `sorted()` is Timsort in C and is faster by orders of magnitude.
 
+## Counting what it actually does
+
+Bubble sort is worth running rather than reading, because the counts explain both why it is slow and why the early-exit version is genuinely different from the naive one. Instrument it and the O(n squared) stops being an assertion.
+
+```python-run
+def bubble(a, early_exit=True):
+    a = a[:]
+    comps = swaps = passes = 0
+    n = len(a)
+    for i in range(n - 1):
+        passes += 1
+        moved = False
+        for j in range(n - 1 - i):
+            comps += 1
+            if a[j] > a[j + 1]:
+                a[j], a[j + 1] = a[j + 1], a[j]
+                swaps += 1
+                moved = True
+        if early_exit and not moved:
+            break                      # a clean pass means it is sorted
+    return a, comps, swaps, passes
+
+
+cases = {
+    "already sorted": list(range(10)),
+    "reversed":       list(range(10))[::-1],
+    "one out of place": [0, 1, 2, 3, 4, 5, 6, 7, 9, 8],
+    "random-ish":     [5, 1, 9, 3, 7, 0, 8, 2, 6, 4],
+}
+
+print("%-18s %6s %6s %7s   %s" % ("input", "comps", "swaps", "passes", "early exit?"))
+for name, data in cases.items():
+    for flag in (True, False):
+        _, c, s, p = bubble(data, flag)
+        print("%-18s %6d %6d %7d   %s" % (name if flag else "", c, s, p, flag))
+
+# Read the two rows for "already sorted": with the early exit it makes one
+# pass and 9 comparisons; without it, 45 comparisons and 9 passes for a
+# list that was finished before it started. That single boolean is the
+# whole difference between O(n) and O(n^2) on sorted input.
+#
+# Then read "reversed": 45 comparisons and 45 swaps either way. Every
+# comparison finds a pair out of order, so the early exit never fires.
+# That is the worst case, and it is exactly n(n-1)/2.
+
+n = 10
+print()
+print("n(n-1)/2 for n=%d is %d" % (n, n * (n - 1) // 2))
+
+# One more property, and it is the reason bubble sort is not merely a bad
+# quick sort: it is STABLE. Equal elements keep their original order,
+# because the swap condition is > rather than >=.
+
+pairs = [("b", 2), ("a", 1), ("c", 2), ("d", 1)]
+
+
+def bubble_pairs(items, strict):
+    items = items[:]
+    for i in range(len(items) - 1):
+        for j in range(len(items) - 1 - i):
+            worse = items[j][1] > items[j + 1][1] if strict else \
+                    items[j][1] >= items[j + 1][1]
+            if worse:
+                items[j], items[j + 1] = items[j + 1], items[j]
+    return items
+
+
+print("input          ", pairs)
+print("with >  (stable)", bubble_pairs(pairs, True))
+print("with >= (broken)", bubble_pairs(pairs, False))
+
+# Sorting by the number only: with > the two 1s stay in their original
+# order (a before d) and so do the 2s (b before c). With >= they are
+# swapped whenever they meet, and the original order is lost. Stability
+# is not a happy accident of the algorithm -- it is that one character.
+```
+
 ## Questions people ask
 
 <strong>Is bubble sort ever the right choice?</strong> Practically no. Insertion sort is better for small arrays; library sorts for everything else. The odd-even parallel variant is the one narrow exception.

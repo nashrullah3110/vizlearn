@@ -121,6 +121,106 @@ Two standard compressions:
 
 For most applications a standard trie with dictionary children is fine, and a radix trie is worth the extra complexity when the key set is large and shares long prefixes.
 
+## Lookup that ignores the dictionary size, and the memory bill for it
+
+A trie's selling point is that finding a word costs the length of the word and nothing else -- the number of words stored does not appear in the complexity at all. That is easy to state and more convincing to measure, along with the memory it costs to make true.
+
+```python-run
+class Trie:
+    def __init__(self):
+        self.root = {}
+        self.nodes = 1
+
+    def add(self, word):
+        node = self.root
+        for ch in word:
+            if ch not in node:
+                node[ch] = {}
+                self.nodes += 1
+            node = node[ch]
+        node["$"] = True             # marks a complete word
+
+    def find(self, word):
+        node, steps = self.root, 0
+        for ch in word:
+            steps += 1
+            if ch not in node:
+                return False, steps
+            node = node[ch]
+        return "$" in node, steps
+
+    def with_prefix(self, prefix):
+        node = self.root
+        for ch in prefix:
+            if ch not in node:
+                return []
+            node = node[ch]
+        out = []
+
+        def walk(n, so_far):
+            for k, v in n.items():
+                if k == "$":
+                    out.append(prefix + so_far)
+                else:
+                    walk(v, so_far + k)
+        walk(node, "")
+        return sorted(out)
+
+
+words = ["car", "card", "care", "careful", "cat", "cats", "dog", "do",
+         "door", "dot"]
+t = Trie()
+for w in words:
+    t.add(w)
+
+print("%d words stored in %d nodes" % (len(words), t.nodes))
+print()
+print("%-10s %8s %8s" % ("lookup", "found", "steps"))
+for w in ("cat", "care", "cab", "careful", "zebra"):
+    found, steps = t.find(w)
+    print("%-10s %8s %8d" % (w, found, steps))
+
+# The step count is the length of the word, never the size of the
+# dictionary. "cab" failed in 3 steps and "zebra" in 1 -- a miss costs
+# only as much as the matching prefix, so most misses are cheaper than
+# hits. Add ten million more words and none of these numbers move.
+#
+# A hash table also gives O(1)-ish lookup. What it cannot do is this:
+
+print()
+for p in ("car", "do", "z"):
+    print('words starting with %-5r %s' % (p, t.with_prefix(p)))
+
+# Prefix search is where the trie is not merely competitive but the only
+# structure that answers the question directly. A hash of whole words has
+# no way to find them without scanning every key; a sorted list can binary
+# search to the first match, which is the real alternative and is why
+# sorted arrays still power many autocomplete boxes.
+#
+# The cost is nodes. Every distinct prefix is an object:
+
+print()
+print("%-14s %8s %10s %14s" % ("dictionary", "words", "characters", "trie nodes"))
+for name, ws in (("this example", words),
+                 ("shared prefixes", ["prefix%03d" % i for i in range(100)]),
+                 ("no sharing", ["%03dsuffix" % i for i in range(100)])):
+    tt = Trie()
+    for w in ws:
+        tt.add(w)
+    print("%-14s %8d %10d %14d" % (
+        name, len(ws), sum(len(w) for w in ws), tt.nodes))
+
+# Compare the last two rows. Identical word count, identical total
+# characters, and the trie is far smaller when the words share prefixes --
+# because a shared prefix is stored exactly once. When they do not share,
+# the trie approaches one node per character and the overhead of a
+# dictionary per node makes it much heavier than the strings themselves.
+#
+# So the honest rule: a trie pays off on dictionaries with real prefix
+# structure -- words in a language, URLs, IP prefixes, phone numbers --
+# and is a poor choice for keys that look random, like hashes or UUIDs.
+```
+
 ## Things to try
 
 1. <strong>Load the sample words</strong> and note how <em>car</em>, <em>card</em>, <em>care</em> and <em>careful</em> all share one path for 'c-a-r'.

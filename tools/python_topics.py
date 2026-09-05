@@ -4997,8 +4997,13 @@ The common failure is inheriting to reuse a method. If that is the only reason, 
 # alternatives - appended by slug so neither file becomes unreadable.
 from python_extra import EXTRA as _EXTRA  # noqa: E402
 
+# The runnable editor goes last, after the prose it refers back to.
+from python_runnable import RUNNABLE as _RUNNABLE  # noqa: E402
+
 for _t in TOPICS:
-    _t["article"] = _t["article"].rstrip() + "\n" + _EXTRA.get(_t["slug"], "")
+    _t["article"] = (_t["article"].rstrip() + "\n"
+                     + _EXTRA.get(_t["slug"], "")
+                     + _RUNNABLE.get(_t["slug"], ""))
 
 
 # The MCQ bank, keyed the way tools/labs.py keys everything else.

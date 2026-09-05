@@ -96,6 +96,95 @@ A stable variant exists: instead of swapping, shift the intervening elements rig
 |Swaps|O(n)|O(n&sup2;)|O(n&sup2;)|
 |In place|Yes|Yes|Yes|
 
+## The one thing it is best at, and the one thing it gets wrong
+
+Selection sort loses to insertion sort on almost every measure, so it is worth being precise about the single column where it wins -- and about the property it quietly lacks, which is the reason it is never the sort in a standard library.
+
+```python-run
+def selection(a):
+    a = a[:]
+    comps = swaps = 0
+    for i in range(len(a)):
+        m = i
+        for j in range(i + 1, len(a)):
+            comps += 1
+            if a[j] < a[m]:
+                m = j
+        if m != i:
+            a[i], a[m] = a[m], a[i]
+            swaps += 1
+    return a, comps, swaps
+
+
+def bubble(a):
+    a = a[:]
+    comps = swaps = 0
+    for i in range(len(a) - 1):
+        for j in range(len(a) - 1 - i):
+            comps += 1
+            if a[j] > a[j + 1]:
+                a[j], a[j + 1] = a[j + 1], a[j]
+                swaps += 1
+    return a, comps, swaps
+
+
+import random
+random.seed(3)
+data = random.sample(range(30), 30)
+
+_, sc, ss = selection(data)
+_, bc, bs = bubble(data)
+print("30 random elements")
+print("  selection: %3d comparisons, %3d writes" % (sc, ss))
+print("  bubble:    %3d comparisons, %3d writes" % (bc, bs))
+
+# Same comparison count, wildly different write count. Selection sort
+# never makes more than n-1 swaps, because each pass puts one element in
+# its final position and leaves it there.
+
+print()
+print("%6s  %10s  %8s" % ("n", "swaps", "n-1"))
+for n in (10, 50, 100, 500):
+    d = random.sample(range(n), n)
+    _, _, s = selection(d)
+    print("%6d  %10d  %8d" % (n, s, n - 1))
+
+# At most n-1, every time, for any input. That is the property worth
+# knowing: when a WRITE is far more expensive than a comparison --
+# flash memory with limited erase cycles, or records that are large to
+# move -- minimising writes is the thing that matters, and this is the
+# simple sort that does it.
+#
+# Now the flaw. Selection sort is NOT stable, and unlike bubble sort's
+# case this is not a one-character fix: the long-distance swap is the
+# algorithm.
+
+items = [("Ada", 2), ("Bala", 1), ("Chen", 2), ("Dara", 1)]
+
+
+def selection_pairs(x):
+    x = x[:]
+    for i in range(len(x)):
+        m = i
+        for j in range(i + 1, len(x)):
+            if x[j][1] < x[m][1]:
+                m = j
+        x[i], x[m] = x[m], x[i]
+    return x
+
+
+print()
+print("input:  ", [p[0] for p in items])
+print("sorted: ", [p[0] for p in selection_pairs(items)])
+
+# Bala and Dara both have key 1, and Ada and Chen both have key 2. Read
+# the output: the two 2s come out as Chen then Ada -- reversed from the
+# input. The second pass swapped Ada to the end to bring Dara forward,
+# throwing it past Chen, and nothing
+# afterwards can put it back. Sorting twice to break ties -- by one key,
+# then another -- silently fails on a sort that does this.
+```
+
 ## Things to try
 
 1. <strong>Watch the scan, then the single swap.</strong> Set <strong>Array Size</strong> to 15 and press <strong>Next Step</strong>. Each pass sweeps the whole unsorted region looking for a minimum, then makes exactly one swap. The scanning is where all the time goes.

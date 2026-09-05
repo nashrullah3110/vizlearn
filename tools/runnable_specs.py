@@ -204,6 +204,22 @@ SPECS = {
         "filename": "example_%02d.py",
         "prelude": _pandas_prelude,
     },
+    "python": {
+        # The language track. Nothing to install: every example here is
+        # meant to run against the standard library alone, which is also
+        # what a reader following along on their own machine will have.
+        "packages": "",
+        "label": "Python",
+        "filename": "example_%02d.py",
+    },
+    "dsa": {
+        # Same runtime as the python track. Algorithms are written out
+        # rather than imported -- the point is the mechanism, so reaching
+        # for bisect or heapq would skip the thing being taught.
+        "packages": "",
+        "label": "Python",
+        "filename": "example_%02d.py",
+    },
     "numpy": {
         # numpy ships with Pyodide, so this is a CDN fetch rather than a wheel.
         "packages": "numpy",

@@ -99,6 +99,112 @@ Two habits prevent a large share of real string bugs.
 
 Note also `split()` with no argument: it splits on any run of whitespace and discards empty results, which is almost always what you want for parsing text. `split(" ")` splits on each single space and can produce empty strings.
 
+## Immutability, and the loop that quietly copies everything
+
+Python strings cannot be modified, so every operation that looks like a modification is building a new string. That single fact explains the performance trap in string building, the reason slicing is safe to hand around, and why the join idiom exists at all.
+
+```python-run
+import time
+
+# Nothing mutates a string. Every method returns a new one:
+s = "hello"
+print("s.upper() ->", s.upper(), "   s is still", s)
+try:
+    s[0] = "H"
+except TypeError as e:
+    print("s[0] = 'H' ->", e)
+
+# So building a string in a loop with += creates a new string every
+# iteration, copying everything accumulated so far.
+
+def by_concat(n):
+    out = ""
+    for i in range(n):
+        out += "x"
+    return out
+
+
+def by_concat_aliased(n):
+    out = ""
+    for i in range(n):
+        keep = out          # a second reference to the string
+        out += "x"
+    return out
+
+
+def by_join(n):
+    parts = []
+    for i in range(n):
+        parts.append("x")
+    return "".join(parts)
+
+
+def ms(f, n):
+    t0 = time.time(); f(n); return (time.time() - t0) * 1000
+
+
+print()
+print("%8s %12s %18s %12s" % ("n", "+= (ms)", "+= aliased (ms)", "join (ms)"))
+for n in (10000, 40000, 160000):
+    print("%8d %12.1f %18.1f %12.1f" % (
+        n, ms(by_concat, n), ms(by_concat_aliased, n), ms(by_join, n)))
+
+# The first column is the surprise: += looks perfectly fine, close to
+# join. That is not because concatenation is cheap -- it is because
+# CPython has an optimisation that resizes the string IN PLACE when it can
+# prove nothing else refers to it.
+#
+# The middle column is the same loop with one extra assignment, which
+# creates a second reference and takes the optimisation away. Now the real
+# cost shows: quadruple n and the time goes up by roughly an order of
+# magnitude, heading for the sixteenfold that O(n^2) predicts, because
+# each += copies everything accumulated so far.
+#
+# So += on strings is fast until it silently is not, and what disables it
+# is as innocuous as keeping the previous value, passing it to a function
+# or storing it in a list. join() does not depend on any of that: it builds
+# a list of pieces with cheap appends, then allocates the final string
+# exactly once, knowing the total length in advance.
+#
+# SLICING. A slice is a new string, so it can never alias the original:
+
+text = "abcdefghij"
+print()
+print("  text[2:5]   ", text[2:5])
+print("  text[:3]    ", text[:3])
+print("  text[-3:]   ", text[-3:])
+print("  text[::2]   ", text[::2])
+print("  text[::-1]  ", text[::-1])
+print("  text[5:2]   ", repr(text[5:2]), "-- backwards slice, empty not error")
+
+# The one rule that makes all of them predictable: start is included, stop
+# is excluded, and out-of-range bounds are clamped rather than raised:
+
+print()
+print("  text[3:999] ", text[3:999], " -- no IndexError")
+try:
+    text[999]
+except IndexError as e:
+    print("  text[999]    IndexError:", e)
+
+# Indexing raises and slicing does not, which is a common source of a bug
+# that returns "" instead of failing.
+#
+# And the methods worth knowing, all of them returning new strings:
+
+line = "  Name , Ashish ,  Delhi  \n"
+print()
+print("  raw          ", repr(line))
+print("  .strip()     ", repr(line.strip()))
+print("  .split(',')  ", [p.strip() for p in line.split(",")])
+print("  .replace     ", repr(line.strip().replace(" ,", ",")))
+print("  'x' in line  ", "Ashish" in line)
+
+# split() then strip() on each part is the idiom for parsing this kind of
+# line, and it is worth preferring over a regular expression for anything
+# this simple -- it is faster to read and it fails in obvious ways.
+```
+
 ## Experiments to try
 
 Try these experiments to solidify your understanding of string manipulation.

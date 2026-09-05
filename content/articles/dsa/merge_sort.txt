@@ -98,6 +98,98 @@ That is merge sort's main disadvantage against quick sort, and it is what decide
 
 The linked-list row is worth noting: merging two linked lists requires only pointer rearrangement, so merge sort on a linked list uses O(1) extra space and is the natural choice there.
 
+## The guarantee, and what it costs
+
+Merge sort's selling point is not that it is fast on average -- quick sort usually beats it -- but that its worst case equals its best case. Here is that guarantee measured against quick sort's on the input designed to break it, along with the price merge sort pays in memory.
+
+```python-run
+def merge_sort(a, stats):
+    if len(a) <= 1:
+        return a
+    mid = len(a) // 2
+    left = merge_sort(a[:mid], stats)
+    right = merge_sort(a[mid:], stats)
+    stats["allocated"] += len(a)          # the merge buffer for this level
+    out, i, j = [], 0, 0
+    while i < len(left) and j < len(right):
+        stats["comps"] += 1
+        if left[i] <= right[j]:           # <= keeps equal elements in order
+            out.append(left[i]); i += 1
+        else:
+            out.append(right[j]); j += 1
+    out.extend(left[i:]); out.extend(right[j:])
+    return out
+
+
+def quick_sort(a, stats, depth=0):
+    stats["depth"] = max(stats["depth"], depth)
+    if len(a) <= 1:
+        return a
+    pivot = a[-1]                          # last element: the naive choice
+    lo, eq, hi = [], [], []
+    for x in a:
+        stats["comps"] += 1
+        (lo if x < pivot else hi if x > pivot else eq).append(x)
+    return quick_sort(lo, stats, depth + 1) + eq + quick_sort(hi, stats, depth + 1)
+
+
+import random
+random.seed(11)
+n = 64
+inputs = {
+    "random":   random.sample(range(n), n),
+    "sorted":   list(range(n)),
+    "reversed": list(range(n))[::-1],
+}
+
+print("n = %d" % n)
+print("%-10s %12s %12s" % ("input", "merge comps", "quick comps"))
+for name, data in inputs.items():
+    ms = {"comps": 0, "allocated": 0}
+    qs = {"comps": 0, "depth": 0}
+    merge_sort(data, ms)
+    quick_sort(data, qs)
+    print("%-10s %12d %12d" % (name, ms["comps"], qs["comps"]))
+
+# Merge sort's column stays inside a narrow band -- 192 to 304, against a
+# ceiling of n log2 n = 384 -- because the split is positional, so the
+# shape of the data cannot change how many levels there are. Quick sort
+# with a last-element pivot does not have that protection: on sorted and
+# reversed input every partition peels off exactly one element, and 375
+# comparisons become 2079 -- one short of n(n+1)/2, the quadratic sum,
+# rather than anything resembling n log n.
+
+import math
+print()
+print("n log2 n = %.0f" % (n * math.log2(n)))
+
+# Now the cost. Merge sort allocates a buffer at every level.
+
+for name, data in inputs.items():
+    ms = {"comps": 0, "allocated": 0}
+    merge_sort(data, ms)
+    print("%-10s allocated %d slots for %d elements  (n log2 n = %.0f)" % (
+        name, ms["allocated"], n, n * math.log2(n)))
+
+# That is the O(n log n) total allocation people mean when they say merge
+# sort needs O(n) extra space -- O(n) live at any moment, since each level
+# is freed before the next, but the allocation traffic is real and it is
+# why merge sort loses to quick sort on cache-friendliness.
+#
+# What you buy with it, besides the guarantee, is stability.
+
+pairs = [(x, i) for i, x in enumerate([3, 1, 3, 1, 2])]
+print()
+print("input (value, original index):", pairs)
+print("merge sorted by value:       ",
+      merge_sort(pairs, {"comps": 0, "allocated": 0}))
+
+# The two 3s come out with original indices 0 then 2, and the two 1s as
+# 1 then 3 -- input order preserved within equal keys. That is the <= in
+# the merge comparison; with < the equal element from the right half
+# would be taken first and stability would be gone.
+```
+
 ## Experiments to try
 
 1. <strong>Watch the recursion bottom out.</strong> Set <strong>Array Size</strong> to 16 and press <strong>Next Step</strong> repeatedly. The array splits until every block holds one element, and only then does anything get compared. All the sorting happens on the way back up.

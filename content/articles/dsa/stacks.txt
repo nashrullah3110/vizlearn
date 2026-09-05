@@ -87,6 +87,86 @@ The final `return not stack` is the part people forget: "(((" has no mismatch an
 
 Both problems share a shape: the most recent unresolved item is the one that must be resolved next, and that is precisely what LIFO provides.
 
+## Bracket matching, and the errors a stack can name
+
+A stack turns a problem that looks like it needs lookahead into one pass with one pointer. Bracket matching is the standard demonstration, but the version worth writing is the one that reports WHICH bracket went wrong and where -- because that is what a parser or a linter actually has to do.
+
+```python-run
+PAIRS = {")": "(", "]": "[", "}": "{"}
+OPEN = set(PAIRS.values())
+
+
+def check(s):
+    stack = []                       # holds (character, index)
+    for i, c in enumerate(s):
+        if c in OPEN:
+            stack.append((c, i))
+        elif c in PAIRS:
+            if not stack:
+                return "unexpected %s at %d" % (c, i)
+            want = PAIRS[c]
+            got, at = stack.pop()
+            if got != want:
+                return "%s at %d closed by %s at %d" % (got, at, c, i)
+    if stack:
+        c, at = stack[-1]
+        return "%s at %d never closed" % (c, at)
+    return "balanced"
+
+
+tests = [
+    "(a[b]{c})",
+    "([)]",
+    "(()",
+    "())",
+    "",
+    "no brackets here",
+    "{[()]}",
+]
+for t in tests:
+    print("%-20r %s" % (t, check(t)))
+
+# Three different failures, three different messages, one pass and one
+# stack. Note "([)]": every bracket is paired and the counts are equal --
+# two opens, two closes -- so a counter would call it balanced. Only the
+# ORDER is wrong, and order is exactly what a stack remembers.
+
+print()
+print("counting instead of stacking says '([)]' is fine:",
+      "([)]".count("(") == "([)]".count(")") and
+      "([)]".count("[") == "([)]".count("]"))
+
+# The reason a stack is the right structure: the constraint is "the most
+# recent unclosed bracket must be the next one closed". Most recent first
+# IS last-in-first-out, so the data structure is a restatement of the
+# rule.
+#
+# The same shape solves anything with nesting. An evaluator for postfix
+# arithmetic is the same loop with numbers instead of brackets:
+
+def rpn(expr):
+    stack = []
+    for tok in expr.split():
+        if tok in "+-*/":
+            b, a = stack.pop(), stack.pop()
+            stack.append({"+": a + b, "-": a - b,
+                          "*": a * b, "/": a // b}[tok])
+        else:
+            stack.append(int(tok))
+    return stack.pop()
+
+
+print()
+for e in ("3 4 +", "3 4 + 2 *", "5 1 2 + 4 * + 3 -"):
+    print("%-20s = %d" % (e, rpn(e)))
+
+# That last one is (5 + ((1 + 2) * 4)) - 3 = 14, evaluated with no
+# parentheses and no precedence rules -- the order is already in the
+# arrangement. Which is why compilers convert to postfix before
+# generating code, and why the machine they generate it for is itself a
+# stack.
+```
+
 ## Things to try
 
 1. <strong>Push A, B, C then pop.</strong> C comes back first &mdash; LIFO in one action.

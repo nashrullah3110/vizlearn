@@ -68,6 +68,78 @@ Sorting pays off when `k log n` plus the sort beats `k n` &mdash; which, roughly
 
 And if you are performing many lookups, the real answer is usually neither: <strong>build a set or dictionary</strong>, which gives O(1) per lookup after O(n) construction. That beats both for repeated membership testing, and it is what most production code should do.
 
+## The cases where the O(n) algorithm is the right one
+
+Linear search is the algorithm everybody knows and nobody defends. It is worth measuring anyway, because there are three specific situations where it beats binary search, and one of them -- the total cost including the sort -- is the one people get wrong most often.
+
+```python-run
+def linear(a, target):
+    for i, x in enumerate(a):
+        if x == target:
+            return i, i + 1
+    return -1, len(a)
+
+
+def binary(a, target):
+    lo, hi, n = 0, len(a) - 1, 0
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        n += 1
+        if a[mid] == target:
+            return mid, n
+        if a[mid] < target:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return -1, n
+
+
+data = list(range(1000))
+print("1000 sorted elements")
+print("%-16s %12s %12s" % ("target", "linear", "binary"))
+for name, t in (("first (0)", 0), ("middle (500)", 500),
+                ("last (999)", 999), ("absent (-1)", -1)):
+    _, lc = linear(data, t)
+    _, bc = binary(data, t)
+    print("%-16s %12d %12d" % (name, lc, bc))
+
+# The cost profiles are inverted. Linear search finds the FIRST element
+# in one comparison, which binary search needs nine for; binary search is
+# unbothered by the last element, which costs linear search a thousand.
+#
+# Case 1: the data is not sorted, and sorting it costs more than the scan.
+
+import math
+n = 1000
+print()
+print("%-42s %s" % ("one search in %d unsorted items" % n, "comparisons"))
+print("%-42s %12d" % ("  linear scan", n // 2))
+print("%-42s %12.0f" % ("  sort, then binary search",
+                        n * math.log2(n) + math.log2(n)))
+
+# Sorting to search once costs about twenty times the scan it replaces.
+# The sort pays for itself only across many searches:
+
+print()
+print("%10s %14s %18s" % ("searches", "linear total", "sort + binary total"))
+for s in (1, 10, 100, 1000):
+    lin = s * (n // 2)
+    binr = n * math.log2(n) + s * math.log2(n)
+    print("%10d %14d %18.0f  %s" % (
+        s, lin, binr, "linear" if lin < binr else "binary"))
+
+# The crossover is around twenty searches on a thousand items. Below it,
+# the simple scan genuinely wins.
+#
+# Case 2: n is small. Case 3: the data is a linked list, where reaching
+# the middle is itself O(n) and binary search has nothing to stand on.
+#
+# And one property that has nothing to do with speed: linear search works
+# on any sequence, sorted or not, with only an equality test. Binary
+# search needs a total ordering AND the sorted invariant maintained by
+# somebody, forever.
+```
+
 ## Things to try
 
 1. <strong>Watch the worst case.</strong> Set <strong>Array Size</strong> to 25, then set <strong>Search Target</strong> to a value that is not in the array and press <strong>Auto-Run</strong>. Every single cell lights up before the algorithm gives up. That full sweep is what O(n) means.

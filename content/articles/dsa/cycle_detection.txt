@@ -108,6 +108,110 @@ The distinction is between meeting a <strong>grey</strong> vertex and a <strong>
 
 Using one visited set treats both as cycles, and reports cycles in perfectly acyclic graphs &mdash; a diamond shape A&rarr;B, A&rarr;C, B&rarr;D, C&rarr;D would be falsely flagged.
 
+## Two pointers against a hash set, and why the tortoise catches up
+
+Floyd's cycle detection is the algorithm people remember as a trick. It is not: the meeting is forced by arithmetic, and the second phase -- finding where the cycle begins -- follows from the same equation. Both halves can be watched happening.
+
+```python-run
+class Node:
+    def __init__(self, val):
+        self.val, self.next = val, None
+
+
+def build(values, cycle_at):
+    nodes = [Node(v) for v in values]
+    for a, b in zip(nodes, nodes[1:]):
+        a.next = b
+    if cycle_at is not None:
+        nodes[-1].next = nodes[cycle_at]
+    return nodes[0], nodes
+
+
+head, nodes = build(list("ABCDEFGH"), 3)      # H points back to D
+print("list: A B C D E F G H, and H -> D")
+print("so the tail is A B C and the cycle is D E F G H (length 5)")
+
+
+def floyd(head, verbose=False):
+    slow = fast = head
+    steps = 0
+    while fast and fast.next:
+        slow, fast = slow.next, fast.next.next
+        steps += 1
+        if verbose:
+            print("   step %d: slow at %s, fast at %s" % (
+                steps, slow.val, fast.val))
+        if slow is fast:
+            return slow, steps
+    return None, steps
+
+
+print()
+print("phase 1 -- move slow by 1, fast by 2:")
+meet, steps = floyd(head, verbose=True)
+print("  they met at %s after %d steps" % (meet.val, steps))
+
+# The fast pointer gains exactly one position per step. Once both are
+# inside the cycle, the gap between them shrinks by one each step, so it
+# reaches zero in at most (cycle length) steps. It cannot be jumped over,
+# because the gap changes by exactly one. That is the whole proof -- there
+# is nothing to intuit.
+
+def find_start(head, meet):
+    a, b = head, meet
+    steps = 0
+    while a is not b:
+        a, b = a.next, b.next
+        steps += 1
+    return a, steps
+
+
+start, steps2 = find_start(head, meet)
+print()
+print("phase 2 -- reset one pointer to the head, advance both by 1:")
+print("  they met at %s after %d steps, and that is the cycle entrance"
+      % (start.val, steps2))
+
+# Why that works: let the tail be length T and the meeting point be K
+# nodes into the cycle. When they met, slow had walked T + K and fast had
+# walked twice that, and the difference is a whole number of laps. The
+# algebra leaves T = (laps - 1) * cycle + (cycle - K) -- which is to say,
+# walking T steps from the head and T steps on from the meeting point both
+# land on the entrance. Here T = 3, and it took 3 steps.
+
+print()
+print("  tail length T =", steps2)
+
+# The obvious alternative is a hash set of visited nodes:
+
+def with_set(head):
+    seen, node = set(), head
+    while node:
+        if id(node) in seen:
+            return node
+        seen.add(id(node))
+        node = node.next
+    return None
+
+
+print()
+print("hash set finds the entrance directly:", with_set(head).val)
+
+# Same answer, one pass, simpler code -- and O(n) memory. Floyd's uses two
+# pointers and nothing else. On a linked list of a hundred million nodes
+# that is the difference between a few bytes and several gigabytes, which
+# is the only reason to prefer the harder algorithm.
+
+clean, _ = build(list("ABCDE"), None)
+print()
+print("on an acyclic list, Floyd returns:", floyd(clean)[0])
+print("and the set version returns:      ", with_set(clean))
+
+# Both correctly report no cycle. The loop condition `fast and fast.next`
+# is what makes that safe: an odd-length list would otherwise step off the
+# end, which is the usual bug in a hand-written version.
+```
+
 ## Things to try
 
 1. <strong>Run the cyclic list.</strong> Watch fast lap the loop and close in on slow one position per step.

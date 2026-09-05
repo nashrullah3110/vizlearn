@@ -157,6 +157,103 @@ With `h = 0`, A* <em>is</em> Dijkstra. With an overly optimistic heuristic it ex
 - <strong>Comparing nodes in the heap.</strong> If distances tie, Python compares the second tuple element &mdash; so nodes must be comparable, or push a tiebreaking counter.
 - <strong>Running it for a single target and not stopping.</strong> Break when the goal is popped; continuing computes distances you do not need.
 
+## Why it needs non-negative weights, on a graph where it fails
+
+Every description of Dijkstra's algorithm mentions that edge weights must be non-negative. It is more convincing to build the graph that breaks it and watch the algorithm return a wrong answer confidently, because the failure is silent -- there is no error, just a shorter path it never looks at again.
+
+```python-run
+import heapq
+
+# Positive weights: the algorithm is correct here.
+GOOD = {
+    "A": [("B", 1), ("C", 4)],
+    "B": [("C", 2), ("D", 6)],
+    "C": [("D", 3)],
+    "D": [],
+}
+
+
+def dijkstra(graph, start):
+    dist = {n: float("inf") for n in graph}
+    dist[start] = 0
+    settled, order = set(), []
+    pq = [(0, start)]
+    while pq:
+        d, node = heapq.heappop(pq)
+        if node in settled:
+            continue
+        settled.add(node)
+        order.append((node, d))
+        for nxt, w in graph[node]:
+            if d + w < dist[nxt]:
+                dist[nxt] = d + w
+                heapq.heappush(pq, (dist[nxt], nxt))
+    return dist, order
+
+
+dist, order = dijkstra(GOOD, "A")
+print("settling order (node, distance when settled):")
+for node, d in order:
+    print("   %s at %d" % (node, d))
+print("final distances:", dict(dist))
+
+# Note A=0, B=1, C=3, D=6 -- and note C was settled at 3 via B, not at 4
+# via the direct edge. The queue handed back the cheaper route first.
+#
+# The invariant doing the work: when a node comes off the priority queue,
+# its distance is FINAL. That holds because every remaining path to it
+# must go through some unsettled node that is already at least as far
+# away, and adding more non-negative edges can only make it longer.
+#
+# Remove the non-negative part and the invariant collapses.
+
+BAD = {
+    "A": [("B", 2), ("C", 5)],
+    "B": [("D", 3)],
+    "C": [("B", -4)],          # a negative edge
+    "D": [],
+}
+
+dist, order = dijkstra(BAD, "A")
+print()
+print("with a -4 edge, settling order:")
+for node, d in order:
+    print("   %s at %d" % (node, d))
+print("Dijkstra says A -> D costs", dist["D"])
+
+# It settled B at 2 and moved on. Later it reached C at 5, and C offers
+# B at 5 + (-4) = 1 -- cheaper than the 2 it committed to. B was already
+# settled, so the improvement is never propagated to D.
+
+print()
+print("the route it never considered: A -> C -> B -> D = %d + %d + %d = %d"
+      % (5, -4, 3, 5 - 4 + 3))
+print("the answer it gave:                                  ", dist["D"])
+
+# The real shortest path costs four; the algorithm reported five, with no
+# warning of any kind and no way for the caller to tell. This is the exact
+# situation Bellman-Ford exists for: it relaxes every edge V-1 times
+# rather than settling nodes once, so a late improvement still propagates.
+#
+# Finally, what the heap actually buys. Without one you scan every
+# unsettled node to find the nearest:
+
+import math
+print()
+print("%10s %16s %20s" % ("V (E = 5V)", "array O(V^2)", "binary heap O(E log V)"))
+for v in (10, 100, 1000, 10000):
+    e = 5 * v
+    print("%10d %16d %20d" % (v, v * v, int(e * math.log2(v))))
+
+# Read the first row: at ten nodes the heap is the SLOWER option, because
+# log V is not yet worth the bookkeeping. By a thousand nodes the array
+# costs twenty times more, and by ten thousand, a hundred and fifty times.
+# That is the usual shape of an asymptotic win -- it arrives at a size,
+# not immediately. On a dense graph where E approaches V^2 the array
+# version stays competitive at any size, which is why both are still
+# taught.
+```
+
 ## Questions people ask
 
 <strong>Why not BFS on a weighted graph?</strong> BFS minimises edge count, not cost. Three cheap edges can beat one expensive one.

@@ -110,6 +110,121 @@ Three responses:
 
 Red-black trees are what most standard libraries use for ordered maps &mdash; C++'s `std::map`, Java's `TreeMap` &mdash; because they balance insertion and lookup cost well.
 
+## The fatal weakness, measured
+
+A BST gives O(log n) search when it is balanced and O(n) when it is not, and nothing in the plain insert algorithm prevents the second. The gap between those two is the whole reason self-balancing trees exist, and it opens up on the most ordinary input there is.
+
+```python-run
+class BST:
+    def __init__(self):
+        self.root = None
+        self.comparisons = 0
+
+    def insert(self, v):
+        if self.root is None:
+            self.root = [v, None, None]
+            return
+        node = self.root
+        while True:
+            if v < node[0]:
+                if node[1] is None:
+                    node[1] = [v, None, None]; return
+                node = node[1]
+            else:
+                if node[2] is None:
+                    node[2] = [v, None, None]; return
+                node = node[2]
+
+    def find(self, v):
+        node, steps = self.root, 0
+        while node:
+            steps += 1
+            if v == node[0]:
+                return steps
+            node = node[1] if v < node[0] else node[2]
+        return steps
+
+    def height(self):
+        # Iterative on purpose: the degenerate tree below is 1000 nodes
+        # deep, and a recursive height() hits Python's stack limit on it
+        # -- itself a fair demonstration of what an unbalanced tree costs.
+        best, stack = 0, [(self.root, 1)]
+        while stack:
+            node, d = stack.pop()
+            if node is None:
+                continue
+            best = max(best, d)
+            stack.append((node[1], d + 1))
+            stack.append((node[2], d + 1))
+        return best
+
+    def inorder(self):
+        out, stack, node = [], [], self.root
+        while stack or node:
+            while node:
+                stack.append(node)
+                node = node[1]
+            node = stack.pop()
+            out.append(node[0])
+            node = node[2]
+        return out
+
+
+import math
+import random
+
+n = 1000
+orders = {
+    "random insert": random.Random(6).sample(range(n), n),
+    "sorted insert": list(range(n)),
+    "reversed insert": list(range(n))[::-1],
+}
+print("%-18s %10s %14s %18s" % ("insertion order", "height", "log2(n)",
+                                "steps to find last"))
+for name, seq in orders.items():
+    t = BST()
+    for v in seq:
+        t.insert(v)
+    print("%-18s %10d %14.1f %18d" % (
+        name, t.height(), math.log2(n), t.find(seq[-1])))
+
+# Sorted input is not an adversarial case anybody has to construct. It is
+# what you get from a database export, a sorted file, an auto-increment
+# id, a timestamp column -- and it turns the tree into a linked list. The
+# height is n, not log n, and every search walks the whole thing.
+#
+# The tree is still CORRECT: it is still a BST, and in-order traversal
+# still gives sorted output. It is only the performance that collapsed,
+# which is why the bug survives testing.
+
+t = BST()
+for v in [5, 3, 8, 1, 4]:
+    t.insert(v)
+print()
+print("in-order traversal of any BST is sorted:", t.inorder())
+
+deg = BST()
+for v in range(6):
+    deg.insert(v)
+print("...including the degenerate one:       ", deg.inorder())
+
+# What a self-balancing tree adds is a rotation after each insert that
+# keeps the height at O(log n) whatever the input order. The cost is a
+# constant factor on writes; the benefit is that the worst case stops
+# being reachable by ordinary data.
+
+print()
+print("%8s %12s %16s %14s" % ("n", "balanced", "degenerate", "ratio"))
+for n in (1000, 10000, 100000, 1000000):
+    bal, degn = math.log2(n), n / 2
+    print("%8d %12.1f %16.0f %14.0fx" % (n, bal, degn, degn / bal))
+
+# At a million rows the difference between a balanced tree and a sorted
+# insert order is twenty steps against half a million. That is the entire
+# argument for red-black and AVL trees, and it is why the ordered
+# containers in every standard library use one.
+```
+
 ## Guided tour
 
 1. <strong>Insert a few values</strong> and watch each one walk down the tree, going left or right at every comparison.

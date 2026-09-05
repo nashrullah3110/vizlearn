@@ -87,6 +87,153 @@ So the honest position: <strong>Fibonacci search is a historical curiosity with 
 
 Its genuine value is as an illustration that the same O(log n) behaviour can be achieved by several splitting strategies, and that the constant factors and hardware characteristics decide which is preferred &mdash; a point that applies far beyond this algorithm.
 
+## A search with no division, and what it actually costs
+
+Fibonacci search exists because binary search needs a division to find the midpoint, and there were machines where division was expensive or absent. It is a genuine algorithm with a genuine motivation, and the honest thing to measure is whether the motivation still applies.
+
+```python-run
+def fib_search(a, target):
+    n = len(a)
+    # smallest Fibonacci number >= n
+    f2, f1 = 0, 1
+    f = f2 + f1
+    while f < n:
+        f2, f1 = f1, f
+        f = f2 + f1
+    offset, probes = -1, 0
+    while f > 1:
+        i = min(offset + f2, n - 1)
+        probes += 1
+        if a[i] < target:
+            f, f1 = f1, f - f1        # only additions and subtractions
+            f2 = f - f1
+            offset = i
+        elif a[i] > target:
+            f, f1, f2 = f2, f1 - f2, f2 - (f1 - f2)
+        else:
+            return i, probes
+    if f1 and offset + 1 < n and a[offset + 1] == target:
+        return offset + 1, probes + 1
+    return -1, probes
+
+
+def bin_search(a, target):
+    lo, hi, probes = 0, len(a) - 1, 0
+    while lo <= hi:
+        probes += 1
+        mid = (lo + hi) // 2          # the division this is all about
+        if a[mid] == target:
+            return mid, probes
+        if a[mid] < target:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return -1, probes
+
+
+import math
+import random
+
+for n in (100, 1000, 10000, 100000):
+    data = list(range(0, n * 2, 2))
+    rng = random.Random(n)
+    targets = [data[rng.randrange(n)] for _ in range(200)]
+    fb = bp = 0
+    for t in targets:
+        fi, fp = fib_search(data, t)
+        bi, b = bin_search(data, t)
+        assert data[fi] == t and data[bi] == t, (t, fi, bi)
+        fb += fp
+        bp += b
+    print("n = %6d   fibonacci %.2f probes   binary %.2f   log2(n) = %.1f"
+          % (n, fb / 200, bp / 200, math.log2(n)))
+
+# Both are logarithmic and the counts are close, with Fibonacci search
+# slightly worse. That is expected: it splits the range at roughly 0.618
+# and 0.382 rather than in half, and an uneven split costs a little more
+# on average than an even one.
+#
+# What it buys is the arithmetic. Look at the update lines: the Fibonacci
+# version moves between consecutive Fibonacci numbers using only addition
+# and subtraction, while binary search computes (lo + hi) // 2.
+
+print()
+print("operations per step:")
+print("  binary:    one addition, one shift or division")
+print("  fibonacci: two or three additions and subtractions, no division")
+
+# On a modern CPU an integer division is a handful of cycles and a shift
+# is one, so binary search wins outright and the original motivation has
+# largely evaporated.
+#
+# The claim usually offered in its defence is that the probe pattern is
+# gentler -- shorter seeks, which mattered on tape. That one is worth
+# testing rather than repeating:
+
+data = list(range(0, 2000, 2))
+_, _ = fib_search(data, 1500)
+
+
+def probe_positions(a, target, which):
+    seen = []
+    n = len(a)
+    if which == "bin":
+        lo, hi = 0, n - 1
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            seen.append(mid)
+            if a[mid] == target:
+                break
+            if a[mid] < target:
+                lo = mid + 1
+            else:
+                hi = mid - 1
+        return seen
+    f2, f1 = 0, 1
+    f = f2 + f1
+    while f < n:
+        f2, f1 = f1, f
+        f = f2 + f1
+    offset = -1
+    while f > 1:
+        i = min(offset + f2, n - 1)
+        seen.append(i)
+        if a[i] < target:
+            f, f1 = f1, f - f1
+            f2 = f - f1
+            offset = i
+        elif a[i] > target:
+            f, f1, f2 = f2, f1 - f2, f2 - (f1 - f2)
+        else:
+            break
+    return seen
+
+
+b = probe_positions(data, 1500, "bin")
+fpos = probe_positions(data, 1500, "fib")
+print()
+print("indices probed searching a 1000-element array:")
+print("  binary:    ", b)
+print("  fibonacci: ", fpos)
+print("  largest jump between consecutive probes -- binary %d, fibonacci %d"
+      % (max(abs(b[i + 1] - b[i]) for i in range(len(b) - 1)),
+         max(abs(fpos[i + 1] - fpos[i]) for i in range(len(fpos) - 1))))
+
+# The defence does not survive the measurement. Fibonacci search made the
+# LARGER jump here, not the smaller one -- its first two probes straddle
+# most of the array before it settles down, while binary search halves
+# tidily from the middle. On this input the seek argument is simply not
+# true, and it is worth changing the probe target above to see how much
+# the comparison depends on which element you look for.
+#
+# What does survive: the algorithm computes no index outside the array and
+# uses no division, which mattered on hardware without bounds checking or
+# a divide instruction. Neither applies to an array in memory on a machine
+# built in the last forty years. Use binary search -- and know that this
+# exists, why it was invented, and that the folklore reason for keeping it
+# does not hold up.
+```
+
 ## Experiments to try
 
 1. <strong>Watch the uneven split.</strong> Set <strong>Array Size</strong> to 30 and press <strong>Next Step</strong> through a search. Notice the probe does not land in the middle &mdash; it sits about 38% of the way in, which is 1/&phi;&sup2;. Binary search would split at exactly 50% every time.

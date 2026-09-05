@@ -95,6 +95,113 @@ Swap `popleft()` for `pop()` and the same code becomes depth-first search. The d
 
 <strong>`queue.Queue`</strong> adds locking for producer-consumer communication between threads. It is slower than `deque` and that is the price of thread safety; use `deque` in single-threaded code.
 
+## Why list.pop(0) is the bug, and what to use instead
+
+A queue built on a Python list looks correct and is quadratic. This is the single most common performance mistake in code that processes work in FIFO order, and it is worth seeing measured, because nothing about the code looks slow.
+
+```python-run
+import time
+from collections import deque
+
+
+def drain_list(n):
+    q = list(range(n))
+    steps = 0
+    while q:
+        q.pop(0)               # removes the FRONT: shifts every other element
+        steps += 1
+    return steps
+
+
+def drain_deque(n):
+    q = deque(range(n))
+    while q:
+        q.popleft()            # O(1): no shifting
+
+
+# The browser clock is quantised to about a millisecond, and draining a
+# deque is far quicker than that -- so repeat it and divide, or the fast
+# column reads a meaningless zero.
+REPS = 50
+
+
+def ms(fn, n, reps=1):
+    t0 = time.time()
+    for _ in range(reps):
+        fn(n)
+    return (time.time() - t0) * 1000 / reps
+
+
+print("%8s %14s %14s %10s" % ("n", "list (ms)", "deque (ms)", "ratio"))
+for n in (2000, 4000, 8000, 16000):
+    a = ms(drain_list, n)
+    b = ms(drain_deque, n, REPS)
+    print("%8d %14.2f %14.2f %10.0f" % (n, a, b, a / b))
+
+# Double n and the list column roughly quadruples: that is the signature
+# of O(n^2). The deque column doubles, as an O(n) total should.
+#
+# The reason is what pop(0) has to do. A Python list is a contiguous
+# array, so removing the first element moves every remaining element one
+# slot to the left -- n-1 moves, for every one of the n removals.
+
+print()
+print("total element moves when draining a list of n with pop(0):")
+for n in (10, 100, 1000):
+    print("  n = %5d -> %d moves  (n(n-1)/2)" % (n, n * (n - 1) // 2))
+
+# append() and pop() at the END are both O(1), so a list is a perfectly
+# good STACK. It is specifically the front that is expensive, and that is
+# what makes it the wrong shape for a queue.
+#
+# A deque is a doubly-linked list of blocks, so both ends are O(1):
+
+d = deque([2, 3, 4])
+d.appendleft(1)
+d.append(5)
+print()
+print("deque after appendleft(1) and append(5):", list(d))
+print("popleft:", d.popleft(), " pop:", d.pop(), " left:", list(d))
+
+# The classic alternative, before deques, was the CIRCULAR buffer: a
+# fixed array with head and tail indices that wrap around with modulo,
+# so nothing is ever shifted and the space is reused.
+
+class Circular:
+    def __init__(self, cap):
+        self.a = [None] * cap
+        self.head = self.size = 0
+
+    def push(self, x):
+        if self.size == len(self.a):
+            return "full"
+        self.a[(self.head + self.size) % len(self.a)] = x
+        self.size += 1
+
+    def pop(self):
+        if not self.size:
+            return "empty"
+        x = self.a[self.head]
+        self.head = (self.head + 1) % len(self.a)
+        self.size -= 1
+        return x
+
+
+c = Circular(4)
+for x in "abcd":
+    c.push(x)
+print()
+print("full buffer:", c.a, "head =", c.head)
+print("pop:", c.pop(), "pop:", c.pop())
+c.push("e"); c.push("f")
+print("after pushing e and f:", c.a, "head =", c.head)
+
+# e and f landed in slots 0 and 1 -- the space a and b vacated. The array
+# never grew and nothing moved; only the two indices changed. That is why
+# this is the structure in ring buffers, audio pipelines and network
+# stacks, where the memory is fixed up front and cannot be reallocated.
+```
+
 ## Experiments to try
 
 1. <strong>Enqueue A, B, C then dequeue.</strong> A comes out first &mdash; the opposite of a stack.

@@ -163,6 +163,82 @@ Partitioning tells you the pivot's final position. If that position is k, the pi
 
 Uses: finding a median, the top k items, or a percentile without sorting the whole array. Python's `heapq.nlargest` uses a heap instead, which is better when k is small; quickselect wins for a median.
 
+## The pivot is the algorithm
+
+Quick sort's average case and its worst case are the same code with a different pivot rule. That makes it a good thing to measure rather than describe: the same input, four pivot strategies, and the comparison counts tell you which choices are safe and which are a denial-of-service waiting to happen.
+
+```python-run
+import random
+
+
+def quick(a, pick, stats, depth=0):
+    stats["depth"] = max(stats["depth"], depth)
+    if len(a) <= 1:
+        return a
+    p = pick(a)
+    lo, eq, hi = [], [], []
+    for x in a:
+        stats["comps"] += 1
+        (lo if x < p else hi if x > p else eq).append(x)
+    return (quick(lo, pick, stats, depth + 1) + eq +
+            quick(hi, pick, stats, depth + 1))
+
+
+first = lambda a: a[0]
+last = lambda a: a[-1]
+rand = lambda a: a[random.randrange(len(a))]
+
+
+def median3(a):
+    lo, mid, hi = a[0], a[len(a) // 2], a[-1]
+    return sorted([lo, mid, hi])[1]
+
+
+n = 100
+inputs = {
+    "random":   random.Random(5).sample(range(n), n),
+    "sorted":   list(range(n)),
+    "reversed": list(range(n))[::-1],
+    "all equal": [7] * n,
+}
+picks = [("first", first), ("last", last), ("random", rand),
+         ("median-of-3", median3)]
+
+print("n = %d, comparisons (max recursion depth)" % n)
+print("%-12s %16s %16s %16s %16s" % tuple(
+    ["pivot"] + list(inputs.keys())))
+for pname, pick in picks:
+    row = []
+    for data in inputs.values():
+        random.seed(1)
+        st = {"comps": 0, "depth": 0}
+        quick(data, pick, st)
+        row.append("%d (%d)" % (st["comps"], st["depth"]))
+    print("%-12s %16s %16s %16s %16s" % tuple([pname] + row))
+
+import math
+print()
+print("for reference: n^2/2 = %d, n log2 n = %.0f" % (n * n // 2, n * math.log2(n)))
+
+# Read the "sorted" and "reversed" columns for the first and last pivots.
+# Those are the quadratic cases, and note the recursion depth: 99 frames
+# deep on 100 elements. In a language without deep stacks this is not a
+# slow sort, it is a crash.
+#
+# Now read "all equal". Every element goes into eq, so the three-way
+# partition finishes in ONE level for every pivot rule. A two-way
+# partition -- the more common Lomuto version, which sends equal elements
+# to one side -- goes quadratic here instead. Repeated values are a real
+# input, and the three-way split is why this version survives them.
+#
+# The random and median-of-3 rows stay within a small factor of
+# n log2 n = 664 on every input. That
+# is the practical fix: not a better average, but no input that an
+# attacker can choose to make it quadratic. Median-of-3 is deterministic,
+# so a determined attacker can still construct a killer sequence; random
+# pivots cannot be targeted in advance.
+```
+
 ## Questions people ask
 
 <strong>Why use quick sort if the worst case is O(n²)?</strong> With randomised or median-of-three pivots the worst case is practically unreachable, and its in-place operation and cache behaviour make it faster than merge sort in the average case.

@@ -194,6 +194,93 @@ Three implementation details that matter:
 
 <strong>Store distances in the visited structure.</strong> A dictionary from node to distance serves as both the visited set and the result, which is simpler than maintaining two.
 
+## The queue is the only difference, and it changes the answer
+
+BFS and DFS are the same seven lines with one substitution: take the next node from the front of the collection or from the back. That single change is what makes one of them find shortest paths and the other not, and the clearest way to see it is to run both from the same code.
+
+```python-run
+# Two routes from A to G: a short one through C, and a long one through
+# B. They are listed so that a stack reaches the long one first -- which
+# is the case that separates the two searches.
+GRAPH = {
+    "A": ["C", "B"],
+    "C": ["G"],            # A -> C -> G, two edges
+    "B": ["D"],
+    "D": ["E"],
+    "E": ["G"],            # A -> B -> D -> E -> G, four edges
+    "G": [],
+}
+from collections import deque
+
+
+def search(graph, start, goal, breadth_first):
+    frontier = deque([(start, [start])])
+    seen = {start}
+    order = []
+    while frontier:
+        node, path = frontier.popleft() if breadth_first else frontier.pop()
+        order.append(node)
+        if node == goal:
+            return order, path
+        for nxt in graph[node]:
+            if nxt not in seen:
+                seen.add(nxt)
+                frontier.append((nxt, path + [nxt]))
+    return order, None
+
+
+for label, bf in (("BFS (popleft)", True), ("DFS (pop)", False)):
+    order, path = search(GRAPH, "A", "G", bf)
+    print("%-15s visits %s" % (label, " ".join(order)))
+    print("%-15s path to G: %s  (%d edges)" % ("", " -> ".join(path), len(path) - 1))
+
+# Both find G. BFS found it in two edges and DFS in four, on the same
+# graph with the same code -- and that is not luck: BFS reaches every node
+# by the fewest edges possible, because it finishes everything at distance
+# 1 before it starts on distance 2. DFS committed to the first branch it
+# entered and took the route that branch happened to offer.
+#
+# Watch the frontier to see why. BFS explores in complete rings:
+
+def levels(graph, start):
+    frontier, seen, d = deque([start]), {start}, {start: 0}
+    order = []
+    while frontier:
+        node = frontier.popleft()
+        order.append((node, d[node]))
+        for nxt in graph[node]:
+            if nxt not in seen:
+                seen.add(nxt)
+                d[nxt] = d[node] + 1
+                frontier.append(nxt)
+    return order
+
+
+print()
+print("distance from A, in the order BFS settles them:")
+for node, dist in levels(GRAPH, "A"):
+    print("  %s at distance %d" % (node, dist))
+
+# The distances come out non-decreasing: 0, 1, 1, 2, 2, 3. A node is
+# never settled before anything closer to the start, which is exactly the
+# invariant that makes the first time you reach a node also the best time.
+#
+# DFS has no such property. It commits to one branch and can arrive at a
+# node the long way round:
+
+order, path = search(GRAPH, "A", "G", False)
+print()
+bfs_order, bfs_path = search(GRAPH, "A", "G", True)
+print("DFS reached G via %s -- %d edges, when %d were available."
+      % (" -> ".join(path), len(path) - 1, len(bfs_path) - 1))
+
+# The catch: this only holds when every edge costs the same. BFS counts
+# EDGES, not distance. Give the edges different weights and the fewest-hop
+# route stops being the cheapest one, which is the gap Dijkstra's
+# algorithm exists to fill -- it is BFS with a priority queue instead of
+# a plain one, so it settles nodes by total cost rather than hop count.
+```
+
 ## Questions people ask
 
 <strong>Does BFS work on weighted graphs?</strong> Not for shortest paths &mdash; it minimises edge count, not cost. Use Dijkstra, or 0-1 BFS if weights are only 0 and 1.

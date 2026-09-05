@@ -86,6 +86,132 @@ Why the alternatives fail: earliest <em>start</em> can pick one very long activi
 
 That distinction &mdash; the right greedy criterion versus a plausible wrong one &mdash; is where most greedy mistakes live. The algorithm is trivial; the choice of what to be greedy about is the problem.
 
+## Where greedy is provably right, and where it is confidently wrong
+
+Greedy algorithms are the ones that take the best-looking option now and never reconsider. Sometimes that is optimal and provably so; sometimes it is merely fast. The difference is a property of the problem, and running both on the same two problems makes it concrete.
+
+```python-run
+# PROBLEM 1: activity selection. Pick the most non-overlapping meetings
+# from a set. Greedy by EARLIEST FINISH TIME is provably optimal here.
+# "x" is the trap for earliest-start: it begins first and runs all day.
+MEETINGS = [("a", 1, 5), ("b", 4, 6), ("c", 5, 10), ("d", 9, 11),
+            ("e", 10, 15), ("f", 14, 16), ("g", 15, 20), ("x", 0, 20)]
+
+
+def greedy_by(meetings, key, label):
+    chosen, last_end = [], -1
+    for m in sorted(meetings, key=key):
+        if m[1] >= last_end:
+            chosen.append(m[0])
+            last_end = m[2]
+    return label, chosen
+
+
+import itertools
+
+
+def brute_force(meetings):
+    best = []
+    for r in range(len(meetings), 0, -1):
+        for combo in itertools.combinations(sorted(meetings, key=lambda m: m[1]), r):
+            ok = all(combo[i][2] <= combo[i + 1][1] for i in range(len(combo) - 1))
+            if ok:
+                return [m[0] for m in combo]
+    return best
+
+
+strategies = [
+    (lambda m: m[2], "earliest finish"),
+    (lambda m: m[1], "earliest start"),
+    (lambda m: m[2] - m[1], "shortest duration"),
+]
+print("%-20s %-30s %s" % ("strategy", "chosen", "count"))
+for key, label in strategies:
+    _, chosen = greedy_by(MEETINGS, key, label)
+    print("%-20s %-30s %d" % (label, " ".join(chosen), len(chosen)))
+best = brute_force(MEETINGS)
+print("%-20s %-30s %d" % ("optimal (brute force)", " ".join(best), len(best)))
+
+# Earliest-finish matches the brute-force optimum. The other two rules,
+# which are every bit as intuitive, do not -- and they fail for different
+# reasons. Earliest-start takes "x" because it begins at 0, and "x" runs
+# until 20, so one choice consumes the entire day. Shortest-duration takes
+# the short meetings, but the short ones here are precisely the ones that
+# straddle two longer meetings, so each pick blocks two to gain one.
+#
+# "Be greedy" is not a strategy until you say greedy BY WHAT, and only one
+# choice of what has a proof behind it.
+#
+# The proof sketch: taking the activity that finishes first leaves the
+# largest possible remaining interval, so any solution can be rewritten to
+# start with it without getting worse. That is an exchange argument, and
+# a greedy algorithm is correct exactly when one exists.
+#
+# PROBLEM 2: the knapsack, where no such argument exists.
+
+ITEMS = [("gold", 10, 60), ("silver", 20, 100), ("bronze", 30, 120)]
+CAPACITY = 50
+
+
+def greedy_knapsack(items, cap):
+    take, total, left = [], 0, cap
+    for name, w, v in sorted(items, key=lambda i: i[2] / i[1], reverse=True):
+        if w <= left:
+            take.append(name); total += v; left -= w
+    return take, total
+
+
+def best_knapsack(items, cap):
+    best = ([], 0)
+    for r in range(len(items) + 1):
+        for combo in itertools.combinations(items, r):
+            w = sum(i[1] for i in combo)
+            v = sum(i[2] for i in combo)
+            if w <= cap and v > best[1]:
+                best = ([i[0] for i in combo], v)
+    return best
+
+
+print()
+print("0/1 knapsack, capacity %d" % CAPACITY)
+g = greedy_knapsack(ITEMS, CAPACITY)
+b = best_knapsack(ITEMS, CAPACITY)
+print("  greedy by value/weight: %-24s = %d" % (str(g[0]), g[1]))
+print("  optimal:                %-24s = %d" % (str(b[0]), b[1]))
+
+# Greedy took gold and silver -- the two best value-per-weight ratios --
+# filled 30 of the 50 units, and then could not fit the 30-unit bronze.
+# The optimal answer SKIPS the item with the best ratio entirely, and no
+# greedy rule can do that, because greedy never reconsiders a choice.
+#
+# Now allow fractions of an item. Nothing else changes:
+
+def fractional(items, cap):
+    total, left = 0.0, cap
+    for name, w, v in sorted(items, key=lambda i: i[2] / i[1], reverse=True):
+        take = min(w, left)
+        total += v * take / w
+        left -= take
+        if left == 0:
+            break
+    return total
+
+
+print()
+print("fractional knapsack, same items and capacity: %.0f"
+      % fractional(ITEMS, CAPACITY))
+
+# Higher than either 0/1 answer, and the SAME greedy rule that failed
+# above is now provably optimal -- because with fractions there is always
+# an exchange that swaps a worse ratio for a better one, and that exchange
+# argument is precisely what was missing in the 0/1 version.
+#
+# So the lesson is not "greedy is unreliable". It is that greedy is
+# correct exactly when the problem admits an exchange argument, and that
+# whether it does can turn on a detail as small as whether you are allowed
+# to cut an item in half.
+```
+
 ## Try it yourself
 
 1. <strong>Run activity selection.</strong> Watch it pick the earliest finisher and reject everything that overlaps &mdash; and confirm the result matches the true optimum.

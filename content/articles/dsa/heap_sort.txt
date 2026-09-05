@@ -145,6 +145,109 @@ The heap itself is far more widely used than heap sort:
 
 <strong>Running medians.</strong> Two heaps &mdash; a max-heap of the lower half and a min-heap of the upper &mdash; give the median of a stream in O(log n) per element.
 
+## Why building the heap is O(n), not O(n log n)
+
+The claim that heapify costs O(n) looks wrong -- there are n elements and each sift is O(log n) -- and it is the one part of heap sort worth checking rather than accepting. Count the sift steps and the answer falls out of the shape of the tree.
+
+```python-run
+def sift_down(a, start, end, stats):
+    root = start
+    while 2 * root + 1 <= end:
+        child = 2 * root + 1
+        if child + 1 <= end:
+            stats["comps"] += 1
+            if a[child] < a[child + 1]:
+                child += 1
+        stats["comps"] += 1
+        if a[root] < a[child]:
+            a[root], a[child] = a[child], a[root]
+            stats["moves"] += 1
+            root = child
+        else:
+            return
+
+
+def build_heap_bottom_up(a, stats):
+    a = a[:]
+    for start in range(len(a) // 2 - 1, -1, -1):
+        sift_down(a, start, len(a) - 1, stats)
+    return a
+
+
+def build_heap_by_insertion(a, stats):
+    # the naive alternative: push one at a time, sifting UP each time
+    heap = []
+    for x in a:
+        heap.append(x)
+        i = len(heap) - 1
+        while i > 0:
+            parent = (i - 1) // 2
+            stats["comps"] += 1
+            if heap[parent] < heap[i]:
+                heap[parent], heap[i] = heap[i], heap[parent]
+                stats["moves"] += 1
+                i = parent
+            else:
+                break
+    return heap
+
+
+import random
+print("%8s %14s %14s %10s" % ("n", "bottom-up", "by insertion", "n log2 n"))
+for n in (15, 31, 63, 127, 255, 511):
+    data = random.Random(4).sample(range(n * 3), n)
+    b = {"comps": 0, "moves": 0}
+    i = {"comps": 0, "moves": 0}
+    build_heap_bottom_up(data, b)
+    build_heap_by_insertion(data, i)
+    print("%8d %14d %14d %10d" % (
+        n, b["comps"], i["comps"], int(n * (n.bit_length() - 1))))
+
+# The bottom-up column grows in step with n, not with n log n: look at the
+# ratio as n doubles -- it is close to 2, while n log2 n grows faster.
+#
+# The reason is where the elements are. In a heap of n nodes, half are
+# leaves and sift down zero levels. A quarter sit one level up and can
+# move at most one. An eighth can move at most two. The total is
+# n * sum(k / 2^k), and that sum converges to 2 -- so the work is bounded
+# by 2n however large the tree gets.
+
+print()
+print("%5s %10s %12s %12s" % ("level", "nodes", "max sift", "product"))
+n = 255
+total = 0
+level, nodes, height = 0, (n + 1) // 2, 7
+while nodes >= 1:
+    product = nodes * level
+    total += product
+    print("%5d %10d %12d %12d" % (height - level, nodes, level, product))
+    nodes //= 2
+    level += 1
+print("total sift steps bounded by %d, and 2n = %d" % (total, 2 * n))
+
+# Building by repeated insertion has the opposite shape: it sifts UP, so
+# an element entering at the bottom can travel the whole height, and the
+# many nodes are the ones with the furthest to go. On random input that
+# costs a modest premium -- most insertions stop early because the value
+# is not large. The gap opens up when the input is ascending, because then
+# every new element is the largest so far and climbs all the way to the
+# root:
+
+print()
+print("%8s %14s %14s" % ("n", "bottom-up", "by insertion"))
+for n in (63, 255, 1023):
+    ascending = list(range(n))
+    b = {"comps": 0, "moves": 0}
+    i = {"comps": 0, "moves": 0}
+    build_heap_bottom_up(ascending, b)
+    build_heap_by_insertion(ascending, i)
+    print("%8d %14d %14d" % (n, b["comps"], i["comps"]))
+
+# Bottom-up does not notice; insertion pays the full log n per element.
+# Same data structure, same n -- the difference is which end of the tree
+# the many nodes are at, and which direction the algorithm walks.
+```
+
 ## Questions people ask
 
 <strong>Why is heap sort slower than quick sort if both are O(n log n)?</strong> Cache behaviour. Sifting jumps between distant indices; quick sort scans sequentially.

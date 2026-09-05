@@ -104,6 +104,92 @@ The complexity is <strong>linear in n</strong> for fixed-width keys, which beats
 |Counting|O(n+k)|Small integer range|
 |Comparison sorts|&Omega;(n log n)|Only a comparison function|
 
+## What happens when the inner sort is not stable
+
+The article says stability is non-negotiable for radix sort. That is a claim you can break on purpose: run the same algorithm with a stable inner pass and an unstable one, and watch the second produce a list that is simply wrong.
+
+```python-run
+def digit(x, place):
+    return (x // place) % 10
+
+
+def radix(a, stable=True):
+    a = a[:]
+    place = 1
+    passes = 0
+    while place <= max(a):
+        buckets = [[] for _ in range(10)]
+        for x in a:
+            buckets[digit(x, place)].append(x)
+        if not stable:
+            # An unstable inner sort keeps the same DIGIT grouping but
+            # loses the order within each bucket. Reversing each bucket is
+            # one concrete way to be unstable.
+            buckets = [list(reversed(b)) for b in buckets]
+        a = [x for b in buckets for x in b]
+        passes += 1
+        place *= 10
+    return a, passes
+
+
+data = [170, 45, 75, 90, 802, 24, 2, 66]
+print("input:          ", data)
+ok, passes = radix(data, stable=True)
+bad, _ = radix(data, stable=False)
+print("stable inner:   ", ok, "  sorted:", ok == sorted(data))
+print("unstable inner: ", bad, "  sorted:", bad == sorted(data))
+print("passes:", passes, "(one per digit of the largest number)")
+
+# The unstable run visits the same buckets in the same order and still
+# produces the wrong answer. The reason is that pass 2 sorts by the tens
+# digit and assumes the ones digit is ALREADY in order within each group.
+# Stability is what carries that earlier work forward; without it, every
+# pass destroys the one before and only the final digit ends up sorted.
+#
+# Watch it happen one pass at a time.
+
+def trace(a, stable):
+    place = 1
+    while place <= max(a):
+        buckets = [[] for _ in range(10)]
+        for x in a:
+            buckets[digit(x, place)].append(x)
+        if not stable:
+            buckets = [list(reversed(b)) for b in buckets]
+        a = [x for b in buckets for x in b]
+        print("  place %4d: %s" % (place, a))
+        place *= 10
+    return a
+
+
+print()
+print("stable:")
+trace(data, True)
+print("unstable:")
+trace(data, False)
+
+# Read the "place 1" lines: both end with the ones digits in order.
+# It is the later passes where they diverge.
+#
+# Now the cost. Radix sort is O(d * (n + k)) -- d passes over n items with
+# k buckets. It beats n log n when d is small, and d is the number of
+# DIGITS, which depends on the base you choose.
+
+import math
+n = 1_000_000
+print()
+print("sorting %d numbers up to 2^32:" % n)
+for base in (10, 256, 65536):
+    d = math.ceil(32 / math.log2(base))
+    print("  base %6d: %d passes, %6d buckets, ~%d bucket-ops" % (
+        base, d, base, d * (n + base)))
+print("  a comparison sort: ~%d comparisons" % int(n * math.log2(n)))
+
+# Bigger base, fewer passes, more memory for buckets. Base 256 is the
+# usual answer -- four passes over a 32-bit key and a cache-friendly
+# 256-entry table -- and it is comfortably under the comparison count.
+```
+
 ## Guided experiments
 
 1. <strong>Step through pass 1 (units).</strong> Values scatter into buckets by their last digit and are collected back in bucket order.

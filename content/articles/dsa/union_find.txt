@@ -109,6 +109,116 @@ The `union` returning False <em>is</em> the cycle check. There is no separate cy
 
 O(E log E) for the sort, plus effectively O(E) for the unions &mdash; so sorting dominates, and the connectivity bookkeeping is free.
 
+## What the two optimisations are actually worth
+
+Union-Find is a handful of lines, and then two optimisations turn its near-linear complexity from a claim into a fact. Both are one line each, so the honest way to judge them is to count pointer hops with each combination switched on and off.
+
+```python-run
+class DSU:
+    def __init__(self, n, by_rank=True, compress=True):
+        self.parent = list(range(n))
+        self.rank = [0] * n
+        self.by_rank, self.compress = by_rank, compress
+        self.hops = 0
+
+    def find(self, x):
+        root = x
+        while self.parent[root] != root:
+            root = self.parent[root]
+            self.hops += 1
+        if self.compress:
+            while self.parent[x] != root:      # second pass: re-point
+                self.parent[x], x = root, self.parent[x]
+        return root
+
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra == rb:
+            return False
+        if self.by_rank:
+            if self.rank[ra] < self.rank[rb]:
+                ra, rb = rb, ra
+            self.parent[rb] = ra
+            if self.rank[ra] == self.rank[rb]:
+                self.rank[ra] += 1
+        else:
+            self.parent[ra] = rb               # arbitrary: builds a chain
+        return True
+
+
+n = 2000
+print("%d elements, unioned in the worst order, then every element queried"
+      % n)
+print("%-26s %14s %14s" % ("variant", "pointer hops", "tree depth"))
+for by_rank in (False, True):
+    for compress in (False, True):
+        d = DSU(n, by_rank, compress)
+        for i in range(n - 1):
+            d.union(i, i + 1)          # a chain, if nothing prevents it
+        d.hops = 0
+        for i in range(n):
+            d.find(i)
+        depth = 0
+        for i in range(n):
+            k, c = i, 0
+            while d.parent[k] != k:
+                k = d.parent[k]; c += 1
+            depth = max(depth, c)
+        name = "%s + %s" % ("rank" if by_rank else "no rank",
+                            "compress" if compress else "no compress")
+        print("%-26s %14d %14d" % (name, d.hops, depth))
+
+# The first row is the degenerate case: unioning 0-1, 1-2, 2-3 in order
+# with no rank builds one long chain, and every find walks it. That is
+# O(n) per query -- a linked list wearing a tree's name.
+#
+# Either optimisation alone fixes it, and they fix it differently. Union
+# by rank PREVENTS the deep tree from forming; path compression allows it
+# to form and then flattens it on the way back out. Together the depth
+# collapses to 1 and a find is a single lookup.
+#
+# The famous complexity is O(alpha(n)) amortised, where alpha is the
+# inverse Ackermann function. It is not a constant, but:
+
+best = DSU(n, True, True)
+for i in range(n - 1):
+    best.union(i, i + 1)
+best.hops = 0
+for i in range(n):
+    best.find(i)
+print()
+print("alpha(n) stays below 5 for any n that fits in the observable universe.")
+print("with both optimisations, %d finds cost %d hops -- %.2f each."
+      % (n, best.hops, best.hops / n))
+
+# Now what it is FOR. Union-Find answers "are these two in the same
+# group" under merges, which is exactly Kruskal's cycle test:
+
+edges = [(1, "a", "b"), (2, "b", "c"), (2, "a", "c"), (3, "c", "d")]
+names = {}
+d = DSU(4)
+for w, u, v in edges:
+    for x in (u, v):
+        names.setdefault(x, len(names))
+
+print()
+d = DSU(len(names))
+total = 0
+for w, u, v in sorted(edges):
+    if d.union(names[u], names[v]):
+        total += w
+        print("  take %s-%s (weight %d)" % (u, v, w))
+    else:
+        print("  skip %s-%s (weight %d) -- would close a cycle" % (u, v, w))
+print("  spanning tree weight:", total)
+
+# The b-c edge was rejected without any search of the tree built so far:
+# b and c were already connected through a, and one find on each end
+# said so.
+# That is the whole contribution: a cycle test that costs almost nothing,
+# which is what makes Kruskal's algorithm practical.
+```
+
 ## Guided tour
 
 1. <strong>Union a few pairs</strong> and watch separate trees form. The group counter drops by one per successful merge.

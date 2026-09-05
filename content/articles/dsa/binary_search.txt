@@ -83,6 +83,89 @@ Four details in those eight lines are the ones that go wrong:
 
 In practice, use the standard library: Python's `bisect_left` and `bisect_right` are correct, tested and C-speed.
 
+## The three off-by-one details, demonstrated
+
+The article says binary search is famously easy to write incorrectly and names the details that break it. Here are the broken versions next to the correct one, on inputs chosen so that the difference actually shows -- because the usual mistake is that the buggy version passes every test you happen to try.
+
+```python-run
+arr = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
+
+
+def correct(a, target):
+    # returns (index, comparisons)
+    lo, hi, n = 0, len(a) - 1, 0
+    while lo <= hi:
+        mid = lo + (hi - lo) // 2
+        n += 1
+        if a[mid] == target:
+            return mid, n
+        if a[mid] < target:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return -1, n
+
+
+def strict_less(a, target):
+    # BUG 1: `lo < hi` instead of `lo <= hi`
+    lo, hi = 0, len(a) - 1
+    while lo < hi:
+        mid = lo + (hi - lo) // 2
+        if a[mid] == target:
+            return mid
+        if a[mid] < target:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return -1
+
+
+print("target  correct  lo<hi")
+for t in arr:
+    i, _ = correct(arr, t)
+    print("%6d  %7d  %5d%s" % (t, i, strict_less(arr, t),
+                               "   <-- MISSED" if strict_less(arr, t) == -1 else ""))
+
+# Four of the ten targets are missed and six are found. So a test that
+# happens to search for 5, 8, 16, 23, 56 or 72 passes cleanly against a
+# function that is wrong for the other four. That is how this bug reaches
+# production: not because it is subtle to read, but because it is easy to
+# test around.
+
+# BUG 2: dropping the +1 / -1 hangs instead of returning. Run it with a
+# step budget rather than letting the page freeze.
+def no_adjust(a, target, budget=50):
+    lo, hi = 0, len(a) - 1
+    steps = 0
+    while lo <= hi and steps < budget:
+        mid = lo + (hi - lo) // 2
+        if a[mid] == target:
+            return "found", steps
+        if a[mid] < target:
+            lo = mid          # should be mid + 1
+        else:
+            hi = mid          # should be mid - 1
+        steps += 1
+    return "gave up", steps
+
+
+print()
+print("no +1/-1, searching for 23:", no_adjust(arr, 23))
+print("no +1/-1, searching for 99:", no_adjust(arr, 99))
+
+# The first one still finds 23 -- the bug is invisible when the target is
+# present. It is the ABSENT value that spins forever.
+
+print()
+print("comparisons, correct version:")
+for t in (2, 23, 91, 99):
+    i, n = correct(arr, t)
+    print("  target %2d -> index %2d in %d comparisons" % (t, i, n))
+
+# Ten elements, at most four comparisons, and a miss costs the same as a
+# hit -- unlike linear search, where a miss is always the worst case.
+```
+
 ## Experiments to try
 
 1. <strong>Count the halvings.</strong> Set <strong>Array Size</strong> to 25 and press <strong>Next Step</strong> repeatedly, watching the shaded region shrink. It takes about five steps, because 2<sup>5</sup> = 32 is the first power of two above 25.

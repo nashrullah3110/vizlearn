@@ -112,6 +112,107 @@ The method is always the same four steps: define the <strong>state</strong> (wha
 
 Defining the state is the hard part. Everything else is mechanical once the state is right.
 
+## The two conditions, and what happens when one is missing
+
+Dynamic programming needs overlapping subproblems and optimal substructure. Those are not decoration -- each one is doing a specific job, and the cleanest way to understand them is to watch what breaks when a problem has one but not the other.
+
+```python-run
+# CONDITION 1: overlapping subproblems. Without them, memoising is pure
+# overhead -- the cache is written and never read.
+calls = {"n": 0}
+hits = {"n": 0}
+
+
+def fib(n, memo=None):
+    calls["n"] += 1
+    if memo is not None and n in memo:
+        hits["n"] += 1
+        return memo[n]
+    if n < 2:
+        return n
+    v = fib(n - 1, memo) + fib(n - 2, memo)
+    if memo is not None:
+        memo[n] = v
+    return v
+
+
+calls["n"] = hits["n"] = 0
+fib(22)
+plain = calls["n"]
+calls["n"] = hits["n"] = 0
+fib(22, {})
+print("fib(22): %d calls plain, %d with a memo (%d cache hits)"
+      % (plain, calls["n"], hits["n"]))
+
+# Now merge sort, which also splits into two subproblems at every level.
+
+msplits = {"n": 0}
+seen = {}
+
+
+def msort(a):
+    key = tuple(a)
+    msplits["n"] += 1
+    seen[key] = seen.get(key, 0) + 1
+    if len(a) <= 1:
+        return a
+    mid = len(a) // 2
+    left, right = msort(a[:mid]), msort(a[mid:])
+    out = []
+    while left and right:
+        out.append(left.pop(0) if left[0] <= right[0] else right.pop(0))
+    return out + left + right
+
+
+import random
+msort(random.Random(1).sample(range(200), 200))
+repeats = sum(1 for v in seen.values() if v > 1)
+print("merge sort on 200 items: %d subproblems, %d of them repeated"
+      % (msplits["n"], repeats))
+
+# Zero repeats. Merge sort has optimal substructure but NO overlap: each
+# subproblem is a different slice, so a cache would never hit. That is
+# why merge sort is divide-and-conquer and not dynamic programming --
+# the distinction is exactly this measurement.
+
+# CONDITION 2: optimal substructure. The best solution must be buildable
+# from best solutions to subproblems. Coin change has it:
+
+def coins_dp(target, coins):
+    best = [0] + [float("inf")] * target
+    for t in range(1, target + 1):
+        for c in coins:
+            if c <= t and best[t - c] + 1 < best[t]:
+                best[t] = best[t - c] + 1
+    return best[target]
+
+
+def coins_greedy(target, coins):
+    n, left = 0, target
+    for c in sorted(coins, reverse=True):
+        while left >= c:
+            left -= c
+            n += 1
+    return n if left == 0 else None
+
+
+print()
+print("%-16s %10s %10s" % ("coin system", "greedy", "DP"))
+for name, coins, target in (("1, 5, 10, 25", [1, 5, 10, 25], 30),
+                            ("1, 3, 4", [1, 3, 4], 6),
+                            ("1, 7, 10", [1, 7, 10], 14)):
+    print("%-16s %10s %10d" % (
+        name + " -> %d" % target, coins_greedy(target, coins),
+        coins_dp(target, coins)))
+
+# The greedy answers are wrong on the second and third systems: 6 is 3+3
+# (two coins) and greedy takes 4+1+1 (three); 14 is 7+7 (two) and greedy
+# takes 10+1+1+1+1 (five). Greedy assumes the biggest coin is always part
+# of the best answer, which is a claim about the coin system, not about
+# the problem. DP makes no such assumption -- it tries every coin at
+# every total, which is why it costs more and why it is always right.
+```
+
 ## Things to try
 
 1. <strong>Run Fibonacci and step through.</strong> Each cell reads exactly two earlier cells &mdash; highlighted in amber &mdash; and is computed once and only once.

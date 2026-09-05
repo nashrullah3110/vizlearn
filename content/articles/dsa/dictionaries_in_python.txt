@@ -97,6 +97,103 @@ class Point:
 
 Defining `__eq__` without `__hash__` makes the class unhashable in Python 3 &mdash; a deliberate safeguard, because equal objects with different hashes would land in different slots and both exist in the dictionary.
 
+## What the hash table gives you, and the order it now keeps
+
+A dict is a hash table with one extra promise since Python 3.7: it remembers insertion order. Both halves matter, and both are easy to check -- along with what can be a key, which is a rule about hashing rather than about types.
+
+```python-run
+import time
+
+n = 100000
+keys = ["k%d" % i for i in range(n)]
+d = {k: i for i, k in enumerate(keys)}
+as_list = list(d.items())
+
+print("%d entries" % n)
+# A dict lookup is far below the browser clock's resolution, so time a
+# large batch of them and divide rather than timing one.
+DICT_REPS, SCAN_REPS = 200000, 20
+t0 = time.time()
+for _ in range(DICT_REPS):
+    _ = d["k99999"]
+t1 = time.time()
+for _ in range(SCAN_REPS):
+    _ = [v for k, v in as_list if k == "k99999"]
+t2 = time.time()
+per_lookup = (t1 - t0) / DICT_REPS
+per_scan = (t2 - t1) / SCAN_REPS
+print("  one dict lookup: %10.3f microseconds" % (per_lookup * 1e6))
+print("  one list scan:   %10.3f microseconds" % (per_scan * 1e6))
+print("  the dict is roughly %.0fx faster, and does not read the other %d keys"
+      % (per_scan / per_lookup, n - 1))
+
+# The dict does not look at the other 99,999 keys. It hashes the one you
+# asked for and goes straight to a slot, which is why the cost does not
+# grow with the size of the dictionary.
+#
+# ORDER. Since 3.7 the language guarantees insertion order:
+
+d2 = {}
+for word in ["pear", "apple", "fig", "date"]:
+    d2[word] = len(word)
+print()
+print("insertion order preserved:", list(d2))
+d2["apple"] = 99                    # updating a value does NOT reorder
+print("after updating 'apple':   ", list(d2))
+del d2["fig"]
+d2["fig"] = 3                       # deleting and re-adding DOES
+print("after del + re-add 'fig': ", list(d2))
+
+# Updating a value keeps the position; removing and re-inserting moves the
+# key to the end. That is worth knowing before relying on the order.
+#
+# WHAT CAN BE A KEY. The rule is hashability, and the reason is that a
+# mutable key could change its hash after being stored and become
+# unfindable.
+
+for candidate in [42, "text", (1, 2), 3.14, True, frozenset([1]),
+                  [1, 2], {1: 2}, {1, 2}]:
+    try:
+        {candidate: 1}
+        print("  %-14r hashable" % (candidate,))
+    except TypeError as e:
+        print("  %-14r NOT hashable -- %s" % (candidate, e))
+
+# Tuples work, lists do not, and the difference is mutability rather than
+# any notion of "simple type". A tuple containing a list is not hashable
+# either, because hashability has to hold all the way down:
+
+try:
+    {(1, [2]): "x"}
+except TypeError as e:
+    print()
+    print("  (1, [2]) as a key ->", e)
+
+# And the collision that surprises people: True == 1, and equal keys with
+# equal hashes are the SAME key.
+
+print()
+print("  {1: 'one', True: 'yes'} =", {1: "one", True: "yes"})
+print("  hash(1) == hash(True):", hash(1) == hash(True), " 1 == True:", 1 == True)
+
+# One entry, not two. The key stayed as the first one inserted and only
+# the value was replaced -- which is exactly what happens when any two
+# keys compare equal.
+#
+# Finally, the safe ways to read a key that may be absent:
+
+stock = {"apples": 3}
+print()
+print("  stock.get('pears'):        ", stock.get("pears"))
+print("  stock.get('pears', 0):     ", stock.get("pears", 0))
+print("  stock.setdefault('pears',0):", stock.setdefault("pears", 0))
+print("  stock is now:              ", stock)
+
+# get() reads without writing; setdefault() inserts the default and
+# returns it, which is convenient and is also a mutation -- the source of
+# a surprising number of dictionaries that grew keys nobody meant to add.
+```
+
 ## Try it yourself
 
 1. <strong>Compare get with direct indexing.</strong> Choose <strong>Method</strong> for a lookup on a missing key and press <strong>Execute</strong>. Direct indexing raises KeyError; <span class="mono-font">get</span> returns None instead. That difference decides which one belongs in your code.

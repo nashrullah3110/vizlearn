@@ -89,6 +89,87 @@ The reason is that O(n log n) algorithms have overhead &mdash; recursion, partit
 
 So the accurate statement is not "insertion sort is slow". It is: <strong>insertion sort is the fastest known approach for small or nearly-sorted arrays, and that is precisely where library sorts delegate to it.</strong>
 
+## Why it is the sort that real libraries keep
+
+Insertion sort is quadratic and still ships inside CPython's sort, Java's, and most C++ standard libraries. The reason is a property the complexity class does not capture, and it shows up immediately if you count comparisons on inputs of different shapes.
+
+```python-run
+def insertion(a):
+    a = a[:]
+    comps = shifts = 0
+    for i in range(1, len(a)):
+        key, j = a[i], i - 1
+        while j >= 0:
+            comps += 1
+            if a[j] > key:
+                a[j + 1] = a[j]
+                shifts += 1
+                j -= 1
+            else:
+                break
+        a[j + 1] = key
+    return a, comps, shifts
+
+
+def selection(a):
+    a = a[:]
+    comps = swaps = 0
+    for i in range(len(a)):
+        m = i
+        for j in range(i + 1, len(a)):
+            comps += 1
+            if a[j] < a[m]:
+                m = j
+        if m != i:
+            a[i], a[m] = a[m], a[i]
+            swaps += 1
+    return a, comps, swaps
+
+
+import random
+random.seed(7)
+n = 20
+shapes = {
+    "sorted":        list(range(n)),
+    "nearly sorted": list(range(n)),
+    "random":        random.sample(range(n), n),
+    "reversed":      list(range(n))[::-1],
+}
+shapes["nearly sorted"][5], shapes["nearly sorted"][6] = \
+    shapes["nearly sorted"][6], shapes["nearly sorted"][5]
+
+print("n = %d" % n)
+print("%-15s %11s %11s" % ("input shape", "insertion", "selection"))
+for name, data in shapes.items():
+    _, ic, _ = insertion(data)
+    _, sc, _ = selection(data)
+    print("%-15s %11d %11d" % (name, ic, sc))
+
+# That first column is the point. Insertion sort costs 19 comparisons on
+# sorted input and 190 on reversed -- a factor of ten between the best and
+# worst case on the same size. It is ADAPTIVE: its cost tracks how far the
+# input already is from sorted.
+#
+# Selection sort's column does not move. 190 comparisons regardless,
+# because it scans the whole remaining region to find each minimum whether
+# or not the data is already in order.
+
+print()
+print("worst case n(n-1)/2 =", n * (n - 1) // 2)
+
+# So: real data is often nearly sorted, and small arrays are always
+# nearly sorted relative to n^2 being small anyway. Both are why the
+# hybrid sorts hand short runs to insertion sort instead of recursing.
+
+print()
+print("comparisons on a 10-element nearly-sorted list:")
+small = list(range(10))
+small[3], small[4] = small[4], small[3]
+_, c1, _ = insertion(small)
+_, c2, _ = selection(small)
+print("  insertion %d, selection %d" % (c1, c2))
+```
+
 ## Things to try
 
 1. <strong>See the sorted region grow.</strong> Set <strong>Array Size</strong> to 12 and press <strong>Next Step</strong> repeatedly. The left-hand block is always sorted and always grows by exactly one per outer pass, no matter what the values are.

@@ -78,6 +78,104 @@ Two different keys can hash to the same slot. With 16 slots and 10 keys, collisi
 
 Python's `dict` uses open addressing with a randomised probe sequence. Java's `HashMap` uses chaining, switching a long chain to a tree above a threshold to bound the worst case.
 
+## Load factor, collisions, and the moment O(1) stops being true
+
+A hash table is O(1) on average and O(n) in the worst case, and the distance between those two is decided by the load factor and the quality of the hash. Both are measurable, so rather than take the averages on trust, build a table and watch the chains grow.
+
+```python-run
+class Table:
+    def __init__(self, buckets, hashfn):
+        self.b = [[] for _ in range(buckets)]
+        self.hashfn = hashfn
+        self.n = 0
+
+    def put(self, key):
+        i = self.hashfn(key) % len(self.b)
+        if key not in self.b[i]:
+            self.b[i].append(key)
+            self.n += 1
+
+    def probes(self, key):
+        # comparisons needed to find (or fail to find) this key
+        i = self.hashfn(key) % len(self.b)
+        chain = self.b[i]
+        for pos, k in enumerate(chain):
+            if k == key:
+                return pos + 1
+        return len(chain)
+
+    def stats(self):
+        lens = [len(c) for c in self.b]
+        return (self.n / len(self.b), max(lens),
+                sum(lens) / max(1, sum(1 for x in lens if x)))
+
+
+keys = ["key%d" % i for i in range(200)]
+
+print("200 keys, a good hash, table grown to keep the load factor down")
+print("%9s %8s %14s %14s %14s" % (
+    "buckets", "load", "longest chain", "avg chain", "probes for last"))
+for buckets in (16, 64, 256, 512):
+    t = Table(buckets, lambda k: hash(k))
+    for k in keys:
+        t.put(k)
+    load, longest, avg = t.stats()
+    print("%9d %8.2f %14d %14.2f %14d" % (
+        buckets, load, longest, avg, t.probes(keys[-1])))
+
+# Load factor is items per bucket. The average-chain column is measured
+# over OCCUPIED buckets, so it cannot fall below 1 -- but watch it track
+# the load down as the table grows: 12.5, 3.3, 1.5, 1.3. Four times the
+# buckets, roughly a quarter of the chain. That is the whole reason
+# implementations resize: keep the load near 1 and a lookup stays a
+# constant number of probes whatever n is. Probes for the last key falls
+# from 13 to 1 across these four rows, and n never changed.
+#
+# Now break the hash instead of the load factor.
+
+def terrible(k):
+    return len(k)            # collides every key of the same length
+
+
+def bad(k):
+    return ord(k[0])         # collides on the first character
+
+
+def good(k):
+    return hash(k)
+
+
+print()
+print("200 keys, 256 buckets, three hash functions")
+print("%-22s %14s %14s %16s" % (
+    "hash", "buckets used", "longest chain", "probes for last"))
+for name, fn in (("len(key)", terrible), ("first char", bad),
+                 ("Python's hash", good)):
+    t = Table(256, fn)
+    for k in keys:
+        t.put(k)
+    used = sum(1 for c in t.b if c)
+    print("%-22s %14d %14d %16d" % (
+        name, used, max(len(c) for c in t.b), t.probes(keys[-1])))
+
+# The table has 256 buckets in all three rows. With len(key) as the hash
+# there are only three distinct key lengths, so 253 buckets sit empty and
+# a lookup walks a chain of 100. Hashing on the first character is worse
+# still: every key starts with "k", so all 200 land in a single bucket and
+# the table has degenerated into a linked list -- 200 probes, the O(n)
+# worst case exactly. Nothing about the table is wrong; the hash is.
+#
+# This is also the shape of a real attack. If an attacker can predict your
+# hash function and choose the keys -- form fields, JSON keys, HTTP
+# headers -- they can send a few thousand colliding keys and turn every
+# lookup quadratic. That is a hash-flooding denial of service, and it is
+# why Python randomises string hashing per process:
+
+print()
+print("hash('a') differs between runs unless PYTHONHASHSEED is fixed:")
+print("  this run:", hash("a"))
+```
+
 ## Experiments to try
 
 1. <strong>Insert a few keys</strong> and watch each one compute its own index &mdash; no searching involved at any point.

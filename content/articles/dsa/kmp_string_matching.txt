@@ -101,6 +101,106 @@ The crucial observation is that `i` only ever increases. The inner `while` reduc
 |Boyer-Moore|O(m + alphabet)|O(n/m) best|O(n&times;m) worst, O(n) with refinements|
 |Rabin-Karp|O(m)|O(n) expected|O(n&times;m) with bad hashing|
 
+## The table, and the pointer that never goes back
+
+KMP is usually presented as the LPS table plus a matching loop, and the table looks arbitrary until you see what the naive algorithm wastes. Count the character comparisons both ways on a text designed to be bad for the naive version, then read what each table entry means.
+
+```python-run
+def naive(text, pat):
+    comps, hits = 0, []
+    for i in range(len(text) - len(pat) + 1):
+        j = 0
+        while j < len(pat):
+            comps += 1
+            if text[i + j] != pat[j]:
+                break
+            j += 1
+        if j == len(pat):
+            hits.append(i)
+    return hits, comps
+
+
+def build_lps(pat):
+    lps = [0] * len(pat)
+    length, i = 0, 1
+    while i < len(pat):
+        if pat[i] == pat[length]:
+            length += 1
+            lps[i] = length
+            i += 1
+        elif length:
+            length = lps[length - 1]
+        else:
+            lps[i] = 0
+            i += 1
+    return lps
+
+
+def kmp(text, pat):
+    lps = build_lps(pat)
+    comps, hits = 0, []
+    i = j = 0
+    while i < len(text):
+        comps += 1
+        if text[i] == pat[j]:
+            i += 1
+            j += 1
+            if j == len(pat):
+                hits.append(i - j)
+                j = lps[j - 1]
+        elif j:
+            j = lps[j - 1]          # fall back in the PATTERN only
+        else:
+            i += 1
+    return hits, comps
+
+
+text = "AAAAAAAAAAAAAAAAAAAB" * 20
+pat = "AAAAAB"
+n_hits, n_comps = naive(text, pat)
+k_hits, k_comps = kmp(text, pat)
+print("text: 'AAAA...AAAB' repeated, %d characters" % len(text))
+print("pattern: %r" % pat)
+print("  naive: %d matches, %d comparisons" % (len(n_hits), n_comps))
+print("  KMP:   %d matches, %d comparisons" % (len(k_hits), k_comps))
+print("  same matches:", n_hits == k_hits)
+
+# The naive version re-reads the same run of As for every starting
+# position. KMP reads each character of the text once and never moves i
+# backwards -- when a mismatch happens it slides the PATTERN instead.
+#
+# What the table stores: for each prefix of the pattern, the length of the
+# longest proper prefix that is also a suffix of it. That is the amount
+# already matched that can be reused after a mismatch.
+
+for p in ("AAAAAB", "ABABACA", "ABCDE", "AABAACAABAA"):
+    lps = build_lps(p)
+    print()
+    print("  pattern %-12s %s" % (p, " ".join(p)))
+    print("  lps     %-12s %s" % ("", " ".join(str(x) for x in lps)))
+
+# Read 'ABABACA'. At index 3 the value is 2, because "ABAB" ends with
+# "AB", which is also how it starts -- so after failing at index 4 we can
+# resume as if two characters already matched, without re-reading them.
+#
+# 'ABCDE' is all zeros: nothing repeats, so a mismatch always restarts the
+# pattern from the beginning. On that kind of pattern KMP does the same
+# work as the naive version, and the table has bought nothing.
+
+print()
+print("%-14s %10s %10s" % ("pattern", "naive", "KMP"))
+for p in ("AAAAAB", "ABCDE"):
+    _, nc = naive(text, p)
+    _, kc = kmp(text, p)
+    print("%-14s %10d %10d" % (p, nc, kc))
+
+# So the guarantee is the point rather than the average: KMP is O(n + m)
+# on EVERY input, where naive is O(n*m) on the bad ones. If your patterns
+# and texts have little internal repetition, the naive scan is competitive
+# and much simpler -- which is why real implementations often use it, with
+# a fallback for the pathological cases.
+```
+
 ## Things to try
 
 1. <strong>Look at the LPS table first.</strong> Non-zero entries mark places where a prefix reappears as a suffix &mdash; the only places a shortcut is possible.
