@@ -73,7 +73,7 @@ def editor(filename, code):
                     <div class="vz-code" data-vz-code="python">
                         <div class="vz-code-gutter" aria-hidden="true"></div>
                         <div class="vz-code-scroll">
-                            <pre class="vz-code-hl" aria-hidden="true"></pre>
+                            <pre class="vz-code-hl" aria-hidden="true">%(shown)s\n</pre>
                             <textarea class="vz-code-input py-editor" aria-label="Python code editor"
                                       spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
                         </div>
@@ -89,7 +89,7 @@ def editor(filename, code):
                              data-empty="Press Run to execute this code."></pre>
                     </div>
                 </div>
-""" % {"code": code.rstrip(), "file": esc(filename)}
+""" % {"code": code.rstrip(), "shown": esc(code.rstrip()), "file": esc(filename)}
 
 
 def page(t):

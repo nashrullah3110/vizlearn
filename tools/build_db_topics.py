@@ -109,7 +109,7 @@ def sql_block(t):
                         <div class="vz-code" data-vz-code="sql">
                             <div class="vz-code-gutter" aria-hidden="true"></div>
                             <div class="vz-code-scroll">
-                                <pre class="vz-code-hl" aria-hidden="true"></pre>
+                                <pre class="vz-code-hl" aria-hidden="true">%(starter)s\n</pre>
                                 <textarea class="vz-code-input sql-editor" aria-label="SQL editor"
                                           spellcheck="false" autocapitalize="off"
                                           autocomplete="off">%(starter)s</textarea>

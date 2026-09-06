@@ -70,7 +70,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -805,7 +811,97 @@ print("  stock is now:              ", stock)
 
 # get() reads without writing; setdefault() inserts the default and
 # returns it, which is convenient and is also a mutation -- the source of
-# a surprising number of dictionaries that grew keys nobody meant to add.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# a surprising number of dictionaries that grew keys nobody meant to add.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import time
+
+n = 100000
+keys = ["k%d" % i for i in range(n)]
+d = {k: i for i, k in enumerate(keys)}
+as_list = list(d.items())
+
+print("%d entries" % n)
+# A dict lookup is far below the browser clock's resolution, so time a
+# large batch of them and divide rather than timing one.
+DICT_REPS, SCAN_REPS = 200000, 20
+t0 = time.time()
+for _ in range(DICT_REPS):
+    _ = d["k99999"]
+t1 = time.time()
+for _ in range(SCAN_REPS):
+    _ = [v for k, v in as_list if k == "k99999"]
+t2 = time.time()
+per_lookup = (t1 - t0) / DICT_REPS
+per_scan = (t2 - t1) / SCAN_REPS
+print("  one dict lookup: %10.3f microseconds" % (per_lookup * 1e6))
+print("  one list scan:   %10.3f microseconds" % (per_scan * 1e6))
+print("  the dict is roughly %.0fx faster, and does not read the other %d keys"
+      % (per_scan / per_lookup, n - 1))
+
+# The dict does not look at the other 99,999 keys. It hashes the one you
+# asked for and goes straight to a slot, which is why the cost does not
+# grow with the size of the dictionary.
+#
+# ORDER. Since 3.7 the language guarantees insertion order:
+
+d2 = {}
+for word in ["pear", "apple", "fig", "date"]:
+    d2[word] = len(word)
+print()
+print("insertion order preserved:", list(d2))
+d2["apple"] = 99                    # updating a value does NOT reorder
+print("after updating 'apple':   ", list(d2))
+del d2["fig"]
+d2["fig"] = 3                       # deleting and re-adding DOES
+print("after del + re-add 'fig': ", list(d2))
+
+# Updating a value keeps the position; removing and re-inserting moves the
+# key to the end. That is worth knowing before relying on the order.
+#
+# WHAT CAN BE A KEY. The rule is hashability, and the reason is that a
+# mutable key could change its hash after being stored and become
+# unfindable.
+
+for candidate in [42, "text", (1, 2), 3.14, True, frozenset([1]),
+                  [1, 2], {1: 2}, {1, 2}]:
+    try:
+        {candidate: 1}
+        print("  %-14r hashable" % (candidate,))
+    except TypeError as e:
+        print("  %-14r NOT hashable -- %s" % (candidate, e))
+
+# Tuples work, lists do not, and the difference is mutability rather than
+# any notion of "simple type". A tuple containing a list is not hashable
+# either, because hashability has to hold all the way down:
+
+try:
+    {(1, [2]): "x"}
+except TypeError as e:
+    print()
+    print("  (1, [2]) as a key -&gt;", e)
+
+# And the collision that surprises people: True == 1, and equal keys with
+# equal hashes are the SAME key.
+
+print()
+print("  {1: 'one', True: 'yes'} =", {1: "one", True: "yes"})
+print("  hash(1) == hash(True):", hash(1) == hash(True), " 1 == True:", 1 == True)
+
+# One entry, not two. The key stayed as the first one inserted and only
+# the value was replaced -- which is exactly what happens when any two
+# keys compare equal.
+#
+# Finally, the safe ways to read a key that may be absent:
+
+stock = {"apples": 3}
+print()
+print("  stock.get('pears'):        ", stock.get("pears"))
+print("  stock.get('pears', 0):     ", stock.get("pears", 0))
+print("  stock.setdefault('pears',0):", stock.setdefault("pears", 0))
+print("  stock is now:              ", stock)
+
+# get() reads without writing; setdefault() inserts the default and
+# returns it, which is convenient and is also a mutation -- the source of
+# a surprising number of dictionaries that grew keys nobody meant to add.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-try-it-yourself">Try it yourself</h3>
@@ -918,7 +1014,57 @@ print()
 d = {1: "int one", 1.0: "float one", True: "bool one"}
 print("{1: ..., 1.0: ..., True: ...} ->", d)
 print("hash(1) == hash(1.0) == hash(True):", hash(1) == hash(1.0) == hash(True))
-print("They are equal AND hash the same, so they are one key with one value.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>dictionaries.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">stock[&quot;apple&quot;]</code><span class="vz-cl-note">Hash the key, go to the slot, compare. No part of that depends on how many keys there are, which is the whole reason dictionaries are everywhere &mdash; see <a href="hash_tables.html">hash tables</a> for the machinery.</span></li><li class="vz-cl-step"><code class="vz-cl-line">probe in haystack_list</code><span class="vz-cl-note">A list has to compare against every element until it finds one, so <code>in</code> is O(n). Swapping a list for a set is the single highest-value optimisation in most beginner Python.</span></li><li class="vz-cl-step"><code class="vz-cl-line">counts.get(w, 0) + 1</code><span class="vz-cl-note">The default avoids a <code>KeyError</code> on the first sight of a word without needing an <code>if</code>. <code>defaultdict</code> and <code>Counter</code> are the same idea, pre-packaged.</span></li><li class="vz-cl-step"><code class="vz-cl-line">{[1, 2]: &quot;x&quot;}</code><span class="vz-cl-note">Keys must be hashable, which in practice means immutable. If a key could change after insertion, its hash would no longer point at the slot it lives in and it would become unreachable.</span></li><li class="vz-cl-step"><code class="vz-cl-line">{1: ..., 1.0: ..., True: ...}</code><span class="vz-cl-note">One entry, not three. <code>1 == 1.0 == True</code> and they hash identically, so each assignment overwrites the previous value while keeping the first key object.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Time <code>-1 in haystack_list</code> alone. The miss is the worst case: the entire list, every time.</li><li>Insert keys in a scrambled order and print the dict. Since Python 3.7 insertion order is preserved &mdash; a guarantee, not an accident.</li><li>Use a tuple <code>(row, col)</code> as a key to build a sparse grid. That is how you store a large mostly-empty matrix without allocating it.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("They are equal AND hash the same, so they are one key with one value.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>dictionaries.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># A dict is a hash table: keys hashed to slots, so lookup does not scan.
+from collections import Counter, defaultdict
+import time
+
+stock = {"apple": 12, "banana": 3, "cherry": 40}
+print("dict      :", stock)
+print("stock['apple']  :", stock["apple"], "- one hash, one probe")
+print("'fig' in stock  :", "fig" in stock)
+print("stock.get('fig', 0):", stock.get("fig", 0), "- no KeyError")
+
+# --- why it matters ----------------------------------------------------
+N = 200_000
+haystack_list = list(range(N))
+haystack_set = set(haystack_list)
+for label, container in (("list", haystack_list), ("set/dict", haystack_set)):
+    start = time.time()
+    for probe in (0, N // 2, N - 1, -1):
+        probe in container
+    print(f"{label:&gt;9}: 4 membership tests in {time.time() - start:.4f}s")
+print("The list scans. The hash table computes where the answer would be.")
+
+# --- the idioms worth knowing -----------------------------------------
+words = "the quick brown fox jumps over the lazy dog the fox".split()
+
+counts = {}
+for w in words:
+    counts[w] = counts.get(w, 0) + 1          # 1. get with a default
+
+groups = defaultdict(list)
+for w in words:
+    groups[len(w)].append(w)                  # 2. defaultdict, no setup
+
+print()
+print("counts   :", Counter(words).most_common(3))   # 3. Counter does it for you
+print("by length:", dict(groups))
+print("inverted :", {v: k for k, v in stock.items()})  # 4. comprehension
+
+# --- the two rules ----------------------------------------------------
+print()
+try:
+    {[1, 2]: "x"}                             # a list can change; its hash cannot
+except TypeError as e:
+    print("list as key   -&gt;", e)
+print("tuple as key  -&gt;", {(1, 2): "fine"})
+
+print()
+d = {1: "int one", 1.0: "float one", True: "bool one"}
+print("{1: ..., 1.0: ..., True: ...} -&gt;", d)
+print("hash(1) == hash(1.0) == hash(True):", hash(1) == hash(1.0) == hash(True))
+print("They are equal AND hash the same, so they are one key with one value.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">stock[&quot;apple&quot;]</code><span class="vz-cl-note">Hash the key, go to the slot, compare. No part of that depends on how many keys there are, which is the whole reason dictionaries are everywhere &mdash; see <a href="hash_tables.html">hash tables</a> for the machinery.</span></li><li class="vz-cl-step"><code class="vz-cl-line">probe in haystack_list</code><span class="vz-cl-note">A list has to compare against every element until it finds one, so <code>in</code> is O(n). Swapping a list for a set is the single highest-value optimisation in most beginner Python.</span></li><li class="vz-cl-step"><code class="vz-cl-line">counts.get(w, 0) + 1</code><span class="vz-cl-note">The default avoids a <code>KeyError</code> on the first sight of a word without needing an <code>if</code>. <code>defaultdict</code> and <code>Counter</code> are the same idea, pre-packaged.</span></li><li class="vz-cl-step"><code class="vz-cl-line">{[1, 2]: &quot;x&quot;}</code><span class="vz-cl-note">Keys must be hashable, which in practice means immutable. If a key could change after insertion, its hash would no longer point at the slot it lives in and it would become unreachable.</span></li><li class="vz-cl-step"><code class="vz-cl-line">{1: ..., 1.0: ..., True: ...}</code><span class="vz-cl-note">One entry, not three. <code>1 == 1.0 == True</code> and they hash identically, so each assignment overwrites the previous value while keeping the first key object.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Time <code>-1 in haystack_list</code> alone. The miss is the worst case: the entire list, every time.</li><li>Insert keys in a scrambled order and print the dict. Since Python 3.7 insertion order is preserved &mdash; a guarantee, not an accident.</li><li>Use a tuple <code>(row, col)</code> as a key to build a sparse grid. That is how you store a large mostly-empty matrix without allocating it.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">Why must dictionary keys be hashable?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">To keep them sorted</button><button type="button" class="vz-q-opt" data-vz-correct="1">Because a key that changed after insertion would no longer hash to the slot it lives in</button><button type="button" class="vz-q-opt" data-vz-correct="0">To save memory</button><button type="button" class="vz-q-opt" data-vz-correct="0">To allow duplicates</button></div><p class="vz-q-why" hidden>It would become unreachable. In practice this means immutable: tuples work as keys, lists do not.</p></li><li class="vz-q"><p class="vz-q-text">{1: &#x27;a&#x27;, 1.0: &#x27;b&#x27;, True: &#x27;c&#x27;} produces a dict with how many entries?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">3</button><button type="button" class="vz-q-opt" data-vz-correct="0">2</button><button type="button" class="vz-q-opt" data-vz-correct="1">1</button><button type="button" class="vz-q-opt" data-vz-correct="0">It raises an error</button></div><p class="vz-q-why" hidden>1 == 1.0 == True and all three hash identically, so each assignment overwrites the previous value while the first key object stays.</p></li><li class="vz-q"><p class="vz-q-text">Replacing &#x27;x in a_big_list&#x27; with &#x27;x in a_big_set&#x27; changes the cost from:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">O(1) to O(n)</button><button type="button" class="vz-q-opt" data-vz-correct="1">O(n) to roughly O(1)</button><button type="button" class="vz-q-opt" data-vz-correct="0">O(log n) to O(1)</button><button type="button" class="vz-q-opt" data-vz-correct="0">Nothing changes</button></div><p class="vz-q-why" hidden>The list compares against every element; the hash table computes where the answer would be. It is the highest-value one-line optimisation in most beginner Python.</p></li></ol></section></div>
@@ -941,11 +1087,11 @@ print("They are equal AND hash the same, so they are one key with one value.")</
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -630,7 +636,86 @@ print("  a comparison sort: ~%d comparisons" % int(n * math.log2(n)))
 
 # Bigger base, fewer passes, more memory for buckets. Base 256 is the
 # usual answer -- four passes over a 32-bit key and a cache-friendly
-# 256-entry table -- and it is comfortably under the comparison count.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# 256-entry table -- and it is comfortably under the comparison count.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">def digit(x, place):
+    return (x // place) % 10
+
+
+def radix(a, stable=True):
+    a = a[:]
+    place = 1
+    passes = 0
+    while place &lt;= max(a):
+        buckets = [[] for _ in range(10)]
+        for x in a:
+            buckets[digit(x, place)].append(x)
+        if not stable:
+            # An unstable inner sort keeps the same DIGIT grouping but
+            # loses the order within each bucket. Reversing each bucket is
+            # one concrete way to be unstable.
+            buckets = [list(reversed(b)) for b in buckets]
+        a = [x for b in buckets for x in b]
+        passes += 1
+        place *= 10
+    return a, passes
+
+
+data = [170, 45, 75, 90, 802, 24, 2, 66]
+print("input:          ", data)
+ok, passes = radix(data, stable=True)
+bad, _ = radix(data, stable=False)
+print("stable inner:   ", ok, "  sorted:", ok == sorted(data))
+print("unstable inner: ", bad, "  sorted:", bad == sorted(data))
+print("passes:", passes, "(one per digit of the largest number)")
+
+# The unstable run visits the same buckets in the same order and still
+# produces the wrong answer. The reason is that pass 2 sorts by the tens
+# digit and assumes the ones digit is ALREADY in order within each group.
+# Stability is what carries that earlier work forward; without it, every
+# pass destroys the one before and only the final digit ends up sorted.
+#
+# Watch it happen one pass at a time.
+
+def trace(a, stable):
+    place = 1
+    while place &lt;= max(a):
+        buckets = [[] for _ in range(10)]
+        for x in a:
+            buckets[digit(x, place)].append(x)
+        if not stable:
+            buckets = [list(reversed(b)) for b in buckets]
+        a = [x for b in buckets for x in b]
+        print("  place %4d: %s" % (place, a))
+        place *= 10
+    return a
+
+
+print()
+print("stable:")
+trace(data, True)
+print("unstable:")
+trace(data, False)
+
+# Read the "place 1" lines: both end with the ones digits in order.
+# It is the later passes where they diverge.
+#
+# Now the cost. Radix sort is O(d * (n + k)) -- d passes over n items with
+# k buckets. It beats n log n when d is small, and d is the number of
+# DIGITS, which depends on the base you choose.
+
+import math
+n = 1_000_000
+print()
+print("sorting %d numbers up to 2^32:" % n)
+for base in (10, 256, 65536):
+    d = math.ceil(32 / math.log2(base))
+    print("  base %6d: %d passes, %6d buckets, ~%d bucket-ops" % (
+        base, d, base, d * (n + base)))
+print("  a comparison sort: ~%d comparisons" % int(n * math.log2(n)))
+
+# Bigger base, fewer passes, more memory for buckets. Base 256 is the
+# usual answer -- four passes over a 32-bit key and a cache-friendly
+# 256-entry table -- and it is comfortably under the comparison count.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-guided-experiments">Guided experiments</h3>
@@ -708,7 +793,45 @@ print("sorted:", radix_sort(data))
 print()
 digits = len(str(max(data)))
 print(f"{len(data)} items, {digits} digits -> {digits} passes over the list.")
-print("Cost is O(d * n): the number of DIGITS, not the number of items.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>radix_sort.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">(value // place) % 10</code><span class="vz-cl-note">Extracts one digit: divide the smaller places away, then take the remainder. Changing 10 here changes the base, and the base is the one real tuning knob radix sort has.</span></li><li class="vz-cl-step"><code class="vz-cl-line">for value in reversed(a):</code><span class="vz-cl-note">Stability is not a nicety here, it is a correctness requirement. Each pass must preserve the order the previous pass established, or sorting by tens throws away the ones ordering entirely.</span></li><li class="vz-cl-step"><code class="vz-cl-line">while max(a) // place &gt; 0:</code><span class="vz-cl-note">One pass per digit of the largest value. Nothing depends on how many items there are, which is why radix sort is O(d &middot; n).</span></li><li class="vz-cl-step"><code class="vz-cl-line">place *= 10</code><span class="vz-cl-note">Least significant digit first. It reads backwards &mdash; the list looks unsorted after every pass but the last &mdash; and it is what allows a single linear pass per digit instead of recursion.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Print only after the ones pass. The list is sorted by last digit and otherwise scrambled &mdash; every intermediate state looks like a bug.</li><li>Make one pass unstable by iterating forwards. The final output is wrong, and it is wrong in a way that is very hard to read off the result.</li><li>Add <code>999999</code> to <code>data</code>. One extra item costs three extra passes over everything &mdash; d is set by the widest value, not the typical one.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("Cost is O(d * n): the number of DIGITS, not the number of items.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>radix_sort.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Radix sort (LSD): sort by the ones digit, then the tens, then the hundreds.
+# Each pass MUST be stable, or the work of the previous pass is destroyed.
+
+def counting_sort_by_digit(a, place):
+    counts = [0] * 10
+    for value in a:
+        counts[(value // place) % 10] += 1
+    for i in range(1, 10):
+        counts[i] += counts[i - 1]
+
+    out = [0] * len(a)
+    for value in reversed(a):            # reversed =&gt; stable
+        digit = (value // place) % 10
+        counts[digit] -= 1
+        out[counts[digit]] = value
+    return out
+
+
+def radix_sort(a):
+    a = a[:]
+    place = 1
+    while max(a) // place &gt; 0:
+        a = counting_sort_by_digit(a, place)
+        name = {1: "ones", 10: "tens", 100: "hundreds", 1000: "thousands"}[place]
+        print(f"after {name:&gt;9} digit: {a}")
+        place *= 10
+    return a
+
+
+data = [170, 45, 75, 90, 802, 24, 2, 66]
+print("start :", data)
+print()
+print("sorted:", radix_sort(data))
+
+print()
+digits = len(str(max(data)))
+print(f"{len(data)} items, {digits} digits -&gt; {digits} passes over the list.")
+print("Cost is O(d * n): the number of DIGITS, not the number of items.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">(value // place) % 10</code><span class="vz-cl-note">Extracts one digit: divide the smaller places away, then take the remainder. Changing 10 here changes the base, and the base is the one real tuning knob radix sort has.</span></li><li class="vz-cl-step"><code class="vz-cl-line">for value in reversed(a):</code><span class="vz-cl-note">Stability is not a nicety here, it is a correctness requirement. Each pass must preserve the order the previous pass established, or sorting by tens throws away the ones ordering entirely.</span></li><li class="vz-cl-step"><code class="vz-cl-line">while max(a) // place &gt; 0:</code><span class="vz-cl-note">One pass per digit of the largest value. Nothing depends on how many items there are, which is why radix sort is O(d &middot; n).</span></li><li class="vz-cl-step"><code class="vz-cl-line">place *= 10</code><span class="vz-cl-note">Least significant digit first. It reads backwards &mdash; the list looks unsorted after every pass but the last &mdash; and it is what allows a single linear pass per digit instead of recursion.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Print only after the ones pass. The list is sorted by last digit and otherwise scrambled &mdash; every intermediate state looks like a bug.</li><li>Make one pass unstable by iterating forwards. The final output is wrong, and it is wrong in a way that is very hard to read off the result.</li><li>Add <code>999999</code> to <code>data</code>. One extra item costs three extra passes over everything &mdash; d is set by the widest value, not the typical one.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">Why must each digit pass be stable?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">To keep it fast</button><button type="button" class="vz-q-opt" data-vz-correct="1">Otherwise the previous pass&#x27;s ordering is destroyed</button><button type="button" class="vz-q-opt" data-vz-correct="0">To handle negative numbers</button><button type="button" class="vz-q-opt" data-vz-correct="0">It does not have to be</button></div><p class="vz-q-why" hidden>Sorting by tens must preserve the ones ordering among items with equal tens digits. An unstable pass silently produces a wrong final answer.</p></li><li class="vz-q"><p class="vz-q-text">Radix sort&#x27;s cost is O(d · n), where d is:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">The number of items</button><button type="button" class="vz-q-opt" data-vz-correct="1">The number of digits in the largest value</button><button type="button" class="vz-q-opt" data-vz-correct="0">The number of distinct values</button><button type="button" class="vz-q-opt" data-vz-correct="0">log n</button></div><p class="vz-q-why" hidden>One pass per digit position, each pass linear in n. Adding a single very wide value adds passes over the entire list.</p></li><li class="vz-q"><p class="vz-q-text">After only the ones-digit pass, the list:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Is sorted</button><button type="button" class="vz-q-opt" data-vz-correct="1">Is sorted by last digit and otherwise scrambled</button><button type="button" class="vz-q-opt" data-vz-correct="0">Is unchanged</button><button type="button" class="vz-q-opt" data-vz-correct="0">Is reverse sorted</button></div><p class="vz-q-why" hidden>Every intermediate state looks broken, which is what makes LSD radix sort hard to debug by eye. Only the final pass makes it correct.</p></li></ol></section></div>
@@ -731,11 +854,11 @@ print("Cost is O(d * n): the number of DIGITS, not the number of items.")</scrip
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

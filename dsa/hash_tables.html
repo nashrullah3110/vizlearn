@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -620,7 +626,98 @@ for name, fn in (("len(key)", terrible), ("first char", bad),
 
 print()
 print("hash('a') differs between runs unless PYTHONHASHSEED is fixed:")
-print("  this run:", hash("a"))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+print("  this run:", hash("a"))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">class Table:
+    def __init__(self, buckets, hashfn):
+        self.b = [[] for _ in range(buckets)]
+        self.hashfn = hashfn
+        self.n = 0
+
+    def put(self, key):
+        i = self.hashfn(key) % len(self.b)
+        if key not in self.b[i]:
+            self.b[i].append(key)
+            self.n += 1
+
+    def probes(self, key):
+        # comparisons needed to find (or fail to find) this key
+        i = self.hashfn(key) % len(self.b)
+        chain = self.b[i]
+        for pos, k in enumerate(chain):
+            if k == key:
+                return pos + 1
+        return len(chain)
+
+    def stats(self):
+        lens = [len(c) for c in self.b]
+        return (self.n / len(self.b), max(lens),
+                sum(lens) / max(1, sum(1 for x in lens if x)))
+
+
+keys = ["key%d" % i for i in range(200)]
+
+print("200 keys, a good hash, table grown to keep the load factor down")
+print("%9s %8s %14s %14s %14s" % (
+    "buckets", "load", "longest chain", "avg chain", "probes for last"))
+for buckets in (16, 64, 256, 512):
+    t = Table(buckets, lambda k: hash(k))
+    for k in keys:
+        t.put(k)
+    load, longest, avg = t.stats()
+    print("%9d %8.2f %14d %14.2f %14d" % (
+        buckets, load, longest, avg, t.probes(keys[-1])))
+
+# Load factor is items per bucket. The average-chain column is measured
+# over OCCUPIED buckets, so it cannot fall below 1 -- but watch it track
+# the load down as the table grows: 12.5, 3.3, 1.5, 1.3. Four times the
+# buckets, roughly a quarter of the chain. That is the whole reason
+# implementations resize: keep the load near 1 and a lookup stays a
+# constant number of probes whatever n is. Probes for the last key falls
+# from 13 to 1 across these four rows, and n never changed.
+#
+# Now break the hash instead of the load factor.
+
+def terrible(k):
+    return len(k)            # collides every key of the same length
+
+
+def bad(k):
+    return ord(k[0])         # collides on the first character
+
+
+def good(k):
+    return hash(k)
+
+
+print()
+print("200 keys, 256 buckets, three hash functions")
+print("%-22s %14s %14s %16s" % (
+    "hash", "buckets used", "longest chain", "probes for last"))
+for name, fn in (("len(key)", terrible), ("first char", bad),
+                 ("Python's hash", good)):
+    t = Table(256, fn)
+    for k in keys:
+        t.put(k)
+    used = sum(1 for c in t.b if c)
+    print("%-22s %14d %14d %16d" % (
+        name, used, max(len(c) for c in t.b), t.probes(keys[-1])))
+
+# The table has 256 buckets in all three rows. With len(key) as the hash
+# there are only three distinct key lengths, so 253 buckets sit empty and
+# a lookup walks a chain of 100. Hashing on the first character is worse
+# still: every key starts with "k", so all 200 land in a single bucket and
+# the table has degenerated into a linked list -- 200 probes, the O(n)
+# worst case exactly. Nothing about the table is wrong; the hash is.
+#
+# This is also the shape of a real attack. If an attacker can predict your
+# hash function and choose the keys -- form fields, JSON keys, HTTP
+# headers -- they can send a few thousand colliding keys and turn every
+# lookup quadratic. That is a hash-flooding denial of service, and it is
+# why Python randomises string hashing per process:
+
+print()
+print("hash('a') differs between runs unless PYTHONHASHSEED is fixed:")
+print("  this run:", hash("a"))
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-experiments-to-try">Experiments to try</h3>
@@ -735,7 +832,68 @@ for word in ["apple", "banana", "cherry", "date"]:
     bad.put(word, len(word))
 bad.show()
 print("Every lookup now scans a list. O(1) was never about hashing being magic -")
-print("it was about the keys being spread out.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>hash_table.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">self.hash_fn(key) % self.size</code><span class="vz-cl-note">Two separate jobs: the hash turns a key into a number, the modulo folds that number into a valid index. Changing the table size changes every index, which is why resizing has to rehash.</span></li><li class="vz-cl-step"><code class="vz-cl-line">for i, (k, _) in enumerate(bucket):</code><span class="vz-cl-note">The chain has to be scanned even on a hit, because two different keys can land in the same bucket. Comparing keys, not hashes, is what makes the answer correct rather than probable.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if self.count / self.size &gt; 0.75:</code><span class="vz-cl-note">The load factor. Past roughly three-quarters full, collisions rise sharply, so the table doubles before that happens rather than after. CPython's own dicts resize on the same principle.</span></li><li class="vz-cl-step"><code class="vz-cl-line">for bucket in old: ... self._index(k)</code><span class="vz-cl-note">A resize is O(n) and touches every key. Amortised over the n inserts that caused it that is O(1) each &mdash; but any single insert can be the expensive one, which matters for latency.</span></li><li class="vz-cl-step"><code class="vz-cl-line">hash_fn=lambda k: 1</code><span class="vz-cl-note">Every key in one bucket. The structure still works and every operation is now O(n): a hash table's guarantee is entirely conditional on the hash spreading keys evenly.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Run it twice. The bucket numbers move, because Python randomises string hashing per process &mdash; a defence against deliberately collided input, and a reason never to rely on dictionary order across runs.</li><li>Insert enough keys to trigger two resizes and watch the bucket layout reshuffle completely each time.</li><li>Use <code>hash_fn=len</code>. Words of the same length collide, which is a much more realistic bad hash than the constant one.</li><li>Swap chaining for open addressing: on a collision, step to the next free slot. Deletion becomes the hard part &mdash; and that is why tombstones exist.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("it was about the keys being spread out.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>hash_table.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># A hash table with separate chaining: buckets of (key, value) pairs.
+
+class HashTable:
+    def __init__(self, size=8, hash_fn=None):
+        self.buckets = [[] for _ in range(size)]
+        self.size = size
+        self.count = 0
+        self.hash_fn = hash_fn or (lambda k: hash(k))
+
+    def _index(self, key):
+        return self.hash_fn(key) % self.size      # fold the hash into range
+
+    def put(self, key, value):
+        bucket = self.buckets[self._index(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:
+                bucket[i] = (key, value)          # update in place
+                return
+        bucket.append((key, value))
+        self.count += 1
+        if self.count / self.size &gt; 0.75:         # load factor
+            self._resize()
+
+    def get(self, key):
+        bucket = self.buckets[self._index(key)]
+        for k, v in bucket:                       # scan the chain
+            if k == key:
+                return v
+        raise KeyError(key)
+
+    def _resize(self):
+        old = self.buckets
+        self.size *= 2
+        self.buckets = [[] for _ in range(self.size)]
+        for bucket in old:
+            for k, v in bucket:                   # every key rehashed
+                self.buckets[self._index(k)].append((k, v))
+        print(f"  ** resized to {self.size} buckets and rehashed everything")
+
+    def show(self):
+        for i, bucket in enumerate(self.buckets):
+            if bucket:
+                print(f"  bucket {i:&gt;2}: {[k for k, _ in bucket]}")
+
+
+table = HashTable(size=8)
+for word in ["apple", "banana", "cherry", "date", "elder", "fig", "grape"]:
+    table.put(word, len(word))
+print("buckets:")
+table.show()
+print("get('cherry') -&gt;", table.get("cherry"))
+print(f"load factor: {table.count}/{table.size} = {table.count / table.size:.2f}")
+
+print()
+print("Now the same keys with a deliberately awful hash:")
+bad = HashTable(size=8, hash_fn=lambda k: 1)      # everything to one bucket
+for word in ["apple", "banana", "cherry", "date"]:
+    bad.put(word, len(word))
+bad.show()
+print("Every lookup now scans a list. O(1) was never about hashing being magic -")
+print("it was about the keys being spread out.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">self.hash_fn(key) % self.size</code><span class="vz-cl-note">Two separate jobs: the hash turns a key into a number, the modulo folds that number into a valid index. Changing the table size changes every index, which is why resizing has to rehash.</span></li><li class="vz-cl-step"><code class="vz-cl-line">for i, (k, _) in enumerate(bucket):</code><span class="vz-cl-note">The chain has to be scanned even on a hit, because two different keys can land in the same bucket. Comparing keys, not hashes, is what makes the answer correct rather than probable.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if self.count / self.size &gt; 0.75:</code><span class="vz-cl-note">The load factor. Past roughly three-quarters full, collisions rise sharply, so the table doubles before that happens rather than after. CPython's own dicts resize on the same principle.</span></li><li class="vz-cl-step"><code class="vz-cl-line">for bucket in old: ... self._index(k)</code><span class="vz-cl-note">A resize is O(n) and touches every key. Amortised over the n inserts that caused it that is O(1) each &mdash; but any single insert can be the expensive one, which matters for latency.</span></li><li class="vz-cl-step"><code class="vz-cl-line">hash_fn=lambda k: 1</code><span class="vz-cl-note">Every key in one bucket. The structure still works and every operation is now O(n): a hash table's guarantee is entirely conditional on the hash spreading keys evenly.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Run it twice. The bucket numbers move, because Python randomises string hashing per process &mdash; a defence against deliberately collided input, and a reason never to rely on dictionary order across runs.</li><li>Insert enough keys to trigger two resizes and watch the bucket layout reshuffle completely each time.</li><li>Use <code>hash_fn=len</code>. Words of the same length collide, which is a much more realistic bad hash than the constant one.</li><li>Swap chaining for open addressing: on a collision, step to the next free slot. Deletion becomes the hard part &mdash; and that is why tombstones exist.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">The program replaces the hash function with &#x27;lambda k: 1&#x27;. What happens?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">It raises an error</button><button type="button" class="vz-q-opt" data-vz-correct="0">Keys are lost</button><button type="button" class="vz-q-opt" data-vz-correct="1">Everything lands in one bucket and every lookup becomes O(n)</button><button type="button" class="vz-q-opt" data-vz-correct="0">It gets faster</button></div><p class="vz-q-why" hidden>The structure still works perfectly and every guarantee evaporates. O(1) was always conditional on the hash spreading keys out.</p></li><li class="vz-q"><p class="vz-q-text">Why does a resize have to rehash every key?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">The hashes change</button><button type="button" class="vz-q-opt" data-vz-correct="1">The index is hash % size, and size just changed</button><button type="button" class="vz-q-opt" data-vz-correct="0">To keep insertion order</button><button type="button" class="vz-q-opt" data-vz-correct="0">To free memory</button></div><p class="vz-q-why" hidden>The hash is stable; the fold into a bucket index is not. Doubling the table moves nearly everything.</p></li><li class="vz-q"><p class="vz-q-text">The load factor threshold exists because:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Memory is limited</button><button type="button" class="vz-q-opt" data-vz-correct="1">Collisions rise sharply as the table fills, so it grows before that happens</button><button type="button" class="vz-q-opt" data-vz-correct="0">Python requires it</button><button type="button" class="vz-q-opt" data-vz-correct="0">It keeps buckets sorted</button></div><p class="vz-q-why" hidden>Past about three-quarters full the chains get long fast. Resizing is O(n), but amortised over the inserts that caused it it is O(1) each.</p></li></ol></section></div>
@@ -758,11 +916,11 @@ print("it was about the keys being spread out.")</script><div class="vz-code-bar
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

@@ -40,7 +40,11 @@ def editor(code, filename):
         '<!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. -->'
         '<div class="vz-code" data-vz-code="python">'
         '<div class="vz-code-gutter" aria-hidden="true"></div>'
-        '<div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre>'
+        '<div class="vz-code-scroll">'
+        # Painted at build time so the program is in the HTML rather than
+        # arriving only when vizlearn-code.js runs; render() overwrites it
+        # with the highlighted copy of the same text on load.
+        '<pre class="vz-code-hl" aria-hidden="true">%(shown)s\n</pre>'
         '<textarea class="vz-code-input py-editor" aria-label="Python code editor" '
         'spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>'
         '</div></div>'
@@ -52,7 +56,7 @@ def editor(code, filename):
         '<pre class="vz-console-body py-output" aria-live="polite" '
         'data-empty="Press Run to execute this code."></pre></div>'
         '</div>'
-    ) % {"code": code, "file": html.escape(filename)}
+    ) % {"code": code, "shown": html.escape(code, quote=False), "file": html.escape(filename)}
 
 
 def walk_list(walk):

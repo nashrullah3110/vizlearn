@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -597,7 +603,54 @@ INSERT INTO order_items (order_id, product_id, qty) VALUES
   (103, 4, 3),
   (104, 1, 2), (104, 5, 1),
   (105, 2, 1),
-  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- Before any index: the planner has no choice but to read every row.
+  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">-- Before any index: the planner has no choice but to read every row.
+
+EXPLAIN QUERY PLAN
+SELECT * FROM orders WHERE status = &#x27;shipped&#x27;;
+
+-- Now give it one, and ask again.
+
+CREATE INDEX idx_orders_status ON orders(status);
+
+EXPLAIN QUERY PLAN
+SELECT * FROM orders WHERE status = &#x27;shipped&#x27;;
+
+-- &quot;SCAN orders&quot; became &quot;SEARCH orders USING INDEX&quot;. That is the whole
+-- observable difference, and it is the only reliable way to tell -- on
+-- six rows the timings are identical noise.
+--
+-- An index has to match the query. This one does not:
+
+EXPLAIN QUERY PLAN
+SELECT * FROM orders WHERE discount &gt; 0;
+
+-- And an index on the wrong column order is nearly useless. A composite
+-- index is sorted by its first column, then its second -- like a phone
+-- book sorted by surname then forename, which cannot help you find
+-- everyone called James.
+
+CREATE INDEX idx_items_order_product ON order_items(order_id, product_id);
+
+EXPLAIN QUERY PLAN
+SELECT * FROM order_items WHERE order_id = 101;
+
+EXPLAIN QUERY PLAN
+SELECT * FROM order_items WHERE product_id = 3;
+
+-- The first uses the index. The second cannot, because product_id is
+-- the second column and there is no way to jump into the middle of a
+-- sort you do not have the prefix for.
+--
+-- Indexes are not free: every INSERT, UPDATE and DELETE must maintain
+-- them, and they occupy space. The cost is paid on every write to buy
+-- speed on some reads, which is why &quot;add an index&quot; is a decision rather
+-- than a default.
+
+DROP INDEX idx_orders_status;
+
+EXPLAIN QUERY PLAN
+SELECT * FROM orders WHERE status = &#x27;shipped&#x27;;
+</pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- Before any index: the planner has no choice but to read every row.
 
 EXPLAIN QUERY PLAN
 SELECT * FROM orders WHERE status = &#x27;shipped&#x27;;
@@ -930,11 +983,11 @@ SELECT * FROM orders WHERE status = &#x27;shipped&#x27;;</textarea></div></div><
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

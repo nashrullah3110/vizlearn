@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -683,7 +689,119 @@ print("   distillation is the most expensive of the four and the only one")
 print("   that can produce a genuinely smaller ARCHITECTURE rather than a")
 print("   cheaper copy of the same one. that is the trade: a training run")
 print("   against a model that is small by design instead of small by")
-print("   compression.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">NumPy</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+print("   compression.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">NumPy</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import numpy as np
+
+CLASSES = ["cat", "dog", "wolf", "car", "spoon"]
+# what a well-trained teacher outputs for one image of a cat
+LOGITS = np.array([6.0, 3.2, 2.8, -1.0, -2.5])
+HARD = np.array([1.0, 0.0, 0.0, 0.0, 0.0])      # the one-hot label
+
+def softmax(z, T=1.0):
+    z = np.asarray(z, float) / T
+    z = z - z.max()
+    e = np.exp(z)
+    return e / e.sum()
+
+print("A TEACHER'S OUTPUT on one image of a cat, at T=1:")
+p = softmax(LOGITS)
+print("%-10s %10s %14s" % ("class", "logit", "probability"))
+for c, l, q in zip(CLASSES, LOGITS, p):
+    print("%-10s %10.2f %14.6f" % (c, l, q))
+print()
+print("THE HARD LABEL says only 'cat'. compare what each target contains:")
+print("%-10s %14s %16s" % ("class", "hard label", "teacher at T=1"))
+for c, h, q in zip(CLASSES, HARD, p):
+    print("%-10s %14.1f %16.6f" % (c, h, q))
+print("   the teacher's output says the image is a cat AND that it is far")
+print("   more dog-like than car-like: P(dog) is %.0fx P(car)."
+      % (p[1] / p[3]))
+print("   that ranking among the WRONG answers is the dark knowledge. it")
+print("   is a statement about the shape of the problem -- cats resemble")
+print("   dogs, and neither resembles cutlery -- and the one-hot label")
+print("   contains none of it.")
+print()
+
+print("BUT AT T=1 IT IS ALMOST INVISIBLE. the small probabilities are")
+print("crushed against zero, so a loss that averages over them barely")
+print("notices they exist:")
+print("%-10s %s" % ("class", "  ".join("%12s" % ("T=%.0f" % t)
+                                       for t in (1, 2, 4, 8))))
+for i, c in enumerate(CLASSES):
+    print("%-10s %s" % (c, "  ".join("%12.6f" % softmax(LOGITS, t)[i]
+                                     for t in (1, 2, 4, 8))))
+print("%-10s %s" % ("P(dog)/P(car)",
+                    "  ".join("%12.1f" % (softmax(LOGITS, t)[1]
+                                          / softmax(LOGITS, t)[3])
+                              for t in (1, 2, 4, 8))))
+print("   raising T flattens the distribution and lifts the tail into a")
+print("   range a gradient can act on. at T=1 the car class carries")
+print("   %.2e of the mass; at T=4 it carries %.4f."
+      % (softmax(LOGITS, 1)[3], softmax(LOGITS, 4)[3]))
+print("   the RATIOS do change, and sharply: P(dog)/P(car) falls from")
+print("   %.0f to %.1f across that sweep. what is preserved is the ORDER."
+      % (softmax(LOGITS, 1)[1] / softmax(LOGITS, 1)[3],
+         softmax(LOGITS, 8)[1] / softmax(LOGITS, 8)[3]))
+print("   temperature compresses the differences without ever reordering")
+print("   them, which is exactly the trade being made: you give up some")
+print("   of the teacher's confidence about how MUCH more dog-like the")
+print("   image is, in exchange for the tail being large enough to learn")
+print("   from at all.")
+print()
+
+print("THE PRICE OF RAISING T, and it is the reason for the 1/T^2 factor")
+print("nobody explains. the gradient of the soft loss shrinks as T grows:")
+print("%-10s %20s %22s" % ("T", "gradient scale ~1/T^2", "after correction"))
+for T in (1, 2, 4, 8):
+    print("%-10d %20.6f %22.4f" % (T, 1.0 / T ** 2, (1.0 / T ** 2) * T ** 2))
+print("   at T=4 the soft-target gradients are %.0fx smaller than the hard"
+      % (4 ** 2))
+print("   ones, so without a correction the soft term would contribute")
+print("   almost nothing to training -- exactly the opposite of what you")
+print("   raised T for.")
+print("   multiplying the soft loss by T^2 restores it, which is why every")
+print("   distillation implementation has that factor and why it looks")
+print("   arbitrary until you differentiate the softmax.")
+print()
+
+print("THE COMBINED LOSS is a weighted sum of the two targets:")
+print("      L = alpha * KL(student, teacher at T) * T^2")
+print("        + (1 - alpha) * CE(student, the hard label)")
+print("%-14s %-34s %s" % ("alpha", "what the student learns from", "risk"))
+for a, learns, risk in ((0.0, "the labels only", "no distillation at all"),
+                        (0.5, "both, equally", "the usual starting point"),
+                        (0.9, "mostly the teacher", "inherits its mistakes"),
+                        (1.0, "the teacher only", "cannot beat the teacher")):
+    print("%-14.1f %-34s %s" % (a, learns, risk))
+print("   the hard-label term is what stops the student inheriting the")
+print("   teacher's errors wholesale. keeping it is why a distilled model")
+print("   can occasionally be RIGHT where its teacher was wrong.")
+print()
+
+print("WHY THIS WORKS BETTER THAN TRAINING SMALL FROM SCRATCH. count the")
+print("information in one training example:")
+print("%-34s %18s %s" % ("target", "numbers per example", "what they say"))
+print("%-34s %18d %s" % ("one-hot label", 1, "the answer"))
+print("%-34s %18d %s"
+      % ("teacher distribution", len(CLASSES), "the answer and its neighbours"))
+print("   for a language model the second row is the vocabulary size --")
+print("   %s numbers per token instead of 1." % "{:,}".format(32000))
+print("   that is a much richer signal per example, which is why a")
+print("   distilled model reaches a given quality on far less data than")
+print("   the same architecture trained from scratch.")
+print()
+print("WHERE IT SITS AMONG THE COMPRESSION METHODS:")
+print("%-24s %-30s %s" % ("method", "what it changes", "needs retraining?"))
+for row in (("quantisation", "the precision of weights", "no"),
+            ("pruning", "which weights exist", "usually"),
+            ("distillation", "the whole architecture", "yes, fully"),
+            ("LoRA", "nothing -- it adds", "a small amount")):
+    print("%-24s %-30s %s" % row)
+print("   distillation is the most expensive of the four and the only one")
+print("   that can produce a genuinely smaller ARCHITECTURE rather than a")
+print("   cheaper copy of the same one. that is the trade: a training run")
+print("   against a model that is small by design instead of small by")
+print("   compression.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-guided-tour">Guided tour</h3>
@@ -744,11 +862,11 @@ print("   compression.")</script><div class="vz-code-bar"><span class="vz-code-d
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

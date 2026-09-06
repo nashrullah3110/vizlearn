@@ -87,6 +87,82 @@ PAGES = {
 },
 
 # ---------------------------------------------------------------------------
+# Every module page carries "By Ashish Jangra" in its byline and, until this
+# page existed, that name resolved to nothing: no page, no background, no way
+# for a reader to judge whether the person explaining backpropagation to them
+# has any business doing so. Google calls that missing first E - Experience -
+# and it is the half of E-E-A-T a technical site is most often marked down on.
+"author.html": {
+    "h1": "Ashish Jangra",
+    "lead": "Who writes VizLearn, how the %(modules)d modules are actually made, "
+            "and how to tell me when one of them is wrong.",
+    "description": "Ashish Jangra builds and maintains VizLearn - %(modules)d "
+                   "interactive explainers for AI, machine learning, algorithms "
+                   "and maths. How the modules are made and verified.",
+    "sections": [
+        ("Who I am",
+         "<p>I am Ashish Jangra. I build and maintain VizLearn on my own &mdash; every "
+         "visualisation, every written explanation, and the build system that assembles "
+         "them into %(modules)d module pages across %(tracks)d tracks.</p>"
+         "<p>There is no team behind this and no company funding it. That is worth saying "
+         "plainly, because it sets what you should expect: the explanations are opinionated "
+         "and consistent, corrections reach the person who can act on them immediately, and "
+         "nothing here is written to a content brief or a keyword target.</p>"
+         "<p>You can see the rest of my work on <a href=\"%(github)s\" rel=\"me noopener\" "
+         "target=\"_blank\">GitHub</a>, <a href=\"%(linkedin)s\" rel=\"me noopener\" "
+         "target=\"_blank\">LinkedIn</a> and <a href=\"%(kaggle)s\" rel=\"me noopener\" "
+         "target=\"_blank\">Kaggle</a>.</p>"),
+
+        ("Why I built VizLearn",
+         "<p>I kept hitting the same wall learning this material: explanations were either "
+         "a wall of equations that assumed the intuition, or a wall of prose that avoided "
+         "the maths entirely. Both leave you simulating the idea in your head and hoping "
+         "you got it right.</p>"
+         "<p>The thing that actually worked for me was building a small interactive version "
+         "of whatever I was stuck on and pushing it until it broke. VizLearn is that habit "
+         "made systematic: set <em>k</em> to 1 and watch KNN overfit in front of you; drop "
+         "specificity by one percent on the Bayes grid and watch a 99%%-accurate test become "
+         "a coin flip.</p>"),
+
+        ("How a module is actually made",
+         "<p>Every module is one self-contained page: an interactive visualisation, the "
+         "controls that drive it, a live readout of what the algorithm is doing right now, "
+         "and a written explanation underneath.</p>"
+         "<p>The pipeline matters more than it sounds. The prose for each module lives in a "
+         "plain text file, not in the HTML, and the pages are generated from it &mdash; so a "
+         "correction is made once, at the source, and cannot survive somewhere else on the "
+         "site. Every visualisation is hand-written SVG driven by plain JavaScript: no "
+         "charting library, no framework, no backend.</p>"
+         "<p>Two rules I hold to. Where a page states a number, that number is produced by "
+         "the same code the visualisation runs, so the text and the animation cannot "
+         "disagree. And every runnable example on the site is executed before it ships "
+         "&mdash; if the output shown under a code block is wrong, that is a bug I want "
+         "reported, not a typo.</p>"),
+
+        ("What I get wrong",
+         "<p>Plenty. The visualisations simplify, and a simplification is a choice about "
+         "what to leave out; sometimes I leave out the wrong thing. Animations can imply a "
+         "sequence the real algorithm does not have. Numbers drift when a default changes.</p>"
+         "<p>So corrections genuinely are the most valuable message I get, and they take "
+         "priority over everything else in the queue. If a module states something false, "
+         "or an animation misrepresents what the algorithm does, tell me: "
+         "<a href=\"contact.html\">the contact page</a> explains what to include, and a "
+         "clear factual correction is usually fixed within the week. When it ships, the "
+         "module's updated date changes and the change is listed on "
+         "<a href=\"whats-new/\">What&rsquo;s New</a>, so you can confirm it landed "
+         "without taking my word for it.</p>"),
+
+        ("How this is paid for",
+         "<p>VizLearn is free, requires no account, and puts nothing behind a signup. It is "
+         "supported by display advertising, which covers the domain and the time that goes "
+         "into new modules. Ads never sit inside a visualisation and never gate a page.</p>"
+         "<p>Advertising means third-party cookies, and the "
+         "<a href=\"privacy.html\">Privacy Policy</a> sets out exactly what is collected "
+         "and how to opt out.</p>"),
+    ],
+},
+
+# ---------------------------------------------------------------------------
 "contact.html": {
     "h1": "Contact",
     "lead": "Corrections, questions, requests for a module that does not exist yet.",

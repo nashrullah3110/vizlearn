@@ -70,7 +70,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -814,7 +820,90 @@ print("  binary:        O(log n) -- %d probes on %d items" % (
 # In practice the safe version is a hybrid: interpolate, but if the window
 # is not shrinking fast enough, fall back to bisection. That is exactly
 # what numerical root-finders do with Brent's method, for the same reason
-# -- keep the fast guess, keep the guaranteed bound.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# -- keep the fast guess, keep the guaranteed bound.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">def binary(a, target):
+    lo, hi, probes = 0, len(a) - 1, 0
+    while lo &lt;= hi:
+        probes += 1
+        mid = (lo + hi) // 2
+        if a[mid] == target:
+            return probes
+        if a[mid] &lt; target:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return probes
+
+
+def interpolation(a, target, cap=10 ** 6):
+    lo, hi, probes = 0, len(a) - 1, 0
+    while lo &lt;= hi and a[lo] &lt;= target &lt;= a[hi] and probes &lt; cap:
+        probes += 1
+        if a[hi] == a[lo]:
+            pos = lo
+        else:
+            # where the value SHOULD be if the data were evenly spread
+            pos = lo + (target - a[lo]) * (hi - lo) // (a[hi] - a[lo])
+        if a[pos] == target:
+            return probes
+        if a[pos] &lt; target:
+            lo = pos + 1
+        else:
+            hi = pos - 1
+    return probes
+
+
+import math
+import random
+
+n = 100000
+uniform = list(range(n))                       # perfectly evenly spaced
+rng = random.Random(9)
+# uniformly distributed but NOT perfectly spaced -- the realistic case
+spread = sorted(rng.sample(range(10 * n), n))
+clustered = sorted(int(rng.random() ** 8 * n) for _ in range(n))
+exponential = sorted(2 ** (i // 3) for i in range(n))
+
+print("%-16s %14s %14s %12s" % ("data", "binary probes", "interp probes",
+                                "log2(log2 n)"))
+for name, data in (("evenly spaced", uniform), ("random uniform", spread),
+                   ("clustered", clustered), ("exponential", exponential)):
+    targets = [data[rng.randrange(n)] for _ in range(50)]
+    b = sum(binary(data, t) for t in targets) / 50
+    i = sum(interpolation(data, t) for t in targets) / 50
+    print("%-16s %14.1f %14.1f %12.1f" % (
+        name, b, i, math.log2(math.log2(n))))
+
+# The first row is the ideal: values exactly one apart, so the formula
+# computes the position rather than estimating it and lands on the target
+# in a single probe. Real data is never that tidy, which is what the
+# second row is for -- uniformly distributed but randomly spaced, where
+# the count settles near log2(log2(n)), about 4. Binary search needs
+# sixteen or seventeen on the same data.
+#
+# On the clustered data the guess is systematically wrong: most values sit
+# near the bottom of the range, so the formula points near the bottom
+# every time and the window shrinks by a little instead of by half.
+#
+# The exponential data is the worst case in a clean form. Each value is
+# roughly double the last, so a linear interpolation between the endpoints
+# is off by orders of magnitude on every probe.
+#
+# Binary search does not care -- its column barely moves, because halving
+# is a fact about the INDEX range and makes no assumption about the
+# values. That is the trade: interpolation search buys speed by assuming a
+# distribution, and pays for the assumption when it is wrong.
+
+print()
+print("worst case if the guess is always off by one position:")
+print("  interpolation: O(n) -- %d probes on %d items" % (n, n))
+print("  binary:        O(log n) -- %d probes on %d items" % (
+    int(math.log2(n)) + 1, n))
+
+# In practice the safe version is a hybrid: interpolate, but if the window
+# is not shrinking fast enough, fall back to bisection. That is exactly
+# what numerical root-finders do with Brent's method, for the same reason
+# -- keep the fast guess, keep the guaranteed bound.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-things-to-try">Things to try</h3>
@@ -906,7 +995,40 @@ skewed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 5000]      # one huge outlier
 i, steps = interpolation_search(skewed, 9, "skewed data, target 9")
 print(f"  -> index {i} in {steps} step(s)")
 print()
-print("Same code, same length, same sortedness. Only the spacing changed.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>interpolation_search.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">while lo &lt;= hi and a[lo] &lt;= target &lt;= a[hi]:</code><span class="vz-cl-note">The second half of the condition is an early exit binary search does not have: if the target is outside the current window's value range, no probe inside it can succeed.</span></li><li class="vz-cl-step"><code class="vz-cl-line">fraction = (target - a[lo]) / (a[hi] - a[lo])</code><span class="vz-cl-note">How far along the window the target's <em>value</em> sits, between 0 and 1. Binary search always uses 0.5 here; this is the one line that makes the two algorithms different.</span></li><li class="vz-cl-step"><code class="vz-cl-line">pos = lo + int(fraction * (hi - lo))</code><span class="vz-cl-note">Turns that value fraction into an index, on the assumption that value and position rise together at a steady rate. When they do, the probe lands on or beside the answer immediately.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if a[hi] == a[lo]: pos = lo</code><span class="vz-cl-note">Guards a division by zero when every value in the window is equal. Reaching for a fraction of a zero-width value range is the crash this algorithm is famous for.</span></li><li class="vz-cl-step"><code class="vz-cl-line">skewed = [1, 2, ..., 5000]</code><span class="vz-cl-note">The outlier drags <code>a[hi]</code> so high that the computed fraction is nearly zero every time, so the probe advances one index per step. Interpolation search is O(log log n) on uniform data and O(n) on data like this.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Change the uniform target to <code>0</code> and to <code>190</code>. Both ends are found in a step or two, where binary search needs its full log n.</li><li>Replace <code>uniform</code> with <code>[i * i for i in range(20)]</code> &mdash; sorted, but quadratically spaced. Watch the probe consistently undershoot.</li><li>Set <code>fraction = 0.5</code> unconditionally. You have just written binary search, and on the skewed list it beats the clever version.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("Same code, same length, same sortedness. Only the spacing changed.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>interpolation_search.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Interpolation search: estimate WHERE the target should be, instead of
+# always probing the middle. Needs sorted AND roughly uniform data.
+
+def interpolation_search(a, target, label):
+    print(label)
+    lo, hi, step = 0, len(a) - 1, 0
+    while lo &lt;= hi and a[lo] &lt;= target &lt;= a[hi]:
+        step += 1
+        if a[hi] == a[lo]:                       # flat span: no slope to follow
+            pos = lo
+        else:
+            fraction = (target - a[lo]) / (a[hi] - a[lo])
+            pos = lo + int(fraction * (hi - lo))
+        print(f"  step {step:&gt;2}: lo={lo:&gt;2} hi={hi:&gt;2} probe={pos:&gt;2} a[probe]={a[pos]}")
+        if a[pos] == target:
+            return pos, step
+        if a[pos] &lt; target:
+            lo = pos + 1
+        else:
+            hi = pos - 1
+    return -1, step
+
+
+uniform = list(range(0, 200, 10))       # 0, 10, 20, ... perfectly even
+i, steps = interpolation_search(uniform, 170, "uniform data, target 170")
+print(f"  -&gt; index {i} in {steps} step(s)")
+
+print()
+skewed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 5000]      # one huge outlier
+i, steps = interpolation_search(skewed, 9, "skewed data, target 9")
+print(f"  -&gt; index {i} in {steps} step(s)")
+print()
+print("Same code, same length, same sortedness. Only the spacing changed.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">while lo &lt;= hi and a[lo] &lt;= target &lt;= a[hi]:</code><span class="vz-cl-note">The second half of the condition is an early exit binary search does not have: if the target is outside the current window's value range, no probe inside it can succeed.</span></li><li class="vz-cl-step"><code class="vz-cl-line">fraction = (target - a[lo]) / (a[hi] - a[lo])</code><span class="vz-cl-note">How far along the window the target's <em>value</em> sits, between 0 and 1. Binary search always uses 0.5 here; this is the one line that makes the two algorithms different.</span></li><li class="vz-cl-step"><code class="vz-cl-line">pos = lo + int(fraction * (hi - lo))</code><span class="vz-cl-note">Turns that value fraction into an index, on the assumption that value and position rise together at a steady rate. When they do, the probe lands on or beside the answer immediately.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if a[hi] == a[lo]: pos = lo</code><span class="vz-cl-note">Guards a division by zero when every value in the window is equal. Reaching for a fraction of a zero-width value range is the crash this algorithm is famous for.</span></li><li class="vz-cl-step"><code class="vz-cl-line">skewed = [1, 2, ..., 5000]</code><span class="vz-cl-note">The outlier drags <code>a[hi]</code> so high that the computed fraction is nearly zero every time, so the probe advances one index per step. Interpolation search is O(log log n) on uniform data and O(n) on data like this.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Change the uniform target to <code>0</code> and to <code>190</code>. Both ends are found in a step or two, where binary search needs its full log n.</li><li>Replace <code>uniform</code> with <code>[i * i for i in range(20)]</code> &mdash; sorted, but quadratically spaced. Watch the probe consistently undershoot.</li><li>Set <code>fraction = 0.5</code> unconditionally. You have just written binary search, and on the skewed list it beats the clever version.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">Interpolation search improves on binary search by:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Sorting as it goes</button><button type="button" class="vz-q-opt" data-vz-correct="1">Guessing where the target should be from its value</button><button type="button" class="vz-q-opt" data-vz-correct="0">Checking both ends first</button><button type="button" class="vz-q-opt" data-vz-correct="0">Using a hash of the target</button></div><p class="vz-q-why" hidden>It interpolates a position from the value's distance between the endpoints, instead of always probing the middle. That one line is the whole difference.</p></li><li class="vz-q"><p class="vz-q-text">The program runs it on [1,2,3,4,5,6,7,8,9,5000] looking for 9. Why does it take so many steps?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">The list is too short</button><button type="button" class="vz-q-opt" data-vz-correct="0">9 is not in the list</button><button type="button" class="vz-q-opt" data-vz-correct="1">The outlier flattens the estimate, so the probe advances one index at a time</button><button type="button" class="vz-q-opt" data-vz-correct="0">It has to sort first</button></div><p class="vz-q-why" hidden>The computed fraction is nearly zero because 5000 dominates the value range, so each probe lands next to the previous one and the search degenerates to O(n).</p></li><li class="vz-q"><p class="vz-q-text">Its O(log log n) figure assumes the data is:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Sorted only</button><button type="button" class="vz-q-opt" data-vz-correct="1">Sorted and roughly uniformly distributed</button><button type="button" class="vz-q-opt" data-vz-correct="0">All positive</button><button type="button" class="vz-q-opt" data-vz-correct="0">In a contiguous array</button></div><p class="vz-q-why" hidden>Sortedness alone is not enough - the estimate is a straight-line guess, so it needs the values to rise at a roughly steady rate.</p></li></ol></section></div>
@@ -929,11 +1051,11 @@ print("Same code, same length, same sortedness. Only the spacing changed.")</scr
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

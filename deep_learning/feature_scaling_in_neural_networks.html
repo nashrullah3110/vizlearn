@@ -36,7 +36,7 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Feature Scaling &amp; Weight Bias - interactive visualization on VizLearn">
     <meta property="og:locale" content="en_US">
-    <meta property="article:modified_time" content="2026-09-05">
+    <meta property="article:modified_time" content="2026-09-02">
     <meta property="article:published_time" content="2026-03-27">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Feature Scaling &amp; Weight Bias">
@@ -50,7 +50,7 @@
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7551664560637561" crossorigin="anonymous"></script>
 
     <meta name="author" content="Ashish Jangra">
-    <meta name="last-modified" content="2026-09-05">
+    <meta name="last-modified" content="2026-09-02">
 
     <script type="application/ld+json">
 {
@@ -67,10 +67,16 @@
   "educationalLevel": "Beginner",
   "typicalAgeRange": "16-",
   "datePublished": "2026-03-27",
-  "dateModified": "2026-09-05",
+  "dateModified": "2026-09-02",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -394,7 +400,7 @@
     <!-- Title Section -->
     <div class="shrink-0 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full">
         <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-main)">Feature Scaling & Weight Bias</h1>
-            <!-- VIZLEARN:BYLINE:BEGIN --><p class="vz-byline"><a class="vz-byline-track" href="../deep_learning/">Deep Learning</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>By <a class="vz-byline-author" rel="author" href="../about.html">Ashish Jangra</a></span><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>Updated <time datetime="2026-09-05">5 September 2026</time></span></p><!-- VIZLEARN:BYLINE:END -->
+            <!-- VIZLEARN:BYLINE:BEGIN --><p class="vz-byline"><a class="vz-byline-track" href="../deep_learning/">Deep Learning</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>By <a class="vz-byline-author" rel="author" href="../about.html">Ashish Jangra</a></span><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>Updated <time datetime="2026-09-02">2 September 2026</time></span></p><!-- VIZLEARN:BYLINE:END -->
         <p class="mt-2 text-sm md:text-base max-w-3xl opacity-80" style="color: var(--text-muted)">
             Adjust the sliders below to pass different values. Notice how raw, unscaled inputs (like Salary = 80,000) cause massive color shifts in the connections, leading to an imbalanced network. Use the scaler to normalize the data and stabilize training.
         </p>
@@ -672,7 +678,109 @@ print()
 print("and the reason BatchNorm and LayerNorm exist: the inputs to layer 5")
 print("drift out of scale during training even if layer 1's inputs were")
 print("perfect. scaling the input fixes the first layer. normalisation")
-print("layers fix the rest of them, continuously.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">NumPy</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+print("layers fix the rest of them, continuously.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">NumPy</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import numpy as np
+
+rng = np.random.default_rng(0)
+n = 400
+raw = np.column_stack([rng.normal(0.5, 0.02, n),      # e.g. a ratio
+                       rng.normal(60_000, 15_000, n)])  # e.g. an income
+w_true = np.array([3.0, 0.00004])
+y = raw @ w_true + rng.normal(0, 0.05, n)
+
+print("two features:")
+print("  feature 0: mean %8.3f, sd %8.3f" % (raw[:, 0].mean(), raw[:, 0].std()))
+print("  feature 1: mean %8.1f, sd %8.1f" % (raw[:, 1].mean(), raw[:, 1].std()))
+print()
+
+def design(a):
+    # every variant gets a bias column, or a centred feature set could not
+    # represent y's mean and the comparison would be meaningless
+    return np.column_stack([a, np.ones(len(a))])
+
+def cond(a):
+    M = design(a)
+    ev = np.linalg.eigvalsh(M.T @ M / len(M))
+    return ev.max() / max(ev.min(), 1e-30), ev.max()
+
+def standardize(a): return (a - a.mean(axis=0)) / a.std(axis=0)
+def minmax(a):      return (a - a.min(axis=0)) / (a.max(axis=0) - a.min(axis=0))
+def center(a):      return a - a.mean(axis=0)
+
+print("%-24s %18s %16s %20s"
+      % ("preprocessing", "condition number", "max curvature", "max stable lr"))
+variants = [("raw", raw), ("centred only", center(raw)),
+            ("min-max to [0,1]", minmax(raw)), ("standardised", standardize(raw))]
+for name, A in variants:
+    c, L = cond(A)
+    print("%-24s %18.3e %16.3e %20.3e" % (name, c, L, 2 / (2 * L)))
+print()
+print("the condition number is the ratio of the steepest curvature to the")
+print("shallowest. gradient descent needs roughly that many steps to")
+print("converge, so a condition number of 1e9 means it will not converge in")
+print("any budget you have.")
+print()
+
+print("run it and see. the same %d steps on each version:" % 400)
+for name, A in variants:
+    c, L = cond(A)
+    lr = 0.9 * 2 / (2 * L)          # just under each version's own limit
+    M = design(A)
+    w = np.zeros(M.shape[1])
+    for _ in range(400):
+        w -= lr * 2 * M.T @ (M @ w - y) / n
+    resid = ((M @ w - y) ** 2).mean()
+    print("  %-22s lr %10.3e  final MSE %14s"
+          % (name, lr,
+             "%.6f" % resid if np.isfinite(resid) and resid &lt; 1e9 else "diverged"))
+print()
+best = ((design(standardize(raw)) @ np.linalg.lstsq(design(standardize(raw)),
+                                                    y, rcond=None)[0] - y) ** 2).mean()
+print("  the exact least-squares answer, for reference: MSE %.6f" % best)
+print()
+print("every version uses the largest learning rate that is stable FOR IT,")
+print("so this is not a handicap -- it is the best each one can do in 400")
+print("steps. the two scaled versions reach the exact optimum; the other two")
+print("do not get close.")
+print()
+print("note that 'centred only' came out WORSE than raw. subtracting the mean")
+print("changes where the surface sits without changing how elongated it is,")
+print("so the condition number stays astronomical -- and it happened to")
+print("remove the one large gradient that was letting the raw version make")
+print("any progress at all. centring is not scaling, and on its own it is")
+print("not reliably an improvement.")
+print()
+
+print("why it happens, geometrically. a step moves each weight by")
+print("lr x gradient, and the gradient for a weight is scaled by its input:")
+g = 2 * raw.T @ (raw @ np.zeros(2) - y) / n
+print("  at w = 0, the two gradient components are:")
+print("    feature 0: %14.4f" % g[0])
+print("    feature 1: %14.4f" % g[1])
+print("  a factor of %.0f apart. one learning rate has to serve both, so it"
+      % abs(g[1] / g[0]))
+print("  is set by the larger one and the smaller weight barely moves.")
+print()
+
+print("which scaler to use:")
+print("  StandardScaler (mean 0, sd 1) -- the default. works with any")
+print("     distribution and is what most initialisation schemes assume.")
+print("  MinMaxScaler ([0,1])          -- when you need a bounded range, e.g.")
+print("     image pixels. one outlier squashes everything else.")
+print("  RobustScaler (median, IQR)    -- when outliers are real data.")
+print()
+print("three rules that are not optional:")
+print("  1. fit the scaler on TRAINING data only. fitting on everything")
+print("     leaks the test set's mean into training.")
+print("  2. save the scaler with the model. an unscaled input at serving")
+print("     time produces confident nonsense, silently.")
+print("  3. scale the TARGET too for regression -- a target in the millions")
+print("     produces gradients in the millions, and the same problem.")
+print()
+print("and the reason BatchNorm and LayerNorm exist: the inputs to layer 5")
+print("drift out of scale during training even if layer 1's inputs were")
+print("perfect. scaling the input fixes the first layer. normalisation")
+print("layers fix the rest of them, continuously.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-guided-experiments">Guided experiments</h3>
@@ -733,11 +841,11 @@ print("layers fix the rest of them, continuously.")</script><div class="vz-code-
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

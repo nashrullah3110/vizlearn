@@ -80,7 +80,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -675,7 +681,97 @@ for v in (10, 100, 1000, 10000):
 # That is the usual shape of an asymptotic win -- it arrives at a size,
 # not immediately. On a dense graph where E approaches V^2 the array
 # version stays competitive at any size, which is why both are still
-# taught.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# taught.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import heapq
+
+# Positive weights: the algorithm is correct here.
+GOOD = {
+    "A": [("B", 1), ("C", 4)],
+    "B": [("C", 2), ("D", 6)],
+    "C": [("D", 3)],
+    "D": [],
+}
+
+
+def dijkstra(graph, start):
+    dist = {n: float("inf") for n in graph}
+    dist[start] = 0
+    settled, order = set(), []
+    pq = [(0, start)]
+    while pq:
+        d, node = heapq.heappop(pq)
+        if node in settled:
+            continue
+        settled.add(node)
+        order.append((node, d))
+        for nxt, w in graph[node]:
+            if d + w &lt; dist[nxt]:
+                dist[nxt] = d + w
+                heapq.heappush(pq, (dist[nxt], nxt))
+    return dist, order
+
+
+dist, order = dijkstra(GOOD, "A")
+print("settling order (node, distance when settled):")
+for node, d in order:
+    print("   %s at %d" % (node, d))
+print("final distances:", dict(dist))
+
+# Note A=0, B=1, C=3, D=6 -- and note C was settled at 3 via B, not at 4
+# via the direct edge. The queue handed back the cheaper route first.
+#
+# The invariant doing the work: when a node comes off the priority queue,
+# its distance is FINAL. That holds because every remaining path to it
+# must go through some unsettled node that is already at least as far
+# away, and adding more non-negative edges can only make it longer.
+#
+# Remove the non-negative part and the invariant collapses.
+
+BAD = {
+    "A": [("B", 2), ("C", 5)],
+    "B": [("D", 3)],
+    "C": [("B", -4)],          # a negative edge
+    "D": [],
+}
+
+dist, order = dijkstra(BAD, "A")
+print()
+print("with a -4 edge, settling order:")
+for node, d in order:
+    print("   %s at %d" % (node, d))
+print("Dijkstra says A -&gt; D costs", dist["D"])
+
+# It settled B at 2 and moved on. Later it reached C at 5, and C offers
+# B at 5 + (-4) = 1 -- cheaper than the 2 it committed to. B was already
+# settled, so the improvement is never propagated to D.
+
+print()
+print("the route it never considered: A -&gt; C -&gt; B -&gt; D = %d + %d + %d = %d"
+      % (5, -4, 3, 5 - 4 + 3))
+print("the answer it gave:                                  ", dist["D"])
+
+# The real shortest path costs four; the algorithm reported five, with no
+# warning of any kind and no way for the caller to tell. This is the exact
+# situation Bellman-Ford exists for: it relaxes every edge V-1 times
+# rather than settling nodes once, so a late improvement still propagates.
+#
+# Finally, what the heap actually buys. Without one you scan every
+# unsettled node to find the nearest:
+
+import math
+print()
+print("%10s %16s %20s" % ("V (E = 5V)", "array O(V^2)", "binary heap O(E log V)"))
+for v in (10, 100, 1000, 10000):
+    e = 5 * v
+    print("%10d %16d %20d" % (v, v * v, int(e * math.log2(v))))
+
+# Read the first row: at ten nodes the heap is the SLOWER option, because
+# log V is not yet worth the bookkeeping. By a thousand nodes the array
+# costs twenty times more, and by ten thousand, a hundred and fifty times.
+# That is the usual shape of an asymptotic win -- it arrives at a size,
+# not immediately. On a dense graph where E approaches V^2 the array
+# version stays competitive at any size, which is why both are still
+# taught.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
@@ -744,7 +840,57 @@ print("Now with a negative edge (B -> C costs -6):")
 graph["B"]["C"] = -6
 bad, _ = dijkstra(graph, "A")
 print("distances:", bad)
-print("A->B->C is 4 + -6 = -2, but C was finalised at 2 and never revisited.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>dijkstra.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">heap = [(0, start)]</code><span class="vz-cl-note">Tuples, so the heap orders by distance first. Python's <code>heapq</code> is a min-heap over whatever you give it, and putting the distance first is what makes it a priority queue over distances.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if node in done: continue</code><span class="vz-cl-note">The lazy-deletion trick. <code>heapq</code> cannot update a key in place, so improved distances are pushed as new entries and the stale ones are skipped when they surface. Cheaper than a decrease-key structure, and far easier to get right.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if d + weight &lt; dist[neighbour]:</code><span class="vz-cl-note">The relaxation, and the whole algorithm. “I have a route to <em>node</em> that costs d; going on to <em>neighbour</em> beats whatever I had.”</span></li><li class="vz-cl-step"><code class="vz-cl-line">done.add(node)</code><span class="vz-cl-note">The node's distance is now final and will never be improved. This is the claim the correctness proof rests on &mdash; and it holds only because every edge is non-negative, so no later route can be shorter.</span></li><li class="vz-cl-step"><code class="vz-cl-line">graph[&quot;B&quot;][&quot;C&quot;] = -6</code><span class="vz-cl-note">The counterexample. C is finalised at 2 before B is even examined, so the cheaper route through B arrives too late. Dijkstra does not detect this; it just returns a wrong answer. Use <a href="bellman_ford.html">Bellman-Ford</a> instead.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Set <code>graph["A"]["C"] = 20</code>. The finalisation order changes and the path to F reroutes &mdash; watch the relax lines that get superseded.</li><li>Print <code>len(heap)</code> each iteration. It exceeds the node count, which is the stale entries lazy deletion leaves behind.</li><li>Replace the heap with a linear scan for the nearest unfinished node. The answers are identical and the complexity goes from O(E log V) to O(V²).</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("A->B->C is 4 + -6 = -2, but C was finalised at 2 and never revisited.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>dijkstra.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Dijkstra: always finalise the nearest unfinished node.
+import heapq
+
+graph = {
+    "A": {"B": 4, "C": 2},
+    "B": {"C": 5, "D": 10},
+    "C": {"E": 3},
+    "D": {"F": 11},
+    "E": {"D": 4},
+    "F": {},
+}
+
+def dijkstra(graph, start):
+    dist = {n: float("inf") for n in graph}
+    dist[start] = 0
+    parent = {start: None}
+    done = set()
+    heap = [(0, start)]                     # (distance so far, node)
+
+    while heap:
+        d, node = heapq.heappop(heap)       # the nearest unfinished node
+        if node in done:
+            continue                        # a stale copy; skip it
+        done.add(node)
+        print(f"finalise {node} at {d}")
+        for neighbour, weight in graph[node].items():
+            if d + weight &lt; dist[neighbour]:
+                dist[neighbour] = d + weight
+                parent[neighbour] = node
+                heapq.heappush(heap, (dist[neighbour], neighbour))
+                print(f"   relax {node}-&gt;{neighbour}: {dist[neighbour]}")
+    return dist, parent
+
+
+dist, parent = dijkstra(graph, "A")
+print()
+print("distances:", dist)
+
+path, node = [], "F"
+while node is not None:
+    path.append(node)
+    node = parent[node]
+print("A -&gt; F   :", " -&gt; ".join(reversed(path)), "=", dist["F"])
+
+print()
+print("Now with a negative edge (B -&gt; C costs -6):")
+graph["B"]["C"] = -6
+bad, _ = dijkstra(graph, "A")
+print("distances:", bad)
+print("A-&gt;B-&gt;C is 4 + -6 = -2, but C was finalised at 2 and never revisited.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">heap = [(0, start)]</code><span class="vz-cl-note">Tuples, so the heap orders by distance first. Python's <code>heapq</code> is a min-heap over whatever you give it, and putting the distance first is what makes it a priority queue over distances.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if node in done: continue</code><span class="vz-cl-note">The lazy-deletion trick. <code>heapq</code> cannot update a key in place, so improved distances are pushed as new entries and the stale ones are skipped when they surface. Cheaper than a decrease-key structure, and far easier to get right.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if d + weight &lt; dist[neighbour]:</code><span class="vz-cl-note">The relaxation, and the whole algorithm. “I have a route to <em>node</em> that costs d; going on to <em>neighbour</em> beats whatever I had.”</span></li><li class="vz-cl-step"><code class="vz-cl-line">done.add(node)</code><span class="vz-cl-note">The node's distance is now final and will never be improved. This is the claim the correctness proof rests on &mdash; and it holds only because every edge is non-negative, so no later route can be shorter.</span></li><li class="vz-cl-step"><code class="vz-cl-line">graph[&quot;B&quot;][&quot;C&quot;] = -6</code><span class="vz-cl-note">The counterexample. C is finalised at 2 before B is even examined, so the cheaper route through B arrives too late. Dijkstra does not detect this; it just returns a wrong answer. Use <a href="bellman_ford.html">Bellman-Ford</a> instead.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Set <code>graph["A"]["C"] = 20</code>. The finalisation order changes and the path to F reroutes &mdash; watch the relax lines that get superseded.</li><li>Print <code>len(heap)</code> each iteration. It exceeds the node count, which is the stale entries lazy deletion leaves behind.</li><li>Replace the heap with a linear scan for the nearest unfinished node. The answers are identical and the complexity goes from O(E log V) to O(V²).</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">With one negative edge, Dijkstra:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Raises an error</button><button type="button" class="vz-q-opt" data-vz-correct="0">Loops forever</button><button type="button" class="vz-q-opt" data-vz-correct="1">Returns a wrong answer without complaining</button><button type="button" class="vz-q-opt" data-vz-correct="0">Still works</button></div><p class="vz-q-why" hidden>The program finalises C at 2, then discovers a route through B worth -2 and never revisits it. Correctness rests on no edge ever making a finalised node cheaper.</p></li><li class="vz-q"><p class="vz-q-text">Why does the code push a new heap entry instead of updating an existing one?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">It is more accurate</button><button type="button" class="vz-q-opt" data-vz-correct="1">heapq cannot decrease a key in place, so stale entries are skipped when popped</button><button type="button" class="vz-q-opt" data-vz-correct="0">To keep the heap sorted</button><button type="button" class="vz-q-opt" data-vz-correct="0">To count relaxations</button></div><p class="vz-q-why" hidden>Lazy deletion: cheaper and far easier to get right than a decrease-key structure, at the cost of a heap larger than the node count.</p></li><li class="vz-q"><p class="vz-q-text">Replacing the heap with a linear scan for the nearest node gives:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Wrong answers</button><button type="button" class="vz-q-opt" data-vz-correct="1">The same answers at O(V²) instead of O(E log V)</button><button type="button" class="vz-q-opt" data-vz-correct="0">A faster algorithm</button><button type="button" class="vz-q-opt" data-vz-correct="0">Bellman-Ford</button></div><p class="vz-q-why" hidden>The heap is an accelerator, not part of the logic. On a dense graph the O(V²) version is actually competitive.</p></li></ol></section></div>
@@ -767,11 +913,11 @@ print("A->B->C is 4 + -6 = -2, but C was finalised at 2 and never revisited.")</
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

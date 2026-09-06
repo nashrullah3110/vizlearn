@@ -62,7 +62,7 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Bias-Variance Tradeoff - interactive visualization on VizLearn">
     <meta property="og:locale" content="en_US">
-    <meta property="article:modified_time" content="2026-09-05">
+    <meta property="article:modified_time" content="2026-09-01">
     <meta property="article:published_time" content="2026-04-02">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Bias-Variance Tradeoff">
@@ -76,7 +76,7 @@
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7551664560637561" crossorigin="anonymous"></script>
 
     <meta name="author" content="Ashish Jangra">
-    <meta name="last-modified" content="2026-09-05">
+    <meta name="last-modified" content="2026-09-01">
 
     <script type="application/ld+json">
 {
@@ -93,10 +93,16 @@
   "educationalLevel": "Beginner",
   "typicalAgeRange": "16-",
   "datePublished": "2026-04-02",
-  "dateModified": "2026-09-05",
+  "dateModified": "2026-09-01",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -382,7 +388,7 @@
             <span>Machine Learning</span>
         </div>
         <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">The Bias-Variance Tradeoff</h1>
-            <!-- VIZLEARN:BYLINE:BEGIN --><p class="vz-byline"><a class="vz-byline-track" href="../machine_learning/">Machine Learning</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>By <a class="vz-byline-author" rel="author" href="../about.html">Ashish Jangra</a></span><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>Updated <time datetime="2026-09-05">5 September 2026</time></span></p><!-- VIZLEARN:BYLINE:END -->
+            <!-- VIZLEARN:BYLINE:BEGIN --><p class="vz-byline"><a class="vz-byline-track" href="../machine_learning/">Machine Learning</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>By <a class="vz-byline-author" rel="author" href="../about.html">Ashish Jangra</a></span><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>Updated <time datetime="2026-09-01">1 September 2026</time></span></p><!-- VIZLEARN:BYLINE:END -->
         <p class="mt-2 text-sm md:text-base max-w-2xl opacity-80" style="color: var(--text-muted)">
             Explicitly control Bias and Variance to understand how models generalize. Use the <strong>Resample</strong> button to visualize the instability of High Variance models!
         </p>
@@ -602,7 +608,61 @@ print()
 print("the trees show the same arc: depth 2 is biased, unlimited depth has")
 print("almost none and pays for it in variance. averaging many deep trees is")
 print("exactly what a random forest does,")
-print("and it is why bagging helps trees far more than it helps a straight line.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+print("and it is why bagging helps trees far more than it helps a straight line.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import numpy as np
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import make_pipeline
+
+TRUTH = lambda x: np.sin(1.5 * x) + 0.3 * x
+x_test = np.linspace(0.2, 5.8, 120).reshape(-1, 1)
+truth_test = TRUTH(x_test.ravel())
+
+def decompose(make_model, runs=250, n=40, noise=0.6):
+    rng = np.random.default_rng(0)
+    preds = np.empty((runs, len(x_test)))
+    for r in range(runs):
+        x = rng.uniform(0, 6, n).reshape(-1, 1)
+        y = TRUTH(x.ravel()) + rng.normal(0, noise, n)
+        preds[r] = make_model().fit(x, y).predict(x_test)
+    bias2 = ((preds.mean(axis=0) - truth_test) ** 2).mean()
+    return bias2, preds.var(axis=0).mean()
+
+def poly(d):
+    return lambda: make_pipeline(PolynomialFeatures(d), LinearRegression())
+
+print("truth: sin(1.5x) + 0.3x.  each sample is 40 noisy points from it.")
+print("250 samples, one model refit on every one of them.")
+print()
+print("%-24s %10s %10s %10s" % ("model", "bias^2", "variance", "total"))
+rows = []
+for name, mk in ([("polynomial deg %d" % d, poly(d)) for d in (1, 3, 5, 7, 9)]
+                 + [("tree, depth 2",   lambda: DecisionTreeRegressor(max_depth=2)),
+                    ("tree, depth 5",   lambda: DecisionTreeRegressor(max_depth=5)),
+                    ("tree, unlimited", lambda: DecisionTreeRegressor())]):
+    b, v = decompose(mk)
+    rows.append((name, b + v))
+    print("%-24s %10.4f %10.4f %10.4f" % (name, b, v, b + v))
+print()
+print("lowest total error: %s (%.4f)" % min(rows, key=lambda r: r[1]))
+print()
+print("read the two columns against each other:")
+print("  bias^2 falls as the model gets more flexible -- it can finally reach")
+print("         the shape of the truth. deg 1 cannot bend at all, so it is stuck.")
+print("  variance rises as it gets more flexible -- it starts fitting the noise,")
+print("         and the noise is different in every sample.")
+print("  the total is a U. finding the bottom of it is most of what tuning is.")
+print()
+print("bias^2 is how far the AVERAGE prediction sits from the truth. more data")
+print("will not fix it, because the model cannot express the shape it needs.")
+print("variance is how much one prediction moves when the training sample")
+print("changes. that error does shrink with more data, or with less capacity.")
+print()
+print("the trees show the same arc: depth 2 is biased, unlimited depth has")
+print("almost none and pays for it in variance. averaging many deep trees is")
+print("exactly what a random forest does,")
+print("and it is why bagging helps trees far more than it helps a straight line.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-try-it-yourself">Try it yourself</h3>
@@ -651,11 +711,11 @@ print("and it is why bagging helps trees far more than it helps a straight line.
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

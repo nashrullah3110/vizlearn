@@ -166,6 +166,17 @@ def runnable_editor(code, spec, n):
     if "</script" in code.lower():
         raise SystemExit("a runnable block contains </script and would break out")
     attrs = ' data-vz-py data-vz-packages="%s"' % spec.get("packages", "")
+    # The .vz-code-hl <pre> is the layer the reader actually sees - the
+    # textarea over it is drawn in transparent text - and it used to ship
+    # empty, painted only once assets/vizlearn-code.js ran. That put every
+    # runnable example, 1,502 of them, outside the HTML: a crawler that does
+    # not execute JavaScript saw an empty <pre> and a <script type="text/plain">,
+    # neither of which is content. The examples are the most distinctive
+    # writing on the site, so they are the last thing that should be
+    # invisible in the file we serve. Painting the plain source here puts it
+    # in the markup; render() in vizlearn-code.js replaces it with the
+    # highlighted copy of the same text on load, so nothing changes visually
+    # and nothing is duplicated at runtime.
     if spec.get("wheels"):
         attrs += ' data-vz-wheels="%s"' % spec["wheels"]
     if spec.get("label"):
@@ -182,7 +193,8 @@ def runnable_editor(code, spec, n):
         '<span>%(file)s</span><span class="vz-code-lang">%(lang)s</span></div>'
         '<div class="vz-code" data-vz-code="python">'
         '<div class="vz-code-gutter" aria-hidden="true"></div>'
-        '<div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre>'
+        '<div class="vz-code-scroll">'
+        '<pre class="vz-code-hl" aria-hidden="true">%(shown)s\n</pre>'
         '<textarea class="vz-code-input py-editor" aria-label="Runnable example"'
         ' spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>'
         '</div></div>'
@@ -195,6 +207,10 @@ def runnable_editor(code, spec, n):
         ' data-empty="Press Run to execute this code."></pre></div>'
         '</div>'
     ) % {"attrs": attrs, "pre": pre, "code": code.rstrip(),
+         # Trimmed exactly the way vizlearn-python.js trims it into the
+         # editor - /^\n+|\s+$/ - so the painted copy and the runnable copy
+         # are the same text and the swap on load is invisible.
+         "shown": html.escape(code.lstrip("\n").rstrip(), quote=False),
          "file": spec.get("filename", "example.py") % n if "%" in
                  spec.get("filename", "example.py") else spec.get("filename", "example.py"),
          "lang": spec.get("label", "Python")}
@@ -218,7 +234,8 @@ def sql_editor(code, spec):
         '<span>%(file)s</span><span class="vz-code-lang">%(lang)s</span></div>'
         '<div class="vz-code" data-vz-code="sql">'
         '<div class="vz-code-gutter" aria-hidden="true"></div>'
-        '<div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre>'
+        '<div class="vz-code-scroll">'
+        '<pre class="vz-code-hl" aria-hidden="true">%(code)s\n</pre>'
         '<textarea class="vz-code-input sql-editor" aria-label="SQL editor"'
         ' spellcheck="false" autocapitalize="off" autocomplete="off">%(code)s</textarea>'
         '</div></div>'
@@ -462,8 +479,16 @@ def load(root):
             path = os.path.join(dirpath, name)
             rel = os.path.relpath(path, base)[: -len(".txt")] + ".html"
             track = os.path.relpath(dirpath, base).split(os.sep)[0]
+            spec = RUNNABLE.get(track)
+            # A track's spec is shared by all its articles; "overrides" lets
+            # one topic add what only it needs -- an extra wheel, a prelude --
+            # without every other editor on the track paying to download it.
+            if spec and spec.get("overrides"):
+                extra = spec["overrides"].get(name[: -len(".txt")])
+                if extra:
+                    spec = dict(spec, **extra)
             with open(path, encoding="utf-8") as fh:
-                entry = parse(fh.read(), RUNNABLE.get(track))
+                entry = parse(fh.read(), spec)
             if entry["sections"]:
                 out[rel.replace(os.sep, "/")] = entry
     return out

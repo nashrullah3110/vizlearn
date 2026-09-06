@@ -80,7 +80,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -685,7 +691,114 @@ on_path = set(path)
 print()
 for r, row in enumerate(GRID):
     print("  " + "".join("o" if (r, c) in on_path else ch
-                         for c, ch in enumerate(row)))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+                         for c, ch in enumerate(row)))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import heapq
+
+GRID = [
+    "..........",
+    ".####.###.",
+    ".#........",
+    ".#.#####.#",
+    "...#...#..",
+    ".###.#.##.",
+    ".....#....",
+    "####.#.##.",
+    "......#...",
+    ".####.....",
+]
+START, GOAL = (0, 0), (9, 9)
+
+
+def neighbours(p):
+    r, c = p
+    for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        nr, nc = r + dr, c + dc
+        if 0 &lt;= nr &lt; len(GRID) and 0 &lt;= nc &lt; len(GRID[0]) and GRID[nr][nc] != "#":
+            yield (nr, nc)
+
+
+def search(h):
+    # h = None gives Dijkstra: no guess at all
+    openq = [(0, 0, START, [START])]
+    best = {START: 0}
+    expanded = 0
+    while openq:
+        _, g, node, path = heapq.heappop(openq)
+        if node == GOAL:
+            return path, expanded
+        if g &gt; best.get(node, float("inf")):
+            continue
+        expanded += 1
+        for nxt in neighbours(node):
+            ng = g + 1
+            if ng &lt; best.get(nxt, float("inf")):
+                best[nxt] = ng
+                f = ng + (h(nxt) if h else 0)
+                heapq.heappush(openq, (f, ng, nxt, path + [nxt]))
+    return None, expanded
+
+
+def manhattan(p):
+    return abs(p[0] - GOAL[0]) + abs(p[1] - GOAL[1])
+
+
+def overestimate(p):
+    return manhattan(p) * 4          # never admissible: it exaggerates
+
+
+print("%-28s %10s %14s" % ("heuristic", "expanded", "path length"))
+for name, h in (("none (Dijkstra)", None),
+                ("Manhattan (admissible)", manhattan),
+                ("Manhattan x 4 (not)", overestimate)):
+    path, expanded = search(h)
+    print("%-28s %10d %14d" % (name, expanded, len(path) - 1))
+
+# Three runs, same grid, same goal. Dijkstra expands the most cells
+# because it explores outward in all directions equally. Manhattan
+# distance points the search at the goal and cuts the work, and it still
+# returns a shortest path.
+#
+# The third one is the warning. Multiplying the heuristic makes it
+# ADMISSIBLE no longer -- it can claim the remaining distance is larger
+# than it really is -- and A* will then happily commit to a route it
+# should have kept open. It expands fewer cells still, and that speed is
+# bought with correctness.
+#
+# Admissible means: never overestimate the true remaining cost. Manhattan
+# distance on a 4-connected grid qualifies, because you must make at least
+# that many moves and obstacles can only make it worse.
+
+print()
+print("checking admissibility against the true cost from each cell:")
+true_cost = {}
+frontier = [(0, GOAL)]
+while frontier:
+    d, node = heapq.heappop(frontier)
+    if node in true_cost:
+        continue
+    true_cost[node] = d
+    for nxt in neighbours(node):
+        if nxt not in true_cost:
+            heapq.heappush(frontier, (d + 1, nxt))
+
+bad_manhattan = [p for p, d in true_cost.items() if manhattan(p) &gt; d]
+bad_scaled = [p for p, d in true_cost.items() if overestimate(p) &gt; d]
+print("  cells where Manhattan overestimates:   %d" % len(bad_manhattan))
+print("  cells where Manhattan x 4 overestimates: %d of %d" % (
+    len(bad_scaled), len(true_cost)))
+
+# Zero against most of the grid. That is the whole condition, checked
+# directly, and it is the reason one of those heuristics is safe to use
+# and the other is not.
+#
+# The path itself:
+
+path, _ = search(manhattan)
+on_path = set(path)
+print()
+for r, row in enumerate(GRID):
+    print("  " + "".join("o" if (r, c) in on_path else ch
+                         for c, ch in enumerate(row)))
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-guided-experiments">Guided experiments</h3>
@@ -798,7 +911,77 @@ for r in range(ROWS):
     print("  " + "".join("*" if (r, c) in path else GRID[r][c] for c in range(COLS)))
 print()
 print(f"{sum(row.count('.') for row in GRID)} open cells.")
-print("Same path length. A* just wasted less time looking away from the goal.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>a_star.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">heapq.heappush(heap, (tentative + h, h, nxt))</code><span class="vz-cl-note">The one line that separates A* from Dijkstra: the priority is <code>f = g + h</code>, cost already spent plus cost estimated to remain, instead of <code>g</code> alone.</span></li><li class="vz-cl-step"><code class="vz-cl-line">(f, h, cell)</code><span class="vz-cl-note">The second element breaks ties. On a grid where every step costs 1 an enormous number of cells share an f value, and preferring the one nearest the goal is what turns a fan into a beeline. It changes nothing about correctness and most of the measured saving here comes from it.</span></li><li class="vz-cl-step"><code class="vz-cl-line">search(lambda a, b: 0, &quot;Dijkstra&quot;)</code><span class="vz-cl-note">With <code>h = 0</code> the formula collapses to <code>f = g</code>, so the identical function <em>is</em> Dijkstra. That is the cleanest way to see that A* is a generalisation, not a different algorithm.</span></li><li class="vz-cl-step"><code class="vz-cl-line">def manhattan(a, b):</code><span class="vz-cl-note">Steps are up/down/left/right and each costs 1, so the Manhattan distance can never overestimate what remains. That property &mdash; admissibility &mdash; is what keeps the answer optimal.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if tentative &lt; g.get(nxt, float(&quot;inf&quot;)):</code><span class="vz-cl-note">Compares on <code>g</code>, never on <code>f</code>. The heuristic decides what to look at next; it must not be allowed to decide what the route actually cost.</span></li><li class="vz-cl-step"><code class="vz-cl-line">expanded</code><span class="vz-cl-note">The number that matters. Both runs return a shortest path of the same length, and A* gets there having opened far fewer cells &mdash; on a game map or a road network that is the entire point.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Multiply the heuristic by 5. It is now inadmissible: expansions drop further, and the path it returns can be longer than the shortest one.</li><li>Swap Manhattan for Euclidean (<code>math.hypot</code>). Still admissible on this grid, but weaker, so more cells get expanded.</li><li>Wall the goal off completely. Both searches drain the heap and the reconstructed path is nonsense &mdash; a real implementation has to check that the goal was actually reached.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("Same path length. A* just wasted less time looking away from the goal.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>a_star.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># A*: Dijkstra plus an estimate of the distance still to go.
+import heapq
+
+GRID = [
+    "..........#.........",
+    ".####.....#.####....",
+    ".#..#..####....#....",
+    ".#..#..#..........#.",
+    "....#..#..####..#.#.",
+    ".####..#.....#..#...",
+    ".......#####.#..#.#.",
+    ".#####.......#....#.",
+    ".....#.#######..###.",
+    "..#........#........",
+]
+ROWS, COLS = len(GRID), len(GRID[0])
+START, GOAL = (0, 0), (ROWS - 1, COLS - 1)
+
+def neighbours(cell):
+    r, c = cell
+    for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        nr, nc = r + dr, c + dc
+        if 0 &lt;= nr &lt; ROWS and 0 &lt;= nc &lt; COLS and GRID[nr][nc] != "#":
+            yield (nr, nc)
+
+def manhattan(a, b):
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+def search(heuristic, label):
+    g = {START: 0}                       # cost from the start, known
+    parent = {START: None}
+    h0 = heuristic(START, GOAL)
+    heap = [(h0, h0, START)]             # (f, h, cell)
+    seen = set()
+    expanded = 0
+
+    while heap:
+        _, _, node = heapq.heappop(heap)
+        if node in seen:
+            continue
+        seen.add(node)
+        expanded += 1
+        if node == GOAL:
+            break
+        for nxt in neighbours(node):
+            tentative = g[node] + 1      # every step costs 1
+            if tentative &lt; g.get(nxt, float("inf")):
+                g[nxt] = tentative
+                parent[nxt] = node
+                h = heuristic(nxt, GOAL)
+                # f = cost so far + estimate of what is left
+                heapq.heappush(heap, (tentative + h, h, nxt))
+
+    path, node = [], GOAL
+    while node is not None:
+        path.append(node)
+        node = parent[node]
+    print(f"{label:&gt;9}: path length {len(path) - 1}, cells expanded {expanded}")
+    return set(path)
+
+
+search(lambda a, b: 0, "Dijkstra")       # h = 0 is exactly Dijkstra
+path = search(manhattan, "A*")
+
+print()
+for r in range(ROWS):
+    print("  " + "".join("*" if (r, c) in path else GRID[r][c] for c in range(COLS)))
+print()
+print(f"{sum(row.count('.') for row in GRID)} open cells.")
+print("Same path length. A* just wasted less time looking away from the goal.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">heapq.heappush(heap, (tentative + h, h, nxt))</code><span class="vz-cl-note">The one line that separates A* from Dijkstra: the priority is <code>f = g + h</code>, cost already spent plus cost estimated to remain, instead of <code>g</code> alone.</span></li><li class="vz-cl-step"><code class="vz-cl-line">(f, h, cell)</code><span class="vz-cl-note">The second element breaks ties. On a grid where every step costs 1 an enormous number of cells share an f value, and preferring the one nearest the goal is what turns a fan into a beeline. It changes nothing about correctness and most of the measured saving here comes from it.</span></li><li class="vz-cl-step"><code class="vz-cl-line">search(lambda a, b: 0, &quot;Dijkstra&quot;)</code><span class="vz-cl-note">With <code>h = 0</code> the formula collapses to <code>f = g</code>, so the identical function <em>is</em> Dijkstra. That is the cleanest way to see that A* is a generalisation, not a different algorithm.</span></li><li class="vz-cl-step"><code class="vz-cl-line">def manhattan(a, b):</code><span class="vz-cl-note">Steps are up/down/left/right and each costs 1, so the Manhattan distance can never overestimate what remains. That property &mdash; admissibility &mdash; is what keeps the answer optimal.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if tentative &lt; g.get(nxt, float(&quot;inf&quot;)):</code><span class="vz-cl-note">Compares on <code>g</code>, never on <code>f</code>. The heuristic decides what to look at next; it must not be allowed to decide what the route actually cost.</span></li><li class="vz-cl-step"><code class="vz-cl-line">expanded</code><span class="vz-cl-note">The number that matters. Both runs return a shortest path of the same length, and A* gets there having opened far fewer cells &mdash; on a game map or a road network that is the entire point.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Multiply the heuristic by 5. It is now inadmissible: expansions drop further, and the path it returns can be longer than the shortest one.</li><li>Swap Manhattan for Euclidean (<code>math.hypot</code>). Still admissible on this grid, but weaker, so more cells get expanded.</li><li>Wall the goal off completely. Both searches drain the heap and the reconstructed path is nonsense &mdash; a real implementation has to check that the goal was actually reached.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">Setting the heuristic to zero turns A* into:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">BFS</button><button type="button" class="vz-q-opt" data-vz-correct="1">Dijkstra</button><button type="button" class="vz-q-opt" data-vz-correct="0">Greedy best-first search</button><button type="button" class="vz-q-opt" data-vz-correct="0">DFS</button></div><p class="vz-q-why" hidden>f = g + h collapses to f = g, which is Dijkstra's priority exactly. The program runs the identical function both ways to show it.</p></li><li class="vz-q"><p class="vz-q-text">An admissible heuristic is one that:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Is fast to compute</button><button type="button" class="vz-q-opt" data-vz-correct="1">Never overestimates the remaining cost</button><button type="button" class="vz-q-opt" data-vz-correct="0">Is always exact</button><button type="button" class="vz-q-opt" data-vz-correct="0">Ignores obstacles</button></div><p class="vz-q-why" hidden>Overestimating lets A* commit to a route before a cheaper one is examined, so the path it returns can be longer than the shortest.</p></li><li class="vz-q"><p class="vz-q-text">Both searches in the program return a path of the same length. What differs?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">The path itself</button><button type="button" class="vz-q-opt" data-vz-correct="1">The number of cells expanded</button><button type="button" class="vz-q-opt" data-vz-correct="0">The memory used</button><button type="button" class="vz-q-opt" data-vz-correct="0">Nothing</button></div><p class="vz-q-why" hidden>136 cells against 90 on this grid. A* is not more correct - it is the same answer reached without looking away from the goal.</p></li></ol></section></div>
@@ -821,11 +1004,11 @@ print("Same path length. A* just wasted less time looking away from the goal.")<
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

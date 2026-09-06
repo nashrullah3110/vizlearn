@@ -70,7 +70,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -835,7 +841,91 @@ print("sorted:", [r[0] for r in stable_counting(records)])
 # both have key 1 and come out in that order. Walk the input forwards
 # instead and every group comes out reversed -- which is the bug that
 # breaks radix sort, since radix sort is counting sort applied repeatedly
-# and depends on each pass preserving the last one's work.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# and depends on each pass preserving the last one's work.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">def counting_sort(a, stats):
+    if not a:
+        return a
+    lo, hi = min(a), max(a)
+    k = hi - lo + 1
+    stats["k"] = k
+    counts = [0] * k
+    stats["ops"] += k                      # allocating the count array
+    for x in a:
+        counts[x - lo] += 1
+        stats["ops"] += 1                  # pass 1: count
+    out, pos = [0] * len(a), 0
+    for i, c in enumerate(counts):
+        stats["ops"] += 1                  # pass 2: walk every bucket
+        for _ in range(c):
+            out[pos] = i + lo
+            pos += 1
+            stats["ops"] += 1              # pass 3: write out
+    return out
+
+
+import random
+rng = random.Random(2)
+n = 1000
+print("n = %d in every row; only the RANGE of the values changes" % n)
+print("%14s %10s %12s %14s" % ("value range", "k", "operations", "ops per item"))
+for hi in (10, 100, 1000, 10 ** 4, 10 ** 6):
+    data = [rng.randrange(hi) for _ in range(n)]
+    st = {"ops": 0, "k": 0}
+    out = counting_sort(data, st)
+    assert out == sorted(data)
+    print("%14s %10d %12d %14.1f" % (
+        "0..%d" % hi, st["k"], st["ops"], st["ops"] / n))
+
+# The first rows are the case counting sort is for: a thousand items with
+# values under a thousand, sorted in a few operations each, no comparisons
+# at all. The last row is the same thousand items with values up to a
+# million -- and the cost per item is now in the thousands, because the
+# algorithm walks a million empty buckets to find them.
+#
+# The rule that falls out: counting sort is O(n + k), and it is a good
+# idea only while k is comparable to n. Sorting a thousand 32-bit integers
+# by this method would allocate four billion counters.
+#
+# Comparison sorts do not care about the range at all:
+
+import math
+print()
+print("a comparison sort would need about n log2 n = %.0f comparisons," % (
+    n * math.log2(n)))
+print("for any of the rows above.")
+
+# The other property worth having is stability, and the naive version
+# above threw it away -- it rebuilt the values from the counts rather than
+# moving the original records. With records that carry a payload you need
+# the prefix-sum version, which places each item by looking up where its
+# bucket ends and walking the input BACKWARDS.
+
+records = [("Ada", 2), ("Bala", 1), ("Chen", 2), ("Dara", 1), ("Eze", 0)]
+
+
+def stable_counting(recs):
+    k = max(r[1] for r in recs) + 1
+    counts = [0] * k
+    for _, key in recs:
+        counts[key] += 1
+    for i in range(1, k):
+        counts[i] += counts[i - 1]         # prefix sums: end position of each bucket
+    out = [None] * len(recs)
+    for rec in reversed(recs):             # backwards is what makes it stable
+        counts[rec[1]] -= 1
+        out[counts[rec[1]]] = rec
+    return out
+
+
+print()
+print("input: ", [r[0] for r in records])
+print("sorted:", [r[0] for r in stable_counting(records)])
+
+# Ada and Chen both have key 2 and come out in that order; Bala and Dara
+# both have key 1 and come out in that order. Walk the input forwards
+# instead and every group comes out reversed -- which is the bug that
+# breaks radix sort, since radix sort is counting sort applied repeatedly
+# and depends on each pass preserving the last one's work.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
@@ -894,7 +984,47 @@ print("start :", wide)
 print("sorted:", counting_sort(wide))
 print()
 print("Three items, a hundred thousand counters, and a pass over every one of")
-print("them. O(n + k) is only a win when k behaves.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>counting_sort.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">counts[value - lo] += 1</code><span class="vz-cl-note">The value itself is the index. That is the trick, and it is also the restriction: this only works for keys that can be used as array offsets.</span></li><li class="vz-cl-step"><code class="vz-cl-line">for i in range(1, k): counts[i] += counts[i - 1]</code><span class="vz-cl-note">Turns counts into positions. After this, <code>counts[v]</code> is the number of items less than or equal to <em>v</em> &mdash; which is exactly where the last <em>v</em> belongs in the output.</span></li><li class="vz-cl-step"><code class="vz-cl-line">for value in reversed(a):</code><span class="vz-cl-note">Walking backwards, combined with decrementing before writing, keeps equal items in their original order. Iterate forwards and the sort still works but is no longer stable &mdash; which would break radix sort, its main customer.</span></li><li class="vz-cl-step"><code class="vz-cl-line">out[counts[value - lo]] = value</code><span class="vz-cl-note">Each item is placed directly at its final index. No item is ever compared with another, so the O(n log n) lower bound for comparison sorts simply does not apply.</span></li><li class="vz-cl-step"><code class="vz-cl-line">k = hi - lo + 1</code><span class="vz-cl-note">The whole cost story. O(n + k) is linear when k is comparable to n, and a disaster when it is not &mdash; as the three-item example shows.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Sort exam marks: <code>[random.randint(0, 100) for _ in range(50)]</code>. Fifty items, 101 counters &mdash; this is the shape counting sort is for.</li><li>Iterate forwards instead of <code>reversed(a)</code>, and sort <code>(value, tag)</code> pairs by value. Watch the tags come out in the wrong order.</li><li>Remove the <code>- lo</code> offset and sort a list with negative numbers. The <code>IndexError</code> is why the offset is there.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("them. O(n + k) is only a win when k behaves.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>counting_sort.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Counting sort: count how many of each value there are, then rebuild.
+# Not a comparison sort - it never asks "is x &lt; y?" at all.
+
+def counting_sort(a):
+    if not a:
+        return []
+    lo, hi = min(a), max(a)
+    k = hi - lo + 1
+    print(f"n = {len(a)}, value range k = {k}  ({lo}..{hi})")
+
+    counts = [0] * k
+    for value in a:
+        counts[value - lo] += 1
+    # Only worth printing while it fits on a line - see the second example.
+    print("counts   :", counts if k &lt;= 20 else f"&lt;{k} counters, {len(a)} non-zero&gt;")
+
+    # Running total: counts[i] becomes "how many items are &lt;= i".
+    for i in range(1, k):
+        counts[i] += counts[i - 1]
+    print("prefix   :", counts if k &lt;= 20 else f"&lt;{k} counters, summed in order&gt;")
+
+    out = [None] * len(a)
+    for value in reversed(a):            # reversed keeps the sort stable
+        counts[value - lo] -= 1
+        out[counts[value - lo]] = value
+    return out
+
+
+data = [4, 2, 2, 8, 3, 3, 1]
+print("start :", data)
+print("sorted:", counting_sort(data))
+
+print()
+print("Now the same algorithm on a wide range:")
+wide = [5, 100_000, 3]
+print("start :", wide)
+print("sorted:", counting_sort(wide))
+print()
+print("Three items, a hundred thousand counters, and a pass over every one of")
+print("them. O(n + k) is only a win when k behaves.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">counts[value - lo] += 1</code><span class="vz-cl-note">The value itself is the index. That is the trick, and it is also the restriction: this only works for keys that can be used as array offsets.</span></li><li class="vz-cl-step"><code class="vz-cl-line">for i in range(1, k): counts[i] += counts[i - 1]</code><span class="vz-cl-note">Turns counts into positions. After this, <code>counts[v]</code> is the number of items less than or equal to <em>v</em> &mdash; which is exactly where the last <em>v</em> belongs in the output.</span></li><li class="vz-cl-step"><code class="vz-cl-line">for value in reversed(a):</code><span class="vz-cl-note">Walking backwards, combined with decrementing before writing, keeps equal items in their original order. Iterate forwards and the sort still works but is no longer stable &mdash; which would break radix sort, its main customer.</span></li><li class="vz-cl-step"><code class="vz-cl-line">out[counts[value - lo]] = value</code><span class="vz-cl-note">Each item is placed directly at its final index. No item is ever compared with another, so the O(n log n) lower bound for comparison sorts simply does not apply.</span></li><li class="vz-cl-step"><code class="vz-cl-line">k = hi - lo + 1</code><span class="vz-cl-note">The whole cost story. O(n + k) is linear when k is comparable to n, and a disaster when it is not &mdash; as the three-item example shows.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Sort exam marks: <code>[random.randint(0, 100) for _ in range(50)]</code>. Fifty items, 101 counters &mdash; this is the shape counting sort is for.</li><li>Iterate forwards instead of <code>reversed(a)</code>, and sort <code>(value, tag)</code> pairs by value. Watch the tags come out in the wrong order.</li><li>Remove the <code>- lo</code> offset and sort a list with negative numbers. The <code>IndexError</code> is why the offset is there.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">How does counting sort beat the O(n log n) lower bound?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">It is parallel</button><button type="button" class="vz-q-opt" data-vz-correct="1">It never compares two elements</button><button type="button" class="vz-q-opt" data-vz-correct="0">It uses more memory</button><button type="button" class="vz-q-opt" data-vz-correct="0">It only works on small lists</button></div><p class="vz-q-why" hidden>The bound applies to comparison sorts. Counting sort uses the value as an array index, so the proof simply does not cover it.</p></li><li class="vz-q"><p class="vz-q-text">Why does the final loop iterate over reversed(a)?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">It is faster</button><button type="button" class="vz-q-opt" data-vz-correct="1">To keep the sort stable</button><button type="button" class="vz-q-opt" data-vz-correct="0">To handle negatives</button><button type="button" class="vz-q-opt" data-vz-correct="0">To avoid an off-by-one</button></div><p class="vz-q-why" hidden>Walking backwards while decrementing before writing keeps equal items in their original order. Radix sort depends on that, so getting it wrong breaks the algorithm built on top.</p></li><li class="vz-q"><p class="vz-q-text">The program sorts [5, 100000, 3]. What is the problem?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">The list is too short</button><button type="button" class="vz-q-opt" data-vz-correct="1">The values are too far apart, so k dwarfs n</button><button type="button" class="vz-q-opt" data-vz-correct="0">It is not sorted first</button><button type="button" class="vz-q-opt" data-vz-correct="0">Counting sort cannot handle 100000</button></div><p class="vz-q-why" hidden>O(n + k) is linear only when k is comparable to n. Three items and a hundred thousand counters is the case that makes the cost obvious.</p></li></ol></section></div>
@@ -917,11 +1047,11 @@ print("them. O(n + k) is only a win when k behaves.")</script><div class="vz-cod
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

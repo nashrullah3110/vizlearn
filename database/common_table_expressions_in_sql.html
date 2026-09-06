@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -560,7 +566,65 @@ INSERT INTO order_items (order_id, product_id, qty) VALUES
   (103, 4, 3),
   (104, 1, 2), (104, 5, 1),
   (105, 2, 1),
-  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- The same query written two ways. Compare them for readability, then
+  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">-- The same query written two ways. Compare them for readability, then
+-- note that they produce identical rows.
+
+SELECT c.name, t.orders, t.gross
+FROM customers c
+JOIN (SELECT o.customer_id,
+             count(DISTINCT o.id)             AS orders,
+             round(sum(i.qty * p.price), 2)   AS gross
+      FROM orders o
+      JOIN order_items i ON i.order_id = o.id
+      JOIN products    p ON p.id = i.product_id
+      GROUP BY o.customer_id) t
+  ON t.customer_id = c.id
+ORDER BY t.gross DESC;
+
+WITH totals AS (
+    SELECT o.customer_id,
+           count(DISTINCT o.id)           AS orders,
+           round(sum(i.qty * p.price), 2) AS gross
+    FROM orders o
+    JOIN order_items i ON i.order_id = o.id
+    JOIN products    p ON p.id = i.product_id
+    GROUP BY o.customer_id
+)
+SELECT c.name, t.orders, t.gross
+FROM customers c
+JOIN totals t ON t.customer_id = c.id
+ORDER BY t.gross DESC;
+
+-- Now the part a subquery cannot do. A RECURSIVE CTE refers to itself,
+-- so it can walk a sequence or a hierarchy of unknown depth.
+
+WITH RECURSIVE months(m) AS (
+    SELECT &#x27;2024-01&#x27;
+    UNION ALL
+    SELECT CASE
+             WHEN substr(m, 6, 2) = &#x27;12&#x27;
+               THEN (CAST(substr(m, 1, 4) AS INT) + 1) || &#x27;-01&#x27;
+             ELSE substr(m, 1, 5) ||
+                  substr(&#x27;0&#x27; || (CAST(substr(m, 6, 2) AS INT) + 1), -2)
+           END
+    FROM months
+    WHERE m &lt; &#x27;2024-06&#x27;
+)
+SELECT months.m                       AS month,
+       count(o.id)                    AS orders
+FROM months
+LEFT JOIN orders o ON substr(o.placed, 1, 7) = months.m
+GROUP BY months.m
+ORDER BY months.m;
+
+-- Look at May and June: zero orders, and they still have a row.
+--
+-- That is the thing the orders table cannot do by itself. A month with
+-- no orders has no rows, so GROUP BY has nothing to group and the month
+-- simply vanishes from the report -- which is how a dashboard ends up
+-- with a gap where a quiet month should be. The recursive CTE generates
+-- the months from nothing, and the LEFT JOIN fills in the zeros.
+</pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- The same query written two ways. Compare them for readability, then
 -- note that they produce identical rows.
 
 SELECT c.name, t.orders, t.gross
@@ -680,11 +744,11 @@ INSERT INTO archived_orders SELECT * FROM moved;</code></pre>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

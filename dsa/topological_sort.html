@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -642,7 +648,84 @@ print("stuck on:", sorted(set(CYCLIC) - set(order3)))
 #
 # Which is why this is the check behind "circular dependency detected" in
 # build systems, package managers and spreadsheet engines: they are all
-# running a topological sort, and the error is the sort failing to finish.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# running a topological sort, and the error is the sort failing to finish.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">from collections import deque
+
+DEPS = {
+    "boil water":   [],
+    "grind beans":  [],
+    "brew":         ["boil water", "grind beans"],
+    "warm cup":     [],
+    "pour":         ["brew", "warm cup"],
+    "drink":        ["pour"],
+}
+
+
+def kahn(deps, tie_break=sorted):
+    indeg = {n: len(d) for n, d in deps.items()}
+    out_edges = {n: [] for n in deps}
+    for node, ds in deps.items():
+        for d in ds:
+            out_edges[d].append(node)
+    ready = tie_break([n for n, k in indeg.items() if k == 0])
+    order = []
+    while ready:
+        node = ready.pop(0)
+        order.append(node)
+        for nxt in out_edges[node]:
+            indeg[nxt] -= 1
+            if indeg[nxt] == 0:
+                ready.append(nxt)
+        ready = tie_break(ready)
+    return order, len(order) == len(deps)
+
+
+order, ok = kahn(DEPS)
+print("one valid order:")
+for i, step in enumerate(order, 1):
+    print("  %d. %s" % (i, step))
+
+# Now the same graph with the ready-list drained in the opposite order.
+
+order2, _ = kahn(DEPS, lambda x: sorted(x, reverse=True))
+print()
+print("another valid order:", " | ".join(order2))
+print("same graph, both correct:", order != order2)
+
+# Three tasks have no prerequisites at all, so nothing in the problem
+# says which comes first. A topological sort returns SOME order consistent
+# with the constraints, not the order -- and code that depends on getting
+# a particular one is depending on a tie-break that is not specified.
+#
+# What IS guaranteed is the constraint itself. Check it directly:
+
+pos = {n: i for i, n in enumerate(order)}
+violations = [(d, n) for n, ds in DEPS.items() for d in ds if pos[d] &gt; pos[n]]
+print()
+print("dependencies that came after the task needing them:", violations)
+
+# Empty, in both orders. That is the entire specification.
+#
+# And the case with no answer. Add one edge that makes a cycle:
+
+CYCLIC = dict(DEPS)
+CYCLIC["boil water"] = ["drink"]      # you must drink before you boil
+
+order3, ok3 = kahn(CYCLIC)
+print()
+print("with a cycle, Kahn's algorithm produced %d of %d tasks" % (
+    len(order3), len(CYCLIC)))
+print("complete?", ok3)
+print("stuck on:", sorted(set(CYCLIC) - set(order3)))
+
+# It did not loop forever and it did not raise: it simply ran out of
+# tasks with an in-degree of zero, and the count came up short. That
+# comparison -- did I emit every node? -- IS the cycle detection, and it
+# comes free with the algorithm.
+#
+# Which is why this is the check behind "circular dependency detected" in
+# build systems, package managers and spreadsheet engines: they are all
+# running a topological sort, and the error is the sort failing to finish.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-things-to-try">Things to try</h3>
@@ -744,7 +827,56 @@ print("Now make nlp a prerequisite of maths, which closes a cycle:")
 prereqs["maths"] = ["nlp"]
 order, stuck = topological_sort(prereqs)
 print("order:", order)
-print("never reached in-degree 0:", stuck)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>topological_sort.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">indegree = {n: len(deps) for n, deps in prereqs.items()}</code><span class="vz-cl-note">How many prerequisites each node is still waiting on. The algorithm is nothing but keeping this table correct as nodes are removed.</span></li><li class="vz-cl-step"><code class="vz-cl-line">dependents[d].append(node)</code><span class="vz-cl-note">The graph reversed. The input says “what does this need”; the loop needs “what is unblocked when this is done”, and building both is cheaper than searching one repeatedly.</span></li><li class="vz-cl-step"><code class="vz-cl-line">ready = deque(... if deg == 0)</code><span class="vz-cl-note">Everything with no prerequisites can start immediately, and in any order. A graph usually has many valid topological orders, not one.</span></li><li class="vz-cl-step"><code class="vz-cl-line">indegree[dependent] -= 1</code><span class="vz-cl-note">Decrement, never recompute. Each edge is looked at exactly once across the whole run, which is what makes this O(V + E).</span></li><li class="vz-cl-step"><code class="vz-cl-line">if len(order) != len(prereqs):</code><span class="vz-cl-note">The cycle test, and it is free. Nodes in a cycle always wait on each other, so their in-degree never reaches zero and they never enter the queue &mdash; a short output <em>is</em> the detection.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Swap <code>popleft()</code> for <code>pop()</code>. A different, equally valid order comes out &mdash; useful proof that the answer is not unique.</li><li>Use a <code>heapq</code> instead of a deque to get the lexicographically smallest valid order. That is the usual “deterministic build order” requirement.</li><li>Add a node with a prerequisite on itself. In-degree 1 forever, and it shows up in the stuck list immediately.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("never reached in-degree 0:", stuck)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>topological_sort.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Topological sort (Kahn): repeatedly take a node nothing depends on.
+from collections import deque
+
+prereqs = {
+    "intro":    [],
+    "maths":    [],
+    "python":   ["intro"],
+    "data":     ["python", "maths"],
+    "ml":       ["data", "maths"],
+    "deep":     ["ml"],
+    "nlp":      ["deep"],
+}
+
+def topological_sort(prereqs):
+    indegree = {n: len(deps) for n, deps in prereqs.items()}
+    dependents = {n: [] for n in prereqs}
+    for node, deps in prereqs.items():
+        for d in deps:
+            dependents[d].append(node)
+
+    ready = deque(n for n, deg in indegree.items() if deg == 0)
+    print("start, in-degrees:", indegree)
+    order = []
+
+    while ready:
+        node = ready.popleft()
+        order.append(node)
+        for dependent in dependents[node]:
+            indegree[dependent] -= 1        # one prerequisite satisfied
+            if indegree[dependent] == 0:
+                ready.append(dependent)
+        print(f"take {node:&gt;7} -&gt; ready={list(ready)}")
+
+    if len(order) != len(prereqs):          # something never reached zero
+        stuck = [n for n, deg in indegree.items() if deg &gt; 0]
+        return None, stuck
+    return order, []
+
+
+order, stuck = topological_sort(prereqs)
+print()
+print("a valid order:", " -&gt; ".join(order))
+
+print()
+print("Now make nlp a prerequisite of maths, which closes a cycle:")
+prereqs["maths"] = ["nlp"]
+order, stuck = topological_sort(prereqs)
+print("order:", order)
+print("never reached in-degree 0:", stuck)
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">indegree = {n: len(deps) for n, deps in prereqs.items()}</code><span class="vz-cl-note">How many prerequisites each node is still waiting on. The algorithm is nothing but keeping this table correct as nodes are removed.</span></li><li class="vz-cl-step"><code class="vz-cl-line">dependents[d].append(node)</code><span class="vz-cl-note">The graph reversed. The input says “what does this need”; the loop needs “what is unblocked when this is done”, and building both is cheaper than searching one repeatedly.</span></li><li class="vz-cl-step"><code class="vz-cl-line">ready = deque(... if deg == 0)</code><span class="vz-cl-note">Everything with no prerequisites can start immediately, and in any order. A graph usually has many valid topological orders, not one.</span></li><li class="vz-cl-step"><code class="vz-cl-line">indegree[dependent] -= 1</code><span class="vz-cl-note">Decrement, never recompute. Each edge is looked at exactly once across the whole run, which is what makes this O(V + E).</span></li><li class="vz-cl-step"><code class="vz-cl-line">if len(order) != len(prereqs):</code><span class="vz-cl-note">The cycle test, and it is free. Nodes in a cycle always wait on each other, so their in-degree never reaches zero and they never enter the queue &mdash; a short output <em>is</em> the detection.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Swap <code>popleft()</code> for <code>pop()</code>. A different, equally valid order comes out &mdash; useful proof that the answer is not unique.</li><li>Use a <code>heapq</code> instead of a deque to get the lexicographically smallest valid order. That is the usual “deterministic build order” requirement.</li><li>Add a node with a prerequisite on itself. In-degree 1 forever, and it shows up in the stuck list immediately.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">Kahn&#x27;s algorithm starts from the nodes whose in-degree is:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Highest</button><button type="button" class="vz-q-opt" data-vz-correct="1">Zero</button><button type="button" class="vz-q-opt" data-vz-correct="0">One</button><button type="button" class="vz-q-opt" data-vz-correct="0">Equal to their out-degree</button></div><p class="vz-q-why" hidden>In-degree zero means nothing has to happen first, so those can be taken immediately - and in any order among themselves.</p></li><li class="vz-q"><p class="vz-q-text">The program detects a cycle by noticing that:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">A node repeats</button><button type="button" class="vz-q-opt" data-vz-correct="1">The output is shorter than the node count</button><button type="button" class="vz-q-opt" data-vz-correct="0">The queue empties</button><button type="button" class="vz-q-opt" data-vz-correct="0">An in-degree goes negative</button></div><p class="vz-q-why" hidden>Nodes in a cycle wait on each other forever, so their in-degree never reaches zero and they never enter the queue. The short output is the detection - it costs nothing extra.</p></li><li class="vz-q"><p class="vz-q-text">A directed acyclic graph has:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Exactly one topological order</button><button type="button" class="vz-q-opt" data-vz-correct="1">Usually many valid topological orders</button><button type="button" class="vz-q-opt" data-vz-correct="0">None unless it is a tree</button><button type="button" class="vz-q-opt" data-vz-correct="0">One per starting node</button></div><p class="vz-q-why" hidden>Swapping popleft() for pop() produces a different, equally correct order. Where a specific one is needed, a heap gives the lexicographically smallest.</p></li></ol></section></div>
@@ -767,11 +899,11 @@ print("never reached in-degree 0:", stuck)</script><div class="vz-code-bar"><spa
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

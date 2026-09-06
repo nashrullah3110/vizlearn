@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -650,7 +656,110 @@ print("  spanning tree weight:", total)
 # b and c were already connected through a, and one find on each end
 # said so.
 # That is the whole contribution: a cycle test that costs almost nothing,
-# which is what makes Kruskal's algorithm practical.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# which is what makes Kruskal's algorithm practical.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">class DSU:
+    def __init__(self, n, by_rank=True, compress=True):
+        self.parent = list(range(n))
+        self.rank = [0] * n
+        self.by_rank, self.compress = by_rank, compress
+        self.hops = 0
+
+    def find(self, x):
+        root = x
+        while self.parent[root] != root:
+            root = self.parent[root]
+            self.hops += 1
+        if self.compress:
+            while self.parent[x] != root:      # second pass: re-point
+                self.parent[x], x = root, self.parent[x]
+        return root
+
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra == rb:
+            return False
+        if self.by_rank:
+            if self.rank[ra] &lt; self.rank[rb]:
+                ra, rb = rb, ra
+            self.parent[rb] = ra
+            if self.rank[ra] == self.rank[rb]:
+                self.rank[ra] += 1
+        else:
+            self.parent[ra] = rb               # arbitrary: builds a chain
+        return True
+
+
+n = 2000
+print("%d elements, unioned in the worst order, then every element queried"
+      % n)
+print("%-26s %14s %14s" % ("variant", "pointer hops", "tree depth"))
+for by_rank in (False, True):
+    for compress in (False, True):
+        d = DSU(n, by_rank, compress)
+        for i in range(n - 1):
+            d.union(i, i + 1)          # a chain, if nothing prevents it
+        d.hops = 0
+        for i in range(n):
+            d.find(i)
+        depth = 0
+        for i in range(n):
+            k, c = i, 0
+            while d.parent[k] != k:
+                k = d.parent[k]; c += 1
+            depth = max(depth, c)
+        name = "%s + %s" % ("rank" if by_rank else "no rank",
+                            "compress" if compress else "no compress")
+        print("%-26s %14d %14d" % (name, d.hops, depth))
+
+# The first row is the degenerate case: unioning 0-1, 1-2, 2-3 in order
+# with no rank builds one long chain, and every find walks it. That is
+# O(n) per query -- a linked list wearing a tree's name.
+#
+# Either optimisation alone fixes it, and they fix it differently. Union
+# by rank PREVENTS the deep tree from forming; path compression allows it
+# to form and then flattens it on the way back out. Together the depth
+# collapses to 1 and a find is a single lookup.
+#
+# The famous complexity is O(alpha(n)) amortised, where alpha is the
+# inverse Ackermann function. It is not a constant, but:
+
+best = DSU(n, True, True)
+for i in range(n - 1):
+    best.union(i, i + 1)
+best.hops = 0
+for i in range(n):
+    best.find(i)
+print()
+print("alpha(n) stays below 5 for any n that fits in the observable universe.")
+print("with both optimisations, %d finds cost %d hops -- %.2f each."
+      % (n, best.hops, best.hops / n))
+
+# Now what it is FOR. Union-Find answers "are these two in the same
+# group" under merges, which is exactly Kruskal's cycle test:
+
+edges = [(1, "a", "b"), (2, "b", "c"), (2, "a", "c"), (3, "c", "d")]
+names = {}
+d = DSU(4)
+for w, u, v in edges:
+    for x in (u, v):
+        names.setdefault(x, len(names))
+
+print()
+d = DSU(len(names))
+total = 0
+for w, u, v in sorted(edges):
+    if d.union(names[u], names[v]):
+        total += w
+        print("  take %s-%s (weight %d)" % (u, v, w))
+    else:
+        print("  skip %s-%s (weight %d) -- would close a cycle" % (u, v, w))
+print("  spanning tree weight:", total)
+
+# The b-c edge was rejected without any search of the tree built so far:
+# b and c were already connected through a, and one find on each end
+# said so.
+# That is the whole contribution: a cycle test that costs almost nothing,
+# which is what makes Kruskal's algorithm practical.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-guided-tour">Guided tour</h3>
@@ -758,7 +867,75 @@ for x in items:
     groups.setdefault(dsu.find(x), []).append(x)
 print("groups:", list(groups.values()))
 print("connected(0, 3):", dsu.find(0) == dsu.find(3))
-print("connected(0, 5):", dsu.find(0) == dsu.find(5))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>union_find.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">self.parent = {x: x for x in items}</code><span class="vz-cl-note">Every element starts as its own root, so there are n groups of one. “Which group is x in?” is always answered by walking to the root, and the root's identity is the group's name.</span></li><li class="vz-cl-step"><code class="vz-cl-line">self.parent[ra] = rb   # naive</code><span class="vz-cl-note">Attaching without looking at the shapes is what builds a chain. Merge in a line, as the sample does, and <code>find</code> degrades to O(n) &mdash; a linked list wearing a tree's name.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if self.rank[ra] &lt; self.rank[rb]: ra, rb = rb, ra</code><span class="vz-cl-note">Union by rank: hang the shorter tree under the taller one so the depth does not grow. Rank is an upper bound on height, not the exact height, which is why compression can leave it stale without breaking anything.</span></li><li class="vz-cl-step"><code class="vz-cl-line">while self.parent[x] != root: self.parent[x], x = root, self.parent[x]</code><span class="vz-cl-note">Path compression. Every node touched on the way up is re-pointed straight at the root, so the next query on any of them is one hop. The work of the walk is what pays for the next walk.</span></li><li class="vz-cl-step"><code class="vz-cl-line">dsu.hops</code><span class="vz-cl-note">Together these give near-constant amortised time &mdash; O(α(n)), where α is the inverse Ackermann function and is below 5 for any n that fits in a computer. The hop counts printed here are that theory, measured.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Raise <code>items</code> to <code>range(1000)</code> with the same chain of merges. The naive count explodes quadratically; the optimised one barely moves.</li><li>Delete only the compression loop, keeping rank. Most of the win survives &mdash; either optimisation alone is already good.</li><li>Add a <code>count</code> field decremented on each successful union. That is how union-find answers “how many connected components?” in O(1).</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("connected(0, 5):", dsu.find(0) == dsu.find(5))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>union_find.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Union-Find (disjoint set union): which things are in the same group?
+
+class NaiveDSU:
+    def __init__(self, items):
+        self.parent = {x: x for x in items}
+        self.hops = 0
+
+    def find(self, x):
+        while self.parent[x] != x:      # walk up to the root
+            self.hops += 1
+            x = self.parent[x]
+        return x
+
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.parent[ra] = rb        # attach blindly - this is the problem
+            return True
+        return False
+
+
+class DSU(NaiveDSU):
+    def __init__(self, items):
+        super().__init__(items)
+        self.rank = {x: 0 for x in items}
+
+    def find(self, x):
+        root = x
+        while self.parent[root] != root:
+            self.hops += 1
+            root = self.parent[root]
+        while self.parent[x] != root:   # path compression: flatten on the way back
+            self.parent[x], x = root, self.parent[x]
+        return root
+
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra == rb:
+            return False
+        if self.rank[ra] &lt; self.rank[rb]:       # union by rank: shorter under taller
+            ra, rb = rb, ra
+        self.parent[rb] = ra
+        if self.rank[ra] == self.rank[rb]:
+            self.rank[ra] += 1
+        return True
+
+
+items = list(range(10))
+merges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8), (8, 9)]
+
+for cls in (NaiveDSU, DSU):
+    dsu = cls(items)
+    for a, b in merges:
+        dsu.union(a, b)
+    for x in items:                     # now ask about every element
+        dsu.find(x)
+    print(f"{cls.__name__:&gt;9}: {dsu.hops} pointer hops")
+
+print()
+dsu = DSU(items)
+for a, b in [(0, 1), (2, 3), (1, 3), (5, 6)]:
+    print(f"union({a}, {b}) merged:", dsu.union(a, b))
+groups = {}
+for x in items:
+    groups.setdefault(dsu.find(x), []).append(x)
+print("groups:", list(groups.values()))
+print("connected(0, 3):", dsu.find(0) == dsu.find(3))
+print("connected(0, 5):", dsu.find(0) == dsu.find(5))
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">self.parent = {x: x for x in items}</code><span class="vz-cl-note">Every element starts as its own root, so there are n groups of one. “Which group is x in?” is always answered by walking to the root, and the root's identity is the group's name.</span></li><li class="vz-cl-step"><code class="vz-cl-line">self.parent[ra] = rb   # naive</code><span class="vz-cl-note">Attaching without looking at the shapes is what builds a chain. Merge in a line, as the sample does, and <code>find</code> degrades to O(n) &mdash; a linked list wearing a tree's name.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if self.rank[ra] &lt; self.rank[rb]: ra, rb = rb, ra</code><span class="vz-cl-note">Union by rank: hang the shorter tree under the taller one so the depth does not grow. Rank is an upper bound on height, not the exact height, which is why compression can leave it stale without breaking anything.</span></li><li class="vz-cl-step"><code class="vz-cl-line">while self.parent[x] != root: self.parent[x], x = root, self.parent[x]</code><span class="vz-cl-note">Path compression. Every node touched on the way up is re-pointed straight at the root, so the next query on any of them is one hop. The work of the walk is what pays for the next walk.</span></li><li class="vz-cl-step"><code class="vz-cl-line">dsu.hops</code><span class="vz-cl-note">Together these give near-constant amortised time &mdash; O(α(n)), where α is the inverse Ackermann function and is below 5 for any n that fits in a computer. The hop counts printed here are that theory, measured.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Raise <code>items</code> to <code>range(1000)</code> with the same chain of merges. The naive count explodes quadratically; the optimised one barely moves.</li><li>Delete only the compression loop, keeping rank. Most of the win survives &mdash; either optimisation alone is already good.</li><li>Add a <code>count</code> field decremented on each successful union. That is how union-find answers “how many connected components?” in O(1).</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">What does path compression do?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Removes duplicate elements</button><button type="button" class="vz-q-opt" data-vz-correct="1">Re-points every node touched on the way up straight at the root</button><button type="button" class="vz-q-opt" data-vz-correct="0">Merges the two smallest trees</button><button type="button" class="vz-q-opt" data-vz-correct="0">Sorts the parent array</button></div><p class="vz-q-why" hidden>The walk pays for the next walk. Every node on the path becomes one hop from the root, so repeat queries are effectively free.</p></li><li class="vz-q"><p class="vz-q-text">Union by rank exists to prevent:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Duplicate unions</button><button type="button" class="vz-q-opt" data-vz-correct="1">Trees degenerating into long chains</button><button type="button" class="vz-q-opt" data-vz-correct="0">Cycles</button><button type="button" class="vz-q-opt" data-vz-correct="0">Memory growth</button></div><p class="vz-q-why" hidden>Attaching blindly, as the naive version does, builds a linked list wearing a tree's name - and find degrades to O(n), which the program's hop counts show directly.</p></li><li class="vz-q"><p class="vz-q-text">With both optimisations, the amortised cost per operation is:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">O(log n)</button><button type="button" class="vz-q-opt" data-vz-correct="0">O(1) exactly</button><button type="button" class="vz-q-opt" data-vz-correct="1">O(α(n)), which is below 5 for any real n</button><button type="button" class="vz-q-opt" data-vz-correct="0">O(n)</button></div><p class="vz-q-why" hidden>The inverse Ackermann function grows so slowly that it is a constant for practical purposes - but it is not literally O(1).</p></li></ol></section></div>
@@ -781,11 +958,11 @@ print("connected(0, 5):", dsu.find(0) == dsu.find(5))</script><div class="vz-cod
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

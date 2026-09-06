@@ -16,7 +16,8 @@ import sys
 import lib_shell as shell
 from lib_catalog import ROOT
 from lib_catalog import counts
-from lib_pages import STATIC_TITLES, last_modified, pretty_date
+from lib_pages import (GITHUB, KAGGLE, LINKEDIN, STATIC_TITLES, last_modified,
+                       pretty_date)
 from static_pages import PAGES
 
 PREFIX = ""
@@ -90,7 +91,10 @@ def slug(heading):
 
 def main():
     written = 0
-    numbers = counts()
+    # The author page links out to the same three profiles the footer does.
+    # They come from lib_pages rather than being retyped here so there is one
+    # place to change if a handle ever moves.
+    numbers = dict(counts(), github=GITHUB, linkedin=LINKEDIN, kaggle=KAGGLE)
     for rel, page in PAGES.items():
         open(os.path.join(ROOT, rel), "w", encoding="utf-8").write(
             build(rel, page, numbers))

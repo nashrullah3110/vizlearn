@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -619,7 +625,92 @@ while pq:
 # The new p1 job jumped ahead of everything with a lower priority, and
 # nothing had to be re-sorted to make that happen. A sorted list would
 # have shifted every element after the insertion point; the heap moved
-# one item up one short path.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# one item up one short path.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import heapq
+import random
+import time
+
+# A heap only guarantees parent &lt;= child. Siblings are unordered, and
+# the array is emphatically not sorted:
+h = []
+for x in [5, 3, 8, 1, 9, 2, 7]:
+    heapq.heappush(h, x)
+print("heap array:", h)
+print("sorted:    ", sorted(h))
+print("smallest is at index 0:", h[0] == min(h))
+
+# Every level down is a valid heap too, which is the invariant:
+def check(a):
+    return all(a[p] &lt;= a[c]
+               for c in range(1, len(a))
+               for p in [(c - 1) // 2])
+
+
+print("parent &lt;= child everywhere:", check(h))
+
+# The array IS the tree. Node i has children 2i+1 and 2i+2 -- no pointers,
+# no nodes, no allocation:
+print()
+for i in range(len(h) // 2):
+    kids = [h[j] for j in (2 * i + 1, 2 * i + 2) if j &lt; len(h)]
+    print("  h[%d] = %d  -&gt;  children %s" % (i, h[i], kids))
+
+# Now the comparison that matters. A sorted list also gives you the
+# minimum in O(1) -- it is just list[0]. The difference is what INSERT
+# costs, and that is where the partial order pays.
+
+def timed(f, n):
+    t0 = time.time(); f(n); return (time.time() - t0) * 1000
+
+
+def with_heap(n):
+    q, rng = [], random.Random(1)
+    for _ in range(n):
+        heapq.heappush(q, rng.random())
+    while q:
+        heapq.heappop(q)
+
+
+def with_sorted_list(n):
+    import bisect
+    q, rng = [], random.Random(1)
+    for _ in range(n):
+        bisect.insort(q, rng.random())    # O(log n) to find, O(n) to shift
+    while q:
+        q.pop(0)
+
+
+print()
+print("%8s %14s %18s" % ("n", "heap (ms)", "sorted list (ms)"))
+for n in (2000, 4000, 8000):
+    print("%8d %14.1f %18.1f" % (n, timed(with_heap, n),
+                                 timed(with_sorted_list, n)))
+
+# The sorted list has to keep a total order it was never asked for. The
+# heap maintains only the parent-child relation, which is one path from
+# the insertion point to the root -- log n comparisons and no shifting.
+#
+# The classic use is scheduling: always take the most urgent job, and
+# keep adding jobs while you work.
+
+jobs = [(3, "write report"), (1, "server on fire"), (2, "review PR"),
+        (5, "reorganise inbox"), (1, "customer down")]
+pq = []
+for pri, name in jobs:
+    heapq.heappush(pq, (pri, name))
+print()
+print("handling in priority order:")
+while pq:
+    pri, name = heapq.heappop(pq)
+    print("  [p%d] %s" % (pri, name))
+    if name == "server on fire":
+        heapq.heappush(pq, (1, "write incident postmortem"))
+        print("        (a new p1 job arrived mid-queue)")
+
+# The new p1 job jumped ahead of everything with a lower priority, and
+# nothing had to be re-sorted to make that happen. A sorted list would
+# have shifted every element after the insertion point; the heap moved
+# one item up one short path.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-try-it-yourself">Try it yourself</h3>
@@ -726,7 +817,68 @@ while tasks:
 # Top-k without sorting the whole list.
 data = [17, 4, 92, 8, 55, 23, 71, 3]
 print()
-print("3 largest:", heapq.nlargest(3, data), "- O(n log k), not O(n log n)")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>heap.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">parent = (i - 1) // 2</code><span class="vz-cl-note">The tree exists only as arithmetic. A node at index <em>i</em> has its parent at <code>(i-1)//2</code> and children at <code>2i+1</code> and <code>2i+2</code> &mdash; no pointers are stored, and none are needed.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if self.a[parent] &lt;= self.a[i]: break</code><span class="vz-cl-note">A heap is a much weaker promise than a sorted list: each parent beats its own children, and nothing is claimed about siblings. That weakness is why push and pop cost O(log n) instead of O(n).</span></li><li class="vz-cl-step"><code class="vz-cl-line">last = self.a.pop(); self.a[0] = last</code><span class="vz-cl-note">Popping the root leaves a hole, and the only item that can be removed without leaving a second hole is the last one. Moving it to the root and sifting down repairs the heap in one pass.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if right &lt; len(self.a) and self.a[right] &lt; self.a[left]:</code><span class="vz-cl-note">Always sift towards the <em>smaller</em> child. Choosing the larger one makes it a valid-looking heap that returns wrong answers &mdash; a quiet bug rather than a crash.</span></li><li class="vz-cl-step"><code class="vz-cl-line">heapq.nlargest(3, data)</code><span class="vz-cl-note">Keeps a heap of size k rather than sorting everything: O(n log k). For “top 10 of a billion” that is the difference between practical and not.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Print <code>h.a</code> after all the pushes. It is not sorted &mdash; only <code>a[0]</code> is guaranteed, and expecting more is the usual misunderstanding.</li><li>Flip both comparisons to build a max-heap. Python's <code>heapq</code> has no max version, so real code pushes <code>-value</code> instead.</li><li>Push <code>(priority, task)</code> tuples where two priorities tie and the second item is not comparable. The <code>TypeError</code> is why production code pushes a counter as a tie-breaker.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("3 largest:", heapq.nlargest(3, data), "- O(n log k), not O(n log n)")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>heap.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># A min-heap: the smallest item is always at index 0.
+import heapq
+
+class MinHeap:
+    def __init__(self):
+        self.a = []
+
+    def push(self, x):
+        self.a.append(x)                 # put it at the end...
+        i = len(self.a) - 1
+        while i &gt; 0:                     # ...and bubble it up
+            parent = (i - 1) // 2
+            if self.a[parent] &lt;= self.a[i]:
+                break
+            self.a[parent], self.a[i] = self.a[i], self.a[parent]
+            i = parent
+
+    def pop(self):
+        smallest = self.a[0]
+        last = self.a.pop()
+        if self.a:
+            self.a[0] = last             # move the last item to the root...
+            i = 0
+            while True:                  # ...and sift it down
+                left, right = 2 * i + 1, 2 * i + 2
+                child = left
+                if right &lt; len(self.a) and self.a[right] &lt; self.a[left]:
+                    child = right
+                if child &gt;= len(self.a) or self.a[i] &lt;= self.a[child]:
+                    break
+                self.a[i], self.a[child] = self.a[child], self.a[i]
+                i = child
+        return smallest
+
+
+h = MinHeap()
+for x in [5, 3, 8, 1, 9, 2]:
+    h.push(x)
+    print(f"push {x} -&gt; {h.a}")
+print()
+print("popped in order:", [h.pop() for _ in range(6)])
+
+print()
+print("The list IS the tree. Index i's children are 2i+1 and 2i+2:")
+tree = [1, 3, 2, 5, 9, 8]
+for i, value in enumerate(tree):
+    kids = [tree[j] for j in (2 * i + 1, 2 * i + 2) if j &lt; len(tree)]
+    print(f"  index {i} = {value:&gt;2}, children {kids}")
+
+# --- the same thing, using the standard library ------------------------
+print()
+tasks = [(3, "write tests"), (1, "fix the outage"), (2, "review PR")]
+heapq.heapify(tasks)                     # O(n), not O(n log n)
+while tasks:
+    priority, name = heapq.heappop(tasks)
+    print(f"  priority {priority}: {name}")
+
+# Top-k without sorting the whole list.
+data = [17, 4, 92, 8, 55, 23, 71, 3]
+print()
+print("3 largest:", heapq.nlargest(3, data), "- O(n log k), not O(n log n)")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">parent = (i - 1) // 2</code><span class="vz-cl-note">The tree exists only as arithmetic. A node at index <em>i</em> has its parent at <code>(i-1)//2</code> and children at <code>2i+1</code> and <code>2i+2</code> &mdash; no pointers are stored, and none are needed.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if self.a[parent] &lt;= self.a[i]: break</code><span class="vz-cl-note">A heap is a much weaker promise than a sorted list: each parent beats its own children, and nothing is claimed about siblings. That weakness is why push and pop cost O(log n) instead of O(n).</span></li><li class="vz-cl-step"><code class="vz-cl-line">last = self.a.pop(); self.a[0] = last</code><span class="vz-cl-note">Popping the root leaves a hole, and the only item that can be removed without leaving a second hole is the last one. Moving it to the root and sifting down repairs the heap in one pass.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if right &lt; len(self.a) and self.a[right] &lt; self.a[left]:</code><span class="vz-cl-note">Always sift towards the <em>smaller</em> child. Choosing the larger one makes it a valid-looking heap that returns wrong answers &mdash; a quiet bug rather than a crash.</span></li><li class="vz-cl-step"><code class="vz-cl-line">heapq.nlargest(3, data)</code><span class="vz-cl-note">Keeps a heap of size k rather than sorting everything: O(n log k). For “top 10 of a billion” that is the difference between practical and not.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Print <code>h.a</code> after all the pushes. It is not sorted &mdash; only <code>a[0]</code> is guaranteed, and expecting more is the usual misunderstanding.</li><li>Flip both comparisons to build a max-heap. Python's <code>heapq</code> has no max version, so real code pushes <code>-value</code> instead.</li><li>Push <code>(priority, task)</code> tuples where two priorities tie and the second item is not comparable. The <code>TypeError</code> is why production code pushes a counter as a tie-breaker.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">In an array-backed heap, the children of index i are at:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">i-1 and i+1</button><button type="button" class="vz-q-opt" data-vz-correct="1">2i+1 and 2i+2</button><button type="button" class="vz-q-opt" data-vz-correct="0">i/2 and i/2+1</button><button type="button" class="vz-q-opt" data-vz-correct="0">0 and n-1</button></div><p class="vz-q-why" hidden>The tree is arithmetic, not structure. No node objects and no pointers are stored at all.</p></li><li class="vz-q"><p class="vz-q-text">After several pushes, the underlying list is:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Sorted</button><button type="button" class="vz-q-opt" data-vz-correct="0">Sorted except the last item</button><button type="button" class="vz-q-opt" data-vz-correct="1">Only guaranteed to have the smallest item at index 0</button><button type="button" class="vz-q-opt" data-vz-correct="0">In insertion order</button></div><p class="vz-q-why" hidden>A heap promises each parent beats its children and nothing about siblings. Expecting more is the usual misunderstanding.</p></li><li class="vz-q"><p class="vz-q-text">heapq.nlargest(k, data) is O(n log k) rather than O(n log n) because it:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Sorts first</button><button type="button" class="vz-q-opt" data-vz-correct="1">Keeps a heap of only k items</button><button type="button" class="vz-q-opt" data-vz-correct="0">Uses C code</button><button type="button" class="vz-q-opt" data-vz-correct="0">Samples the data</button></div><p class="vz-q-why" hidden>For "top 10 of a billion" that is the difference between practical and not.</p></li></ol></section></div>
@@ -749,11 +901,11 @@ print("3 largest:", heapq.nlargest(3, data), "- O(n log k), not O(n log n)")</sc
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

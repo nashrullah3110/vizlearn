@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -567,7 +573,86 @@ INSERT INTO order_items (order_id, product_id, qty) VALUES
   (103, 4, 3),
   (104, 1, 2), (104, 5, 1),
   (105, 2, 1),
-  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- LIKE is the portable one. Two wildcards, and that is the whole
+  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">-- LIKE is the portable one. Two wildcards, and that is the whole
+-- language: % matches any run of characters, _ matches exactly one.
+
+SELECT &#x27;city LIKE L%&#x27;     AS pattern, group_concat(city) AS matches
+FROM customers WHERE city LIKE &#x27;L%&#x27;
+UNION ALL
+SELECT &#x27;city LIKE %n&#x27;,    group_concat(city) FROM customers WHERE city LIKE &#x27;%n&#x27;
+UNION ALL
+SELECT &#x27;city LIKE _____&#x27;, group_concat(city) FROM customers WHERE city LIKE &#x27;_____&#x27;
+UNION ALL
+SELECT &#x27;city LIKE %o%&#x27;,   group_concat(city) FROM customers WHERE city LIKE &#x27;%o%&#x27;;
+
+-- GLOB is the same idea with shell syntax, and unlike LIKE it is
+-- case-sensitive in SQLite.
+
+SELECT &#x27;GLOB L*&#x27;  AS pattern, group_concat(city) AS matches
+FROM customers WHERE city GLOB &#x27;L*&#x27;
+UNION ALL
+SELECT &#x27;GLOB l*&#x27;, group_concat(city) FROM customers WHERE city GLOB &#x27;l*&#x27;
+UNION ALL
+SELECT &#x27;LIKE l%&#x27;, group_concat(city) FROM customers WHERE city LIKE &#x27;l%&#x27;;
+
+-- Note the last two rows: GLOB finds nothing for a lowercase l, while
+-- LIKE returns both cities. That difference has surprised people into
+-- shipping a filter that works in testing and misses half the data.
+--
+-- REGEXP is the powerful one, and SQLite does not implement it -- the
+-- keyword parses and the function is not defined unless the host
+-- program supplies it. Postgres has ~ and MySQL has REGEXP built in.
+-- Portable code does not assume it exists.
+--
+-- AND HERE IS THE PART THAT MATTERS. An index on a text column is
+-- sorted by that text, so a pattern anchored at the start ought to be
+-- answerable as a range scan. Whether it actually is depends on a
+-- detail that is easy to miss.
+
+CREATE INDEX idx_city ON customers(city);
+
+EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city = &#x27;London&#x27;;
+
+EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city LIKE &#x27;L%&#x27;;
+
+EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city GLOB &#x27;L*&#x27;;
+
+EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city LIKE &#x27;%n&#x27;;
+
+-- Read those four plans. Equality searches the index, as expected. So
+-- does GLOB &#x27;L*&#x27;. But LIKE &#x27;L%&#x27; -- the same prefix, in the operator
+-- everybody actually uses -- falls back to a full SCAN.
+--
+-- The reason is collation. LIKE is case-insensitive by default, and the
+-- index is sorted case-sensitively, so the sorted order does not group
+-- the rows LIKE considers equal and a range scan would give the wrong
+-- answer. GLOB is case-sensitive, so its range scan is valid.
+--
+-- Two ways to get the optimisation back. Either make LIKE
+-- case-sensitive:
+
+PRAGMA case_sensitive_like = ON;
+
+EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city LIKE &#x27;L%&#x27;;
+
+-- or build the index with the collation LIKE uses:
+
+PRAGMA case_sensitive_like = OFF;
+CREATE INDEX idx_city_nocase ON customers(city COLLATE NOCASE);
+
+EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city LIKE &#x27;L%&#x27;;
+
+-- Both now SEARCH. The general rule behind it is worth carrying to
+-- other engines: an index can only serve a comparison that agrees with
+-- the index&#x27;s own collation, which is why a case-insensitive search on
+-- a case-sensitive index quietly scans.
+--
+-- And the last plan in the first group is the one no collation fixes.
+-- A leading wildcard means every row must be examined, for the same
+-- reason a phone book cannot find everyone whose surname ends in
+-- &quot;son&quot;. If you need that search, the answer is a full-text or trigram
+-- index, not a bigger machine.
+</pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- LIKE is the portable one. Two wildcards, and that is the whole
 -- language: % matches any run of characters, _ matches exactly one.
 
 SELECT &#x27;city LIKE L%&#x27;     AS pattern, group_concat(city) AS matches
@@ -686,11 +771,11 @@ EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city LIKE &#x27;L%&#x27;;
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

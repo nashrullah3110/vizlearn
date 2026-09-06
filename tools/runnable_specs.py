@@ -95,6 +95,32 @@ def _sklearn_prelude():
     )
 
 
+def _pydantic_overrides():
+    """Per-topic wheels and preludes, read from pydantic_topics.
+
+    pydantic_topics.topic() has always accepted `wheels` and `prelude`, and
+    two topics declare them -- settings_management needs pydantic_settings,
+    pydantic_with_fastapi needs the fastapi stack. Nothing ever read them:
+    build_pydantic_topics.editor() would have emitted them but is never
+    called, because the editors on those pages come from the article's
+    ```pydantic-run fences through prose.py instead. The declaration was
+    orphaned, so every editor on both pages raised ModuleNotFoundError on
+    the live site. This is the wire that was missing.
+    """
+    import pydantic_topics
+    out = {}
+    for t in pydantic_topics.TOPICS:
+        extra = {}
+        if t.get("wheels"):
+            extra["wheels"] = ",".join(
+                "../assets/wheels/" + w for w in t["wheels"])
+        if t.get("prelude"):
+            extra["prelude"] = t["prelude"]
+        if extra:
+            out[t["slug"]] = extra
+    return out
+
+
 SPECS = {
     "maths": {
         # numpy alone, deliberately. It carries linalg (cholesky, eig, svd),
@@ -219,6 +245,9 @@ SPECS = {
         "filename": "example_%02d.py",
     },
     "pydantic": {
+        # Two of these topics need wheels the rest do not; see
+        # _pydantic_overrides above.
+        "overrides": _pydantic_overrides,
         "packages": "pydantic,ssl",
         "label": "Pydantic",
         "filename": "example_%02d.py",
@@ -257,5 +286,7 @@ def resolve():
         spec = dict(spec)
         if callable(spec.get("prelude")):
             spec["prelude"] = spec["prelude"]()
+        if callable(spec.get("overrides")):
+            spec["overrides"] = spec["overrides"]()
         out[track] = spec
     return out

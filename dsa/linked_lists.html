@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -639,7 +645,110 @@ print("  linked nodes: %8d bytes (5000 objects, ~%d bytes each)" % (
 # Which is why the honest summary is: use a linked list when you are
 # splicing at a position you already hold -- an LRU cache moving a node to
 # the front, a free list, an allocator -- and use an array for almost
-# everything else.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# everything else.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import time
+
+
+class Node:
+    def __init__(self, val):
+        self.val = val
+        self.next = None
+
+
+class LinkedList:
+    def __init__(self, values=()):
+        self.head = None
+        tail = None
+        for v in values:
+            n = Node(v)
+            if tail:
+                tail.next = n
+            else:
+                self.head = n
+            tail = n
+
+    def get(self, i):
+        # O(i): there is no arithmetic that finds the i-th node
+        n, steps = self.head, 0
+        while n and steps &lt; i:
+            n = n.next
+            steps += 1
+        return n, steps + 1
+
+    def insert_after(self, node, val):
+        # O(1): two pointer writes, no matter how long the list is
+        new = Node(val)
+        new.next = node.next
+        node.next = new
+        return 2
+
+
+n = 5000
+lst = list(range(n))
+ll = LinkedList(range(n))
+
+print("INDEXING, %d elements" % n)
+for i in (0, n // 2, n - 1):
+    _, steps = ll.get(i)
+    print("  index %5d: list = 1 step (address arithmetic), linked = %d steps"
+          % (i, steps))
+
+# There is no fifth-element formula for a linked list. Every access walks
+# from the head, which is why the O(1) indexing of an array is not a small
+# advantage but a categorical one.
+
+print()
+print("INSERTING AT THE FRONT, %d times" % 10000)
+t0 = time.time()
+a = []
+for i in range(10000):
+    a.insert(0, i)             # shifts every element right
+t1 = time.time()
+ll2 = LinkedList()
+for i in range(10000):
+    node = Node(i)             # two writes, wherever the list is
+    node.next = ll2.head
+    ll2.head = node
+t2 = time.time()
+print("  list.insert(0, x): %7.1f ms" % ((t1 - t0) * 1000))
+print("  linked prepend:    %7.1f ms" % ((t2 - t1) * 1000))
+
+# This is the operation linked lists exist for, and the gap is real.
+#
+# But now the part the complexity table hides. Insertion is O(1) only
+# once you HAVE the node. Finding it is O(n), and in real code you almost
+# always have to find it first:
+
+print()
+print("insert after the value 4000, including the search:")
+node, steps = ll.get(4000)
+writes = ll.insert_after(node, "new")
+print("  linked: %d steps to find + %d pointer writes = %d operations"
+      % (steps, writes, steps + writes))
+print("  list:   1 step to find + %d shifts = %d operations"
+      % (n - 4000, n - 4000 + 1))
+
+# The linked list did MORE total work here, because walking 4001 nodes
+# cost more than shifting 1000 array slots -- and shifting an array is a
+# single memmove over contiguous memory, while walking a list is 4001
+# dependent pointer dereferences, each one a potential cache miss.
+#
+# That last point is the one that decides it in practice. An array of
+# 5000 ints occupies one contiguous block the CPU prefetches perfectly.
+# The same 5000 as linked nodes are scattered objects, each holding a
+# value and a pointer:
+
+import sys
+print()
+print("memory for 5000 ints:")
+print("  list:        %8d bytes (plus the ints)" % sys.getsizeof(lst))
+print("  linked nodes: %8d bytes (5000 objects, ~%d bytes each)" % (
+    5000 * (sys.getsizeof(Node(0)) + 16), sys.getsizeof(Node(0)) + 16))
+
+# Which is why the honest summary is: use a linked list when you are
+# splicing at a position you already hold -- an LRU cache moving a node to
+# the front, a free list, an allocator -- and use an array for almost
+# everything else.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-try-it-yourself">Try it yourself</h3>
@@ -759,7 +868,79 @@ ll.delete(10)
 print("delete 10    :", ll)
 ll.find(40, verbose=True)
 ll.reverse()
-print("reversed     :", ll)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>linked_list.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">self.head = Node(value, self.head)</code><span class="vz-cl-note">Inserting at the front is O(1) and involves no movement at all &mdash; the new node simply points at the old head. The same insert into a Python list costs O(n).</span></li><li class="vz-cl-step"><code class="vz-cl-line">while node: ... node = node.next</code><span class="vz-cl-note">There is no arithmetic that jumps to element 5. Every access starts at the head and hops, which is why linked lists lose to arrays on almost every read-heavy workload despite the better insert.</span></li><li class="vz-cl-step"><code class="vz-cl-line">dummy = Node(None, self.head)</code><span class="vz-cl-note">The sentinel trick. Without it, deleting the first node needs its own branch because there is no previous node to re-point &mdash; and that branch is where the bug always is.</span></li><li class="vz-cl-step"><code class="vz-cl-line">prev.next = prev.next.next</code><span class="vz-cl-note">Deletion is one assignment. Nothing is shifted and no memory is moved, which is the operation linked lists exist for.</span></li><li class="vz-cl-step"><code class="vz-cl-line">nxt = node.next; node.next = prev</code><span class="vz-cl-note">The order is the whole exercise. Overwrite <code>node.next</code> before saving it and the rest of the list is unreachable &mdash; not corrupted, just gone.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Delete the <code>nxt = node.next</code> line in <code>reverse</code> and print the result. The list is one node long, and the other three are lost.</li><li>Build a list of 100,000 nodes and time <code>find</code> on the last value against the same lookup on a Python list. Both are O(n), and the linked version is far slower &mdash; cache locality, not complexity.</li><li>Add a <code>prev</code> pointer to make it doubly linked. Deletion no longer needs the node before it, which is exactly what <code>collections.deque</code> buys with the extra memory.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("reversed     :", ll)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>linked_list.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># A singly linked list: each node holds a value and a reference to the next.
+
+class Node:
+    def __init__(self, value, next=None):
+        self.value = value
+        self.next = next
+
+
+class LinkedList:
+    def __init__(self, values=()):
+        self.head = None
+        for v in reversed(list(values)):     # build back to front
+            self.head = Node(v, self.head)
+
+    def __repr__(self):
+        parts, node = [], self.head
+        while node:
+            parts.append(str(node.value))
+            node = node.next
+        return " -&gt; ".join(parts) + " -&gt; None"
+
+    def push_front(self, value):             # O(1) - no shifting, ever
+        self.head = Node(value, self.head)
+
+    def insert_after(self, target, value):   # O(1) once you hold the node
+        node = self.find(target)
+        if node:
+            node.next = Node(value, node.next)
+
+    def find(self, value, verbose=False):    # O(n) - no random access
+        node, steps = self.head, 0
+        while node:
+            steps += 1
+            if node.value == value:
+                if verbose:
+                    print(f"find({value})    : {steps} hop(s) from the head")
+                return node
+            node = node.next
+        return None
+
+    def delete(self, value):
+        # The dummy head removes the "deleting the first node" special case.
+        dummy = Node(None, self.head)
+        prev = dummy
+        while prev.next:
+            if prev.next.value == value:
+                prev.next = prev.next.next   # unlink; nothing moves
+                self.head = dummy.next
+                return True
+            prev = prev.next
+        return False
+
+    def reverse(self):
+        prev, node = None, self.head
+        while node:
+            nxt = node.next        # save it BEFORE overwriting
+            node.next = prev       # flip the arrow
+            prev, node = node, nxt # step both forward
+        self.head = prev
+
+
+ll = LinkedList([10, 20, 30, 40])
+print("start        :", ll)
+ll.push_front(5)
+print("push_front(5):", ll)
+ll.insert_after(20, 25)
+print("insert 25    :", ll)
+ll.delete(10)
+print("delete 10    :", ll)
+ll.find(40, verbose=True)
+ll.reverse()
+print("reversed     :", ll)
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">self.head = Node(value, self.head)</code><span class="vz-cl-note">Inserting at the front is O(1) and involves no movement at all &mdash; the new node simply points at the old head. The same insert into a Python list costs O(n).</span></li><li class="vz-cl-step"><code class="vz-cl-line">while node: ... node = node.next</code><span class="vz-cl-note">There is no arithmetic that jumps to element 5. Every access starts at the head and hops, which is why linked lists lose to arrays on almost every read-heavy workload despite the better insert.</span></li><li class="vz-cl-step"><code class="vz-cl-line">dummy = Node(None, self.head)</code><span class="vz-cl-note">The sentinel trick. Without it, deleting the first node needs its own branch because there is no previous node to re-point &mdash; and that branch is where the bug always is.</span></li><li class="vz-cl-step"><code class="vz-cl-line">prev.next = prev.next.next</code><span class="vz-cl-note">Deletion is one assignment. Nothing is shifted and no memory is moved, which is the operation linked lists exist for.</span></li><li class="vz-cl-step"><code class="vz-cl-line">nxt = node.next; node.next = prev</code><span class="vz-cl-note">The order is the whole exercise. Overwrite <code>node.next</code> before saving it and the rest of the list is unreachable &mdash; not corrupted, just gone.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Delete the <code>nxt = node.next</code> line in <code>reverse</code> and print the result. The list is one node long, and the other three are lost.</li><li>Build a list of 100,000 nodes and time <code>find</code> on the last value against the same lookup on a Python list. Both are O(n), and the linked version is far slower &mdash; cache locality, not complexity.</li><li>Add a <code>prev</code> pointer to make it doubly linked. Deletion no longer needs the node before it, which is exactly what <code>collections.deque</code> buys with the extra memory.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">In reverse(), why is &#x27;nxt = node.next&#x27; saved before &#x27;node.next = prev&#x27;?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">For readability</button><button type="button" class="vz-q-opt" data-vz-correct="1">Otherwise the rest of the list becomes unreachable</button><button type="button" class="vz-q-opt" data-vz-correct="0">To count the nodes</button><button type="button" class="vz-q-opt" data-vz-correct="0">To handle the empty list</button></div><p class="vz-q-why" hidden>Overwriting the only pointer to the remainder loses it - not corrupted, just gone. Delete the line and the list comes back one node long.</p></li><li class="vz-q"><p class="vz-q-text">What is the dummy head in delete() for?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Marking the end</button><button type="button" class="vz-q-opt" data-vz-correct="1">Removing the special case of deleting the first node</button><button type="button" class="vz-q-opt" data-vz-correct="0">Counting nodes</button><button type="button" class="vz-q-opt" data-vz-correct="0">Making it doubly linked</button></div><p class="vz-q-why" hidden>Without a previous node to re-point, deleting the head needs its own branch - and that branch is where the bug always is.</p></li><li class="vz-q"><p class="vz-q-text">Compared with a Python list, a linked list is better at:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Random access</button><button type="button" class="vz-q-opt" data-vz-correct="1">Inserting at the front</button><button type="button" class="vz-q-opt" data-vz-correct="0">Memory use</button><button type="button" class="vz-q-opt" data-vz-correct="0">Cache behaviour</button></div><p class="vz-q-why" hidden>O(1) with no shifting. It loses on everything else, including sequential scans, because the nodes are scattered in memory.</p></li></ol></section></div>
@@ -782,11 +963,11 @@ print("reversed     :", ll)</script><div class="vz-code-bar"><span class="vz-cod
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

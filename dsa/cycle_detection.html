@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -650,7 +656,104 @@ print("and the set version returns:      ", with_set(clean))
 
 # Both correctly report no cycle. The loop condition `fast and fast.next`
 # is what makes that safe: an odd-length list would otherwise step off the
-# end, which is the usual bug in a hand-written version.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# end, which is the usual bug in a hand-written version.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">class Node:
+    def __init__(self, val):
+        self.val, self.next = val, None
+
+
+def build(values, cycle_at):
+    nodes = [Node(v) for v in values]
+    for a, b in zip(nodes, nodes[1:]):
+        a.next = b
+    if cycle_at is not None:
+        nodes[-1].next = nodes[cycle_at]
+    return nodes[0], nodes
+
+
+head, nodes = build(list("ABCDEFGH"), 3)      # H points back to D
+print("list: A B C D E F G H, and H -&gt; D")
+print("so the tail is A B C and the cycle is D E F G H (length 5)")
+
+
+def floyd(head, verbose=False):
+    slow = fast = head
+    steps = 0
+    while fast and fast.next:
+        slow, fast = slow.next, fast.next.next
+        steps += 1
+        if verbose:
+            print("   step %d: slow at %s, fast at %s" % (
+                steps, slow.val, fast.val))
+        if slow is fast:
+            return slow, steps
+    return None, steps
+
+
+print()
+print("phase 1 -- move slow by 1, fast by 2:")
+meet, steps = floyd(head, verbose=True)
+print("  they met at %s after %d steps" % (meet.val, steps))
+
+# The fast pointer gains exactly one position per step. Once both are
+# inside the cycle, the gap between them shrinks by one each step, so it
+# reaches zero in at most (cycle length) steps. It cannot be jumped over,
+# because the gap changes by exactly one. That is the whole proof -- there
+# is nothing to intuit.
+
+def find_start(head, meet):
+    a, b = head, meet
+    steps = 0
+    while a is not b:
+        a, b = a.next, b.next
+        steps += 1
+    return a, steps
+
+
+start, steps2 = find_start(head, meet)
+print()
+print("phase 2 -- reset one pointer to the head, advance both by 1:")
+print("  they met at %s after %d steps, and that is the cycle entrance"
+      % (start.val, steps2))
+
+# Why that works: let the tail be length T and the meeting point be K
+# nodes into the cycle. When they met, slow had walked T + K and fast had
+# walked twice that, and the difference is a whole number of laps. The
+# algebra leaves T = (laps - 1) * cycle + (cycle - K) -- which is to say,
+# walking T steps from the head and T steps on from the meeting point both
+# land on the entrance. Here T = 3, and it took 3 steps.
+
+print()
+print("  tail length T =", steps2)
+
+# The obvious alternative is a hash set of visited nodes:
+
+def with_set(head):
+    seen, node = set(), head
+    while node:
+        if id(node) in seen:
+            return node
+        seen.add(id(node))
+        node = node.next
+    return None
+
+
+print()
+print("hash set finds the entrance directly:", with_set(head).val)
+
+# Same answer, one pass, simpler code -- and O(n) memory. Floyd's uses two
+# pointers and nothing else. On a linked list of a hundred million nodes
+# that is the difference between a few bytes and several gigabytes, which
+# is the only reason to prefer the harder algorithm.
+
+clean, _ = build(list("ABCDE"), None)
+print()
+print("on an acyclic list, Floyd returns:", floyd(clean)[0])
+print("and the set version returns:      ", with_set(clean))
+
+# Both correctly report no cycle. The loop condition `fast and fast.next`
+# is what makes that safe: an odd-length list would otherwise step off the
+# end, which is the usual bug in a hand-written version.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-things-to-try">Things to try</h3>
@@ -774,7 +877,79 @@ def has_cycle(graph):
 
 print()
 print("directed graph:", graph)
-print("cycle:", " -> ".join(has_cycle(graph)))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>cycle_detection.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">slow = slow.next; fast = fast.next.next</code><span class="vz-cl-note">Two pointers at different speeds. Inside a loop the gap closes by one node per step, so if there is a cycle they must meet &mdash; and the whole thing costs two pointers of memory rather than a visited set.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if slow is fast:</code><span class="vz-cl-note"><code>is</code>, not <code>==</code>. The test is whether they are on the same node; two different nodes holding equal values would fool <code>==</code> completely.</span></li><li class="vz-cl-step"><code class="vz-cl-line">while entry is not slow: entry, slow = entry.next, slow.next</code><span class="vz-cl-note">The second phase, and the part that looks like magic. The distance from the head to the loop entry equals the distance from the meeting point to the entry, so two pointers advancing in step meet exactly there.</span></li><li class="vz-cl-step"><code class="vz-cl-line">WHITE, GREY, BLACK</code><span class="vz-cl-note">Two colours are not enough for a directed graph. GREY means “on the path I am currently exploring”; BLACK means “finished, and reaching it again is fine”. Merging them reports a cycle for any diamond shape.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if colour[nxt] == GREY: return ...</code><span class="vz-cl-note">An edge back into the current path is a cycle, by definition. The explicit <code>stack</code> is only there so the cycle can be printed &mdash; detection needs the colours alone.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Point <code>nodes[-1].next</code> at <code>None</code>. The loop exits through its <code>else</code> branch, which is what makes this a detector and not just a locator.</li><li>Change <code>fast.next.next</code> to <code>fast.next</code>. The two pointers now move at the same speed and never meet.</li><li>In the graph, drop GREY and treat any seen node as a cycle. Then add <code>"e": ["a", "b"]</code> &mdash; a false positive, on a graph with no cycle through e at all.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("cycle:", " -> ".join(has_cycle(graph)))</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>cycle_detection.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Two cycle problems that look alike and are not.
+
+# --- 1. A linked list: Floyd's tortoise and hare, O(1) memory -----------
+class Node:
+    def __init__(self, value):
+        self.value = value
+        self.next = None
+
+values = [1, 2, 3, 4, 5, 6]
+nodes = [Node(v) for v in values]
+for a, b in zip(nodes, nodes[1:]):
+    a.next = b
+nodes[-1].next = nodes[2]              # 6 points back at 3 - a loop
+
+def find_cycle(head):
+    slow = fast = head
+    step = 0
+    while fast and fast.next:
+        slow = slow.next               # one step
+        fast = fast.next.next          # two steps
+        step += 1
+        print(f"  step {step}: slow={slow.value} fast={fast.value}")
+        if slow is fast:               # identity, not equality
+            break
+    else:
+        return None
+
+    # Second phase: the distance from head to the entry equals the
+    # distance from the meeting point to the entry.
+    entry = head
+    while entry is not slow:
+        entry, slow = entry.next, slow.next
+    return entry
+
+
+print("linked list:")
+entry = find_cycle(nodes[0])
+print("cycle enters at value:", entry.value if entry else "no cycle")
+
+# --- 2. A directed graph: DFS with three colours ------------------------
+graph = {"a": ["b"], "b": ["c"], "c": ["d"], "d": ["b"], "e": ["a"]}
+WHITE, GREY, BLACK = 0, 1, 2          # unseen / on the stack / finished
+
+def has_cycle(graph):
+    colour = {n: WHITE for n in graph}
+    stack = []
+
+    def visit(node):
+        colour[node] = GREY           # now on the current path
+        stack.append(node)
+        for nxt in graph.get(node, []):
+            if colour[nxt] == GREY:   # back edge to something still open
+                return stack[stack.index(nxt):] + [nxt]
+            if colour[nxt] == WHITE:
+                found = visit(nxt)
+                if found:
+                    return found
+        colour[node] = BLACK          # finished; safe to meet again
+        stack.pop()
+        return None
+
+    for node in graph:
+        if colour[node] == WHITE:
+            found = visit(node)
+            if found:
+                return found
+    return None
+
+
+print()
+print("directed graph:", graph)
+print("cycle:", " -&gt; ".join(has_cycle(graph)))
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">slow = slow.next; fast = fast.next.next</code><span class="vz-cl-note">Two pointers at different speeds. Inside a loop the gap closes by one node per step, so if there is a cycle they must meet &mdash; and the whole thing costs two pointers of memory rather than a visited set.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if slow is fast:</code><span class="vz-cl-note"><code>is</code>, not <code>==</code>. The test is whether they are on the same node; two different nodes holding equal values would fool <code>==</code> completely.</span></li><li class="vz-cl-step"><code class="vz-cl-line">while entry is not slow: entry, slow = entry.next, slow.next</code><span class="vz-cl-note">The second phase, and the part that looks like magic. The distance from the head to the loop entry equals the distance from the meeting point to the entry, so two pointers advancing in step meet exactly there.</span></li><li class="vz-cl-step"><code class="vz-cl-line">WHITE, GREY, BLACK</code><span class="vz-cl-note">Two colours are not enough for a directed graph. GREY means “on the path I am currently exploring”; BLACK means “finished, and reaching it again is fine”. Merging them reports a cycle for any diamond shape.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if colour[nxt] == GREY: return ...</code><span class="vz-cl-note">An edge back into the current path is a cycle, by definition. The explicit <code>stack</code> is only there so the cycle can be printed &mdash; detection needs the colours alone.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Point <code>nodes[-1].next</code> at <code>None</code>. The loop exits through its <code>else</code> branch, which is what makes this a detector and not just a locator.</li><li>Change <code>fast.next.next</code> to <code>fast.next</code>. The two pointers now move at the same speed and never meet.</li><li>In the graph, drop GREY and treat any seen node as a cycle. Then add <code>"e": ["a", "b"]</code> &mdash; a false positive, on a graph with no cycle through e at all.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">Floyd&#x27;s tortoise and hare uses how much extra memory?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">O(n) for a visited set</button><button type="button" class="vz-q-opt" data-vz-correct="0">O(log n)</button><button type="button" class="vz-q-opt" data-vz-correct="1">O(1) - two pointers</button><button type="button" class="vz-q-opt" data-vz-correct="0">O(n) for the path</button></div><p class="vz-q-why" hidden>That is the entire point of it. A visited set also works and is easier, but it costs memory proportional to the list.</p></li><li class="vz-q"><p class="vz-q-text">Why does the comparison use &#x27;slow is fast&#x27; rather than &#x27;==&#x27; ?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">It is faster</button><button type="button" class="vz-q-opt" data-vz-correct="1">Two different nodes holding equal values would fool ==</button><button type="button" class="vz-q-opt" data-vz-correct="0">== does not work on objects</button><button type="button" class="vz-q-opt" data-vz-correct="0">To avoid a type error</button></div><p class="vz-q-why" hidden>The question is whether the two pointers are on the same node, which is identity, not equality of contents.</p></li><li class="vz-q"><p class="vz-q-text">Why does directed-graph cycle detection need three colours rather than a plain visited set?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">To find the cycle&#x27;s length</button><button type="button" class="vz-q-opt" data-vz-correct="1">Because reaching an already-finished node is fine, while reaching one still on the current path is a cycle</button><button type="button" class="vz-q-opt" data-vz-correct="0">To handle disconnected graphs</button><button type="button" class="vz-q-opt" data-vz-correct="0">To make it iterative</button></div><p class="vz-q-why" hidden>With two states, any diamond shape - two paths meeting at one node - is reported as a cycle. GREY versus BLACK is what distinguishes them.</p></li></ol></section></div>
@@ -797,11 +972,11 @@ print("cycle:", " -> ".join(has_cycle(graph)))</script><div class="vz-code-bar">
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

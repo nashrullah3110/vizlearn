@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -640,7 +646,100 @@ for name, ws in (("this example", words),
 #
 # So the honest rule: a trie pays off on dictionaries with real prefix
 # structure -- words in a language, URLs, IP prefixes, phone numbers --
-# and is a poor choice for keys that look random, like hashes or UUIDs.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# and is a poor choice for keys that look random, like hashes or UUIDs.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">class Trie:
+    def __init__(self):
+        self.root = {}
+        self.nodes = 1
+
+    def add(self, word):
+        node = self.root
+        for ch in word:
+            if ch not in node:
+                node[ch] = {}
+                self.nodes += 1
+            node = node[ch]
+        node["$"] = True             # marks a complete word
+
+    def find(self, word):
+        node, steps = self.root, 0
+        for ch in word:
+            steps += 1
+            if ch not in node:
+                return False, steps
+            node = node[ch]
+        return "$" in node, steps
+
+    def with_prefix(self, prefix):
+        node = self.root
+        for ch in prefix:
+            if ch not in node:
+                return []
+            node = node[ch]
+        out = []
+
+        def walk(n, so_far):
+            for k, v in n.items():
+                if k == "$":
+                    out.append(prefix + so_far)
+                else:
+                    walk(v, so_far + k)
+        walk(node, "")
+        return sorted(out)
+
+
+words = ["car", "card", "care", "careful", "cat", "cats", "dog", "do",
+         "door", "dot"]
+t = Trie()
+for w in words:
+    t.add(w)
+
+print("%d words stored in %d nodes" % (len(words), t.nodes))
+print()
+print("%-10s %8s %8s" % ("lookup", "found", "steps"))
+for w in ("cat", "care", "cab", "careful", "zebra"):
+    found, steps = t.find(w)
+    print("%-10s %8s %8d" % (w, found, steps))
+
+# The step count is the length of the word, never the size of the
+# dictionary. "cab" failed in 3 steps and "zebra" in 1 -- a miss costs
+# only as much as the matching prefix, so most misses are cheaper than
+# hits. Add ten million more words and none of these numbers move.
+#
+# A hash table also gives O(1)-ish lookup. What it cannot do is this:
+
+print()
+for p in ("car", "do", "z"):
+    print('words starting with %-5r %s' % (p, t.with_prefix(p)))
+
+# Prefix search is where the trie is not merely competitive but the only
+# structure that answers the question directly. A hash of whole words has
+# no way to find them without scanning every key; a sorted list can binary
+# search to the first match, which is the real alternative and is why
+# sorted arrays still power many autocomplete boxes.
+#
+# The cost is nodes. Every distinct prefix is an object:
+
+print()
+print("%-14s %8s %10s %14s" % ("dictionary", "words", "characters", "trie nodes"))
+for name, ws in (("this example", words),
+                 ("shared prefixes", ["prefix%03d" % i for i in range(100)]),
+                 ("no sharing", ["%03dsuffix" % i for i in range(100)])):
+    tt = Trie()
+    for w in ws:
+        tt.add(w)
+    print("%-14s %8d %10d %14d" % (
+        name, len(ws), sum(len(w) for w in ws), tt.nodes))
+
+# Compare the last two rows. Identical word count, identical total
+# characters, and the trie is far smaller when the words share prefixes --
+# because a shared prefix is stored exactly once. When they do not share,
+# the trie approaches one node per character and the overhead of a
+# dictionary per node makes it much heavier than the strings themselves.
+#
+# So the honest rule: a trie pays off on dictionaries with real prefix
+# structure -- words in a language, URLs, IP prefixes, phone numbers --
+# and is a poor choice for keys that look random, like hashes or UUIDs.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-things-to-try">Things to try</h3>
@@ -764,7 +863,76 @@ print()
 for prefix in ["car", "d", "z"]:
     print(f"  complete({prefix!r}) -> {trie.complete(prefix)}")
 print()
-print("Lookup costs O(length of the word) - the number of words never enters into it.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>trie.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">self.children = {}</code><span class="vz-cl-note">A dictionary per node rather than a fixed array of 26. It costs more per node and handles any alphabet, including Unicode &mdash; the array version is faster and quietly assumes lowercase ASCII.</span></li><li class="vz-cl-step"><code class="vz-cl-line">self.is_word = False</code><span class="vz-cl-note">The flag is why <code>"ca"</code> is not a word even though the path exists, and why <code>"do"</code> is one even though <code>"dog"</code> continues past it. Without it a trie can only answer prefix questions.</span></li><li class="vz-cl-step"><code class="vz-cl-line">for ch in word: node = node.children[ch]</code><span class="vz-cl-note">Lookup walks one node per character, so it costs O(length) no matter how many words are stored. A hash table also gets O(1)-ish, but it must hash the whole string first &mdash; also O(length).</span></li><li class="vz-cl-step"><code class="vz-cl-line">trie.nodes vs sum(len(w))</code><span class="vz-cl-note">The saving is real but modest, and it comes entirely from shared prefixes. A trie over unrelated strings uses more memory than storing them in a set.</span></li><li class="vz-cl-step"><code class="vz-cl-line">def collect(node, so_far):</code><span class="vz-cl-note">Autocomplete is a DFS from the prefix node. This is the operation a hash table simply cannot perform &mdash; hashing destroys the relationship between <code>"car"</code> and <code>"card"</code>.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Insert <code>"carpet"</code> and re-print the node count. It adds three nodes, not six &mdash; <code>car</code> was already there.</li><li>Insert a hundred unrelated random strings and compare <code>trie.nodes</code> with the character count. The saving vanishes.</li><li>Add <code>delete</code>. The awkward part is knowing when a node may be removed: only when it ends no word and has no children.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("Lookup costs O(length of the word) - the number of words never enters into it.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>trie.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># A trie: one node per character, with common prefixes shared.
+
+class TrieNode:
+    def __init__(self):
+        self.children = {}           # character -&gt; TrieNode
+        self.is_word = False         # does a word END here?
+
+
+class Trie:
+    def __init__(self):
+        self.root = TrieNode()
+        self.nodes = 1
+
+    def insert(self, word):
+        node = self.root
+        for ch in word:
+            if ch not in node.children:
+                node.children[ch] = TrieNode()
+                self.nodes += 1      # a genuinely new node
+            node = node.children[ch]
+        node.is_word = True          # mark the end, do not add a node
+
+    def _walk(self, prefix):
+        node = self.root
+        for ch in prefix:
+            if ch not in node.children:
+                return None
+            node = node.children[ch]
+        return node
+
+    def contains(self, word):
+        node = self._walk(word)
+        return node is not None and node.is_word     # both conditions matter
+
+    def starts_with(self, prefix):
+        return self._walk(prefix) is not None
+
+    def complete(self, prefix):
+        node = self._walk(prefix)
+        found = []
+        def collect(node, so_far):
+            if node.is_word:
+                found.append(so_far)
+            for ch, child in sorted(node.children.items()):
+                collect(child, so_far + ch)
+        if node:
+            collect(node, prefix)
+        return found
+
+
+words = ["car", "card", "care", "careful", "cat", "dog", "do"]
+trie = Trie()
+for w in words:
+    trie.insert(w)
+
+print("words     :", words)
+print("characters:", sum(len(w) for w in words))
+print("trie nodes:", trie.nodes, "- shared prefixes are stored once")
+
+print()
+for probe in ["car", "ca", "cart", "do"]:
+    print(f"  contains({probe!r:&gt;8}) = {str(trie.contains(probe)):&gt;5}   "
+          f"starts_with = {trie.starts_with(probe)}")
+
+print()
+for prefix in ["car", "d", "z"]:
+    print(f"  complete({prefix!r}) -&gt; {trie.complete(prefix)}")
+print()
+print("Lookup costs O(length of the word) - the number of words never enters into it.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">self.children = {}</code><span class="vz-cl-note">A dictionary per node rather than a fixed array of 26. It costs more per node and handles any alphabet, including Unicode &mdash; the array version is faster and quietly assumes lowercase ASCII.</span></li><li class="vz-cl-step"><code class="vz-cl-line">self.is_word = False</code><span class="vz-cl-note">The flag is why <code>"ca"</code> is not a word even though the path exists, and why <code>"do"</code> is one even though <code>"dog"</code> continues past it. Without it a trie can only answer prefix questions.</span></li><li class="vz-cl-step"><code class="vz-cl-line">for ch in word: node = node.children[ch]</code><span class="vz-cl-note">Lookup walks one node per character, so it costs O(length) no matter how many words are stored. A hash table also gets O(1)-ish, but it must hash the whole string first &mdash; also O(length).</span></li><li class="vz-cl-step"><code class="vz-cl-line">trie.nodes vs sum(len(w))</code><span class="vz-cl-note">The saving is real but modest, and it comes entirely from shared prefixes. A trie over unrelated strings uses more memory than storing them in a set.</span></li><li class="vz-cl-step"><code class="vz-cl-line">def collect(node, so_far):</code><span class="vz-cl-note">Autocomplete is a DFS from the prefix node. This is the operation a hash table simply cannot perform &mdash; hashing destroys the relationship between <code>"car"</code> and <code>"card"</code>.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Insert <code>"carpet"</code> and re-print the node count. It adds three nodes, not six &mdash; <code>car</code> was already there.</li><li>Insert a hundred unrelated random strings and compare <code>trie.nodes</code> with the character count. The saving vanishes.</li><li>Add <code>delete</code>. The awkward part is knowing when a node may be removed: only when it ends no word and has no children.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">What does the is_word flag distinguish?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Leaves from internal nodes</button><button type="button" class="vz-q-opt" data-vz-correct="1">&quot;ca&quot;, which is only a prefix, from &quot;do&quot;, which is a stored word with more beyond it</button><button type="button" class="vz-q-opt" data-vz-correct="0">Uppercase from lowercase</button><button type="button" class="vz-q-opt" data-vz-correct="0">Full from partial branches</button></div><p class="vz-q-why" hidden>Without it a trie can only answer prefix questions - and "do" being a word while "dog" continues past it has nothing to do with being a leaf.</p></li><li class="vz-q"><p class="vz-q-text">Trie lookup costs O(length of the word) because:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">The words are sorted</button><button type="button" class="vz-q-opt" data-vz-correct="1">It walks one node per character, and the number of stored words never enters into it</button><button type="button" class="vz-q-opt" data-vz-correct="0">Hashing is O(1)</button><button type="button" class="vz-q-opt" data-vz-correct="0">It is a balanced tree</button></div><p class="vz-q-why" hidden>A million stored words cost the same as ten. A hash table is also roughly O(length), because it must hash the whole string.</p></li><li class="vz-q"><p class="vz-q-text">The operation a hash table cannot do at all is:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Exact lookup</button><button type="button" class="vz-q-opt" data-vz-correct="0">Insert</button><button type="button" class="vz-q-opt" data-vz-correct="1">List everything starting with &quot;car&quot;</button><button type="button" class="vz-q-opt" data-vz-correct="0">Delete</button></div><p class="vz-q-why" hidden>Hashing destroys the relationship between "car" and "card". Autocomplete is a DFS from the prefix node, which needs the shared structure a trie keeps.</p></li></ol></section></div>
@@ -787,11 +955,11 @@ print("Lookup costs O(length of the word) - the number of words never enters int
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

@@ -70,7 +70,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -833,7 +839,106 @@ print("  'x' in line  ", "Ashish" in line)
 
 # split() then strip() on each part is the idiom for parsing this kind of
 # line, and it is worth preferring over a regular expression for anything
-# this simple -- it is faster to read and it fails in obvious ways.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# this simple -- it is faster to read and it fails in obvious ways.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import time
+
+# Nothing mutates a string. Every method returns a new one:
+s = "hello"
+print("s.upper() -&gt;", s.upper(), "   s is still", s)
+try:
+    s[0] = "H"
+except TypeError as e:
+    print("s[0] = 'H' -&gt;", e)
+
+# So building a string in a loop with += creates a new string every
+# iteration, copying everything accumulated so far.
+
+def by_concat(n):
+    out = ""
+    for i in range(n):
+        out += "x"
+    return out
+
+
+def by_concat_aliased(n):
+    out = ""
+    for i in range(n):
+        keep = out          # a second reference to the string
+        out += "x"
+    return out
+
+
+def by_join(n):
+    parts = []
+    for i in range(n):
+        parts.append("x")
+    return "".join(parts)
+
+
+def ms(f, n):
+    t0 = time.time(); f(n); return (time.time() - t0) * 1000
+
+
+print()
+print("%8s %12s %18s %12s" % ("n", "+= (ms)", "+= aliased (ms)", "join (ms)"))
+for n in (10000, 40000, 160000):
+    print("%8d %12.1f %18.1f %12.1f" % (
+        n, ms(by_concat, n), ms(by_concat_aliased, n), ms(by_join, n)))
+
+# The first column is the surprise: += looks perfectly fine, close to
+# join. That is not because concatenation is cheap -- it is because
+# CPython has an optimisation that resizes the string IN PLACE when it can
+# prove nothing else refers to it.
+#
+# The middle column is the same loop with one extra assignment, which
+# creates a second reference and takes the optimisation away. Now the real
+# cost shows: quadruple n and the time goes up by roughly an order of
+# magnitude, heading for the sixteenfold that O(n^2) predicts, because
+# each += copies everything accumulated so far.
+#
+# So += on strings is fast until it silently is not, and what disables it
+# is as innocuous as keeping the previous value, passing it to a function
+# or storing it in a list. join() does not depend on any of that: it builds
+# a list of pieces with cheap appends, then allocates the final string
+# exactly once, knowing the total length in advance.
+#
+# SLICING. A slice is a new string, so it can never alias the original:
+
+text = "abcdefghij"
+print()
+print("  text[2:5]   ", text[2:5])
+print("  text[:3]    ", text[:3])
+print("  text[-3:]   ", text[-3:])
+print("  text[::2]   ", text[::2])
+print("  text[::-1]  ", text[::-1])
+print("  text[5:2]   ", repr(text[5:2]), "-- backwards slice, empty not error")
+
+# The one rule that makes all of them predictable: start is included, stop
+# is excluded, and out-of-range bounds are clamped rather than raised:
+
+print()
+print("  text[3:999] ", text[3:999], " -- no IndexError")
+try:
+    text[999]
+except IndexError as e:
+    print("  text[999]    IndexError:", e)
+
+# Indexing raises and slicing does not, which is a common source of a bug
+# that returns "" instead of failing.
+#
+# And the methods worth knowing, all of them returning new strings:
+
+line = "  Name , Ashish ,  Delhi  \n"
+print()
+print("  raw          ", repr(line))
+print("  .strip()     ", repr(line.strip()))
+print("  .split(',')  ", [p.strip() for p in line.split(",")])
+print("  .replace     ", repr(line.strip().replace(" ,", ",")))
+print("  'x' in line  ", "Ashish" in line)
+
+# split() then strip() on each part is the idiom for parsing this kind of
+# line, and it is worth preferring over a regular expression for anything
+# this simple -- it is faster to read and it fails in obvious ways.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-experiments-to-try">Experiments to try</h3>
@@ -940,7 +1045,61 @@ print()
 word = "level"
 print(f"{word!r} is a palindrome:", word == word[::-1])
 print("counts:", {ch: word.count(ch) for ch in sorted(set(word))})
-print("ord/chr:", ord("a"), chr(98), "- the numbers behind the characters")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>strings.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">s[0] = &quot;A&quot; -&gt; TypeError</code><span class="vz-cl-note">Immutability is enforced, not advisory. It is also what lets strings be hashable, and therefore usable as dictionary keys &mdash; a mutable string could not be.</span></li><li class="vz-cl-step"><code class="vz-cl-line">acc.text += &quot;x&quot;</code><span class="vz-cl-note">Each <code>+=</code> allocates a new string and copies everything so far, so building n characters costs O(n²). The table measures growth rather than one timing, because that is the part that does not depend on the machine.</span></li><li class="vz-cl-step"><code class="vz-cl-line">why an attribute, not a local variable</code><span class="vz-cl-note">CPython has a special case that can resize a string in place when the target is a plain local and nothing else refers to it, which makes the textbook example look fine on some builds and not others. Storing into an attribute takes that variable out of the measurement &mdash; and a rescue that depends on the interpreter build is not one to write code against.</span></li><li class="vz-cl-step"><code class="vz-cl-line">&quot;&quot;.join(parts)</code><span class="vz-cl-note">One pass to compute the total length, one allocation, one copy. It is the idiomatic answer, it is the fast one, and it does not depend on an interpreter detail to stay fast.</span></li><li class="vz-cl-step"><code class="vz-cl-line">s[2:6]</code><span class="vz-cl-note">Slicing copies. On a large string in a loop that is a real cost, and it is why algorithms that scan text carry indices around instead of slicing as they go.</span></li><li class="vz-cl-step"><code class="vz-cl-line">word == word[::-1]</code><span class="vz-cl-note">Readable, and it allocates a full reversed copy. The <a href="two_pointers.html">two-pointer</a> version uses O(1) memory &mdash; worth knowing which one you are writing.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Swap <code>acc.text</code> for a plain local variable <code>out</code> and re-run. Whether the quadratic disappears depends on the interpreter you are running &mdash; which is the argument for <code>join</code> in one line.</li><li>Check whether two words are anagrams with <code>sorted(a) == sorted(b)</code>, then again with <code>Counter</code>. O(n log n) against O(n).</li><li>Try <code>"café"[::-1]</code> and <code>len("café")</code>. Python 3 strings are sequences of code points, so this behaves &mdash; and an emoji with a skin-tone modifier still will not.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("ord/chr:", ord("a"), chr(98), "- the numbers behind the characters")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>strings.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Strings are immutable. Every "change" builds a new string.
+import time
+
+s = "algorithms"
+print("s          :", s)
+print("s[0], s[-1]:", s[0], s[-1])
+print("s[2:6]     :", s[2:6], "- a new string, not a view")
+print("s[::-1]    :", s[::-1], "- the standard reversal idiom")
+
+try:
+    s[0] = "A"
+except TypeError as e:
+    print("s[0] = 'A' -&gt;", e)
+print("s.replace('a', 'A') -&gt;", s.replace("a", "A"), "  original still:", s)
+
+# --- the loop everyone writes first ------------------------------------
+class Accumulator:
+    def __init__(self):
+        self.text = ""
+
+print()
+print(f"{'n':&gt;7} {'+= in a loop':&gt;14} {'list + join':&gt;13} {'ratio':&gt;7}")
+for n in (20_000, 40_000, 80_000):
+    acc = Accumulator()
+    start = time.time()
+    for _ in range(n):
+        acc.text += "x"           # a new string each time: O(n) per step
+    concat = time.time() - start
+
+    start = time.time()
+    parts = []
+    for _ in range(n):
+        parts.append("x")         # O(1) each...
+    text = "".join(parts)         # ...then one allocation: O(n) overall
+    joined = time.time() - start
+
+    print(f"{n:&gt;7} {concat:&gt;13.4f}s {joined:&gt;12.4f}s {concat / joined:&gt;6.1f}x")
+
+print("Double n: the join column doubles. The += column quadruples.")
+
+# --- the methods that do the work --------------------------------------
+line = "  Name , Age ,  City  "
+print()
+print("split+strip:", [f.strip() for f in line.strip().split(",")])
+print("startswith :", "algorithms".startswith("algo"))
+print("find       :", "algorithms".find("rit"), "- index, or -1")
+print("join       :", "-".join(["a", "b", "c"]))
+
+# --- characters are strings too ----------------------------------------
+print()
+word = "level"
+print(f"{word!r} is a palindrome:", word == word[::-1])
+print("counts:", {ch: word.count(ch) for ch in sorted(set(word))})
+print("ord/chr:", ord("a"), chr(98), "- the numbers behind the characters")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">s[0] = &quot;A&quot; -&gt; TypeError</code><span class="vz-cl-note">Immutability is enforced, not advisory. It is also what lets strings be hashable, and therefore usable as dictionary keys &mdash; a mutable string could not be.</span></li><li class="vz-cl-step"><code class="vz-cl-line">acc.text += &quot;x&quot;</code><span class="vz-cl-note">Each <code>+=</code> allocates a new string and copies everything so far, so building n characters costs O(n²). The table measures growth rather than one timing, because that is the part that does not depend on the machine.</span></li><li class="vz-cl-step"><code class="vz-cl-line">why an attribute, not a local variable</code><span class="vz-cl-note">CPython has a special case that can resize a string in place when the target is a plain local and nothing else refers to it, which makes the textbook example look fine on some builds and not others. Storing into an attribute takes that variable out of the measurement &mdash; and a rescue that depends on the interpreter build is not one to write code against.</span></li><li class="vz-cl-step"><code class="vz-cl-line">&quot;&quot;.join(parts)</code><span class="vz-cl-note">One pass to compute the total length, one allocation, one copy. It is the idiomatic answer, it is the fast one, and it does not depend on an interpreter detail to stay fast.</span></li><li class="vz-cl-step"><code class="vz-cl-line">s[2:6]</code><span class="vz-cl-note">Slicing copies. On a large string in a loop that is a real cost, and it is why algorithms that scan text carry indices around instead of slicing as they go.</span></li><li class="vz-cl-step"><code class="vz-cl-line">word == word[::-1]</code><span class="vz-cl-note">Readable, and it allocates a full reversed copy. The <a href="two_pointers.html">two-pointer</a> version uses O(1) memory &mdash; worth knowing which one you are writing.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Swap <code>acc.text</code> for a plain local variable <code>out</code> and re-run. Whether the quadratic disappears depends on the interpreter you are running &mdash; which is the argument for <code>join</code> in one line.</li><li>Check whether two words are anagrams with <code>sorted(a) == sorted(b)</code>, then again with <code>Counter</code>. O(n log n) against O(n).</li><li>Try <code>"café"[::-1]</code> and <code>len("café")</code>. Python 3 strings are sequences of code points, so this behaves &mdash; and an emoji with a skin-tone modifier still will not.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">Building a string by += in a loop is O(n²) because each step:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Reallocates the list</button><button type="button" class="vz-q-opt" data-vz-correct="1">Allocates a new string and copies everything so far</button><button type="button" class="vz-q-opt" data-vz-correct="0">Re-encodes to UTF-8</button><button type="button" class="vz-q-opt" data-vz-correct="0">Sorts the characters</button></div><p class="vz-q-why" hidden>Strings are immutable, so there is nothing to append to. "".join(parts) does one length calculation, one allocation and one copy.</p></li><li class="vz-q"><p class="vz-q-text">The program accumulates into an object attribute rather than a local variable. Why?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">It is more realistic</button><button type="button" class="vz-q-opt" data-vz-correct="1">CPython has an in-place resize special case for locals that would hide the quadratic</button><button type="button" class="vz-q-opt" data-vz-correct="0">Locals are faster</button><button type="button" class="vz-q-opt" data-vz-correct="0">To avoid a NameError</button></div><p class="vz-q-why" hidden>The optimisation only fires under specific conditions and varies by build - which is itself the argument for using join rather than relying on it.</p></li><li class="vz-q"><p class="vz-q-text">Immutability is also what allows strings to be:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Sliced</button><button type="button" class="vz-q-opt" data-vz-correct="1">Used as dictionary keys</button><button type="button" class="vz-q-opt" data-vz-correct="0">Concatenated</button><button type="button" class="vz-q-opt" data-vz-correct="0">Iterated</button></div><p class="vz-q-why" hidden>Hashability requires that the value cannot change underneath the table. A mutable string could not be a key.</p></li></ol></section></div>
@@ -963,11 +1122,11 @@ print("ord/chr:", ord("a"), chr(98), "- the numbers behind the characters")</scr
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

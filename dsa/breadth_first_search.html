@@ -70,7 +70,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -710,7 +716,87 @@ print("DFS reached G via %s -- %d edges, when %d were available."
 # EDGES, not distance. Give the edges different weights and the fewest-hop
 # route stops being the cheapest one, which is the gap Dijkstra's
 # algorithm exists to fill -- it is BFS with a priority queue instead of
-# a plain one, so it settles nodes by total cost rather than hop count.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# a plain one, so it settles nodes by total cost rather than hop count.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Two routes from A to G: a short one through C, and a long one through
+# B. They are listed so that a stack reaches the long one first -- which
+# is the case that separates the two searches.
+GRAPH = {
+    "A": ["C", "B"],
+    "C": ["G"],            # A -&gt; C -&gt; G, two edges
+    "B": ["D"],
+    "D": ["E"],
+    "E": ["G"],            # A -&gt; B -&gt; D -&gt; E -&gt; G, four edges
+    "G": [],
+}
+from collections import deque
+
+
+def search(graph, start, goal, breadth_first):
+    frontier = deque([(start, [start])])
+    seen = {start}
+    order = []
+    while frontier:
+        node, path = frontier.popleft() if breadth_first else frontier.pop()
+        order.append(node)
+        if node == goal:
+            return order, path
+        for nxt in graph[node]:
+            if nxt not in seen:
+                seen.add(nxt)
+                frontier.append((nxt, path + [nxt]))
+    return order, None
+
+
+for label, bf in (("BFS (popleft)", True), ("DFS (pop)", False)):
+    order, path = search(GRAPH, "A", "G", bf)
+    print("%-15s visits %s" % (label, " ".join(order)))
+    print("%-15s path to G: %s  (%d edges)" % ("", " -&gt; ".join(path), len(path) - 1))
+
+# Both find G. BFS found it in two edges and DFS in four, on the same
+# graph with the same code -- and that is not luck: BFS reaches every node
+# by the fewest edges possible, because it finishes everything at distance
+# 1 before it starts on distance 2. DFS committed to the first branch it
+# entered and took the route that branch happened to offer.
+#
+# Watch the frontier to see why. BFS explores in complete rings:
+
+def levels(graph, start):
+    frontier, seen, d = deque([start]), {start}, {start: 0}
+    order = []
+    while frontier:
+        node = frontier.popleft()
+        order.append((node, d[node]))
+        for nxt in graph[node]:
+            if nxt not in seen:
+                seen.add(nxt)
+                d[nxt] = d[node] + 1
+                frontier.append(nxt)
+    return order
+
+
+print()
+print("distance from A, in the order BFS settles them:")
+for node, dist in levels(GRAPH, "A"):
+    print("  %s at distance %d" % (node, dist))
+
+# The distances come out non-decreasing: 0, 1, 1, 2, 2, 3. A node is
+# never settled before anything closer to the start, which is exactly the
+# invariant that makes the first time you reach a node also the best time.
+#
+# DFS has no such property. It commits to one branch and can arrive at a
+# node the long way round:
+
+order, path = search(GRAPH, "A", "G", False)
+print()
+bfs_order, bfs_path = search(GRAPH, "A", "G", True)
+print("DFS reached G via %s -- %d edges, when %d were available."
+      % (" -&gt; ".join(path), len(path) - 1, len(bfs_path) - 1))
+
+# The catch: this only holds when every edge costs the same. BFS counts
+# EDGES, not distance. Give the edges different weights and the fewest-hop
+# route stops being the cheapest one, which is the gap Dijkstra's
+# algorithm exists to fill -- it is BFS with a priority queue instead of
+# a plain one, so it settles nodes by total cost rather than hop count.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
@@ -781,7 +867,59 @@ while node is not None:
     node = parent[node]
 print()
 print(f"shortest path A -> {target}:", " -> ".join(reversed(path)),
-      f"({dist[target]} edges)")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>bfs.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">queue = deque([start])</code><span class="vz-cl-note">A <code>deque</code>, not a list: <code>list.pop(0)</code> is O(n) because it shifts every remaining item. On a large graph that alone turns a linear traversal quadratic.</span></li><li class="vz-cl-step"><code class="vz-cl-line">visited.add(neighbour)  # on enqueue</code><span class="vz-cl-note">Marking on enqueue rather than on dequeue is the difference between BFS and a slow disaster. Mark late and a node with three neighbours already in the queue gets added three times.</span></li><li class="vz-cl-step"><code class="vz-cl-line">node = queue.popleft()</code><span class="vz-cl-note">First in, first out. Change this one call to <code>pop()</code> and the same twelve lines become depth-first search &mdash; the container is the algorithm.</span></li><li class="vz-cl-step"><code class="vz-cl-line">dist[neighbour] = dist[node] + 1</code><span class="vz-cl-note">Because nodes are dequeued in order of distance, the first time BFS reaches a node is necessarily by a shortest path. This is why BFS solves shortest paths on unweighted graphs and Dijkstra is not needed.</span></li><li class="vz-cl-step"><code class="vz-cl-line">while node is not None: path.append(node)</code><span class="vz-cl-note">The <code>parent</code> map is a tree rooted at the start, so the path is recovered by walking up it. Storing the whole path per node instead would cost O(V) memory per node for no benefit.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Change <code>popleft()</code> to <code>pop()</code>. The visit order becomes depth-first and the distances stop being shortest paths.</li><li>Move <code>visited.add</code> to just after <code>popleft()</code>, then print the queue length. Nodes appear more than once &mdash; the classic BFS bug.</li><li>Add the edge <code>"A": ["B", "C", "G"]</code>. The path to G drops to one edge, and the level listing rearranges itself.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+      f"({dist[target]} edges)")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>bfs.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Breadth-first search: explore everything one step away, then two, then...
+from collections import deque
+
+graph = {
+    "A": ["B", "C"],
+    "B": ["A", "D", "E"],
+    "C": ["A", "F"],
+    "D": ["B"],
+    "E": ["B", "F"],
+    "F": ["C", "E", "G"],
+    "G": ["F"],
+}
+
+def bfs(graph, start):
+    visited = {start}                # marked when ENQUEUED, not when dequeued
+    queue = deque([start])
+    order, parent, dist = [], {start: None}, {start: 0}
+
+    while queue:
+        print(f"  queue: {list(queue)}")
+        node = queue.popleft()       # popleft = FIFO = breadth-first
+        order.append(node)
+        for neighbour in graph[node]:
+            if neighbour not in visited:
+                visited.add(neighbour)
+                parent[neighbour] = node
+                dist[neighbour] = dist[node] + 1
+                queue.append(neighbour)
+    return order, parent, dist
+
+
+print("BFS from A:")
+order, parent, dist = bfs(graph, "A")
+print()
+print("visit order:", " -&gt; ".join(order))
+
+print()
+levels = {}
+for node, d in dist.items():
+    levels.setdefault(d, []).append(node)
+for d in sorted(levels):
+    print(f"  {d} step(s) from A: {levels[d]}")
+
+# Rebuild the path by walking parents backwards from the target.
+target = "G"
+path, node = [], target
+while node is not None:
+    path.append(node)
+    node = parent[node]
+print()
+print(f"shortest path A -&gt; {target}:", " -&gt; ".join(reversed(path)),
+      f"({dist[target]} edges)")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">queue = deque([start])</code><span class="vz-cl-note">A <code>deque</code>, not a list: <code>list.pop(0)</code> is O(n) because it shifts every remaining item. On a large graph that alone turns a linear traversal quadratic.</span></li><li class="vz-cl-step"><code class="vz-cl-line">visited.add(neighbour)  # on enqueue</code><span class="vz-cl-note">Marking on enqueue rather than on dequeue is the difference between BFS and a slow disaster. Mark late and a node with three neighbours already in the queue gets added three times.</span></li><li class="vz-cl-step"><code class="vz-cl-line">node = queue.popleft()</code><span class="vz-cl-note">First in, first out. Change this one call to <code>pop()</code> and the same twelve lines become depth-first search &mdash; the container is the algorithm.</span></li><li class="vz-cl-step"><code class="vz-cl-line">dist[neighbour] = dist[node] + 1</code><span class="vz-cl-note">Because nodes are dequeued in order of distance, the first time BFS reaches a node is necessarily by a shortest path. This is why BFS solves shortest paths on unweighted graphs and Dijkstra is not needed.</span></li><li class="vz-cl-step"><code class="vz-cl-line">while node is not None: path.append(node)</code><span class="vz-cl-note">The <code>parent</code> map is a tree rooted at the start, so the path is recovered by walking up it. Storing the whole path per node instead would cost O(V) memory per node for no benefit.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Change <code>popleft()</code> to <code>pop()</code>. The visit order becomes depth-first and the distances stop being shortest paths.</li><li>Move <code>visited.add</code> to just after <code>popleft()</code>, then print the queue length. Nodes appear more than once &mdash; the classic BFS bug.</li><li>Add the edge <code>"A": ["B", "C", "G"]</code>. The path to G drops to one edge, and the level listing rearranges itself.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">Turning BFS into DFS requires changing:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">The visited set</button><button type="button" class="vz-q-opt" data-vz-correct="1">popleft() to pop() - the container</button><button type="button" class="vz-q-opt" data-vz-correct="0">The graph representation</button><button type="button" class="vz-q-opt" data-vz-correct="0">The order of the neighbour list</button></div><p class="vz-q-why" hidden>FIFO gives breadth-first, LIFO gives depth-first. The rest of the loop is identical, which is the clearest way to see that the container is the algorithm.</p></li><li class="vz-q"><p class="vz-q-text">Why does the code mark a node visited when it is enqueued rather than when it is dequeued?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">It is tidier</button><button type="button" class="vz-q-opt" data-vz-correct="1">Otherwise a node with several neighbours already queued gets added more than once</button><button type="button" class="vz-q-opt" data-vz-correct="0">To keep distances correct</button><button type="button" class="vz-q-opt" data-vz-correct="0">To detect cycles</button></div><p class="vz-q-why" hidden>Marking late lets the same node be queued repeatedly before it is ever processed, which blows up the queue on dense graphs.</p></li><li class="vz-q"><p class="vz-q-text">BFS gives shortest paths on an unweighted graph because:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">It uses a priority queue</button><button type="button" class="vz-q-opt" data-vz-correct="1">Nodes are dequeued in order of distance, so the first arrival is by a shortest path</button><button type="button" class="vz-q-opt" data-vz-correct="0">It visits every node</button><button type="button" class="vz-q-opt" data-vz-correct="0">It sorts the neighbours</button></div><p class="vz-q-why" hidden>The frontier expands one full level at a time. On weighted graphs that no longer holds and you need Dijkstra.</p></li></ol></section></div>
@@ -804,11 +942,11 @@ print(f"shortest path A -> {target}:", " -> ".join(reversed(path)),
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

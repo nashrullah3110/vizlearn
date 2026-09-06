@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -627,7 +633,94 @@ for n in (30, 100):
 # fib(30) went from over a million calls to under sixty. And fib(100) --
 # which the naive version could not finish in the lifetime of this page --
 # returns immediately. Same recursion, same base case; the only change is
-# refusing to solve a subproblem twice.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# refusing to solve a subproblem twice.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import sys
+
+
+def factorial(n, depth=0):
+    indent = "  " * depth
+    print("%scall factorial(%d)" % (indent, n))
+    if n &lt;= 1:
+        print("%sreturn 1        &lt;- base case, the unwinding starts here" % indent)
+        return 1
+    result = n * factorial(n - 1, depth + 1)
+    print("%sreturn %d * factorial(%d) = %d" % (indent, n, n - 1, result))
+    return result
+
+
+factorial(5)
+
+# Read the indentation. Every "call" line goes deeper and nothing is
+# computed on the way down -- the multiplications all happen on the way
+# back up, in reverse order. Those five paused frames each hold their own
+# n, waiting for the call below to return. That waiting is the whole
+# reason recursion needs memory that iteration does not.
+
+print()
+print("Python's recursion limit:", sys.getrecursionlimit())
+
+
+def depth_probe(n=0):
+    try:
+        return depth_probe(n + 1)
+    except RecursionError:
+        return n
+
+
+print("frames this function actually reached:", depth_probe())
+
+# That limit is a guard, not a hardware fact: Python raises RecursionError
+# before the C stack overflows, because a real overflow is a segfault
+# rather than an exception. A linked list of 10,000 nodes traversed
+# recursively hits it; the same traversal in a while loop does not.
+#
+# The cautionary tale is naive fibonacci, where the same subproblems are
+# recomputed on separate branches.
+
+calls = {"n": 0}
+
+
+def fib(n):
+    calls["n"] += 1
+    return n if n &lt; 2 else fib(n - 1) + fib(n - 2)
+
+
+print()
+print("%4s %12s %14s" % ("n", "fib(n)", "calls made"))
+for n in (10, 20, 25, 30):
+    calls["n"] = 0
+    v = fib(n)
+    print("%4d %12d %14d" % (n, v, calls["n"]))
+
+# The call count grows faster than the answer does. Each n adds roughly
+# 60% more calls, because the recursion tree branches twice at every level
+# and the two halves never share their work.
+#
+# One dictionary fixes it, and the contrast is the point:
+
+memo = {}
+mcalls = {"n": 0}
+
+
+def mfib(n):
+    mcalls["n"] += 1
+    if n &lt; 2:
+        return n
+    if n not in memo:
+        memo[n] = mfib(n - 1) + mfib(n - 2)
+    return memo[n]
+
+
+print()
+for n in (30, 100):
+    memo.clear(); mcalls["n"] = 0
+    v = mfib(n)
+    print("memoised fib(%d) = %d in %d calls" % (n, v, mcalls["n"]))
+
+# fib(30) went from over a million calls to under sixty. And fib(100) --
+# which the naive version could not finish in the lifetime of this page --
+# returns immediately. Same recursion, same base case; the only change is
+# refusing to solve a subproblem twice.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-guided-experiments">Guided experiments</h3>
@@ -742,7 +835,65 @@ for n in (10, 20, 25):
     value = fib(n)
     print(f"fib({n}) = {value:>6}  after {calls:>7} calls")
 print("Calls roughly double per +1. The tree of frames is the problem, and")
-print("memoisation - see the dynamic programming module - is the fix.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>recursion.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">if n &lt;= 1: return 1</code><span class="vz-cl-note">The base case, and the only thing standing between this function and a crash. Every recursive function needs one, and every call must make measurable progress towards it.</span></li><li class="vz-cl-step"><code class="vz-cl-line">result = n * factorial(n - 1, depth + 1)</code><span class="vz-cl-note">The multiplication happens <em>after</em> the recursive call returns, so the frame has to stay alive while the whole subtree below it runs. That is precisely what the call stack is holding.</span></li><li class="vz-cl-step"><code class="vz-cl-line">the indented print pairs</code><span class="vz-cl-note">Each <code>call</code> line has a matching <code>return</code> at the same indent. Read downwards for the pushes and upwards for the pops &mdash; the output is the stack, drawn over time.</span></li><li class="vz-cl-step"><code class="vz-cl-line">except RecursionError: return 0</code><span class="vz-cl-note">Python caps the depth deliberately, because the real C stack underneath would otherwise be overrun and the process would die rather than raise. The limit is a guard rail, not the actual capacity.</span></li><li class="vz-cl-step"><code class="vz-cl-line">calls += 1 in fib</code><span class="vz-cl-note">Naive <code>fib</code> recomputes the same subproblems exponentially often. Recursion is not slow; recursion without memory is.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Delete the base case from <code>factorial</code>. The <code>RecursionError</code> traceback is what an infinite recursion looks like from the inside.</li><li>Call <code>fib(30)</code> and then <code>fib(32)</code>. Roughly four times the calls for two more terms &mdash; and it is about to get much worse.</li><li>Rewrite <code>factorial</code> so the recursive call is the last thing it does (pass the accumulator down). That is tail recursion &mdash; and CPython still will not optimise it away.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("memoisation - see the dynamic programming module - is the fix.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>recursion.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Recursion, and the stack that makes it work.
+import sys
+
+def factorial(n, depth=0):
+    pad = "|  " * depth
+    print(f"{pad}call factorial({n})")
+    if n &lt;= 1:                       # base case: stop, do not recurse
+        print(f"{pad}return 1")
+        return 1
+    result = n * factorial(n - 1, depth + 1)     # frame waits here
+    print(f"{pad}return {n} * {result // n} = {result}")
+    return result
+
+
+print(factorial(4))
+
+# The same computation with no stack at all.
+def factorial_loop(n):
+    result = 1
+    for i in range(2, n + 1):
+        result *= i
+    return result
+
+
+print()
+print("iterative:", factorial_loop(4))
+
+# --- what the stack costs ----------------------------------------------
+def depth_reached(n):
+    """How deep can we go before Python refuses?"""
+    try:
+        return 1 + depth_reached(n + 1)
+    except RecursionError:
+        return 0
+
+
+print()
+print("Python's recursion limit:", sys.getrecursionlimit())
+print("frames we actually got   :", depth_reached(0))
+print("Each frame holds arguments, locals and a return address. That is memory,")
+print("and it is why deep recursion is a space cost, not just a style choice.")
+
+# --- the cost of recomputing -------------------------------------------
+calls = 0
+
+def fib(n):
+    global calls
+    calls += 1
+    return n if n &lt; 2 else fib(n - 1) + fib(n - 2)
+
+
+print()
+for n in (10, 20, 25):
+    calls = 0
+    value = fib(n)
+    print(f"fib({n}) = {value:&gt;6}  after {calls:&gt;7} calls")
+print("Calls roughly double per +1. The tree of frames is the problem, and")
+print("memoisation - see the dynamic programming module - is the fix.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">if n &lt;= 1: return 1</code><span class="vz-cl-note">The base case, and the only thing standing between this function and a crash. Every recursive function needs one, and every call must make measurable progress towards it.</span></li><li class="vz-cl-step"><code class="vz-cl-line">result = n * factorial(n - 1, depth + 1)</code><span class="vz-cl-note">The multiplication happens <em>after</em> the recursive call returns, so the frame has to stay alive while the whole subtree below it runs. That is precisely what the call stack is holding.</span></li><li class="vz-cl-step"><code class="vz-cl-line">the indented print pairs</code><span class="vz-cl-note">Each <code>call</code> line has a matching <code>return</code> at the same indent. Read downwards for the pushes and upwards for the pops &mdash; the output is the stack, drawn over time.</span></li><li class="vz-cl-step"><code class="vz-cl-line">except RecursionError: return 0</code><span class="vz-cl-note">Python caps the depth deliberately, because the real C stack underneath would otherwise be overrun and the process would die rather than raise. The limit is a guard rail, not the actual capacity.</span></li><li class="vz-cl-step"><code class="vz-cl-line">calls += 1 in fib</code><span class="vz-cl-note">Naive <code>fib</code> recomputes the same subproblems exponentially often. Recursion is not slow; recursion without memory is.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Delete the base case from <code>factorial</code>. The <code>RecursionError</code> traceback is what an infinite recursion looks like from the inside.</li><li>Call <code>fib(30)</code> and then <code>fib(32)</code>. Roughly four times the calls for two more terms &mdash; and it is about to get much worse.</li><li>Rewrite <code>factorial</code> so the recursive call is the last thing it does (pass the accumulator down). That is tail recursion &mdash; and CPython still will not optimise it away.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">What does a stack frame hold?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">The function&#x27;s source</button><button type="button" class="vz-q-opt" data-vz-correct="1">Its arguments, its locals and where to return to</button><button type="button" class="vz-q-opt" data-vz-correct="0">The whole call tree</button><button type="button" class="vz-q-opt" data-vz-correct="0">Only the return value</button></div><p class="vz-q-why" hidden>That is why recursion depth is a memory cost: a thousand pending calls means a thousand of these alive at once.</p></li><li class="vz-q"><p class="vz-q-text">In &#x27;return n * factorial(n - 1)&#x27;, why can the frame not be discarded at the recursive call?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Python does not support it</button><button type="button" class="vz-q-opt" data-vz-correct="1">The multiplication still has to happen after the call returns</button><button type="button" class="vz-q-opt" data-vz-correct="0">The argument might change</button><button type="button" class="vz-q-opt" data-vz-correct="0">It is discarded</button></div><p class="vz-q-why" hidden>Pending work after the call is exactly what keeps a frame alive. Writing it so the call is the last thing done is tail recursion - which CPython still will not optimise away.</p></li><li class="vz-q"><p class="vz-q-text">The program prints call counts for naive fib. What is the shape?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Linear in n</button><button type="button" class="vz-q-opt" data-vz-correct="1">Roughly doubling for each +1 in n</button><button type="button" class="vz-q-opt" data-vz-correct="0">n log n</button><button type="button" class="vz-q-opt" data-vz-correct="0">Constant</button></div><p class="vz-q-why" hidden>177 calls for fib(10) and 242,785 for fib(25). Recursion is not slow; recursion that recomputes the same subproblems is.</p></li></ol></section></div>
@@ -765,11 +916,11 @@ print("memoisation - see the dynamic programming module - is the fix.")</script>
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -643,7 +649,115 @@ for n in (1000, 10000, 100000, 1000000):
 # At a million rows the difference between a balanced tree and a sorted
 # insert order is twenty steps against half a million. That is the entire
 # argument for red-black and AVL trees, and it is why the ordered
-# containers in every standard library use one.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# containers in every standard library use one.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">class BST:
+    def __init__(self):
+        self.root = None
+        self.comparisons = 0
+
+    def insert(self, v):
+        if self.root is None:
+            self.root = [v, None, None]
+            return
+        node = self.root
+        while True:
+            if v &lt; node[0]:
+                if node[1] is None:
+                    node[1] = [v, None, None]; return
+                node = node[1]
+            else:
+                if node[2] is None:
+                    node[2] = [v, None, None]; return
+                node = node[2]
+
+    def find(self, v):
+        node, steps = self.root, 0
+        while node:
+            steps += 1
+            if v == node[0]:
+                return steps
+            node = node[1] if v &lt; node[0] else node[2]
+        return steps
+
+    def height(self):
+        # Iterative on purpose: the degenerate tree below is 1000 nodes
+        # deep, and a recursive height() hits Python's stack limit on it
+        # -- itself a fair demonstration of what an unbalanced tree costs.
+        best, stack = 0, [(self.root, 1)]
+        while stack:
+            node, d = stack.pop()
+            if node is None:
+                continue
+            best = max(best, d)
+            stack.append((node[1], d + 1))
+            stack.append((node[2], d + 1))
+        return best
+
+    def inorder(self):
+        out, stack, node = [], [], self.root
+        while stack or node:
+            while node:
+                stack.append(node)
+                node = node[1]
+            node = stack.pop()
+            out.append(node[0])
+            node = node[2]
+        return out
+
+
+import math
+import random
+
+n = 1000
+orders = {
+    "random insert": random.Random(6).sample(range(n), n),
+    "sorted insert": list(range(n)),
+    "reversed insert": list(range(n))[::-1],
+}
+print("%-18s %10s %14s %18s" % ("insertion order", "height", "log2(n)",
+                                "steps to find last"))
+for name, seq in orders.items():
+    t = BST()
+    for v in seq:
+        t.insert(v)
+    print("%-18s %10d %14.1f %18d" % (
+        name, t.height(), math.log2(n), t.find(seq[-1])))
+
+# Sorted input is not an adversarial case anybody has to construct. It is
+# what you get from a database export, a sorted file, an auto-increment
+# id, a timestamp column -- and it turns the tree into a linked list. The
+# height is n, not log n, and every search walks the whole thing.
+#
+# The tree is still CORRECT: it is still a BST, and in-order traversal
+# still gives sorted output. It is only the performance that collapsed,
+# which is why the bug survives testing.
+
+t = BST()
+for v in [5, 3, 8, 1, 4]:
+    t.insert(v)
+print()
+print("in-order traversal of any BST is sorted:", t.inorder())
+
+deg = BST()
+for v in range(6):
+    deg.insert(v)
+print("...including the degenerate one:       ", deg.inorder())
+
+# What a self-balancing tree adds is a rotation after each insert that
+# keeps the height at O(log n) whatever the input order. The cost is a
+# constant factor on writes; the benefit is that the worst case stops
+# being reachable by ordinary data.
+
+print()
+print("%8s %12s %16s %14s" % ("n", "balanced", "degenerate", "ratio"))
+for n in (1000, 10000, 100000, 1000000):
+    bal, degn = math.log2(n), n / 2
+    print("%8d %12.1f %16.0f %14.0fx" % (n, bal, degn, degn / bal))
+
+# At a million rows the difference between a balanced tree and a sorted
+# insert order is twenty steps against half a million. That is the entire
+# argument for red-black and AVL trees, and it is why the ordered
+# containers in every standard library use one.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-guided-tour">Guided tour</h3>
@@ -783,7 +897,90 @@ for key in [10, 20, 30, 40, 50, 60, 70]:        # sorted input
     degenerate = insert(degenerate, key)
 print("sorted input -> height", height(degenerate), "for 7 nodes")
 print("That is a linked list. Search is O(n), and this is why AVL and")
-print("red-black trees exist.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>bst.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">node.left = insert(node.left, key)</code><span class="vz-cl-note">Assigning the result back is what builds the tree. The recursive call returns either the existing subtree or a brand-new node, and this line does not need to know which.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if key &lt; node.key: ... else: right</code><span class="vz-cl-note">One comparison discards an entire subtree, exactly like binary search on an array &mdash; the tree is that algorithm made into a structure that can also be inserted into cheaply.</span></li><li class="vz-cl-step"><code class="vz-cl-line">inorder: left, self, right</code><span class="vz-cl-note">Visiting in that order emits the keys in sorted order, for free and without sorting anything. Change the position of the <code>append</code> and you have pre-order or post-order instead.</span></li><li class="vz-cl-step"><code class="vz-cl-line">successor = node.right; while successor.left:</code><span class="vz-cl-note">Deleting a node with two children means finding the next key in sorted order &mdash; the leftmost node of the right subtree &mdash; copying it up, and deleting that instead. It is guaranteed to have at most one child, so the hard case reduces to an easy one.</span></li><li class="vz-cl-step"><code class="vz-cl-line">sorted input -&gt; height 7</code><span class="vz-cl-note">A BST's O(log n) is a property of its <em>shape</em>, not its definition. Sorted input produces one long spine, and every operation degrades to O(n). Self-balancing trees exist entirely to prevent this.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Insert <code>[50, 30, 70, ...]</code> shuffled with <code>random.shuffle</code> and print the height each time. Random order gives O(log n) with high probability &mdash; that is the usual defence.</li><li>Delete a leaf, a one-child node and the root, and print the traversal after each. It stays sorted, which is the invariant to test against.</li><li>Add a <code>count</code> to each node instead of ignoring duplicate keys. That is how a BST becomes a multiset.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("red-black trees exist.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>bst.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># A binary search tree: everything left is smaller, everything right larger.
+
+class Node:
+    def __init__(self, key):
+        self.key = key
+        self.left = self.right = None
+
+
+def insert(node, key):
+    if node is None:
+        return Node(key)
+    if key &lt; node.key:
+        node.left = insert(node.left, key)     # rebuild the link on the way out
+    elif key &gt; node.key:
+        node.right = insert(node.right, key)
+    return node                                # equal keys: ignored
+
+
+def search(node, key, depth=1):
+    if node is None:
+        return None, depth
+    if key == node.key:
+        return node, depth
+    if key &lt; node.key:
+        return search(node.left, key, depth + 1)
+    return search(node.right, key, depth + 1)
+
+
+def inorder(node, out=None):
+    if out is None:
+        out = []
+    if node:
+        inorder(node.left, out)                # left
+        out.append(node.key)                   # self
+        inorder(node.right, out)               # right
+    return out
+
+
+def height(node):
+    return 0 if node is None else 1 + max(height(node.left), height(node.right))
+
+
+def delete(node, key):
+    if node is None:
+        return None
+    if key &lt; node.key:
+        node.left = delete(node.left, key)
+    elif key &gt; node.key:
+        node.right = delete(node.right, key)
+    else:
+        if node.left is None:                  # 0 or 1 child: promote it
+            return node.right
+        if node.right is None:
+            return node.left
+        successor = node.right                 # 2 children: smallest on the right
+        while successor.left:
+            successor = successor.left
+        node.key = successor.key               # copy it up
+        node.right = delete(node.right, successor.key)
+    return node
+
+
+root = None
+for key in [50, 30, 70, 20, 40, 60, 80]:
+    root = insert(root, key)
+
+print("in-order  :", inorder(root), "  &lt;- always sorted")
+print("height    :", height(root))
+for key in (40, 65):
+    node, depth = search(root, key)
+    print(f"search {key}: {'found' if node else 'not found'} after {depth} comparisons")
+
+root = delete(root, 30)          # one child
+root = delete(root, 50)          # two children - the interesting case
+print("after deleting 30 and 50:", inorder(root))
+
+print()
+degenerate = None
+for key in [10, 20, 30, 40, 50, 60, 70]:        # sorted input
+    degenerate = insert(degenerate, key)
+print("sorted input -&gt; height", height(degenerate), "for 7 nodes")
+print("That is a linked list. Search is O(n), and this is why AVL and")
+print("red-black trees exist.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">node.left = insert(node.left, key)</code><span class="vz-cl-note">Assigning the result back is what builds the tree. The recursive call returns either the existing subtree or a brand-new node, and this line does not need to know which.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if key &lt; node.key: ... else: right</code><span class="vz-cl-note">One comparison discards an entire subtree, exactly like binary search on an array &mdash; the tree is that algorithm made into a structure that can also be inserted into cheaply.</span></li><li class="vz-cl-step"><code class="vz-cl-line">inorder: left, self, right</code><span class="vz-cl-note">Visiting in that order emits the keys in sorted order, for free and without sorting anything. Change the position of the <code>append</code> and you have pre-order or post-order instead.</span></li><li class="vz-cl-step"><code class="vz-cl-line">successor = node.right; while successor.left:</code><span class="vz-cl-note">Deleting a node with two children means finding the next key in sorted order &mdash; the leftmost node of the right subtree &mdash; copying it up, and deleting that instead. It is guaranteed to have at most one child, so the hard case reduces to an easy one.</span></li><li class="vz-cl-step"><code class="vz-cl-line">sorted input -&gt; height 7</code><span class="vz-cl-note">A BST's O(log n) is a property of its <em>shape</em>, not its definition. Sorted input produces one long spine, and every operation degrades to O(n). Self-balancing trees exist entirely to prevent this.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Insert <code>[50, 30, 70, ...]</code> shuffled with <code>random.shuffle</code> and print the height each time. Random order gives O(log n) with high probability &mdash; that is the usual defence.</li><li>Delete a leaf, a one-child node and the root, and print the traversal after each. It stays sorted, which is the invariant to test against.</li><li>Add a <code>count</code> to each node instead of ignoring duplicate keys. That is how a BST becomes a multiset.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">Inserting sorted keys into a plain BST produces:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">A balanced tree</button><button type="button" class="vz-q-opt" data-vz-correct="1">A tree of height n - effectively a linked list</button><button type="button" class="vz-q-opt" data-vz-correct="0">An error</button><button type="button" class="vz-q-opt" data-vz-correct="0">A heap</button></div><p class="vz-q-why" hidden>Every key goes right, so the tree is one spine and search degrades to O(n). The program prints height 7 for seven sorted keys.</p></li><li class="vz-q"><p class="vz-q-text">An in-order traversal of a BST emits the keys:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">In insertion order</button><button type="button" class="vz-q-opt" data-vz-correct="1">In sorted order</button><button type="button" class="vz-q-opt" data-vz-correct="0">Level by level</button><button type="button" class="vz-q-opt" data-vz-correct="0">In reverse</button></div><p class="vz-q-why" hidden>Left, self, right. It comes out sorted for free, without sorting anything - which is the structure's whole selling point over a hash table.</p></li><li class="vz-q"><p class="vz-q-text">Deleting a node with two children works by:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Deleting both subtrees</button><button type="button" class="vz-q-opt" data-vz-correct="1">Copying up the in-order successor and deleting that instead</button><button type="button" class="vz-q-opt" data-vz-correct="0">Rotating the tree</button><button type="button" class="vz-q-opt" data-vz-correct="0">Marking it deleted</button></div><p class="vz-q-why" hidden>The leftmost node of the right subtree has at most one child, so the hard case reduces to an easy one.</p></li></ol></section></div>
@@ -806,11 +1003,11 @@ print("red-black trees exist.")</script><div class="vz-code-bar"><span class="vz
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

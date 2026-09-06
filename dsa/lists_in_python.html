@@ -70,7 +70,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -862,7 +868,93 @@ print("original mutated ->  shallow copy sees it:", shallow[0][0] == 99)
 print("                     deep copy does not:  ", deep[0][0] == 1)
 
 # Slicing gives a new outer list holding the SAME inner lists. For nested
-# data that is usually not the copy you meant.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# data that is usually not the copy you meant.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import time
+
+
+def timed(fn, reps=5):
+    best = None
+    for _ in range(reps):
+        t0 = time.time(); fn(); dt = time.time() - t0
+        best = dt if best is None else min(best, dt)
+    return best * 1000
+
+
+n = 30000            # kept modest: the O(n^2) row runs in the browser
+base = list(range(n))
+set_base = set(base)
+
+
+def front_insert(k):
+    a = []
+    for i in range(k):
+        a.insert(0, i)          # every element shifts one slot right
+
+
+print("%-34s %12s" % ("operation, repeated %d times" % n, "ms"))
+print("%-34s %12.1f" % ("append to the end",
+                        timed(lambda: [x for x in range(n)])))
+print("%-34s %12.1f" % ("insert(0, x) at the front",
+                        timed(lambda: front_insert(n))))
+print("%-34s %12.1f" % ("index a[i]",
+                        timed(lambda: [base[i] for i in range(n)])))
+print("%-34s %12.1f" % ("x in list (linear scan, x200)",
+                        timed(lambda: [(n - 1) in base for _ in range(200)])))
+print("%-34s %12.1f" % ("x in set (hash lookup, x200)",
+                        timed(lambda: [(n - 1) in set_base for _ in range(200)])))
+
+# Indexing is one address calculation, so it does not care where in the
+# list you look. Inserting at the FRONT has to move every element right,
+# which is why it is the one to avoid -- and `in` on a list is the same
+# problem in a different costume: a scan, not a lookup.
+#
+# The famous one is append, which is amortised O(1). Python over-allocates
+# so most appends are free and occasional ones copy everything. You can
+# see the over-allocation directly:
+
+import sys
+print()
+print("%8s %14s %10s" % ("length", "bytes", "grew?"))
+a = []
+last = sys.getsizeof(a)          # so row 0 is the starting size, not a jump
+for i in range(17):
+    size = sys.getsizeof(a)
+    print("%8d %14d %10s" % (len(a), size, "yes" if size != last else ""))
+    last = size
+    a.append(i)
+
+# The size jumps at a few lengths and is flat between them. Each jump
+# copies the whole list, but the new capacity is proportional to the
+# current size, so the copies get rarer exactly as fast as they get more
+# expensive. Averaged over n appends, that is a constant per append.
+#
+# The aliasing trap, which is a consequence of lists being references:
+
+grid = [[0] * 3] * 3            # three references to ONE row
+grid[0][0] = 9
+print()
+print("[[0]*3]*3 after setting grid[0][0] = 9:", grid)
+
+grid = [[0] * 3 for _ in range(3)]
+grid[0][0] = 9
+print("the comprehension version:             ", grid)
+
+# The first form copied the REFERENCE three times, so every row is the
+# same object and writing through one writes through all of them. This is
+# the single most common bug when building a grid, and the fix is the
+# comprehension, which evaluates [0]*3 afresh each time.
+
+import copy
+outer = [[1, 2], [3, 4]]
+shallow = outer[:]
+deep = copy.deepcopy(outer)
+outer[0][0] = 99
+print()
+print("original mutated -&gt;  shallow copy sees it:", shallow[0][0] == 99)
+print("                     deep copy does not:  ", deep[0][0] == 1)
+
+# Slicing gives a new outer list holding the SAME inner lists. For nested
+# data that is usually not the copy you meant.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
@@ -931,7 +1023,56 @@ c = a[:]                             # a copy
 a.append(60)
 print()
 print("b is a:", b is a, "->", b)
-print("c is a:", c is a, "->", c)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>lists.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">a[2]</code><span class="vz-cl-note">One multiplication and one memory read. The list stores references contiguously, so element <em>i</em> is at a computable address &mdash; this is the difference between a list and a <a href="linked_lists.html">linked list</a>.</span></li><li class="vz-cl-step"><code class="vz-cl-line">lst.insert(0, 1)</code><span class="vz-cl-note">Everything after the insertion point moves one slot right, so this is O(n). Doing it in a loop is O(n²), and it is the usual reason a “queue” written on a list is slow &mdash; see <a href="queues.html">queues</a>.</span></li><li class="vz-cl-step"><code class="vz-cl-line">sys.getsizeof(lst)</code><span class="vz-cl-note">The size jumps in steps, not per item. CPython over-allocates on growth so that most appends need no reallocation, which is what “amortised O(1)” means concretely.</span></li><li class="vz-cl-step"><code class="vz-cl-line">[[0] * 3] * 3</code><span class="vz-cl-note">Multiplying a list repeats the <em>reference</em> three times, so all three rows are one object. This is the single most common Python bug in grid and matrix code.</span></li><li class="vz-cl-step"><code class="vz-cl-line">b = a versus c = a[:]</code><span class="vz-cl-note">Assignment binds another name to the same object; slicing builds a new one. <code>is</code> asks which object, <code>==</code> asks about contents, and confusing them is how mutation surprises happen.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Raise <code>N</code> to 60,000. The append timing doubles; the front-insert timing roughly quadruples.</li><li>Replace the front-insert loop with <code>collections.deque</code> and <code>appendleft</code>. Same result, back to linear.</li><li>Print <code>sys.getsizeof</code> for a list of 1,000 items and for 1,000 separate integers. The list stores references, so it is far smaller than the things in it.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("c is a:", c is a, "->", c)</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>lists.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># A Python list is a resizable array of references. Everything follows.
+import sys, time
+
+a = [10, 20, 30, 40, 50]
+print("list      :", a)
+print("a[2]      :", a[2], "- computed address, O(1), whatever the length")
+print("a[-1]     :", a[-1], "- negative indices count from the end")
+print("a[1:4]    :", a[1:4], "- a slice is a NEW list, O(k) to build")
+
+# --- where the cost is -------------------------------------------------
+N = 30_000
+for label, action in [
+    ("append (end)", lambda lst: lst.append(1)),
+    ("insert (front)", lambda lst: lst.insert(0, 1)),
+]:
+    lst = []
+    start = time.time()
+    for _ in range(N):
+        action(lst)
+    print(f"{label:&gt;15}: {N} operations in {time.time() - start:.3f}s")
+print("insert(0, x) shifts every existing element one place right.")
+
+# --- growth is over-allocated ------------------------------------------
+print()
+lst = []
+previous = sys.getsizeof(lst)
+print("length  bytes")
+for i in range(1, 18):
+    lst.append(i)
+    size = sys.getsizeof(lst)
+    if size != previous:
+        print(f"{i:&gt;6}  {size:&gt;5}  &lt;- reallocated, with room to spare")
+        previous = size
+
+# --- lists hold references, not copies ---------------------------------
+print()
+grid_wrong = [[0] * 3] * 3          # three references to ONE list
+grid_right = [[0] * 3 for _ in range(3)]
+grid_wrong[0][0] = 9
+grid_right[0][0] = 9
+print("[[0]*3]*3          -&gt;", grid_wrong, "  all three rows changed")
+print("[[0]*3 for _ in ..] -&gt;", grid_right, "  only the first")
+
+b = a                                # another name for the same list
+c = a[:]                             # a copy
+a.append(60)
+print()
+print("b is a:", b is a, "-&gt;", b)
+print("c is a:", c is a, "-&gt;", c)
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">a[2]</code><span class="vz-cl-note">One multiplication and one memory read. The list stores references contiguously, so element <em>i</em> is at a computable address &mdash; this is the difference between a list and a <a href="linked_lists.html">linked list</a>.</span></li><li class="vz-cl-step"><code class="vz-cl-line">lst.insert(0, 1)</code><span class="vz-cl-note">Everything after the insertion point moves one slot right, so this is O(n). Doing it in a loop is O(n²), and it is the usual reason a “queue” written on a list is slow &mdash; see <a href="queues.html">queues</a>.</span></li><li class="vz-cl-step"><code class="vz-cl-line">sys.getsizeof(lst)</code><span class="vz-cl-note">The size jumps in steps, not per item. CPython over-allocates on growth so that most appends need no reallocation, which is what “amortised O(1)” means concretely.</span></li><li class="vz-cl-step"><code class="vz-cl-line">[[0] * 3] * 3</code><span class="vz-cl-note">Multiplying a list repeats the <em>reference</em> three times, so all three rows are one object. This is the single most common Python bug in grid and matrix code.</span></li><li class="vz-cl-step"><code class="vz-cl-line">b = a versus c = a[:]</code><span class="vz-cl-note">Assignment binds another name to the same object; slicing builds a new one. <code>is</code> asks which object, <code>==</code> asks about contents, and confusing them is how mutation surprises happen.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Raise <code>N</code> to 60,000. The append timing doubles; the front-insert timing roughly quadruples.</li><li>Replace the front-insert loop with <code>collections.deque</code> and <code>appendleft</code>. Same result, back to linear.</li><li>Print <code>sys.getsizeof</code> for a list of 1,000 items and for 1,000 separate integers. The list stores references, so it is far smaller than the things in it.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">Indexing a Python list is O(1) because the list stores:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">A hash of each item</button><button type="button" class="vz-q-opt" data-vz-correct="1">References contiguously, so the address is computed</button><button type="button" class="vz-q-opt" data-vz-correct="0">The items in sorted order</button><button type="button" class="vz-q-opt" data-vz-correct="0">A linked chain of nodes</button></div><p class="vz-q-why" hidden>One multiplication and one read. This is the whole difference between a list and a linked list.</p></li><li class="vz-q"><p class="vz-q-text">What does [[0] * 3] * 3 build?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">A 3x3 grid of independent rows</button><button type="button" class="vz-q-opt" data-vz-correct="1">Three references to one row, so writing to one writes to all</button><button type="button" class="vz-q-opt" data-vz-correct="0">A flat list of nine zeros</button><button type="button" class="vz-q-opt" data-vz-correct="0">An error</button></div><p class="vz-q-why" hidden>Multiplying repeats the reference, not the object. This is the most common Python bug in grid and matrix code.</p></li><li class="vz-q"><p class="vz-q-text">sys.getsizeof shows a list&#x27;s size jumping in steps rather than per item because:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">The report is approximate</button><button type="button" class="vz-q-opt" data-vz-correct="1">CPython over-allocates on growth so most appends need no reallocation</button><button type="button" class="vz-q-opt" data-vz-correct="0">Items vary in size</button><button type="button" class="vz-q-opt" data-vz-correct="0">Small lists are cached</button></div><p class="vz-q-why" hidden>That is what "amortised O(1) append" means concretely: most appends are free, and occasionally one pays for a copy.</p></li></ol></section></div>
@@ -954,11 +1095,11 @@ print("c is a:", c is a, "->", c)</script><div class="vz-code-bar"><span class="
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

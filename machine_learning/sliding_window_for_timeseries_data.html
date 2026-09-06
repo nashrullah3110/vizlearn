@@ -46,7 +46,7 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Sliding Window Explorer - interactive visualization on VizLearn">
     <meta property="og:locale" content="en_US">
-    <meta property="article:modified_time" content="2026-09-05">
+    <meta property="article:modified_time" content="2026-09-01">
     <meta property="article:published_time" content="2026-02-20">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Sliding Window Explorer">
@@ -60,7 +60,7 @@
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7551664560637561" crossorigin="anonymous"></script>
 
     <meta name="author" content="Ashish Jangra">
-    <meta name="last-modified" content="2026-09-05">
+    <meta name="last-modified" content="2026-09-01">
 
     <script type="application/ld+json">
 {
@@ -77,10 +77,16 @@
   "educationalLevel": "Beginner",
   "typicalAgeRange": "16-",
   "datePublished": "2026-02-20",
-  "dateModified": "2026-09-05",
+  "dateModified": "2026-09-01",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -493,7 +499,7 @@
                 <span style="color: var(--accent-primary)">Sliding Window</span>
             </div>
             <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Sliding Window for Timeseries Data</h1>
-            <!-- VIZLEARN:BYLINE:BEGIN --><p class="vz-byline"><a class="vz-byline-track" href="../machine_learning/">Machine Learning</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>By <a class="vz-byline-author" rel="author" href="../about.html">Ashish Jangra</a></span><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>Updated <time datetime="2026-09-05">5 September 2026</time></span></p><!-- VIZLEARN:BYLINE:END -->
+            <!-- VIZLEARN:BYLINE:BEGIN --><p class="vz-byline"><a class="vz-byline-track" href="../machine_learning/">Machine Learning</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>By <a class="vz-byline-author" rel="author" href="../about.html">Ashish Jangra</a></span><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>Updated <time datetime="2026-09-01">1 September 2026</time></span></p><!-- VIZLEARN:BYLINE:END -->
             <p class="mt-2 text-sm max-w-2xl" style="color: var(--text-muted)">
                 Visualize how time series data is processed into windows for forecasting and analysis.
             </p>
@@ -785,7 +791,106 @@ print("  a model trained for horizon 1 is not a model for horizon 20.")
 print()
 print("one more leak with no code to show for it: scaling. fitting a scaler on")
 print("the whole series puts the future's mean and standard deviation into")
-print("your training rows. fit it on the training rows only, inside a pipeline.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+print("your training rows. fit it on the training rows only, inside a pipeline.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">scikit-learn</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import numpy as np
+from sklearn.linear_model import Ridge
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import TimeSeriesSplit, KFold, cross_val_score
+from sklearn.metrics import mean_absolute_error
+
+rng = np.random.default_rng(0)
+n = 900
+# a random walk with a cycle on top -- non-stationary, like most real series
+series = 50 + np.cumsum(rng.normal(0, 0.8, n)) + 6 * np.sin(np.arange(n) / 11.0)
+print("a series of %d points: a random walk with a cycle on top." % n)
+print("first eight values:", np.round(series[:8], 2))
+print()
+
+def windows(s, lookback, horizon=1):
+    X = np.array([s[i:i + lookback] for i in range(len(s) - lookback - horizon + 1)])
+    y = np.array([s[i + lookback + horizon - 1] for i in range(len(X))])
+    return X, y
+
+X, y = windows(series, lookback=10)
+print("with lookback=10, horizon=1:")
+print("  row 0 features:", np.round(X[0], 2))
+print("  row 0 target  :", round(y[0], 2), " (that is series[10])")
+print("  row 1 features:", np.round(X[1], 2))
+print("  %d points became %d rows of %d columns." % (n, len(X), X.shape[1]))
+print("  consecutive rows share 9 of their 10 values. they are near-duplicates,")
+print("  and that is where every mistake below comes from.")
+print()
+
+split = int(0.8 * len(X))
+print("%-34s %12s %12s" % ("", "ridge MAE", "forest MAE"))
+
+def evaluate(label, Xa, ya):
+    out = []
+    for mk in (lambda: Ridge(),
+               lambda: RandomForestRegressor(n_estimators=80, random_state=0)):
+        m = mk().fit(Xa[:split], ya[:split])
+        out.append(mean_absolute_error(ya[split:], m.predict(Xa[split:])))
+    print("%-34s %12.4f %12.4f" % (label, out[0], out[1]))
+    return out
+
+honest = evaluate("chronological split (correct)", X, y)
+idx = rng.permutation(len(X))
+cheat = evaluate("shuffled split (cheating)", X[idx], y[idx])
+print()
+print("the forest went from %.4f to %.4f -- it looks %.1fx better purely from"
+      % (honest[1], cheat[1], honest[1] / cheat[1]))
+print("the shuffle. a shuffled test row shares 9 of its 10 values with training")
+print("rows either side of it in time, and a forest is flexible enough to look")
+print("that neighbour up rather than learn anything.")
+print()
+print("note that ridge barely moved (%.4f to %.4f). the leak is real either"
+      % (honest[0], cheat[0]))
+print("way; a linear model just is not able to exploit it. so 'my score did")
+print("not change when I shuffled' is not evidence that the split was safe.")
+print()
+
+print("the same trap in cross-validation:")
+for label, cv in (("KFold(5, shuffled)", KFold(5, shuffle=True, random_state=0)),
+                  ("TimeSeriesSplit(5)", TimeSeriesSplit(5))):
+    s = -cross_val_score(RandomForestRegressor(n_estimators=80, random_state=0),
+                         X, y, cv=cv, scoring="neg_mean_absolute_error").mean()
+    print("  %-22s forest MAE %.4f" % (label, s))
+print("  TimeSeriesSplit only trains on rows that come BEFORE the fold it")
+print("  tests on, and the training window grows:")
+for i, (a, b) in enumerate(TimeSeriesSplit(5).split(X)):
+    print("     fold %d: train rows 0-%d, test rows %d-%d" % (i, a[-1], b[0], b[-1]))
+print()
+
+print("the baseline you have to beat -- just predict the last value you saw:")
+print("  naive           MAE %.4f" % mean_absolute_error(y[split:], X[split:, -1]))
+print("  ridge, honest   MAE %.4f" % honest[0])
+print("  forest, honest  MAE %.4f" % honest[1])
+print("  on a random walk the naive forecast is genuinely hard to beat, which")
+print("  is exactly why quoting it is not optional.")
+print()
+
+print("lookback is a real hyperparameter. tune it on time-ordered folds:")
+print("%10s %14s" % ("lookback", "ridge MAE"))
+for lb in (1, 3, 10, 30, 60):
+    Xl, yl = windows(series, lookback=lb)
+    print("%10d %14.4f"
+          % (lb, -cross_val_score(Ridge(), Xl, yl, cv=TimeSeriesSplit(4),
+                                  scoring="neg_mean_absolute_error").mean()))
+print()
+
+print("and the horizon changes the problem completely:")
+for h in (1, 5, 20):
+    Xh, yh = windows(series, lookback=20, horizon=h)
+    sp = int(0.8 * len(Xh))
+    m = Ridge().fit(Xh[:sp], yh[:sp])
+    print("  %2d step(s) ahead: ridge MAE %.4f   naive MAE %.4f"
+          % (h, mean_absolute_error(yh[sp:], m.predict(Xh[sp:])),
+             mean_absolute_error(yh[sp:], Xh[sp:, -1])))
+print("  a model trained for horizon 1 is not a model for horizon 20.")
+print()
+print("one more leak with no code to show for it: scaling. fitting a scaler on")
+print("the whole series puts the future's mean and standard deviation into")
+print("your training rows. fit it on the training rows only, inside a pipeline.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
@@ -825,11 +930,11 @@ print("your training rows. fit it on the training rows only, inside a pipeline."
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

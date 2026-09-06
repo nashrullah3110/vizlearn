@@ -80,7 +80,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -541,7 +547,66 @@ INSERT INTO order_items (order_id, product_id, qty) VALUES
   (103, 4, 3),
   (104, 1, 2), (104, 5, 1),
   (105, 2, 1),
-  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- First, the relational answer to &quot;give me a customer and their orders&quot;:
+  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">-- First, the relational answer to &quot;give me a customer and their orders&quot;:
+-- a join, assembled at read time.
+
+SELECT c.name, o.id AS order_id, o.placed, o.status
+FROM customers c LEFT JOIN orders o ON o.customer_id = c.id
+WHERE c.name = &#x27;Ada&#x27;
+ORDER BY o.placed;
+
+-- Now the document shape. A document store would hold this as ONE
+-- record per customer, orders nested inside. Built here with JSON so
+-- you can see it:
+
+SELECT json_object(
+         &#x27;id&#x27;,     c.id,
+         &#x27;name&#x27;,   c.name,
+         &#x27;city&#x27;,   c.city,
+         &#x27;orders&#x27;, json_group_array(
+                     json_object(&#x27;id&#x27;, o.id, &#x27;placed&#x27;, o.placed,
+                                 &#x27;status&#x27;, o.status))
+       ) AS document
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+WHERE c.name = &#x27;Ada&#x27;
+GROUP BY c.id;
+
+-- ONE read, no join, everything the customer page needs. That is the
+-- case document stores are built for, and it is a real advantage.
+--
+-- Now ask a question that cuts the other way: which customers bought a
+-- monitor? Relationally it is a join away.
+
+SELECT DISTINCT c.name
+FROM customers c
+JOIN orders o      ON o.customer_id = c.id
+JOIN order_items i ON i.order_id = o.id
+JOIN products p    ON p.id = i.product_id
+WHERE p.name = &#x27;Monitor&#x27;;
+
+-- In the document shape there is no orders collection to search -- the
+-- orders live inside customer documents. Answering it means opening
+-- every customer document and looking inside, which is why document
+-- stores grow secondary indexes, and why the shape you chose at the
+-- start decides which questions stay cheap.
+--
+-- And the guarantee that goes away: nothing checks that a nested order
+-- has the fields the next reader expects.
+
+SELECT json_object(&#x27;id&#x27;, 9, &#x27;placed&#x27;, &#x27;2024-09-01&#x27;)     AS doc_missing_status
+UNION ALL
+SELECT json_object(&#x27;id&#x27;, 10, &#x27;placed&#x27;, &#x27;2024-09-02&#x27;, &#x27;status&#x27;, &#x27;shipped&#x27;);
+
+-- Both are valid documents. A reader that assumes &quot;status&quot; exists is
+-- fine until the day it does not, and the error surfaces in the
+-- application rather than at the write. The relational version cannot
+-- get into that state: status is NOT NULL in the table definition, and
+-- the database refuses the row.
+--
+-- Neither model is the correct one. They put the same complexity in
+-- different places -- schema up front, or handling in every reader.
+</pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- First, the relational answer to &quot;give me a customer and their orders&quot;:
 -- a join, assembled at read time.
 
 SELECT c.name, o.id AS order_id, o.placed, o.status
@@ -656,11 +721,11 @@ SELECT json_object(&#x27;id&#x27;, 10, &#x27;placed&#x27;, &#x27;2024-09-02&#x27
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

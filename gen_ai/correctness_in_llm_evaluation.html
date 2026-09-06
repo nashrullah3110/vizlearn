@@ -91,7 +91,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -439,7 +445,117 @@ print("   ignored your documents. it looks correct and your retrieval is")
 print("   doing nothing, which you will discover the first time the")
 print("   question is about something the model was not trained on.")
 print("   only correctness catches row 2, and only groundedness catches")
-print("   row 3, which is why both get reported.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">NumPy</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+print("   row 3, which is why both get reported.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">NumPy</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import numpy as np
+
+REFERENCE = "Refunds are available within 30 days of purchase."
+
+ANSWERS = [
+    ("You have 30 days from purchase to request a refund.", True),
+    ("Refunds are available within 30 days of purchase.", True),
+    ("Within 30 days.", True),
+    ("Refunds are available within 60 days of purchase.", False),
+    ("Refunds are available within 30 days of purchase, and shipping "
+     "is free.", True),
+    ("The refund policy is described in section 4.", False),
+]
+
+def toks(s):
+    return set(w.strip(".,").lower() for w in s.split())
+
+REF = toks(REFERENCE)
+
+def exact(a):
+    return 1.0 if a.strip().lower() == REFERENCE.strip().lower() else 0.0
+
+def f1(a):
+    t = toks(a)
+    if not t or not REF:
+        return 0.0
+    inter = len(t &amp; REF)
+    if not inter:
+        return 0.0
+    p, r = inter / float(len(t)), inter / float(len(REF))
+    return 2 * p * r / (p + r)
+
+print("THE REFERENCE ANSWER: %r" % REFERENCE)
+print()
+print("%-58s %8s %8s %8s" % ("candidate answer", "truth", "exact", "F1"))
+for a, truth in ANSWERS:
+    print("%-58s %8s %8.2f %8.4f"
+          % (a[:56], "right" if truth else "WRONG", exact(a), f1(a)))
+print()
+
+print("EXACT MATCH scores %d of %d correctly."
+      % (sum(1 for a, t in ANSWERS if (exact(a) &gt;= 0.5) == t), len(ANSWERS)))
+print("   it accepts only the reference itself. every correct paraphrase")
+print("   is marked wrong, which means the metric is measuring whether")
+print("   the model reproduced your wording, not whether it answered.")
+print("   for anything but a single-token answer -- a date, a name, a")
+print("   yes/no -- exact match is not an option.")
+print()
+
+THR = 0.5
+print("TOKEN F1 at a threshold of %.1f scores %d of %d correctly."
+      % (THR, sum(1 for a, t in ANSWERS if (f1(a) &gt;= THR) == t), len(ANSWERS)))
+print("   it handles paraphrase better, and it has two failure modes that")
+print("   are both visible above:")
+wrong_high = [(a, f1(a)) for a, t in ANSWERS if not t and f1(a) &gt;= THR]
+right_low = [(a, f1(a)) for a, t in ANSWERS if t and f1(a) &lt; THR]
+for a, s in wrong_high:
+    print("      SCORES HIGH AND IS WRONG (%.4f):" % s)
+    print("         %s" % a[:60])
+for a, s in right_low:
+    print("      SCORES LOW AND IS RIGHT (%.4f):" % s)
+    print("         %s" % a[:60])
+print("   the first is the serious one. '60 days' shares every word with")
+print("   the reference except the one that carries the answer, so overlap")
+print("   scores it %.4f -- higher than several correct answers."
+      % f1("Refunds are available within 60 days of purchase."))
+print("   token overlap cannot weight the token that matters, because it")
+print("   does not know which token that is.")
+print()
+
+print("A MODEL-AS-JUDGE reads both and decides. this snippet cannot run")
+print("one -- which is precisely the point, because a judge needs a model")
+print("call per example and the two metrics above need none.")
+print("a judge handles the '60 days' case that overlap could not, because")
+print("it can tell which token carried the answer. it also brings its own")
+print("problems, and they are not the obvious ones:")
+print("%-34s %s" % ("problem", "what to do about it"))
+for row in (("it is not deterministic", "temperature 0, and still sample"),
+            ("it prefers longer answers", "control for length in the prompt"),
+            ("it prefers its own family's style", "use a different family"),
+            ("it agrees with itself, not you", "calibrate against humans once"),
+            ("it costs a call per example", "sample, do not score everything")):
+    print("%-34s %s" % row)
+print("   the length bias is worth measuring on your own judge before")
+print("   trusting it. score the same correct answer padded to different")
+print("   lengths and see whether the number moves; if it does, your")
+print("   'correctness' metric is partly a verbosity metric.")
+print()
+
+print("AND THE DISTINCTION THAT MATTERS MOST -- CORRECTNESS IS NOT")
+print("GROUNDEDNESS:")
+CASES = [
+    ("the context is right, the answer follows it", "grounded", "correct"),
+    ("the context is WRONG, the answer follows it", "grounded", "WRONG"),
+    ("the context is right, the answer ignores it", "UNGROUNDED", "correct"),
+    ("the context is right, the answer invents", "UNGROUNDED", "WRONG"),
+]
+print("%-46s %14s %10s" % ("situation", "groundedness", "correctness"))
+for s, g, c in CASES:
+    print("%-46s %14s %10s" % (s, g, c))
+print("   row 2 is the one that catches teams out: a perfectly grounded")
+print("   answer that is wrong, because the retrieved document was out of")
+print("   date. groundedness cannot see it -- the answer faithfully")
+print("   reflects the context it was given.")
+print("   row 3 is the mirror: the model happened to know the answer and")
+print("   ignored your documents. it looks correct and your retrieval is")
+print("   doing nothing, which you will discover the first time the")
+print("   question is about something the model was not trained on.")
+print("   only correctness catches row 2, and only groundedness catches")
+print("   row 3, which is why both get reported.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-things-to-try">Things to try</h3>
@@ -530,11 +646,11 @@ print("   row 3, which is why both get reported.")</script><div class="vz-code-b
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

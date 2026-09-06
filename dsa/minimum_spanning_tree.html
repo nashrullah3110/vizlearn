@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -661,7 +667,116 @@ for _ in range(5):
 # either may be chosen and there is more than one minimum spanning tree,
 # all of the same total weight. Re-run the cuts with a different seed and
 # a tied edge will eventually come up "no" for that reason -- the tree is
-# still minimum, it is just not the only one.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# still minimum, it is just not the only one.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import heapq
+
+EDGES = [
+    ("A", "B", 4), ("A", "C", 8), ("B", "C", 11), ("B", "D", 8),
+    ("C", "E", 7), ("C", "F", 1), ("D", "E", 2), ("D", "G", 7),
+    ("E", "F", 6), ("F", "G", 2), ("G", "H", 9), ("D", "H", 4),
+]
+NODES = sorted({n for a, b, _ in EDGES for n in (a, b)})
+
+
+def kruskal(edges):
+    parent = {n: n for n in NODES}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    chosen, total = [], 0
+    for w, a, b in sorted((w, a, b) for a, b, w in edges):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+            chosen.append((a, b, w))
+            total += w
+    return chosen, total
+
+
+def prim(edges, start):
+    adj = {n: [] for n in NODES}
+    for a, b, w in edges:
+        adj[a].append((w, b))
+        adj[b].append((w, a))
+    seen = {start}
+    pq = [(w, start, to) for w, to in adj[start]]
+    heapq.heapify(pq)
+    chosen, total = [], 0
+    while pq and len(seen) &lt; len(NODES):
+        w, frm, to = heapq.heappop(pq)
+        if to in seen:
+            continue
+        seen.add(to)
+        chosen.append((frm, to, w))
+        total += w
+        for w2, nxt in adj[to]:
+            if nxt not in seen:
+                heapq.heappush(pq, (w2, to, nxt))
+    return chosen, total
+
+
+k_edges, k_total = kruskal(EDGES)
+print("Kruskal picks, in order:")
+for a, b, w in k_edges:
+    print("   %s-%s  weight %d" % (a, b, w))
+print("   total %d" % k_total)
+
+print()
+print("Prim from A picks, in order:")
+p_edges, p_total = prim(EDGES, "A")
+for a, b, w in p_edges:
+    print("   %s-%s  weight %d" % (a, b, w))
+print("   total %d" % p_total)
+
+print()
+print("same total:", k_total == p_total)
+print("same edge set:", sorted(tuple(sorted((a, b))) for a, b, _ in k_edges)
+      == sorted(tuple(sorted((a, b))) for a, b, _ in p_edges))
+
+# The orders are completely different -- Kruskal takes the globally
+# cheapest edge anywhere, Prim only ever takes an edge touching the tree
+# it has built. They still agree.
+#
+# The CUT PROPERTY is why. Split the nodes into any two groups; the
+# cheapest edge crossing that split must be in some minimum spanning
+# tree. If it were not, adding it would create a cycle, and removing any
+# other crossing edge of that cycle would give a tree that weighs less --
+# a contradiction.
+#
+# Both algorithms are just different ways of choosing which cut to apply
+# it to. Check the property directly:
+
+print()
+print("cheapest edge across a few random cuts, and whether the MST has it:")
+import random
+rng = random.Random(4)
+in_mst = {tuple(sorted((a, b))) for a, b, _ in k_edges}
+for _ in range(5):
+    group = set(rng.sample(NODES, rng.randrange(1, len(NODES))))
+    crossing = [(w, a, b) for a, b, w in EDGES
+                if (a in group) != (b in group)]
+    if not crossing:
+        continue
+    w, a, b = min(crossing)
+    ties = sum(1 for cw, _, _ in crossing if cw == w)
+    mark = "yes" if tuple(sorted((a, b))) in in_mst else "no"
+    print("   |group| = %d: cheapest crossing %s-%s (%d), tied with %d other"
+          " -&gt; in MST: %s" % (len(group), a, b, w, ties - 1, mark))
+
+# Every one of them is in the tree, which is the cut property holding on
+# five arbitrary splits of the graph.
+#
+# The tie column is the fine print. The property forces the cheapest
+# crossing edge into EVERY minimum spanning tree only when it is uniquely
+# cheapest; where another edge of equal weight crosses the same cut,
+# either may be chosen and there is more than one minimum spanning tree,
+# all of the same total weight. Re-run the cuts with a different seed and
+# a tied edge will eventually come up "no" for that reason -- the tree is
+# still minimum, it is just not the only one.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-things-to-try">Things to try</h3>
@@ -766,7 +881,72 @@ p_tree, p_total = prim("A")
 print()
 print("Kruskal edges :", [f"{u}-{v}" for u, v, _ in k_tree], "total", k_total)
 print("Prim weights  :", [w for _, w in p_tree], "total", p_total)
-print(f"{len(nodes)} nodes -> {len(k_tree)} edges. A spanning tree always has V-1.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>mst.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">sorted(edges, key=lambda e: e[2])</code><span class="vz-cl-note">Kruskal's entire strategy: cheapest first, globally, ignoring where the edges are. The sort is also its dominant cost &mdash; O(E log E).</span></li><li class="vz-cl-step"><code class="vz-cl-line">if ru == rv: continue</code><span class="vz-cl-note">Both ends already connected means this edge adds nothing but a cycle. Union-find answers that in near-constant time; without it the check would need a traversal per edge.</span></li><li class="vz-cl-step"><code class="vz-cl-line">heap = list(adj[start])</code><span class="vz-cl-note">Prim starts from one node and only ever considers edges leaving the tree it has grown. It never sees most of the graph at once, which is the opposite of Kruskal's global sort.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if node in seen: continue</code><span class="vz-cl-note">Same lazy deletion as Dijkstra &mdash; and Prim really is Dijkstra with the priority changed from “distance from the start” to “weight of this one edge”.</span></li><li class="vz-cl-step"><code class="vz-cl-line">len(k_tree) == len(nodes) - 1</code><span class="vz-cl-note">Any spanning tree of V nodes has exactly V &minus; 1 edges. Both algorithms hit that count and the same total, though the edge sets can differ when weights tie.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Print the two edge sets side by side. On this graph they match; make two edges equal in weight and they can diverge while the totals stay equal.</li><li>Delete edge <code>C-F</code>. Kruskal's very first choice changes and the whole tree reshapes.</li><li>Remove an edge so the graph is disconnected. Kruskal returns fewer than V &minus; 1 edges &mdash; a spanning forest, which is often what you actually wanted.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print(f"{len(nodes)} nodes -> {len(k_tree)} edges. A spanning tree always has V-1.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>mst.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Minimum spanning tree, twice: Kruskal (sort edges) and Prim (grow a tree).
+import heapq
+
+edges = [("A", "B", 4), ("A", "C", 8), ("B", "C", 11), ("B", "D", 8),
+         ("C", "E", 7), ("D", "E", 2), ("D", "F", 4), ("E", "F", 9),
+         ("C", "F", 1)]
+nodes = sorted({n for u, v, _ in edges for n in (u, v)})
+
+# --- Kruskal: cheapest edge first, skip any that closes a cycle ---------
+def kruskal():
+    parent = {n: n for n in nodes}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]      # path compression
+            x = parent[x]
+        return x
+
+    tree, total = [], 0
+    for u, v, w in sorted(edges, key=lambda e: e[2]):
+        ru, rv = find(u), find(v)
+        if ru == rv:
+            print(f"  skip {u}-{v} ({w}) - would close a cycle")
+            continue
+        parent[ru] = rv
+        tree.append((u, v, w))
+        total += w
+        print(f"  take {u}-{v} ({w})")
+    return tree, total
+
+
+# --- Prim: grow one tree, always out along its cheapest edge ------------
+def prim(start):
+    adj = {n: [] for n in nodes}
+    for u, v, w in edges:
+        adj[u].append((w, v))
+        adj[v].append((w, u))
+
+    seen = {start}
+    heap = list(adj[start])
+    heapq.heapify(heap)
+    tree, total = [], 0
+    while heap and len(seen) &lt; len(nodes):
+        w, node = heapq.heappop(heap)
+        if node in seen:
+            continue
+        seen.add(node)
+        tree.append((node, w))
+        total += w
+        print(f"  take {node} ({w})")
+        for nxt in adj[node]:
+            if nxt[1] not in seen:
+                heapq.heappush(heap, nxt)
+    return tree, total
+
+
+print("Kruskal:")
+k_tree, k_total = kruskal()
+print("Prim from A:")
+p_tree, p_total = prim("A")
+
+print()
+print("Kruskal edges :", [f"{u}-{v}" for u, v, _ in k_tree], "total", k_total)
+print("Prim weights  :", [w for _, w in p_tree], "total", p_total)
+print(f"{len(nodes)} nodes -&gt; {len(k_tree)} edges. A spanning tree always has V-1.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">sorted(edges, key=lambda e: e[2])</code><span class="vz-cl-note">Kruskal's entire strategy: cheapest first, globally, ignoring where the edges are. The sort is also its dominant cost &mdash; O(E log E).</span></li><li class="vz-cl-step"><code class="vz-cl-line">if ru == rv: continue</code><span class="vz-cl-note">Both ends already connected means this edge adds nothing but a cycle. Union-find answers that in near-constant time; without it the check would need a traversal per edge.</span></li><li class="vz-cl-step"><code class="vz-cl-line">heap = list(adj[start])</code><span class="vz-cl-note">Prim starts from one node and only ever considers edges leaving the tree it has grown. It never sees most of the graph at once, which is the opposite of Kruskal's global sort.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if node in seen: continue</code><span class="vz-cl-note">Same lazy deletion as Dijkstra &mdash; and Prim really is Dijkstra with the priority changed from “distance from the start” to “weight of this one edge”.</span></li><li class="vz-cl-step"><code class="vz-cl-line">len(k_tree) == len(nodes) - 1</code><span class="vz-cl-note">Any spanning tree of V nodes has exactly V &minus; 1 edges. Both algorithms hit that count and the same total, though the edge sets can differ when weights tie.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Print the two edge sets side by side. On this graph they match; make two edges equal in weight and they can diverge while the totals stay equal.</li><li>Delete edge <code>C-F</code>. Kruskal's very first choice changes and the whole tree reshapes.</li><li>Remove an edge so the graph is disconnected. Kruskal returns fewer than V &minus; 1 edges &mdash; a spanning forest, which is often what you actually wanted.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">A spanning tree of a graph with V nodes always has:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">V edges</button><button type="button" class="vz-q-opt" data-vz-correct="1">V - 1 edges</button><button type="button" class="vz-q-opt" data-vz-correct="0">E - V edges</button><button type="button" class="vz-q-opt" data-vz-correct="0">As few as possible</button></div><p class="vz-q-why" hidden>Exactly enough to connect everything with no cycle. Both Kruskal and Prim stop at that count in the program.</p></li><li class="vz-q"><p class="vz-q-text">The difference between Kruskal and Prim is that Kruskal:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Is faster</button><button type="button" class="vz-q-opt" data-vz-correct="1">Sorts all edges globally, while Prim only considers edges leaving the tree it has grown</button><button type="button" class="vz-q-opt" data-vz-correct="0">Handles negative weights</button><button type="button" class="vz-q-opt" data-vz-correct="0">Needs a starting node</button></div><p class="vz-q-why" hidden>Kruskal works from a global sort and needs union-find to reject cycles; Prim grows locally from one node with a priority queue.</p></li><li class="vz-q"><p class="vz-q-text">Kruskal uses union-find to:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Sort the edges</button><button type="button" class="vz-q-opt" data-vz-correct="0">Track the tree&#x27;s weight</button><button type="button" class="vz-q-opt" data-vz-correct="1">Check in near-constant time whether an edge would close a cycle</button><button type="button" class="vz-q-opt" data-vz-correct="0">Find the starting node</button></div><p class="vz-q-why" hidden>Both endpoints already in the same component means the edge adds only a cycle. Without union-find that check would need a traversal per edge.</p></li></ol></section></div>
@@ -789,11 +969,11 @@ print(f"{len(nodes)} nodes -> {len(k_tree)} edges. A spanning tree always has V-
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

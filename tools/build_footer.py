@@ -95,7 +95,11 @@ def build(prefix):
         "        </div>\n"
         '        <div class="vz-footer-bar">\n'
         '            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by '
-        '<a href="%(gh)s" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>\n'
+        # Points at the author page rather than straight out to GitHub: this
+        # is the one link every page on the site carries to the person who
+        # wrote it, and sending it off-site spent that signal instead of
+        # using it.
+        '<a href="%(p)sauthor.html" rel="author">Ashish Jangra</a></p>\n'
         '            <p class="mono-font vz-foot-note">This site uses cookies for '
         'analytics and advertising &mdash; see the '
         '<a href="%(p)sprivacy.html">Privacy Policy</a>.</p>\n'

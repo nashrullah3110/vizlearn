@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -642,7 +648,100 @@ for p in ("AAAAAB", "ABCDE"):
 # on EVERY input, where naive is O(n*m) on the bad ones. If your patterns
 # and texts have little internal repetition, the naive scan is competitive
 # and much simpler -- which is why real implementations often use it, with
-# a fallback for the pathological cases.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# a fallback for the pathological cases.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">def naive(text, pat):
+    comps, hits = 0, []
+    for i in range(len(text) - len(pat) + 1):
+        j = 0
+        while j &lt; len(pat):
+            comps += 1
+            if text[i + j] != pat[j]:
+                break
+            j += 1
+        if j == len(pat):
+            hits.append(i)
+    return hits, comps
+
+
+def build_lps(pat):
+    lps = [0] * len(pat)
+    length, i = 0, 1
+    while i &lt; len(pat):
+        if pat[i] == pat[length]:
+            length += 1
+            lps[i] = length
+            i += 1
+        elif length:
+            length = lps[length - 1]
+        else:
+            lps[i] = 0
+            i += 1
+    return lps
+
+
+def kmp(text, pat):
+    lps = build_lps(pat)
+    comps, hits = 0, []
+    i = j = 0
+    while i &lt; len(text):
+        comps += 1
+        if text[i] == pat[j]:
+            i += 1
+            j += 1
+            if j == len(pat):
+                hits.append(i - j)
+                j = lps[j - 1]
+        elif j:
+            j = lps[j - 1]          # fall back in the PATTERN only
+        else:
+            i += 1
+    return hits, comps
+
+
+text = "AAAAAAAAAAAAAAAAAAAB" * 20
+pat = "AAAAAB"
+n_hits, n_comps = naive(text, pat)
+k_hits, k_comps = kmp(text, pat)
+print("text: 'AAAA...AAAB' repeated, %d characters" % len(text))
+print("pattern: %r" % pat)
+print("  naive: %d matches, %d comparisons" % (len(n_hits), n_comps))
+print("  KMP:   %d matches, %d comparisons" % (len(k_hits), k_comps))
+print("  same matches:", n_hits == k_hits)
+
+# The naive version re-reads the same run of As for every starting
+# position. KMP reads each character of the text once and never moves i
+# backwards -- when a mismatch happens it slides the PATTERN instead.
+#
+# What the table stores: for each prefix of the pattern, the length of the
+# longest proper prefix that is also a suffix of it. That is the amount
+# already matched that can be reused after a mismatch.
+
+for p in ("AAAAAB", "ABABACA", "ABCDE", "AABAACAABAA"):
+    lps = build_lps(p)
+    print()
+    print("  pattern %-12s %s" % (p, " ".join(p)))
+    print("  lps     %-12s %s" % ("", " ".join(str(x) for x in lps)))
+
+# Read 'ABABACA'. At index 3 the value is 2, because "ABAB" ends with
+# "AB", which is also how it starts -- so after failing at index 4 we can
+# resume as if two characters already matched, without re-reading them.
+#
+# 'ABCDE' is all zeros: nothing repeats, so a mismatch always restarts the
+# pattern from the beginning. On that kind of pattern KMP does the same
+# work as the naive version, and the table has bought nothing.
+
+print()
+print("%-14s %10s %10s" % ("pattern", "naive", "KMP"))
+for p in ("AAAAAB", "ABCDE"):
+    _, nc = naive(text, p)
+    _, kc = kmp(text, p)
+    print("%-14s %10d %10d" % (p, nc, kc))
+
+# So the guarantee is the point rather than the average: KMP is O(n + m)
+# on EVERY input, where naive is O(n*m) on the bad ones. If your patterns
+# and texts have little internal repetition, the naive scan is competitive
+# and much simpler -- which is why real implementations often use it, with
+# a fallback for the pathological cases.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-things-to-try">Things to try</h3>
@@ -754,7 +853,79 @@ bad_text = "a" * 300 + "b"
 bad_pattern = "a" * 20 + "b"
 for name, fn in [("naive", naive_search), ("KMP", kmp_search)]:
     hits, comparisons = fn(bad_text, bad_pattern)
-    print(f"  {name:>5}: {comparisons:>6} comparisons, hits at {hits}")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>kmp.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">length = lps[length - 1]</code><span class="vz-cl-note">The line that makes the table build linear, and the one that looks wrong. On a mismatch the fallback is to the next-best border already computed &mdash; the table is built using itself.</span></li><li class="vz-cl-step"><code class="vz-cl-line">lps[i]</code><span class="vz-cl-note">For each prefix, how much of it is also a suffix of itself. That overlap is the only thing KMP needs in order to know how far it may safely slide after a mismatch.</span></li><li class="vz-cl-step"><code class="vz-cl-line">elif j: j = lps[j - 1]</code><span class="vz-cl-note">The search's whole trick. On a mismatch the pattern slides forward while <code>i</code> stays put, because the table already proves the skipped alignments cannot match.</span></li><li class="vz-cl-step"><code class="vz-cl-line">i never decreases</code><span class="vz-cl-note">Every character of the text is looked at a bounded number of times, which is the O(n + m) guarantee. Naive matching restarts at <code>i - j + 1</code> and can re-read the same characters over and over.</span></li><li class="vz-cl-step"><code class="vz-cl-line">j = lps[j - 1] after a hit</code><span class="vz-cl-note">Falling back rather than resetting to 0 is what finds overlapping occurrences. Set it to 0 and searching for <code>"aaa"</code> in <code>"aaaaa"</code> reports one match instead of three.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Build the table for <code>"aaaa"</code> and for <code>"abcd"</code>. One is all overlap, the other has none &mdash; the two extremes of what the table can say.</li><li>Lengthen <code>bad_text</code> to 3,000 a's. The naive count grows quadratically while the KMP count grows linearly.</li><li>Search for <code>"aa"</code> in <code>"aaaa"</code>. Three overlapping hits &mdash; then set the post-hit line to <code>j = 0</code> and watch one disappear.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+    print(f"  {name:>5}: {comparisons:>6} comparisons, hits at {hits}")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>kmp.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Knuth-Morris-Pratt: never re-examine a character of the text.
+
+def build_lps(pattern):
+    """lps[i] = length of the longest proper prefix of pattern[:i+1]
+    that is also a suffix of it."""
+    lps = [0] * len(pattern)
+    length = 0
+    i = 1
+    while i &lt; len(pattern):
+        if pattern[i] == pattern[length]:
+            length += 1
+            lps[i] = length
+            i += 1
+        elif length:
+            length = lps[length - 1]     # fall back, do NOT restart at 0
+        else:
+            lps[i] = 0
+            i += 1
+    return lps
+
+
+pattern = "ababaca"
+lps = build_lps(pattern)
+print("pattern:", " ".join(pattern))
+print("lps    :", " ".join(str(x) for x in lps))
+print("lps[4]=3 because 'ababa' starts and ends with 'aba'.")
+
+
+def kmp_search(text, pattern):
+    lps = build_lps(pattern)
+    hits, comparisons = [], 0
+    i = j = 0                            # i walks the text, j the pattern
+    while i &lt; len(text):
+        comparisons += 1
+        if text[i] == pattern[j]:
+            i += 1
+            j += 1
+            if j == len(pattern):
+                hits.append(i - j)
+                j = lps[j - 1]           # keep going for overlapping matches
+        elif j:
+            j = lps[j - 1]               # slide the pattern, i never moves back
+        else:
+            i += 1
+    return hits, comparisons
+
+
+def naive_search(text, pattern):
+    hits, comparisons = [], 0
+    for i in range(len(text) - len(pattern) + 1):
+        for j in range(len(pattern)):
+            comparisons += 1
+            if text[i + j] != pattern[j]:
+                break
+        else:
+            hits.append(i)
+    return hits, comparisons
+
+
+text = "abababacabababacaba"
+print()
+print("text   :", text)
+print("KMP    :", kmp_search(text, pattern))
+print("naive  :", naive_search(text, pattern))
+
+# The input designed to make naive matching look bad.
+print()
+bad_text = "a" * 300 + "b"
+bad_pattern = "a" * 20 + "b"
+for name, fn in [("naive", naive_search), ("KMP", kmp_search)]:
+    hits, comparisons = fn(bad_text, bad_pattern)
+    print(f"  {name:&gt;5}: {comparisons:&gt;6} comparisons, hits at {hits}")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">length = lps[length - 1]</code><span class="vz-cl-note">The line that makes the table build linear, and the one that looks wrong. On a mismatch the fallback is to the next-best border already computed &mdash; the table is built using itself.</span></li><li class="vz-cl-step"><code class="vz-cl-line">lps[i]</code><span class="vz-cl-note">For each prefix, how much of it is also a suffix of itself. That overlap is the only thing KMP needs in order to know how far it may safely slide after a mismatch.</span></li><li class="vz-cl-step"><code class="vz-cl-line">elif j: j = lps[j - 1]</code><span class="vz-cl-note">The search's whole trick. On a mismatch the pattern slides forward while <code>i</code> stays put, because the table already proves the skipped alignments cannot match.</span></li><li class="vz-cl-step"><code class="vz-cl-line">i never decreases</code><span class="vz-cl-note">Every character of the text is looked at a bounded number of times, which is the O(n + m) guarantee. Naive matching restarts at <code>i - j + 1</code> and can re-read the same characters over and over.</span></li><li class="vz-cl-step"><code class="vz-cl-line">j = lps[j - 1] after a hit</code><span class="vz-cl-note">Falling back rather than resetting to 0 is what finds overlapping occurrences. Set it to 0 and searching for <code>"aaa"</code> in <code>"aaaaa"</code> reports one match instead of three.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Build the table for <code>"aaaa"</code> and for <code>"abcd"</code>. One is all overlap, the other has none &mdash; the two extremes of what the table can say.</li><li>Lengthen <code>bad_text</code> to 3,000 a's. The naive count grows quadratically while the KMP count grows linearly.</li><li>Search for <code>"aa"</code> in <code>"aaaa"</code>. Three overlapping hits &mdash; then set the post-hit line to <code>j = 0</code> and watch one disappear.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">What does lps[i] store?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">The character at i</button><button type="button" class="vz-q-opt" data-vz-correct="1">The length of the longest proper prefix of pattern[:i+1] that is also its suffix</button><button type="button" class="vz-q-opt" data-vz-correct="0">The number of matches so far</button><button type="button" class="vz-q-opt" data-vz-correct="0">The next index to check</button></div><p class="vz-q-why" hidden>That overlap is the only information needed to know how far the pattern may safely slide after a mismatch.</p></li><li class="vz-q"><p class="vz-q-text">In the search loop, what never happens?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">j decreases</button><button type="button" class="vz-q-opt" data-vz-correct="1">i decreases</button><button type="button" class="vz-q-opt" data-vz-correct="0">The pattern slides</button><button type="button" class="vz-q-opt" data-vz-correct="0">A hit</button></div><p class="vz-q-why" hidden>The text index only moves forward, which is the O(n + m) guarantee. Naive matching restarts at i - j + 1 and re-reads characters.</p></li><li class="vz-q"><p class="vz-q-text">After a full match, the code sets j = lps[j - 1] rather than 0. Why?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">To reset faster</button><button type="button" class="vz-q-opt" data-vz-correct="1">To find overlapping occurrences</button><button type="button" class="vz-q-opt" data-vz-correct="0">To avoid an index error</button><button type="button" class="vz-q-opt" data-vz-correct="0">To count the matches</button></div><p class="vz-q-why" hidden>Set it to 0 and searching "aa" in "aaaa" reports fewer matches than there are.</p></li></ol></section></div>
@@ -777,11 +948,11 @@ for name, fn in [("naive", naive_search), ("KMP", kmp_search)]:
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

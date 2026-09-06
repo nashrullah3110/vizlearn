@@ -70,7 +70,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -786,7 +792,92 @@ print("merge sorted by value:       ",
 # The two 3s come out with original indices 0 then 2, and the two 1s as
 # 1 then 3 -- input order preserved within equal keys. That is the <= in
 # the merge comparison; with < the equal element from the right half
-# would be taken first and stability would be gone.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# would be taken first and stability would be gone.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">def merge_sort(a, stats):
+    if len(a) &lt;= 1:
+        return a
+    mid = len(a) // 2
+    left = merge_sort(a[:mid], stats)
+    right = merge_sort(a[mid:], stats)
+    stats["allocated"] += len(a)          # the merge buffer for this level
+    out, i, j = [], 0, 0
+    while i &lt; len(left) and j &lt; len(right):
+        stats["comps"] += 1
+        if left[i] &lt;= right[j]:           # &lt;= keeps equal elements in order
+            out.append(left[i]); i += 1
+        else:
+            out.append(right[j]); j += 1
+    out.extend(left[i:]); out.extend(right[j:])
+    return out
+
+
+def quick_sort(a, stats, depth=0):
+    stats["depth"] = max(stats["depth"], depth)
+    if len(a) &lt;= 1:
+        return a
+    pivot = a[-1]                          # last element: the naive choice
+    lo, eq, hi = [], [], []
+    for x in a:
+        stats["comps"] += 1
+        (lo if x &lt; pivot else hi if x &gt; pivot else eq).append(x)
+    return quick_sort(lo, stats, depth + 1) + eq + quick_sort(hi, stats, depth + 1)
+
+
+import random
+random.seed(11)
+n = 64
+inputs = {
+    "random":   random.sample(range(n), n),
+    "sorted":   list(range(n)),
+    "reversed": list(range(n))[::-1],
+}
+
+print("n = %d" % n)
+print("%-10s %12s %12s" % ("input", "merge comps", "quick comps"))
+for name, data in inputs.items():
+    ms = {"comps": 0, "allocated": 0}
+    qs = {"comps": 0, "depth": 0}
+    merge_sort(data, ms)
+    quick_sort(data, qs)
+    print("%-10s %12d %12d" % (name, ms["comps"], qs["comps"]))
+
+# Merge sort's column stays inside a narrow band -- 192 to 304, against a
+# ceiling of n log2 n = 384 -- because the split is positional, so the
+# shape of the data cannot change how many levels there are. Quick sort
+# with a last-element pivot does not have that protection: on sorted and
+# reversed input every partition peels off exactly one element, and 375
+# comparisons become 2079 -- one short of n(n+1)/2, the quadratic sum,
+# rather than anything resembling n log n.
+
+import math
+print()
+print("n log2 n = %.0f" % (n * math.log2(n)))
+
+# Now the cost. Merge sort allocates a buffer at every level.
+
+for name, data in inputs.items():
+    ms = {"comps": 0, "allocated": 0}
+    merge_sort(data, ms)
+    print("%-10s allocated %d slots for %d elements  (n log2 n = %.0f)" % (
+        name, ms["allocated"], n, n * math.log2(n)))
+
+# That is the O(n log n) total allocation people mean when they say merge
+# sort needs O(n) extra space -- O(n) live at any moment, since each level
+# is freed before the next, but the allocation traffic is real and it is
+# why merge sort loses to quick sort on cache-friendliness.
+#
+# What you buy with it, besides the guarantee, is stability.
+
+pairs = [(x, i) for i, x in enumerate([3, 1, 3, 1, 2])]
+print()
+print("input (value, original index):", pairs)
+print("merge sorted by value:       ",
+      merge_sort(pairs, {"comps": 0, "allocated": 0}))
+
+# The two 3s come out with original indices 0 then 2, and the two 1s as
+# 1 then 3 -- input order preserved within equal keys. That is the &lt;= in
+# the merge comparison; with &lt; the equal element from the right half
+# would be taken first and stability would be gone.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-experiments-to-try">Experiments to try</h3>
@@ -874,7 +965,51 @@ print("sorted:", result)
 pairs = [("b", 2), ("a", 1), ("c", 2), ("d", 1)]
 print()
 print("by number:", merge_sort(pairs, key=lambda p: p[1], show=False))
-print("a before d, b before c - ties kept the order they arrived in")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>merge_sort.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">if len(a) &lt;= 1: return a</code><span class="vz-cl-note">The base case. A list of one is sorted by definition, and every branch of the recursion bottoms out here &mdash; which is why merge sort needs no explicit termination check.</span></li><li class="vz-cl-step"><code class="vz-cl-line">mid = len(a) // 2</code><span class="vz-cl-note">The split is positional and costs nothing to choose. Contrast quicksort, where choosing the split point <em>is</em> the algorithm and a bad choice costs O(n²).</span></li><li class="vz-cl-step"><code class="vz-cl-line">while i &lt; len(left) and j &lt; len(right):</code><span class="vz-cl-note">Both halves are already sorted, so the next smallest item overall is always at the front of one of them. That single fact is why merging is linear.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if left[i] &lt;= right[j]:</code><span class="vz-cl-note">The <code>&lt;=</code> is what makes merge sort stable: on a tie the left half wins, and the left half held the earlier items. Change it to <code>&lt;</code> and stability is gone, silently.</span></li><li class="vz-cl-step"><code class="vz-cl-line">out.extend(left[i:]); out.extend(right[j:])</code><span class="vz-cl-note">When one side runs out the other is already sorted and every item in it is larger, so it can be appended wholesale. One of these two lines is always a no-op.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Change <code>&lt;=</code> to <code>&lt;</code> in <code>merge</code>, then sort a list with duplicates and watch stability break.</li><li>Count the merge lines the program prints. It is about n log n for any input &mdash; merge sort has no best case, and no worst case either.</li><li>Replace the slices with index ranges into one shared list. That removes the O(n) copies, and shows why the classic implementation needs O(n) extra space.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("a before d, b before c - ties kept the order they arrived in")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>merge_sort.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Merge sort: split until the pieces are trivially sorted, then merge.
+
+def merge(left, right, key):
+    out = []
+    i = j = 0
+    while i &lt; len(left) and j &lt; len(right):
+        if key(left[i]) &lt;= key(right[j]):   # &lt;= keeps equal items in order
+            out.append(left[i]); i += 1
+        else:
+            out.append(right[j]); j += 1
+    out.extend(left[i:])             # one side is empty; drain the other
+    out.extend(right[j:])
+    return out
+
+
+def merge_sort(a, key=lambda x: x, depth=0, show=True):
+    pad = "  " * depth
+    if len(a) &lt;= 1:                  # a single item is already sorted
+        if show:
+            print(f"{pad}{a}  (base case)")
+        return a
+    mid = len(a) // 2
+    if show:
+        print(f"{pad}split {a} -&gt; {a[:mid]} + {a[mid:]}")
+    left = merge_sort(a[:mid], key, depth + 1, show)
+    right = merge_sort(a[mid:], key, depth + 1, show)
+    out = merge(left, right, key)
+    if show:
+        print(f"{pad}merge {left} + {right} -&gt; {out}")
+    return out
+
+
+data = [38, 27, 43, 3, 9, 82, 10]
+print("start :", data)
+print()
+result = merge_sort(data)
+print()
+print("sorted:", result)
+
+# Stability, run through this same code rather than asserted.
+pairs = [("b", 2), ("a", 1), ("c", 2), ("d", 1)]
+print()
+print("by number:", merge_sort(pairs, key=lambda p: p[1], show=False))
+print("a before d, b before c - ties kept the order they arrived in")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">if len(a) &lt;= 1: return a</code><span class="vz-cl-note">The base case. A list of one is sorted by definition, and every branch of the recursion bottoms out here &mdash; which is why merge sort needs no explicit termination check.</span></li><li class="vz-cl-step"><code class="vz-cl-line">mid = len(a) // 2</code><span class="vz-cl-note">The split is positional and costs nothing to choose. Contrast quicksort, where choosing the split point <em>is</em> the algorithm and a bad choice costs O(n²).</span></li><li class="vz-cl-step"><code class="vz-cl-line">while i &lt; len(left) and j &lt; len(right):</code><span class="vz-cl-note">Both halves are already sorted, so the next smallest item overall is always at the front of one of them. That single fact is why merging is linear.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if left[i] &lt;= right[j]:</code><span class="vz-cl-note">The <code>&lt;=</code> is what makes merge sort stable: on a tie the left half wins, and the left half held the earlier items. Change it to <code>&lt;</code> and stability is gone, silently.</span></li><li class="vz-cl-step"><code class="vz-cl-line">out.extend(left[i:]); out.extend(right[j:])</code><span class="vz-cl-note">When one side runs out the other is already sorted and every item in it is larger, so it can be appended wholesale. One of these two lines is always a no-op.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Change <code>&lt;=</code> to <code>&lt;</code> in <code>merge</code>, then sort a list with duplicates and watch stability break.</li><li>Count the merge lines the program prints. It is about n log n for any input &mdash; merge sort has no best case, and no worst case either.</li><li>Replace the slices with index ranges into one shared list. That removes the O(n) copies, and shows why the classic implementation needs O(n) extra space.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">Where does the actual sorting happen in merge sort?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">In the split</button><button type="button" class="vz-q-opt" data-vz-correct="1">In the merge</button><button type="button" class="vz-q-opt" data-vz-correct="0">In the base case</button><button type="button" class="vz-q-opt" data-vz-correct="0">In the recursion</button></div><p class="vz-q-why" hidden>Splitting a list in half is positional and does no comparing. All the ordering work is in combining two sorted halves.</p></li><li class="vz-q"><p class="vz-q-text">In merge, why is the comparison left[i] &lt;= right[j] rather than &lt; ?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">It is faster</button><button type="button" class="vz-q-opt" data-vz-correct="1">It keeps the sort stable</button><button type="button" class="vz-q-opt" data-vz-correct="0">It avoids an index error</button><button type="button" class="vz-q-opt" data-vz-correct="0">It handles empty lists</button></div><p class="vz-q-why" hidden>On a tie the left half wins, and the left half held the earlier items. Changing it to < breaks stability silently, with no other visible symptom.</p></li><li class="vz-q"><p class="vz-q-text">Merge sort&#x27;s worst case compared with its best case:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Much worse</button><button type="button" class="vz-q-opt" data-vz-correct="0">Slightly worse</button><button type="button" class="vz-q-opt" data-vz-correct="1">The same - O(n log n) either way</button><button type="button" class="vz-q-opt" data-vz-correct="0">Depends on the pivot</button></div><p class="vz-q-why" hidden>It has no pivot to choose badly and no early exit to hit. That predictability is exactly why it is used where worst-case latency matters.</p></li></ol></section></div>
@@ -897,11 +1032,11 @@ print("a before d, b before c - ties kept the order they arrived in")</script><d
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

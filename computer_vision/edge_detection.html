@@ -46,7 +46,7 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Real-time Edge Detection - interactive visualization on VizLearn">
     <meta property="og:locale" content="en_US">
-    <meta property="article:modified_time" content="2026-09-05">
+    <meta property="article:modified_time" content="2026-09-04">
     <meta property="article:published_time" content="2026-02-20">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Real-time Edge Detection">
@@ -60,7 +60,7 @@
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7551664560637561" crossorigin="anonymous"></script>
 
     <meta name="author" content="Ashish Jangra">
-    <meta name="last-modified" content="2026-09-05">
+    <meta name="last-modified" content="2026-09-04">
 
     <script type="application/ld+json">
 {
@@ -77,10 +77,16 @@
   "educationalLevel": "Beginner",
   "typicalAgeRange": "16-",
   "datePublished": "2026-02-20",
-  "dateModified": "2026-09-05",
+  "dateModified": "2026-09-04",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -511,7 +517,7 @@
                 <span style="color: var(--accent-primary)">Feature Extraction</span>
             </div>
             <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">Real-time Edge Detection</h1>
-            <!-- VIZLEARN:BYLINE:BEGIN --><p class="vz-byline"><a class="vz-byline-track" href="../computer_vision/">Computer Vision</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>By <a class="vz-byline-author" rel="author" href="../about.html">Ashish Jangra</a></span><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>Updated <time datetime="2026-09-05">5 September 2026</time></span></p><!-- VIZLEARN:BYLINE:END -->
+            <!-- VIZLEARN:BYLINE:BEGIN --><p class="vz-byline"><a class="vz-byline-track" href="../computer_vision/">Computer Vision</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>By <a class="vz-byline-author" rel="author" href="../about.html">Ashish Jangra</a></span><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>Updated <time datetime="2026-09-04">4 September 2026</time></span></p><!-- VIZLEARN:BYLINE:END -->
             <p class="mt-2 text-sm max-w-2xl" style="color: var(--text-muted)">
                 Apply the Sobel operator to detect edges in static images or live video feeds directly in your browser.
             </p>
@@ -860,7 +866,206 @@ print("blur, differentiate, thin, threshold twice: that sequence is Canny,")
 print("published in 1986 and still the default in OpenCV. each of the five")
 print("stages exists to repair a specific failure of the stage before it,")
 print("and none of them does anything a network could not learn -- only")
-print("far cheaper, deterministically, with no training data at all.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">NumPy</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+print("far cheaper, deterministically, with no training data at all.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">NumPy</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import numpy as np
+
+rng = np.random.default_rng(4)
+H, W = 14, 24
+img = np.full((H, W), 60.0)
+img[:, 13:] = 190.0                    # a strong vertical edge
+img[7:, :13] += 26.0                   # a FAINT horizontal edge, touching it
+img[11, 17] += 45.0                    # one isolated bright speck
+img += rng.normal(0, 3.5, (H, W))
+img = np.clip(img, 0, 255)
+
+FLAT = (slice(9, 14), slice(3, 12))    # a genuinely featureless patch
+
+def show(a, label, hi):
+    ramp = " .:-=+*#%@"
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(
+            ramp[min(9, int(9 * max(0.0, v) / (hi + 1e-9)))] for v in row))
+
+show(img, "the image", 255)
+print("      a strong vertical step at column 13 (60 -&gt; 190), a faint")
+print("      horizontal step at row 7 (60 -&gt; 86) that runs into it, and one")
+print("      isolated bright speck in the right-hand region. the faint step")
+print("      is only about twice the noise, deliberately.")
+print()
+
+print("STEP 1 -- the crudest derivative: the difference with the neighbour.")
+dx = np.abs(np.diff(img, axis=1))
+dy = np.abs(np.diff(img, axis=0))
+strong_raw = dx[3, 12]
+faint_raw = dy[6, 7]
+noise_raw = max(dx[FLAT].max(), dy[FLAT].max())
+print("      across the strong edge:  %.1f" % strong_raw)
+print("      across the faint edge:   %.1f" % faint_raw)
+print("      worst noise in the flat: %.1f" % noise_raw)
+print("      the strong edge is %.1fx the noise floor and easy. the faint"
+      % (strong_raw / noise_raw))
+print("      edge is %.2fx it -- indistinguishable. a single-pixel"
+      % (faint_raw / noise_raw))
+print("      difference amplifies noise as eagerly as it finds edges,")
+print("      because differentiation is a high-pass operation and noise is")
+print("      entirely high frequency.")
+print()
+
+print("STEP 2 -- SOBEL. smooth ALONG the edge while differentiating ACROSS")
+print("it. that is the only reason the kernel is 3x3 and not 1x2:")
+KX = np.array([[-1., 0, 1], [-2, 0, 2], [-1, 0, 1]])
+KY = KX.T
+print("      Kx = [-1 0 1]        Ky = [-1 -2 -1]")
+print("           [-2 0 2]             [ 0  0  0]")
+print("           [-1 0 1]             [ 1  2  1]")
+print("      each is an outer product of [1 2 1] and [-1 0 1]. the [1 2 1]")
+print("      half averages 3 pixels along the edge; the [-1 0 1] half")
+print("      differentiates across it.")
+
+def conv(a, k):
+    p = np.pad(a, 1, mode="edge")
+    return np.array([[float((p[i:i + 3, j:j + 3] * k).sum())
+                      for j in range(a.shape[1])] for i in range(a.shape[0])])
+
+gx, gy = conv(img, KX), conv(img, KY)
+mag = np.hypot(gx, gy)
+s_sob, f_sob = mag[3, 13], mag[7, 6]
+n_sob = mag[FLAT].max()
+print("      the same three measurements, now with Sobel:")
+print("%26s %12s %12s" % ("", "raw diff", "Sobel"))
+print("%26s %12.1f %12.1f" % ("strong edge", strong_raw, s_sob))
+print("%26s %12.1f %12.1f" % ("faint edge", faint_raw, f_sob))
+print("%26s %12.1f %12.1f" % ("worst noise in the flat", noise_raw, n_sob))
+print("%26s %11.2fx %11.2fx"
+      % ("faint-edge margin", faint_raw / noise_raw, f_sob / n_sob))
+print("      Sobel has a gain of 8, so compare the RATIOS, not the values.")
+print("      the faint edge went from %.2fx the noise -- lost -- to %.2fx"
+      % (faint_raw / noise_raw, f_sob / n_sob))
+print("      it. averaging 3 pixels along a line cuts uncorrelated noise")
+print("      by about sqrt(3) while leaving a straight edge untouched,")
+print("      and a real edge is straight for far more than 3 pixels.")
+print()
+
+print("STEP 3 -- DIRECTION. gx and gy together give an angle, not just a")
+print("strength:")
+ang = np.degrees(np.arctan2(gy, gx))
+print("%22s %10s %10s %12s" % ("location", "gx", "gy", "angle"))
+for label, (r, c) in (("the strong edge", (3, 13)),
+                      ("the faint edge", (7, 6)),
+                      ("flat interior", (11, 6))):
+    print("%22s %10.1f %10.1f %11.0f deg" % (label, gx[r, c], gy[r, c],
+                                             ang[r, c]))
+print("   the vertical edge has a big gx and almost no gy; the horizontal")
+print("   edge is the reverse. the gradient points ACROSS an edge, never")
+print("   along it, so an edge at 0 degrees of gradient is a vertical line.")
+print("   over the flat patch the angle is meaningless -- it is the")
+print("   direction of the noise, and it changes every pixel.")
+print()
+
+print("STEP 4 -- NON-MAXIMUM SUPPRESSION. Sobel answers with a ridge two")
+print("or three pixels wide; an edge is one pixel wide. keep a pixel only")
+print("if it beats its two neighbours ALONG ITS OWN GRADIENT:")
+print("      row 7, columns 10-16 before: "
+      + " ".join("%4.0f" % v for v in mag[7][10:17]))
+nms = np.zeros_like(mag)
+for i in range(1, H - 1):
+    for j in range(1, W - 1):
+        a = ang[i, j] % 180
+        if a &lt; 22.5 or a &gt;= 157.5:
+            n1, n2 = mag[i, j - 1], mag[i, j + 1]
+        elif a &lt; 67.5:
+            n1, n2 = mag[i - 1, j + 1], mag[i + 1, j - 1]
+        elif a &lt; 112.5:
+            n1, n2 = mag[i - 1, j], mag[i + 1, j]
+        else:
+            n1, n2 = mag[i - 1, j - 1], mag[i + 1, j + 1]
+        if mag[i, j] &gt;= n1 and mag[i, j] &gt;= n2:
+            nms[i, j] = mag[i, j]
+print("      row 7, columns 10-16 after:  "
+      + " ".join("%4.0f" % v for v in nms[7][10:17]))
+print("      the ridge collapsed onto its crest. this is the first stage")
+print("      that needs the ANGLE rather than the strength, which is why")
+print("      Sobel bothers to compute two kernels instead of one.")
+print("      pixels above 80: %d before, %d after."
+      % (int((mag &gt; 80).sum()), int((nms &gt; 80).sum())))
+print()
+
+print("STEP 5 -- HYSTERESIS. one threshold cannot work here. try three:")
+for t in (80, 200, 400):
+    kept = nms &gt; t
+    print("      threshold %3d: %3d pixels: %2d on the faint edge, %d on the speck"
+          % (t, int(kept.sum()), int(kept[6:9, 0:12].sum()),
+             int(kept[10:13, 16:19].sum())))
+faint_peak = nms[6:9, 0:12].max()
+speck_peak = nms[10:13, 16:19].max()
+print("      and here is why no single number works:")
+print("         strongest response on the faint edge: %6.1f" % faint_peak)
+print("         strongest response on the speck:      %6.1f" % speck_peak)
+print("      they are %.0f apart out of %.0f -- the same neighbourhood of"
+      % (abs(faint_peak - speck_peak), max(faint_peak, speck_peak)))
+print("      values. a threshold that keeps one keeps the other, and a")
+print("      threshold that drops one drops the other. BRIGHTNESS ALONE")
+print("      CANNOT TELL THEM APART. so use TWO thresholds, and let strong")
+print("      edges vouch for weak pixels connected to them:")
+LO, HI = 80.0, 400.0
+strong = nms &gt;= HI
+weak = (nms &gt;= LO) &amp; (nms &lt; HI)
+keep = strong.copy()
+for _ in range(H * W):
+    grown = keep.copy()
+    for i in range(1, H - 1):
+        for j in range(1, W - 1):
+            if weak[i, j] and not keep[i, j] and keep[i - 1:i + 2, j - 1:j + 2].any():
+                grown[i, j] = True
+    if (grown == keep).all():
+        break
+    keep = grown
+promoted = int(keep.sum() - strong.sum())
+print("      strong (&gt;= %.0f): %2d      weak (%.0f to %.0f): %2d"
+      % (HI, int(strong.sum()), LO, HI, int(weak.sum())))
+print("      after linking: %d kept. %d weak pixels were promoted because"
+      % (int(keep.sum()), promoted))
+print("      they connect to a strong one, and %d were dropped because"
+      % int(weak.sum() - promoted))
+print("      they connect to nothing.")
+show(keep.astype(float), "the final edge map", 1.0)
+print("      the faint edge came back along most of its length, with a")
+print("      couple of gaps where the noise happened to flatten its crest.")
+print("      and it came back from ONE end: not one of its pixels ever")
+print("      cleared the high threshold -- all %d strong pixels are on the"
+      % int(strong.sum()))
+print("      vertical line (%d of them on the faint edge). the chain starts"
+      % int(strong[6:9, 0:12].sum()))
+print("      at the junction and walks left. linking is transitive: each")
+print("      promoted pixel then vouches for its own neighbour.")
+print("      the speck, whose peak response is within %.0f of the faint"
+      % abs(faint_peak - speck_peak))
+print("      edge's, is gone -- %s in the final map."
+      % ("still present" if keep[10:13, 16:19].any() else "not one pixel of it"))
+print("      it had no chain leading back to any evidence. that is the")
+print("      whole idea: hysteresis judges a pixel by what it CONNECTS to,")
+print("      not by how bright it is.")
+print()
+
+print("WHAT EACH STAGE REMOVED, counting pixels marked as edge:")
+print("%-32s %8s %14s" % ("stage", "pixels", "speck pixels"))
+speck_mask = np.zeros((H, W), bool)
+speck_mask[10:13, 16:19] = True
+for label, m in (("Sobel magnitude &gt; 80", mag &gt; LO),
+                 ("+ non-maximum suppression", nms &gt; LO),
+                 ("+ hysteresis linking", keep)):
+    print("%-32s %8d %14d" % (label, int(m.sum()), int((m &amp; speck_mask).sum())))
+print("   thinning cuts the count without discriminating -- it shrinks the")
+print("   speck to a crest just as neatly as it shrinks a real edge.")
+print("   linking is the only stage that asks whether the evidence is")
+print("   connected to anything, and it is the stage that kills the speck.")
+print()
+print("blur, differentiate, thin, threshold twice: that sequence is Canny,")
+print("published in 1986 and still the default in OpenCV. each of the five")
+print("stages exists to repair a specific failure of the stage before it,")
+print("and none of them does anything a network could not learn -- only")
+print("far cheaper, deterministically, with no training data at all.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-worth-remembering">Worth remembering</h3>
@@ -916,11 +1121,11 @@ print("far cheaper, deterministically, with no training data at all.")</script><
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

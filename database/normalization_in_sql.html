@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -514,7 +520,64 @@ INSERT INTO order_items (order_id, product_id, qty) VALUES
   (103, 4, 3),
   (104, 1, 2), (104, 5, 1),
   (105, 2, 1),
-  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- One wide table holding everything about an order. This is what
+  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">-- One wide table holding everything about an order. This is what
+-- denormalised data looks like, and it is not obviously wrong.
+
+CREATE TABLE flat (
+    order_id      INTEGER,
+    customer_name TEXT,
+    customer_city TEXT,
+    product_name  TEXT,
+    product_price REAL,
+    qty           INTEGER
+);
+
+INSERT INTO flat VALUES
+    (101, &#x27;Ada&#x27;, &#x27;London&#x27;, &#x27;Keyboard&#x27;,  45.0, 1),
+    (101, &#x27;Ada&#x27;, &#x27;London&#x27;, &#x27;Mouse&#x27;,     25.0, 2),
+    (102, &#x27;Ada&#x27;, &#x27;London&#x27;, &#x27;Monitor&#x27;,  180.0, 1),
+    (104, &#x27;Chen&#x27;, &#x27;Singapore&#x27;, &#x27;Keyboard&#x27;, 45.0, 2);
+
+SELECT * FROM flat;
+
+-- ANOMALY 1, UPDATE. Ada moves to Bristol. Her city appears three
+-- times, so a partial update leaves the table disagreeing with itself.
+
+UPDATE flat SET customer_city = &#x27;Bristol&#x27; WHERE order_id = 101;
+
+SELECT DISTINCT customer_name, customer_city FROM flat WHERE customer_name = &#x27;Ada&#x27;;
+
+-- Two cities for one person. Nothing in the schema forbids it, because
+-- the schema does not know those rows describe the same customer.
+--
+-- ANOMALY 2, DELETE. Remove order 102 and something unrelated goes
+-- with it.
+
+DELETE FROM flat WHERE order_id = 102;
+
+SELECT count(*) AS monitor_rows_left FROM flat WHERE product_name = &#x27;Monitor&#x27;;
+
+-- The price of a Monitor was only recorded on that row, so deleting an
+-- order deleted a fact about a product.
+--
+-- ANOMALY 3, INSERT. A new product that nobody has ordered cannot be
+-- recorded at all without inventing an order to hang it on.
+--
+-- The normalised schema this article&#x27;s database uses has none of these:
+-- the city lives once in customers, the price lives once in products,
+-- and order_items holds only the link.
+
+SELECT &#x27;flat: rows mentioning Ada city&#x27; AS where_a_fact_lives, count(*) AS copies
+FROM flat WHERE customer_name = &#x27;Ada&#x27;
+UNION ALL
+SELECT &#x27;normalised: rows with Ada city&#x27;, count(*)
+FROM customers WHERE name = &#x27;Ada&#x27;;
+
+-- One row, one place, one update. That is the whole benefit, and the
+-- cost is that answering a question now needs joins -- which is why
+-- reporting systems often denormalise deliberately, accepting the
+-- anomalies because the data is rebuilt rather than edited.
+</pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- One wide table holding everything about an order. This is what
 -- denormalised data looks like, and it is not obviously wrong.
 
 CREATE TABLE flat (
@@ -790,11 +853,11 @@ FROM customers WHERE name = &#x27;Ada&#x27;;
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

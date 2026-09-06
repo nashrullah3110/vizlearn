@@ -46,7 +46,7 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="What is Transfer Learning in CNN? - interactive visualization on VizLearn">
     <meta property="og:locale" content="en_US">
-    <meta property="article:modified_time" content="2026-09-05">
+    <meta property="article:modified_time" content="2026-09-04">
     <meta property="article:published_time" content="2026-06-26">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="What is Transfer Learning in CNN?">
@@ -63,7 +63,7 @@
     <script defer src="../assets/icons.js"></script>
 
     <meta name="author" content="Ashish Jangra">
-    <meta name="last-modified" content="2026-09-05">
+    <meta name="last-modified" content="2026-09-04">
 
     <script type="application/ld+json">
 {
@@ -80,10 +80,16 @@
   "educationalLevel": "Beginner",
   "typicalAgeRange": "16-",
   "datePublished": "2026-06-26",
-  "dateModified": "2026-09-05",
+  "dateModified": "2026-09-04",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -372,7 +378,7 @@
                 <span style="color: var(--accent-primary)">Transfer Learning</span>
             </div>
             <h1 class="text-3xl md:text-4xl font-bold brand-font" style="color: var(--text-main)">What is Transfer Learning in CNN?</h1>
-            <!-- VIZLEARN:BYLINE:BEGIN --><p class="vz-byline"><a class="vz-byline-track" href="../computer_vision/">Computer Vision</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>By <a class="vz-byline-author" rel="author" href="../about.html">Ashish Jangra</a></span><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>Updated <time datetime="2026-09-05">5 September 2026</time></span></p><!-- VIZLEARN:BYLINE:END -->
+            <!-- VIZLEARN:BYLINE:BEGIN --><p class="vz-byline"><a class="vz-byline-track" href="../computer_vision/">Computer Vision</a><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>By <a class="vz-byline-author" rel="author" href="../about.html">Ashish Jangra</a></span><span class="vz-byline-sep" aria-hidden="true">&middot;</span><span>Updated <time datetime="2026-09-04">4 September 2026</time></span></p><!-- VIZLEARN:BYLINE:END -->
             <p class="mt-2 text-sm max-w-2xl" style="color: var(--text-muted)">
                 Select a pre-trained model, choose a strategy, and selectively unfreeze layers to see how fine-tuning impacts the learning curve and final accuracy.
             </p>
@@ -785,7 +791,200 @@ print("   normalised input and every activation is out of range from the")
 print("   first convolution. the model still runs, still produces")
 print("   probabilities, and is simply wrong -- there is no error message")
 print("   for using the wrong normalisation, which is exactly what makes")
-print("   it worth checking first when a fine-tune underperforms.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">NumPy</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+print("   it worth checking first when a fine-tune underperforms.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">NumPy</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">import numpy as np
+
+rng = np.random.default_rng(9)
+
+print("WHY IT WORKS AT ALL: the early layers of a trained network are not")
+print("about its classes. they are about images.")
+print("%-10s %-30s %s" % ("layer", "what it learns", "task-specific?"))
+for row in (("conv1", "edges, colour blobs", "no -- universal"),
+            ("conv2", "corners, textures", "barely"),
+            ("conv3", "motifs, repeated patterns", "somewhat"),
+            ("conv4", "object parts", "increasingly"),
+            ("conv5", "whole objects", "yes"),
+            ("fc", "the 1000 ImageNet classes", "entirely")):
+    print("%-10s %-30s %s" % row)
+print("   conv1 of a network trained on cats and one trained on chest")
+print("   x-rays look nearly the same, because the first thing any vision")
+print("   model must do is find edges. that fact -- not any property of")
+print("   ImageNet -- is what transfer learning rests on.")
+print()
+
+# a small simulation. "pretrained features" are a fixed projection that
+# keeps the directions the source task needed; a target task far from the
+# source puts its signal in directions that projection did not keep.
+D, NCLASS, NTRAIN, NOISE = 40, 4, 30, 1.5
+
+def make_task(shift):
+    proto = rng.normal(0, 1, (NCLASS, D))
+    theta = shift * np.pi / 2
+    R = np.eye(D)
+    for i in range(0, D - 1, 2):
+        c, sn = np.cos(theta), np.sin(theta)
+        R[i, i], R[i, i + 1] = c, -sn
+        R[i + 1, i], R[i + 1, i + 1] = sn, c
+    return proto @ R
+
+def sample(proto, n):
+    y = rng.integers(0, NCLASS, n)
+    return proto[y] + rng.normal(0, NOISE, (n, D)), y
+
+def softmax(z):
+    z = z - z.max(axis=1, keepdims=True)
+    e = np.exp(z)
+    return e / e.sum(axis=1, keepdims=True)
+
+def fit_linear(X, y, epochs=400, lr=0.4):
+    # the FROZEN case: one linear layer on top of fixed features
+    Wm, bb = np.zeros((X.shape[1], NCLASS)), np.zeros(NCLASS)
+    Y = np.eye(NCLASS)[y]
+    for _ in range(epochs):
+        g = (softmax(X @ Wm + bb) - Y) / len(X)
+        Wm -= lr * (X.T @ g)
+        bb -= lr * g.sum(axis=0)
+    return Wm, bb
+
+def acc(Wm, bb, X, y):
+    return float(((X @ Wm + bb).argmax(axis=1) == y).mean())
+
+def fit_head(X, y):
+    Wm, bb = fit_linear(X, y)
+    return lambda Z: (Z @ Wm + bb).argmax(axis=1)
+
+def fit_full(X, y, epochs=700, lr=0.5):
+    # the FULL RETRAIN case: learn the features too, from scratch
+    W1 = rng.normal(0, 1 / np.sqrt(D), (D, D)); b1 = np.zeros(D)
+    W2 = rng.normal(0, 1 / np.sqrt(D), (D, NCLASS)); b2 = np.zeros(NCLASS)
+    Y = np.eye(NCLASS)[y]
+    for _ in range(epochs):
+        h = np.maximum(X @ W1 + b1, 0)
+        gz = (softmax(h @ W2 + b2) - Y) / len(X)
+        gh = (gz @ W2.T) * (h &gt; 0)
+        W2 -= lr * (h.T @ gz); b2 -= lr * gz.sum(axis=0)
+        W1 -= lr * (X.T @ gh); b1 -= lr * gh.sum(axis=0)
+    return lambda Z: (np.maximum(Z @ W1 + b1, 0) @ W2 + b2).argmax(axis=1)
+
+print("A CONTROLLED EXPERIMENT with %d training examples -- the situation"
+      % NTRAIN)
+print("transfer learning exists for. two options for each task:")
+print("      FROZEN: keep the pretrained features, fit a linear head.")
+print("              %d parameters." % (D * NCLASS + NCLASS))
+print("      FULL:   throw them away and learn features and head from")
+print("              scratch. %d parameters." % (D * D + D + D * NCLASS + NCLASS))
+print()
+print("%-22s %10s %10s %12s %10s"
+      % ("task distance", "frozen", "full", "full, train", "winner"))
+for label, shift, keep in (("nearly identical", 0.0, D),
+                           ("related", 0.3, 26),
+                           ("different domain", 0.6, 12),
+                           ("unrelated", 1.0, 4)):
+    proto = make_task(shift)
+    Xtr, ytr = sample(proto, NTRAIN)
+    Xte, yte = sample(proto, 600)
+    mask = np.zeros(D); mask[:keep] = 1.0
+    fz = fit_head(Xtr * mask, ytr)
+    a_fz = float((fz(Xte * mask) == yte).mean())
+    fl = fit_full(Xtr, ytr)
+    a_fl = float((fl(Xte) == yte).mean())
+    a_fl_tr = float((fl(Xtr) == ytr).mean())
+    print("%-22s %10.3f %10.3f %12.3f %10s"
+          % (label, a_fz, a_fl, a_fl_tr,
+             "frozen" if a_fz &gt; a_fl else "full"))
+print("   THERE IS A CROSSOVER, and both halves of it are worth reading.")
+print("   the 'full, train' column is 1.000 in every row: with %d"
+      % (D * D + D + D * NCLASS + NCLASS))
+print("   parameters and %d examples the from-scratch model memorises its"
+      % NTRAIN)
+print("   training set completely, every time. that never changes.")
+print("   what changes is whether memorising COSTS anything.")
+print("   in the top rows the pretrained features already contain the")
+print("   task's signal, so the frozen head has a strong head start and")
+print("   only %d parameters to fit -- it cannot memorise even if it wants"
+      % (D * NCLASS + NCLASS))
+print("   to, and it wins. the fixed features are acting as a regulariser")
+print("   that no amount of weight decay would have given you for free.")
+print("   in the bottom rows the projection has thrown the task's signal")
+print("   away, and the frozen head is fitting %d numbers that no longer"
+      % (D * NCLASS + NCLASS))
+print("   describe the problem. it collapses. the from-scratch model,")
+print("   overfitting and all, still does better -- because bad features")
+print("   are worse than no features.")
+print("   so the decision depends on the PAIR: how similar the task is AND")
+print("   how much data you have. neither alone tells you anything, which")
+print("   is why the advice comes as a 2x2 table rather than a rule.")
+print()
+print("THE STANDARD DECISION TABLE:")
+print("%-22s %-24s %s" % ("", "small dataset", "large dataset"))
+print("%-22s %-24s %s"
+      % ("similar domain", "freeze all, new head", "fine-tune the top few"))
+print("%-22s %-24s %s"
+      % ("different domain", "freeze early, tune late", "fine-tune everything"))
+print("   the top-left cell is the one people skip past and the one that")
+print("   matters most: with a few hundred images you do not have enough")
+print("   data to move millions of weights without destroying them, and")
+print("   the frozen features are better than anything you could learn.")
+print()
+
+print("NOW THE MISTAKE THAT BREAKS IT. the head starts RANDOM, so its")
+print("first gradients are large and meaningless. if the backbone is")
+print("unfrozen at that moment, those gradients flow straight into it:")
+print("%-30s %16s %16s" % ("", "head grad", "into backbone"))
+Wh = rng.normal(0, 0.5, (D, NCLASS))     # random head
+proto = make_task(0.0)
+X, y = sample(proto, NTRAIN)
+Y = np.eye(NCLASS)[y]
+for label, head in (("random head, step 1", Wh),
+                    ("trained head, step 1", fit_linear(X, y)[0])):
+    z = X @ head
+    z = z - z.max(axis=1, keepdims=True)
+    p = np.exp(z)
+    p = p / p.sum(axis=1, keepdims=True)
+    g = (p - Y) / len(X)
+    print("%-30s %16.4f %16.4f"
+          % (label, np.linalg.norm(X.T @ g), np.linalg.norm(g @ head.T)))
+print("   the random head sends a far bigger signal backward, and it is")
+print("   pure noise -- it encodes nothing except that the head has not")
+print("   been trained yet. features that took a GPU-month to learn get")
+print("   overwritten in the first few hundred steps. the name for this")
+print("   is catastrophic forgetting, and the two standard preventions")
+print("   both amount to the same idea:")
+print("      1. freeze the backbone, train the head to convergence, THEN")
+print("         unfreeze. the head is no longer random when it matters.")
+print("      2. use a much smaller learning rate for the backbone than")
+print("         for the head -- 10x to 100x smaller is the usual range.")
+print()
+
+print("WHAT THE LEARNING RATE DOES, measured. take good features and")
+print("perturb them by an amount standing in for one optimiser step:")
+proto = make_task(0.0)
+Xtr, ytr = sample(proto, NTRAIN)
+Xte, yte = sample(proto, 400)
+Wg, bg = fit_linear(Xtr, ytr)
+print("%-24s %16s %16s" % ("backbone LR", "feature damage", "test accuracy"))
+for lr, damage in (("frozen (0)", 0.0), ("1e-5 (small)", 0.05),
+                   ("1e-4", 0.2), ("1e-3 (default)", 0.9),
+                   ("1e-2 (too big)", 2.5)):
+    Xd = Xte + rng.normal(0, damage, Xte.shape)
+    print("%-24s %16.2f %16.3f" % (lr, damage, acc(Wg, bg, Xd, yte)))
+print("   accuracy falls away as the features are disturbed, and the")
+print("   default learning rate you would use to train from scratch sits")
+print("   well down that curve. training from scratch and fine-tuning are")
+print("   not the same job, and reusing the same LR is the most common")
+print("   way to get a fine-tuned model that is worse than the frozen one.")
+print()
+
+print("AND ONE DETAIL THAT SILENTLY RUINS RESULTS: use the pretraining")
+print("preprocessing, exactly.")
+print("%-30s %s" % ("ImageNet mean", "[0.485, 0.456, 0.406]"))
+print("%-30s %s" % ("ImageNet std", "[0.229, 0.224, 0.225]"))
+print("   feed 0..255 pixels to a network whose first layer expects")
+print("   normalised input and every activation is out of range from the")
+print("   first convolution. the model still runs, still produces")
+print("   probabilities, and is simply wrong -- there is no error message")
+print("   for using the wrong normalisation, which is exactly what makes")
+print("   it worth checking first when a fine-tune underperforms.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
@@ -825,11 +1024,11 @@ print("   it worth checking first when a fine-tune underperforms.")</script><div
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

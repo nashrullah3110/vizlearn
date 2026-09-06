@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -640,7 +646,101 @@ for name, coins, target in (("1, 5, 10, 25", [1, 5, 10, 25], 30),
 # takes 10+1+1+1+1 (five). Greedy assumes the biggest coin is always part
 # of the best answer, which is a claim about the coin system, not about
 # the problem. DP makes no such assumption -- it tries every coin at
-# every total, which is why it costs more and why it is always right.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
+# every total, which is why it costs more and why it is always right.</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>example_01.py</span><span class="vz-code-lang">Python</span></div><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># CONDITION 1: overlapping subproblems. Without them, memoising is pure
+# overhead -- the cache is written and never read.
+calls = {"n": 0}
+hits = {"n": 0}
+
+
+def fib(n, memo=None):
+    calls["n"] += 1
+    if memo is not None and n in memo:
+        hits["n"] += 1
+        return memo[n]
+    if n &lt; 2:
+        return n
+    v = fib(n - 1, memo) + fib(n - 2, memo)
+    if memo is not None:
+        memo[n] = v
+    return v
+
+
+calls["n"] = hits["n"] = 0
+fib(22)
+plain = calls["n"]
+calls["n"] = hits["n"] = 0
+fib(22, {})
+print("fib(22): %d calls plain, %d with a memo (%d cache hits)"
+      % (plain, calls["n"], hits["n"]))
+
+# Now merge sort, which also splits into two subproblems at every level.
+
+msplits = {"n": 0}
+seen = {}
+
+
+def msort(a):
+    key = tuple(a)
+    msplits["n"] += 1
+    seen[key] = seen.get(key, 0) + 1
+    if len(a) &lt;= 1:
+        return a
+    mid = len(a) // 2
+    left, right = msort(a[:mid]), msort(a[mid:])
+    out = []
+    while left and right:
+        out.append(left.pop(0) if left[0] &lt;= right[0] else right.pop(0))
+    return out + left + right
+
+
+import random
+msort(random.Random(1).sample(range(200), 200))
+repeats = sum(1 for v in seen.values() if v &gt; 1)
+print("merge sort on 200 items: %d subproblems, %d of them repeated"
+      % (msplits["n"], repeats))
+
+# Zero repeats. Merge sort has optimal substructure but NO overlap: each
+# subproblem is a different slice, so a cache would never hit. That is
+# why merge sort is divide-and-conquer and not dynamic programming --
+# the distinction is exactly this measurement.
+
+# CONDITION 2: optimal substructure. The best solution must be buildable
+# from best solutions to subproblems. Coin change has it:
+
+def coins_dp(target, coins):
+    best = [0] + [float("inf")] * target
+    for t in range(1, target + 1):
+        for c in coins:
+            if c &lt;= t and best[t - c] + 1 &lt; best[t]:
+                best[t] = best[t - c] + 1
+    return best[target]
+
+
+def coins_greedy(target, coins):
+    n, left = 0, target
+    for c in sorted(coins, reverse=True):
+        while left &gt;= c:
+            left -= c
+            n += 1
+    return n if left == 0 else None
+
+
+print()
+print("%-16s %10s %10s" % ("coin system", "greedy", "DP"))
+for name, coins, target in (("1, 5, 10, 25", [1, 5, 10, 25], 30),
+                            ("1, 3, 4", [1, 3, 4], 6),
+                            ("1, 7, 10", [1, 7, 10], 14)):
+    print("%-16s %10s %10d" % (
+        name + " -&gt; %d" % target, coins_greedy(target, coins),
+        coins_dp(target, coins)))
+
+# The greedy answers are wrong on the second and third systems: 6 is 3+3
+# (two coins) and greedy takes 4+1+1 (three); 14 is 7+7 (two) and greedy
+# takes 10+1+1+1+1 (five). Greedy assumes the biggest coin is always part
+# of the best answer, which is a claim about the coin system, not about
+# the problem. DP makes no such assumption -- it tries every coin at
+# every total, which is why it costs more and why it is always right.
+</pre><textarea class="vz-code-input py-editor" aria-label="Runnable example" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div>
                 </div>
                 <div>
                     <h3 id="vz-s-things-to-try">Things to try</h3>
@@ -734,7 +834,61 @@ print("  coins :", "".join(f"{c:>4}" for c in best))
 print()
 print(f"{target} needs {best[target]} coins (4+4+3).")
 print("Greedy would take 4+4+1+1+1 = 5. Each cell here was computed once and")
-print("read many times - that is the whole method.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>dynamic_programming.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">if n in cache: return cache[n]</code><span class="vz-cl-note">Memoisation in one line. The recursion is unchanged; it simply stops descending into a subtree whose answer is already known, which collapses an exponential tree into a linear path.</span></li><li class="vz-cl-step"><code class="vz-cl-line">cache[n] = value</code><span class="vz-cl-note">Top-down: the answer is stored on the way back out. The structure of the code still mirrors the recurrence, which is why memoisation is usually the easier of the two directions to write.</span></li><li class="vz-cl-step"><code class="vz-cl-line">table = [0, 1] + [0] * (n - 1)</code><span class="vz-cl-note">Bottom-up: fill the small cases first and build upwards, so no call stack is involved at all. Same complexity, no recursion limit, and usually faster in practice.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if c &lt;= t and best[t - c] + 1 &lt; best[t]:</code><span class="vz-cl-note">The recurrence, and it is the only piece of real thinking in the whole method: the best way to make <em>t</em> is one coin on top of the best way to make <em>t &minus; c</em>, for whichever c wins.</span></li><li class="vz-cl-step"><code class="vz-cl-line">best[t - c]</code><span class="vz-cl-note">Reading a cell that was filled earlier in the same loop. Dynamic programming needs subproblems that <em>overlap</em> &mdash; if each one were used once, a table would buy nothing over plain recursion.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Raise <code>N</code> to 30 and watch the naive count. Around 35 it stops being a demonstration and starts being a wait.</li><li>Print the whole <code>best</code> row for <code>coins = [1, 5, 10, 25]</code>. Every value matches the greedy answer &mdash; which is exactly why greedy appears to work on real currency.</li><li>Track which coin won each cell in a second list, then walk it backwards to recover the actual coins rather than just the count.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
+print("read many times - that is the whole method.")</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>dynamic_programming.py</span><span class="vz-code-lang">Python 3</span></div><!-- .py-editor stays: assets/vizlearn-python.js reads .value off it. --><div class="vz-code" data-vz-code="python"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"># Dynamic programming: solve each subproblem once, then reuse the answer.
+
+calls = {"naive": 0, "memo": 0}
+
+def fib_naive(n):
+    calls["naive"] += 1
+    return n if n &lt; 2 else fib_naive(n - 1) + fib_naive(n - 2)
+
+
+def fib_memo(n, cache=None):
+    if cache is None:
+        cache = {}
+    calls["memo"] += 1
+    if n in cache:                      # already solved: reuse it
+        return cache[n]
+    value = n if n &lt; 2 else fib_memo(n - 1, cache) + fib_memo(n - 2, cache)
+    cache[n] = value                    # top-down: remember on the way out
+    return value
+
+
+def fib_table(n):
+    table = [0, 1] + [0] * (n - 1)      # bottom-up: no recursion at all
+    for i in range(2, n + 1):
+        table[i] = table[i - 1] + table[i - 2]
+    return table[n]
+
+
+N = 25
+print(f"fib({N}) =", fib_naive(N), f"in {calls['naive']} calls")
+print(f"fib({N}) =", fib_memo(N), f"in {calls['memo']} calls")
+print(f"fib({N}) =", fib_table(N), "in one loop, O(1) memory if you keep two values")
+
+# --- coin change: the classic table ------------------------------------
+def coin_change(coins, target):
+    # best[t] = fewest coins that make t; inf means "cannot be made"
+    best = [0] + [float("inf")] * target
+    for t in range(1, target + 1):
+        for c in coins:
+            if c &lt;= t and best[t - c] + 1 &lt; best[t]:
+                best[t] = best[t - c] + 1
+    return best
+
+
+coins = [1, 3, 4]
+target = 11
+best = coin_change(coins, target)
+print()
+print(f"coins {coins}, making every amount up to {target}:")
+print("  amount:", "".join(f"{t:&gt;4}" for t in range(target + 1)))
+print("  coins :", "".join(f"{c:&gt;4}" for c in best))
+print()
+print(f"{target} needs {best[target]} coins (4+4+3).")
+print("Greedy would take 4+4+1+1+1 = 5. Each cell here was computed once and")
+print("read many times - that is the whole method.")
+</pre><textarea class="vz-code-input py-editor" aria-label="Python code editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div></div><div class="py-controls"><button type="button" class="py-run-btn">Run</button><button type="button" class="py-reset-btn">Reset</button><span class="py-status"></span></div><div class="vz-console"><div class="vz-console-bar">Output</div><pre class="vz-console-body py-output" aria-live="polite" data-empty="Press Run to execute this code."></pre></div></div><div class="vz-cl-aside"><section class="vz-cl-side"><h3>How the code works</h3><ol class="vz-cl-walk"><li class="vz-cl-step"><code class="vz-cl-line">if n in cache: return cache[n]</code><span class="vz-cl-note">Memoisation in one line. The recursion is unchanged; it simply stops descending into a subtree whose answer is already known, which collapses an exponential tree into a linear path.</span></li><li class="vz-cl-step"><code class="vz-cl-line">cache[n] = value</code><span class="vz-cl-note">Top-down: the answer is stored on the way back out. The structure of the code still mirrors the recurrence, which is why memoisation is usually the easier of the two directions to write.</span></li><li class="vz-cl-step"><code class="vz-cl-line">table = [0, 1] + [0] * (n - 1)</code><span class="vz-cl-note">Bottom-up: fill the small cases first and build upwards, so no call stack is involved at all. Same complexity, no recursion limit, and usually faster in practice.</span></li><li class="vz-cl-step"><code class="vz-cl-line">if c &lt;= t and best[t - c] + 1 &lt; best[t]:</code><span class="vz-cl-note">The recurrence, and it is the only piece of real thinking in the whole method: the best way to make <em>t</em> is one coin on top of the best way to make <em>t &minus; c</em>, for whichever c wins.</span></li><li class="vz-cl-step"><code class="vz-cl-line">best[t - c]</code><span class="vz-cl-note">Reading a cell that was filled earlier in the same loop. Dynamic programming needs subproblems that <em>overlap</em> &mdash; if each one were used once, a table would buy nothing over plain recursion.</span></li></ol></section><section class="vz-cl-side"><h3>Change one thing</h3><ul class="vz-cl-try"><li>Raise <code>N</code> to 30 and watch the naive count. Around 35 it stops being a demonstration and starts being a wait.</li><li>Print the whole <code>best</code> row for <code>coins = [1, 5, 10, 25]</code>. Every value matches the greedy answer &mdash; which is exactly why greedy appears to work on real currency.</li><li>Track which coin won each cell in a second list, then walk it backwards to recover the actual coins rather than just the count.</li></ul></section><section class="vz-cl-side"><h3>Where this runs</h3><p class="vz-cl-note">Real CPython, compiled to WebAssembly and running on your own machine &mdash; nothing is uploaded. The first run takes a few seconds while the interpreter downloads; after that it is immediate. Need more room, or want to paste your own attempt? Use the <a href="../python-lab/">Python compiler</a>.</p></section></div></div></section>
 <!-- VIZLEARN:CODE:END -->
 <!-- VIZLEARN:LAB:BEGIN (generated by tools/build_labs.py) -->
 <div class="vz-lab"><section class="vz-check" aria-labelledby="vz-check-h"><div class="vz-section-head"><svg class="vz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2  0 0 1 2-2h11"/></svg><h2 id="vz-check-h">Check yourself</h2><span class="vz-rule"></span><span class="vz-check-score" aria-live="polite">0 of 3</span></div><p class="vz-check-intro">Answer without scrolling back up.</p><ol class="vz-check-list"><li class="vz-q"><p class="vz-q-text">Dynamic programming needs subproblems that:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Are independent</button><button type="button" class="vz-q-opt" data-vz-correct="1">Overlap, so an answer is reused many times</button><button type="button" class="vz-q-opt" data-vz-correct="0">Are all the same size</button><button type="button" class="vz-q-opt" data-vz-correct="0">Can be sorted</button></div><p class="vz-q-why" hidden>If each subproblem were needed once, a table would buy nothing over plain recursion. The reuse is what pays for the storage.</p></li><li class="vz-q"><p class="vz-q-text">Top-down memoisation and bottom-up tabulation differ in that tabulation:</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">Gives different answers</button><button type="button" class="vz-q-opt" data-vz-correct="0">Is always faster</button><button type="button" class="vz-q-opt" data-vz-correct="1">Fills the small cases first and uses no call stack</button><button type="button" class="vz-q-opt" data-vz-correct="0">Needs less memory</button></div><p class="vz-q-why" hidden>Same complexity, no recursion limit, and usually a better constant. Memoisation is normally the easier one to write, because the code still mirrors the recurrence.</p></li><li class="vz-q"><p class="vz-q-text">For coins [1, 3, 4] and target 6, greedy takes 4+1+1. What does the DP table give?</p><div class="vz-q-opts"><button type="button" class="vz-q-opt" data-vz-correct="0">The same 3 coins</button><button type="button" class="vz-q-opt" data-vz-correct="1">2 coins - two 3s</button><button type="button" class="vz-q-opt" data-vz-correct="0">4 coins</button><button type="button" class="vz-q-opt" data-vz-correct="0">It cannot be made</button></div><p class="vz-q-why" hidden>The table computes every amount up to the target, so it finds the combination greedy's one-way choice never considers.</p></li></ol></section></div>
@@ -757,11 +911,11 @@ print("read many times - that is the whole method.")</script><div class="vz-code
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

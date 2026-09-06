@@ -77,7 +77,13 @@
   "dateModified": "2026-09-05",
   "author": {
     "@type": "Person",
-    "name": "Ashish Jangra"
+    "name": "Ashish Jangra",
+    "url": "https://vizlearn.in/author.html",
+    "sameAs": [
+      "https://github.com/AshishJangra27",
+      "https://www.linkedin.com/in/ashish-jangra/",
+      "https://www.kaggle.com/ashishjangra27"
+    ]
   },
   "publisher": {
     "@type": "Organization",
@@ -557,7 +563,57 @@ INSERT INTO order_items (order_id, product_id, qty) VALUES
   (103, 4, 3),
   (104, 1, 2), (104, 5, 1),
   (105, 2, 1),
-  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true"></pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- CASE as a value in the SELECT list.
+  (106, 3, 2), (106, 4, 1);</script><div class="vz-code-bar"><span class="vz-code-dot"></span><span>query.sql</span><span class="vz-code-lang">SQLite</span></div><div class="vz-code" data-vz-code="sql"><div class="vz-code-gutter" aria-hidden="true"></div><div class="vz-code-scroll"><pre class="vz-code-hl" aria-hidden="true">-- CASE as a value in the SELECT list.
+
+SELECT name,
+       price,
+       CASE WHEN price &gt;= 100 THEN &#x27;premium&#x27;
+            WHEN price &gt;=  40 THEN &#x27;standard&#x27;
+            ELSE                   &#x27;budget&#x27;
+       END AS tier
+FROM products
+ORDER BY price DESC;
+
+-- CASE inside an aggregate is the useful trick: it turns one pass over
+-- the table into several conditional counts, which is how you pivot.
+
+SELECT count(*)                                             AS all_orders,
+       sum(CASE WHEN status = &#x27;shipped&#x27;   THEN 1 ELSE 0 END) AS shipped,
+       sum(CASE WHEN status = &#x27;pending&#x27;   THEN 1 ELSE 0 END) AS pending,
+       sum(CASE WHEN status = &#x27;cancelled&#x27; THEN 1 ELSE 0 END) AS cancelled,
+       count(discount)                                      AS with_discount
+FROM orders;
+
+-- Note the last column. count(discount) counts non-NULL values, while
+-- count(*) counts rows -- which is the shortest way to count how many
+-- rows have a value in a nullable column.
+--
+-- A VIEW names a query. It stores no data.
+
+CREATE VIEW order_totals AS
+SELECT o.id           AS order_id,
+       c.name         AS customer,
+       o.status,
+       sum(i.qty * p.price) AS gross
+FROM orders o
+JOIN customers   c ON c.id = o.customer_id
+JOIN order_items i ON i.order_id = o.id
+JOIN products    p ON p.id = i.product_id
+GROUP BY o.id, c.name, o.status;
+
+SELECT * FROM order_totals ORDER BY gross DESC;
+
+-- The view is re-run every time you select from it. It costs nothing to
+-- create and saves nothing at query time -- it is a name for a query,
+-- not a cache of its answer. The thing that caches is a MATERIALIZED
+-- view, which SQLite does not have and which every engine that does have
+-- one makes you decide when to refresh.
+
+SELECT customer, count(*) AS orders, round(sum(gross), 2) AS lifetime
+FROM order_totals
+GROUP BY customer
+ORDER BY lifetime DESC;
+</pre><textarea class="vz-code-input sql-editor" aria-label="SQL editor" spellcheck="false" autocapitalize="off" autocomplete="off">-- CASE as a value in the SELECT list.
 
 SELECT name,
        price,
@@ -767,11 +823,11 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_revenue;</code></pre><p>Queries a
             </nav>
             <nav class="vz-foot-col" aria-label="Site">
                 <h2 class="vz-foot-head">Site</h2>
-                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
+                <ul class="vz-foot-list"><li><a href="../practice/">Practice</a></li><li><a href="../map/">Concept Map</a></li><li><a href="../whats-new/">What&#x27;s New</a></li><li><a href="../glossary/">Glossary</a></li><li><a href="../python-lab/">Python Compiler</a></li><li><a href="../sql-lab/">SQL Playground</a></li><li><a href="../js-lab/">JavaScript Compiler</a></li><li><a href="../html-lab/">HTML Playground</a></li><li><a href="../pydantic-lab/">Pydantic Compiler</a></li><li><a href="../fastapi-lab/">FastAPI Compiler</a></li><li><a href="../notebook/">Python Notebook</a></li><li><a href="../saved/">Saved</a></li><li><a href="../about.html">About VizLearn</a></li><li><a href="../author.html">Ashish Jangra</a></li><li><a href="../contact.html">Contact</a></li><li><a href="../privacy.html">Privacy Policy</a></li><li><a href="../terms.html">Terms of Use</a></li></ul>
             </nav>
         </div>
         <div class="vz-footer-bar">
-            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="https://github.com/AshishJangra27" target="_blank" rel="noopener noreferrer">Ashish Jangra</a></p>
+            <p class="mono-font">&copy; 2026 VizLearn &middot; Built by <a href="../author.html" rel="author">Ashish Jangra</a></p>
             <p class="mono-font vz-foot-note">This site uses cookies for analytics and advertising &mdash; see the <a href="../privacy.html">Privacy Policy</a>.</p>
         </div>
     </footer>

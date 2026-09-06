@@ -530,10 +530,12 @@ def is_practice_page(rel):
     return rel == PRACTICE["rel"]
 
 
-STATIC_PAGES = ["about.html", "contact.html", "privacy.html", "terms.html"]
+STATIC_PAGES = ["about.html", "author.html", "contact.html", "privacy.html",
+                "terms.html"]
 
 STATIC_TITLES = {
     "about.html": "About VizLearn",
+    "author.html": "Ashish Jangra",
     "contact.html": "Contact",
     "privacy.html": "Privacy Policy",
     "terms.html": "Terms of Use",
@@ -542,6 +544,10 @@ STATIC_TITLES = {
 # schema.org @type per static page.
 STATIC_LD_TYPE = {
     "about.html": "AboutPage",
+    # ProfilePage is the type Google documents for a page about one person,
+    # and it is what makes the byline on 580 module pages resolve to
+    # something a reader - or a reviewer - can actually check.
+    "author.html": "ProfilePage",
     "contact.html": "ContactPage",
     "privacy.html": "PrivacyPolicyPage",
     "terms.html": "WebPage",
@@ -653,23 +659,49 @@ def _uncommitted():
     return _dirty
 
 
+def content_source(rel):
+    """The file a page's prose actually lives in, or None.
+
+    A module page is generated: `maths/bayes_theorem.html` is rendered from
+    `content/articles/maths/bayes_theorem.txt` and is rewritten in full by
+    every build whether or not a word of it changed. The .txt is the thing a
+    reader's experience depends on, so it is the thing a date should track.
+    """
+    if not rel.endswith(".html") or "/" not in rel:
+        return None
+    track, _, name = rel.rpartition("/")
+    src = os.path.join("content", "articles", track, name[: -len(".html")] + ".txt")
+    return src if os.path.exists(os.path.join(ROOT, src)) else None
+
+
 def last_modified(rel):
     """Date this page's content last changed (YYYY-MM-DD).
 
     The last commit that touched the file, unless the working tree has since
     changed it - an uncommitted change is today's change, and dating it to
     the previous commit would tell a crawler nothing had happened.
+
+    For a generated module page the date is taken from its article source
+    rather than the built HTML. `npm run build` rewrites all 616 pages on
+    every run, so one commit touching thirty topics commits six hundred
+    files, and reading the HTML's commit date stamped every URL in the
+    sitemap with the same day - four times in the six days to 2 Sep 2026.
+    Google stops trusting `lastmod` once it catches it being untrue, and
+    that is the crawl-scheduling signal this site most needs. The .txt only
+    moves when the writing moves, so the date it gives is one Google can act
+    on.
     """
     if rel in _date_cache:
         return _date_cache[rel]
     import datetime
-    if rel in _uncommitted():
+    target = content_source(rel) or rel
+    if target in _uncommitted():
         out = datetime.date.today().isoformat()
     else:
         out = ""
         try:
             out = subprocess.run(
-                ["git", "log", "-1", "--format=%cs", "--", rel],
+                ["git", "log", "-1", "--format=%cs", "--", target],
                 cwd=ROOT, capture_output=True, text=True, check=False,
             ).stdout.strip()
         except OSError:
