@@ -288,7 +288,57 @@ except ValidationError as e:
                 <div class="vz-code" data-vz-code="python">
                     <div class="vz-code-gutter" aria-hidden="true"></div>
                     <div class="vz-code-scroll">
-                        <pre class="vz-code-hl" aria-hidden="true"></pre>
+                        <pre class="vz-code-hl" aria-hidden="true"># Real Pydantic v2, running in your browser. Nothing is sent to a server.
+from typing import List, Optional
+from pydantic import BaseModel, Field, ValidationError, field_validator
+import pydantic
+
+print("pydantic", pydantic.VERSION)
+print()
+
+
+class Address(BaseModel):
+    city: str
+    pin: str = Field(min_length=6, max_length=6)
+
+
+class User(BaseModel):
+    name: str
+    age: int = Field(ge=0, le=130)
+    email: Optional[str] = None
+    tags: List[str] = []
+    address: Optional[Address] = None
+
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_blank(cls, v: str) -&gt; str:
+        if not v.strip():
+            raise ValueError("name cannot be blank")
+        return v.strip().title()
+
+
+# 1. Coercion. Note what happens to the string "36" and to age's type.
+u = User(name="  ada lovelace  ", age="36", tags=["maths", "engine"])
+print("model  :", u)
+print("age is :", type(u.age).__name__)
+print("json   :", u.model_dump_json())
+print()
+
+# 2. Nested models are built from plain dicts.
+u2 = User(name="Grace", age=45, address={"city": "New York", "pin": "100011"})
+print("nested :", u2.address)
+print("dict   :", u2.model_dump(exclude_none=True))
+print()
+
+# 3. Now the part worth reading: what a failure looks like.
+try:
+    User(name="", age=200, tags="not-a-list", address={"city": "Delhi", "pin": "11"})
+except ValidationError as e:
+    print("errors :", e.error_count())
+    print(e)
+
+# Try editing this, or delete it and write your own models.
+</pre>
                         <textarea class="vz-code-input py-editor" aria-label="Pydantic code editor"
                                   spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
                     </div>
