@@ -29,14 +29,27 @@ END = "<!-- VIZLEARN:HEAD:END -->"
 AUTHOR = "Ashish Jangra"
 
 # The byline every module page carries, as structured data. It used to be a
-# bare {"@type": "Person", "name": ...}, which asserts that someone wrote the
-# page and gives a reader no way to check who. `url` resolves the name to a
-# page on this site and `sameAs` ties it to profiles that already exist, which
-# is what turns a name into an identity Google can corroborate.
+# bare {"@type": "Person", "name": ...}, which asserts that somebody wrote the
+# page and gives a reader no way to check who. Everything below exists so the
+# claim can be tested: `url` resolves the name to a page on this site, the job
+# and the degree say what the author was trained in and does, and `sameAs`
+# ties all of it to profiles that already exist and can corroborate it.
 AUTHOR_LD = {
     "@type": "Person",
     "name": AUTHOR,
     "url": SITE + "/author.html",
+    "jobTitle": "Data Scientist",
+    "worksFor": {"@type": "Organization", "name": "GeeksforGeeks"},
+    "alumniOf": {
+        "@type": "CollegeOrUniversity",
+        "name": "Lovely Professional University",
+    },
+    "knowsAbout": [
+        "Machine Learning", "Deep Learning", "Natural Language Processing",
+        "Computer Vision", "Generative AI", "Retrieval-Augmented Generation",
+        "Algorithms and Data Structures", "Mathematics for Machine Learning",
+        "Python", "SQL",
+    ],
     "sameAs": [
         "https://github.com/AshishJangra27",
         "https://www.linkedin.com/in/ashish-jangra/",

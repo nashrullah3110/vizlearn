@@ -101,17 +101,55 @@ PAGES = {
                    "and maths. How the modules are made and verified.",
     "sections": [
         ("Who I am",
-         "<p>I am Ashish Jangra. I build and maintain VizLearn on my own &mdash; every "
-         "visualisation, every written explanation, and the build system that assembles "
-         "them into %(modules)d module pages across %(tracks)d tracks.</p>"
-         "<p>There is no team behind this and no company funding it. That is worth saying "
-         "plainly, because it sets what you should expect: the explanations are opinionated "
-         "and consistent, corrections reach the person who can act on them immediately, and "
-         "nothing here is written to a content brief or a keyword target.</p>"
+         "<p>I am Ashish Jangra, a data scientist at "
+         "<strong>GeeksforGeeks</strong> in Noida, where I have worked since 2021. I hold a "
+         "B.Tech in Computer Science from Lovely Professional University, and I have spent "
+         "about five years building AI systems and teaching people how they work.</p>"
+         "<p>The teaching half is the part that explains this site. I have designed and "
+         "scaled data science and analytics programmes that enrolled more than "
+         "<strong>26,000 learners</strong>, written the curriculum behind 13 instructor-led "
+         "courses and over 200 hours of material, and delivered more than "
+         "<strong>200 live sessions to upwards of 100,000 students</strong>. Explaining the "
+         "same twenty ideas to that many people teaches you something no amount of reading "
+         "does: precisely which twenty ideas are hard, and exactly where the standard "
+         "explanation loses the room. VizLearn works from that list.</p>"
+         "<p>I build and maintain it on my own &mdash; every visualisation, every written "
+         "explanation, and the build system that assembles them into %(modules)d module "
+         "pages across %(tracks)d tracks. There is no team behind it and no company funding "
+         "it, which is worth saying plainly because it sets what you should expect: the "
+         "explanations are opinionated and consistent, corrections reach the person who can "
+         "act on them immediately, and nothing here is written to a content brief or a "
+         "keyword target.</p>"
          "<p>You can see the rest of my work on <a href=\"%(github)s\" rel=\"me noopener\" "
          "target=\"_blank\">GitHub</a>, <a href=\"%(linkedin)s\" rel=\"me noopener\" "
          "target=\"_blank\">LinkedIn</a> and <a href=\"%(kaggle)s\" rel=\"me noopener\" "
          "target=\"_blank\">Kaggle</a>.</p>"),
+
+        # The claim a reader of a machine learning site most needs to test is
+        # whether the author has ever had to make any of it survive contact with
+        # production. This section is here to let them test it.
+        ("What I work on when I am not writing this",
+         "<p>The other half of my job is building the systems these tracks describe. Among "
+         "the things I have shipped:</p>"
+         "<ul>"
+         "<li>A retrieval-augmented chatbot over a <strong>213,000-article</strong> "
+         "knowledge base, serving <strong>5,000 queries a day</strong>, held above a 95%% "
+         "faithfulness rate with RAGAS through grounding strategies and guardrails.</li>"
+         "<li>A semantic search engine over the same corpus &mdash; context-aware chunking, "
+         "fine-tuned <span class=\"mono-font\">all-MiniLM-L6-v2</span> embeddings, Pinecone "
+         "indices, around 2.5 seconds a query.</li>"
+         "<li>A generative-AI evaluation pipeline that grades <strong>10,000+ project "
+         "submissions in six hours</strong>, work that previously took more than 2,500 "
+         "manual ones, with standardised scoring and explainable feedback.</li>"
+         "<li>A tagging pipeline that sorted <strong>35,000 interview questions</strong> "
+         "from 800 companies into 370 skill clusters.</li>"
+         "</ul>"
+         "<p>All of it deployed as Dockerised FastAPI services on Google Cloud Run.</p>"
+         "<p>That matters here for exactly one reason. The tracks on this site are not "
+         "subjects I read about in order to write about them. Embeddings, chunking, "
+         "retrieval metrics, evaluation, the FastAPI and Pydantic tracks &mdash; those pages "
+         "describe things I have had to make work in production and keep working, and the "
+         "failure modes they warn you about are mostly ones I have walked into myself.</p>"),
 
         ("Why I built VizLearn",
          "<p>I kept hitting the same wall learning this material: explanations were either "
