@@ -954,8 +954,7 @@ topic(
         "Move the expansion point and the region of agreement moves with it. "
         "It is a local statement, always.",
     ],
-    """
-title: Taylor Series
+    """title: Taylor Series
 intro: Replacing a hard function with a polynomial, and being precise about where that is allowed.
 
 ## The construction
@@ -1041,6 +1040,84 @@ series about 0 is the wrong tool for estimating at x = 5.
 **Forgetting smoothness is required.** The function needs derivatives of every
 order at the expansion point. `|x|` has none at 0, so there is no series there.
 
+## e to the x, worked by hand
+
+Expand `e^x` about `a = 0`. Every derivative of `e^x` is `e^x`, and `e^0 = 1`,
+so every coefficient is `1/k!` and the series is as clean as they come:
+
+```
+e^x  ~  1 + x + x^2/2 + x^3/6 + x^4/24 + ...
+```
+
+Evaluate it at `x = 1`, where the true value is 2.718282, adding one term at a
+time:
+
+|terms|value|error|
+|---|---|---|
+|1|1.0000|1.7183|
+|2|2.0000|0.7183|
+|3|2.5000|0.2183|
+|4|2.6667|0.0516|
+|5|2.7083|0.0099|
+|6|2.7167|0.0016|
+
+Six terms and the error is under a tenth of a percent. Now the *same six terms*
+at `x = 3`, where the truth is 20.0855:
+
+|terms|value|error|
+|---|---|---|
+|1|1.000|19.09|
+|2|4.000|16.09|
+|3|8.500|11.59|
+|4|13.000|7.09|
+|5|16.375|3.71|
+|6|18.400|1.69|
+
+Still 8% out. The reason is visible in the term itself: the `k`-th term is
+`x^k / k!`, so the numerator grows like `3^k` while the factorial does not
+overtake it until `k` passes 3. Near the expansion point the terms shrink from
+the start; far from it they **grow first and shrink later**, and you have to
+push through that bulge before the series is any use. Matching at `x = 3` the
+accuracy six terms gave at `x = 1` takes eleven.
+
+That is the whole "local, and only local" claim, in numbers: the same
+polynomial, unchanged, is excellent at one distance and unusable at three times
+it. It is also why real implementations do **range reduction** first &mdash;
+`e^3` is computed as `e^0.25` raised to a power, not by expanding at 3.
+
+## Questions people ask
+
+**Taylor or Maclaurin?** A Maclaurin series is a Taylor series with the
+expansion point at zero. That is the entire difference, and it is why the two
+words are used almost interchangeably.
+
+**How many terms do I need?** Whatever makes the first term you dropped small
+enough. For a well-behaved alternating series the remainder is bounded by the
+size of that next term, which makes it a genuinely practical stopping rule.
+Otherwise use the Lagrange remainder, which bounds the error by the largest
+`(n+1)`-th derivative anywhere between the expansion point and where you are
+evaluating &mdash; and that bound is why the error grows with distance.
+
+**Why does 1/(1 + x&sup2;) break at x = 1 when it is smooth everywhere?**
+Because the real line is the wrong place to look. Allow complex numbers and the
+function blows up at `x = i` and `x = -i`, both at distance 1 from the origin.
+A power series converges inside a *disc* reaching the nearest singularity in the
+complex plane, so the radius here is 1 regardless of how well behaved the
+function looks on the reals. The failure is real; the cause is elsewhere.
+
+**Is the Taylor polynomial the best polynomial approximation?** No, and this
+surprises people. It is the best one *at the expansion point*, where it matches
+as many derivatives as it has terms. Across an interval it is usually beaten
+comfortably by a minimax or Chebyshev fit, which spreads the error evenly
+instead of concentrating accuracy at one spot. Numerical libraries use those,
+not Taylor, for precisely this reason.
+
+**Does a Taylor series always converge to the function?** Not necessarily. The
+standard counterexample is `e^(-1/x^2)` extended by zero at the origin: every
+derivative there is 0, so its series is identically 0, which agrees with the
+function at exactly one point. Smooth is not enough; the property that makes the
+series work is called being *analytic*.
+
 ## Rebuild a function from its derivatives
 
 Terms added one at a time, with the error after each. The approximation is excellent near the expansion point and hopeless far from it.
@@ -1072,7 +1149,6 @@ for x in (0.01, 0.1, 0.5):
     print("  ln(1+%.2f) = %.6f, and x = %.6f     (error %.2e)"
           % (x, np.log(1 + x), x, abs(np.log(1 + x) - x)))
 ```
-
 """,
     [
         {"q": "What does the second term of a Taylor series give you?",
@@ -1136,8 +1212,7 @@ topic(
         "Expectation is linear no matter what. Variance only adds across "
         "<em>independent</em> variables &mdash; a distinction that matters constantly.",
     ],
-    """
-title: Expectation and Variance
+    """title: Expectation and Variance
 intro: The two numbers that summarise a random quantity, and the rules for combining them.
 
 ## Expectation
@@ -1253,6 +1328,83 @@ its variance.
 has neither a finite variance nor a finite mean, and sample averages of Cauchy
 draws never settle.
 
+## Both numbers, worked by hand
+
+Five cards, drawn one at a time with every card equally likely. They are marked
+1, 1, 2, 5 and 11.
+
+Build the table. `P(x)` is how often that value appears out of five, and the
+last two columns are what the two formulas need:
+
+|x|P(x)|x P(x)|x&sup2; P(x)|
+|---|---|---|---|
+|1|2/5|0.4|0.4|
+|2|1/5|0.4|0.8|
+|5|1/5|1.0|5.0|
+|11|1/5|2.2|24.2|
+|**total**|**1**|**4.0**|**30.4**|
+
+The third column sums to the expectation: **E[X] = 4.0**. Note that no card is
+marked 4. The fourth sums to **E[X&sup2;] = 30.4**, and the one-pass identity
+gives the variance straight away:
+
+```
+Var(X)  =  E[X^2] - (E[X])^2  =  30.4 - 16  =  14.4
+```
+
+Now the same number from the definition, `E[(X - mu)^2]`, squaring each
+distance from 4 and weighting it:
+
+```
+(1  - 4)^2 = 9    weight 2/5   ->  3.6
+(2  - 4)^2 = 4    weight 1/5   ->  0.8
+(5  - 4)^2 = 1    weight 1/5   ->  0.2
+(11 - 4)^2 = 49   weight 1/5   ->  9.8
+                               -------
+                                  14.4
+```
+
+The same 14.4, by a different route. The standard deviation is
+&radic;14.4 = **3.79** &mdash; almost as large as the mean itself, which is the
+honest summary of this deck: the average is 4, and the single 11 does most of
+the work.
+
+The two routes cost differently. The definition needs the mean before it can
+start, so it is two passes over the data. The identity needs only running totals
+of `x` and `x`&sup2;, so it is one &mdash; which is why it is the one that gets
+implemented, and why the precision trap above is worth knowing about.
+
+## Questions people ask
+
+**Why square the deviations instead of taking absolute values?** You can, and
+that gives the mean absolute deviation, which is a perfectly good measure of
+spread. Squaring wins on grounds of convenience rather than truth: it is
+differentiable everywhere, it makes the variance of a sum decompose into a sum
+of variances, and it produces the identity above. Absolute values give none of
+those, which is why almost every result in this material is stated for variance.
+
+**Does the expectation have to be a value the variable can take?** No, and
+usually it is not. A fair die averages 3.5; the deck above averages 4 without
+containing a 4. Expectation is a balance point of the distribution, not a
+forecast of any single draw.
+
+**Why does sample variance divide by n &minus; 1?** Because the sample mean is
+itself estimated from the same data, and it sits closer to the data than the
+true mean does &mdash; it is the value that *minimises* the sum of squared
+deviations, so squared distances measured from it are systematically too small.
+Dividing by `n - 1` instead of `n` corrects that bias exactly. With the true
+mean known, `n` would be right.
+
+**When can I add variances?** Only when the variables are independent, or at
+least uncorrelated. Otherwise the covariance term is genuinely there and
+dropping it will mislead you, almost always in the direction of thinking you
+have less risk than you do.
+
+**Variance or standard deviation in a report?** Standard deviation, nearly
+always, because it is in the same units as the data and can be compared to the
+mean. Variance is the quantity the algebra is easier in, which is why it appears
+in the derivations and rarely in the conclusions.
+
 ## A bet worth taking that usually loses
 
 Expectation and variance computed from the definition, then measured over 400,000 plays. The two numbers say different things, and both matter.
@@ -1283,7 +1435,6 @@ print("the sd is %.1f -- far bigger than the edge of %.2f."
       % (np.sqrt(var), ev))
 print("expectation says play; variance says do not bet the rent on one round.")
 ```
-
 """,
     [
         {"q": "A fair die has E[X] = 3.5. What does that tell you?",
@@ -3390,8 +3541,7 @@ topic(
         "It is the reason a log-likelihood can be bounded from below, which is "
         "the reason EM and variational inference work at all.",
     ],
-    """
-title: Jensen's Inequality
+    """title: Jensen's Inequality
 intro: Why averaging before and after a curve gives different answers, and what that difference is used for.
 
 ## The statement
@@ -3488,6 +3638,75 @@ and a rising ELBO does not prove the likelihood rose by as much.
 **Forgetting that equality needs linearity or a constant.** Nothing else gives
 it.
 
+## The average speed trap, worked
+
+Drive 60 km at 30 km/h, then another 60 km at 60 km/h. What was the average
+speed?
+
+Almost everyone answers 45. Work it out instead:
+
+```
+first leg   60 km at 30 km/h  ->  2 hours
+second leg  60 km at 60 km/h  ->  1 hour
+                                 --------
+            120 km in 3 hours  ->  40 km/h
+```
+
+**40, not 45.** The answer is dragged toward the slower speed, because you spend
+twice as long travelling at it. The correct average here is the harmonic mean,
+`2 / (1/30 + 1/60) = 40`.
+
+Jensen says this had to happen, and says which direction. Time per kilometre is
+`1/X`, and `1/x` is convex on the positives, so:
+
+```
+E[1/X]  >=  1/E[X]
+
+E[1/X]  = (1/30 + 1/60)/2 = 0.02500 hours per km
+1/E[X]  = 1/45            = 0.02222 hours per km
+```
+
+The time you actually spend is governed by the left-hand side, and it is
+**bigger**. Over 120 km: 3.00 hours actual against 2.67 predicted by the naive
+average. The trip is always at least as slow as the arithmetic mean suggests,
+and exactly as slow only when both speeds are equal &mdash; the equality case,
+where the distribution collapses to a point.
+
+The same shape appears wherever a rate is averaged: cost per unit, latency per
+request, price-to-earnings across a portfolio. **Averaging a ratio and taking
+the ratio of averages are different operations**, and Jensen tells you in
+advance which one comes out larger, without computing either.
+
+## Questions people ask
+
+**How do I remember which way it points?** Picture the chord. Convex means the
+curve bends upward and every chord lies above it, so the average of the heights
+(the chord) beats the height of the average (the curve): `E[f(X)] >= f(E[X])`.
+Concave flips the picture and the inequality. If you can recall that `x`&sup2;
+is convex, one example settles it &mdash; the mean of squares exceeds the square
+of the mean, which is just the variance being non-negative.
+
+**When is it an equality?** In exactly two cases: `f` is linear over the range
+the variable actually reaches, or the variable is a constant. Anything else and
+the gap is strictly positive. This is why linear transformations pass cleanly
+through an expectation and nothing else does.
+
+**Is AM-GM really the same statement?** Yes. Apply Jensen to `log`, which is
+concave, and you get `log` of the mean at least the mean of the `log`s;
+exponentiate and that is the arithmetic mean dominating the geometric mean. The
+inequality you may have proved by induction at school is one substitution away.
+
+**Does it apply to medians too?** No. Jensen is a statement about expectations,
+and the median passes through any *monotone* function untouched &mdash;
+`median(f(X)) = f(median(X))` for increasing `f`, convex or not. That difference
+is one practical reason to report a median when a quantity has been through a
+nonlinear transformation.
+
+**Where will this actually bite me?** Wherever you average something that was
+already a rate or a log. Averaging log-probabilities and exponentiating gives
+the geometric mean, not the arithmetic one &mdash; which is what perplexity is,
+and why it is not the average probability.
+
 ## The average of the function is not the function of the average
 
 Three concrete cases where swapping those two operations changes the answer, including the one that quietly costs money.
@@ -3527,7 +3746,6 @@ print()
 print("log is concave, so the average of the logs sits below the log of the")
 print("average -- which is exactly the gap between the two 'mean returns'.")
 ```
-
 """,
     [
         {"q": "For a convex f, which is larger?",
@@ -4006,8 +4224,7 @@ topic(
         "The bars are C(n, k) for every k. Symmetric, because choosing k to "
         "keep is choosing n&minus;k to leave.",
     ],
-    """
-title: Combinatorics: Permutations and Combinations
+    """title: Combinatorics: Permutations and Combinations
 intro: The counting that probability is built on, and the one question that decides which formula to use.
 
 ## The question to ask first
@@ -4108,6 +4325,82 @@ replacement all permit it.
 **Double counting.** When the objects are not all distinguishable the plain
 formulas over-count, and the multiset versions are needed instead.
 
+## A worked example: the birthday problem
+
+In a room of 23 people, the chance that two share a birthday is just over half.
+That number is famous for feeling wrong, and working it out teaches the single
+most useful counting trick there is.
+
+Counting "at least one shared birthday" directly is miserable: one pair, two
+pairs, a triple, a triple and a pair, and so on, all overlapping. So count the
+opposite &mdash; **all birthdays different** &mdash; which is one clean product,
+and subtract from 1. This is **complementary counting**, and reaching for it is
+often the whole difficulty of a counting problem.
+
+With 365 equally likely days and `k` people, the total number of ways to assign
+birthdays is `365^k`. The number of ways with no repeat is `P(365, k)`, the
+ordered count from above. So:
+
+```
+P(all different)  =  P(365, k) / 365^k
+                  =  (365/365)(364/365)(363/365) ... ((366-k)/365)
+```
+
+Each new person must dodge every birthday already taken, so each factor is
+slightly smaller than the last:
+
+|people|P(all different)|P(a shared birthday)|
+|---|---|---|
+|10|0.883|11.7%|
+|20|0.589|41.1%|
+|**23**|**0.493**|**50.7%**|
+|30|0.294|70.6%|
+|50|0.030|97.0%|
+|70|0.0008|99.9%|
+
+The reason 23 feels far too small is that people picture *their own* birthday
+being matched, which needs 253 people to reach even odds. The question is
+not about you. It is about **pairs**, and 23 people make
+`C(23, 2) = 253` of them &mdash; each a separate chance to collide.
+
+That gap between "people" and "pairs" is a quadratic hiding behind a linear
+intuition, and it is exactly why hash collisions arrive far sooner than the
+table size suggests. The birthday bound is the reason a 64-bit hash starts
+colliding after around 2&sup3;&sup2; items rather than 2&sup4;.
+
+## Questions people ask
+
+**Which of the three formulas do I want?** Two questions settle it every time
+&mdash; can an item repeat, and does order matter:
+
+|repeats?|order matters?|count|example|
+|---|---|---|---|
+|yes|yes|`n^k`|a 4-digit PIN|
+|no|yes|`P(n, k)`|gold, silver, bronze|
+|no|no|`C(n, k)`|a committee of three|
+|yes|no|`C(n+k-1, k)`|scoops of ice cream|
+
+**How do I compute C(n, k) without overflowing?** Never build the factorials.
+Multiply and divide alternately &mdash; `C(n,k) = C(n,k-1) * (n-k+1) / k` &mdash;
+which keeps every intermediate an exact integer and roughly the size of the
+answer. For very large `n`, work with `lgamma` in log space and exponentiate at
+the end. Python's `math.comb` already does the safe thing.
+
+**Why is C(n, 0) equal to 1?** There is exactly one way to choose nothing: take
+nothing. It is not a special case bolted on &mdash; it is what makes the
+symmetry `C(n,k) = C(n,n-k)` and Pascal's recurrence hold at the edges without
+exceptions.
+
+**What if some items are identical?** The plain formulas assume every item is
+distinguishable. Arranging the letters of *BANANA* is not `6!`, because swapping
+the two Ns changes nothing; divide by the factorial of each repeat count,
+`6!/(3! 2! 1!) = 60`.
+
+**Is C(n, k) the same as "n choose k"?** Yes &mdash; and the same as the
+binomial coefficient, and the same as a row entry of Pascal's triangle. Three
+names, one number, which is a large part of why this topic reads as harder than
+it is.
+
 ## List them, then count them
 
 Small enough to print every arrangement, so the formulas are checkable rather than memorised.
@@ -4136,7 +4429,6 @@ for n in (5, 10, 20, 52):
     print("  %2d items: %d orderings, %d hands of 3"
           % (n, math.factorial(n), math.comb(n, 3)))
 ```
-
 """,
     [
         {"q": "What separates a permutation count from a combination count?",

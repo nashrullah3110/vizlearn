@@ -99,6 +99,82 @@ replacement all permit it.
 **Double counting.** When the objects are not all distinguishable the plain
 formulas over-count, and the multiset versions are needed instead.
 
+## A worked example: the birthday problem
+
+In a room of 23 people, the chance that two share a birthday is just over half.
+That number is famous for feeling wrong, and working it out teaches the single
+most useful counting trick there is.
+
+Counting "at least one shared birthday" directly is miserable: one pair, two
+pairs, a triple, a triple and a pair, and so on, all overlapping. So count the
+opposite &mdash; **all birthdays different** &mdash; which is one clean product,
+and subtract from 1. This is **complementary counting**, and reaching for it is
+often the whole difficulty of a counting problem.
+
+With 365 equally likely days and `k` people, the total number of ways to assign
+birthdays is `365^k`. The number of ways with no repeat is `P(365, k)`, the
+ordered count from above. So:
+
+```
+P(all different)  =  P(365, k) / 365^k
+                  =  (365/365)(364/365)(363/365) ... ((366-k)/365)
+```
+
+Each new person must dodge every birthday already taken, so each factor is
+slightly smaller than the last:
+
+|people|P(all different)|P(a shared birthday)|
+|---|---|---|
+|10|0.883|11.7%|
+|20|0.589|41.1%|
+|**23**|**0.493**|**50.7%**|
+|30|0.294|70.6%|
+|50|0.030|97.0%|
+|70|0.0008|99.9%|
+
+The reason 23 feels far too small is that people picture *their own* birthday
+being matched, which needs 253 people to reach even odds. The question is
+not about you. It is about **pairs**, and 23 people make
+`C(23, 2) = 253` of them &mdash; each a separate chance to collide.
+
+That gap between "people" and "pairs" is a quadratic hiding behind a linear
+intuition, and it is exactly why hash collisions arrive far sooner than the
+table size suggests. The birthday bound is the reason a 64-bit hash starts
+colliding after around 2&sup3;&sup2; items rather than 2&sup4;.
+
+## Questions people ask
+
+**Which of the three formulas do I want?** Two questions settle it every time
+&mdash; can an item repeat, and does order matter:
+
+|repeats?|order matters?|count|example|
+|---|---|---|---|
+|yes|yes|`n^k`|a 4-digit PIN|
+|no|yes|`P(n, k)`|gold, silver, bronze|
+|no|no|`C(n, k)`|a committee of three|
+|yes|no|`C(n+k-1, k)`|scoops of ice cream|
+
+**How do I compute C(n, k) without overflowing?** Never build the factorials.
+Multiply and divide alternately &mdash; `C(n,k) = C(n,k-1) * (n-k+1) / k` &mdash;
+which keeps every intermediate an exact integer and roughly the size of the
+answer. For very large `n`, work with `lgamma` in log space and exponentiate at
+the end. Python's `math.comb` already does the safe thing.
+
+**Why is C(n, 0) equal to 1?** There is exactly one way to choose nothing: take
+nothing. It is not a special case bolted on &mdash; it is what makes the
+symmetry `C(n,k) = C(n,n-k)` and Pascal's recurrence hold at the edges without
+exceptions.
+
+**What if some items are identical?** The plain formulas assume every item is
+distinguishable. Arranging the letters of *BANANA* is not `6!`, because swapping
+the two Ns changes nothing; divide by the factorial of each repeat count,
+`6!/(3! 2! 1!) = 60`.
+
+**Is C(n, k) the same as "n choose k"?** Yes &mdash; and the same as the
+binomial coefficient, and the same as a row entry of Pascal's triangle. Three
+names, one number, which is a large part of why this topic reads as harder than
+it is.
+
 ## List them, then count them
 
 Small enough to print every arrangement, so the formulas are checkable rather than memorised.
