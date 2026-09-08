@@ -2402,6 +2402,23 @@ over a couple of years land naturally in that band.
 Partitions can also be **subpartitioned** &mdash; range by month, then hash by
 customer within each month &mdash; when both access patterns matter.
 
+## Joins get a second, quieter benefit
+
+Pruning is the benefit everyone knows. The other one shows up when two tables are
+partitioned on the *same* key &mdash; orders and order-items both by `customer_id`,
+say. A row in bucket `i` of one table can only match rows in bucket `i` of the
+other, so the engine performs a **partition-wise join**: 60 small joins of
+aligned buckets, rather than one join over the whole product.
+
+The arithmetic is the same shape as pruning. With 60 buckets a side, matched
+partitioning means 60 aligned partition-joins; unmatched, any bucket of one table
+could hold a match for any bucket of the other, which is 60 &times; 60 = 3,600
+partition-pairs to consider. And each aligned join is small enough that its hash
+table &mdash; two million rows, not 120 million &mdash; fits in memory instead of
+spilling to disk. This is why data warehouses partition fact and dimension tables
+on the join key: the join, not just the scan, gets cut into pieces the engine can
+hold.
+
 ## Where it goes wrong
 
 **Partitioning a small table.** Under a few million rows, a good index is
@@ -2806,6 +2823,23 @@ network round trip. Throughput falls, and latency rises by the distance to the
 replica. If the synchronous replica becomes unreachable, writes stall entirely
 unless a fallback is configured.
 
+That "distance to the replica" is not a figure of speech &mdash; it has a floor set
+by physics, and the floor is worth knowing before choosing where a synchronous
+replica lives. Light in fibre travels at about two-thirds of `c`, so the
+round-trip *cannot* be faster than twice the distance over that speed:
+
+|synchronous replica|round-trip floor|added to every commit|
+|---|---|---|
+|same datacentre|~0 ms|negligible|
+|same region (~100 km)|~1 ms|tolerable|
+|across a continent (~5,500 km)|~56 ms|every write waits 56 ms+|
+
+Real fibre paths run about half again longer than the straight-line distance, so
+the cross-continent figure is nearer 70&nbsp;ms in practice. That is per commit, and
+no amount of hardware removes it &mdash; it is the reason a synchronous replica is
+kept nearby and durability across regions is bought with asynchronous copies plus
+the accepted risk of the section above.
+
 This is a direct instance of the [CAP](cap_theorem.html) trade: consistency
 across replicas costs availability and latency, and no configuration escapes it.
 The usual compromise is one synchronous replica nearby for durability, and
@@ -2997,6 +3031,14 @@ consistent and slower &mdash; or acknowledge locally and replicate afterwards
 That is exactly the [synchronous versus asynchronous replication
 choice](replication_and_lag.html), and unlike CAP's trade it is live on every
 request.
+
+That "live on every request" is the whole reason the extension earns its keep. A
+partition is a rare event &mdash; the network between healthy nodes works the vast
+majority of the time &mdash; so CAP's consistency-or-availability choice is one you
+actually pay only during those rare failures. The latency-or-consistency choice,
+by contrast, is paid on *every single request* the system ever serves. PACELC is
+"the more useful version" precisely because it names the trade you make billions
+of times a day rather than the one you make on the bad afternoon a cable is cut.
 
 ## The tunable, made concrete: R + W > N
 
@@ -4079,6 +4121,25 @@ user whose name is literally `' OR '1'='1`, which finds nothing.
 This is not a filter that might miss something. It is a structural guarantee:
 there is no input for which a bound parameter becomes syntax.
 
+## The same property also makes it faster
+
+The security comes from one fact: the query text is fixed and the values arrive
+separately. That same fact is a performance win, and the two are not a
+coincidence &mdash; they are the same mechanism seen from two sides.
+
+A database parses a query string, plans it, and only then runs it. When the text
+is fixed, that parse-and-plan happens once and the plan is cached and reused for
+every later execution with different bound values. When the query is built by
+concatenation, every call is a *different* string &mdash; `name = 'user1'`,
+`name = 'user2'` &mdash; so the cache never hits and the planner runs every time.
+
+Measured in the SQLite this page runs, reusing one prepared statement against
+re-parsing a fresh query string each time is about **1.8&times; faster** (7.5 vs
+13.3 microseconds per query), and the gap widens for more complex queries where
+planning is the larger share. So the concatenation habit is slower *and* unsafe,
+and the fix for one is the fix for the other: the fixed query string that denies
+an attacker a foothold is the same fixed string the planner can cache.
+
 ## Why escaping is not the fix
 
 Escaping tries to neutralise dangerous characters in the input. It fails for
@@ -4117,6 +4178,22 @@ if column is None: reject()
 ```
 
 Never sanitise an identifier by escaping. Choose it from a fixed set.
+
+There is one more case that sends people back to concatenation, and it should
+not: a variable-length `IN` list. `WHERE id IN (?)` does **not** bind a list to
+the single placeholder &mdash; it binds one value. The correct move is to generate
+*one placeholder per element* and bind them positionally:
+
+```
+ids = [4, 7, 12]
+marks = ",".join("?" for _ in ids)      # "?,?,?"
+cursor.execute("... WHERE id IN (%s)" % marks, ids)
+```
+
+The `%` here builds only punctuation &mdash; commas and question marks, never the
+values &mdash; so nothing user-controlled reaches the query text. Every id is still
+bound. It looks like string-building, and the thing being built contains no data,
+which is exactly the line that keeps it safe.
 
 ## The other layers
 

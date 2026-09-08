@@ -102,6 +102,23 @@ network round trip. Throughput falls, and latency rises by the distance to the
 replica. If the synchronous replica becomes unreachable, writes stall entirely
 unless a fallback is configured.
 
+That "distance to the replica" is not a figure of speech &mdash; it has a floor set
+by physics, and the floor is worth knowing before choosing where a synchronous
+replica lives. Light in fibre travels at about two-thirds of `c`, so the
+round-trip *cannot* be faster than twice the distance over that speed:
+
+|synchronous replica|round-trip floor|added to every commit|
+|---|---|---|
+|same datacentre|~0 ms|negligible|
+|same region (~100 km)|~1 ms|tolerable|
+|across a continent (~5,500 km)|~56 ms|every write waits 56 ms+|
+
+Real fibre paths run about half again longer than the straight-line distance, so
+the cross-continent figure is nearer 70&nbsp;ms in practice. That is per commit, and
+no amount of hardware removes it &mdash; it is the reason a synchronous replica is
+kept nearby and durability across regions is bought with asynchronous copies plus
+the accepted risk of the section above.
+
 This is a direct instance of the [CAP](cap_theorem.html) trade: consistency
 across replicas costs availability and latency, and no configuration escapes it.
 The usual compromise is one synchronous replica nearby for durability, and
