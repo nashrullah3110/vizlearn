@@ -2327,7 +2327,20 @@ comes out too narrow.
 
 **That is exactly why the t-distribution exists.** Gosset's correction widens
 the interval to account for having estimated the SD, and the correction is large
-at small `n` and negligible past about 30. Drag `n` upward and watch the gap
+at small `n` and negligible past about 30. The multiplier it puts in place of
+1.96 is worth seeing, because it explains both halves of that sentence:
+
+|n|t multiplier|wider than z by|
+|---|---|---|
+|5|2.776|42%|
+|10|2.262|15%|
+|30|2.045|4%|
+|100|1.984|1%|
+
+At n = 5 the honest interval is nearly half as wide again as the one this page
+draws, which is where the missing coverage went. By n = 30 the correction is 4%
+and the distinction stops mattering, which is where the rule of thumb comes
+from. Drag `n` upward and watch the gap
 close on its own &mdash; the page is demonstrating the problem the t-distribution
 solves, rather than quietly using t and hiding it.
 
@@ -2359,6 +2372,53 @@ that level. That correspondence is exact, and it is why many people prefer
 reporting intervals to reporting
 [p-values](hypothesis_testing_and_p_values.html): the interval carries the
 effect size and the uncertainty together, where a p-value carries neither.
+
+## Two intervals that overlap, and a difference that is real
+
+The rule above &mdash; do not eyeball the bars &mdash; is worth doing rather than
+taking on trust, because the arithmetic is short and the result is genuinely
+counter-intuitive.
+
+An experiment with 100 observations in each arm and a standard deviation of 10,
+so the standard error in each arm is 10 / &radic;100 = **1**.
+
+|arm|mean|95% interval|
+|---|---|---|
+|A|10.0|[8.04, 11.96]|
+|B|13.2|[11.24, 15.16]|
+
+Those intervals overlap, between 11.24 and 11.96. Draw them as error bars and
+every instinct says the arms are indistinguishable.
+
+Now test the difference directly. The difference is 3.2, and its standard error
+is **not** the two standard errors added:
+
+SE<sub>diff</sub> = &radic;(1&sup2; + 1&sup2;) = &radic;2 = **1.414**, not 2
+
+which gives a 95% interval for the difference of 3.2 &plusmn; 1.96 &times; 1.414
+= **[0.43, 5.97]**. That excludes zero, and the corresponding two-tailed p is
+**0.024**. The difference is significant while the individual intervals overlap.
+
+The reason is in that square root. Two independent errors do not both go the
+wrong way at once as often as they each go wrong, so they partly cancel, and the
+difference is pinned down more tightly than either mean is. Adding the errors
+assumes the worst case every time.
+
+The consequence is a whole band where the eye and the arithmetic disagree. With
+equal standard errors, a difference becomes significant once it exceeds
+1.96&radic;2 = **2.77** standard errors, but the two intervals keep touching
+until it exceeds 2 &times; 1.96 = **3.92**. Any gap between those two numbers
+overlaps *and* is significant.
+
+|gap between the means|bars overlap?|significant?|
+|---|---|---|
+|2.0 SE|yes|no|
+|3.2 SE|yes|**yes**|
+|4.5 SE|no|yes|
+
+The middle row is the one that catches people, and it is why the comparison you
+report has to be a test of the difference rather than a picture of two intervals
+side by side. The picture is answering a question nobody asked.
 
 ## Where it goes wrong
 
@@ -2509,6 +2569,44 @@ Drag the observed statistic and watch the area shrink as it moves outward. A
 large statistic is unusual under the null, so its tail is small &mdash; and a
 small tail is what "unlikely, if the null were true" means.
 
+## One test, worked by hand
+
+The simulation below computes a p-value by brute force. It is worth doing one
+the ordinary way first, on numbers small enough to check, so the quantity stops
+being whatever the library returned.
+
+Five measurements per group:
+
+|group|values|mean|
+|---|---|---|
+|control|12, 14, 11, 13, 15|13|
+|variant|15, 17, 14, 16, 18|16|
+
+The deviations from the mean are the same five numbers in both groups
+&mdash; &minus;1, 1, &minus;2, 0, 2 &mdash; so each group's sum of squared
+deviations is 10, and each sample variance is 10 / 4 = **2.5**. Dividing by
+n &minus; 1 rather than n is the correction covered in
+[expectation and variance](expectation_and_variance.html).
+
+The difference between the means is 3. What decides whether 3 is a lot is the
+standard error of that difference:
+
+SE = &radic;(2.5/5 + 2.5/5) = &radic;1 = **1**
+
+t = 3 / 1 = **3**, on 5 + 5 &minus; 2 = **8** degrees of freedom, which gives a
+two-tailed **p = 0.0171**.
+
+Read that last number as the definition demands: *if the two groups were really
+the same*, a gap of 3 or more in either direction would turn up in about one
+sample in 59. It says nothing about how likely it is that they are the same, and
+nothing about whether a gap of 3 matters to anyone.
+
+Notice which quantity did the work. The difference of 3 was never enough on its
+own &mdash; it had to be measured against the SE, and the SE fell as the spread
+fell and as the sample grew. Quadruple the sample and the SE halves, because it
+divides by &radic;n rather than n. That single square root is why the fourth
+hundred observations buy so much less than the first hundred.
+
 ## What it is not
 
 Three misreadings, all common enough to have names.
@@ -2545,6 +2643,49 @@ one for the same statistic, because the same area is being counted on both sides
 The choice must be made **before** seeing the data. Deciding afterwards that you
 only cared about one direction halves your p-value for free, and that is a
 recognised form of cheating rather than a modelling choice.
+
+## Why one in twenty, exactly
+
+The claim that a 0.05 threshold lets one test in twenty through is not a rough
+estimate. It is exact, and the reason is a fact about p-values that is rarely
+stated: **when the null is true, the p-value is uniformly distributed between 0
+and 1.** Every value is equally likely. A p of 0.03 is exactly as probable as a
+p of 0.87.
+
+Once that is granted, everything else follows arithmetically. The probability
+that a uniform value falls below &alpha; is &alpha;. So a 0.05 cutoff admits 5%
+of true nulls by construction &mdash; not as a regrettable side effect, but as
+the definition of what the cutoff is doing. Twenty thousand tests with no effect
+in them at all:
+
+|threshold|fraction of nulls below it|uniform predicts|
+|---|---|---|
+|p &lt; 0.01|0.0111|0.01|
+|p &lt; 0.05|0.0520|0.05|
+|p &lt; 0.10|0.1003|0.10|
+|p &lt; 0.25|0.2492|0.25|
+|p &lt; 0.50|0.4953|0.50|
+|p &lt; 0.90|0.8968|0.90|
+
+The deciles come out 0.10, 0.20, 0.30, 0.40, 0.50, 0.61, 0.71, 0.81, 0.90 &mdash;
+the identity line, which is what a flat distribution looks like from the inside.
+
+This is also the mechanism behind p-hacking, and it makes the size of the problem
+computable rather than vague. Running k independent tests on nothing means
+drawing k uniforms and keeping the smallest, and the smallest of k uniforms has
+an average of 1/(k + 1):
+
+|tests run|average smallest p|chance at least one clears 0.05|
+|---|---|---|
+|5|0.167|1 &minus; 0.95&#8309; = 22.6%|
+|20|0.048|1 &minus; 0.95&#178;&#8304; = 64.2%|
+|100|0.010|1 &minus; 0.95&#185;&#8304;&#8304; = 99.4%|
+
+Twenty metrics on an experiment that changed nothing, and the odds are roughly
+two in three that one of them looks significant. At a hundred it is a near
+certainty. Nobody has to be dishonest for this to happen &mdash; it is what the
+arithmetic does on its own, which is why the correction has to be decided before
+the tests are run.
 
 ## Why 0.05 is under attack
 
@@ -2778,6 +2919,52 @@ effect &mdash; and when it does find one, the estimate is inflated, because only
 an unusually large sample fluctuation could have crossed the threshold at that
 sample size. That is the **winner's curse**, and it is a substantial part of why
 published effects shrink on replication.
+
+## The question alpha and power cannot answer alone
+
+Alpha is the chance of a false positive **given that the null is true**, and
+power is the chance of a true positive **given that it is false**. Neither of
+them answers the question anyone actually has after a significant result: how
+likely is it that *this* finding is real?
+
+That question needs one more number, and it is the one nobody reports &mdash; the
+proportion of the hypotheses being tested that were true to begin with. Work it
+through on a thousand tests, everything done correctly, alpha at 0.05 and power
+at a respectable 80%, in a field where one hypothesis in ten is true:
+
+|  |true (100)|false (900)|
+|---|---|---|
+|**significant**|80|45|
+|**not significant**|20|855|
+
+There are 125 significant results and 45 of them are false. **Thirty-six per cent
+of the findings are wrong**, with no p-hacking, no bad faith and no methodological
+error &mdash; only 5% of a large number of false hypotheses being larger than 80%
+of a small number of true ones.
+
+Everything follows from the ratio of those two counts:
+
+|true hypotheses|alpha|power|share of significant results that are real|
+|---|---|---|---|
+|10%|0.05|0.80|64.0%|
+|10%|0.05|0.35|43.8%|
+|1%|0.05|0.80|13.9%|
+|10%|0.005|0.80|94.7%|
+|50%|0.05|0.80|94.1%|
+
+Read the third row. In exploratory work where one hypothesis in a hundred is
+true &mdash; screening compounds, scanning the genome, trying features &mdash;
+about six of every seven significant results are false, and the study was
+run perfectly. Read the second: halving the power does not halve the errors, it
+raises the false share from 36% to 56%, which is the concrete cost of the
+underpowered study described above.
+
+Then read the last two rows, because they are the levers. Tightening alpha
+tenfold takes the false share from 36% to 5%, which is the actual argument
+behind moving the threshold to 0.005. Testing better hypotheses does the same
+thing &mdash; a field where half the ideas are right barely has the problem.
+Neither lever is inside the statistics; they are choices about how hard you are
+willing to make it to publish, and about what you bother to test.
 
 ## Where it goes wrong
 
@@ -3855,6 +4042,62 @@ slows visibly; a chain that could not leave a state at all would never mix.
 The speed is governed by the second-largest eigenvalue: the closer it is to 1,
 the slower the mixing. That number has a name, the *spectral gap*, and it is
 what people mean by a chain mixing slowly.
+
+## The whole thing on two states
+
+Everything above fits on a chain with two states, small enough to do on paper and
+still large enough to show all three claims.
+
+Weather, where a sunny day is usually followed by another and rain clears half
+the time:
+
+|from \ to|sunny|rainy|
+|---|---|---|
+|**sunny**|0.9|0.1|
+|**rainy**|0.5|0.5|
+
+**The stationary distribution, solved exactly.** &pi;P = &pi; on two states is
+just &pi;<sub>s</sub> = 0.9&pi;<sub>s</sub> + 0.5&pi;<sub>r</sub>, which
+rearranges to 0.1&pi;<sub>s</sub> = 0.5&pi;<sub>r</sub>, so
+&pi;<sub>s</sub> = 5&pi;<sub>r</sub>. With the two summing to 1 that gives
+**&pi; = (5/6, 1/6)**, or (0.8333, 0.1667). No iteration, no eigenvalue routine
+&mdash; two lines of algebra.
+
+**The same answer by iterating.** Start with certainty and multiply by P
+repeatedly:
+
+|step|from sunny|from rainy|
+|---|---|---|
+|0|(1.000, 0.000)|(0.000, 1.000)|
+|1|(0.900, 0.100)|(0.500, 0.500)|
+|2|(0.860, 0.140)|(0.700, 0.300)|
+|3|(0.844, 0.156)|(0.780, 0.220)|
+|4|(0.838, 0.162)|(0.812, 0.188)|
+|5|(0.835, 0.165)|(0.825, 0.175)|
+
+Two starting points that could not be further apart, converging on the same
+(0.8333, 0.1667). The chain forgets where it began, which is the whole content of
+the claim that the limit does not depend on the start.
+
+**And the mixing speed, which is not a metaphor.** The eigenvalues of a 2&times;2
+stochastic matrix are 1 and (trace &minus; 1), so here the second eigenvalue is
+0.9 + 0.5 &minus; 1 = **0.4**. Now measure how far the sunny column is from
+0.8333 at each step:
+
+0.1667, 0.0667, 0.0267, 0.0107, 0.0043, 0.0017
+
+Each is exactly 0.4 times the one before it. The second eigenvalue is not merely
+*related* to the mixing rate; it **is** the factor by which the remaining error
+shrinks per step. A chain with a second eigenvalue of 0.99 needs 365
+steps to shrink the error as far as this one does in four, which is why the spectral gap is the
+number MCMC practitioners worry about.
+
+One more reading falls out of &pi; for free, and it is the one that makes the
+numbers concrete. The expected time to return to a state is
+**1 / &pi;<sub>i</sub>**, so rain recurs every 1 / (1/6) = **6 days** on average
+and sun every 1 / (5/6) = **1.2 days**. The stationary distribution is not only
+the long-run share of time spent in each state; it is the reciprocal of how long
+you wait to come back to it.
 
 ## Where they appear
 
