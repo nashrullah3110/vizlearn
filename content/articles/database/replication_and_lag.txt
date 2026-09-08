@@ -14,6 +14,33 @@ helping can simply be removed.
 
 Replicas also serve as warm standbys. If the primary fails, one is promoted.
 
+## How far reads actually scale
+
+"Multiplies read capacity" has a limit, and the limit is worth seeing because it
+decides when replicas stop being the answer. Every replica serves reads *and*
+must apply every write the primary takes &mdash; the write load is not shared out,
+it is copied to all of them. So if one machine handles 10,000 operations a second,
+a replica taking `W` writes per second has only `10,000 - W` left for reads, and
+`N` replicas serve `N &times; (10,000 - W)`:
+
+|write rate|1 replica|3 replicas|10 replicas|
+|---|---|---|---|
+|500/s (5%)|9,500|28,500|95,000|
+|2,000/s (20%)|8,000|24,000|80,000|
+|5,000/s (50%)|5,000|15,000|50,000|
+
+At a light write rate reads scale almost linearly &mdash; ten replicas give nearly
+ten times the read throughput, which is why read replicas are the standard answer
+for read-heavy workloads. But look down the columns rather than across: as writes
+climb, every replica loses that capacity to apply work, and the whole fleet's
+read ceiling drops with it. Once writes alone approach what one machine can do,
+`10,000 - W` heads toward zero and adding replicas buys almost nothing &mdash;
+each new machine spends all its capacity just keeping up with the write stream.
+
+That is the wall replicas hit and [sharding](sharding_in_databases.html) is built
+to get past: sharding splits the writes across machines, so it is the tool for a
+write-bound system exactly where more replicas is the tool for a read-bound one.
+
 ## Lag
 
 A change committed on the primary is not instantly present on a replica. It has

@@ -73,12 +73,43 @@ A second constraint follows: a unique constraint has to include the partition
 key, because the engine cannot cheaply enforce uniqueness across pieces it is
 trying not to read.
 
+## What pruning is worth, and what caps it
+
+The payoff scales with how much the query skips, and that is just arithmetic.
+Take 120 million orders over five years, partitioned by month &mdash; 60
+partitions of two million rows each. A report over a single month, filtering on
+the partition key, prunes to one partition:
+
+|query| rows the engine must touch |fraction of the table|
+|---|---|---|
+|one month|2,000,000|1.7% (1/60)|
+|one quarter|6,000,000|5.0% (3/60)|
+|no partition-key filter|120,000,000|100%|
+
+The single-month query does **60&times; less scanning** &mdash; and the number is
+exactly the partition count, because pruning reads one of 60 equal pieces. Finer
+partitions prune harder: weekly partitions would make that same month prune to a
+quarter of the rows again.
+
 ## Sizing
 
-Too few partitions and pruning barely helps. Too many and planning cost grows,
-because the planner considers each one. Somewhere between a few dozen and a few
-hundred is the usual advice, with monthly partitions over a couple of years
-landing naturally in that band.
+So why not partition into thousands of tiny pieces? Because pruning saves scan
+work and the planner spends it back. The planner evaluates every partition when it
+builds the plan, so planning cost grows roughly linearly with the partition count
+&mdash; a fixed overhead paid on every query whether or not pruning helps it:
+
+|partitions|rough planning overhead|
+|---|---|
+|60|small, negligible next to the scan|
+|500|starting to matter for short queries|
+|5,000|can exceed the query's own runtime|
+
+For a lookup that executes in a couple of milliseconds, planning across thousands
+of partitions is the dominant cost, and the partitioning has made the query
+slower. That is the ceiling the two forces set between them: too few partitions
+and pruning barely helps; too many and planning overwhelms the saving. Somewhere
+between a few dozen and a few hundred is the usual advice, and monthly partitions
+over a couple of years land naturally in that band.
 
 Partitions can also be **subpartitioned** &mdash; range by month, then hash by
 customer within each month &mdash; when both access patterns matter.

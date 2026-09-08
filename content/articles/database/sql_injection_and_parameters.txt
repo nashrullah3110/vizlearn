@@ -40,6 +40,17 @@ one.
 whether the page errors, or how long it takes, leaks one bit per request &mdash;
 and one bit per request is enough to read a password hash.
 
+That last one is worth costing out, because "one bit per request" sounds slow
+and is not. Ask a yes/no question the query answers through its behaviour &mdash;
+*is the first character of the admin's hash greater than `m`?* &mdash; and binary
+search finds each character in `ceil(log2(95)) = 7` requests across the printable
+ASCII range. A bcrypt hash is 60 characters, so the whole thing comes out in
+about 60 &times; 7 = **420 requests**, plus a handful to find the length first.
+At a modest 100 requests a second that is **four seconds**, and it is entirely
+automated &mdash; the attacker writes none of it by hand. The naive
+character-by-character guess would take 2,850 requests; binary search is what
+makes a channel that leaks one bit at a time genuinely fast.
+
 ## The fix
 
 Send the query and the values separately:

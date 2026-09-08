@@ -2361,12 +2361,43 @@ A second constraint follows: a unique constraint has to include the partition
 key, because the engine cannot cheaply enforce uniqueness across pieces it is
 trying not to read.
 
+## What pruning is worth, and what caps it
+
+The payoff scales with how much the query skips, and that is just arithmetic.
+Take 120 million orders over five years, partitioned by month &mdash; 60
+partitions of two million rows each. A report over a single month, filtering on
+the partition key, prunes to one partition:
+
+|query| rows the engine must touch |fraction of the table|
+|---|---|---|
+|one month|2,000,000|1.7% (1/60)|
+|one quarter|6,000,000|5.0% (3/60)|
+|no partition-key filter|120,000,000|100%|
+
+The single-month query does **60&times; less scanning** &mdash; and the number is
+exactly the partition count, because pruning reads one of 60 equal pieces. Finer
+partitions prune harder: weekly partitions would make that same month prune to a
+quarter of the rows again.
+
 ## Sizing
 
-Too few partitions and pruning barely helps. Too many and planning cost grows,
-because the planner considers each one. Somewhere between a few dozen and a few
-hundred is the usual advice, with monthly partitions over a couple of years
-landing naturally in that band.
+So why not partition into thousands of tiny pieces? Because pruning saves scan
+work and the planner spends it back. The planner evaluates every partition when it
+builds the plan, so planning cost grows roughly linearly with the partition count
+&mdash; a fixed overhead paid on every query whether or not pruning helps it:
+
+|partitions|rough planning overhead|
+|---|---|
+|60|small, negligible next to the scan|
+|500|starting to matter for short queries|
+|5,000|can exceed the query's own runtime|
+
+For a lookup that executes in a couple of milliseconds, planning across thousands
+of partitions is the dominant cost, and the partitioning has made the query
+slower. That is the ceiling the two forces set between them: too few partitions
+and pruning barely helps; too many and planning overwhelms the saving. Somewhere
+between a few dozen and a few hundred is the usual advice, and monthly partitions
+over a couple of years land naturally in that band.
 
 Partitions can also be **subpartitioned** &mdash; range by month, then hash by
 customer within each month &mdash; when both access patterns matter.
@@ -2687,6 +2718,33 @@ helping can simply be removed.
 
 Replicas also serve as warm standbys. If the primary fails, one is promoted.
 
+## How far reads actually scale
+
+"Multiplies read capacity" has a limit, and the limit is worth seeing because it
+decides when replicas stop being the answer. Every replica serves reads *and*
+must apply every write the primary takes &mdash; the write load is not shared out,
+it is copied to all of them. So if one machine handles 10,000 operations a second,
+a replica taking `W` writes per second has only `10,000 - W` left for reads, and
+`N` replicas serve `N &times; (10,000 - W)`:
+
+|write rate|1 replica|3 replicas|10 replicas|
+|---|---|---|---|
+|500/s (5%)|9,500|28,500|95,000|
+|2,000/s (20%)|8,000|24,000|80,000|
+|5,000/s (50%)|5,000|15,000|50,000|
+
+At a light write rate reads scale almost linearly &mdash; ten replicas give nearly
+ten times the read throughput, which is why read replicas are the standard answer
+for read-heavy workloads. But look down the columns rather than across: as writes
+climb, every replica loses that capacity to apply work, and the whole fleet's
+read ceiling drops with it. Once writes alone approach what one machine can do,
+`10,000 - W` heads toward zero and adding replicas buys almost nothing &mdash;
+each new machine spends all its capacity just keeping up with the write stream.
+
+That is the wall replicas hit and [sharding](sharding_in_databases.html) is built
+to get past: sharding splits the writes across machines, so it is the tool for a
+write-bound system exactly where more replicas is the tool for a read-bound one.
+
 ## Lag
 
 A change committed on the primary is not instantly present on a replica. It has
@@ -2939,6 +2997,38 @@ consistent and slower &mdash; or acknowledge locally and replicate afterwards
 That is exactly the [synchronous versus asynchronous replication
 choice](replication_and_lag.html), and unlike CAP's trade it is live on every
 request.
+
+## The tunable, made concrete: R + W > N
+
+The last "where it goes wrong" note below says the labels are tunable per query.
+That tuning is one inequality, and it is worth seeing because it is how a single
+system offers both answers.
+
+Keep `N` copies of each row. Let a write wait for `W` of them to acknowledge, and
+a read collect answers from `R` of them and take the newest. The read is
+guaranteed to see the latest write whenever the read set and the write set must
+overlap &mdash; which is exactly when **R + W > N**. Below that they can miss each
+other, and a read can come back stale.
+
+On `N = 3`:
+
+|W|R|R + W > N|what you get|
+|---|---|---|---|
+|1|1|no|fastest reads and writes, but reads can be stale|
+|2|2|yes|**quorum**: strong, and survives one node down either way|
+|3|1|yes|strong, instant reads, but a write needs all three up|
+|1|3|yes|strong, instant writes, but a read needs all three up|
+
+Read the `W=1, R=1` row against the `W=2, R=2` row: same three machines, and the
+choice between a possibly-stale answer and a guaranteed-current one is nothing but
+how many replicas each operation waits for. That is the AP/CP dial from earlier,
+turned per request instead of per system.
+
+Quorum &mdash; `W = R = 2` &mdash; is the common default because 2 + 2 = 4 > 3
+overlaps by one replica *and* still completes with a single node down, where the
+`R = 1` and `R = 3` rows each give up availability on one side. This is precisely
+what Cassandra's `ONE` / `QUORUM` / `ALL` levels and DynamoDB's strongly-consistent
+reads are selecting.
 
 ## Where it goes wrong
 
@@ -3958,6 +4048,17 @@ one.
 **Blind extraction.** Even with no output at all, a condition that changes
 whether the page errors, or how long it takes, leaks one bit per request &mdash;
 and one bit per request is enough to read a password hash.
+
+That last one is worth costing out, because "one bit per request" sounds slow
+and is not. Ask a yes/no question the query answers through its behaviour &mdash;
+*is the first character of the admin's hash greater than `m`?* &mdash; and binary
+search finds each character in `ceil(log2(95)) = 7` requests across the printable
+ASCII range. A bcrypt hash is 60 characters, so the whole thing comes out in
+about 60 &times; 7 = **420 requests**, plus a handful to find the length first.
+At a modest 100 requests a second that is **four seconds**, and it is entirely
+automated &mdash; the attacker writes none of it by hand. The naive
+character-by-character guess would take 2,850 requests; binary search is what
+makes a channel that leaks one bit at a time genuinely fast.
 
 ## The fix
 
