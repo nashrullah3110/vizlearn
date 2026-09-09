@@ -102,6 +102,26 @@ The result is that "we need a data warehouse" is a much bigger claim than it was
 For datasets under a few hundred gigabytes, DuckDB over Parquet on one machine
 frequently outperforms a cluster.
 
+## The I/O gap, in bytes
+
+"A fiftieth of the data" deserves a concrete figure, because it is the whole
+argument for columnar. Take ten million orders, fifty columns, eight bytes each,
+and average one column:
+
+|layout|bytes read for `AVG(total)`|
+|---|---|
+|row store|10M &times; 50 &times; 8 = **4.0 GB**|
+|column store|10M &times; 8 = **80 MB**|
+
+The row store must pass over every column of every row to reach the one it needs,
+so it reads the whole four gigabytes to sum eighty megabytes of actual interest.
+The column store reads only the `total` region &mdash; fifty times less &mdash; and
+that ratio is why an aggregate that takes seconds on a row store returns in
+milliseconds on a columnar one. It also compounds with compression: that single
+column, being one type with few distinct values, often compresses several-fold
+again, so the real read is smaller still. The wider the table, the larger the
+gap, which is exactly backwards from what OLTP wants.
+
 ## Where it goes wrong
 
 **Reporting off the primary.** Cache eviction makes the application slow, and the

@@ -91,6 +91,27 @@ Two habits follow: run `ANALYZE` after a bulk load so the statistics reflect the
 data, and be suspicious of any plan step whose estimate is off by more than an
 order of magnitude.
 
+## What SCAN against SEARCH costs, in row reads
+
+The `SCAN` / `SEARCH` distinction is easy to nod at and worth turning into
+numbers, because that is what makes it urgent on a growing table. `SCAN` reads
+every row and tests it; `SEARCH` through a B-tree index descends a sorted
+structure, so it does on the order of `log2(rows)` steps to reach the block it
+wants:
+
+|table size|`SCAN` reads|`SEARCH` (index steps)|
+|---|---|---|
+|5,000 rows|5,000|~13|
+|5,000,000 rows|5,000,000|~23|
+
+Two things follow. The gap is not constant &mdash; it widens as the table grows,
+because the scan is linear and the search is logarithmic, so the query that was
+"fine in staging" on 5,000 rows is a thousandfold worse in production on five
+million while the indexed version barely moved from 13 steps to 23. And it is why
+`SCAN` on a large table where you expected a lookup is the single most valuable
+thing to spot in a plan: it is the difference between reading a handful of pages
+and reading the whole table.
+
 ## Where it goes wrong
 
 **Guessing instead of asking.** The plan is one command away and settles the

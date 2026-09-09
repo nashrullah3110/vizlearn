@@ -87,6 +87,25 @@ there are three, and the database will not choose one. Some engines historically
 allowed it and returned an arbitrary row, which is worse than an error because
 it works until it does not.
 
+## Three averages of the same column
+
+The "AVG divides by the count of values, not rows" rule is best seen as three
+numbers that all claim to be the average. Five rows, two of them with a NULL
+reading, the three present values being 10, 20 and 30 (sum 60):
+
+|expression|value|what it computed|
+|---|---|---|
+|`AVG(t)`|**20**|60 / 3, the mean of the readings that exist|
+|`SUM(t) / COUNT(*)`|**12**|60 / 5, the total spread across all rows|
+|`AVG(COALESCE(t, 0))`|**12**|same, treating a missing reading as zero|
+
+Confirmed in the SQLite this page runs. The gap between 20 and 12 is not rounding
+&mdash; it is the two NULLs, counted by `COUNT(*)` and skipped by `AVG`. Which one
+is correct is a question about the data, not the SQL: if a NULL means a sensor
+failed, 20 is right and 12 invents readings of zero; if it means "no sales that
+day", 12 is right and 20 overstates the typical day. The database will compute
+whichever you write and warn you about neither.
+
 ## Where it goes wrong
 
 **Using AVG on data where NULL means zero.** The average silently rises. Use

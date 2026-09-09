@@ -79,6 +79,25 @@ operational tooling built around that model from the start. What it gives up is
 joins and multi-document transactions &mdash; though MongoDB has had the latter
 since 4.0, which narrowed the gap considerably.
 
+## The number behind the update argument
+
+"Rewriting every one" is the whole cost of copying a shared fact, and it is worth
+seeing at scale. Suppose the customer's address is denormalised into each of
+their order documents. Changing it is not one write:
+
+|orders holding the copy|document store: rewrites|relational: rows changed|
+|---|---|---|
+|100|100|1|
+|10,000|10,000|1|
+|1,000,000|1,000,000|1|
+
+Relationally the address lives in one `customers` row and one `UPDATE` changes it;
+every order simply keeps pointing at it. The document shape trades that single
+write for one per copy, and while the copies are being rewritten the database
+briefly disagrees with itself about where the customer lives. That is the exact
+trade: the document read is faster because the join was done once at write time,
+and every later change to a shared fact pays it back in full.
+
 ## Where it goes wrong
 
 **Choosing documents to avoid schema design.** The schema still exists; it has

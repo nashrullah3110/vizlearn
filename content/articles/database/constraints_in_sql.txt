@@ -82,6 +82,26 @@ Defaults and constraints are frequently paired for this reason. The default
 handles the common case, and the constraint handles the case where someone was
 explicit about something they should not have been.
 
+## The NULL count that surprises people, measured
+
+`UNIQUE` allowing many NULLs is not a quirk to memorise but a consequence to see.
+Because NULL = NULL is *unknown* rather than true, two NULLs are never "equal" and
+the constraint has nothing to reject. In the SQLite this page runs, a `UNIQUE`
+column happily accepts row after row of NULL:
+
+```
+CREATE TABLE t (email TEXT UNIQUE);
+INSERT INTO t VALUES (NULL), (NULL), (NULL);   -- all three succeed
+INSERT INTO t VALUES ('a@x.com');
+INSERT INTO t VALUES ('a@x.com');              -- THIS one fails
+```
+
+Three unknown emails coexist; the first repeated *known* value is refused. This is
+not even consistent across engines &mdash; SQL Server permits exactly one NULL in a
+unique column, while PostgreSQL, MySQL and SQLite permit many &mdash; so a schema
+that relies on either behaviour is not portable. If the rule you meant was "one row
+per real address", `UNIQUE` alone does not say it; `UNIQUE` plus `NOT NULL` does.
+
 ## Where it goes wrong
 
 **Unnamed constraints.** Six `CHECK`s on a table and an error that says only

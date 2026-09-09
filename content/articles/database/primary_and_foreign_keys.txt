@@ -77,6 +77,28 @@ alone identifies a row, and the pair does. That declaration also states a
 business rule &mdash; a student can enrol on a course once &mdash; which the
 database will now enforce for free.
 
+## Why the child side needs its own index
+
+The parent side of a foreign key is indexed for free &mdash; it is a primary key.
+The child side usually is not, and that omission turns cheap operations into full
+scans, because every referential action has to ask "are there children?" and
+answer it by looking.
+
+Delete a customer with 5,000,000 orders in the child table. With no index on
+`orders.customer_id`:
+
+|operation|with no index on the child FK|with the index|
+|---|---|---|
+|`ON DELETE RESTRICT` check|scan up to 5,000,000 rows|a single index seek|
+|`ON DELETE CASCADE`|scan to find the children|seek straight to them|
+|a join `customers &#8904; orders`|scan the child table|indexed lookup|
+
+The database enforces the constraint correctly either way; the difference is
+whether each check is a seek or a scan of the whole child table. This is the
+quiet reason a schema "with foreign keys" can still be slow: the constraint was
+declared, the supporting index on the referencing column was not, and every
+delete or cascade pays for it.
+
 ## Where it goes wrong
 
 **Turning foreign keys off for performance.** They cost something on write. The

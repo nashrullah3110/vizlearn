@@ -87,6 +87,28 @@ and Gremlin say in one line what a recursive CTE says in fifteen.
 The strong argument for a separate store is when the workload is
 overwhelmingly of one shape. The weak argument is that the model is fashionable.
 
+## Why traversal depth is where graphs win
+
+The graph advantage is not vague; it scales with depth, and the arithmetic shows
+where the crossover is. "Friends of friends of friends" over a social graph with
+an average of 100 connections per person touches, level by level, roughly 100 then
+10,000 then 1,000,000 people. A relational engine reaches each level with another
+join, and the planner's row estimates degrade as they multiply:
+
+|depth|people reached (branching ~100)|relational cost|
+|---|---|---|
+|1|100|one join|
+|2|10,000|join of a join|
+|3|1,000,000|three joins, estimates compounding|
+
+A graph engine follows stored edges directly, so its cost tracks *edges actually
+visited* rather than the product of table sizes, and it does not re-estimate a
+join at each level. At depth one or two a recursive CTE is perfectly good; by
+depth three or four over a large graph the relational plan is doing work
+proportional to the tables while the graph is doing work proportional to the
+answer. That divergence &mdash; not lookup speed &mdash; is the real reason to
+reach for a graph.
+
 ## Where it goes wrong
 
 **Using a key-value store as the system of record without a plan for secondary

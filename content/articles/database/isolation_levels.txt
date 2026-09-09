@@ -97,6 +97,29 @@ The alternatives are explicit locking (`SELECT ... FOR UPDATE`) or letting the
 database enforce the invariant with a constraint, which needs no isolation
 reasoning at all.
 
+## The lost update the levels do not stop
+
+The read-then-write hazard is best seen as one arithmetic. Two transactions both
+withdraw 100 from an account holding 1,000, each reading before either writes:
+
+|step|transaction A|transaction B|
+|---|---|---|
+|1|read balance = 1000|read balance = 1000|
+|2|compute 1000 &minus; 100 = 900||
+|3||compute 1000 &minus; 100 = 900|
+|4|write 900||
+|5||write 900|
+
+Two withdrawals of 100 leave the balance at **900, not 800** &mdash; one
+withdrawal has vanished. Nothing here is a dirty or non-repeatable read, so
+READ COMMITTED and even REPEATABLE READ permit it: both transactions read
+committed data and each is internally consistent. Only SERIALIZABLE stops it on
+its own, by aborting one at commit &mdash; which is why this pattern needs either
+that level with a retry, an explicit `SELECT ... FOR UPDATE`, or a single
+`UPDATE ... SET balance = balance - 100` that never reads into the application at
+all. Reasoning about isolation is the hard way; letting one statement do the
+arithmetic is the safe one.
+
 ## Where it goes wrong
 
 **Assuming a default.** They differ between engines, and code written against

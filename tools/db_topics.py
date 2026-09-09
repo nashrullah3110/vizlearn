@@ -209,6 +209,28 @@ alone identifies a row, and the pair does. That declaration also states a
 business rule &mdash; a student can enrol on a course once &mdash; which the
 database will now enforce for free.
 
+## Why the child side needs its own index
+
+The parent side of a foreign key is indexed for free &mdash; it is a primary key.
+The child side usually is not, and that omission turns cheap operations into full
+scans, because every referential action has to ask "are there children?" and
+answer it by looking.
+
+Delete a customer with 5,000,000 orders in the child table. With no index on
+`orders.customer_id`:
+
+|operation|with no index on the child FK|with the index|
+|---|---|---|
+|`ON DELETE RESTRICT` check|scan up to 5,000,000 rows|a single index seek|
+|`ON DELETE CASCADE`|scan to find the children|seek straight to them|
+|a join `customers &#8904; orders`|scan the child table|indexed lookup|
+
+The database enforces the constraint correctly either way; the difference is
+whether each check is a seek or a scan of the whole child table. This is the
+quiet reason a schema "with foreign keys" can still be slow: the constraint was
+declared, the supporting index on the referencing column was not, and every
+delete or cascade pays for it.
+
 ## Where it goes wrong
 
 **Turning foreign keys off for performance.** They cost something on write. The
@@ -383,6 +405,26 @@ default, unless `NOT NULL` refuses it.
 Defaults and constraints are frequently paired for this reason. The default
 handles the common case, and the constraint handles the case where someone was
 explicit about something they should not have been.
+
+## The NULL count that surprises people, measured
+
+`UNIQUE` allowing many NULLs is not a quirk to memorise but a consequence to see.
+Because NULL = NULL is *unknown* rather than true, two NULLs are never "equal" and
+the constraint has nothing to reject. In the SQLite this page runs, a `UNIQUE`
+column happily accepts row after row of NULL:
+
+```
+CREATE TABLE t (email TEXT UNIQUE);
+INSERT INTO t VALUES (NULL), (NULL), (NULL);   -- all three succeed
+INSERT INTO t VALUES ('a@x.com');
+INSERT INTO t VALUES ('a@x.com');              -- THIS one fails
+```
+
+Three unknown emails coexist; the first repeated *known* value is refused. This is
+not even consistent across engines &mdash; SQL Server permits exactly one NULL in a
+unique column, while PostgreSQL, MySQL and SQLite permit many &mdash; so a schema
+that relies on either behaviour is not portable. If the rule you meant was "one row
+per real address", `UNIQUE` alone does not say it; `UNIQUE` plus `NOT NULL` does.
 
 ## Where it goes wrong
 
@@ -597,6 +639,25 @@ there are three, and the database will not choose one. Some engines historically
 allowed it and returned an arbitrary row, which is worse than an error because
 it works until it does not.
 
+## Three averages of the same column
+
+The "AVG divides by the count of values, not rows" rule is best seen as three
+numbers that all claim to be the average. Five rows, two of them with a NULL
+reading, the three present values being 10, 20 and 30 (sum 60):
+
+|expression|value|what it computed|
+|---|---|---|
+|`AVG(t)`|**20**|60 / 3, the mean of the readings that exist|
+|`SUM(t) / COUNT(*)`|**12**|60 / 5, the total spread across all rows|
+|`AVG(COALESCE(t, 0))`|**12**|same, treating a missing reading as zero|
+
+Confirmed in the SQLite this page runs. The gap between 20 and 12 is not rounding
+&mdash; it is the two NULLs, counted by `COUNT(*)` and skipped by `AVG`. Which one
+is correct is a question about the data, not the SQL: if a NULL means a sensor
+failed, 20 is right and 12 invents readings of zero; if it means "no sales that
+day", 12 is right and 20 overstates the typical day. The database will compute
+whichever you write and warn you about neither.
+
 ## Where it goes wrong
 
 **Using AVG on data where NULL means zero.** The average silently rises. Use
@@ -809,6 +870,26 @@ So performance is rarely the reason to choose. The reasons that survive are:
 Check the plan when it matters. [EXPLAIN](explain_and_query_plans.html) settles
 in ten seconds what a rule of thumb argues about indefinitely.
 
+## The NOT IN failure, run in this engine
+
+The `NOT IN` trap is worth seeing execute rather than reasoning about, because it
+produces no error &mdash; only a wrong answer. Three customers, an orders table
+where one order is anonymous (a NULL `customer_id`), asked which customers never
+ordered:
+
+|query|result|
+|---|---|
+|`... WHERE id NOT IN (SELECT customer_id FROM orders)`|**zero rows**|
+|`... WHERE NOT EXISTS (SELECT 1 ...)`|**customer 3** (correct)|
+
+The single NULL in the subquery poisons the whole `NOT IN`: `3 <> NULL` is
+unknown, `AND` with unknown is unknown, and `WHERE` keeps only rows that are
+definitely true, so every customer is filtered out. `NOT EXISTS` never compares
+anything to NULL &mdash; it asks whether a matching row was found &mdash; so it
+returns the right answer on the same data. This is not a corner case to file away;
+a nullable column is the normal situation, which is why `NOT EXISTS` is the safe
+default and `NOT IN` earns its place only on a column that is provably `NOT NULL`.
+
 ## Where it goes wrong
 
 **`NOT IN` on anything nullable.** The query returns zero rows and looks like a
@@ -1009,6 +1090,26 @@ That is the boundary where the technique runs out and
 [recursive CTEs](recursive_ctes_in_sql.html) take over. A recursive CTE walks
 down as many levels as exist, and it is the correct tool the moment the depth is
 not known in advance.
+
+## Why the pair condition is not optional
+
+The `a.id < b.id` line is easy to read past, so it is worth seeing what its
+absence does to the row count. Pairing a group against itself is a Cartesian
+product within the group: `n` colleagues under one manager produce `n &times; n`
+ordered pairs before any condition trims them.
+
+|colleagues under a manager|no condition (n&sup2;)|`a.id <> b.id`|`a.id < b.id`|
+|---|---|---|---|
+|5|25|20|10|
+|10|100|90|45|
+|50|2,500|2,450|1,225|
+
+The middle column still counts every pair twice; only `a.id < b.id` gives the
+`n(n-1)/2` unordered pairs you meant. And the gap is quadratic, so on a manager
+with fifty reports the wrong condition does not return a few extra rows &mdash; it
+returns 2,500 where 1,225 were wanted, and any total computed over them comes out
+roughly doubled. That is why the idiom is worth recognising on sight rather than
+rediscovering after a report reads twice what it should.
 
 ## Where it goes wrong
 
@@ -1241,6 +1342,32 @@ Real data acquires cycles. The defences, in increasing order of robustness:
 A depth cap costs almost nothing and turns a hung query into a wrong-but-finite
 answer, which is far easier to notice.
 
+## Filling gaps: the row-per-day spine
+
+The sequence trick earns its own worked case, because it solves a problem every
+reporting query hits: a `GROUP BY day` over a table with no sales on some days
+simply has no row for those days, so the chart skips them and a week with a
+zero-sales Tuesday looks like a six-day week.
+
+The fix is to generate every day in the range and `LEFT JOIN` the data onto it:
+
+```
+WITH RECURSIVE days(d) AS (
+    SELECT date('2026-01-01')
+    UNION ALL
+    SELECT date(d, '+1 day') FROM days WHERE d < '2026-01-31'
+)
+SELECT days.d, COALESCE(SUM(s.amount), 0) AS sales
+FROM days LEFT JOIN sales s ON s.day = days.d
+GROUP BY days.d;
+```
+
+The anchor is one date, the step adds a day until it reaches the end, and 31 rows
+come out of no table at all. The `LEFT JOIN` then keeps every day, and
+`COALESCE` turns the missing matches into zeros. A gap in the data becomes a
+visible zero rather than an invisible skip &mdash; the difference between a chart
+that lies by omission and one that does not.
+
 ## Where it goes wrong
 
 **No termination guard.** Cyclic data plus `UNION ALL` runs forever.
@@ -1439,6 +1566,27 @@ the reason a plan is bad.
 Two habits follow: run `ANALYZE` after a bulk load so the statistics reflect the
 data, and be suspicious of any plan step whose estimate is off by more than an
 order of magnitude.
+
+## What SCAN against SEARCH costs, in row reads
+
+The `SCAN` / `SEARCH` distinction is easy to nod at and worth turning into
+numbers, because that is what makes it urgent on a growing table. `SCAN` reads
+every row and tests it; `SEARCH` through a B-tree index descends a sorted
+structure, so it does on the order of `log2(rows)` steps to reach the block it
+wants:
+
+|table size|`SCAN` reads|`SEARCH` (index steps)|
+|---|---|---|
+|5,000 rows|5,000|~13|
+|5,000,000 rows|5,000,000|~23|
+
+Two things follow. The gap is not constant &mdash; it widens as the table grows,
+because the scan is linear and the search is logarithmic, so the query that was
+"fine in staging" on 5,000 rows is a thousandfold worse in production on five
+million while the indexed version barely moved from 13 steps to 23. And it is why
+`SCAN` on a large table where you expected a lookup is the single most valuable
+thing to spot in a plan: it is the difference between reading a handful of pages
+and reading the whole table.
 
 ## Where it goes wrong
 
@@ -1648,6 +1796,28 @@ for nothing.
 The practical loop is: find the slow query, read its
 [plan](explain_and_query_plans.html), add the one index the plan asks for, read
 the plan again. Not: add indexes and hope.
+
+## Why two single indexes are not one composite
+
+The claim that `(a)` and `(b)` cannot replace `(a, b)` is worth making concrete,
+because it is where "but I indexed both columns" goes wrong. An index on
+`(status, customer_id)` is sorted by status first, so `customer_id` values for any
+one customer are scattered one per status &mdash; the phone-book-by-first-name
+problem. That decides which queries get a seek:
+
+|query|`(status, customer_id)`|
+|---|---|
+|`WHERE status = ? AND customer_id = ?`|SEARCH (both used)|
+|`WHERE status = ?`|SEARCH (leading prefix)|
+|`WHERE customer_id = ?`|**SCAN** (not a prefix)|
+
+Given instead two separate indexes, `(status)` and `(customer_id)`, the engine can
+search each and intersect the results &mdash; two lookups and a merge, against one
+lookup on the composite &mdash; and neither provides the ordering for
+`ORDER BY status, customer_id`, so that still sorts. The composite is strictly
+more capable for queries that lead with `status`, which is why column order is a
+design decision: it is chosen for the queries you actually run, and it is the
+leading column that a second query can borrow, never the trailing one.
 
 ## Where it goes wrong
 
@@ -1863,6 +2033,29 @@ The alternatives are explicit locking (`SELECT ... FOR UPDATE`) or letting the
 database enforce the invariant with a constraint, which needs no isolation
 reasoning at all.
 
+## The lost update the levels do not stop
+
+The read-then-write hazard is best seen as one arithmetic. Two transactions both
+withdraw 100 from an account holding 1,000, each reading before either writes:
+
+|step|transaction A|transaction B|
+|---|---|---|
+|1|read balance = 1000|read balance = 1000|
+|2|compute 1000 &minus; 100 = 900||
+|3||compute 1000 &minus; 100 = 900|
+|4|write 900||
+|5||write 900|
+
+Two withdrawals of 100 leave the balance at **900, not 800** &mdash; one
+withdrawal has vanished. Nothing here is a dirty or non-repeatable read, so
+READ COMMITTED and even REPEATABLE READ permit it: both transactions read
+committed data and each is internally consistent. Only SERIALIZABLE stops it on
+its own, by aborting one at commit &mdash; which is why this pattern needs either
+that level with a retry, an explicit `SELECT ... FOR UPDATE`, or a single
+`UPDATE ... SET balance = balance - 100` that never reads into the application at
+all. Reasoning about isolation is the hard way; letting one statement do the
+arithmetic is the safe one.
+
 ## Where it goes wrong
 
 **Assuming a default.** They differ between engines, and code written against
@@ -2047,6 +2240,26 @@ code and it has to be right:
 4. Cap the attempts and log what happened, so a genuine design problem does not
    hide behind a retry loop that quietly succeeds on the fourth attempt.
 
+## The transfer, in both lock orders
+
+The fix is one worked example away. Two transfers run at once &mdash; A moves money
+from account 1 to 2, B from account 2 to 1 &mdash; and the only thing that differs
+is the order each takes its locks.
+
+|step|naive (lock source first)|ordered (lock lower id first)|
+|---|---|---|
+|1|A locks 1|A locks 1|
+|2|B locks 2|B waits for 1|
+|3|A wants 2 &rarr; **blocked**|A locks 2, works, commits|
+|4|B wants 1 &rarr; **deadlock**|B proceeds, commits|
+
+Naively, A holds 1 and wants 2 while B holds 2 and wants 1 &mdash; a cycle, and the
+detector kills one of them. Ordered by account id, B simply waits at step 2 for a
+lock A already holds, A finishes, and B continues. Same two transfers, same rows,
+no error &mdash; because a cycle requires the two to disagree about order, and
+"always lock the lower id first" removes the disagreement. That is the entire
+technique, and it is code discipline, not a database setting.
+
 ## Where it goes wrong
 
 **Treating it as a database configuration problem.** No setting prevents
@@ -2191,6 +2404,29 @@ table itself and vacuums them. MySQL's InnoDB keeps them in a separate undo log
 and purges it. Oracle uses undo segments, and the same open-transaction problem
 appears as `ORA-01555 snapshot too old` &mdash; the old version needed was
 already discarded.
+
+## What an open transaction actually costs
+
+"Does damage even when it is doing nothing" is measurable. A snapshot cannot be
+released while any transaction that might still need it is open, so every row
+version superseded *after* that transaction began has to be kept.
+
+Picture a table taking a steady 1,000 updates a second. Each update leaves a dead
+version behind. A reporting transaction that opens and then sits idle &mdash; a
+connection returned to a pool without a commit, a debugger stopped at a
+breakpoint &mdash; pins cleanup for as long as it stays open:
+
+|idle for|dead versions pinned|
+|---|---|
+|1 minute|60,000|
+|10 minutes|600,000|
+|1 hour|3,600,000|
+
+The live row count never moved. But the table now holds millions of dead
+versions the vacuum cannot touch, every scan reads the pages they sit on, and the
+file keeps growing. One forgotten transaction, doing nothing, taxes every query
+against that table until it is closed &mdash; which is why "idle in transaction"
+is a state worth alerting on, not just avoiding.
 
 ## Where it goes wrong
 
@@ -2607,6 +2843,26 @@ Before it:
 
 Shard when writes exceed what one machine can take, or the working set no longer
 fits in memory anywhere, and not before.
+
+## Why naive rebalancing is the nightmare
+
+"Almost every row's destination moves" is not hyperbole, and the number is the
+reason consistent hashing and virtual buckets exist. With the rule
+`hash(key) % N`, adding one shard changes the divisor, and a key moves whenever
+`hash % N` differs from `hash % (N+1)` &mdash; which is almost always:
+
+|change|keys that must move|
+|---|---|
+|`% 4` &rarr; `% 5`|~80%|
+|`% 100` &rarr; `% 101`|~99%|
+
+Measured over two hundred thousand random keys, the `% 4` to `% 5` change relocated
+79.8% of them, and it only gets worse as the fleet grows. Consistent hashing and
+virtual buckets bring that down to roughly `1/(N+1)` &mdash; about 20% and 1% for
+the two rows above &mdash; because a new shard takes a slice from its neighbours
+instead of forcing every key to recompute against a new divisor. Moving 1% of the
+data to add a machine is an afternoon; moving 99% while serving traffic is the
+project everyone dreads.
 
 ## Where it goes wrong
 
@@ -3246,6 +3502,25 @@ operational tooling built around that model from the start. What it gives up is
 joins and multi-document transactions &mdash; though MongoDB has had the latter
 since 4.0, which narrowed the gap considerably.
 
+## The number behind the update argument
+
+"Rewriting every one" is the whole cost of copying a shared fact, and it is worth
+seeing at scale. Suppose the customer's address is denormalised into each of
+their order documents. Changing it is not one write:
+
+|orders holding the copy|document store: rewrites|relational: rows changed|
+|---|---|---|
+|100|100|1|
+|10,000|10,000|1|
+|1,000,000|1,000,000|1|
+
+Relationally the address lives in one `customers` row and one `UPDATE` changes it;
+every order simply keeps pointing at it. The document shape trades that single
+write for one per copy, and while the copies are being rewritten the database
+briefly disagrees with itself about where the customer lives. That is the exact
+trade: the document read is faster because the join was done once at write time,
+and every later change to a shared fact pays it back in full.
+
 ## Where it goes wrong
 
 **Choosing documents to avoid schema design.** The schema still exists; it has
@@ -3465,6 +3740,28 @@ and Gremlin say in one line what a recursive CTE says in fifteen.
 
 The strong argument for a separate store is when the workload is
 overwhelmingly of one shape. The weak argument is that the model is fashionable.
+
+## Why traversal depth is where graphs win
+
+The graph advantage is not vague; it scales with depth, and the arithmetic shows
+where the crossover is. "Friends of friends of friends" over a social graph with
+an average of 100 connections per person touches, level by level, roughly 100 then
+10,000 then 1,000,000 people. A relational engine reaches each level with another
+join, and the planner's row estimates degrade as they multiply:
+
+|depth|people reached (branching ~100)|relational cost|
+|---|---|---|
+|1|100|one join|
+|2|10,000|join of a join|
+|3|1,000,000|three joins, estimates compounding|
+
+A graph engine follows stored edges directly, so its cost tracks *edges actually
+visited* rather than the product of table sizes, and it does not re-estimate a
+join at each level. At depth one or two a recursive CTE is perfectly good; by
+depth three or four over a large graph the relational plan is doing work
+proportional to the tables while the graph is doing work proportional to the
+answer. That divergence &mdash; not lookup speed &mdash; is the real reason to
+reach for a graph.
 
 ## Where it goes wrong
 
@@ -3701,6 +3998,26 @@ The result is that "we need a data warehouse" is a much bigger claim than it was
 For datasets under a few hundred gigabytes, DuckDB over Parquet on one machine
 frequently outperforms a cluster.
 
+## The I/O gap, in bytes
+
+"A fiftieth of the data" deserves a concrete figure, because it is the whole
+argument for columnar. Take ten million orders, fifty columns, eight bytes each,
+and average one column:
+
+|layout|bytes read for `AVG(total)`|
+|---|---|
+|row store|10M &times; 50 &times; 8 = **4.0 GB**|
+|column store|10M &times; 8 = **80 MB**|
+
+The row store must pass over every column of every row to reach the one it needs,
+so it reads the whole four gigabytes to sum eighty megabytes of actual interest.
+The column store reads only the `total` region &mdash; fifty times less &mdash; and
+that ratio is why an aggregate that takes seconds on a row store returns in
+milliseconds on a columnar one. It also compounds with compression: that single
+column, being one type with few distinct values, often compresses several-fold
+again, so the real read is smaller still. The wider the table, the larger the
+gap, which is exactly backwards from what OLTP wants.
+
 ## Where it goes wrong
 
 **Reporting off the primary.** Cache eviction makes the application slow, and the
@@ -3909,6 +4226,24 @@ enough that the redundancy costs little, the extra joins cost real query time,
 and the denormalised version is far easier to read. The exception is a genuinely
 large dimension &mdash; tens of millions of customers &mdash; where the
 duplication starts to matter.
+
+## Mixed grain, shown inflating a total
+
+"Multiplied the revenue by the number of lines" is the most expensive silent bug
+in warehousing, so it is worth watching happen. Three orders of $100 each, with
+3, 2 and 1 line items, joined fact-to-lines and summed the wrong way:
+
+|query|result|
+|---|---|
+|`SUM(total)` over orders|**$300** (correct)|
+|`SUM(total)` after joining order lines|**$600** (wrong)|
+
+The join repeats each order's total once per line, so the three-line order counts
+its $100 three times, and the total comes out exactly doubled &mdash; here 2&times;,
+but the factor is the average number of lines per order, whatever that happens to
+be. Nothing errors, the number is plausible, and it is wrong on every run. This is
+what "state the grain in one sentence" prevents: a measure at order grain must be
+summed at order grain, and mixing it with a per-line join silently multiplies it.
 
 ## Where it goes wrong
 

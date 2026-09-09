@@ -89,6 +89,32 @@ Real data acquires cycles. The defences, in increasing order of robustness:
 A depth cap costs almost nothing and turns a hung query into a wrong-but-finite
 answer, which is far easier to notice.
 
+## Filling gaps: the row-per-day spine
+
+The sequence trick earns its own worked case, because it solves a problem every
+reporting query hits: a `GROUP BY day` over a table with no sales on some days
+simply has no row for those days, so the chart skips them and a week with a
+zero-sales Tuesday looks like a six-day week.
+
+The fix is to generate every day in the range and `LEFT JOIN` the data onto it:
+
+```
+WITH RECURSIVE days(d) AS (
+    SELECT date('2026-01-01')
+    UNION ALL
+    SELECT date(d, '+1 day') FROM days WHERE d < '2026-01-31'
+)
+SELECT days.d, COALESCE(SUM(s.amount), 0) AS sales
+FROM days LEFT JOIN sales s ON s.day = days.d
+GROUP BY days.d;
+```
+
+The anchor is one date, the step adds a day until it reaches the end, and 31 rows
+come out of no table at all. The `LEFT JOIN` then keeps every day, and
+`COALESCE` turns the missing matches into zeros. A gap in the data becomes a
+visible zero rather than an invisible skip &mdash; the difference between a chart
+that lies by omission and one that does not.
+
 ## Where it goes wrong
 
 **No termination guard.** Cyclic data plus `UNION ALL` runs forever.

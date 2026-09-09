@@ -95,6 +95,28 @@ The practical loop is: find the slow query, read its
 [plan](explain_and_query_plans.html), add the one index the plan asks for, read
 the plan again. Not: add indexes and hope.
 
+## Why two single indexes are not one composite
+
+The claim that `(a)` and `(b)` cannot replace `(a, b)` is worth making concrete,
+because it is where "but I indexed both columns" goes wrong. An index on
+`(status, customer_id)` is sorted by status first, so `customer_id` values for any
+one customer are scattered one per status &mdash; the phone-book-by-first-name
+problem. That decides which queries get a seek:
+
+|query|`(status, customer_id)`|
+|---|---|
+|`WHERE status = ? AND customer_id = ?`|SEARCH (both used)|
+|`WHERE status = ?`|SEARCH (leading prefix)|
+|`WHERE customer_id = ?`|**SCAN** (not a prefix)|
+
+Given instead two separate indexes, `(status)` and `(customer_id)`, the engine can
+search each and intersect the results &mdash; two lookups and a merge, against one
+lookup on the composite &mdash; and neither provides the ordering for
+`ORDER BY status, customer_id`, so that still sorts. The composite is strictly
+more capable for queries that lead with `status`, which is why column order is a
+design decision: it is chosen for the queries you actually run, and it is the
+leading column that a second query can borrow, never the trailing one.
+
 ## Where it goes wrong
 
 **Indexing every column separately.** Expensive on write, and none of them

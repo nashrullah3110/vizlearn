@@ -79,6 +79,29 @@ and purges it. Oracle uses undo segments, and the same open-transaction problem
 appears as `ORA-01555 snapshot too old` &mdash; the old version needed was
 already discarded.
 
+## What an open transaction actually costs
+
+"Does damage even when it is doing nothing" is measurable. A snapshot cannot be
+released while any transaction that might still need it is open, so every row
+version superseded *after* that transaction began has to be kept.
+
+Picture a table taking a steady 1,000 updates a second. Each update leaves a dead
+version behind. A reporting transaction that opens and then sits idle &mdash; a
+connection returned to a pool without a commit, a debugger stopped at a
+breakpoint &mdash; pins cleanup for as long as it stays open:
+
+|idle for|dead versions pinned|
+|---|---|
+|1 minute|60,000|
+|10 minutes|600,000|
+|1 hour|3,600,000|
+
+The live row count never moved. But the table now holds millions of dead
+versions the vacuum cannot touch, every scan reads the pages they sit on, and the
+file keeps growing. One forgotten transaction, doing nothing, taxes every query
+against that table until it is closed &mdash; which is why "idle in transaction"
+is a state worth alerting on, not just avoiding.
+
 ## Where it goes wrong
 
 **Long-running transactions.** They pin versions across the entire database.

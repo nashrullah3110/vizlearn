@@ -93,6 +93,24 @@ and the denormalised version is far easier to read. The exception is a genuinely
 large dimension &mdash; tens of millions of customers &mdash; where the
 duplication starts to matter.
 
+## Mixed grain, shown inflating a total
+
+"Multiplied the revenue by the number of lines" is the most expensive silent bug
+in warehousing, so it is worth watching happen. Three orders of $100 each, with
+3, 2 and 1 line items, joined fact-to-lines and summed the wrong way:
+
+|query|result|
+|---|---|
+|`SUM(total)` over orders|**$300** (correct)|
+|`SUM(total)` after joining order lines|**$600** (wrong)|
+
+The join repeats each order's total once per line, so the three-line order counts
+its $100 three times, and the total comes out exactly doubled &mdash; here 2&times;,
+but the factor is the average number of lines per order, whatever that happens to
+be. Nothing errors, the number is plausible, and it is wrong on every run. This is
+what "state the grain in one sentence" prevents: a measure at order grain must be
+summed at order grain, and mixing it with a per-line join silently multiplies it.
+
 ## Where it goes wrong
 
 **Mixed grain.** Silent, and it inflates every total.

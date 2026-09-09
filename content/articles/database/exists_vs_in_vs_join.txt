@@ -91,6 +91,26 @@ So performance is rarely the reason to choose. The reasons that survive are:
 Check the plan when it matters. [EXPLAIN](explain_and_query_plans.html) settles
 in ten seconds what a rule of thumb argues about indefinitely.
 
+## The NOT IN failure, run in this engine
+
+The `NOT IN` trap is worth seeing execute rather than reasoning about, because it
+produces no error &mdash; only a wrong answer. Three customers, an orders table
+where one order is anonymous (a NULL `customer_id`), asked which customers never
+ordered:
+
+|query|result|
+|---|---|
+|`... WHERE id NOT IN (SELECT customer_id FROM orders)`|**zero rows**|
+|`... WHERE NOT EXISTS (SELECT 1 ...)`|**customer 3** (correct)|
+
+The single NULL in the subquery poisons the whole `NOT IN`: `3 <> NULL` is
+unknown, `AND` with unknown is unknown, and `WHERE` keeps only rows that are
+definitely true, so every customer is filtered out. `NOT EXISTS` never compares
+anything to NULL &mdash; it asks whether a matching row was found &mdash; so it
+returns the right answer on the same data. This is not a corner case to file away;
+a nullable column is the normal situation, which is why `NOT EXISTS` is the safe
+default and `NOT IN` earns its place only on a column that is provably `NOT NULL`.
+
 ## Where it goes wrong
 
 **`NOT IN` on anything nullable.** The query returns zero rows and looks like a
