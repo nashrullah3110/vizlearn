@@ -83,6 +83,38 @@ first](feature_scaling.html) &mdash; this is not optional.
 **Cost.** Naively O(n&sup2;) because of the neighbourhood queries. A spatial
 index brings it to about O(n log n) in low dimensions.
 
+## Core, border and noise, counted
+
+The three definitions become concrete the moment you apply them. Take eps = 1.5,
+minPts = 3, and a point whose 1.5-radius neighbourhood is being examined:
+
+|point|neighbours within eps (incl. itself)|type|
+|---|---|---|
+|in a dense cluster|5|**core** (&ge; minPts)|
+|on a cluster edge|2, but one is a core point|**border**|
+|off on its own|1|**noise**|
+
+A cluster is then everything reachable through core points: start at a core point,
+absorb its neighbourhood, and for every neighbour that is *also* core, absorb its
+neighbourhood too, until nothing new arrives. That chain-through-cores rule is why
+DBSCAN follows a crescent around its curve &mdash; it never measures distance to a
+centre, only local crowding &mdash; and why it labels the lone point noise instead
+of forcing it into a cluster and dragging a centroid toward it, as k-means must.
+The cost is that one eps applies everywhere: raise it past the gap between two
+groups and they merge, drop it below the spacing of a sparse cluster and that
+whole cluster becomes noise. On data with one dense and one sparse cluster no
+single eps works, which is exactly what HDBSCAN was built to fix.
+
+Choosing eps is not guesswork either: the standard technique is a k-distance plot,
+where you measure every point's distance to its minPts-th nearest neighbour, sort
+those distances and look for the knee &mdash; the point where they start rising
+sharply is where you leave the dense region and begin crossing gaps, and it makes a
+defensible eps. minPts is the less delicate of the two, with a common starting rule
+of twice the number of dimensions. The method's real ceiling is high dimensionality:
+distances concentrate as dimensions grow until "neighbourhood" stops meaning much,
+so reducing dimensions first is not optional, and neither is scaling, since eps is a
+single absolute distance applied to every feature at once.
+
 ## Where it goes wrong
 
 **Not scaling the features.** `eps` becomes meaningless.

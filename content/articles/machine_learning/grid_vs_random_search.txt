@@ -79,6 +79,39 @@ For anything cheap, random search remains an excellent default. It has no
 hyperparameters of its own, it parallelises perfectly, and it is very hard to
 use wrongly.
 
+## Why random search reaches the good region
+
+Random search's advantage over a grid is that it does not spend trials
+re-measuring the axis that does not matter, and its chance of landing in the good
+region follows a simple curve. If the top 5% of the space is what you want, `n`
+independent random draws miss it only if *all* of them do:
+
+|random trials|P(at least one lands in the top 5%)|
+|---|---|
+|10|0.40|
+|20|0.64|
+|60|0.95|
+
+Sixty trials find the good region 95% of the time, with no assumption about which
+hyperparameter matters. A grid of the same 60 trials over two axes gives about 8
+distinct values of each, so if only one axis matters it has spent all but 8 of its
+trials varying the one that does not &mdash; and over five axes at four values
+each, a grid is 1,024 trials and still only four values per parameter. That is
+Bergstra and Bengio's result, and it is why random beat grid as the default. The
+one place it needs care is the sampling scale: a learning rate must be drawn
+log-uniformly, because a uniform draw between 0.0001 and 0.1 puts 90% of its
+samples above 0.01 and starves the small values that often matter most.
+
+What replaced both methods for expensive objectives is Bayesian optimisation
+&mdash; Optuna, Hyperopt &mdash; which builds a model of the score surface from the
+trials so far and proposes the point most likely to improve, clearly better when a
+single trial takes an hour. Successive halving and Hyperband attack the cost from
+another angle, starting many configurations cheaply and killing the worst, which
+wins when early performance predicts final performance. For anything cheap, random
+search remains an excellent default: it has no hyperparameters of its own, it
+parallelises perfectly, and the one way to misuse it &mdash; a linear scale on a
+parameter that should be logarithmic &mdash; is the same trap noted above.
+
 ## Where it goes wrong
 
 **Sampling scale.** A learning rate should be sampled log-uniformly. Uniform

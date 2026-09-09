@@ -91,6 +91,47 @@ so a patient cannot appear on both sides. If the data is a time series, use
 hyperparameters on the same folds you report, that number is optimistic too;
 nested cross-validation is the honest version.
 
+## The size of the leak, in accuracy points
+
+The reason to insist on a pipeline is that the leak is large and silent. Take 300
+rows of pure noise &mdash; features with no relationship to the label at all
+&mdash; and select the 20 columns most correlated with the label, then
+cross-validate:
+
+|when the columns are chosen|reported accuracy|truth|
+|---|---|---|
+|once, on all the data, before CV|~65%|50%|
+|inside each fold, on its training rows only|~50%|50%|
+
+The data cannot support better than chance, and the honest pipeline says so. The
+by-hand version reports 65% because the feature selection has already seen every
+fold's validation rows: it picked the columns that happened to correlate with
+those labels too, so each fold is scored on features chosen partly *because* they
+match its answers. Nothing errors, and the inflation &mdash; fifteen points here,
+more with more candidate features &mdash; cannot be estimated after the fact,
+because it depends on data the leak already consumed. The pipeline makes the
+correct order the only order the object can execute: each fold fits the selector,
+the scaler and the model on its own training rows and merely transforms the
+validation rows, so the number it reports is an estimate of something real.
+
+Beyond stopping the leak, the pipeline buys three things that are awkward by hand.
+Hyperparameter search can range over the preprocessing &mdash; whether the median
+beats the mean becomes a tuned choice on the same footing as the model's own
+settings. There is no train/serve gap, because the fitted pipeline is one object
+saved and loaded whole, so there is no second copy of the preprocessing to drift
+out of step. And `ColumnTransformer` routes numeric columns to a scaler,
+categoricals to an encoder, and text to a vectoriser, all inside the same object.
+What a pipeline cannot do is validate the splits themselves: if rows are grouped by
+patient or ordered in time, it still needs `GroupKFold` or `TimeSeriesSplit` to
+keep the folds honest.
+
+One special case catches people: resampling. SMOTE and other over-samplers must
+run on the training fold only, and scikit-learn's own `Pipeline` does not enforce
+that &mdash; `imblearn`'s pipeline does. A log transform, by contrast, has no
+fitted parameters and cannot leak, so it need not live in the pipeline at all,
+though keeping it there is still worth the tidiness of one place for the
+preprocessing.
+
 ## Where it goes wrong
 
 **Calling `fit` on the test data.** Use `transform`. `fit_transform` on the test

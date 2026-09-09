@@ -86,6 +86,40 @@ model, the number that makes that model best is the number.
 
 Both metrics are worth computing, and the application usually decides.
 
+## The silhouette of one point
+
+Where inertia only ever falls as k grows &mdash; reaching zero when every point is
+its own cluster &mdash; the silhouette has a real maximum, because it measures
+separation against tightness rather than tightness alone. For one point, let a be
+its mean distance to its own cluster and b its mean distance to the nearest other
+cluster; `s = (b - a) / max(a, b)`:
+
+|a (own)|b (nearest other)|silhouette|reading|
+|---|---|---|---|
+|1.0|3.0|0.67|comfortably inside its cluster|
+|2.5|3.0|0.17|near the boundary|
+|3.0|1.0|&minus;0.67|closer to another cluster &mdash; misassigned|
+
+Averaging s over all points gives one number per k, and unlike inertia it does not
+improve automatically: add too many clusters and points are forced close to a
+neighbouring cluster, which drives b down and the score with it, so the curve peaks
+at a defensible k rather than sliding forever toward "more". The cost is O(n&sup2;)
+pairwise distances against inertia's O(n). Both still evaluate only the clustering
+they were handed, though &mdash; on two interleaved crescents that k-means never
+separated, the silhouette cannot recover them either, which is the honest shared
+limit: these scores judge a partition, they do not know the algorithm was the
+wrong one.
+
+The honest last word is that neither metric knows what the clusters are *for*. If
+you are segmenting customers so a team can write one message per segment, k is
+roughly how many messages they can write; if you are quantising colours, k is the
+palette you can afford; if the clusters feed a downstream model, the k that makes
+that model best is the answer. The elbow and the silhouette are both worth
+computing &mdash; the elbow reads tightness, the silhouette reads separation, and
+their disagreement is informative rather than a problem to resolve &mdash; but the
+application usually decides, and a formalisation like the kneedle algorithm only
+helps once you have accepted that a knee exists at all.
+
 ## Where it goes wrong
 
 **Choosing k by inertia alone.** It will always say "more".

@@ -83,6 +83,48 @@ The practical rule: if a human or a process has to act on every positive
 prediction, precision is the thing they experience, and the PR curve is the one
 to look at.
 
+## Add a million negatives, and watch only one curve move
+
+The divergence is arithmetic. Hold the model's rates fixed &mdash; 90% recall, 5%
+false-positive rate &mdash; and change only the class balance in 10,000 rows:
+
+|positives|TP|FP|precision|TPR / FPR|
+|---|---|---|---|---|
+|5,000 (balanced)|4,500|250|0.95|0.90 / 0.05|
+|100 (1%)|90|495|**0.15**|0.90 / 0.05|
+
+The ROC coordinates are identical in both rows, because TPR divides by actual
+positives and FPR by actual negatives &mdash; each lives inside one class, so the
+balance cannot touch them. Precision divides by everything flagged, which mixes
+the classes, so when negatives outnumber positives a 5% false-positive rate turns
+into 495 false alarms drowning 90 real ones and precision falls to 0.15. Same
+model, same scores, and ROC records it as excellent while five of every six
+flagged cases are wrong. That is why ROC AUC alone on rare-positive data is the
+standard way to make an undeployable model look ready, and why the PR curve
+&mdash; whose no-skill baseline is the positive rate itself, 0.01 here, not a
+fixed 0.5 &mdash; is the honest one to quote.
+
+The practical rule follows from who acts on the output. If a human or a process
+has to deal with every positive prediction &mdash; an analyst investigating each
+flag, a queue of cases to review &mdash; then precision is the experience that
+person actually has, and the PR curve is the one to read. ROC still has its place:
+it is the right tool when you care about ranking quality overall, and it is more
+comparable across datasets because its baseline is a fixed 0.5 rather than a
+base-rate that shifts. Neither curve, though, tells you which threshold to deploy;
+that is a separate decision driven by [costs](threshold_tuning.html).
+
+One more asymmetry is worth stating: because the PR baseline is the positive rate,
+a PR AUC has no fixed scale. A PR AUC of 0.4 is poor on balanced data and
+outstanding at a 2% base rate, so the number means nothing quoted alone &mdash; it
+has to be read against the baseline for that dataset, which is exactly why it
+cannot be compared across datasets with different balances the way ROC can.
+
+A last comparison point: the two curves also treat the negatives differently. ROC
+rewards a model for correctly ranking the vast pool of easy negatives, which is
+where its optimism on rare-positive data comes from; PR ignores true negatives
+entirely &mdash; they appear in neither precision nor recall &mdash; so it reports
+only on the positives you care about and the false alarms among them.
+
 ## Where it goes wrong
 
 **Reporting ROC AUC alone on imbalanced data.** It is the standard way to make a

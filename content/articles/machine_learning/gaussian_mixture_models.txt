@@ -69,6 +69,48 @@ number of components &mdash; a principled alternative to
 K-means is exactly the limiting case: spherical components of equal weight, with
 responsibilities forced to 0 or 1.
 
+## The E-step, worked
+
+The soft assignment the whole method turns on is one calculation. Two components,
+N(0,1) with weight 0.6 and N(3,1) with weight 0.4, and a point to assign: its
+responsibility to each is the weighted density there, normalised so the two sum
+to 1.
+
+|point|r(component 1)|r(component 2)|
+|---|---|---|
+|x = 0.5|0.968|0.032|
+|x = 1.5|0.600|0.400|
+
+At x = 0.5 the point sits deep in the first component and is assigned to it with
+97% confidence &mdash; but k-means would have recorded the same hard label with no
+hint of the 3% doubt. At x = 1.5, halfway between the means, the responsibilities
+fall back to the mixing weights themselves: the data gives almost no reason to
+prefer either component, and the GMM says so where k-means would still pick one.
+That preserved doubt is the whole point, and it is why the number of low-confidence
+assignments climbs as the components overlap. The M-step then re-estimates each
+mean, width and weight using every point weighted by its responsibility, and
+alternating the two provably never decreases the likelihood &mdash; which is also
+why a GMM can report one, through BIC, and choose its own number of components
+where k-means cannot.
+
+What a GMM buys over k-means, when the data suits it, is three things at once:
+elliptical clusters, because a full covariance per component fits stretched and
+tilted shapes k-means cuts in half; unequal sizes, because the mixing weights let
+one component own 80% of the data; and the soft assignment itself, useful whenever
+something downstream can act on a probability. K-means is exactly the limiting
+case &mdash; spherical components of equal weight with responsibilities forced to
+0 or 1 &mdash; which is why it fabricates the confidence a GMM keeps. The costs are
+the assumption of Gaussian components (crescents defeat it) and convergence only to
+a local optimum, which is why libraries run several initialisations and keep the
+best.
+
+The other failure to watch is a singularity: a component can collapse onto a
+single point, driving its width toward zero and the likelihood toward infinity.
+A small constant added to each covariance &mdash; on by default in most libraries
+&mdash; prevents it, and it is the same regularisation instinct that stops too many
+components fitting the noise, which is what BIC's penalty on parameter count guards
+against when choosing how many components to keep.
+
 ## Where it goes wrong
 
 **Assuming Gaussian.** If the clusters are crescents, a mixture of Gaussians is

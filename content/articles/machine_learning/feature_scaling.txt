@@ -90,6 +90,45 @@ evaluated, and the reported score stops being an estimate of anything. That is
 applied machine learning, and it is why scalers belong inside a
 [pipeline](ml_pipelines.html) rather than being applied by hand.
 
+## Standardising, and why trees do not care
+
+The fix is one formula applied per column, `z = (x - mean) / std`, and working it
+shows why some models transform completely and others not at all. Age spanning
+25-55 and income spanning 20,000-70,000, standardised:
+
+|raw|z-score|
+|---|---|
+|age 30 (mean 40, sd 10)|&minus;1.0|
+|age 55|+1.5|
+|income 25,000 (mean 45k, sd 15k)|&minus;1.3|
+|income 70,000|+1.7|
+
+Both columns now live on the same &minus;3-to-3 scale, so a year of age and a
+standard-deviation of income count comparably in a Euclidean distance &mdash; where
+before, the income term's raw spread of 50,000 against age's 30 made age
+numerically invisible to k-NN, k-means, SVM-RBF and PCA. A decision tree, by
+contrast, is completely unmoved: its split asks `is income > 45000`, which after
+scaling becomes `is income' > 0.53`, and that partitions the rows into exactly the
+same two groups. Any monotonic rescaling leaves every possible split unchanged, so
+scaling before a random forest is a genuine no-op &mdash; not wrong, just wasted
+effort &mdash; while for the distance-based models it is the difference between a
+usable model and a one-dimensional one.
+
+The choice between the two common scalers comes down to outliers. StandardScaler
+uses the mean and standard deviation, so one extreme value shifts the centre only a
+little; MinMaxScaler uses the minimum and maximum, the two most outlier-sensitive
+numbers there are, so a single salary of ten million maps to 1.0 and crushes every
+real salary into the bottom fraction of a per cent of the range. StandardScaler is
+the safer default for most data, MinMax suits genuinely bounded inputs like image
+pixels. One thing neither should touch is a one-hot column: it is already 0 and 1,
+and standardising it turns two meaningful values into two arbitrary ones for no
+gain.
+
+And if you scale the target as well as the features, remember to invert the
+transform on the predictions, or the error metric comes back in scaled units and
+means nothing &mdash; a small bookkeeping step that is easy to forget and quietly
+corrupts every reported number.
+
 ## Where it goes wrong
 
 **Fitting the scaler on everything.** The number you report goes up and the

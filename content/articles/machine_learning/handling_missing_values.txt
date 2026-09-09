@@ -91,6 +91,30 @@ Also worth knowing: some models handle missing values natively. LightGBM and
 XGBoost learn a default direction at each split for rows whose value is absent,
 which is frequently better than anything you would impute by hand.
 
+## Why "why" changes the answer
+
+The strategy matters far less than the reason the value is absent, and the same
+30%-missing column shows it. When the missing values are the *largest* ones
+(missing not at random &mdash; high earners decline to state income), every method
+that ignores the absence inherits the bias:
+
+|values 1-100, top 30 missing|resulting mean|
+|---|---|
+|true mean|50.5|
+|after dropping the missing rows|35.5|
+|after mean/median imputation|~35.5 (a spike at the low centre)|
+
+Dropping or filling both land near 35.5, understating the truth by fifteen, because
+the rows removed or flattened are exactly the high ones &mdash; no arithmetic on the
+values that remain can recover values that were never seen. The one strategy that
+helps adds a *missingness indicator*: a second column marking which rows were
+absent. In the not-at-random case the absence is itself the signal &mdash; "declined
+to answer" predicts high income &mdash; so keeping that flag lets the model use what
+plain imputation throws away. It costs one column and no assumptions. And dropping
+carries a second, arithmetic cost: with ten columns each 5% missing,
+`1 - 0.95^10 = 40%` of rows have *some* gap, so row-dropping discards 40% of the
+data even though 95% of every column is present.
+
 ## Where it goes wrong
 
 **Imputing before the split.** The column mean is computed from the test rows

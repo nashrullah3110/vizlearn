@@ -89,6 +89,41 @@ anomalous in order to place a threshold, and if you knew that you would be much
 further along. Prefer to look at the score distribution and choose a cut, which
 is what the slider here makes you do.
 
+## The path-length score, worked
+
+The score turns an average path length into a number between 0 and 1, and working
+it shows why the direction is what it is. With a 256-point subsample the expected
+path in a random tree is `c(256) &asymp; 10.24`, and `score = 2^(-avg_path / c(n))`:
+
+|average path to isolate the point|score|reading|
+|---|---|---|
+|3 (cut off early)|0.82|anomalous|
+|8 (survived many cuts)|0.58|nearer normal|
+
+A point far from the crowd is separated by one or two random splits &mdash; a
+single cut has a good chance of landing in the empty space around it &mdash; so its
+path is short, its score high, and it is flagged. A point buried in a dense cluster
+needs many splits to peel away from its neighbours, so its path is long and its
+score low. Short path, high score, anomalous: the relationship that catches people
+because it runs opposite to the intuition that a bigger number is safer. The
+256-point subsample is not only for speed &mdash; a small sample usually contains a
+would-be anomaly alone, so it isolates immediately, where in the full data a tight
+clump of anomalies can shield each other and survive several cuts (masking). And
+the average is over many trees for a reason: one tree's path length is nearly
+meaningless, and the flagged set only stabilises across dozens.
+
+What Isolation Forest is good and bad at both follow from that random-split
+mechanism. It is fast &mdash; linear in the points, with shallow trees &mdash; and
+indifferent to dimensionality, since it uses no distance metric and so escapes the
+concentration that undoes k-nearest-neighbour detectors, and it assumes nothing
+about the shape of "normal". But it finds only *globally* easy-to-separate points:
+a point sitting in a low-density gap between two dense clusters can be perfectly
+ordinary globally and clearly anomalous locally, which is what Local Outlier Factor
+catches by comparing each point's density to its neighbours'. And its
+`contamination` parameter, which asks what fraction of the data is anomalous, is a
+guess presented as a setting &mdash; better to read the score distribution and cut
+it yourself.
+
 ## Where it goes wrong
 
 **Reading the score backwards.** High means anomalous.

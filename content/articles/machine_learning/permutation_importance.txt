@@ -97,6 +97,32 @@ Shuffling is random, so a single shuffle is a noisy estimate. The repeats contro
 above averages several, and the wobble as you change the seed at one repeat
 shrinks visibly as you raise it. Five to ten is typical.
 
+## Two copies of one signal, and the discount
+
+The central trap is measurable. Feed a model four features &mdash; a strong signal,
+a weak one, pure noise, and a near-duplicate copy of the strong signal &mdash; and
+read the permutation importances:
+
+|feature|importance|
+|---|---|
+|signal|high|
+|copy of signal|~half of signal, level with `weak`|
+|weak|low|
+|noise|~0|
+
+`noise` scoring zero is correct and reassuring. But `copy of signal` carries the
+same information as `signal` &mdash; either alone would serve the model &mdash; and
+it scores about half, down at the level of a genuinely weak feature. The cause is
+the procedure: importance is measured one column at a time, so when the copy is
+shuffled every tree that split on the original still works, and the measured drop is
+small. The honest reading is not "the copy does not matter" but "either substitutes
+for the other, and this method cannot say so" &mdash; and the effect is worst on the
+tree models where these charts are drawn most, because a forest can swap one
+correlated column for the other outright. The fixes are to cluster correlated
+features and permute the group, or to check the correlation matrix before trusting
+any importance bar. Compute it on held-out data, too: on training data it rewards
+whatever the model memorised.
+
 ## Where it goes wrong
 
 **Reading it on correlated features.** The central trap.

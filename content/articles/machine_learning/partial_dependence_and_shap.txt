@@ -89,6 +89,42 @@ implementations approximate &mdash; `TreeSHAP` exactly and quickly for trees,
 | SHAP | how much each feature contributed here | one prediction |
 | [Permutation importance](permutation_importance.html) | how much accuracy depends on a feature | global |
 
+## SHAP adds up, exactly
+
+What makes a SHAP explanation trustworthy for one prediction is that the parts sum
+to the whole. Each feature gets a value saying how far it pushed this prediction
+from the base value &mdash; the average prediction over the dataset &mdash; and
+those pushes reconstruct the prediction exactly:
+
+|term|value|
+|---|---|
+|base value|0.30|
+|age|+0.15|
+|income|+0.10|
+|region|&minus;0.05|
+|**prediction**|**0.50**|
+
+`0.30 + 0.15 + 0.10 - 0.05 = 0.50`, with nothing unattributed &mdash; that
+additivity is the property partial dependence and ICE do not have, and it is what
+lets SHAP explain a single row rather than the model's average behaviour. The
+values come from Shapley values in cooperative game theory, which distribute credit
+for a joint outcome fairly, and computing them exactly means evaluating every
+subset of features &mdash; exponential, which is why TreeSHAP (exact, fast, for
+trees) and KernelSHAP (sampled, for anything) exist. The caution is that additivity
+is not causality: a model using postcode as a proxy for income will show postcode
+contributing, which is a true statement about the model and not about the world.
+
+The flat-curve trap is worth restating because it is silent: a partial dependence
+line near zero can hide individual effects that are large but cancel &mdash; a
+feature that slopes up for one subgroup and down for another averages to nothing,
+while mattering enormously to every row. Plotting the ICE curves underneath is the
+standard defence: parallel curves mean the average is a fair summary, curves that
+fan out or cross mean there is an interaction and the average is lying. Partial
+dependence also quietly assumes the feature can be swept independently of the
+others, so with strongly correlated features part of the curve is the model
+extrapolating into combinations that never occur &mdash; which is what Accumulated
+Local Effects plots were designed to avoid.
+
 ## Where it goes wrong
 
 **Reading a flat PD curve as "unimportant".** Plot the ICE curves.

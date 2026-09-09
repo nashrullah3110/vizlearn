@@ -98,6 +98,42 @@ you asked for; from uncalibrated scores it does not.
 If all you do is rank &mdash; show the top 100 results &mdash; calibration is
 irrelevant.
 
+## Expected calibration error, worked
+
+ECE puts a single number on "do the confidences mean anything". Bin the
+predictions by stated confidence, and in each bin compare the average confidence
+against the fraction actually positive; ECE is the average gap, weighted by bin
+size:
+
+|bin|mean confidence|observed accuracy|gap|
+|---|---|---|---|
+|high|0.90|0.70|0.20|
+|mid|0.70|0.65|0.05|
+|low|0.55|0.55|0.00|
+
+With 100 points in each bin the ECE is `(0.20 + 0.05 + 0.00)/3 = 0.083` &mdash;
+the model is eight points miscalibrated on average, driven almost entirely by the
+top bin, where it says 0.90 and is right 70% of the time. That over-confidence is
+the common and damaging failure, and note what it does *not* touch: every one of
+those predictions could still rank correctly, so AUC and average precision are
+unchanged. Temperature scaling &mdash; dividing the logit by a constant fitted on
+held-out data &mdash; pulls the top bin down toward its true accuracy without
+reordering anything, which is why it can fix calibration for free while leaving
+every ranking metric identical. The one caution is that ECE is an average and can
+hide compensating errors, so a curve above the diagonal in one region and below in
+another can post a small ECE; read the reliability curve, not only the number.
+
+Why models miscalibrate is worth knowing, because it predicts which fix to reach
+for. Modern neural networks are over-confident and increasingly so as they grow,
+because minimising cross-entropy on data they can fit perfectly keeps pushing
+outputs toward 0 and 1 long after accuracy has stopped improving; temperature
+scaling is the standard remedy. Naive Bayes is over-confident because its
+independence assumption multiplies correlated evidence as if it were independent.
+Random forests are usually *under*-confident at the extremes, because averaging many
+trees pulls predictions toward the middle. Logistic regression on well-specified
+features tends to come out close to calibrated, because that is exactly what it
+optimises.
+
 ## Where it goes wrong
 
 **Calibrating on the training set.** It will look perfect and generalise

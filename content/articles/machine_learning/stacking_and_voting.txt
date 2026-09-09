@@ -83,6 +83,40 @@ inference time, memory and the number of things that can break in production. A
 one-point gain on a leaderboard is worth it; a one-point gain in a service
 usually is not.
 
+## When the majority is wrong, in numbers
+
+Majority voting only helps when the members are comparable, and the arithmetic
+shows why. For three independent classifiers the vote is correct when at least two
+are, `P = &Sigma;` over the majority outcomes:
+
+|three members|majority-vote accuracy|
+|---|---|
+|0.62, 0.66, 0.90|0.83 &mdash; **below the 0.90 member**|
+|0.80, 0.80, 0.80|0.90 &mdash; above any member|
+
+Three equal 80% models vote to 90%, which is the ensemble win everyone hopes for:
+independent errors partly cancel. But bolt a 90% model to two mediocre ones and
+the vote drops it to 83%, because whenever the two weak members happen to agree
+they outvote the strong one, and two coin-ish models agree wrongly often enough to
+matter. That is voting's built-in assumption &mdash; equal competence &mdash;
+failing out loud, and it is why "just ensemble it" is bad advice without checking
+the members are comparable. Stacking fixes exactly this by learning the weights
+instead of fixing them: the meta-learner hands most of the weight to the strong
+member and can drive a weak one negative, recovering the best model where the vote
+destroyed it. (Real classifiers are not independent, so the true numbers shift
+with error correlation &mdash; which is itself the thing to measure before
+combining anything.)
+
+Getting stacking right turns on one detail: the meta-learner must be trained on
+*out-of-sample* base predictions. Feed it predictions the base models made on their
+own training data and it learns to trust whichever member overfitted most, because
+an overfitted model looks suspiciously accurate there. The fix is cross-validated
+predictions &mdash; for each fold, predict with base models trained on the other
+folds &mdash; which is why stacking costs roughly k times the training of its
+members. Keep the meta-learner simple, too; logistic regression is the standard
+choice, because it has few base predictions to work from and a flexible meta-learner
+overfits them readily.
+
 ## Where it goes wrong
 
 **Ensembling a strong model with weak ones by vote.** Demonstrated above.
