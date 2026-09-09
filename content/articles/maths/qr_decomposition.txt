@@ -93,6 +93,53 @@ there is, and it is this decomposition in a loop.
 **Kalman filters** in square-root form, for the same conditioning reason as
 least squares.
 
+## Gram-Schmidt by hand, on two vectors
+
+The editor below runs the full factorisation; the mechanism is clearest on two
+vectors small enough to finish on paper. Take `a1 = (1, 1)` and `a2 = (2, 0)`,
+which span the plane but meet at 45&deg;, not a right angle.
+
+**q1** is `a1` normalised: its length is &radic;2, so `q1 = (1, 1)/&radic;2`.
+
+**q2** removes from `a2` its component along `q1`. The projection length is
+`a2 &middot; q1 = 2/&radic;2 = &radic;2`, so the projection is `&radic;2 &middot;
+q1 = (1, 1)`. Subtract it: `a2 &minus; (1, 1) = (1, &minus;1)`. That remainder is
+perpendicular to `q1` by construction, and normalising it (length &radic;2 again)
+gives `q2 = (1, &minus;1)/&radic;2`.
+
+Check: `q1 &middot; q2 = (1&minus;1)/2 = 0`, exactly, as it must be. And the
+projections you subtracted are `R`:
+
+|R|value|
+|---|---|
+|R&#8321;&#8321; = &#124;a1&#124;|&radic;2|
+|R&#8321;&#8322; = a2 &middot; q1|&radic;2|
+|R&#8322;&#8322; = &#124;remainder&#124;|&radic;2|
+
+`R` is upper triangular because `a1` was built from `q1` alone and only `a2` ever
+used `q2` &mdash; nothing is ever built from a later `q`, so everything below the
+diagonal is zero. That is the whole factorisation, and every larger case is this
+one repeated.
+
+The reason least squares reaches for this rather than the textbook normal
+equations is visible in the same small picture. Solving `Rx = Q'b` uses the
+triangular `R` directly and never forms `A'A`, which would square the condition
+number &mdash; a matrix conditioned at 10&#8310; becomes 10&#185;&#178;, and in
+double precision that discards most of the available digits before the solve even
+starts. The orthonormal columns are what make `Q'Q` disappear to the identity, so
+the substitution costs nothing and the conditioning is left untouched.
+
+The version shown here, subtracting every projection at the end, is *classical*
+Gram-Schmidt and drifts out of orthogonality in floating point; the *modified*
+form subtracts each projection immediately and behaves far better, though serious
+libraries use Householder reflections instead. Gram-Schmidt survives as the
+version you can watch happen, which is why it is the one worth working by hand.
+
+The same decomposition, run in a loop that factors and re-multiplies in the
+opposite order, is the QR algorithm for eigenvalues &mdash; one of the most
+important numerical methods there is, and at heart just this factorisation
+repeated until the matrix goes triangular.
+
 ## Where it goes wrong
 
 **Classical Gram-Schmidt on ill-conditioned input.** Use the modified version,

@@ -84,6 +84,39 @@ some SQL engines.
 For large samples the differences are negligible. For small ones they are not,
 and two tools can legitimately report different quartiles for identical data.
 
+## The definition ambiguity, on ten numbers
+
+The wrinkle deserves numbers, because it is where two tools disagree on identical
+data. Take the ten values `1, 2, 3, &hellip;, 10` and ask for the 25th
+percentile. "The value below which 25% falls" does not land on an observation, and
+the defensible answers differ:
+
+|method|25th percentile|how|
+|---|---|---|
+|linear interpolation|3.25|position `(n&minus;1)&middot;0.25 = 2.25`, so a quarter of the way from the 3rd value to the 4th|
+|nearest-rank|3|the smallest value with at least 25% at or below it|
+
+Both are correct; they answer slightly different questions about what a
+"percentile" of a finite sample means. NumPy's default is the linear method, and
+it offers nine in total; other tools default differently, which is why
+`numpy.percentile` and a SQL engine can report different quartiles for the same
+column. For a thousand points the gap between methods is negligible; for ten it is
+0.25 out of a range of 9, which is enough to change a decision. State the method
+when the sample is small and the number matters.
+
+The reason to care sits in the tail. A service's latency is reported at p95 and
+p99 precisely because one slow request in a thousand is invisible in a mean and
+obvious in a high percentile &mdash; and those percentiles cannot be averaged
+across servers, because the p99 of two machines is not the mean of their p99s.
+Aggregating them needs the underlying distributions or a structure like a
+t-digest; averaging them understates the tail every time, which is the one error
+this whole topic exists to prevent.
+
+There is also no single agreed definition of a sample quantile: on ten points the
+"value below which 25% falls" is a matter of interpolation, and NumPy alone offers
+nine methods. On large samples the choice is negligible; on small ones two honest
+tools can report different quartiles for identical data.
+
 ## Where it goes wrong
 
 **Averaging percentiles.** The single most common error, and it always

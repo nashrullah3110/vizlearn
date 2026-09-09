@@ -186,6 +186,42 @@ far better conditioned than the direct approach.
 **Fourier and wavelet transforms** are changes into an orthogonal basis chosen
 so the interesting structure shows up in a few coordinates.
 
+## Coordinates, with and without orthogonality
+
+The payoff of an orthogonal basis is concrete: coordinates become dot products
+instead of a system of equations. Take the point `p = (5, 5)` and two bases.
+
+In the ordinary basis `b1 = (2, 1)`, `b2 = (1, 3)`, finding coordinates
+`c1, c2` with `c1 b1 + c2 b2 = p` means solving
+
+`2c1 + c2 = 5` and `c1 + 3c2 = 5` &rarr; `c1 = 2, c2 = 1`.
+
+That is a `2&times;2` system; in `n` dimensions it is an `n&times;n` solve.
+
+In the orthonormal basis `q1 = (1, 1)/&radic;2`, `q2 = (1, &minus;1)/&radic;2`,
+each coordinate is a single dot product:
+
+|coordinate|computation|value|
+|---|---|---|
+|c1|p &middot; q1 = (5+5)/&radic;2|&asymp; 7.07|
+|c2|p &middot; q2 = (5&minus;5)/&radic;2|0|
+
+No system to solve &mdash; one dot product per axis, because the axes do not
+interfere. This is why an orthonormal basis is worth manufacturing (that is what
+[QR](qr_decomposition.html) does): the matrix of its vectors has its transpose as
+its inverse, so projecting onto it and reconstructing from it both cost a single
+multiply, and that is the property numerical methods reach for whenever stability
+matters.
+
+The determinant is the warning the coordinates give before they fail. It is the
+signed area of the parallelogram the basis vectors span, and it reaches zero
+exactly when they line up and the span collapses to a line &mdash; at which point
+most of the plane becomes unreachable and no coordinates exist for it. A
+determinant of 0.001 is that same collapse nearly arrived: the basis still
+technically works, but reconstructing a point from its coordinates divides by that
+tiny number and amplifies every rounding error, which is the numerical face of the
+near-dependence an orthonormal basis is built to avoid.
+
 ## Where it goes wrong
 
 **Nearly dependent vectors.** A determinant of exactly zero is easy to spot; a
@@ -399,6 +435,39 @@ product.
 **Noise reduction** works on the assumption that signal concentrates in the
 large singular values and noise spreads through the small ones.
 
+## Singular values by hand, from A'A
+
+You rarely compute an SVD on paper, but seeing where the singular values come
+from removes the mystery. The singular values of `A` are the square roots of the
+eigenvalues of `A'A`. Take `A = [[3, 0], [4, 5]]`:
+
+`A'A = [[9 + 16,  20], [20,  25]] = [[25, 20], [20, 25]]`.
+
+A symmetric `2&times;2` `[[a, b], [b, a]]` has eigenvalues `a + b` and
+`a &minus; b`, here `45` and `5`. So the singular values are:
+
+|singular value|from|
+|---|---|
+|&sigma;&#8321; = &radic;45 &asymp; 6.708|the largest stretch A applies|
+|&sigma;&#8322; = &radic;5 &asymp; 2.236|the smallest|
+
+Their ratio, `&radic;(45/5) = 3`, is the condition number: `A` stretches its most
+sensitive direction three times more than its least. That is why the unit circle
+becomes an ellipse with semi-axes 6.708 and 2.236, and why the singular values
+are always real and non-negative &mdash; they are square roots of eigenvalues of
+`A'A`, which is symmetric positive semi-definite for any `A`. Eigenvalues of `A`
+itself could be complex or negative; the SVD's numbers never are, which is half
+the reason it is the factorisation to reach for.
+
+This is the machinery under PCA, which is nothing more than the SVD of the
+mean-centred data: the principal directions are the right singular vectors and the
+variance each explains is its singular value squared. Keeping only the largest few
+&mdash; setting the small singular values to zero and multiplying back &mdash;
+gives the provably best low-rank approximation of the data, which is the same
+operation behind image compression, latent-semantic analysis and recommender
+factorisations. The small singular values are where noise concentrates, so
+dropping them often sharpens the signal rather than degrading it.
+
 ## Where it goes wrong
 
 **Forgetting to centre before PCA.** Without subtracting the mean, the first
@@ -601,6 +670,32 @@ from the scalar loss, so every intermediate stays a **vector**.
 That is why training is affordable. The cost of a backward pass is a small
 multiple of a forward pass, regardless of how many parameters there are,
 because no Jacobian is ever formed in full.
+
+## The curvature test, on two functions
+
+In one dimension a positive second derivative means a minimum and a negative one
+a maximum. In many dimensions the Hessian's *eigenvalues* play that role, and two
+small examples show the whole classification.
+
+`f = x&sup2; + xy + y&sup2;` has Hessian `[[2, 1], [1, 2]]`, whose eigenvalues are
+`2 + 1 = 3` and `2 &minus; 1 = 1` &mdash; both positive. Every direction curves
+upward, so the stationary point at the origin is a genuine minimum.
+
+`f = x&sup2; &minus; y&sup2;` has Hessian `[[2, 0], [0, &minus;2]]`, eigenvalues
+`2` and `&minus;2`.
+
+|function|Hessian eigenvalues|the origin is|
+|---|---|---|
+|x&sup2; + xy + y&sup2;|3, 1 (all positive)|a minimum|
+|x&sup2; &minus; y&sup2;|2, &minus;2 (mixed sign)|a saddle|
+
+The mixed sign is the saddle: up along `x`, down along `y`, so the gradient is
+zero without it being any kind of extremum. This is exactly the test
+[Cholesky](cholesky_and_positive_definiteness.html) performs cheaply &mdash; a
+successful factorisation means all eigenvalues are positive, confirming a minimum
+&mdash; and it is why, in the millions of dimensions of a network, stationary
+points are almost always saddles: needing *every* eigenvalue positive at once
+becomes vanishingly unlikely.
 
 ## Where it goes wrong
 
@@ -818,6 +913,42 @@ guarantee your step size will find it.
 The safe step depends on curvature, which is what
 [the Hessian](jacobian_and_hessian.html) measures and what adaptive optimisers
 estimate.
+
+## The chord test, on numbers
+
+Convexity has a definition you can check by hand: the straight line between any
+two points on the curve must lie on or above it. Take `f(x) = x&sup2;` and the
+points at `x = &minus;2` and `x = 4`.
+
+The chord's height at the midpoint is the average of the endpoint values:
+`(f(&minus;2) + f(4)) / 2 = (4 + 16)/2 = 10`. The curve's height at that same
+midpoint, `x = 1`, is `f(1) = 1`.
+
+|at the midpoint x = 1|value|
+|---|---|
+|the chord|10|
+|the curve|1|
+
+The chord sits above the curve, by 9, and it does so for *every* pair of points
+you pick &mdash; that is what makes `x&sup2;` convex, and why a single downhill
+walk finds its one minimum. Now try the same on `f(x) = 0.15x&sup2; + 3sin(2x)`:
+between two well-chosen points the chord dips *below* the curve, because the
+ripples bulge upward past the straight line. One such dip is enough to disqualify
+convexity, and it is exactly the bulge a descent path can get stuck behind. The
+test is not a metaphor; it is an inequality you can evaluate at any two points.
+
+The consequence is the one that separates the well-behaved models from the rest.
+Because `x&sup2;`-shaped objectives pass the chord test everywhere, linear
+regression, logistic regression and SVMs with convex loss have a single minimum
+that every downhill path reaches &mdash; the answer does not depend on where you
+start. The rippled function fails the test somewhere, and that single failure is
+enough to trap a descent path in a basin that depends entirely on its starting
+point, which is why a neural network gives a different answer on every restart.
+
+And yet deep networks train anyway, because in millions of dimensions almost
+every stationary point is a saddle rather than a trap &mdash; a genuine minimum
+needs every Hessian eigenvalue positive at once, which is vanishingly unlikely
+&mdash; and mini-batch noise slides the optimiser off the saddles it meets.
 
 ## Where it goes wrong
 
@@ -1597,6 +1728,41 @@ to counting words and to noting presence or absence.
 your estimate of it is `p(1-p)/n` &mdash; which is why rare classes need so
 much more data before a rate estimate settles.
 
+## The binomial formula, worked
+
+The formula is best trusted by evaluating it. Five trials, success probability
+0.3, `P(k) = C(5, k) &middot; 0.3^k &middot; 0.7^(5&minus;k)`:
+
+|k|C(5, k)|P(k)|
+|---|---|---|
+|0|1|0.1681|
+|1|5|0.3601|
+|2|10|0.3087|
+|3|10|0.1323|
+|4|5|0.0283|
+|5|1|0.0024|
+
+The most likely single outcome is one success, not the mean of 1.5, because the
+distribution is skewed at `p = 0.3`. The probabilities sum to exactly 1 &mdash;
+they must, since some number of successes between 0 and 5 always happens &mdash;
+and the mean `&Sigma; k&middot;P(k)` works out to `np = 1.5`. The three factors
+each do one job: `0.3^k` for the successes, `0.7^(5&minus;k)` for the failures,
+and `C(5, k)` for the number of orders in which those successes could have
+arrived. Drop the `C(5, k)` and you would have the probability of one *specific*
+sequence; it is there because you asked how many successes, not which trials.
+
+Push `n` up and `p` down together, holding `np` fixed, and this same formula
+slides into the Poisson: the individual `n` and `p` vanish and only their product
+survives, which is why Poisson models counts when you know the rate but not the
+number of chances &mdash; arrivals per minute, defects per batch. The signature to
+check is that a Poisson forces mean and variance equal; real counts often have
+variance well above the mean (overdispersion), and that gap is a finding, not
+noise &mdash; it says something the model treats as fixed is actually varying.
+
+When overdispersion is real, the usual fix is a negative binomial, which adds a
+second parameter and lets the rate itself vary rather than forcing mean and
+variance to be equal &mdash; the Poisson's rigidity is exactly what it relaxes.
+
 ## Where it goes wrong
 
 **Applying a binomial to sampling without replacement.** `p` changes; use the
@@ -1794,6 +1960,35 @@ mean is normal. That assumption is this theorem.
 **Measurement error** is often modelled as normal because it is the sum of many
 small independent errors.
 
+## Standardising a sample mean
+
+The theorem is used, in practice, to turn an observed sample mean into a
+probability, and the arithmetic is short. Suppose a population has mean 50 and
+standard deviation 8, and you take a sample of `n = 16`. By the theorem the sample
+mean is approximately normal, centred at 50, with standard error
+`8 / &radic;16 = 2`.
+
+Now you observe a sample mean of 54. How surprising is that?
+
+`z = (54 &minus; 50) / 2 = 2.0`
+
+The observed mean is two standard errors above the population mean, and for a
+normal distribution about 2.3% of samples fall that far above by chance alone.
+That single `z` is the engine under a one-sample z-test and a confidence interval
+alike: the interval `54 &plusmn; 1.96 &times; 2` is `[50.08, 57.92]`, which
+&mdash; just barely &mdash; excludes 50. Note which quantity did the work: the
+standard error, not the population's own spread. The raw data has sd 8, but the
+*mean* of sixteen draws has spread 2, and it is that shrinkage by `&radic;n` that
+makes an observed difference of 4 look like a lot rather than a little.
+
+Increasing the sample sharpens that verdict fast, through the same square root.
+At `n = 64` the standard error falls to `8 / 8 = 1`, so the same observed mean of
+54 now sits `z = 4` standard errors out &mdash; a result that was mildly
+surprising at sixteen samples becomes overwhelming at sixty-four. Nothing about
+the population changed; the larger sample simply pins the mean down four times
+more tightly than the raw data's spread of 8 would suggest, and that shrinkage is
+the entire practical content of the theorem.
+
 ## Where it goes wrong
 
 **Applying it to the data instead of the statistic.** Extremely common.
@@ -1976,6 +2171,39 @@ some SQL engines.
 
 For large samples the differences are negligible. For small ones they are not,
 and two tools can legitimately report different quartiles for identical data.
+
+## The definition ambiguity, on ten numbers
+
+The wrinkle deserves numbers, because it is where two tools disagree on identical
+data. Take the ten values `1, 2, 3, &hellip;, 10` and ask for the 25th
+percentile. "The value below which 25% falls" does not land on an observation, and
+the defensible answers differ:
+
+|method|25th percentile|how|
+|---|---|---|
+|linear interpolation|3.25|position `(n&minus;1)&middot;0.25 = 2.25`, so a quarter of the way from the 3rd value to the 4th|
+|nearest-rank|3|the smallest value with at least 25% at or below it|
+
+Both are correct; they answer slightly different questions about what a
+"percentile" of a finite sample means. NumPy's default is the linear method, and
+it offers nine in total; other tools default differently, which is why
+`numpy.percentile` and a SQL engine can report different quartiles for the same
+column. For a thousand points the gap between methods is negligible; for ten it is
+0.25 out of a range of 9, which is enough to change a decision. State the method
+when the sample is small and the number matters.
+
+The reason to care sits in the tail. A service's latency is reported at p95 and
+p99 precisely because one slow request in a thousand is invisible in a mean and
+obvious in a high percentile &mdash; and those percentiles cannot be averaged
+across servers, because the p99 of two machines is not the mean of their p99s.
+Aggregating them needs the underlying distributions or a structure like a
+t-digest; averaging them understates the tail every time, which is the one error
+this whole topic exists to prevent.
+
+There is also no single agreed definition of a sample quantile: on ten points the
+"value below which 25% falls" is a matter of interpolation, and NumPy alone offers
+nine methods. On large samples the choice is negligible; on small ones two honest
+tools can report different quartiles for identical data.
 
 ## Where it goes wrong
 
@@ -2175,6 +2403,36 @@ around it.
 
 **A/B test duration** is a standard error calculation before it is anything
 else.
+
+## The cost of precision, tabulated
+
+The `sigma / &radic;n` formula has a consequence worth seeing as a table, because
+it governs how big every survey and every A/B test has to be. With a population
+standard deviation of 10:
+
+|sample size n|standard error|
+|---|---|
+|4|5.00|
+|16|2.50|
+|64|1.25|
+|256|0.625|
+
+Each row quadruples `n` and the standard error halves &mdash; the `&radic;n` in
+the denominator made literal. Going from 4 to 16 buys a lot; going from 64 to 256
+buys the same *factor* of improvement for four times the absolute cost. Precision
+has diminishing returns, and they diminish predictably: to add one more decimal
+place of accuracy you need a hundred times the data. This is the whole reason
+national polls settle near a thousand respondents rather than ten thousand
+&mdash; past that point each extra person shrinks the error by too little to be
+worth collecting, and any remaining error is bias, which more data cannot touch.
+
+The table also draws the line between the two quantities people confuse. The
+population's own spread &mdash; its standard deviation &mdash; is 10 in every row;
+collecting more data never moves it. The standard error is the column that shrinks,
+because it describes the *estimate*, not the data. A useful test: if a number would
+change when you collect more observations of the same kind, it is a standard error;
+if it would not, it is a standard deviation. An error bar that does not say which
+it is could mean either, and the two tell completely different stories.
 
 ## Where it goes wrong
 
@@ -3178,6 +3436,53 @@ there is, and it is this decomposition in a loop.
 **Kalman filters** in square-root form, for the same conditioning reason as
 least squares.
 
+## Gram-Schmidt by hand, on two vectors
+
+The editor below runs the full factorisation; the mechanism is clearest on two
+vectors small enough to finish on paper. Take `a1 = (1, 1)` and `a2 = (2, 0)`,
+which span the plane but meet at 45&deg;, not a right angle.
+
+**q1** is `a1` normalised: its length is &radic;2, so `q1 = (1, 1)/&radic;2`.
+
+**q2** removes from `a2` its component along `q1`. The projection length is
+`a2 &middot; q1 = 2/&radic;2 = &radic;2`, so the projection is `&radic;2 &middot;
+q1 = (1, 1)`. Subtract it: `a2 &minus; (1, 1) = (1, &minus;1)`. That remainder is
+perpendicular to `q1` by construction, and normalising it (length &radic;2 again)
+gives `q2 = (1, &minus;1)/&radic;2`.
+
+Check: `q1 &middot; q2 = (1&minus;1)/2 = 0`, exactly, as it must be. And the
+projections you subtracted are `R`:
+
+|R|value|
+|---|---|
+|R&#8321;&#8321; = &#124;a1&#124;|&radic;2|
+|R&#8321;&#8322; = a2 &middot; q1|&radic;2|
+|R&#8322;&#8322; = &#124;remainder&#124;|&radic;2|
+
+`R` is upper triangular because `a1` was built from `q1` alone and only `a2` ever
+used `q2` &mdash; nothing is ever built from a later `q`, so everything below the
+diagonal is zero. That is the whole factorisation, and every larger case is this
+one repeated.
+
+The reason least squares reaches for this rather than the textbook normal
+equations is visible in the same small picture. Solving `Rx = Q'b` uses the
+triangular `R` directly and never forms `A'A`, which would square the condition
+number &mdash; a matrix conditioned at 10&#8310; becomes 10&#185;&#178;, and in
+double precision that discards most of the available digits before the solve even
+starts. The orthonormal columns are what make `Q'Q` disappear to the identity, so
+the substitution costs nothing and the conditioning is left untouched.
+
+The version shown here, subtracting every projection at the end, is *classical*
+Gram-Schmidt and drifts out of orthogonality in floating point; the *modified*
+form subtracts each projection immediately and behaves far better, though serious
+libraries use Householder reflections instead. Gram-Schmidt survives as the
+version you can watch happen, which is why it is the one worth working by hand.
+
+The same decomposition, run in a loop that factors and re-multiplies in the
+opposite order, is the QR algorithm for eigenvalues &mdash; one of the most
+important numerical methods there is, and at heart just this factorisation
+repeated until the matrix goes triangular.
+
 ## Where it goes wrong
 
 **Classical Gram-Schmidt on ill-conditioned input.** Use the modified version,
@@ -3391,6 +3696,42 @@ The standard repairs: add a small multiple of the identity to the diagonal
 [ridge regression](ridge_and_lasso_regression.html); use a shrinkage estimator
 such as Ledoit-Wolf; or clip the negative eigenvalues to zero and reassemble.
 
+## Cholesky by hand, and the failure
+
+The three formulas are short enough to run on a 2&times;2. Take
+`C = [[4, 2], [2, 5]]`:
+
+`L&#8321;&#8321; = &radic;4 = 2`. `L&#8322;&#8321; = 2 / L&#8321;&#8321; = 1`.
+`L&#8322;&#8322; = &radic;(5 &minus; 1&sup2;) = &radic;4 = 2`.
+
+So `L = [[2, 0], [1, 2]]`, and multiplying back, `L L' = [[4, 2], [2, 5]]` &mdash;
+the original. The whole story is in that last square root: `C&#8322;&#8322;`
+minus what the first column already accounts for must be non-negative for a real
+`L` to exist.
+
+Now feed it a matrix that is symmetric but not positive definite,
+`B = [[1, 2], [2, 1]]`. The last step asks for `&radic;(1 &minus; 2&sup2;) =
+&radic;(&minus;3)`, which has no real value, and the factorisation stops. That is
+not a bug &mdash; it is the test. `B` fails because `x = (1, &minus;1)` gives
+`x' B x = 1 &minus; 4 + 1 = &minus;2 < 0`, so `B` is not a covariance of anything:
+no set of variables has a negative variance. The cheap `n&sup3;/3` factorisation
+is how a routine decides positive-definiteness, precisely because it breaks
+exactly when the property fails.
+
+That is also why an estimated covariance matrix sometimes fails the factorisation
+when it "should" work: with more variables than observations the estimate is
+singular by construction, and a genuinely collinear pair gives some direction zero
+variance, so the last square root reaches zero or below. The standard repair
+&mdash; adding a small multiple of the identity, the same idea as ridge
+regression &mdash; nudges every eigenvalue up just enough to make the square roots
+real again, at the cost of admitting you changed the model.
+
+It is worth stressing why the factorisation is the test of choice: at about
+`n&sup3;/3` operations it is half the cost of a general LU decomposition and a
+fraction of computing the eigenvalues, so a routine that needs to know whether a
+matrix is positive definite simply attempts the Cholesky and watches for the
+negative square root.
+
 ## Where it goes wrong
 
 **Passing a non-symmetric matrix.** Most implementations read only one triangle
@@ -3595,6 +3936,49 @@ non-zero, or it is slack and its multiplier is zero.
 That is what makes SVMs sparse. Points comfortably on the correct side of the
 margin have slack constraints, so their multipliers are zero, so they contribute
 nothing to the solution. Only the points pressed against the margin survive.
+
+## The shadow price, worked
+
+The claim that `lambda` is a price is easiest to trust on a case you can check by
+hand. Minimise `x&sup2; + y&sup2;` &mdash; distance-squared from the origin
+&mdash; subject to `3x + 4y = c`. The constraint is a line, and the closest point
+on a line `3x + 4y = c` to the origin is at distance `c/5` (because
+&radic;(3&sup2;+4&sup2;) = 5), so the minimum value is `(c/5)&sup2;`.
+
+Now watch what one unit of `c` buys:
+
+|c|minimum `x&sup2;+y&sup2;`|change|
+|---|---|---|
+|24|23.04||
+|25|25.00|+1.96|
+|26|27.04|+2.04|
+
+The optimum rises by about 2 per unit of `c`, and the multiplier the method
+returns is `lambda = 2c/25 = 2` at `c = 25`. The two agree: `lambda` *is* the
+rate at which the optimal value changes as the constraint moves &mdash; the price
+of one more unit of the resource. The small gap between 1.96 and 2.04 is the
+curvature of that price across the step; in the limit of an infinitesimal change
+it is exactly `lambda`. This is why, in a real problem, the multiplier is often
+worth more than the optimum: it tells you what relaxing the constraint is worth
+before you pay to relax it.
+
+This is why the multiplier reappears under other names across machine learning:
+it is the regularisation strength in ridge regression (the price of the
+coefficient-size budget), and it is the per-point dual variable in an SVM, where
+the points whose multiplier comes out non-zero are exactly the support vectors.
+In every case `lambda` answers the question the optimum cannot: not "what is the
+best value" but "what is the constraint costing me", which is usually the number a
+decision actually turns on.
+
+A multiplier of zero carries its own message: the constraint is not binding, you
+would have chosen that point anyway, and relaxing it buys nothing &mdash; which is
+as useful to know as a large multiplier that says the constraint is expensive and
+worth paying to loosen.
+
+For inequality constraints the same idea extends to the KKT conditions, whose
+complementary slackness says each constraint is either tight with a possibly
+non-zero multiplier or slack with a zero one &mdash; which is precisely what makes
+an SVM sparse, since points comfortably inside the margin contribute nothing.
 
 ## Where it goes wrong
 
@@ -4344,6 +4728,44 @@ it should, and if it does not, something is transposed.
 The transpose in that last line is why the backward pass is sometimes described
 as running the network in reverse: the same weights, applied the other way
 round.
+
+## One gradient, worked and checked
+
+The identities are worth exercising on numbers. Take `f(x) = x'Ax` with
+`A = [[2, 1], [1, 3]]` (symmetric) at `x = (1, 2)`. The rule says the gradient is
+`(A + A')x = 2Ax`:
+
+`2Ax = 2 &middot; (2&middot;1 + 1&middot;2,  1&middot;1 + 3&middot;2) =
+2 &middot; (4, 7) = (8, 14)`.
+
+Check it against the definition by nudging each input. `f(1, 2) =
+2 + 2&middot;2 + 3&middot;4 = 18`. Increase `x&#8321;` by a small `h`: the change
+in `f` divided by `h` approaches 8. Increase `x&#8322;`: it approaches 14. The
+partial derivatives are the gradient's components, and they match the identity
+term for term.
+
+The shape rule catches the error you are most likely to make. `f` is a scalar and
+`x` is length 2, so `df/dx` must be length 2 &mdash; which `(8, 14)` is. Had a
+derivation produced a 2&times;2 or a scalar, it would be wrong before any
+arithmetic was checked. That single check &mdash; does the gradient have the shape
+of the thing it differentiates &mdash; resolves the numerator-versus-denominator
+layout ambiguity every time, because only one orientation matches the parameter.
+
+The same check scales straight to a network layer. For `y = Wx + b`, the weight
+gradient is the outer product `(dL/dy) x'`: if the outgoing error is `m`-long and
+the input `n`-long, that product is `m&times;n` &mdash; the shape of `W` &mdash;
+so the update `W -= lr &middot; dW` type-checks by construction. Get a transpose
+wrong and the shapes stop matching before any number is computed, which is why the
+shape rule is the fastest debugging tool a backward pass has.
+
+That transpose in the input gradient, `W'(dL/dy)`, is why the backward pass is
+described as running the network in reverse: the same weights, applied the other
+way round, carrying the error back to the layer before.
+
+None of this is new calculus &mdash; differentiating `x'Ax` is the product rule
+applied to a sum &mdash; but the compact notation and the handful of memorised
+identities are what let you write a gradient down without expanding into indices
+every time.
 
 ## Where it goes wrong
 

@@ -102,6 +102,44 @@ The transpose in that last line is why the backward pass is sometimes described
 as running the network in reverse: the same weights, applied the other way
 round.
 
+## One gradient, worked and checked
+
+The identities are worth exercising on numbers. Take `f(x) = x'Ax` with
+`A = [[2, 1], [1, 3]]` (symmetric) at `x = (1, 2)`. The rule says the gradient is
+`(A + A')x = 2Ax`:
+
+`2Ax = 2 &middot; (2&middot;1 + 1&middot;2,  1&middot;1 + 3&middot;2) =
+2 &middot; (4, 7) = (8, 14)`.
+
+Check it against the definition by nudging each input. `f(1, 2) =
+2 + 2&middot;2 + 3&middot;4 = 18`. Increase `x&#8321;` by a small `h`: the change
+in `f` divided by `h` approaches 8. Increase `x&#8322;`: it approaches 14. The
+partial derivatives are the gradient's components, and they match the identity
+term for term.
+
+The shape rule catches the error you are most likely to make. `f` is a scalar and
+`x` is length 2, so `df/dx` must be length 2 &mdash; which `(8, 14)` is. Had a
+derivation produced a 2&times;2 or a scalar, it would be wrong before any
+arithmetic was checked. That single check &mdash; does the gradient have the shape
+of the thing it differentiates &mdash; resolves the numerator-versus-denominator
+layout ambiguity every time, because only one orientation matches the parameter.
+
+The same check scales straight to a network layer. For `y = Wx + b`, the weight
+gradient is the outer product `(dL/dy) x'`: if the outgoing error is `m`-long and
+the input `n`-long, that product is `m&times;n` &mdash; the shape of `W` &mdash;
+so the update `W -= lr &middot; dW` type-checks by construction. Get a transpose
+wrong and the shapes stop matching before any number is computed, which is why the
+shape rule is the fastest debugging tool a backward pass has.
+
+That transpose in the input gradient, `W'(dL/dy)`, is why the backward pass is
+described as running the network in reverse: the same weights, applied the other
+way round, carrying the error back to the layer before.
+
+None of this is new calculus &mdash; differentiating `x'Ax` is the product rule
+applied to a sum &mdash; but the compact notation and the handful of memorised
+identities are what let you write a gradient down without expanding into indices
+every time.
+
 ## Where it goes wrong
 
 **Mixing layout conventions mid-derivation.** Pick one, and use the shape rule

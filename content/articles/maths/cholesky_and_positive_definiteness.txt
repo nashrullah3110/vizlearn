@@ -97,6 +97,42 @@ The standard repairs: add a small multiple of the identity to the diagonal
 [ridge regression](ridge_and_lasso_regression.html); use a shrinkage estimator
 such as Ledoit-Wolf; or clip the negative eigenvalues to zero and reassemble.
 
+## Cholesky by hand, and the failure
+
+The three formulas are short enough to run on a 2&times;2. Take
+`C = [[4, 2], [2, 5]]`:
+
+`L&#8321;&#8321; = &radic;4 = 2`. `L&#8322;&#8321; = 2 / L&#8321;&#8321; = 1`.
+`L&#8322;&#8322; = &radic;(5 &minus; 1&sup2;) = &radic;4 = 2`.
+
+So `L = [[2, 0], [1, 2]]`, and multiplying back, `L L' = [[4, 2], [2, 5]]` &mdash;
+the original. The whole story is in that last square root: `C&#8322;&#8322;`
+minus what the first column already accounts for must be non-negative for a real
+`L` to exist.
+
+Now feed it a matrix that is symmetric but not positive definite,
+`B = [[1, 2], [2, 1]]`. The last step asks for `&radic;(1 &minus; 2&sup2;) =
+&radic;(&minus;3)`, which has no real value, and the factorisation stops. That is
+not a bug &mdash; it is the test. `B` fails because `x = (1, &minus;1)` gives
+`x' B x = 1 &minus; 4 + 1 = &minus;2 < 0`, so `B` is not a covariance of anything:
+no set of variables has a negative variance. The cheap `n&sup3;/3` factorisation
+is how a routine decides positive-definiteness, precisely because it breaks
+exactly when the property fails.
+
+That is also why an estimated covariance matrix sometimes fails the factorisation
+when it "should" work: with more variables than observations the estimate is
+singular by construction, and a genuinely collinear pair gives some direction zero
+variance, so the last square root reaches zero or below. The standard repair
+&mdash; adding a small multiple of the identity, the same idea as ridge
+regression &mdash; nudges every eigenvalue up just enough to make the square roots
+real again, at the cost of admitting you changed the model.
+
+It is worth stressing why the factorisation is the test of choice: at about
+`n&sup3;/3` operations it is half the cost of a general LU decomposition and a
+fraction of computing the eigenvalues, so a routine that needs to know whether a
+matrix is positive definite simply attempts the Cholesky and watches for the
+negative square root.
+
 ## Where it goes wrong
 
 **Passing a non-symmetric matrix.** Most implementations read only one triangle
