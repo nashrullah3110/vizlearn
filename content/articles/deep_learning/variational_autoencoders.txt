@@ -96,6 +96,45 @@ harder to train. Diffusion models have largely displaced both for image
 generation, and the VAE survives inside them &mdash; latent diffusion runs the
 diffusion process in a VAE's latent space rather than in pixels.
 
+## The KL term, computed
+
+A VAE's loss is reconstruction error plus a KL divergence pulling each encoded
+distribution toward the unit-Gaussian prior, and for Gaussians that KL has a
+closed form worth seeing:
+
+`KL(N(mu, sigma) || N(0, 1)) = &frac12;(mu&sup2; + sigma&sup2; &minus; ln sigma&sup2; &minus; 1)`
+
+|encoder output|KL cost|
+|---|---|
+|mu = 0, sigma = 1 (matches the prior)|0.00|
+|mu = 2, sigma = 1 (shifted away)|2.00|
+|mu = 0, sigma = 0.1 (too confident)|1.81|
+
+The term is zero exactly when the code looks like a draw from the prior, and it
+punishes both a mean pushed away from the origin and a variance collapsed toward
+a point &mdash; the tight, confident code a plain autoencoder loves. That is the
+tension: reconstruction wants tight, well-separated codes it can decode exactly,
+while the KL wants every code to look prior-like so that a draw from the prior
+looks like a code and sampling works. When the KL wins you get *posterior
+collapse* &mdash; the encoder outputs the prior regardless of input and the
+decoder ignores the latent &mdash; and when reconstruction wins you get sharp
+clusters with unsamplable gaps between them. beta-VAE weights the KL to sit the
+balance where you want it, and the loss itself is not arbitrary: it is the ELBO,
+the [Jensen's-inequality](../maths/jensens_inequality.html) lower bound on the
+intractable `log p(x)`.
+
+The reparameterisation trick is what makes all of this trainable, and it is worth
+stating on its own: you cannot backpropagate through a sampling step, so the code
+is written as `z = mu + sigma &middot; epsilon` with `epsilon` drawn from a fixed
+standard normal. The randomness is now an input rather than an operation, so with
+`epsilon` held fixed the expression is an ordinary differentiable function of `mu`
+and `sigma` and the gradient flows to the encoder normally. It is two lines of
+code and VAEs did not train without it, and the same device reappears wherever a
+sample must be differentiated through &mdash; the Gumbel-softmax does the identical
+job for discrete latents. The blur in VAE samples, by contrast, is structural: the
+pixel-wise reconstruction term rewards hedging, so an uncertain decoder averages
+the possibilities rather than committing to one.
+
 ## Where it goes wrong
 
 **Posterior collapse**, especially with a powerful decoder that can do well

@@ -82,6 +82,52 @@ condition, then extrapolates away from the unconditioned prediction at sampling
 time. It is what makes prompts actually steer the output, and turning it up
 trades diversity for prompt adherence.
 
+## The closed form that makes training cheap
+
+The reason diffusion training is cheap is one equation: the forward process has a
+closed form, so you can jump to any noise level without simulating the steps
+before it.
+
+`x_t = sqrt(abar_t) &middot; x_0 + sqrt(1 - abar_t) &middot; epsilon`
+
+`abar_t` is the fraction of the original signal still present, falling along a
+fixed schedule. On the cosine schedule over 60 steps:
+
+|step t|signal kept, sqrt(abar)|noise, sqrt(1-abar)|
+|---|---|---|
+|0|1.00|0.00|
+|15|0.92|0.39|
+|30|0.70|0.71|
+|45|0.38|0.93|
+|60|0.00|1.00|
+
+Training picks a random `t`, jumps straight there with one draw of `epsilon`, and
+asks the network to predict that `epsilon` &mdash; a plain squared-error
+regression, no simulation, no adversary. And the forward step is exactly
+invertible if you know the noise: rearranging the equation recovers `x_0` from
+`x_t` and `epsilon` with essentially zero error, so predicting the noise is the
+whole job. The cosine schedule above is chosen over the original linear one
+precisely because linear destroys the signal too fast &mdash; its final steps are
+nearly pure noise and teach almost nothing, while the cosine keeps signal alive
+longer and trains better.
+
+Everything that made diffusion win over GANs follows from that squared-error
+objective. Predicting noise is ordinary supervised regression, so there is no
+minimax game to balance and no mode collapse &mdash; the model is trained to
+denoise *every* example, so it cannot quietly drop part of the distribution the
+way a GAN can. The price is sampling speed: generation is many sequential denoise
+steps, originally a thousand and now often ten to fifty with a better sampler,
+where a GAN needs one forward pass. Latent diffusion cuts the cost by running the
+whole process in a VAE's latent space rather than in pixels, which is what Stable
+Diffusion is, and classifier-free guidance is what lets a text prompt actually
+steer the result.
+
+One last point of confusion worth heading off: most diffusion models predict the
+*noise*, not the image, and some predict the original or a mixture called `v`. The
+three are algebraically equivalent but behave differently in training, and
+assuming the network outputs the picture rather than the noise makes the sampling
+code nonsense.
+
 ## Where it goes wrong
 
 **Expecting fast sampling.** It is the known weakness.

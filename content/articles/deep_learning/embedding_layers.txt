@@ -79,6 +79,44 @@ symbol.
 **Recommendation.** Users and items each get a table, and their dot product is a
 predicted affinity. Matrix factorisation is exactly this.
 
+## Why the lookup replaces the matmul
+
+The formal definition of an embedding layer is a one-hot vector times a weight
+matrix, and writing out the sizes shows why nobody computes it that way. At a
+50,000-token vocabulary and 512 dimensions:
+
+|operation|numbers touched|
+|---|---|
+|one-hot vector &times; weight matrix|50,000 &times; 512 = **25.6 million**|
+|the row it actually selects|**512**|
+
+The one-hot is all zeros but one, so the multiply reads 25.6 million values to
+return 512 and multiplies everything else by zero. Every framework therefore
+implements the layer as an indexed table lookup, with a backward pass that
+scatters gradients only to the rows a batch actually used &mdash; which means the
+table is a huge parameter tensor that sits almost entirely idle on any given step.
+The table itself is `vocab &times; dim = 25.6 million` parameters, often the
+largest single component of a model, and the two standard economies both attack
+that: weight tying reuses the input table as the output layer (halving the token
+parameters and usually improving quality, since both are learning what tokens
+mean), and subword tokenisation keeps the vocabulary in the tens of thousands
+rather than the millions a word-level scheme would need. The geometry the rows
+end up with &mdash; king &minus; man + woman landing near queen &mdash; is never
+imposed; it falls out of the training objective, which also means it inherits the
+training corpus's biases.
+
+Because only the rows appearing in a batch receive a gradient, an embedding table
+is a large parameter tensor that is almost entirely idle on any given step, which
+complicates optimisers that keep per-parameter state and anyone sharding a model
+across devices. The same lookup mechanism generalises well beyond words: a user
+id, a postcode or a product category embeds the same way, which is what made
+neural networks competitive on tabular data with high-cardinality categories; a
+transformer embeds positions as well as tokens; and a recommender gives users and
+items each a table whose dot product is a predicted affinity, which is matrix
+factorisation wearing a different name. The proximity of two rows should be read
+as co-occurrence in the training data, not as meaning &mdash; a distinction that
+matters wherever those associations encode bias.
+
 ## Where it goes wrong
 
 **Implementing the one-hot matmul literally.** Correct, and enormously wasteful.

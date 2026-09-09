@@ -83,6 +83,40 @@ gradients, mostly was not. **bfloat16 needs no loss scaling**, which is why it
 is the default on hardware that supports it, and why large-model training
 largely stopped talking about GradScaler.
 
+## The range that makes loss scaling necessary
+
+The failure is entirely about fp16's floor. fp16 carries 5 exponent bits, giving
+a smallest normal value around `2^-14 &asymp; 6.1 &times; 10^-5` and a maximum of
+65,504. Real gradients routinely sit *below* that floor:
+
+|quantity|magnitude|in fp16|
+|---|---|---|
+|a typical small gradient|~1 &times; 10^-7|rounds to **zero**|
+|the same, times a loss scale of 4096|~4 &times; 10^-4|represented fine|
+
+A gradient that rounds to zero is not a small update, it is *no* update &mdash;
+the parameter freezes, silently, while the loss still falls and the run looks
+healthy. Loss scaling fixes it in one line: multiply the loss by a constant before
+the backward pass, so by the chain rule every gradient is multiplied too and the
+whole distribution shifts up into the representable range; divide it back out
+before the optimiser steps. The update is mathematically unchanged &mdash; it is a
+change of units, not of algorithm. Push the constant too high and gradients
+overflow to infinity instead, which is why the standard scaler is *dynamic*:
+start high, double it after stretches without overflow, and halve it and skip the
+step when an infinity appears. bfloat16 sidesteps the whole page by keeping fp32's
+8 exponent bits &mdash; same range, less precision &mdash; so it needs no scaling
+at all.
+
+The other half of "mixed" is what deliberately stays in fp32. Weights keep an
+fp32 master copy, because an update is often far smaller than the weight it
+adjusts and adding a tiny number to a large one in fp16 rounds to no change at
+all. Reductions &mdash; sums, means, softmax, normalisation statistics &mdash;
+accumulate in fp32, because adding many small numbers is exactly where ten mantissa
+bits go wrong and produce the mysterious NaNs that half-precision softmax is known
+for. The fp16 lives where the speed is: the matrix multiplies and convolutions the
+tensor cores accelerate. Layers that are memory-bound rather than compute-bound
+gain little, which is why the speed-up is real but never uniform across a model.
+
 ## Where it goes wrong
 
 **fp16 without loss scaling.** Silent underflow, and a partly frozen model.

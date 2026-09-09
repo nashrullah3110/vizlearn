@@ -75,6 +75,46 @@ and not at all lorry. Smoothing deliberately flattens exactly that, erasing what
 the student was supposed to learn. If a model is going to be a distillation
 teacher, train it without.
 
+## The floor the loss cannot go below
+
+Two numbers make label smoothing concrete. With `epsilon = 0.1` and `K = 10`
+classes, the target puts `1 - 0.1 + 0.1/10 = 0.91` on the correct class and
+`0.1/10 = 0.011` on each of the other nine. A model that matches that target
+*exactly* still records a cross-entropy equal to the target's own entropy:
+
+`-(0.91 &middot; ln 0.91 + 9 &middot; 0.011 &middot; ln 0.011) &asymp; 0.50`
+
+|target|minimum achievable loss|
+|---|---|
+|one-hot|0 (but never reached &mdash; needs an infinite logit gap)|
+|smoothed, eps = 0.1|~0.50|
+
+That is the whole mechanism, stated as arithmetic. The one-hot target has a floor
+of zero that softmax can only approach by driving the correct logit infinitely
+far from the rest &mdash; so the gradient never vanishes and training keeps
+inflating confidence. The smoothed target has a floor of 0.50 reached at a
+*finite* logit gap, so the model has a reason to stop, and it stops before it
+becomes overconfident. It also means a smoothed run's training loss is not
+comparable with an unsmoothed one: 0.50 is the new zero, and comparing the raw
+numbers across the two is comparing against different floors.
+
+The one place smoothing actively hurts is distillation. A student learns from the
+teacher's full output distribution, and the informative part is the relative sizes
+of the *wrong* classes &mdash; that a particular dog photo is a little cat-like and
+not at all lorry-like. That structure is exactly what smoothing flattens, by
+design, pushing every wrong class toward the same small value. So a model destined
+to be a distillation teacher should be trained without it, even though 0.1 is the
+right default almost everywhere else &mdash; it was in the Inception-v3 paper and
+the original Transformer, and it has stayed the default because the calibration
+and generalisation gains are consistent across classification and translation
+alike.
+
+It is also worth remembering what smoothing is not: it is a change to a
+categorical target, so it has no meaning for regression, and it is not a
+substitute for explicit calibration. Temperature scaling on a validation set
+corrects confidence more directly, and the two compose &mdash; smoothing during
+training, scaling afterwards.
+
 ## Where it goes wrong
 
 **Epsilon too large.** Past about 0.2 you are actively teaching the model that

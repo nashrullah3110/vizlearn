@@ -83,6 +83,49 @@ competitive where inference must be a single forward pass, and the adversarial
 idea itself survives everywhere &mdash; in domain adaptation, in perceptual
 losses, in super-resolution.
 
+## Why a winning discriminator kills training
+
+The vanishing-gradient failure is not vague; it falls straight out of the
+optimal discriminator `D*(x) = p_real(x) / (p_real(x) + p_fake(x))`. Put the real
+and fake distributions as unit Gaussians and slide them apart:
+
+|separation of the means|D* at the fake's centre|D* at the real's centre|
+|---|---|---|
+|0.5 (heavy overlap)|0.47|0.53|
+|4.0 (barely overlapping)|0.0003|0.9997|
+
+When the two overlap, D* sits near 0.5 everywhere and its curve *slopes* through
+the region the fakes occupy &mdash; and that slope is the generator's entire
+learning signal. When they separate, D* saturates to 0.0003 where the fakes live:
+almost perfectly correct, and almost perfectly flat. A flat discriminator has no
+slope to follow, so the generator gets no gradient exactly when it is doing
+worst. This is the awkward heart of the original GAN &mdash; the better the
+discriminator, the less the generator can learn &mdash; and it is why Wasserstein
+GAN replaced the classifier with a critic estimating earth-mover distance, which
+stays informative even for distributions that do not overlap at all.
+
+This is also why a GAN has no usable progress metric and why mode collapse goes
+unpunished. There is no single loss that decreases &mdash; a falling generator
+loss can mean the generator improved or the discriminator weakened &mdash; so FID
+and Inception Score exist as external proxies for sample quality. And because the
+discriminator judges samples one at a time, a generator that finds one convincing
+region and abandons the rest of the distribution is never penalised for the lack
+of variety; nothing in the objective ever sees more than a single sample at once,
+so the fix has to come from outside it, in minibatch discrimination or in the
+Wasserstein reformulation.
+
+None of this makes GANs obsolete. They still win where inference must be a single
+forward pass, and the adversarial idea itself is everywhere &mdash; in domain
+adaptation, in perceptual losses, in super-resolution &mdash; even though
+diffusion models have taken over image generation by trading sampling speed for
+the training stability a minimax game can never quite offer.
+
+The practical upshot for anyone training one: watch the samples, not the loss;
+keep the discriminator from winning outright, since a perfect discriminator gives
+no gradient; and check the variety of what the generator produces rather than the
+quality of any single sample, because individually convincing outputs are exactly
+what mode collapse leaves you with.
+
 ## Where it goes wrong
 
 **Reading the loss curves.** They mostly say who is winning, not whether the

@@ -94,6 +94,43 @@ dropout.
 **Recommendation and retrieval**, where "these two things go together" is the
 native form of the data.
 
+## InfoNCE by hand, and why temperature dominates
+
+The contrastive loss is ordinary cross-entropy over "which candidate is the
+match", so it is worth evaluating once. Anchor similarity to its positive 0.9,
+to four negatives 0.85 (one hard), 0.2, 0.1, 0.3, loss
+`-log[ exp(0.9/tau) / (exp(0.9/tau) + &Sigma; exp(neg/tau)) ]`:
+
+|temperature tau|loss|P(picks the positive)|
+|---|---|---|
+|0.05|0.31|0.73|
+|0.10|0.48|0.62|
+|0.50|0.98|0.38|
+
+Same geometry, same similarities &mdash; only `tau` changed &mdash; and the loss
+moves by a factor of three. Low temperature sharpens the softmax so the hard
+negative at 0.85 dominates the denominator and the gradient concentrates on the
+single most confusable case: fast, fine distinctions, and unstable. High
+temperature flattens the candidates until they count about equally and the loss
+stops discriminating. That is why temperature is tuned before anything
+architectural, and why SimCLR's ablations found it and the augmentation choice
+mattered more than the encoder. More negatives raise the loss for the right
+reason &mdash; a harder task is more informative &mdash; which is what pushed the
+field to large batches and memory queues, before BYOL and SimSiam showed the
+negatives could be dropped entirely given the right asymmetry.
+
+The augmentations are not a preprocessing detail; they *are* the design, because
+they decide what the model learns to treat as irrelevant. Colour jitter teaches
+colour invariance, which is exactly right for object recognition and exactly wrong
+for a task where colour is the label. Random cropping teaches that a part implies
+the whole, which is most of why contrastive learning works on images. The other
+standing risk is false negatives: two different photos of the same class are
+pushed apart by a loss that has no labels to know they belong together, a real
+cost that supervised contrastive learning removes when labels happen to be
+available. CLIP is the variant that contrasts images against their captions
+instead of against other views, which is what produced a model steerable by
+language.
+
 ## Where it goes wrong
 
 **Augmentations that destroy the label.** Colour jitter on a task about colour.

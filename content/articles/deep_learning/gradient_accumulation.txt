@@ -83,6 +83,41 @@ pass, for roughly 30% more time and a large memory saving. The two combine.
 **Model parallelism and ZeRO** attack the fixed costs, which accumulation cannot
 touch. When the weights alone do not fit, accumulation is not the answer.
 
+## Where the memory actually goes
+
+Accumulation works because it attacks the one cost that scales with the batch.
+Training memory splits in two: a fixed part &mdash; weights, their gradients, and
+the optimiser state, which for Adam is about four times the model size &mdash;
+and activations, every intermediate value kept for the backward pass, which grows
+linearly with the batch. Take a 1&nbsp;GB model on an 8&nbsp;GB budget:
+
+|batch|fixed (Adam ~4&times;)|activations|total|
+|---|---|---|---|
+|256 (wanted)|4.0 GB|~5.1 GB|9.1 GB &mdash; **over budget**|
+|16 (micro-batch)|4.0 GB|~0.3 GB|4.3 GB &mdash; fits|
+
+Run the micro-batch of 16 sixteen times, summing the gradients, and step once:
+the update is *identical* to the 256-batch, because the batch gradient is the mean
+of the per-example gradients and a mean can be built in pieces. The fixed 4&nbsp;GB
+never moves &mdash; accumulation cannot touch it, which is why it is no help when
+the weights alone do not fit &mdash; but the activation term, the part that broke
+the budget, is now a sixteenth of its size. The cost is time: sixteen sequential
+passes take about as long as sixteen passes. It buys capability, not throughput,
+and the one thing it does *not* reproduce is batch-norm statistics, which are
+computed over the micro-batch and so behave like the small batch however many
+steps you accumulate.
+
+Two implementation details cause most accumulation bugs, and both fail quietly.
+The loss must be divided by the number of accumulation steps before the backward
+pass, or the accumulated gradient is a sum where the optimiser expects a mean and
+the effective learning rate is silently multiplied by the step count. And the
+gradients must be zeroed after the optimiser step, not after every backward pass
+&mdash; zero them each pass and the technique is defeated with no error at all,
+training proceeding with exactly the small batch it was meant to escape.
+Activation checkpointing and mixed precision attack the same activation memory
+from other angles and combine with it; model parallelism attacks the fixed part
+that accumulation cannot.
+
 ## Where it goes wrong
 
 **Forgetting to divide the loss.** Silently multiplies the learning rate.

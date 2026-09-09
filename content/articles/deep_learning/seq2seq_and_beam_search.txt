@@ -73,6 +73,48 @@ most probable path, because for creative text the most probable path is the
 boring one. Beam search survives where there is a right answer: translation,
 speech recognition, constrained generation.
 
+## Where greedy loses, on a tree you can check
+
+The claim that greedy decoding optimises the wrong thing is a two-step example
+away. Suppose the first token is A with probability 0.6 or B with 0.4, and the
+best continuation after each is:
+
+|first token|P(first)|best P(second)|sequence probability|
+|---|---|---|---|
+|A|0.6|0.5|0.30|
+|B|0.4|0.9|**0.36**|
+
+Greedy takes A, because 0.6 beats 0.4, and lands on a sequence of probability
+0.30. Beam search with width 2 keeps both A and B alive, discovers that B leads
+to a 0.9 continuation, and returns the 0.36 sequence &mdash; the more probable
+*sequence*, which the greedy first choice ruled out at step one. That is the
+entire argument for beam search: the highest-probability first token can open
+into a region where everything after it is worse.
+
+It is still a heuristic, not a global search, and it has its own trap. Sequence
+probability is a product of per-token terms, so every extra token multiplies by
+something below 1 and longer sequences score lower automatically &mdash; which is
+why unnormalised beam search truncates, and why every production decoder divides
+the log-probability by length. Widen the beam too far and quality can even fall,
+because a more faithful search of the model's probability finds the blandest,
+safest text; that is the beam-search curse, and it is why open-ended generation
+samples instead.
+
+The deeper reason open-ended generation abandons beam search is that the model's
+notion of probable is not the same as good. A more faithful search of the
+probability surface converges on the safe, generic continuation &mdash; the blandest
+text is often the most probable &mdash; so past a beam width of about five,
+translation and summarisation quality can fall rather than rise. Beam search earns
+its place only where there is a genuinely correct answer to find: translation,
+speech recognition, constrained decoding. For creative text, temperature, top-k
+and nucleus sampling deliberately avoid the most probable path, because that path
+is exactly the one worth leaving.
+
+And the cost is not free: a beam of width `k` multiplies both computation and
+memory by `k`, which for a large model is usually the binding constraint long
+before quality is, so the width is chosen against a hardware budget as much as
+against the translation it buys.
+
 ## Where it goes wrong
 
 **No length normalisation.** Everything comes out truncated.

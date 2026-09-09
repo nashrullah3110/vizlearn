@@ -73,6 +73,46 @@ before better initialisation and normalisation made it unnecessary.
 gaps, so a random code usually decodes to nothing meaningful. Fixing that is
 what [the VAE](variational_autoencoders.html) is for.
 
+## The elbow that reveals intrinsic dimension
+
+The useful thing an autoencoder measures is *how many numbers the data really
+needs*, and it shows up as an elbow in reconstruction error against latent size.
+On data that genuinely lives in `d` dimensions with a little noise on top,
+widening the bottleneck past `d` buys almost nothing:
+
+|latent size|reconstruction error|
+|---|---|
+|1|large &mdash; only the biggest structure survives|
+|up to the true d|falling steeply, each dimension earns its place|
+|beyond d|flat &mdash; the remaining detail is noise|
+
+The point where the curve flattens is the data's intrinsic dimensionality, and it
+is the same number [PCA](../machine_learning/pca.html) would find &mdash; a linear
+autoencoder with squared-error loss provably recovers the PCA subspace. The
+reason to reach for an autoencoder instead is the non-linear case: real data (an
+image dataset, say) lies on a curved manifold in a high-dimensional space, and a
+straight projection cannot follow the curve where a non-linear encoder can. That
+is also why the reconstruction error reads as pixel agreement rather than
+perceptual quality, and why autoencoder outputs look softened: the bottleneck
+keeps what is common to the data and spends nothing on the specific sharp detail
+that distinguishes one example from its neighbours.
+
+The denoising variant turns the same bottleneck into a training procedure: corrupt
+the input deliberately and ask for the clean version back. Because noise is by
+construction the part of a signal with no structure to compress, a narrow code
+cannot afford to store it, so reconstructing through the bottleneck forces the
+network to discard exactly what noise is. That also removes the degenerate escape
+where a too-wide code simply learns the identity, which is why the trick shows up
+even when denoising is not the goal &mdash; and it is the same instinct behind
+using an autoencoder for anomaly detection, where a model trained only on normal
+data reconstructs anything unfamiliar badly, and the reconstruction error becomes
+the anomaly score.
+
+None of the latent dimensions mean anything individually, either: they are not
+ordered or disentangled unless something in the training made them so, which is a
+large part of what separates a plain autoencoder from the variational and
+beta-weighted variants built to encourage exactly that structure.
+
 ## Where it goes wrong
 
 **A bottleneck that is too wide.** With enough capacity the network learns the
