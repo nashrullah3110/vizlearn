@@ -82,6 +82,30 @@ The standard follow-up is a morphological open to remove the speckles and a
 close to fill the holes, which is exactly what [erosion and
 dilation](erosion_and_dilation.html) are for.
 
+## What Otsu maximises, worked
+
+Otsu picks the threshold by trying all 256 and keeping the one whose two groups are
+most separated &mdash; the maximum *between-class variance*,
+`w_bg &middot; w_fg &middot; (mean_bg &minus; mean_fg)&sup2;`. On a tiny bimodal set
+of pixel values {1, 1, 2, 2, 8, 8, 9, 9}:
+
+|threshold|groups|between-class variance|
+|---|---|---|
+|2|{1,1} vs {2,2,8,8,9,9}|5.33|
+|4|{1,1,2,2} vs {8,8,9,9}|**12.25**|
+|6|{1,1,2,2} vs {8,8,9,9}|12.25|
+
+The maximum, 12.25, is reached by any threshold sitting in the empty valley between
+the two humps (here 3 through 7 all split the data the same way), which is exactly
+where a threshold belongs. A threshold at 2 slices through the low hump and the two
+groups' means end up closer, so the variance is lower. This is why Otsu works on a
+genuinely *bimodal* histogram and fails on a unimodal one: with a single hump there
+is no valley, and Otsu confidently returns the midpoint of one distribution,
+separating nothing. And it is global &mdash; one threshold for the whole image
+&mdash; so uneven lighting, where lit background outshines shadowed ink, defeats it
+regardless of the number chosen, which is what adaptive thresholding fixes with a
+local threshold per region.
+
 ## Where it goes wrong
 
 **Thresholding a colour image by brightness.** A saturated red and a mid-grey

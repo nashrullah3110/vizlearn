@@ -3793,7 +3793,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Function Arguments | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Functions and Return Values",
@@ -3841,7 +3841,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn List Comprehensions | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Lists and Indexing",
@@ -3873,7 +3873,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Nested Conditionals | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Nested Data Structures",
@@ -3889,7 +3889,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Nested For Loops | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "None and Truthiness",
@@ -3897,7 +3897,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn None and Truthiness | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Numbers and Operators",
@@ -3921,7 +3921,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Sets and Set Operations | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Shallow vs Deep Copying",
@@ -3929,7 +3929,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Shallow vs Deep Copying | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Slicing with Step",
@@ -3937,7 +3937,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Slicing with Step | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "String Methods",
@@ -3945,7 +3945,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn String Methods | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Strings and Slicing",
@@ -3961,7 +3961,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Tuples and Unpacking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Type Conversion",
@@ -3969,7 +3969,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Type Conversion | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Variable Scope",
@@ -3977,7 +3977,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn Variable Scope | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Variables and Types",
@@ -4009,7 +4009,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn f-strings and Formatting | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "for/else and while/else",
@@ -4017,7 +4017,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn for/else and while/else | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "input() and Output",
@@ -4041,7 +4041,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn match and case | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "range() with step",
@@ -4049,7 +4049,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn range() with step | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "sorted() with key=",
@@ -4057,7 +4057,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn sorted() with key= | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "try and except",
@@ -4065,7 +4065,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn try and except | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "zip()",
@@ -4073,7 +4073,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": "Learn zip() | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": ""
  },
  {
   "title": "Annotating a Plot",

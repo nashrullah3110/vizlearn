@@ -75,6 +75,38 @@ followed by a 1&#215;1 that mixes channels but not neighbours. Together they
 approximate a full 3&#215;3 at roughly a ninth of the cost. MobileNet is built
 almost entirely from that pair, and half of it is 1&#215;1 convolutions.
 
+## The bottleneck, counted
+
+The 1&times;1's main job is changing the channel count cheaply, and the ResNet
+bottleneck shows why that is worth a layer. Compare a straight 3&times;3 from 256 to
+256 channels against the bottleneck that squeezes down, does the spatial work
+narrow, and expands back:
+
+|design|weights|
+|---|---|
+|one 3&times;3, 256 &rarr; 256|9 &times; 256 &times; 256 = 589,824|
+|1&times;1 to 64, 3&times;3 at 64, 1&times;1 to 256|256&middot;64 + 9&middot;64&middot;64 + 64&middot;256 = 69,632|
+
+Same input and output shape, **8.5&times; fewer** parameters, and two extra
+non-linearities thrown in &mdash; because the expensive 3&times;3 now runs on a
+quarter of the channels while the two 1&times;1s that resize the stack cost almost
+nothing. That is the whole reason deep ResNets are affordable. The 1&times;1 is
+doing no spatial work at all &mdash; fix one position and it is exactly a dense
+layer, `Cin &times; Cout` weights, applied unchanged at every position &mdash; so
+it contributes nothing to the [receptive field](receptive_field.html); its entire
+value is mixing channels, which is precisely what the spatial kernels cannot afford
+to do at full width.
+
+Beyond resizing channels, the 1&times;1 buys non-linearity at constant resolution
+&mdash; each is followed by an activation, so a stack of them deepens the network
+spatially for almost nothing, which was the "network in network" idea that named the
+technique &mdash; and it is half of a depthwise-separable convolution, the pointwise
+step that mixes channels after the depthwise step mixes neighbours. Two cautions: the
+bottleneck is a genuine information bottleneck, so squeezing 256 channels to 8 before
+the spatial work can cost more accuracy than the computation it saves; and a
+1&times;1 with no activation after it, stacked on another linear layer, collapses
+into one linear map, because two matrices multiplied together are a single matrix.
+
 ## Where it goes wrong
 
 **Expecting spatial work from it.** It cannot smooth, sharpen or find an edge.

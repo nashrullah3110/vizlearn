@@ -95,6 +95,31 @@ differently from axes; a disc is isotropic; a horizontal line erodes vertical
 strokes while leaving horizontal ones alone, which is how table rules are
 separated from text in document processing.
 
+## Open and close, and what each removes
+
+Erosion keeps a foreground pixel only where *every* pixel under the structuring
+element is foreground; dilation keeps it where *any* is. Alone, each changes the
+size of everything &mdash; erosion retreats boundaries inward and deletes specks
+smaller than the element, dilation advances them out and fills holes &mdash; so they
+are composed in pairs that despeckle without resizing:
+
+|operation|sequence|removes|net effect on size|
+|---|---|---|---|
+|opening|erode then dilate|small bright specks|roughly unchanged|
+|closing|dilate then erode|small dark holes|roughly unchanged|
+
+Opening erodes first, destroying specks too small to contain the element, then
+dilates what survived back to about its original size &mdash; and a speck that was
+destroyed cannot grow back, so the net effect is "remove small bright things, leave
+the rest where it was". Closing is the mirror: fill small holes, then shrink back,
+so holes stay filled. This is why the standard pipeline after
+[thresholding](thresholding.html) is open-then-close &mdash; despeckle the
+background, fill the object &mdash; before counting components or tracing contours.
+The one parameter that matters is the element size, and the principle is exact: it
+must be larger than the artefacts to remove and smaller than the features to keep,
+so if a speck is 3 pixels and a real object is 30, anything between works, and if
+they are 3 and 5, morphology is the wrong tool.
+
 ## Where it goes wrong
 
 **Applying it to a greyscale image without thinking.** Greyscale morphology is

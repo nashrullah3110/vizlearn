@@ -70,6 +70,44 @@ dedicated class token instead &mdash; a learned vector that attends to all the
 [patches](vision_transformer_patches.html) and carries the summary. Some ViT
 variants pool the patch tokens instead and report it works about as well.
 
+## The parameters it deletes
+
+The saving is exact and it is large. A 7&times;7&times;512 feature map into 10
+classes, two ways to reach the classifier:
+
+|method|weights in that layer|
+|---|---|
+|flatten + dense|7 &times; 7 &times; 512 &times; 10 = 250,880|
+|global average pool + dense|512 &times; 10 = 5,120|
+
+Forty-nine times fewer &mdash; and 49 is exactly the 7&times;7 spatial area, so the
+ratio is always the size of the feature map. Scale the classes to ImageNet's 1000
+and the flattened version needs 25 million weights in a single layer, which is why
+VGG-16 keeps about 90% of its 138 million parameters in its final dense layers,
+almost all in the one right after the flatten. GAP deletes those, and gets two
+things back for free: any input size works, because the mean of a channel is one
+number whatever the spatial dimensions, where 25,088 flatten-weights demand exactly
+25,088 inputs; and each class score becomes a weighted sum of channel means, which
+is precisely the structure [Grad-CAM](grad_cam.html) reads to make a heatmap. What
+it gives up is *where* each activation was &mdash; usually the right trade for
+classification, where presence matters more than position.
+
+What pooling gives up is *where* each activation was &mdash; if a channel responds
+to wheels, flatten preserves that they were at the bottom-left, GAP records only
+that there were wheels &mdash; and for classification that is the right trade,
+because the question is whether a car is present, not where its wheels sat. Every
+modern architecture uses GAP: ResNet, Inception, MobileNet and EfficientNet all end
+with a global pool and one dense layer. The exception is the Vision Transformer,
+which usually carries a dedicated class token instead, though some variants pool the
+patch tokens and report it works about as well &mdash; and global *max* pooling is
+the sibling worth remembering, better when one strong local response matters more
+than an average.
+
+The parameter cut is also a regularisation story. A dense layer with 25 million
+weights on a dataset of 50,000 images is an invitation to memorise; replacing it
+with a 512-to-classes layer removes most of the capacity that overfitting lives in,
+which is part of why the change stuck across every architecture that followed VGG.
+
 ## Where it goes wrong
 
 **Pooling too early.** GAP belongs after the last convolutional block. Applied

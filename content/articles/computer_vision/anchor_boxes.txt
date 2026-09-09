@@ -91,6 +91,39 @@ They remove the anchor hyperparameters, which is a real simplification. What the
 do not remove is the assignment problem &mdash; deciding which prediction is
 responsible for which object &mdash; which is simply solved differently.
 
+## The assignment, by IoU
+
+Every anchor is labelled before training by its IoU with the nearest ground-truth
+box, and working three cases shows the bands. Anchor at [0,0,4,4] against three
+possible objects:
+
+|ground-truth box|IoU|label|
+|---|---|---|
+|[0,0,4,5]|0.80|positive &mdash; regress the offset|
+|[1,1,5,5]|0.39|ignored &mdash; too ambiguous to train on|
+|[3,3,7,7]|0.03|negative &mdash; predict background|
+
+The ignore band (roughly 0.3-0.5) exists because forcing an ambiguous anchor either
+way teaches the network something untrue. The deeper problem the numbers expose is
+imbalance: a detector places tens of thousands of anchors, and an image with three
+objects makes almost all of them negative &mdash; ratios of 1000:1 are normal, so a
+naively trained model just says "background" very confidently. That single fact
+drove three fixes &mdash; hard-negative mining to hold the ratio near 3:1, focal
+loss to down-weight the easy negatives (which is what let one-stage detectors catch
+up), and two-stage proposal networks to filter first. And because anchors are a
+*prior*, a set tuned for photographs fails on aerial or text data, which is why
+YOLOv2 fits them by k-means over the training boxes.
+
+Anchor-free detectors &mdash; FCOS, CenterNet, DETR &mdash; drop the reference boxes
+entirely: FCOS predicts, for each point inside an object, the four distances to the
+box edges; CenterNet predicts centres as a heatmap; DETR predicts a fixed set of
+boxes and matches them to ground truth with a Hungarian assignment. They remove the
+anchor hyperparameters, a real simplification, but not the underlying assignment
+problem of deciding which prediction owns which object &mdash; that is simply solved
+differently. And too many anchors is its own cost: each one is memory and computation
+at every position of every feature map, and past a point they overlap so heavily that
+extra ones add nothing but expense.
+
 ## Where it goes wrong
 
 **Default anchors on unusual data.** Check the IoU distribution of your anchors

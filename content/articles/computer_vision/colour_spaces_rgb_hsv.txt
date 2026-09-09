@@ -90,6 +90,30 @@ colours *look*, which of these is closer &mdash; the answer is a space like
 correspond to roughly equal perceived differences. Colour-difference metrics
 and palette-matching work there.
 
+## The same pixel, converted
+
+RGB stores three lights; HSV stores three answers to separate questions, and
+converting one pixel shows why the second is easier to reason about. Take a mid-red
+`(200, 60, 60)`. Value is the largest channel over 255, saturation is the channel
+range over the max, hue is set by which channel leads:
+
+|component|computation|value|
+|---|---|---|
+|Value|200 / 255|0.78|
+|Saturation|(200 &minus; 60) / 200|0.70|
+|Hue|red leads, so 60&middot;((g&minus;b)/range)|0&deg;|
+
+No information is added or lost &mdash; it is the same pixel in different
+coordinates &mdash; but now "how red" is a single number. Darken the colour and only
+V moves; wash it out and only S moves; the hue stays near 0 through both, which is
+exactly what makes "find the red object" one comparison, `hue < 15 or hue > 345`,
+where the RGB version needs coupled, lighting-dependent ranges on all three channels.
+Two traps come straight out of the arithmetic: hue *wraps*, so red straddles 0 and
+needs two range tests, not one; and hue is meaningless when saturation is near zero
+(a grey pixel's hue is decided by rounding noise), so a real colour mask also
+requires S above a floor. And OpenCV packs hue into 0-179 to fit a byte, so half of
+every published threshold is wrong for it.
+
 ## Where it goes wrong
 
 **Forgetting that hue wraps.** Red straddles 0. A naive range test

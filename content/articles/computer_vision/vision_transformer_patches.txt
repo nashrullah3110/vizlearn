@@ -85,6 +85,40 @@ and must learn from data that position 37 is next to 36 and above 23.
 Changing the input resolution changes the number of positions, which is why ViTs
 interpolate their positional embeddings when fine-tuned at a different size.
 
+## The patch size is the whole budget
+
+Cutting the image into patches decides everything downstream, and the token count
+makes it concrete. A 224-pixel image at patch size 16 gives a 14&times;14 grid =
+**196 tokens**, each starting as 16&times;16&times;3 = 768 raw numbers, and
+attention costs the square of the token count:
+
+|patch|tokens|attention pairs|relative cost|
+|---|---|---|---|
+|32|49|2,401|1&times;|
+|16|196|38,416|16&times;|
+|8|784|614,656|256&times;|
+
+Halve the patch and the token count quadruples, so attention rises sixteenfold.
+That is why patch size is not a minor hyperparameter but the resolution at which the
+model perceives anything, traded directly against compute &mdash; and why one token
+per pixel (50,176 tokens, 2.5 billion pairs a layer) is impossible. The cost inside
+a patch is subtler: a 16&times;16 region is projected to one vector, so structure
+within it is never attended to, and unlike a convolution the ViT has no built-in
+locality &mdash; it must *learn* that patch 37 sits beside 36, from data, through
+the positional embeddings. Which is why the original ViT needed 300 million
+pre-training images to beat a ResNet that had locality for free.
+
+Attention is permutation-invariant &mdash; shuffle the tokens and the output is
+shuffled identically &mdash; so without positional embeddings a ViT literally cannot
+tell a photograph from a jigsaw of itself, and the fix, a learned vector per
+position, is strikingly weak next to convolution: the model is told "this is position
+37" and must learn from data that 37 sits beside 36 and above 23. That missing
+inductive bias is why the plain ViT needed enormous pre-training, and why two
+responses followed &mdash; DeiT showed distillation and heavy augmentation could
+train one on ImageNet alone, and Swin reintroduced locality by restricting attention
+to windows and merging patches hierarchically, recovering the pyramid a CNN has for
+free and making dense prediction practical.
+
 ## Where it goes wrong
 
 **Shrinking the patch to gain resolution.** The attention cost is quadratic in

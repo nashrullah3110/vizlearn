@@ -89,6 +89,41 @@ An eight-times parameter reduction is therefore often two or three times faster
 in practice rather than eight. Still worth having, and worth measuring rather
 than assuming.
 
+## Where the saving comes from, and how big
+
+Splitting a convolution into a depthwise step (mix neighbours, keep channels
+apart) and a pointwise 1&times;1 (mix channels, ignore neighbours) costs a fraction
+of doing both at once. The ratio is `1 / (1/Cout + 1/k&sup2;)`, which approaches
+`k&sup2;` as the output grows wide:
+
+|kernel|separable saving (Cout=128)|approaches|
+|---|---|---|
+|3&times;3|8.4&times;|9|
+|5&times;5|20.9&times;|25|
+|7&times;7|35.4&times;|49|
+
+So a 3&times;3 to 128 channels drops from 73,728 weights to 8,768, and the larger
+the kernel the more it saves, which is why separable convolutions matter most in
+wide layers with big kernels. The cost is representational: the separable pair can
+only learn functions that factor into a spatial part and a channel part, a strictly
+smaller family than a full convolution, so it reaches slightly lower accuracy per
+layer &mdash; but the saving is so much larger than the loss that the freed budget
+buys more or wider layers that win overall. And the parameter saving does not
+translate one-to-one into speed: a depthwise convolution does little arithmetic per
+byte it touches, so it is memory-bound, and an eight-times parameter cut is often
+only two or three times faster in practice.
+
+The technique earns its keep in wide layers, which is where the cost was, and it
+underpins the on-device architectures: MobileNet is built almost entirely from these
+pairs, Xception argued Inception modules were already approximating them and pushed
+the idea to its limit, and EfficientNet wraps them in inverted residual blocks that
+expand channels with a 1&times;1, do the spatial work depthwise, and project back
+down. Two failure modes are worth naming. Using a separable convolution in the first
+layer saves almost nothing &mdash; three input channels leave little to factor
+&mdash; and costs accuracy where the model can least afford it; and the depthwise and
+pointwise steps need a non-linearity between them, or the pair collapses toward a
+single linear map rather than the two-stage decomposition it is meant to be.
+
 ## Where it goes wrong
 
 **Expecting the speed-up to match the parameter count.** Measure it.

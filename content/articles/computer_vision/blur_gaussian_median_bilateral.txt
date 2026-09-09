@@ -92,6 +92,33 @@ discriminating, and you have an ordinary Gaussian blur back.
 A practical note: these compose. Median first to remove impulses, then a
 gentle Gaussian to handle what remains, is a common and effective pipeline.
 
+## Mean against median, on one neighbourhood
+
+The three filters differ in what they assume about the noise, and a single
+salt-and-pepper neighbourhood shows why the choice is not cosmetic. Take a 3&times;3
+window of pixels around value 40, with two corrupted to the extremes &mdash; a 255
+(salt) and a 0 (pepper):
+
+`[40, 42, 255, 41, 39, 38, 43, 40, 0]`
+
+|filter|output|
+|---|---|
+|mean (Gaussian-like)|59.8 &mdash; dragged up, the 255 spread over the region|
+|median|**40** &mdash; the extremes sort to the ends and are never chosen|
+
+A mean *includes every value it is given*, so the 255 does not get removed, it gets
+smeared into a dimmer smudge, and the 0 pulls the other way; the output, 59.8,
+resembles neither the true signal nor the noise. The median sorts the nine values
+and takes the middle one, and an extreme by definition sorts to an end, so it is
+simply not selected &mdash; the output is a value some real neighbour actually had.
+That is why median filtering removes salt-and-pepper completely while a Gaussian
+cannot, and why it also preserves edges: at a boundary most of the window belongs to
+one side, so the majority side supplies the median. The cost is that it is
+non-linear, so it cannot be separated into two 1D passes and needs a sort per pixel.
+The bilateral filter keeps the average but zeroes the weight of neighbours too
+different in value, which is how it smooths within a region and refuses to smooth
+across an edge.
+
 ## Where it goes wrong
 
 **Blurring before edge detection without thinking.** Some blur helps, since

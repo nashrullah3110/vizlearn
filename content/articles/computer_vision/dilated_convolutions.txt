@@ -73,6 +73,45 @@ has to span thousands of samples and downsampling would destroy the waveform.
 **Dense prediction generally** &mdash; depth estimation, optical flow, anything
 whose output is an image &mdash; uses it for the same reason segmentation does.
 
+## The reach a dilated stack buys
+
+The whole point is receptive field without downsampling, and the arithmetic shows
+how fast it grows. A dilated `k&times;k` kernel spans `k + (k-1)(d-1)`, and stacked
+layers accumulate `(k-1)&middot;d` at each step. Take four 3&times;3 layers at the
+standard rising rates 1, 2, 4, 8:
+
+|layer|dilation|reach added|running receptive field|
+|---|---|---|---|
+|1|1|2|3|
+|2|2|4|7|
+|3|4|8|15|
+|4|8|16|31|
+
+Four layers reach a 31-pixel window &mdash; effectively 33&times;33 counting the
+kernel &mdash; using 4 &times; 9 = **36 weights** per channel pair and *no pooling
+at all*. A stride-1 stack of ordinary 3&times;3 layers would need fifteen layers to
+see as far, because its reach grows by 2 per layer instead of doubling. That
+exponential growth at constant resolution is why DeepLab put dilation at the centre
+of segmentation. The catch is in those same gaps: repeat one rate and some input
+positions are never sampled by any layer, producing the gridding artefact, which is
+why the rates are varied (1, 2, 5) so their sampling patterns interlock.
+
+Where dilation earns its place is dense prediction &mdash; segmentation, depth,
+optical flow &mdash; anything whose output must be the same size as the input, so
+resolution cannot be thrown away by pooling. DeepLab's ASPP module runs several
+rates in parallel and concatenates them, giving the network several scales from one
+feature map, and WaveNet used the one-dimensional version over audio, where the
+receptive field has to span thousands of samples. The one cost that is not free is
+memory: a network that never downsamples holds full-resolution activations at every
+layer, which is usually the binding constraint on a segmentation model, so the
+parameters are free but the memory is not.
+
+The gridding fix is worth stating as a rule of its own: never repeat the same
+dilation several times in a row. Rates chosen so their sampling patterns interlock
+&mdash; 1, 2, 5, or 1, 2, 3 &mdash; cover the positions any single rate would skip,
+and the hybrid-dilated-convolution literature is largely about picking such
+sequences so that every input position is read by some layer in the stack.
+
 ## Where it goes wrong
 
 **Repeating one rate.** Gridding artefacts, and detail that falls in the gaps is

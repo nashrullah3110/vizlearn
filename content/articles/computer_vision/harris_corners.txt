@@ -97,6 +97,40 @@ and solving for the transform between them. Detection is the first step;
 [template matching](template_matching.html) is the alternative that does not
 survive rotation.
 
+## Flat, edge, corner, by the numbers
+
+The whole detector reduces to the two eigenvalues of the structure tensor, and
+Harris's shortcut `R = det(M) - k&middot;trace(M)&sup2;` reads them without solving
+for them. With `k = 0.04`:
+
+|region|&lambda;&#8321;|&lambda;&#8322;|R|
+|---|---|---|---|
+|flat|0.1|0.1|+0.008 (near zero)|
+|edge|5.0|0.1|**&minus;0.54** (strongly negative)|
+|corner|5.0|4.0|**+16.76** (large positive)|
+
+The determinant multiplies the eigenvalues, so one small eigenvalue drags it toward
+zero; the trace term subtracts a penalty that grows when the two are unbalanced.
+The result is large and positive only when *both* eigenvalues are large &mdash; the
+corner case, where the intensity changes in two independent directions and the
+window can be pinned down. An edge changes in one direction only, so it comes out
+strongly negative and is rejected; a flat region changes in neither and sits near
+zero. That is why `R` separates corners from edges without ever computing an
+eigenvalue, and why `k` (0.04-0.06) tunes how strictly the balance is enforced. The
+eigenvalues are rotation-invariant, so a rotated corner scores the same &mdash; but
+not scale-invariant, which is the gap SIFT was built to close.
+
+What Harris is and is not invariant to decides where it can be used. Rotation: yes
+&mdash; the eigenvalues do not depend on the coordinate frame, so a rotated corner
+scores the same, which is what makes it usable for matching two views. Illumination:
+mostly &mdash; a brightness offset leaves gradients untouched, but a contrast scaling
+multiplies `R`, which is why the threshold must be relative to the image maximum
+rather than absolute. Scale: no &mdash; a corner seen from twice as far is a smaller
+corner a fixed window cannot capture, and that gap is exactly what SIFT closed by
+searching over scales and recording the one at which each keypoint is most
+distinctive. Corners feed panorama stitching, structure-from-motion, visual SLAM and
+calibration, all of which rest on finding the same physical point in several images.
+
 ## Where it goes wrong
 
 **An absolute threshold.** Response scales with contrast, so a threshold tuned on

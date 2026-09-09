@@ -89,6 +89,50 @@ stock, people in a queue.
 "where is the road" (stuff) and "which car is which" (things), and needs them
 consistent.
 
+## PQ, worked
+
+Panoptic quality is the one metric that spans both halves, and seeing it computed
+shows why it resists the easy failures. It factors into segmentation quality times
+recognition quality: SQ is the mean IoU over *matched* segments, RQ is an F1 over
+whether segments were matched at all, `TP / (TP + &frac12;FP + &frac12;FN)`.
+
+Take a scene where 8 predicted segments matched ground truth at mean IoU 0.80, 1
+prediction matched nothing (a false positive), and 2 ground-truth objects were
+missed (false negatives):
+
+|term|value|
+|---|---|
+|SQ (mean IoU of matches)|0.80|
+|RQ = 8 / (8 + 0.5 + 1)|0.84|
+|**PQ = SQ &times; RQ**|**0.67**|
+
+The two factors guard different failures. A method that segments the pixels it
+finds beautifully but misses half the objects has a high SQ and a low RQ, so PQ
+falls; one that finds every object but traces them sloppily has the reverse. Only
+getting both right &mdash; the pixels *and* the object count &mdash; scores well,
+which is exactly the point of a metric built to end the split between the semantic
+community, who measured pixels with mIoU, and the instance community, who measured
+objects. It is also why a semantic mIoU and a panoptic PQ are not comparable: they
+are answering different questions, and only one of them can tell two touching cars
+apart.
+
+The taxonomy behind the metrics is two yes/no questions: do two objects of the same
+class get separate identities, and does the background get labelled. Semantic says
+no and yes &mdash; every pixel gets a class, two overlapping cars are one "car"
+region &mdash; so it is right when area matters and counting does not: tumour extent,
+drivable surface, land cover. Instance says yes and no &mdash; each object gets its
+own mask, background is left unlabelled &mdash; which is what counting needs, and
+because Mask R-CNN predicts a mask per detected box, its masks can overlap. Panoptic
+demands exactly one label per pixel *and* an instance id for the countable things,
+which is the constraint that makes it harder than running the other two and merging
+their outputs, since that merge needs a conflict rule.
+
+The vocabulary that makes the split coherent is things against stuff: things are
+countable &mdash; people, cars &mdash; so instances make sense, while stuff is
+uncountable &mdash; sky, road &mdash; and has extent but no instances. Semantic
+treats everything as stuff, instance handles only things, and panoptic covers both,
+which is exactly why it needed a name of its own.
+
 ## Where it goes wrong
 
 **Using semantic segmentation to count.** Two touching objects are one region.

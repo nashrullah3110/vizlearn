@@ -82,6 +82,42 @@ This matters for machine learning specifically. A dataset resized with a
 naive-sampling routine has aliased artefacts that vary with the original
 resolution, and a network will happily learn them.
 
+## Bilinear, worked, and why masks forbid it
+
+Bilinear interpolation reads the four input pixels around a fractional position and
+takes a distance-weighted average &mdash; linear across, then linear down. For an
+output point landing at fraction (0.25, 0.75) inside a cell whose corners are 10
+(top-left), 20 (top-right), 30 (bottom-left), 40 (bottom-right):
+
+|step|value|
+|---|---|
+|top edge: 10&middot;0.75 + 20&middot;0.25|12.5|
+|bottom edge: 30&middot;0.75 + 40&middot;0.25|32.5|
+|down: 12.5&middot;0.25 + 32.5&middot;0.75|**27.5**|
+
+The output, 27.5, is a value that appears nowhere in the input &mdash; and that is
+the whole point for a photograph, where it smooths the staircase nearest-neighbour
+would leave. It is also exactly why a *label mask* must never be resized this way:
+if 3 means "road" and 5 means "building", their bilinear average of 4 might mean
+something else entirely, because a class index is a name, not a quantity, and names
+do not average. Nearest neighbour, which copies the single closest pixel, is the
+only correct choice there. Shrinking is a third case again: naively keeping every
+second pixel aliases &mdash; a striped pattern can vanish or invert &mdash; so it
+needs an average (area interpolation) before sampling, not an interpolation between
+samples.
+
+Bicubic extends the same idea to sixteen surrounding pixels with a cubic weight that
+overshoots slightly at edges, adding a little local contrast &mdash; which is why
+photo editors default to it and also why it can leave faint halos beside
+high-contrast edges. Shrinking is the failure people meet as a mysterious bug
+elsewhere: keeping every second pixel of an alternating pattern can return a solid
+field of one colour, because detail finer than the new sampling grid reappears as a
+false pattern &mdash; aliasing, the same effect as moiré on a striped shirt on video.
+The cure is to average before sampling (area interpolation, or a Gaussian blur first,
+which is what an image pyramid does), and it matters for machine learning
+specifically, because a dataset resized by naive sampling carries artefacts that vary
+with the original resolution and a network will happily learn them.
+
 ## Where it goes wrong
 
 **Bilinear on a label mask.** Averaging class indices produces indices that

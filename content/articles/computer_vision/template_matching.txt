@@ -86,6 +86,41 @@ Where the assumptions fail, the successors are **keypoint matching** &mdash;
 points and match those, giving rotation and scale invariance for free, and
 learned detectors, which handle deformation and appearance variation as well.
 
+## Why normalisation is the whole trick
+
+The reason NCC beats raw subtraction is one line of arithmetic. Take a template of
+pixel values and a patch that is the same pattern brightened by 20 &mdash; the kind
+of lighting change that breaks sum-of-squared-differences completely, since every
+difference grows. Normalised cross-correlation subtracts each side's mean and
+divides by its standard deviation before comparing:
+
+|comparison|score|
+|---|---|
+|template vs itself|1.000|
+|template vs (itself + 20 brightness)|**1.000**|
+|template vs a different pattern|well below 1|
+
+Subtracting the means removes any constant brightness offset; dividing by the
+standard deviations removes any contrast scaling; what remains measures *pattern*,
+bounded in &minus;1 to 1 so scores are comparable across positions. That invariance
+is why the response map is readable as an image and why the peak stays at 1.000
+under a lighting change that would swamp SSD. What normalising cannot fix is the
+geometry: a template rotated ten degrees or scaled up no longer aligns, and the
+correlation collapses &mdash; which is the wall that sent the field toward
+[keypoint detectors](harris_corners.html) that survive rotation and scale.
+
+Reading the response map is its own lesson: the bright region around the true match
+is a blob, not a point, because a template shifted one pixel still overlaps almost
+entirely and still scores well &mdash; so taking the argmax returns the same
+detection several times, and the fix is the same [non-maximum
+suppression](iou_and_non_max_suppression.html) that object detection uses. Where
+template matching survives is precisely the case its assumptions fit: a fixed camera
+and fixed orientation, where position is the only unknown &mdash; industrial
+inspection, finding an icon for UI automation, aligning a scanned form. When the
+object can rotate, scale or deform, it is the wrong method rather than one that needs
+tuning, and the successors are keypoint matchers like SIFT and ORB that get rotation
+and scale invariance for free.
+
 ## Where it goes wrong
 
 **Sum of squared differences under changing light.** Use NCC.

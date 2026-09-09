@@ -84,6 +84,41 @@ weights from gradients instead, which removed the architectural requirement.
 occluding with it and seeing what the score does &mdash; slower, and immune to
 gradient saturation.
 
+## The weighting, one cell at a time
+
+Grad-CAM's heatmap is a weighted sum of feature maps followed by a ReLU, and doing
+one cell by hand removes the mystery. Three maps, with weights that are the
+spatial-average gradients of the class score, combined at a single location:
+
+|contribution|value|
+|---|---|
+|map 1 activation 0.8 &times; weight +2.0|+1.60|
+|map 2 activation 0.5 &times; weight &minus;1.0|&minus;0.50|
+|map 3 activation 0.2 &times; weight +0.5|+0.10|
+|sum &rarr; ReLU|**1.20**|
+
+At a cell where the negatively-weighted map dominates the sum comes out negative
+&mdash; say &minus;0.65 &mdash; and the ReLU clips it to 0. That clip is the step
+people skip and then misread: Grad-CAM deliberately discards evidence *against* the
+class, because the question is what supported this prediction, and a map mixing
+support and opposition on one colour scale is easy to misread. The consequence is
+that a Grad-CAM heatmap can never show you what argued against a class &mdash; drag
+every weight negative and it goes empty, not inverted &mdash; and to see the
+opposing evidence you run it on the competing class instead. The map is also only
+7&times;7 before upsampling, so the smooth blob over the animal's face is
+interpolation, not pixel-level proof.
+
+Grad-CAM's real caution is that plausibility is not correctness. A heatmap over an
+animal's face looks convincing whether or not the model used the face, and published
+work has produced sensible-looking saliency maps for *randomly initialised* networks
+&mdash; so a reasonable heatmap is a hypothesis about the model, not a verification
+of it. It also explains exactly one layer, usually the last convolutional one, and
+the choice of layer changes the answer, so a Grad-CAM result is really "what the
+gradients at this layer say", not "what the model used". Its ancestor CAM required
+the network to end in global average pooling and read the weights straight from that
+layer; Grad-CAM's contribution was getting the same weights from gradients, which
+removed the architectural requirement and is why it works on almost any CNN.
+
 ## Where it goes wrong
 
 **Reading the smooth blob as pixel-level evidence.** It is 7&#215;7,

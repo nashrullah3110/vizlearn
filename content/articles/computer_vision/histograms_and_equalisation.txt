@@ -91,6 +91,31 @@ far apart nearly-identical values can be pushed &mdash; and since noise
 amplification *is* pushing nearly-identical values apart, capping it directly
 limits the damage.
 
+## Equalisation is the CDF, worked
+
+Histogram equalisation has one moving part: it remaps each brightness through the
+image's own cumulative distribution, scaled to the full range. On a 16-pixel image
+whose values cluster low, `new[v] = round(cdf[v] &times; 7)` over an 8-level range:
+
+|old value|cumulative fraction|new value|
+|---|---|---|
+|2|4/16|2|
+|3|10/16|4|
+|5|13/16|6|
+|6|15/16|7|
+|7|16/16|7|
+
+The crowded values (3 appears six times) get pulled far apart, because the CDF
+climbs steeply across them; the rare high values collapse together, because the CDF
+is nearly flat there. The transformation gives range to where the pixels actually
+are and takes it from where they are not, which is what flattens the histogram and
+makes buried contrast visible. The costs follow from the same mechanism: in a genuinely
+flat region the small random differences between pixels are stretched too, so noise
+is amplified &mdash; a clear sky becomes mottled &mdash; and because one lookup table
+is computed from the whole image, a frame that is well-exposed on one side and dark
+on the other gets a compromise suiting neither. CLAHE fixes both by equalising
+per-tile with a contrast cap that limits how steeply the CDF may climb.
+
 ## Where it goes wrong
 
 **Equalising an already well-exposed image.** There is nothing to gain and

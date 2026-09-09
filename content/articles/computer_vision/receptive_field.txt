@@ -101,6 +101,31 @@ merely equal to them. Dilated convolutions exist largely as a way to buy
 receptive field without buying downsampling, which matters when the output has
 to stay at full resolution &mdash; segmentation, most obviously.
 
+## Why two 3&times;3s beat one 5&times;5
+
+Stacking small kernels reaches as far as one big kernel for fewer weights and more
+non-linearity, which is why 3&times;3 stacks won. The receptive field of a stride-1
+stack grows by `k-1` per layer, so:
+
+|arrangement|receptive field|weights (per channel pair)|
+|---|---|---|
+|one 5&times;5|5&times;5|25|
+|two 3&times;3|5&times;5|18|
+|one 7&times;7|7&times;7|49|
+|three 3&times;3|7&times;7|27|
+
+Same reach, fewer weights &mdash; and, more importantly, a ReLU sits between the
+stacked layers, so three 3&times;3s are a composition of three non-linear functions
+where one 7&times;7 is a single linear map of its 49 inputs. That representational
+gap is the argument VGG made in 2014, and it ended large kernels. The table also
+explains why depth alone is not enough: at stride 1 the field grows only linearly,
+so twenty 3&times;3 layers still see just 41 pixels &mdash; under a fifth of a
+224-pixel image. Growing it affordably needs stride, which makes the per-layer jump
+compound geometrically, or dilation, which is how segmentation networks reach far
+while keeping full resolution. And the *effective* field is smaller and softer than
+this theoretical one, falling off like a Gaussian from the centre, so a network
+usually needs a theoretical field noticeably larger than the objects it must see.
+
 ## Where it goes wrong
 
 **Assuming depth alone is enough.** Twenty stride-1 layers of 3&#215;3 still

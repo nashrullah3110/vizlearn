@@ -82,6 +82,42 @@ them.
 post-processed output, so a detector that fires many overlapping boxes can look
 fine as long as suppression cleans up.
 
+## AP is the area, worked
+
+Average precision is the area under the precision-recall curve, and computing one
+on a handful of points shows what it rewards. Walk down the confidence-sorted
+predictions, recomputing precision and recall after each:
+
+|recall|precision|
+|---|---|
+|0.2|1.00|
+|0.4|1.00|
+|0.6|0.67|
+|0.8|0.50|
+|1.0|0.40|
+
+Summing precision across each recall step gives **AP &asymp; 0.71**. Because it
+integrates over the whole ranking rather than one operating point, a detector that
+puts its correct predictions above its wrong ones scores well regardless of how its
+confidences are calibrated &mdash; which is exactly what you want from a summary of
+a ranking. The catch is that AP has no threshold, so it tells you nothing about
+which confidence to deploy, and mAP averages it *unweighted* across classes, so a
+rare class the model handles badly drags the number down as hard as a common one.
+And COCO's headline averages this again over ten IoU thresholds from 0.50 to 0.95,
+which is why a detector reporting 0.80 under VOC's single 0.50 threshold might
+report 0.45 under COCO on identical predictions &mdash; the numbers are different
+measurements and cannot be compared.
+
+What mAP hides is as important as what it reports. It has no threshold, so it says
+nothing about which confidence to deploy; it ignores the cost of errors, counting a
+missed pedestrian and a spurious traffic cone the same; and being an unweighted mean
+over classes, a model excellent on nineteen and useless on the twentieth can outscore
+one that is decent on all. COCO's breakdowns &mdash; by object size, at fixed
+detection counts &mdash; are usually more actionable than the headline, because "bad
+at small objects" tells you what to fix where "mAP 0.42" does not. And tuning NMS to
+lift mAP is a trap: the operating point that maximises an integral over all
+thresholds is not the one you ship, so it often makes the deployed detector worse.
+
 ## Where it goes wrong
 
 **Comparing across datasets or conventions.** VOC against COCO, or one AP

@@ -224,6 +224,31 @@ towards something that looks very much like Sobel, because edges turn out to
 be a useful thing to measure. Nobody put Sobel there. The architecture only
 supplies the sliding window; the content of the window is discovered.
 
+## One output pixel, worked
+
+A convolution is a weighted sum repeated at every position, and the character of a
+kernel is legible from its numbers. Take the sharpen kernel &mdash; centre 5, the
+four orthogonal neighbours &minus;1, corners 0 &mdash; and apply it where a centre
+pixel of 100 sits among neighbours of 90:
+
+`5&times;100 &minus; 90 &minus; 90 &minus; 90 &minus; 90 = 140`
+
+|patch|sharpen output|
+|---|---|
+|centre 100, neighbours 90 (an edge)|140 &mdash; the difference exaggerated|
+|centre 100, all neighbours 100 (flat)|100 &mdash; unchanged|
+
+On flat ground the amplification of the centre and the subtraction of the neighbours
+cancel exactly, so nothing happens; only where the centre differs from its
+surroundings does the output diverge, which is why sharpening exaggerates edges and,
+for the same reason, amplifies noise &mdash; a noisy pixel *is* one that differs from
+its neighbours. The kernel's weight sum tells you its family: sum to 1 (identity,
+blur, sharpen) preserves brightness, sum to 0 (Sobel, Laplacian) produces a
+difference image that is flat-grey where nothing changes. A CNN's first layer runs
+exactly this operation with the nine numbers as *learned* parameters &mdash; and
+training reliably drives some of them toward something very like Sobel, because
+edges turn out to be worth measuring, though nobody put Sobel there.
+
 ## Where it goes wrong
 
 **Sharpening noise.** Any kernel with negative weights amplifies pixel-to-pixel
@@ -495,6 +520,30 @@ an object, and speckles where noise crossed the threshold in the background.
 The standard follow-up is a morphological open to remove the speckles and a
 close to fill the holes, which is exactly what [erosion and
 dilation](erosion_and_dilation.html) are for.
+
+## What Otsu maximises, worked
+
+Otsu picks the threshold by trying all 256 and keeping the one whose two groups are
+most separated &mdash; the maximum *between-class variance*,
+`w_bg &middot; w_fg &middot; (mean_bg &minus; mean_fg)&sup2;`. On a tiny bimodal set
+of pixel values {1, 1, 2, 2, 8, 8, 9, 9}:
+
+|threshold|groups|between-class variance|
+|---|---|---|
+|2|{1,1} vs {2,2,8,8,9,9}|5.33|
+|4|{1,1,2,2} vs {8,8,9,9}|**12.25**|
+|6|{1,1,2,2} vs {8,8,9,9}|12.25|
+
+The maximum, 12.25, is reached by any threshold sitting in the empty valley between
+the two humps (here 3 through 7 all split the data the same way), which is exactly
+where a threshold belongs. A threshold at 2 slices through the low hump and the two
+groups' means end up closer, so the variance is lower. This is why Otsu works on a
+genuinely *bimodal* histogram and fails on a unimodal one: with a single hump there
+is no valley, and Otsu confidently returns the midpoint of one distribution,
+separating nothing. And it is global &mdash; one threshold for the whole image
+&mdash; so uneven lighting, where lit background outshines shadowed ink, defeats it
+regardless of the number chosen, which is what adaptive thresholding fixes with a
+local threshold per region.
 
 ## Where it goes wrong
 
@@ -807,6 +856,31 @@ across the other bins. This caps how steeply the CDF can climb, which caps how
 far apart nearly-identical values can be pushed &mdash; and since noise
 amplification *is* pushing nearly-identical values apart, capping it directly
 limits the damage.
+
+## Equalisation is the CDF, worked
+
+Histogram equalisation has one moving part: it remaps each brightness through the
+image's own cumulative distribution, scaled to the full range. On a 16-pixel image
+whose values cluster low, `new[v] = round(cdf[v] &times; 7)` over an 8-level range:
+
+|old value|cumulative fraction|new value|
+|---|---|---|
+|2|4/16|2|
+|3|10/16|4|
+|5|13/16|6|
+|6|15/16|7|
+|7|16/16|7|
+
+The crowded values (3 appears six times) get pulled far apart, because the CDF
+climbs steeply across them; the rare high values collapse together, because the CDF
+is nearly flat there. The transformation gives range to where the pixels actually
+are and takes it from where they are not, which is what flattens the histogram and
+makes buried contrast visible. The costs follow from the same mechanism: in a genuinely
+flat region the small random differences between pixels are stretched too, so noise
+is amplified &mdash; a clear sky becomes mottled &mdash; and because one lookup table
+is computed from the whole image, a frame that is well-exposed on one side and dark
+on the other gets a compromise suiting neither. CLAHE fixes both by equalising
+per-tile with a contrast cap that limits how steeply the CDF may climb.
 
 ## Where it goes wrong
 
@@ -1123,6 +1197,33 @@ discriminating, and you have an ordinary Gaussian blur back.
 
 A practical note: these compose. Median first to remove impulses, then a
 gentle Gaussian to handle what remains, is a common and effective pipeline.
+
+## Mean against median, on one neighbourhood
+
+The three filters differ in what they assume about the noise, and a single
+salt-and-pepper neighbourhood shows why the choice is not cosmetic. Take a 3&times;3
+window of pixels around value 40, with two corrupted to the extremes &mdash; a 255
+(salt) and a 0 (pepper):
+
+`[40, 42, 255, 41, 39, 38, 43, 40, 0]`
+
+|filter|output|
+|---|---|
+|mean (Gaussian-like)|59.8 &mdash; dragged up, the 255 spread over the region|
+|median|**40** &mdash; the extremes sort to the ends and are never chosen|
+
+A mean *includes every value it is given*, so the 255 does not get removed, it gets
+smeared into a dimmer smudge, and the 0 pulls the other way; the output, 59.8,
+resembles neither the true signal nor the noise. The median sorts the nine values
+and takes the middle one, and an extreme by definition sorts to an end, so it is
+simply not selected &mdash; the output is a value some real neighbour actually had.
+That is why median filtering removes salt-and-pepper completely while a Gaussian
+cannot, and why it also preserves edges: at a boundary most of the window belongs to
+one side, so the majority side supplies the median. The cost is that it is
+non-linear, so it cannot be separated into two 1D passes and needs a sort per pixel.
+The bilateral filter keeps the average but zeroes the weight of neighbours too
+different in value, which is how it smooths within a region and refuses to smooth
+across an edge.
 
 ## Where it goes wrong
 
@@ -1458,6 +1559,31 @@ differently from axes; a disc is isotropic; a horizontal line erodes vertical
 strokes while leaving horizontal ones alone, which is how table rules are
 separated from text in document processing.
 
+## Open and close, and what each removes
+
+Erosion keeps a foreground pixel only where *every* pixel under the structuring
+element is foreground; dilation keeps it where *any* is. Alone, each changes the
+size of everything &mdash; erosion retreats boundaries inward and deletes specks
+smaller than the element, dilation advances them out and fills holes &mdash; so they
+are composed in pairs that despeckle without resizing:
+
+|operation|sequence|removes|net effect on size|
+|---|---|---|---|
+|opening|erode then dilate|small bright specks|roughly unchanged|
+|closing|dilate then erode|small dark holes|roughly unchanged|
+
+Opening erodes first, destroying specks too small to contain the element, then
+dilates what survived back to about its original size &mdash; and a speck that was
+destroyed cannot grow back, so the net effect is "remove small bright things, leave
+the rest where it was". Closing is the mirror: fill small holes, then shrink back,
+so holes stay filled. This is why the standard pipeline after
+[thresholding](thresholding.html) is open-then-close &mdash; despeckle the
+background, fill the object &mdash; before counting components or tracing contours.
+The one parameter that matters is the element size, and the principle is exact: it
+must be larger than the artefacts to remove and smaller than the features to keep,
+so if a speck is 3 pixels and a real object is 30, anything between works, and if
+they are 3 and 5, morphology is the wrong tool.
+
 ## Where it goes wrong
 
 **Applying it to a greyscale image without thinking.** Greyscale morphology is
@@ -1775,6 +1901,30 @@ colours *look*, which of these is closer &mdash; the answer is a space like
 correspond to roughly equal perceived differences. Colour-difference metrics
 and palette-matching work there.
 
+## The same pixel, converted
+
+RGB stores three lights; HSV stores three answers to separate questions, and
+converting one pixel shows why the second is easier to reason about. Take a mid-red
+`(200, 60, 60)`. Value is the largest channel over 255, saturation is the channel
+range over the max, hue is set by which channel leads:
+
+|component|computation|value|
+|---|---|---|
+|Value|200 / 255|0.78|
+|Saturation|(200 &minus; 60) / 200|0.70|
+|Hue|red leads, so 60&middot;((g&minus;b)/range)|0&deg;|
+
+No information is added or lost &mdash; it is the same pixel in different
+coordinates &mdash; but now "how red" is a single number. Darken the colour and only
+V moves; wash it out and only S moves; the hue stays near 0 through both, which is
+exactly what makes "find the red object" one comparison, `hue < 15 or hue > 345`,
+where the RGB version needs coupled, lighting-dependent ranges on all three channels.
+Two traps come straight out of the arithmetic: hue *wraps*, so red straddles 0 and
+needs two range tests, not one; and hue is meaningless when saturation is near zero
+(a grey pixel's hue is decided by rounding noise), so a real colour mask also
+requires S above a floor. And OpenCV packs hue into 0-179 to fit a byte, so half of
+every published threshold is wrong for it.
+
 ## Where it goes wrong
 
 **Forgetting that hue wraps.** Red straddles 0. A naive range test
@@ -2050,6 +2200,42 @@ end, and is what an image pyramid does at every level.
 This matters for machine learning specifically. A dataset resized with a
 naive-sampling routine has aliased artefacts that vary with the original
 resolution, and a network will happily learn them.
+
+## Bilinear, worked, and why masks forbid it
+
+Bilinear interpolation reads the four input pixels around a fractional position and
+takes a distance-weighted average &mdash; linear across, then linear down. For an
+output point landing at fraction (0.25, 0.75) inside a cell whose corners are 10
+(top-left), 20 (top-right), 30 (bottom-left), 40 (bottom-right):
+
+|step|value|
+|---|---|
+|top edge: 10&middot;0.75 + 20&middot;0.25|12.5|
+|bottom edge: 30&middot;0.75 + 40&middot;0.25|32.5|
+|down: 12.5&middot;0.25 + 32.5&middot;0.75|**27.5**|
+
+The output, 27.5, is a value that appears nowhere in the input &mdash; and that is
+the whole point for a photograph, where it smooths the staircase nearest-neighbour
+would leave. It is also exactly why a *label mask* must never be resized this way:
+if 3 means "road" and 5 means "building", their bilinear average of 4 might mean
+something else entirely, because a class index is a name, not a quantity, and names
+do not average. Nearest neighbour, which copies the single closest pixel, is the
+only correct choice there. Shrinking is a third case again: naively keeping every
+second pixel aliases &mdash; a striped pattern can vanish or invert &mdash; so it
+needs an average (area interpolation) before sampling, not an interpolation between
+samples.
+
+Bicubic extends the same idea to sixteen surrounding pixels with a cubic weight that
+overshoots slightly at edges, adding a little local contrast &mdash; which is why
+photo editors default to it and also why it can leave faint halos beside
+high-contrast edges. Shrinking is the failure people meet as a mysterious bug
+elsewhere: keeping every second pixel of an alternating pattern can return a solid
+field of one colour, because detail finer than the new sampling grid reappears as a
+false pattern &mdash; aliasing, the same effect as moiré on a striped shirt on video.
+The cure is to average before sampling (area interpolation, or a Gaussian blur first,
+which is what an image pyramid does), and it matters for machine learning
+specifically, because a dataset resized by naive sampling carries artefacts that vary
+with the original resolution and a network will happily learn them.
 
 ## Where it goes wrong
 
@@ -2413,6 +2599,30 @@ the affine transform that best maps one onto the other.
 if the camera was square to the page and projective if it was not, which is why
 scanning apps ask you to mark the corners.
 
+## One matrix, applied and measured
+
+The six numbers are one 2&times;3 matrix sending `(x, y)` to `(ax+by+e, cx+dy+f)`,
+and rotation &mdash; which has no control of its own &mdash; is just a particular
+filling of a, b, c, d. A 30-degree rotation is `a=d=cos30=0.866`, `c=sin30=0.5`,
+`b=-0.5`, and applied to the point (1, 0):
+
+|quantity|value|
+|---|---|
+|(1,0) &rarr; (a&middot;1, c&middot;1)|(0.866, 0.500)|
+|determinant ad &minus; bc|1.000|
+
+The point lands exactly where a 30-degree turn puts it, and the determinant is the
+factor by which area scales &mdash; 1 for a pure rotation, because turning changes
+no areas; 4 if both axes double; negative if the image is flipped; and 0 when the
+transform collapses the plane onto a line and becomes non-invertible. That
+determinant is why rotation is "a particular combination of scale and shear", a fact
+the matrix makes obvious and four separate functions hide. The other thing the
+matrix view clarifies is why implementations run *backwards*: mapping input pixels
+forward leaves holes where enlargement spreads them apart, so real code loops over
+*output* pixels, applies the inverse matrix to find where each came from, and
+samples there with an interpolation &mdash; which is why an affine warp needs the
+same nearest-or-bilinear choice as [resizing](resizing_and_interpolation.html).
+
 ## Where it goes wrong
 
 **Expecting to correct perspective.** Affine cannot. A photograph taken from an
@@ -2753,6 +2963,31 @@ merely equal to them. Dilated convolutions exist largely as a way to buy
 receptive field without buying downsampling, which matters when the output has
 to stay at full resolution &mdash; segmentation, most obviously.
 
+## Why two 3&times;3s beat one 5&times;5
+
+Stacking small kernels reaches as far as one big kernel for fewer weights and more
+non-linearity, which is why 3&times;3 stacks won. The receptive field of a stride-1
+stack grows by `k-1` per layer, so:
+
+|arrangement|receptive field|weights (per channel pair)|
+|---|---|---|
+|one 5&times;5|5&times;5|25|
+|two 3&times;3|5&times;5|18|
+|one 7&times;7|7&times;7|49|
+|three 3&times;3|7&times;7|27|
+
+Same reach, fewer weights &mdash; and, more importantly, a ReLU sits between the
+stacked layers, so three 3&times;3s are a composition of three non-linear functions
+where one 7&times;7 is a single linear map of its 49 inputs. That representational
+gap is the argument VGG made in 2014, and it ended large kernels. The table also
+explains why depth alone is not enough: at stride 1 the field grows only linearly,
+so twenty 3&times;3 layers still see just 41 pixels &mdash; under a fifth of a
+224-pixel image. Growing it affordably needs stride, which makes the per-layer jump
+compound geometrically, or dilation, which is how segmentation networks reach far
+while keeping full resolution. And the *effective* field is smaller and softer than
+this theoretical one, falling off like a Gaussian from the centre, so a network
+usually needs a theoretical field noticeably larger than the objects it must see.
+
 ## Where it goes wrong
 
 **Assuming depth alone is enough.** Twenty stride-1 layers of 3&#215;3 still
@@ -3026,6 +3261,38 @@ followed by a 1&#215;1 that mixes channels but not neighbours. Together they
 approximate a full 3&#215;3 at roughly a ninth of the cost. MobileNet is built
 almost entirely from that pair, and half of it is 1&#215;1 convolutions.
 
+## The bottleneck, counted
+
+The 1&times;1's main job is changing the channel count cheaply, and the ResNet
+bottleneck shows why that is worth a layer. Compare a straight 3&times;3 from 256 to
+256 channels against the bottleneck that squeezes down, does the spatial work
+narrow, and expands back:
+
+|design|weights|
+|---|---|
+|one 3&times;3, 256 &rarr; 256|9 &times; 256 &times; 256 = 589,824|
+|1&times;1 to 64, 3&times;3 at 64, 1&times;1 to 256|256&middot;64 + 9&middot;64&middot;64 + 64&middot;256 = 69,632|
+
+Same input and output shape, **8.5&times; fewer** parameters, and two extra
+non-linearities thrown in &mdash; because the expensive 3&times;3 now runs on a
+quarter of the channels while the two 1&times;1s that resize the stack cost almost
+nothing. That is the whole reason deep ResNets are affordable. The 1&times;1 is
+doing no spatial work at all &mdash; fix one position and it is exactly a dense
+layer, `Cin &times; Cout` weights, applied unchanged at every position &mdash; so
+it contributes nothing to the [receptive field](receptive_field.html); its entire
+value is mixing channels, which is precisely what the spatial kernels cannot afford
+to do at full width.
+
+Beyond resizing channels, the 1&times;1 buys non-linearity at constant resolution
+&mdash; each is followed by an activation, so a stack of them deepens the network
+spatially for almost nothing, which was the "network in network" idea that named the
+technique &mdash; and it is half of a depthwise-separable convolution, the pointwise
+step that mixes channels after the depthwise step mixes neighbours. Two cautions: the
+bottleneck is a genuine information bottleneck, so squeezing 256 channels to 8 before
+the spatial work can cost more accuracy than the computation it saves; and a
+1&times;1 with no activation after it, stacked on another linear layer, collapses
+into one linear map, because two matrices multiplied together are a single matrix.
+
 ## Where it goes wrong
 
 **Expecting spatial work from it.** It cannot smooth, sharpen or find an edge.
@@ -3293,6 +3560,41 @@ reach anything like its peak throughput on one.
 An eight-times parameter reduction is therefore often two or three times faster
 in practice rather than eight. Still worth having, and worth measuring rather
 than assuming.
+
+## Where the saving comes from, and how big
+
+Splitting a convolution into a depthwise step (mix neighbours, keep channels
+apart) and a pointwise 1&times;1 (mix channels, ignore neighbours) costs a fraction
+of doing both at once. The ratio is `1 / (1/Cout + 1/k&sup2;)`, which approaches
+`k&sup2;` as the output grows wide:
+
+|kernel|separable saving (Cout=128)|approaches|
+|---|---|---|
+|3&times;3|8.4&times;|9|
+|5&times;5|20.9&times;|25|
+|7&times;7|35.4&times;|49|
+
+So a 3&times;3 to 128 channels drops from 73,728 weights to 8,768, and the larger
+the kernel the more it saves, which is why separable convolutions matter most in
+wide layers with big kernels. The cost is representational: the separable pair can
+only learn functions that factor into a spatial part and a channel part, a strictly
+smaller family than a full convolution, so it reaches slightly lower accuracy per
+layer &mdash; but the saving is so much larger than the loss that the freed budget
+buys more or wider layers that win overall. And the parameter saving does not
+translate one-to-one into speed: a depthwise convolution does little arithmetic per
+byte it touches, so it is memory-bound, and an eight-times parameter cut is often
+only two or three times faster in practice.
+
+The technique earns its keep in wide layers, which is where the cost was, and it
+underpins the on-device architectures: MobileNet is built almost entirely from these
+pairs, Xception argued Inception modules were already approximating them and pushed
+the idea to its limit, and EfficientNet wraps them in inverted residual blocks that
+expand channels with a 1&times;1, do the spatial work depthwise, and project back
+down. Two failure modes are worth naming. Using a separable convolution in the first
+layer saves almost nothing &mdash; three input channels leave little to factor
+&mdash; and costs accuracy where the model can least afford it; and the depthwise and
+pointwise steps need a non-linearity between them, or the pair collapses toward a
+single linear map rather than the two-stage decomposition it is meant to be.
 
 ## Where it goes wrong
 
@@ -3562,6 +3864,45 @@ has to span thousands of samples and downsampling would destroy the waveform.
 **Dense prediction generally** &mdash; depth estimation, optical flow, anything
 whose output is an image &mdash; uses it for the same reason segmentation does.
 
+## The reach a dilated stack buys
+
+The whole point is receptive field without downsampling, and the arithmetic shows
+how fast it grows. A dilated `k&times;k` kernel spans `k + (k-1)(d-1)`, and stacked
+layers accumulate `(k-1)&middot;d` at each step. Take four 3&times;3 layers at the
+standard rising rates 1, 2, 4, 8:
+
+|layer|dilation|reach added|running receptive field|
+|---|---|---|---|
+|1|1|2|3|
+|2|2|4|7|
+|3|4|8|15|
+|4|8|16|31|
+
+Four layers reach a 31-pixel window &mdash; effectively 33&times;33 counting the
+kernel &mdash; using 4 &times; 9 = **36 weights** per channel pair and *no pooling
+at all*. A stride-1 stack of ordinary 3&times;3 layers would need fifteen layers to
+see as far, because its reach grows by 2 per layer instead of doubling. That
+exponential growth at constant resolution is why DeepLab put dilation at the centre
+of segmentation. The catch is in those same gaps: repeat one rate and some input
+positions are never sampled by any layer, producing the gridding artefact, which is
+why the rates are varied (1, 2, 5) so their sampling patterns interlock.
+
+Where dilation earns its place is dense prediction &mdash; segmentation, depth,
+optical flow &mdash; anything whose output must be the same size as the input, so
+resolution cannot be thrown away by pooling. DeepLab's ASPP module runs several
+rates in parallel and concatenates them, giving the network several scales from one
+feature map, and WaveNet used the one-dimensional version over audio, where the
+receptive field has to span thousands of samples. The one cost that is not free is
+memory: a network that never downsamples holds full-resolution activations at every
+layer, which is usually the binding constraint on a segmentation model, so the
+parameters are free but the memory is not.
+
+The gridding fix is worth stating as a rule of its own: never repeat the same
+dilation several times in a row. Rates chosen so their sampling patterns interlock
+&mdash; 1, 2, 5, or 1, 2, 3 &mdash; cover the positions any single rate would skip,
+and the hybrid-dilated-convolution literature is largely about picking such
+sequences so that every input position is read by some layer in the stack.
+
 ## Where it goes wrong
 
 **Repeating one rate.** Gridding artefacts, and detail that falls in the gaps is
@@ -3828,6 +4169,44 @@ The exception worth knowing is **Vision Transformers**, which typically use a
 dedicated class token instead &mdash; a learned vector that attends to all the
 [patches](vision_transformer_patches.html) and carries the summary. Some ViT
 variants pool the patch tokens instead and report it works about as well.
+
+## The parameters it deletes
+
+The saving is exact and it is large. A 7&times;7&times;512 feature map into 10
+classes, two ways to reach the classifier:
+
+|method|weights in that layer|
+|---|---|
+|flatten + dense|7 &times; 7 &times; 512 &times; 10 = 250,880|
+|global average pool + dense|512 &times; 10 = 5,120|
+
+Forty-nine times fewer &mdash; and 49 is exactly the 7&times;7 spatial area, so the
+ratio is always the size of the feature map. Scale the classes to ImageNet's 1000
+and the flattened version needs 25 million weights in a single layer, which is why
+VGG-16 keeps about 90% of its 138 million parameters in its final dense layers,
+almost all in the one right after the flatten. GAP deletes those, and gets two
+things back for free: any input size works, because the mean of a channel is one
+number whatever the spatial dimensions, where 25,088 flatten-weights demand exactly
+25,088 inputs; and each class score becomes a weighted sum of channel means, which
+is precisely the structure [Grad-CAM](grad_cam.html) reads to make a heatmap. What
+it gives up is *where* each activation was &mdash; usually the right trade for
+classification, where presence matters more than position.
+
+What pooling gives up is *where* each activation was &mdash; if a channel responds
+to wheels, flatten preserves that they were at the bottom-left, GAP records only
+that there were wheels &mdash; and for classification that is the right trade,
+because the question is whether a car is present, not where its wheels sat. Every
+modern architecture uses GAP: ResNet, Inception, MobileNet and EfficientNet all end
+with a global pool and one dense layer. The exception is the Vision Transformer,
+which usually carries a dedicated class token instead, though some variants pool the
+patch tokens and report it works about as well &mdash; and global *max* pooling is
+the sibling worth remembering, better when one strong local response matters more
+than an average.
+
+The parameter cut is also a regularisation story. A dense layer with 25 million
+weights on a dataset of 50,000 images is an invitation to memorise; replacing it
+with a 512-to-classes layer removes most of the capacity that overfitting lives in,
+which is part of why the change stuck across every architecture that followed VGG.
 
 ## Where it goes wrong
 
@@ -4134,6 +4513,39 @@ them to ground truth with a Hungarian assignment.
 They remove the anchor hyperparameters, which is a real simplification. What they
 do not remove is the assignment problem &mdash; deciding which prediction is
 responsible for which object &mdash; which is simply solved differently.
+
+## The assignment, by IoU
+
+Every anchor is labelled before training by its IoU with the nearest ground-truth
+box, and working three cases shows the bands. Anchor at [0,0,4,4] against three
+possible objects:
+
+|ground-truth box|IoU|label|
+|---|---|---|
+|[0,0,4,5]|0.80|positive &mdash; regress the offset|
+|[1,1,5,5]|0.39|ignored &mdash; too ambiguous to train on|
+|[3,3,7,7]|0.03|negative &mdash; predict background|
+
+The ignore band (roughly 0.3-0.5) exists because forcing an ambiguous anchor either
+way teaches the network something untrue. The deeper problem the numbers expose is
+imbalance: a detector places tens of thousands of anchors, and an image with three
+objects makes almost all of them negative &mdash; ratios of 1000:1 are normal, so a
+naively trained model just says "background" very confidently. That single fact
+drove three fixes &mdash; hard-negative mining to hold the ratio near 3:1, focal
+loss to down-weight the easy negatives (which is what let one-stage detectors catch
+up), and two-stage proposal networks to filter first. And because anchors are a
+*prior*, a set tuned for photographs fails on aerial or text data, which is why
+YOLOv2 fits them by k-means over the training boxes.
+
+Anchor-free detectors &mdash; FCOS, CenterNet, DETR &mdash; drop the reference boxes
+entirely: FCOS predicts, for each point inside an object, the four distances to the
+box edges; CenterNet predicts centres as a heatmap; DETR predicts a fixed set of
+boxes and matches them to ground truth with a Hungarian assignment. They remove the
+anchor hyperparameters, a real simplification, but not the underlying assignment
+problem of deciding which prediction owns which object &mdash; that is simply solved
+differently. And too many anchors is its own cost: each one is memory and computation
+at every position of every feature map, and past a point they overlap so heavily that
+extra ones add nothing but expense.
 
 ## Where it goes wrong
 
@@ -4498,6 +4910,42 @@ them.
 post-processed output, so a detector that fires many overlapping boxes can look
 fine as long as suppression cleans up.
 
+## AP is the area, worked
+
+Average precision is the area under the precision-recall curve, and computing one
+on a handful of points shows what it rewards. Walk down the confidence-sorted
+predictions, recomputing precision and recall after each:
+
+|recall|precision|
+|---|---|
+|0.2|1.00|
+|0.4|1.00|
+|0.6|0.67|
+|0.8|0.50|
+|1.0|0.40|
+
+Summing precision across each recall step gives **AP &asymp; 0.71**. Because it
+integrates over the whole ranking rather than one operating point, a detector that
+puts its correct predictions above its wrong ones scores well regardless of how its
+confidences are calibrated &mdash; which is exactly what you want from a summary of
+a ranking. The catch is that AP has no threshold, so it tells you nothing about
+which confidence to deploy, and mAP averages it *unweighted* across classes, so a
+rare class the model handles badly drags the number down as hard as a common one.
+And COCO's headline averages this again over ten IoU thresholds from 0.50 to 0.95,
+which is why a detector reporting 0.80 under VOC's single 0.50 threshold might
+report 0.45 under COCO on identical predictions &mdash; the numbers are different
+measurements and cannot be compared.
+
+What mAP hides is as important as what it reports. It has no threshold, so it says
+nothing about which confidence to deploy; it ignores the cost of errors, counting a
+missed pedestrian and a spurious traffic cone the same; and being an unweighted mean
+over classes, a model excellent on nineteen and useless on the twentieth can outscore
+one that is decent on all. COCO's breakdowns &mdash; by object size, at fixed
+detection counts &mdash; are usually more actionable than the headline, because "bad
+at small objects" tells you what to fix where "mAP 0.42" does not. And tuning NMS to
+lift mAP is a trap: the operating point that maximises an integral over all
+thresholds is not the one you ship, so it often makes the deployed detector worse.
+
 ## Where it goes wrong
 
 **Comparing across datasets or conventions.** VOC against COCO, or one AP
@@ -4849,6 +5297,41 @@ Where the assumptions fail, the successors are **keypoint matching** &mdash;
 points and match those, giving rotation and scale invariance for free, and
 learned detectors, which handle deformation and appearance variation as well.
 
+## Why normalisation is the whole trick
+
+The reason NCC beats raw subtraction is one line of arithmetic. Take a template of
+pixel values and a patch that is the same pattern brightened by 20 &mdash; the kind
+of lighting change that breaks sum-of-squared-differences completely, since every
+difference grows. Normalised cross-correlation subtracts each side's mean and
+divides by its standard deviation before comparing:
+
+|comparison|score|
+|---|---|
+|template vs itself|1.000|
+|template vs (itself + 20 brightness)|**1.000**|
+|template vs a different pattern|well below 1|
+
+Subtracting the means removes any constant brightness offset; dividing by the
+standard deviations removes any contrast scaling; what remains measures *pattern*,
+bounded in &minus;1 to 1 so scores are comparable across positions. That invariance
+is why the response map is readable as an image and why the peak stays at 1.000
+under a lighting change that would swamp SSD. What normalising cannot fix is the
+geometry: a template rotated ten degrees or scaled up no longer aligns, and the
+correlation collapses &mdash; which is the wall that sent the field toward
+[keypoint detectors](harris_corners.html) that survive rotation and scale.
+
+Reading the response map is its own lesson: the bright region around the true match
+is a blob, not a point, because a template shifted one pixel still overlaps almost
+entirely and still scores well &mdash; so taking the argmax returns the same
+detection several times, and the fix is the same [non-maximum
+suppression](iou_and_non_max_suppression.html) that object detection uses. Where
+template matching survives is precisely the case its assumptions fit: a fixed camera
+and fixed orientation, where position is the only unknown &mdash; industrial
+inspection, finding an icon for UI automation, aligning a scanned form. When the
+object can rotate, scale or deform, it is the wrong method rather than one that needs
+tuning, and the successors are keypoint matchers like SIFT and ORB that get rotation
+and scale invariance for free.
+
 ## Where it goes wrong
 
 **Sum of squared differences under changing light.** Use NCC.
@@ -5196,6 +5679,40 @@ and solving for the transform between them. Detection is the first step;
 [template matching](template_matching.html) is the alternative that does not
 survive rotation.
 
+## Flat, edge, corner, by the numbers
+
+The whole detector reduces to the two eigenvalues of the structure tensor, and
+Harris's shortcut `R = det(M) - k&middot;trace(M)&sup2;` reads them without solving
+for them. With `k = 0.04`:
+
+|region|&lambda;&#8321;|&lambda;&#8322;|R|
+|---|---|---|---|
+|flat|0.1|0.1|+0.008 (near zero)|
+|edge|5.0|0.1|**&minus;0.54** (strongly negative)|
+|corner|5.0|4.0|**+16.76** (large positive)|
+
+The determinant multiplies the eigenvalues, so one small eigenvalue drags it toward
+zero; the trace term subtracts a penalty that grows when the two are unbalanced.
+The result is large and positive only when *both* eigenvalues are large &mdash; the
+corner case, where the intensity changes in two independent directions and the
+window can be pinned down. An edge changes in one direction only, so it comes out
+strongly negative and is rejected; a flat region changes in neither and sits near
+zero. That is why `R` separates corners from edges without ever computing an
+eigenvalue, and why `k` (0.04-0.06) tunes how strictly the balance is enforced. The
+eigenvalues are rotation-invariant, so a rotated corner scores the same &mdash; but
+not scale-invariant, which is the gap SIFT was built to close.
+
+What Harris is and is not invariant to decides where it can be used. Rotation: yes
+&mdash; the eigenvalues do not depend on the coordinate frame, so a rotated corner
+scores the same, which is what makes it usable for matching two views. Illumination:
+mostly &mdash; a brightness offset leaves gradients untouched, but a contrast scaling
+multiplies `R`, which is why the threshold must be relative to the image maximum
+rather than absolute. Scale: no &mdash; a corner seen from twice as far is a smaller
+corner a fixed window cannot capture, and that gap is exactly what SIFT closed by
+searching over scales and recording the one at which each keypoint is most
+distinctive. Corners feed panorama stitching, structure-from-motion, visual SLAM and
+calibration, all of which rest on finding the same physical point in several images.
+
 ## Where it goes wrong
 
 **An absolute threshold.** Response scales with contrast, so a threshold tuned on
@@ -5508,6 +6025,40 @@ and must learn from data that position 37 is next to 36 and above 23.
 
 Changing the input resolution changes the number of positions, which is why ViTs
 interpolate their positional embeddings when fine-tuned at a different size.
+
+## The patch size is the whole budget
+
+Cutting the image into patches decides everything downstream, and the token count
+makes it concrete. A 224-pixel image at patch size 16 gives a 14&times;14 grid =
+**196 tokens**, each starting as 16&times;16&times;3 = 768 raw numbers, and
+attention costs the square of the token count:
+
+|patch|tokens|attention pairs|relative cost|
+|---|---|---|---|
+|32|49|2,401|1&times;|
+|16|196|38,416|16&times;|
+|8|784|614,656|256&times;|
+
+Halve the patch and the token count quadruples, so attention rises sixteenfold.
+That is why patch size is not a minor hyperparameter but the resolution at which the
+model perceives anything, traded directly against compute &mdash; and why one token
+per pixel (50,176 tokens, 2.5 billion pairs a layer) is impossible. The cost inside
+a patch is subtler: a 16&times;16 region is projected to one vector, so structure
+within it is never attended to, and unlike a convolution the ViT has no built-in
+locality &mdash; it must *learn* that patch 37 sits beside 36, from data, through
+the positional embeddings. Which is why the original ViT needed 300 million
+pre-training images to beat a ResNet that had locality for free.
+
+Attention is permutation-invariant &mdash; shuffle the tokens and the output is
+shuffled identically &mdash; so without positional embeddings a ViT literally cannot
+tell a photograph from a jigsaw of itself, and the fix, a learned vector per
+position, is strikingly weak next to convolution: the model is told "this is position
+37" and must learn from data that 37 sits beside 36 and above 23. That missing
+inductive bias is why the plain ViT needed enormous pre-training, and why two
+responses followed &mdash; DeiT showed distillation and heavy augmentation could
+train one on ImageNet alone, and Swin reintroduced locality by restricting attention
+to windows and merging patches hierarchically, recovering the pyramid a CNN has for
+free and making dense prediction practical.
 
 ## Where it goes wrong
 
@@ -5837,6 +6388,41 @@ weights from gradients instead, which removed the architectural requirement.
 occluding with it and seeing what the score does &mdash; slower, and immune to
 gradient saturation.
 
+## The weighting, one cell at a time
+
+Grad-CAM's heatmap is a weighted sum of feature maps followed by a ReLU, and doing
+one cell by hand removes the mystery. Three maps, with weights that are the
+spatial-average gradients of the class score, combined at a single location:
+
+|contribution|value|
+|---|---|
+|map 1 activation 0.8 &times; weight +2.0|+1.60|
+|map 2 activation 0.5 &times; weight &minus;1.0|&minus;0.50|
+|map 3 activation 0.2 &times; weight +0.5|+0.10|
+|sum &rarr; ReLU|**1.20**|
+
+At a cell where the negatively-weighted map dominates the sum comes out negative
+&mdash; say &minus;0.65 &mdash; and the ReLU clips it to 0. That clip is the step
+people skip and then misread: Grad-CAM deliberately discards evidence *against* the
+class, because the question is what supported this prediction, and a map mixing
+support and opposition on one colour scale is easy to misread. The consequence is
+that a Grad-CAM heatmap can never show you what argued against a class &mdash; drag
+every weight negative and it goes empty, not inverted &mdash; and to see the
+opposing evidence you run it on the competing class instead. The map is also only
+7&times;7 before upsampling, so the smooth blob over the animal's face is
+interpolation, not pixel-level proof.
+
+Grad-CAM's real caution is that plausibility is not correctness. A heatmap over an
+animal's face looks convincing whether or not the model used the face, and published
+work has produced sensible-looking saliency maps for *randomly initialised* networks
+&mdash; so a reasonable heatmap is a hypothesis about the model, not a verification
+of it. It also explains exactly one layer, usually the last convolutional one, and
+the choice of layer changes the answer, so a Grad-CAM result is really "what the
+gradients at this layer say", not "what the model used". Its ancestor CAM required
+the network to end in global average pooling and read the weights straight from that
+layer; Grad-CAM's contribution was getting the same weights from gradients, which
+removed the architectural requirement and is why it works on almost any CNN.
+
 ## Where it goes wrong
 
 **Reading the smooth blob as pixel-level evidence.** It is 7&#215;7,
@@ -6154,6 +6740,50 @@ stock, people in a queue.
 **A complete scene description** &mdash; panoptic. Autonomous driving needs both
 "where is the road" (stuff) and "which car is which" (things), and needs them
 consistent.
+
+## PQ, worked
+
+Panoptic quality is the one metric that spans both halves, and seeing it computed
+shows why it resists the easy failures. It factors into segmentation quality times
+recognition quality: SQ is the mean IoU over *matched* segments, RQ is an F1 over
+whether segments were matched at all, `TP / (TP + &frac12;FP + &frac12;FN)`.
+
+Take a scene where 8 predicted segments matched ground truth at mean IoU 0.80, 1
+prediction matched nothing (a false positive), and 2 ground-truth objects were
+missed (false negatives):
+
+|term|value|
+|---|---|
+|SQ (mean IoU of matches)|0.80|
+|RQ = 8 / (8 + 0.5 + 1)|0.84|
+|**PQ = SQ &times; RQ**|**0.67**|
+
+The two factors guard different failures. A method that segments the pixels it
+finds beautifully but misses half the objects has a high SQ and a low RQ, so PQ
+falls; one that finds every object but traces them sloppily has the reverse. Only
+getting both right &mdash; the pixels *and* the object count &mdash; scores well,
+which is exactly the point of a metric built to end the split between the semantic
+community, who measured pixels with mIoU, and the instance community, who measured
+objects. It is also why a semantic mIoU and a panoptic PQ are not comparable: they
+are answering different questions, and only one of them can tell two touching cars
+apart.
+
+The taxonomy behind the metrics is two yes/no questions: do two objects of the same
+class get separate identities, and does the background get labelled. Semantic says
+no and yes &mdash; every pixel gets a class, two overlapping cars are one "car"
+region &mdash; so it is right when area matters and counting does not: tumour extent,
+drivable surface, land cover. Instance says yes and no &mdash; each object gets its
+own mask, background is left unlabelled &mdash; which is what counting needs, and
+because Mask R-CNN predicts a mask per detected box, its masks can overlap. Panoptic
+demands exactly one label per pixel *and* an instance id for the countable things,
+which is the constraint that makes it harder than running the other two and merging
+their outputs, since that merge needs a conflict rule.
+
+The vocabulary that makes the split coherent is things against stuff: things are
+countable &mdash; people, cars &mdash; so instances make sense, while stuff is
+uncountable &mdash; sky, road &mdash; and has extent but no instances. Semantic
+treats everything as stuff, instance handles only things, and panoptic covers both,
+which is exactly why it needed a name of its own.
 
 ## Where it goes wrong
 
