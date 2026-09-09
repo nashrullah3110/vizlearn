@@ -112,6 +112,27 @@ million while the indexed version barely moved from 13 steps to 23. And it is wh
 thing to spot in a plan: it is the difference between reading a handful of pages
 and reading the whole table.
 
+## Why a scan can beat the index
+
+"A scan is not always wrong" deserves the reason, because it explains why the
+optimiser sometimes ignores an index you built for it. An index gives a list of
+row locations, which then have to be fetched one at a time &mdash; random access.
+A scan reads the table in order &mdash; sequential access, which is far cheaper per
+row. So there is a crossover in selectivity:
+
+|query matches|index path|better plan|
+|---|---|---|
+|0.1% of rows|a few random fetches|**index**|
+|60% of rows|0.6N random fetches|**scan**|
+
+Fetching 60% of a table one row at a time through an index costs more than reading
+the whole table sequentially and discarding 40%, because random reads dominate the
+bill. This is why the optimiser's choice depends on the *statistics*, not just the
+SQL &mdash; and why a query that used the index in staging, against a few hundred
+rows, can correctly switch to a scan in production, against millions with a
+different distribution. The plan changing under you is the optimiser doing its
+job, not misbehaving.
+
 ## Where it goes wrong
 
 **Guessing instead of asking.** The plan is one command away and settles the

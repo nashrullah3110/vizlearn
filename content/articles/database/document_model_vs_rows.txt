@@ -98,6 +98,28 @@ briefly disagrees with itself about where the customer lives. That is the exact
 trade: the document read is faster because the join was done once at write time,
 and every later change to a shared fact pays it back in full.
 
+## The read the document shape wins
+
+The mirror image of the update cost is the read, and it is why the trade exists
+at all. Assembling one order &mdash; the order, its five line items, the customer
+&mdash; from normalised tables means touching three tables, and an ORM that loads
+them naively issues one query for the order and then one per related set:
+
+|shape|reads to assemble one order|
+|---|---|
+|document|**1** (the whole object, contiguous)|
+|relational, one join query|3 tables joined|
+|relational, naive ORM|1 + N round trips (the N+1 problem)|
+
+The document was written with the join already done, so the read is a single
+contiguous fetch with no reassembly. That is a real advantage for a
+read-this-whole-object access pattern, and it grows as the object gains parts. It
+is the same coin as the update cost: the document pays once at write time to make
+this read cheap, and the relational shape pays a little at read time to keep every
+fact in one place. Which way that trade should fall is a property of the workload, not of the
+database &mdash; read-mostly and object-shaped leans document, write-shared and
+queried-many-ways leans relational.
+
 ## Where it goes wrong
 
 **Choosing documents to avoid schema design.** The schema still exists; it has

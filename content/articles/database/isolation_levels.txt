@@ -120,6 +120,27 @@ that level with a retry, an explicit `SELECT ... FOR UPDATE`, or a single
 all. Reasoning about isolation is the hard way; letting one statement do the
 arithmetic is the safe one.
 
+## READ UNCOMMITTED is often a no-op
+
+One level on the dial frequently does nothing, and assuming otherwise is a portable
+source of confusion. `READ UNCOMMITTED` is meant to permit dirty reads &mdash;
+seeing another transaction's uncommitted changes &mdash; but a
+[snapshot-based](mvcc_in_databases.html) engine has no uncommitted version to
+show. PostgreSQL accepts the syntax and silently gives you `READ COMMITTED`
+instead:
+
+|engine|`SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED`|
+|---|---|
+|PostgreSQL|accepted, runs as READ COMMITTED|
+|MySQL InnoDB|honoured; dirty reads are possible|
+
+So the same statement means two different things on two databases, and a
+"performance" isolation level chosen on one has no effect on the other. This is a
+particular case of the general rule already stated &mdash; the standard names the
+anomalies a level *permits*, and an engine may prevent more &mdash; and it is why
+the level a system runs at is a fact about the engine as much as about the
+`SET` statement.
+
 ## Where it goes wrong
 
 **Assuming a default.** They differ between engines, and code written against

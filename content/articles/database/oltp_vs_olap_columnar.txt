@@ -122,6 +122,26 @@ column, being one type with few distinct values, often compresses several-fold
 again, so the real read is smaller still. The wider the table, the larger the
 gap, which is exactly backwards from what OLTP wants.
 
+## Where the ten-times compression comes from
+
+"Ten-times ratios are ordinary" is not a hope; it falls out of a column holding
+one type with few distinct values. A `country` column over ten million rows has
+maybe 200 distinct values, so dictionary encoding stores a one-byte code per row
+plus a tiny lookup, instead of the full string each time:
+
+|encoding|size of the country column|
+|---|---|
+|raw text (~10 bytes/value)|~100 MB|
+|dictionary (1 byte/row + dict)|~10 MB|
+
+Ten to one, and a sorted or slowly-changing column run-length encodes even harder
+&mdash; a date column that repeats each value for a day's worth of rows stores a
+value and a count rather than the value a million times. A row store cannot do any
+of this, because each value sits between bytes of other columns of other types,
+with nothing to compress against. The compression is not a feature bolted on; it
+is a consequence of putting like values next to like, and most of the resulting
+speed-up is simply that there is less to read.
+
 ## Where it goes wrong
 
 **Reporting off the primary.** Cache eviction makes the application slow, and the

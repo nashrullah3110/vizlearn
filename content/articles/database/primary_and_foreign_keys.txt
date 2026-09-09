@@ -99,6 +99,26 @@ quiet reason a schema "with foreign keys" can still be slow: the constraint was
 declared, the supporting index on the referencing column was not, and every
 delete or cascade pays for it.
 
+## Why the surrogate key is usually smaller too
+
+The natural-versus-surrogate choice has a storage side that compounds with every
+referencing table. A natural key &mdash; an email, a UUID string &mdash; is copied
+into every child row that references it, so its width is paid once per reference,
+not once per person:
+
+|key in 5 child tables, 10M rows each|storage in the children|
+|---|---|
+|email as the foreign key (~30 bytes)|~1,500 MB|
+|surrogate integer (4 bytes)|~200 MB|
+
+The surrogate is not just stable against change &mdash; it is seven times smaller
+across the references, and a smaller key means more index entries per page, so the
+indexes that use it are smaller and shallower too. The natural key still earns a
+`UNIQUE` constraint so the real-world rule ("one account per email") is enforced;
+it simply does not also have to be the value scattered across a dozen tables. That
+is the reasoning behind "surrogate primary key plus a unique natural key" &mdash;
+stable, compact identity for the machine, and the business rule kept as well.
+
 ## Where it goes wrong
 
 **Turning foreign keys off for performance.** They cost something on write. The

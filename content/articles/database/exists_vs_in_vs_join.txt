@@ -111,6 +111,24 @@ returns the right answer on the same data. This is not a corner case to file awa
 a nullable column is the normal situation, which is why `NOT EXISTS` is the safe
 default and `NOT IN` earns its place only on a column that is provably `NOT NULL`.
 
+## EXISTS stops at the first match
+
+The early exit is the other reason to prefer `EXISTS`, and it is a real difference
+in work done. `EXISTS` is true the moment one matching row is found, so for a
+customer with ten thousand orders it examines one; `COUNT(*) > 0`, the common
+alternative, counts all ten thousand before comparing:
+
+|test|rows the subquery examines|
+|---|---|
+|`EXISTS (SELECT 1 ...)`|1 (stops at the first)|
+|`(SELECT COUNT(*) ...) > 0`|all of them|
+
+The two return the same answer and do wildly different amounts of work, and the
+gap grows with how many matches there are &mdash; exactly the case where you least
+want to count them. So the habit worth forming is `EXISTS` for "is there at least
+one", never `COUNT(*) > 0`: the question is existence, and existence is answered
+by the first row, not the last.
+
 ## Where it goes wrong
 
 **`NOT IN` on anything nullable.** The query returns zero rows and looks like a

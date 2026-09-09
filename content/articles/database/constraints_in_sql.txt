@@ -102,6 +102,27 @@ unique column, while PostgreSQL, MySQL and SQLite permit many &mdash; so a schem
 that relies on either behaviour is not portable. If the rule you meant was "one row
 per real address", `UNIQUE` alone does not say it; `UNIQUE` plus `NOT NULL` does.
 
+## Adding one to a large table is not free
+
+A constraint added at `CREATE TABLE` costs nothing; one added later has to be
+*proved* against every existing row before the database will accept it. Adding
+`CHECK (age >= 18)` or a `NOT NULL` to a 50-million-row table means the engine
+reads all 50 million rows to confirm none already violates it, and in most engines
+it holds a lock on the table while it does:
+
+|constraint added|what the database must do|
+|---|---|
+|at table creation|nothing; no rows exist yet|
+|to a 50M-row table|read all 50M rows, usually under a lock|
+
+So the same declaration is instant on an empty table and an outage on a full one.
+This is why constraints should encode what is *structurally* true &mdash; a
+salary is positive, an end date follows a start date &mdash; rather than current
+policy: a `CHECK` on this year's VAT rate has to be dropped and re-verified across
+every row each time the rate changes, and re-verifying a large table is the
+expensive operation above, paid on a schedule set by the tax authority rather
+than by you.
+
 ## Where it goes wrong
 
 **Unnamed constraints.** Six `CHECK`s on a table and an error that says only

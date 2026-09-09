@@ -115,6 +115,31 @@ come out of no table at all. The `LEFT JOIN` then keeps every day, and
 visible zero rather than an invisible skip &mdash; the difference between a chart
 that lies by omission and one that does not.
 
+## What a cycle actually does
+
+"Runs forever" understates it. With `UNION ALL` and a cycle, each round feeds the
+next, and if the cycle doubles the frontier the row count explodes geometrically
+before the server kills it:
+
+|round|rows produced|
+|---|---|
+|1|1|
+|5|16|
+|10|512|
+|20|524,288|
+
+That is not a slow query; it is a query trying to build a billion-row
+intermediate from a handful of cyclic rows. A `WHERE level < 50` guard turns it
+into a wrong-but-finite answer that returns at once and is obvious in the output,
+which is far easier to notice than a connection that simply never comes back.
+`UNION` instead of `UNION ALL` stops it too, by deduplicating &mdash; but that
+compares each new row against everything found so far, every round, so on
+acyclic data it makes a correct query needlessly quadratic. The depth cap costs
+one integer comparison per row; reach for it first. A path-based guard &mdash; refusing to revisit a name already on the accumulated
+path &mdash; is stricter and costs a substring check per row, and it is the right
+choice when the data is a graph rather than a tree and genuine repeats are
+expected.
+
 ## Where it goes wrong
 
 **No termination guard.** Cyclic data plus `UNION ALL` runs forever.

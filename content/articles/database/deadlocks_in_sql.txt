@@ -100,6 +100,26 @@ no error &mdash; because a cycle requires the two to disagree about order, and
 "always lock the lower id first" removes the disagreement. That is the entire
 technique, and it is code discipline, not a database setting.
 
+## Retry with backoff, not in lockstep
+
+The retry after a deadlock has one detail that decides whether it helps: the wait
+before retrying must be *randomised*. Both victims of a deadlock were doing similar
+work at the same time, so if both retry immediately &mdash; or both after exactly
+100 ms &mdash; they collide again on the same schedule, and again after that:
+
+|retry strategy|outcome under contention|
+|---|---|
+|immediate|the two collide again at once|
+|fixed delay|they collide again after the delay|
+|exponential backoff with jitter|the two drift apart and one wins|
+
+Exponential backoff spreads successive attempts (100 ms, 200 ms, 400 ms), and the
+jitter &mdash; a random fraction added to each &mdash; breaks the symmetry so the
+two transactions stop arriving together. Without the randomness a deadlock can
+become a livelock: no cycle in the wait graph, but two transactions retrying in
+step and failing each other forever. The fix for a deadlock and the fix for the
+retry storm it can cause are different, and both are needed.
+
 ## Where it goes wrong
 
 **Treating it as a database configuration problem.** No setting prevents

@@ -231,6 +231,26 @@ quiet reason a schema "with foreign keys" can still be slow: the constraint was
 declared, the supporting index on the referencing column was not, and every
 delete or cascade pays for it.
 
+## Why the surrogate key is usually smaller too
+
+The natural-versus-surrogate choice has a storage side that compounds with every
+referencing table. A natural key &mdash; an email, a UUID string &mdash; is copied
+into every child row that references it, so its width is paid once per reference,
+not once per person:
+
+|key in 5 child tables, 10M rows each|storage in the children|
+|---|---|
+|email as the foreign key (~30 bytes)|~1,500 MB|
+|surrogate integer (4 bytes)|~200 MB|
+
+The surrogate is not just stable against change &mdash; it is seven times smaller
+across the references, and a smaller key means more index entries per page, so the
+indexes that use it are smaller and shallower too. The natural key still earns a
+`UNIQUE` constraint so the real-world rule ("one account per email") is enforced;
+it simply does not also have to be the value scattered across a dozen tables. That
+is the reasoning behind "surrogate primary key plus a unique natural key" &mdash;
+stable, compact identity for the machine, and the business rule kept as well.
+
 ## Where it goes wrong
 
 **Turning foreign keys off for performance.** They cost something on write. The
@@ -425,6 +445,27 @@ not even consistent across engines &mdash; SQL Server permits exactly one NULL i
 unique column, while PostgreSQL, MySQL and SQLite permit many &mdash; so a schema
 that relies on either behaviour is not portable. If the rule you meant was "one row
 per real address", `UNIQUE` alone does not say it; `UNIQUE` plus `NOT NULL` does.
+
+## Adding one to a large table is not free
+
+A constraint added at `CREATE TABLE` costs nothing; one added later has to be
+*proved* against every existing row before the database will accept it. Adding
+`CHECK (age >= 18)` or a `NOT NULL` to a 50-million-row table means the engine
+reads all 50 million rows to confirm none already violates it, and in most engines
+it holds a lock on the table while it does:
+
+|constraint added|what the database must do|
+|---|---|
+|at table creation|nothing; no rows exist yet|
+|to a 50M-row table|read all 50M rows, usually under a lock|
+
+So the same declaration is instant on an empty table and an outage on a full one.
+This is why constraints should encode what is *structurally* true &mdash; a
+salary is positive, an end date follows a start date &mdash; rather than current
+policy: a `CHECK` on this year's VAT rate has to be dropped and re-verified across
+every row each time the rate changes, and re-verifying a large table is the
+expensive operation above, paid on a schedule set by the tax authority rather
+than by you.
 
 ## Where it goes wrong
 
@@ -658,6 +699,25 @@ failed, 20 is right and 12 invents readings of zero; if it means "no sales that
 day", 12 is right and 20 overstates the typical day. The database will compute
 whichever you write and warn you about neither.
 
+## The empty group returns NULL, not zero
+
+There is one more NULL behaviour that breaks arithmetic downstream: an aggregate
+over *no values* returns NULL, and only `COUNT` returns 0. Restrict to rows that
+have no reading at all &mdash; a real group with zero values &mdash; and:
+
+|aggregate|over an empty group|
+|---|---|
+|`COUNT(*)`|0|
+|`COUNT(t)`|0|
+|`SUM`, `AVG`, `MIN`, `MAX`|**NULL**|
+
+`SUM` of nothing being NULL rather than 0 is the one that bites, because NULL then
+propagates: `SUM(amount) * 1.2` over an empty group is NULL, and it stays NULL
+through every operation until something wraps it in `COALESCE`. A report that
+subtotals by group and then does arithmetic on the subtotals will show blanks, not
+zeros, for the empty groups &mdash; and a blank where a number was expected is how
+this surfaces, usually in front of someone who trusts the report.
+
 ## Where it goes wrong
 
 **Using AVG on data where NULL means zero.** The average silently rises. Use
@@ -890,6 +950,24 @@ returns the right answer on the same data. This is not a corner case to file awa
 a nullable column is the normal situation, which is why `NOT EXISTS` is the safe
 default and `NOT IN` earns its place only on a column that is provably `NOT NULL`.
 
+## EXISTS stops at the first match
+
+The early exit is the other reason to prefer `EXISTS`, and it is a real difference
+in work done. `EXISTS` is true the moment one matching row is found, so for a
+customer with ten thousand orders it examines one; `COUNT(*) > 0`, the common
+alternative, counts all ten thousand before comparing:
+
+|test|rows the subquery examines|
+|---|---|
+|`EXISTS (SELECT 1 ...)`|1 (stops at the first)|
+|`(SELECT COUNT(*) ...) > 0`|all of them|
+
+The two return the same answer and do wildly different amounts of work, and the
+gap grows with how many matches there are &mdash; exactly the case where you least
+want to count them. So the habit worth forming is `EXISTS` for "is there at least
+one", never `COUNT(*) > 0`: the question is existence, and existence is answered
+by the first row, not the last.
+
 ## Where it goes wrong
 
 **`NOT IN` on anything nullable.** The query returns zero rows and looks like a
@@ -1110,6 +1188,27 @@ with fifty reports the wrong condition does not return a few extra rows &mdash; 
 returns 2,500 where 1,225 were wanted, and any total computed over them comes out
 roughly doubled. That is why the idiom is worth recognising on sight rather than
 rediscovering after a report reads twice what it should.
+
+## A self-join reads the table twice
+
+The other cost hides in the plan. A self-join names the table twice, so the engine
+reads it twice, and if the join column is unindexed each read is a full scan with
+a hash build in between. On `employees` self-joined on `manager_id`:
+
+|`manager_id`|plan|
+|---|---|
+|indexed|SEARCH the second copy per row &mdash; a seek|
+|unindexed|SCAN both copies, hash-join in memory|
+
+On a hundred employees nobody notices. On a hundred thousand, the unindexed
+version builds a hash table of every row and probes it with every row &mdash; the
+work grows with the square of the table where the indexed plan grows with its
+logarithm. A hundred thousand employees joined without that index is on the order of ten
+billion row comparisons; with it, a hundred thousand seeks of about seventeen
+steps each &mdash; the difference between a query that returns and one that does
+not. The index on the parent column that a foreign key would give you is on
+the *referenced* side; the self-join reads the *referencing* column, which is the
+one that usually lacks an index, so this is easy to miss until the table grows.
 
 ## Where it goes wrong
 
@@ -1368,6 +1467,31 @@ come out of no table at all. The `LEFT JOIN` then keeps every day, and
 visible zero rather than an invisible skip &mdash; the difference between a chart
 that lies by omission and one that does not.
 
+## What a cycle actually does
+
+"Runs forever" understates it. With `UNION ALL` and a cycle, each round feeds the
+next, and if the cycle doubles the frontier the row count explodes geometrically
+before the server kills it:
+
+|round|rows produced|
+|---|---|
+|1|1|
+|5|16|
+|10|512|
+|20|524,288|
+
+That is not a slow query; it is a query trying to build a billion-row
+intermediate from a handful of cyclic rows. A `WHERE level < 50` guard turns it
+into a wrong-but-finite answer that returns at once and is obvious in the output,
+which is far easier to notice than a connection that simply never comes back.
+`UNION` instead of `UNION ALL` stops it too, by deduplicating &mdash; but that
+compares each new row against everything found so far, every round, so on
+acyclic data it makes a correct query needlessly quadratic. The depth cap costs
+one integer comparison per row; reach for it first. A path-based guard &mdash; refusing to revisit a name already on the accumulated
+path &mdash; is stricter and costs a substring check per row, and it is the right
+choice when the data is a graph rather than a tree and genuine repeats are
+expected.
+
 ## Where it goes wrong
 
 **No termination guard.** Cyclic data plus `UNION ALL` runs forever.
@@ -1587,6 +1711,27 @@ million while the indexed version barely moved from 13 steps to 23. And it is wh
 `SCAN` on a large table where you expected a lookup is the single most valuable
 thing to spot in a plan: it is the difference between reading a handful of pages
 and reading the whole table.
+
+## Why a scan can beat the index
+
+"A scan is not always wrong" deserves the reason, because it explains why the
+optimiser sometimes ignores an index you built for it. An index gives a list of
+row locations, which then have to be fetched one at a time &mdash; random access.
+A scan reads the table in order &mdash; sequential access, which is far cheaper per
+row. So there is a crossover in selectivity:
+
+|query matches|index path|better plan|
+|---|---|---|
+|0.1% of rows|a few random fetches|**index**|
+|60% of rows|0.6N random fetches|**scan**|
+
+Fetching 60% of a table one row at a time through an index costs more than reading
+the whole table sequentially and discarding 40%, because random reads dominate the
+bill. This is why the optimiser's choice depends on the *statistics*, not just the
+SQL &mdash; and why a query that used the index in staging, against a few hundred
+rows, can correctly switch to a scan in production, against millions with a
+different distribution. The plan changing under you is the optimiser doing its
+job, not misbehaving.
 
 ## Where it goes wrong
 
@@ -2056,6 +2201,27 @@ that level with a retry, an explicit `SELECT ... FOR UPDATE`, or a single
 all. Reasoning about isolation is the hard way; letting one statement do the
 arithmetic is the safe one.
 
+## READ UNCOMMITTED is often a no-op
+
+One level on the dial frequently does nothing, and assuming otherwise is a portable
+source of confusion. `READ UNCOMMITTED` is meant to permit dirty reads &mdash;
+seeing another transaction's uncommitted changes &mdash; but a
+[snapshot-based](mvcc_in_databases.html) engine has no uncommitted version to
+show. PostgreSQL accepts the syntax and silently gives you `READ COMMITTED`
+instead:
+
+|engine|`SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED`|
+|---|---|
+|PostgreSQL|accepted, runs as READ COMMITTED|
+|MySQL InnoDB|honoured; dirty reads are possible|
+
+So the same statement means two different things on two databases, and a
+"performance" isolation level chosen on one has no effect on the other. This is a
+particular case of the general rule already stated &mdash; the standard names the
+anomalies a level *permits*, and an engine may prevent more &mdash; and it is why
+the level a system runs at is a fact about the engine as much as about the
+`SET` statement.
+
 ## Where it goes wrong
 
 **Assuming a default.** They differ between engines, and code written against
@@ -2260,6 +2426,26 @@ no error &mdash; because a cycle requires the two to disagree about order, and
 "always lock the lower id first" removes the disagreement. That is the entire
 technique, and it is code discipline, not a database setting.
 
+## Retry with backoff, not in lockstep
+
+The retry after a deadlock has one detail that decides whether it helps: the wait
+before retrying must be *randomised*. Both victims of a deadlock were doing similar
+work at the same time, so if both retry immediately &mdash; or both after exactly
+100 ms &mdash; they collide again on the same schedule, and again after that:
+
+|retry strategy|outcome under contention|
+|---|---|
+|immediate|the two collide again at once|
+|fixed delay|they collide again after the delay|
+|exponential backoff with jitter|the two drift apart and one wins|
+
+Exponential backoff spreads successive attempts (100 ms, 200 ms, 400 ms), and the
+jitter &mdash; a random fraction added to each &mdash; breaks the symmetry so the
+two transactions stop arriving together. Without the randomness a deadlock can
+become a livelock: no cycle in the wait graph, but two transactions retrying in
+step and failing each other forever. The fix for a deadlock and the fix for the
+retry storm it can cause are different, and both are needed.
+
 ## Where it goes wrong
 
 **Treating it as a database configuration problem.** No setting prevents
@@ -2427,6 +2613,26 @@ versions the vacuum cannot touch, every scan reads the pages they sit on, and th
 file keeps growing. One forgotten transaction, doing nothing, taxes every query
 against that table until it is closed &mdash; which is why "idle in transaction"
 is a state worth alerting on, not just avoiding.
+
+## Visibility is one comparison
+
+The claim that visibility becomes arithmetic rather than a queue is worth making
+literal, because it is why reads never wait. A version is visible to a snapshot
+`S` exactly when `created_by <= S AND (deleted_by IS NULL OR deleted_by > S)`.
+Take the two versions from earlier &mdash; v1 created by 100 and deleted by 142,
+v2 created by 142 and still live:
+
+|snapshot|v1 (100&ndash;142)|v2 (142&ndash;)|sees|
+|---|---|---|---|
+|120|100&le;120 and 142&gt;120 &rarr; **yes**|142&le;120 &rarr; no|v1, balance 1000|
+|150|142&gt;150 is false &rarr; no|142&le;150 and live &rarr; **yes**|v2, balance 850|
+
+No lock is consulted and nothing blocks; each reader compares transaction ids and
+picks its version. A snapshot of 120 keeps seeing 1000 no matter how many times
+142 commits, because the numbers do not change once fixed. That is the entire
+mechanism by which a long report runs undisturbed beside a stream of writes. It is also why the visible version is found without a scan of the history: the
+engine keeps versions chained newest-first and walks until the comparison first
+succeeds, which for a recently-read row is usually the very first link.
 
 ## Where it goes wrong
 
@@ -2863,6 +3069,27 @@ the two rows above &mdash; because a new shard takes a slice from its neighbours
 instead of forcing every key to recompute against a new divisor. Moving 1% of the
 data to add a machine is an afternoon; moving 99% while serving traffic is the
 project everyone dreads.
+
+## The slowest shard sets the latency
+
+"Scatter-gather latency is the slowest shard's, not the average" is a statement
+about tail probability, and the arithmetic is unforgiving. If each shard answers
+within its target 99% of the time, a query that must wait for *all* of them is
+fast only if *every* shard was fast &mdash; and that probability falls as the
+fan-out grows:
+
+|shards in the fan-out|each 99% fast|chance the query hits a slow shard|
+|---|---|---|
+|10|0.99|9.6%|
+|100|0.99|**63.4%**|
+|100|0.999|9.5%|
+
+A hundred-shard query with per-shard 99% latency is slow *most of the time*,
+because 0.99&#8313;&#8304; is only 0.366. The fan-out has turned a rare per-shard
+event into the common case, and the only cures are to make each shard far more
+reliable (the third row) or to avoid the fan-out by putting the shard key in the
+query. This is why a single degraded node makes an entire sharded tier feel slow,
+and why "the average shard is fast" is the wrong thing to measure.
 
 ## Where it goes wrong
 
@@ -3521,6 +3748,28 @@ briefly disagrees with itself about where the customer lives. That is the exact
 trade: the document read is faster because the join was done once at write time,
 and every later change to a shared fact pays it back in full.
 
+## The read the document shape wins
+
+The mirror image of the update cost is the read, and it is why the trade exists
+at all. Assembling one order &mdash; the order, its five line items, the customer
+&mdash; from normalised tables means touching three tables, and an ORM that loads
+them naively issues one query for the order and then one per related set:
+
+|shape|reads to assemble one order|
+|---|---|
+|document|**1** (the whole object, contiguous)|
+|relational, one join query|3 tables joined|
+|relational, naive ORM|1 + N round trips (the N+1 problem)|
+
+The document was written with the join already done, so the read is a single
+contiguous fetch with no reassembly. That is a real advantage for a
+read-this-whole-object access pattern, and it grows as the object gains parts. It
+is the same coin as the update cost: the document pays once at write time to make
+this read cheap, and the relational shape pays a little at read time to keep every
+fact in one place. Which way that trade should fall is a property of the workload, not of the
+database &mdash; read-mostly and object-shaped leans document, write-shared and
+queried-many-ways leans relational.
+
 ## Where it goes wrong
 
 **Choosing documents to avoid schema design.** The schema still exists; it has
@@ -3762,6 +4011,26 @@ depth three or four over a large graph the relational plan is doing work
 proportional to the tables while the graph is doing work proportional to the
 answer. That divergence &mdash; not lookup speed &mdash; is the real reason to
 reach for a graph.
+
+## The lookup, and why it is O(1)
+
+The reason a key-value store outruns a general database on its one job is the
+absence of a tree. A relational primary-key lookup descends a B-tree &mdash; about
+`log2(n)` steps &mdash; while a hash-based key-value `get` computes one hash and
+does one read, regardless of size:
+
+|keys stored|B-tree lookup|hash lookup|
+|---|---|---|
+|1,000,000|~20 steps|~1 probe|
+|1,000,000,000|~30 steps|~1 probe|
+
+The B-tree's cost grows, slowly, forever; the hash's does not grow at all. That
+flat line is the whole value proposition, and it is bought by giving up
+everything a tree enables &mdash; ordered scans, range queries, "the next key
+after this one" &mdash; none of which a hash can answer. So the choice is not
+"key-value is faster" but "key-value is faster at point lookups and cannot do
+ranges at all", which is exactly the trade to weigh before moving a workload off
+SQL for speed.
 
 ## Where it goes wrong
 
@@ -4018,6 +4287,26 @@ column, being one type with few distinct values, often compresses several-fold
 again, so the real read is smaller still. The wider the table, the larger the
 gap, which is exactly backwards from what OLTP wants.
 
+## Where the ten-times compression comes from
+
+"Ten-times ratios are ordinary" is not a hope; it falls out of a column holding
+one type with few distinct values. A `country` column over ten million rows has
+maybe 200 distinct values, so dictionary encoding stores a one-byte code per row
+plus a tiny lookup, instead of the full string each time:
+
+|encoding|size of the country column|
+|---|---|
+|raw text (~10 bytes/value)|~100 MB|
+|dictionary (1 byte/row + dict)|~10 MB|
+
+Ten to one, and a sorted or slowly-changing column run-length encodes even harder
+&mdash; a date column that repeats each value for a day's worth of rows stores a
+value and a count rather than the value a million times. A row store cannot do any
+of this, because each value sits between bytes of other columns of other types,
+with nothing to compress against. The compression is not a feature bolted on; it
+is a consequence of putting like values next to like, and most of the resulting
+speed-up is simply that there is less to read.
+
 ## Where it goes wrong
 
 **Reporting off the primary.** Cache eviction makes the application slow, and the
@@ -4244,6 +4533,27 @@ but the factor is the average number of lines per order, whatever that happens t
 be. Nothing errors, the number is plausible, and it is wrong on every run. This is
 what "state the grain in one sentence" prevents: a measure at order grain must be
 summed at order grain, and mixing it with a per-line join silently multiplies it.
+
+## Text belongs in the dimension, and here is the cost
+
+"Text in the fact table" sounds harmless until you remember which table is
+enormous. The fact table has one row per event &mdash; hundreds of millions of
+them &mdash; while dimensions are small. Storing a 20-byte product name on every
+fact row, instead of a 4-byte key pointing at the product dimension, widens the
+largest table in the warehouse:
+
+|on a 100M-row fact table|storage|
+|---|---|
+|a 20-byte text column|~2.0 GB|
+|a 4-byte foreign key to a dimension|~0.4 GB|
+
+Five times the space, on the table every analytical scan has to read, for data
+that is duplicated millions of times &mdash; the same product name written on
+every one of its sales. The dimension stores it once. And because columnar
+warehouses scan the columns a query touches, a bloated fact table is not just disk;
+it is read on every query that goes near it. Narrow facts, wide dimensions is not
+an aesthetic preference &mdash; it is keeping the big table small and the
+redundancy in the place where it is cheap.
 
 ## Where it goes wrong
 

@@ -102,6 +102,26 @@ file keeps growing. One forgotten transaction, doing nothing, taxes every query
 against that table until it is closed &mdash; which is why "idle in transaction"
 is a state worth alerting on, not just avoiding.
 
+## Visibility is one comparison
+
+The claim that visibility becomes arithmetic rather than a queue is worth making
+literal, because it is why reads never wait. A version is visible to a snapshot
+`S` exactly when `created_by <= S AND (deleted_by IS NULL OR deleted_by > S)`.
+Take the two versions from earlier &mdash; v1 created by 100 and deleted by 142,
+v2 created by 142 and still live:
+
+|snapshot|v1 (100&ndash;142)|v2 (142&ndash;)|sees|
+|---|---|---|---|
+|120|100&le;120 and 142&gt;120 &rarr; **yes**|142&le;120 &rarr; no|v1, balance 1000|
+|150|142&gt;150 is false &rarr; no|142&le;150 and live &rarr; **yes**|v2, balance 850|
+
+No lock is consulted and nothing blocks; each reader compares transaction ids and
+picks its version. A snapshot of 120 keeps seeing 1000 no matter how many times
+142 commits, because the numbers do not change once fixed. That is the entire
+mechanism by which a long report runs undisturbed beside a stream of writes. It is also why the visible version is found without a scan of the history: the
+engine keeps versions chained newest-first and walks until the comparison first
+succeeds, which for a recently-read row is usually the very first link.
+
 ## Where it goes wrong
 
 **Long-running transactions.** They pin versions across the entire database.

@@ -111,6 +111,27 @@ be. Nothing errors, the number is plausible, and it is wrong on every run. This 
 what "state the grain in one sentence" prevents: a measure at order grain must be
 summed at order grain, and mixing it with a per-line join silently multiplies it.
 
+## Text belongs in the dimension, and here is the cost
+
+"Text in the fact table" sounds harmless until you remember which table is
+enormous. The fact table has one row per event &mdash; hundreds of millions of
+them &mdash; while dimensions are small. Storing a 20-byte product name on every
+fact row, instead of a 4-byte key pointing at the product dimension, widens the
+largest table in the warehouse:
+
+|on a 100M-row fact table|storage|
+|---|---|
+|a 20-byte text column|~2.0 GB|
+|a 4-byte foreign key to a dimension|~0.4 GB|
+
+Five times the space, on the table every analytical scan has to read, for data
+that is duplicated millions of times &mdash; the same product name written on
+every one of its sales. The dimension stores it once. And because columnar
+warehouses scan the columns a query touches, a bloated fact table is not just disk;
+it is read on every query that goes near it. Narrow facts, wide dimensions is not
+an aesthetic preference &mdash; it is keeping the big table small and the
+redundancy in the place where it is cheap.
+
 ## Where it goes wrong
 
 **Mixed grain.** Silent, and it inflates every total.

@@ -106,6 +106,25 @@ failed, 20 is right and 12 invents readings of zero; if it means "no sales that
 day", 12 is right and 20 overstates the typical day. The database will compute
 whichever you write and warn you about neither.
 
+## The empty group returns NULL, not zero
+
+There is one more NULL behaviour that breaks arithmetic downstream: an aggregate
+over *no values* returns NULL, and only `COUNT` returns 0. Restrict to rows that
+have no reading at all &mdash; a real group with zero values &mdash; and:
+
+|aggregate|over an empty group|
+|---|---|
+|`COUNT(*)`|0|
+|`COUNT(t)`|0|
+|`SUM`, `AVG`, `MIN`, `MAX`|**NULL**|
+
+`SUM` of nothing being NULL rather than 0 is the one that bites, because NULL then
+propagates: `SUM(amount) * 1.2` over an empty group is NULL, and it stays NULL
+through every operation until something wraps it in `COALESCE`. A report that
+subtotals by group and then does arithmetic on the subtotals will show blanks, not
+zeros, for the empty groups &mdash; and a blank where a number was expected is how
+this surfaces, usually in front of someone who trusts the report.
+
 ## Where it goes wrong
 
 **Using AVG on data where NULL means zero.** The average silently rises. Use

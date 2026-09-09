@@ -109,6 +109,26 @@ proportional to the tables while the graph is doing work proportional to the
 answer. That divergence &mdash; not lookup speed &mdash; is the real reason to
 reach for a graph.
 
+## The lookup, and why it is O(1)
+
+The reason a key-value store outruns a general database on its one job is the
+absence of a tree. A relational primary-key lookup descends a B-tree &mdash; about
+`log2(n)` steps &mdash; while a hash-based key-value `get` computes one hash and
+does one read, regardless of size:
+
+|keys stored|B-tree lookup|hash lookup|
+|---|---|---|
+|1,000,000|~20 steps|~1 probe|
+|1,000,000,000|~30 steps|~1 probe|
+
+The B-tree's cost grows, slowly, forever; the hash's does not grow at all. That
+flat line is the whole value proposition, and it is bought by giving up
+everything a tree enables &mdash; ordered scans, range queries, "the next key
+after this one" &mdash; none of which a hash can answer. So the choice is not
+"key-value is faster" but "key-value is faster at point lookups and cannot do
+ranges at all", which is exactly the trade to weigh before moving a workload off
+SQL for speed.
+
 ## Where it goes wrong
 
 **Using a key-value store as the system of record without a plan for secondary

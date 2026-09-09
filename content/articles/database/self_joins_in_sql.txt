@@ -106,6 +106,27 @@ returns 2,500 where 1,225 were wanted, and any total computed over them comes ou
 roughly doubled. That is why the idiom is worth recognising on sight rather than
 rediscovering after a report reads twice what it should.
 
+## A self-join reads the table twice
+
+The other cost hides in the plan. A self-join names the table twice, so the engine
+reads it twice, and if the join column is unindexed each read is a full scan with
+a hash build in between. On `employees` self-joined on `manager_id`:
+
+|`manager_id`|plan|
+|---|---|
+|indexed|SEARCH the second copy per row &mdash; a seek|
+|unindexed|SCAN both copies, hash-join in memory|
+
+On a hundred employees nobody notices. On a hundred thousand, the unindexed
+version builds a hash table of every row and probes it with every row &mdash; the
+work grows with the square of the table where the indexed plan grows with its
+logarithm. A hundred thousand employees joined without that index is on the order of ten
+billion row comparisons; with it, a hundred thousand seeks of about seventeen
+steps each &mdash; the difference between a query that returns and one that does
+not. The index on the parent column that a foreign key would give you is on
+the *referenced* side; the self-join reads the *referencing* column, which is the
+one that usually lacks an index, so this is easy to miss until the table grows.
+
 ## Where it goes wrong
 
 **Inner join on a nullable parent.** The root vanishes. This is the single most
