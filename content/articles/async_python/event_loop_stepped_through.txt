@@ -1,0 +1,120 @@
+title: The Event Loop, Stepped Through
+intro: One thread, one queue of ready work, and coroutines that step aside at every await. Everything else about async Python is a consequence of this.
+
+## The whole machine, in one sentence
+
+Asynchronous Python runs on a single thread. There is no parallelism here and no
+second core doing work behind your back. What there is instead is an **event
+loop**: a plain loop that keeps a queue of coroutines that are ready to run,
+takes one, runs it until it voluntarily steps aside, and moves to the next.
+
+That "steps aside" is the entire trick, and it happens at exactly one kind of
+place: an <code>await</code>. Between two awaits a coroutine has the thread to
+itself and nothing can interrupt it. At an await it hands control back to the
+loop, which is then free to run something else while the first coroutine is
+waiting for whatever it awaited.
+
+## Watch two coroutines take turns
+
+The clearest way to see the loop switching is to make two coroutines that yield
+control on purpose, with <code>await asyncio.sleep(0)</code> &mdash; a sleep of
+zero seconds whose only effect is to return to the loop.
+
+```python
+import asyncio
+
+async def task(name, steps):
+    for i in range(steps):
+        print(f"{name} step {i}")
+        await asyncio.sleep(0)          # hand control back to the loop
+
+async def main():
+    await asyncio.gather(task("A", 3), task("B", 3))
+
+asyncio.run(main())
+```
+
+The output is not <code>A A A B B B</code>. It is interleaved:
+
+```
+A step 0
+B step 0
+A step 1
+B step 1
+A step 2
+B step 2
+```
+
+A runs until its first await and stops. The loop then runs B until *its* first
+await. Then A again, because its sleep(0) has resolved and it is back on the
+ready queue. The two advance in lockstep, one step each per turn, and the point
+where a turn ends is always an await. Delete the <code>await asyncio.sleep(0)</code>
+and A runs all three steps before B starts at all, because without an await it
+never gives the loop a chance to switch.
+
+## Where the concurrency actually comes from
+
+Nothing above ran in parallel. A and B took turns on one thread, and the total
+work was the same as doing them one after another. So what is the loop for?
+
+The answer is that real awaits are not instant. When a coroutine does
+<code>await</code> on a network read, a timer, or a database reply, it is saying
+"I have nothing to do until this arrives &mdash; run someone else." The loop
+does exactly that. While A waits 200&nbsp;ms for a server, B is not blocked; it
+is running, or waiting on its own reply. A thousand coroutines can all be waiting
+at once on one thread, which is the thing threads are too expensive to do at that
+scale.
+
+The loop is therefore an **overlap machine for waiting**, not a way to do two
+computations at once. That distinction decides everything about when async helps
+&mdash; it is covered in [running work concurrently](running_work_concurrently.html),
+and its most common failure, a coroutine that does not step aside, is the whole
+subject of [the blocking call that freezes the loop](the_blocking_call_that_freezes_the_loop.html).
+
+## The three states a coroutine is in
+
+At any moment the loop sees each coroutine in one of three states, and following
+them is enough to predict any async program's behaviour:
+
+| State | Meaning |
+|---|---|
+| Running | it has the thread right now, between two awaits |
+| Ready | it is waiting in the queue for its turn |
+| Waiting | it is suspended at an await, until that await resolves |
+
+Exactly one coroutine is ever *running*. When it hits an await it becomes
+*waiting*, and the loop promotes the next *ready* one to running. When an await
+resolves &mdash; a timer fires, a reply arrives &mdash; its coroutine moves from
+*waiting* back to *ready*, and will run again when its turn comes.
+
+## Why "cooperative" is the word that matters
+
+This scheduling is **cooperative**: the loop can only switch when the running
+coroutine chooses to await. It cannot preempt. A thread-based system is
+different &mdash; the operating system can pause a thread mid-instruction and run
+another &mdash; but an event loop has no such power, because there is only one
+thread and it is currently executing your code.
+
+The upside is that between awaits your code is atomic: no other coroutine can
+observe a half-finished update, which removes a whole category of race condition
+that threads suffer from. The downside is the mirror image: if a coroutine runs
+for a long time *without* awaiting, the entire loop is frozen for that whole
+time, because nothing can take the thread away from it. Cooperation only works if
+everyone cooperates.
+
+## Where it goes wrong
+
+**Expecting parallelism.** The loop runs one thing at a time. For work that is
+genuinely CPU-bound, async does nothing; you need processes.
+
+**A coroutine that never awaits.** It monopolises the single thread, and every
+other coroutine stalls until it finishes. This is the most common async bug and
+has [its own article](the_blocking_call_that_freezes_the_loop.html).
+
+**Assuming order across awaits.** Between two awaits your code is safe. Across an
+await, anything else may have run, so state you read before the await may have
+changed after it.
+
+**Confusing "started" with "running".** Creating a coroutine object does not run
+it, and neither does the loop until you hand it over &mdash; which is what
+[coroutines, tasks and await](coroutines_tasks_and_await.html) is about.

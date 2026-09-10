@@ -1,0 +1,186 @@
+title: Running Work Concurrently: gather and TaskGroup
+intro: Fan out many awaits at once, collect the results, and decide what should happen when one of them fails.
+
+## The shape of the win
+
+The reason to reach for async is almost always the same: you have many
+independent waits &mdash; requests, queries, file reads &mdash; and doing them
+one after another wastes the time each one spends idle. Running them together
+collapses the total time from the sum of the waits to the longest single wait.
+
+<code>asyncio.gather</code> is the direct tool. Hand it several coroutines and it
+schedules them all as [tasks](coroutines_tasks_and_await.html), waits for every
+one, and returns their results in the order you passed them &mdash; not the order
+they finished.
+
+```python
+import asyncio, time
+
+async def fetch(name, seconds):
+    await asyncio.sleep(seconds)
+    return f"{name}:{seconds}"
+
+async def main():
+    t0 = time.time()
+    results = await asyncio.gather(
+        fetch("A", 0.3),
+        fetch("B", 0.2),
+        fetch("C", 0.1),
+    )
+    print("results:", results)
+    print(f"elapsed {time.time()-t0:.2f}s")
+
+asyncio.run(main())
+```
+
+```
+results: ['A:0.3', 'B:0.2', 'C:0.1']
+elapsed 0.30s
+```
+
+Three waits of 0.3, 0.2 and 0.1&nbsp;seconds finish in 0.30, not 0.60 &mdash; the
+total is the longest one, because all three timers ran at once. And the results
+came back in call order (A, B, C) even though C finished first: <code>gather</code>
+lines the results up with the arguments, so you can index them without tracking
+which finished when.
+
+## What happens when one fails
+
+By default, the first exception in any of the gathered coroutines stops the wait
+and propagates out of <code>gather</code>. The other coroutines are not
+cancelled, but their results are lost &mdash; you get the exception, not a
+partial list.
+
+```python
+import asyncio
+
+async def square(n):
+    await asyncio.sleep(0.1); return n * n
+
+async def boom():
+    await asyncio.sleep(0.05); raise ValueError("failed")
+
+async def main():
+    try:
+        await asyncio.gather(square(2), boom(), square(3))
+    except ValueError as e:
+        print("gather re-raised the first exception:", e)
+
+    res = await asyncio.gather(square(2), boom(), square(3),
+                               return_exceptions=True)
+    print("return_exceptions=True:", res)
+
+asyncio.run(main())
+```
+
+```
+gather re-raised the first exception: failed
+return_exceptions=True: [4, ValueError('failed'), 9]
+```
+
+The default hands you the first exception and hides the successful results.
+Passing <code>return_exceptions=True</code> changes the contract: nothing is
+raised, and the exception is placed in the results list where that coroutine's
+value would have been. That is the right choice when you want every result you
+can get and intend to inspect the failures yourself &mdash; and the wrong one if
+a failure should abort the whole batch, because it quietly turns errors into data
+you might forget to check.
+
+## TaskGroup: the modern default
+
+<code>gather</code> has an awkward gap: when one coroutine fails, the others keep
+running unsupervised, and cleaning them up is your problem. Python 3.11 added
+<code>asyncio.TaskGroup</code> to close it, and it is now the recommended way to
+run concurrent work.
+
+```python
+import asyncio
+
+async def work(n):
+    await asyncio.sleep(0.05 * n)
+    print(f"done {n}")
+    return n
+
+async def main():
+    async with asyncio.TaskGroup() as tg:
+        tasks = [tg.create_task(work(i)) for i in range(1, 4)]
+    print("results:", [t.result() for t in tasks])
+
+asyncio.run(main())
+```
+
+```
+done 1
+done 2
+done 3
+results: [1, 2, 3]
+```
+
+The <code>async with</code> block does not exit until every task created inside
+it has finished, so the work is scoped: when control passes the closing line,
+all of it is done. This is **structured concurrency** &mdash; tasks live and die
+within a visible block rather than floating free &mdash; and it gives one
+guarantee <code>gather</code> does not: if any task raises, the group
+**cancels all the others** and then raises, so a failure never leaves siblings
+running in the background.
+
+## Failures come back as a group
+
+Because several tasks can fail at once, a TaskGroup raises an
+<code>ExceptionGroup</code>, unpacked with the <code>except*</code> syntax also
+new in 3.11:
+
+```python
+import asyncio
+
+async def ok():  await asyncio.sleep(0.1); print("ok ran")
+async def bad(): await asyncio.sleep(0.02); raise ValueError("x")
+
+async def main():
+    try:
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(ok())
+            tg.create_task(bad())
+    except* ValueError as eg:
+        print("TaskGroup raised ExceptionGroup:", [str(e) for e in eg.exceptions])
+
+asyncio.run(main())
+```
+
+```
+TaskGroup raised ExceptionGroup: ['x']
+```
+
+When <code>bad</code> raises, the group cancels <code>ok</code> before it can
+finish &mdash; note that "ok ran" never prints &mdash; and surfaces the failure
+inside an <code>ExceptionGroup</code>. The <code>except*</code> form is how you
+handle it, and it is built for the real case the group creates: more than one
+task failing together.
+
+## Which to reach for
+
+| Want | Use |
+|---|---|
+| Results in call order, siblings independent | <code>gather</code> |
+| Every result including failures, as data | <code>gather(return_exceptions=True)</code> |
+| A failure to cancel the rest, cleanly scoped | <code>TaskGroup</code> |
+| Results as they finish, not in order | <code>as_completed</code> |
+
+For new code on Python 3.11 or later, TaskGroup is the sensible default, and
+<code>gather</code> is for the cases where you specifically want the siblings to
+survive a failure.
+
+## Where it goes wrong
+
+**Gathering a huge list at once.** <code>gather</code> over ten thousand
+coroutines starts ten thousand at once and can exhaust connections or memory. Cap
+the concurrency with a semaphore, or batch.
+
+**Ignoring return_exceptions results.** With it on, a failure is a value in the
+list. Code that does not check for exceptions there treats an error as a success.
+
+**Expecting gather to cancel on failure.** It does not; the other coroutines run
+on. TaskGroup is what cancels siblings.
+
+**Passing plain values to gather.** Everything you gather must be awaitable. A
+non-coroutine in the list is an error, not a constant that passes through.

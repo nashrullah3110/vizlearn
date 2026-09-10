@@ -1,0 +1,155 @@
+title: The Blocking Call That Freezes the Loop
+intro: One synchronous call in a coroutine stops every other coroutine dead. It is the most common async bug, and the way it hides is worse than the way it looks.
+
+## One thread means one blocker stops everything
+
+The [event loop](event_loop_stepped_through.html) runs on a single thread and can
+only switch coroutines when the running one hits an <code>await</code>. So a
+coroutine that stops awaiting &mdash; because it called something synchronous that
+takes real time &mdash; holds the one thread for that whole time, and every other
+coroutine, however unrelated, waits.
+
+Nothing enforces cooperation. The loop cannot preempt a coroutine mid-call, so a
+blocking line does not slow the loop down, it *pauses it entirely* until the line
+returns.
+
+## Watch a heartbeat stall
+
+Here a heartbeat prints a tick every 0.1&nbsp;seconds &mdash; the kind of steady
+progress a healthy loop makes &mdash; while a second coroutine does a blocking
+<code>time.sleep(0.3)</code> instead of an async one.
+
+```python
+import asyncio, time
+
+async def heartbeat():
+    for _ in range(5):
+        print("tick"); await asyncio.sleep(0.1)
+
+async def blocker():
+    time.sleep(0.3)                     # blocks the ONE thread the loop runs on
+    print("blocker done")
+
+async def main():
+    await asyncio.gather(heartbeat(), blocker())
+
+asyncio.run(main())
+```
+
+```
+tick
+blocker done
+tick
+tick
+tick
+tick
+```
+
+The first tick prints, the heartbeat hits its <code>await</code> and steps aside,
+and then <code>blocker</code> runs <code>time.sleep(0.3)</code>. For those
+0.3&nbsp;seconds the thread is gone: the heartbeat's timer expires in real time
+but the loop cannot act on it, so no tick appears. Only when
+<code>time.sleep</code> returns does the loop catch up, firing the four backed-up
+ticks in a burst. The gap between the first tick and the rest is the loop frozen
+solid.
+
+The insidious part is that <code>time.sleep</code> is standing in for anything
+synchronous that takes time: <code>requests.get</code>, a blocking database
+driver, reading a large file, <code>json.loads</code> on a huge string, a tight
+numeric loop. Each looks like ordinary code and each freezes the loop for its
+full duration.
+
+## The fix: get the blocking work off the thread
+
+You do not rewrite the blocking call &mdash; you move it to a worker thread and
+<code>await</code> its completion, so the loop is free while it runs.
+<code>asyncio.to_thread</code> does exactly that.
+
+```python
+import asyncio, time
+
+async def heartbeat():
+    for _ in range(5):
+        print("tick"); await asyncio.sleep(0.1)
+
+async def blocker():
+    await asyncio.to_thread(time.sleep, 0.3)     # moved off the loop
+    print("blocker done")
+
+async def main():
+    await asyncio.gather(heartbeat(), blocker())
+
+asyncio.run(main())
+```
+
+```
+tick
+tick
+tick
+tick
+blocker done
+tick
+```
+
+Now the ticks keep coming. <code>await asyncio.to_thread(...)</code> hands the
+blocking call to a separate thread and suspends only <code>blocker</code>, so the
+loop stays free and the heartbeat runs on schedule while the sleep happens
+elsewhere. The <code>blocker done</code> lands in the middle of the ticks rather
+than freezing them &mdash; the work still took 0.3&nbsp;seconds, but it no longer
+took the whole program with it.
+
+<code>to_thread</code> is the general escape hatch for a blocking function you
+cannot avoid. Its older sibling is <code>loop.run_in_executor</code>, and for
+CPU-bound work a thread will not help &mdash; for that a
+separate process is the answer, since a thread still shares the one interpreter.
+
+## Why it hides so well
+
+This bug rarely shows up in development and reliably shows up under load, for a
+structural reason. With one user, one blocking call just makes that one request a
+little slow, which looks like the network. With a hundred concurrent users, one
+blocking call in the request path freezes *all* of them for its duration, because
+they share the single thread &mdash; so the symptom is not "one slow endpoint"
+but "the whole service periodically stops responding", which points nowhere
+obvious.
+
+It is also invisible to a glance at the code. A blocking call has the same shape
+as an async one; only knowing the library tells you which it is.
+<code>requests.get(url)</code> and <code>await client.get(url)</code> look almost
+identical and behave completely differently inside a loop.
+
+## How to find them
+
+The loop can tell you. Running with debug mode on makes asyncio warn about any
+callback that holds the thread too long:
+
+```python
+import asyncio
+
+async def main():
+    ...
+
+asyncio.run(main(), debug=True)     # warns: "Executing ... took N seconds"
+```
+
+With debug on, a blocking call produces a "slow callback" warning naming the
+place it happened, which turns an invisible freeze into a log line. The habits
+that prevent it in the first place: use async-native libraries in coroutines
+(<code>httpx</code> or <code>aiohttp</code> over <code>requests</code>, an async
+database driver over a blocking one), and wrap anything unavoidably synchronous
+in <code>to_thread</code>.
+
+## Where it goes wrong
+
+**A synchronous HTTP or database call in a coroutine.** The classic. It freezes
+the loop for the full round trip. Use the async client, or <code>to_thread</code>.
+
+**time.sleep instead of asyncio.sleep.** The single most common beginner version,
+and the one to recognise on sight.
+
+**CPU-bound work.** <code>to_thread</code> does not help, because a thread still
+contends for the interpreter. Heavy computation belongs in a process pool.
+
+**Trusting that it is fine because it works in testing.** One user hides the bug;
+concurrency exposes it. Test the loop under load, or run with
+<code>debug=True</code> and watch for slow-callback warnings.

@@ -1,0 +1,123 @@
+title: Queues, Producers and Backpressure
+intro: The pattern most real async programs are built from, and the one number that stops a fast producer from burying a slow consumer.
+
+## The shape of almost every async program
+
+Once a program does more than a single fan-out, it tends to settle into the same
+structure: something produces work, something else consumes it, and the two run
+at different speeds. A crawler finds URLs faster than it can fetch them. A log
+reader ingests lines faster than it can index them. A handler accepts requests
+faster than a downstream service can answer.
+
+An <code>asyncio.Queue</code> is the piece that connects the two. Producers
+<code>put</code> items in, consumers <code>get</code> them out, and because both
+operations are awaitable, the queue is also the place where one side can wait for
+the other without either blocking the [loop](event_loop_stepped_through.html).
+
+## Producer and consumer, running together
+
+```python
+import asyncio
+
+async def producer(q, n):
+    for i in range(n):
+        await q.put(i)
+        print(f"produced {i}  (queue holds {q.qsize()})")
+    await q.put(None)                            # sentinel: "no more"
+
+async def consumer(q):
+    while True:
+        item = await q.get()
+        if item is None:
+            break
+        await asyncio.sleep(0.1)                 # a slow consumer
+        print(f"    consumed {item}")
+
+async def main():
+    q = asyncio.Queue(maxsize=2)                 # bounded
+    await asyncio.gather(producer(q, 5), consumer(q))
+
+asyncio.run(main())
+```
+
+```
+produced 0  (queue holds 1)
+produced 1  (queue holds 2)
+produced 2  (queue holds 2)
+    consumed 0
+produced 3  (queue holds 2)
+    consumed 1
+produced 4  (queue holds 2)
+    consumed 2
+    consumed 3
+    consumed 4
+```
+
+Read the queue-size column. It climbs to 2 and then stops: the producer put items
+0 and 1 immediately, and when it tried to put item 2 the queue was full, so
+<code>await q.put(2)</code> **suspended the producer** until the consumer took one
+out. From then on the producer only advances when the consumer makes room, which
+is why "produced 2" appears interleaved with "consumed" lines rather than all the
+production happening first.
+
+That pacing is the whole point, and it came from one argument.
+
+## Backpressure is the maxsize
+
+<code>maxsize=2</code> made the queue **bounded**, and a bounded queue is what
+creates **backpressure**: when it is full, <code>put</code> waits, so a fast
+producer is automatically slowed to the rate the consumer can keep up with. The
+producer never runs more than two items ahead.
+
+Remove the bound &mdash; <code>asyncio.Queue()</code> with no maxsize &mdash; and
+the behaviour changes completely: the producer dumps all five items in instantly,
+the queue holds all of them, and only then does the consumer start draining. With
+five items that is harmless. With a producer reading a million-line file into an
+unbounded queue faster than the consumer can process it, the queue grows without
+limit and the program runs out of memory &mdash; a failure that looks like a leak
+and is really a missing bound.
+
+So the size of the queue is not a tuning detail; it is the contract between the
+two sides. Bounded means "the producer may run at most this far ahead", and that
+sentence is usually what you actually want.
+
+## Fanning out to several consumers
+
+One slow consumer is often the bottleneck, and the queue makes it trivial to add
+more: start several consumer coroutines on the same queue and each takes the next
+available item. The queue hands each item to exactly one consumer, so work is
+shared without any coordination between them.
+
+The clean way to know when everything is finished is <code>task_done</code> and
+<code>join</code>. Each consumer calls <code>q.task_done()</code> after handling
+an item; the producer, after putting everything, calls <code>await q.join()</code>,
+which returns only once every item has been marked done. That removes the
+awkward sentinel bookkeeping and gives a single, reliable "all work drained"
+signal &mdash; the standard way to shut a worker pool down cleanly.
+
+## Why a queue and not just gather
+
+[gather and TaskGroup](running_work_concurrently.html) run a *fixed, known* set
+of coroutines at once. A queue is for the other case: an *open-ended stream* of
+work whose size you do not know in advance, arriving over time, to be processed
+by a bounded number of workers. Crawlers, pipelines, and anything that consumes a
+feed have that shape, and the queue is what decouples "how fast work arrives"
+from "how fast we handle it" &mdash; with the bound as the safety valve between
+them.
+
+## Where it goes wrong
+
+**An unbounded queue with a fast producer.** It grows until memory runs out. Set
+<code>maxsize</code> to whatever "too far ahead" means for your program.
+
+**Forgetting the shutdown signal.** Consumers looping on <code>await q.get()</code>
+wait forever once production stops, unless a sentinel or <code>join</code> tells
+them to stop. A program that hangs at the end is usually this.
+
+**Doing the slow work between get and task_done in a way that blocks the loop.**
+The queue paces correctly, but a synchronous call in the consumer still freezes
+everything &mdash; see [the blocking call](the_blocking_call_that_freezes_the_loop.html).
+
+**Reading qsize and acting on it.** By the time you branch on
+<code>q.qsize()</code>, another coroutine may have changed it. Let <code>put</code>
+and <code>get</code> do the waiting; the count is for observing, not for control.

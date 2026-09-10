@@ -1,0 +1,138 @@
+title: Coroutines, Tasks and await
+intro: Why calling an async function runs nothing, why a bare await is still sequential, and the one word that turns waiting into overlap.
+
+## A coroutine is a plan, not an action
+
+Define a function with <code>async def</code> and calling it does not run it. It
+hands you back a **coroutine object** &mdash; a description of work that has not
+started.
+
+```python
+import asyncio
+
+async def greet():
+    return "hi"
+
+c = greet()
+print("type:", type(c).__name__)
+print("is coroutine:", asyncio.iscoroutine(c))
+print("running it needs the loop, not a call")
+c.close()
+```
+
+```
+type: coroutine
+is coroutine: True
+running it needs the loop, not a call
+```
+
+Calling <code>greet()</code> returned an object, not <code>"hi"</code>. This
+trips up everyone once: an <code>async def</code> looks like a function and is
+really a factory for coroutine objects, and the object does nothing until
+something drives it. The thing that drives it is the
+[event loop](event_loop_stepped_through.html), reached with
+<code>asyncio.run</code> at the top of a program, or with <code>await</code> from
+inside another coroutine.
+
+(The <code>c.close()</code> is only there to avoid a "coroutine was never awaited"
+warning &mdash; a coroutine you create and then abandon is itself a bug, covered
+at the end.)
+
+## await runs it, and waits for it
+
+<code>await</code> does two things at once. It starts the coroutine, and it
+suspends the current one until that coroutine finishes, handing control back to
+the loop in the meantime. The value of the expression is whatever the coroutine
+returned.
+
+The catch is the "waits for it" half. Awaiting one coroutine, then awaiting
+another, is strictly sequential &mdash; the second cannot start until the first
+has returned, because <code>await</code> blocked on it. Overlap does not come
+from <code>await</code> alone.
+
+## Tasks are what run concurrently
+
+To make two coroutines make progress at the same time, you wrap each in a
+**task**. <code>asyncio.create_task</code> schedules a coroutine on the loop
+immediately and returns a handle; the coroutine starts running at the next await,
+whether or not you have awaited the handle yet.
+
+```python
+import asyncio, time
+
+async def fetch(seconds):
+    await asyncio.sleep(seconds)
+    return seconds
+
+async def main():
+    t0 = time.time()
+    await fetch(0.2); await fetch(0.2)                 # one then the other
+    print(f"sequential: {time.time()-t0:.2f}s")
+
+    t0 = time.time()
+    a = asyncio.create_task(fetch(0.2))
+    b = asyncio.create_task(fetch(0.2))
+    await a; await b                                   # both already running
+    print(f"concurrent: {time.time()-t0:.2f}s")
+
+asyncio.run(main())
+```
+
+```
+sequential: 0.40s
+concurrent: 0.20s
+```
+
+Two identical waits of 0.2&nbsp;seconds. Awaited one after the other they take
+0.40; wrapped in tasks they take 0.20, because both timers were counting down at
+once. Nothing was faster &mdash; the waiting overlapped. That is the entire value
+proposition of async, and it is visible in this one four-hundredth-versus-two-
+hundredth difference.
+
+The reason is scheduling order. <code>await fetch(...)</code> creates the
+coroutine and immediately blocks on it, so the second one is not created until
+the first returns. <code>create_task</code> puts both on the loop *before* either
+is awaited, so by the time you <code>await a</code>, task <code>b</code> is
+already running and its timer is already ticking.
+
+## The rule that follows
+
+<code>await</code> when you need the result before you can continue; wrap in a
+task when you want the work happening while you do something else. Two awaits in
+a row are two things done in sequence. Two tasks are two things done at once. The
+mistake that quietly costs all the performance is a loop of
+<code>await do_one(x)</code> over a list &mdash; correct, and exactly as slow as
+a plain synchronous loop, because each await finishes before the next begins.
+
+Managing tasks by hand, as above, is also easy to get wrong: a task you forget to
+await can be discarded before it finishes, and an exception inside a task you
+never await can vanish silently. Both are why
+[running work concurrently](running_work_concurrently.html) reaches for
+<code>gather</code> and <code>TaskGroup</code> instead of loose
+<code>create_task</code> calls.
+
+## await needs something awaitable
+
+You can only <code>await</code> an **awaitable**: a coroutine, a task, or a
+future. Awaiting a plain value is a <code>TypeError</code>, and &mdash; more
+commonly &mdash; forgetting to await something that *is* awaitable is a silent
+bug. <code>result = fetch(2)</code> without an await binds the coroutine object,
+not its result; the arithmetic you do on it next fails in a way whose cause is
+three lines up.
+
+## Where it goes wrong
+
+**Calling instead of awaiting.** <code>fetch(2)</code> builds a coroutine and
+runs nothing; you meant <code>await fetch(2)</code>. Python warns "coroutine was
+never awaited" &mdash; a warning worth treating as an error.
+
+**A loop of awaits, expecting overlap.** Sequential every time. Use tasks or
+<code>gather</code>.
+
+**Awaiting create_task too early.** <code>await asyncio.create_task(f())</code>
+on one line is just a slower <code>await f()</code> &mdash; you scheduled it and
+immediately blocked on it, gaining nothing.
+
+**An orphaned task.** A task nobody holds a reference to can be garbage-collected
+mid-flight, and an unhandled exception inside it may never surface. Keep the
+handle, and await it.
