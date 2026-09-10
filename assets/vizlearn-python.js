@@ -82,7 +82,7 @@
   // `g` is rebuilt per run, so a name left over from a previous Run can never
   // make a later one appear to work.
   var RUNNER_SRC = [
-    'import ast, sys, traceback',
+    'import ast, sys, traceback, inspect',
     // A program that draws does not print, so without this the editor
     // reports success and shows nothing. Figures are collected after the
     // run, encoded, and handed back for the page to display.
@@ -120,7 +120,18 @@
     '    _viz_prelude_ns.clear()',
     '    _viz_prelude_ns.update(ns)',
     '    _viz_prelude_src = prelude',
-    'def _viz_run(code, prelude=""):',
+    // _viz_run is async, and user code is compiled with
+    // PyCF_ALLOW_TOP_LEVEL_AWAIT, so an editor can `await` at the top level -
+    // which is the only way async runs in the browser. asyncio.run() cannot:
+    // Pyodide already has one running event loop and there is no second thread
+    // to drive a nested one, so asyncio.run() raises "cannot be called from a
+    // running event loop". The async examples therefore end in `await main()`,
+    // the same form a notebook or the `python -m asyncio` REPL uses. eval() of
+    // a code object compiled with that flag returns a coroutine when the source
+    // contains a top-level await, and None otherwise; awaiting the coroutine is
+    // what lets the loop process the program`s asyncio.sleep, gather, and tasks.
+    // Sync programs are unchanged - no await, no coroutine, identical behaviour.
+    'async def _viz_run(code, prelude=""):',
     '    g = {"__name__": "__main__"}',
     // The prelude shares the namespace, so what it defines is simply there
     // for the reader's code. Its failure is reported as the page's fault,
@@ -134,14 +145,20 @@
     '            sys.stderr.write(traceback.format_exc())',
     '            return []',
     '    try:',
+    '        _flag = ast.PyCF_ALLOW_TOP_LEVEL_AWAIT',
     '        tree = ast.parse(code, "<user>", "exec")',
     '        if len(tree.body) == 1 and isinstance(tree.body[0], ast.Expr):',
     '            expr = ast.Expression(tree.body[0].value)',
-    '            val = eval(compile(expr, "<user>", "eval"), g)',
+    '            val = eval(compile(expr, "<user>", "eval", flags=_flag), g)',
+    '            if inspect.isawaitable(val):',
+    '                val = await val',
     '            if val is not None:',
     '                print(repr(val))',
     '        else:',
-    '            exec(compile(tree, "<user>", "exec"), g)',
+    '            _obj = compile(tree, "<user>", "exec", flags=_flag)',
+    '            _res = eval(_obj, g)',
+    '            if inspect.isawaitable(_res):',
+    '                await _res',
     '    except SyntaxError as e:',
     '        sys.stderr.write("SyntaxError: %s (line %s)\\n" % (e.msg, e.lineno))',
     '    except BaseException as e:',
