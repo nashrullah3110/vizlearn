@@ -238,6 +238,15 @@ SPECS = {
         "label": "Python",
         "filename": "example_%02d.py",
     },
+    "async_python": {
+        # asyncio is stdlib, so nothing to install. The examples end in
+        # `await main()`: the runner (assets/vizlearn-python.js) allows a
+        # top-level await, and asyncio.run() cannot run under Pyodide's
+        # already-running loop.
+        "packages": "",
+        "label": "Python",
+        "filename": "example_%02d.py",
+    },
     "numpy": {
         # numpy ships with Pyodide, so this is a CDN fetch rather than a wheel.
         "packages": "numpy",

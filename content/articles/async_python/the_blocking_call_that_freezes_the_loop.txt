@@ -19,7 +19,9 @@ Here a heartbeat prints a tick every 0.1&nbsp;seconds &mdash; the kind of steady
 progress a healthy loop makes &mdash; while a second coroutine does a blocking
 <code>time.sleep(0.3)</code> instead of an async one.
 
-```python
+These editors run inside a browser event loop that is already going, so the examples finish with <code>await main()</code>. In a standalone <code>.py</code> script &mdash; run with <code>python file.py</code> &mdash; you write <code>asyncio.run(main())</code> instead, which starts a loop, runs the coroutine, and closes it. The two are the same program with different entry points.
+
+```python-run
 import asyncio, time
 
 async def heartbeat():
@@ -33,7 +35,7 @@ async def blocker():
 async def main():
     await asyncio.gather(heartbeat(), blocker())
 
-asyncio.run(main())
+await main()
 ```
 
 ```
@@ -59,51 +61,69 @@ driver, reading a large file, <code>json.loads</code> on a huge string, a tight
 numeric loop. Each looks like ordinary code and each freezes the loop for its
 full duration.
 
-## The fix: get the blocking work off the thread
+## The fix: stop blocking the thread
 
-You do not rewrite the blocking call &mdash; you move it to a worker thread and
-<code>await</code> its completion, so the loop is free while it runs.
-<code>asyncio.to_thread</code> does exactly that.
+The blocking call has to stop holding the thread. The direct fix &mdash; and the
+one this editor can show &mdash; is to use the <em>async-native</em> version of
+whatever you were doing. Here that means <code>await asyncio.sleep</code> in place
+of <code>time.sleep</code>; in real code it means an async HTTP client
+(<code>httpx</code>, <code>aiohttp</code>) instead of <code>requests</code>, or an
+async database driver instead of a blocking one.
 
-```python
-import asyncio, time
+```python-run
+import asyncio
 
 async def heartbeat():
     for _ in range(5):
         print("tick"); await asyncio.sleep(0.1)
 
 async def blocker():
-    await asyncio.to_thread(time.sleep, 0.3)     # moved off the loop
+    await asyncio.sleep(0.3)             # async-native: suspends, frees the loop
     print("blocker done")
 
 async def main():
     await asyncio.gather(heartbeat(), blocker())
 
-asyncio.run(main())
+await main()
 ```
 
 ```
-tick
 tick
 tick
 tick
 blocker done
 tick
+tick
 ```
 
-Now the ticks keep coming. <code>await asyncio.to_thread(...)</code> hands the
-blocking call to a separate thread and suspends only <code>blocker</code>, so the
-loop stays free and the heartbeat runs on schedule while the sleep happens
-elsewhere. The <code>blocker done</code> lands in the middle of the ticks rather
-than freezing them &mdash; the work still took 0.3&nbsp;seconds, but it no longer
-took the whole program with it.
+Now the ticks keep coming. <code>await asyncio.sleep</code> suspends only
+<code>blocker</code> and hands the thread back to the loop, so the heartbeat runs
+on schedule and <code>blocker done</code> lands in the middle of the ticks rather
+than after a frozen gap. The wait still took 0.3&nbsp;seconds; it just no longer
+took the whole program with it. Every async-native library does the same thing
+&mdash; its <code>await</code> is a point where the loop can run something else.
 
-<code>to_thread</code> is the general escape hatch for a blocking function you
-cannot avoid. Its older sibling is <code>loop.run_in_executor</code>, and for
-CPU-bound work a thread will not help &mdash; for that a
-separate process is the answer, since a thread still shares the one interpreter.
+## When you cannot swap in an async version
 
-## Why it hides so well
+Sometimes the blocking call has no async form: a legacy library with only a
+synchronous API, or a lump of pure computation. Then you move it off the loop
+onto a worker thread and await that:
+
+```python
+async def blocker():
+    await asyncio.to_thread(time.sleep, 0.3)   # run the blocking call on a thread
+    print("blocker done")
+```
+
+<code>asyncio.to_thread</code> is the escape hatch for a blocking function you
+cannot rewrite, and <code>loop.run_in_executor</code> is its older sibling. Two
+caveats. It needs real threads, so it does nothing in a sandbox that has none
+&mdash; the browser interpreter running these editors is one such sandbox, which
+is why this snippet is shown rather than run. And for CPU-bound work a thread
+does not help even where threads exist, because the work still contends for the
+one interpreter; that belongs in a separate process.
+
+## Why it hides so well## Why it hides so well
 
 This bug rarely shows up in development and reliably shows up under load, for a
 structural reason. With one user, one blocking call just makes that one request a
@@ -142,7 +162,8 @@ in <code>to_thread</code>.
 ## Where it goes wrong
 
 **A synchronous HTTP or database call in a coroutine.** The classic. It freezes
-the loop for the full round trip. Use the async client, or <code>to_thread</code>.
+the loop for the full round trip. Use the async client; or, if there is none,
+<code>to_thread</code> where real threads exist.
 
 **time.sleep instead of asyncio.sleep.** The single most common beginner version,
 and the one to recognise on sight.
