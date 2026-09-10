@@ -1,0 +1,183 @@
+title: Deep Learning for Recommendation Systems
+intro: The network is the small part. Everything that makes a production recommender difficult follows from where the parameters actually live.
+
+## An id is not a feature
+
+The first problem is one that does not exist in vision or language. A user id
+is an arbitrary integer. So is an item id. Neither has any numeric meaning
+&mdash; user 4,192 is not "between" users 4,191 and 4,193 &mdash; so they
+cannot be fed to a network directly.
+
+An **embedding table** is the answer: a matrix with one learned row per id. The
+model looks up the row and works with that. This is the same operation as a
+word embedding, and it is doing the same job &mdash; turning a symbol into a
+vector whose geometry means something.
+
+The consequence is the whole page. The table has one row per user and one per
+item, so **its size is set by the catalogue, not by the model design**.
+
+## The two towers
+
+Look at the diagram in the explorer. A user tower turns a user id into a
+vector, an item tower turns an item id into a vector, and an interaction
+combines them into a score.
+
+The tower structure is not stylistic. Keeping the two sides separate until the
+final step means the item tower can be run **once per item, offline**, and its
+outputs stored in a vector index. At request time only the user tower runs, and
+finding the best items becomes an approximate nearest-neighbour query rather
+than five million forward passes.
+
+If the two ids were concatenated at the input and fed to a single network, that
+would be impossible: every (user, item) pair would need its own forward pass.
+The two-tower shape is what makes retrieval tractable, and it is why it is the
+standard for the candidate-generation stage of every large system.
+
+## Three ways to interact
+
+Switch the model control and watch the diagram and the numbers change.
+
+**Matrix factorisation** takes the dot product. One number, no parameters in
+the interaction at all. It says the score is high when the two vectors point
+the same way.
+
+**MLP** concatenates the two vectors and passes them through dense layers. In
+principle this can learn any interaction; a dot product is a very specific one.
+
+**NeuMF** does both and fuses them, with *separate* embedding tables for each
+path &mdash; note the parameter count doubling when you select it. The paper's
+argument is that the optimal embedding for a dot product and for an MLP are not
+the same, so forcing them to share is a constraint neither wants.
+
+Then look at the comparison bars. On this data the dot product wins: matrix
+factorisation reaches about 0.76 RMSE where the MLP settles near 0.83 &mdash;
+and pushing the MLP's epoch count past 300 makes it *worse*, which is the
+overfitting you would expect from 444 parameters and 138 ratings.
+
+That is not a quirk of a small page. In 2019 Dacrema, Cremonesi and Jannach
+reproduced the published neural recommendation results and found that a
+properly tuned matrix factorisation matched or beat most of them on the
+standard benchmarks &mdash; the neural models had been compared against weak
+baselines. It is worth knowing about, because "we replaced the dot product with
+an MLP" is not on its own a reason to expect an improvement.
+
+## So what does deep learning actually buy?
+
+Not a better interaction function. Something more basic: **the ability to
+accept anything other than an id.**
+
+A dot product between two id embeddings can only ever use who rated what. A
+network can take, alongside the embeddings:
+
+- item **text and images**, so a title with no ratings still has a vector
+  &mdash; which is the item cold-start problem solved;
+- **context** &mdash; time of day, device, what the session has already
+  contained;
+- **sequence** &mdash; a transformer over the user's recent history, so the
+  model represents "what they are doing now" rather than "what they like in
+  general", which is what SASRec and BERT4Rec are for;
+- **multiple objectives** at once, since clicks, watch time and purchases are
+  different heads on shared towers.
+
+Every one of those is a genuine capability that factorisation does not have.
+None of them is "the MLP learns a better interaction".
+
+## The parameter budget
+
+Set the catalogue-size control to a large service and read the table. This is
+the fact that shapes every production system.
+
+At 50 million users and 5 million items with 64-dimensional embeddings, the
+tables hold about 3.5 billion parameters. The network on top &mdash; a couple
+of dense layers &mdash; holds a few thousand. The ratio is on screen and it is
+not close.
+
+Everything follows from that:
+
+- **Sharding.** The tables do not fit on one machine, so they are split across
+  parameter servers while the network is replicated. This is the reason
+  large-scale recommender training infrastructure looks nothing like
+  large-scale vision training infrastructure.
+- **Hashing.** Ids are hashed into a fixed number of buckets to cap the table
+  size, accepting collisions as the price. Two rare items sharing a row is
+  usually cheaper than a table that grows forever.
+- **Sparse gradients.** One training example touches two rows. A dense
+  optimiser update over three billion parameters per step would be absurd, so
+  the embedding gradients are sparse and only the touched rows move.
+- **Retrieval and ranking as separate stages.** A cheap two-tower model
+  retrieves a few hundred candidates from millions by nearest neighbour; an
+  expensive model with full cross-features ranks those few hundred. Nothing
+  large ever scores the whole catalogue.
+
+## Implicit feedback, which is what you will actually have
+
+This page and the previous one use explicit ratings, because they are easy to
+reason about. Almost no real system has them. What it has is clicks, plays,
+purchases and dwell time &mdash; **implicit feedback**, which is positive-only.
+
+That changes the problem. There are no negatives, only absences, and an absence
+is ambiguous: the user disliked it, or never saw it. Training needs sampled
+negatives, and the sampling strategy matters more than the architecture
+&mdash; uniform sampling makes the task too easy, popularity-based sampling
+makes it harder and usually better, and in-batch negatives are what large
+two-tower systems actually use because they are free.
+
+The loss changes too. Squared error on a rating becomes a ranking loss: BPR
+maximises the margin between a positive and a sampled negative, and sampled
+softmax treats retrieval as classification over the catalogue.
+
+```python
+import torch
+import torch.nn as nn
+
+class TwoTower(nn.Module):
+    def __init__(self, n_users, n_items, dim=64, hidden=128):
+        super().__init__()
+        self.user_emb = nn.Embedding(n_users, dim)
+        self.item_emb = nn.Embedding(n_items, dim)
+        # Towers stay separate: item vectors are precomputed and indexed.
+        self.user_tower = nn.Sequential(nn.Linear(dim, hidden), nn.ReLU(),
+                                        nn.Linear(hidden, dim))
+        self.item_tower = nn.Sequential(nn.Linear(dim, hidden), nn.ReLU(),
+                                        nn.Linear(hidden, dim))
+
+    def user_vec(self, u):
+        return nn.functional.normalize(self.user_tower(self.user_emb(u)), dim=-1)
+
+    def item_vec(self, i):
+        return nn.functional.normalize(self.item_tower(self.item_emb(i)), dim=-1)
+
+    def forward(self, u, i):
+        return (self.user_vec(u) * self.item_vec(i)).sum(-1)
+
+# Every other item in the batch is a negative. Free negatives.
+def in_batch_softmax(model, users, items, temperature=0.05):
+    U = model.user_vec(users)                 # [B, D]
+    I = model.item_vec(items)                 # [B, D]
+    logits = U @ I.T / temperature            # [B, B]
+    target = torch.arange(len(users), device=logits.device)
+    return nn.functional.cross_entropy(logits, target)
+```
+
+The `normalize` calls are what make the final score a cosine similarity, which
+is what nearest-neighbour indexes are built for &mdash; skip them and your
+retrieval index no longer matches your training objective. The `temperature`
+is a real hyperparameter: too high and every item looks equally good, too low
+and training destabilises.
+
+`in_batch_softmax` is the trick worth remembering. The diagonal of the
+similarity matrix is the true pairs and everything off it is a negative, so a
+batch of 1,024 gives 1,023 negatives per example at no extra cost. Its one
+weakness is that popular items appear in more batches and so are sampled as
+negatives more often, which suppresses them &mdash; production systems correct
+for that with a logQ term.
+
+## The order to learn this in
+
+Start with matrix factorisation and get the biases and regularisation right,
+because it is a strong baseline that a lot of published neural work failed to
+beat. Move to a two-tower model when you have side information for it to use,
+or when you need to retrieve from millions of items by nearest neighbour. Reach
+for sequence models when the recent session matters more than the long-run
+profile. And measure ranking metrics on held-out interactions throughout,
+because RMSE on a rating is not what a recommender is for.

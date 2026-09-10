@@ -25,6 +25,15 @@
        that exists only in light mode leaves dark mode with no selection at
        all - which is the bug it was meant to fix. */
     --code-selection: rgba(88, 160, 255, 0.35);
+    /* Categorical series colours for the architecture explorers, where a
+       diagram needs a second and third hue that are not the accent: the
+       optimal discriminator against the two distributions it separates, one
+       object class against another, the rounded region against the real one.
+       Defined per theme because a fixed hex that reads on the dark ground is
+       too light to be legible as 9px text on the light one. */
+    --vz-series-2: #7cbcf5;
+    --vz-series-3: #57c194;
+    --vz-series-warn: #f0796c;
     --vz-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     /* The page column; see the note below on --vz-page. */
     --vz-page: 1600px;
@@ -82,6 +91,9 @@
 
 /* Light mode. Same tokens, different values. */
 body.light-mode {
+    --vz-series-2: #1c6ba8;
+    --vz-series-3: #16704a;
+    --vz-series-warn: #a63528;
     --vz-mono: ui-monospace, SFMono-Regular, "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
     --vz-raise: #e9ecee;
     --vz-band: #eef1f2;
@@ -4398,4 +4410,304 @@ input[type="range"].ml-input { accent-color: var(--accent-fill); }
 /* Printing a page should not print a control that cannot be pressed. */
 @media print {
     .vz-copy { display: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   The architecture explorers  (assets/vizlearn-arch.js)
+
+   Fifteen modules about named models - VGG, Inception, ResNet, U-Net, YOLO,
+   Mask R-CNN, word2vec, GloVe, seq2seq, GANs, autoencoders, recommenders -
+   share one harness, so they share one block of rules rather than fifteen
+   near-identical inline <style> elements.
+
+   Everything is a token: these pages are read in both themes, and a diagram
+   whose labels are hard-coded grey is unreadable in one of them.
+   --------------------------------------------------------------------------- */
+.vz-arch { display: block; }
+.arch-fallback { color: var(--text-muted); font-size: 0.9rem; }
+
+.arch-stage > * + * { margin-top: 1rem; }
+
+/* A wide diagram scrolls inside its own box. The page body must never scroll
+   sideways, and several of these are 620px of SVG at a fixed aspect. */
+.arch-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.25rem;
+}
+.arch-svg { display: block; width: 100%; height: auto; }
+.arch-svg-wide { min-width: 520px; }
+.arch-scene { display: block; max-width: 100%; height: auto; }
+.arch-overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
+.arch-canvas-wrap { position: relative; line-height: 0; }
+.arch-canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    background: var(--bg-surface);
+    touch-action: none;
+    cursor: crosshair;
+}
+
+.arch-sub {
+    font-family: var(--vz-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--text-muted);
+    margin: 1.4rem 0 0.5rem;
+}
+.arch-caption {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 0.4rem;
+    line-height: 1.55;
+}
+.arch-note {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.65;
+    border-left: 2px solid var(--border-subtle);
+    padding-left: 0.9rem;
+}
+.arch-note strong { color: var(--text-main); }
+.arch-note em { color: var(--text-main); font-style: italic; }
+.arch-mono, .arch-note .arch-mono {
+    font-family: var(--vz-mono);
+    font-size: 0.82em;
+    color: var(--accent-primary);
+}
+.arch-readout {
+    font-family: var(--vz-mono);
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    margin-top: 0.9rem;
+    min-height: 1.2em;
+    line-height: 1.5;
+}
+
+/* The headline numbers. Four across on a desktop, two on a phone: three
+   would leave one stat alone on its own row, which reads as an error. */
+.arch-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+}
+@media (min-width: 720px) {
+    .arch-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.arch-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    background: var(--stat-bg);
+    border: 1px solid var(--stat-border);
+    border-radius: 8px;
+    padding: 0.55rem 0.65rem;
+    min-width: 0;
+}
+.arch-stat-value {
+    font-family: var(--vz-mono);
+    font-size: 0.98rem;
+    color: var(--accent-primary);
+    overflow-wrap: anywhere;
+}
+.arch-stat-label {
+    font-size: 0.7rem;
+    color: var(--text-main);
+    line-height: 1.3;
+}
+.arch-stat-note {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    line-height: 1.3;
+}
+
+.arch-bars { display: grid; gap: 0.4rem; }
+.arch-bar-row {
+    display: grid;
+    grid-template-columns: minmax(0, 11rem) 1fr auto;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+@media (max-width: 640px) {
+    .arch-bar-row { grid-template-columns: 1fr auto; }
+    .arch-bar-track { grid-column: 1 / -1; order: 3; }
+}
+.arch-bar-label { overflow-wrap: anywhere; }
+.arch-bar-track {
+    height: 9px;
+    border-radius: 5px;
+    background: var(--input-bg);
+    overflow: hidden;
+}
+.arch-bar-fill {
+    height: 100%;
+    background: var(--accent-fill);
+    opacity: 0.55;
+    border-radius: 5px;
+}
+.arch-bar-row.is-hot .arch-bar-fill { opacity: 1; }
+.arch-bar-row.is-hot .arch-bar-label { color: var(--accent-primary); }
+.arch-bar-value {
+    font-family: var(--vz-mono);
+    font-size: 0.72rem;
+    color: var(--text-main);
+    white-space: nowrap;
+}
+
+.arch-table-wrap { overflow-x: auto; }
+.arch-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+    min-width: 420px;
+}
+.arch-table th {
+    text-align: left;
+    font-family: var(--vz-mono);
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 400;
+    padding: 0.35rem 0.55rem;
+    border-bottom: 1px solid var(--border-subtle);
+    white-space: nowrap;
+}
+.arch-table td {
+    padding: 0.35rem 0.55rem;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-subtle);
+    white-space: nowrap;
+}
+.arch-table td:first-child { color: var(--text-main); }
+.arch-table tbody tr.is-selected td,
+.arch-table tbody tr.is-stage td {
+    color: var(--accent-primary);
+    background: var(--card-icon-bg);
+}
+.arch-table tbody tr[tabindex] { cursor: pointer; }
+.arch-table tbody tr[tabindex]:hover td { background: var(--card-icon-bg); }
+.arch-table tbody tr:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: -2px;
+}
+
+/* Side-by-side tiles: two pooled maps, four stages of one pipeline, six
+   learned components. The count is set by the widget, not guessed here. */
+.arch-pair {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+.arch-pair > * { flex: 0 1 auto; min-width: 0; }
+.arch-heat, .arch-tile { display: block; height: auto; }
+
+.arch-latent {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    align-self: stretch;
+    justify-content: flex-end;
+    padding-bottom: 0.1rem;
+}
+.arch-latent-label {
+    font-family: var(--vz-mono);
+    font-size: 0.62rem;
+    color: var(--text-muted);
+}
+.arch-latent-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 74px;
+}
+.arch-latent-bar {
+    width: 9px;
+    height: 100%;
+    background: var(--input-bg);
+    border-radius: 2px;
+    display: flex;
+    align-items: flex-end;
+}
+.arch-latent-fill {
+    width: 100%;
+    background: var(--accent-fill);
+    border-radius: 2px;
+}
+
+/* A sentence with its context window marked. */
+.arch-tokens {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    font-family: var(--vz-mono);
+    font-size: 0.8rem;
+}
+.arch-token {
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+}
+.arch-token.is-context {
+    border-color: var(--border-subtle);
+    color: var(--text-main);
+}
+.arch-token.is-centre {
+    background: var(--accent-fill);
+    color: var(--on-accent);
+    border-color: var(--accent-fill);
+}
+.arch-pairs {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+    overflow-wrap: anywhere;
+}
+
+.arch-controls {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-subtle);
+}
+@media (min-width: 900px) {
+    .arch-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem 1.5rem; }
+}
+.arch-control {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 0.3rem 0.6rem;
+}
+.arch-control-name { font-size: 0.8rem; color: var(--text-muted); }
+.arch-control-value {
+    font-family: var(--vz-mono);
+    font-size: 0.76rem;
+    color: var(--accent-primary);
+    text-align: right;
+}
+.arch-input { grid-column: 1 / -1; width: 100%; }
+select.arch-input {
+    background: var(--input-bg);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-main);
+    border-radius: 6px;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.82rem;
+}
+input[type="range"].arch-input { accent-color: var(--accent-fill); }
+input[type="checkbox"].arch-input {
+    grid-column: auto;
+    width: auto;
+    justify-self: end;
+    accent-color: var(--accent-fill);
 }

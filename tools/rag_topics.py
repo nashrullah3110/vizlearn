@@ -260,6 +260,112 @@ WIDGETS = {
      "min": 4, "max": 48, "step": 2, "value": 16},
 ], "data": {"corpus": 1000000}},
 
+# --------------------------------------------------------------------------
+# The eight vector-index modules.
+#
+# These use "scene": True, which asks build_rag.py for a drawing slot above
+# the bars and tags the page so it loads assets/vizlearn-annviz.js. Their
+# models really build the index and really run the search over a shared
+# 600-vector corpus, and report recall measured against an exhaustive search
+# over the same points, averaged across 48 fixed probe queries.
+#
+# Sharing one corpus is deliberate: it makes the comparison figures on eight
+# different pages comparable with each other, which they would not be if each
+# page invented its own data.
+# --------------------------------------------------------------------------
+
+"flat_index": {"model": "ann_flat", "scene": True, "controls": [
+    {"id": "k", "label": "k (neighbours wanted)", "kind": "range",
+     "min": 1, "max": 25, "step": 1, "value": 10},
+    {"id": "scanned", "label": "Fraction of the corpus scanned (%)",
+     "kind": "range", "min": 5, "max": 100, "step": 5, "value": 100},
+    {"id": "corpus", "label": "Corpus size (drawn)", "kind": "range",
+     "min": 100, "max": 600, "step": 50, "value": 600},
+], "data": {}},
+
+"hnsw_index": {"model": "ann_hnsw", "scene": True, "controls": [
+    {"id": "ef", "label": "efSearch (query time)", "kind": "range",
+     "min": 1, "max": 64, "step": 1, "value": 16},
+    {"id": "M", "label": "M, edges per node (build time)", "kind": "range",
+     "min": 2, "max": 32, "step": 2, "value": 8},
+    {"id": "efc", "label": "efConstruction (build time)", "kind": "range",
+     "min": 4, "max": 100, "step": 4, "value": 40},
+    {"id": "layer", "label": "Layer drawn", "kind": "range",
+     "min": 0, "max": 4, "step": 1, "value": 0},
+    {"id": "k", "label": "k (neighbours wanted)", "kind": "range",
+     "min": 1, "max": 25, "step": 1, "value": 10},
+], "data": {}},
+
+"ivf_flat_index": {"model": "ann_ivfflat", "scene": True, "controls": [
+    {"id": "nprobe", "label": "nprobe (cells opened)", "kind": "range",
+     "min": 1, "max": 16, "step": 1, "value": 2},
+    {"id": "nlist", "label": "nlist (cells built)", "kind": "range",
+     "min": 8, "max": 96, "step": 8, "value": 48},
+    {"id": "k", "label": "k (neighbours wanted)", "kind": "range",
+     "min": 1, "max": 25, "step": 1, "value": 10},
+], "data": {}},
+
+"ivf_pq_index": {"model": "ann_ivfpq", "scene": True, "controls": [
+    {"id": "nprobe", "label": "nprobe (cells opened)", "kind": "range",
+     "min": 1, "max": 16, "step": 1, "value": 4},
+    {"id": "bits", "label": "Bits per subquantizer", "kind": "range",
+     "min": 2, "max": 6, "step": 1, "value": 4},
+    {"id": "residual", "label": "Quantise the residual, not the vector",
+     "kind": "toggle", "value": True},
+    {"id": "rerank", "label": "Rerank shortlist with exact vectors",
+     "kind": "range", "min": 0, "max": 60, "step": 10, "value": 0},
+    {"id": "nlist", "label": "nlist (cells built)", "kind": "range",
+     "min": 8, "max": 96, "step": 8, "value": 48},
+    {"id": "k", "label": "k (neighbours wanted)", "kind": "range",
+     "min": 1, "max": 25, "step": 1, "value": 10},
+], "data": {}},
+
+"product_quantization": {"model": "ann_pq", "scene": True, "controls": [
+    {"id": "m", "label": "m (subquantizers)", "kind": "range",
+     "min": 1, "max": 2, "step": 1, "value": 2},
+    {"id": "bits", "label": "Bits per subquantizer", "kind": "range",
+     "min": 2, "max": 7, "step": 1, "value": 5},
+    {"id": "k", "label": "k (neighbours wanted)", "kind": "range",
+     "min": 1, "max": 25, "step": 1, "value": 10},
+], "data": {}},
+
+"diskann_index": {"model": "ann_diskann", "scene": True, "controls": [
+    {"id": "alpha", "label": "alpha x10 (pruning slack)", "kind": "range",
+     "min": 10, "max": 20, "step": 1, "value": 12},
+    {"id": "L", "label": "L (search beam width)", "kind": "range",
+     "min": 5, "max": 80, "step": 5, "value": 10},
+    {"id": "R", "label": "R (max degree)", "kind": "range",
+     "min": 8, "max": 48, "step": 4, "value": 32},
+    {"id": "edges", "label": "Draw the whole graph", "kind": "toggle",
+     "value": False},
+    {"id": "k", "label": "k (neighbours wanted)", "kind": "range",
+     "min": 1, "max": 25, "step": 1, "value": 10},
+], "data": {}},
+
+"annoy_index": {"model": "ann_annoy", "scene": True, "controls": [
+    {"id": "trees", "label": "n_trees", "kind": "range",
+     "min": 1, "max": 24, "step": 1, "value": 10},
+    {"id": "searchk", "label": "search_k (candidate budget)", "kind": "range",
+     "min": 5, "max": 150, "step": 5, "value": 25},
+    {"id": "leaf", "label": "Leaf size", "kind": "range",
+     "min": 4, "max": 40, "step": 4, "value": 12},
+    {"id": "show", "label": "Tree drawn", "kind": "range",
+     "min": 0, "max": 9, "step": 1, "value": 0},
+    {"id": "k", "label": "k (neighbours wanted)", "kind": "range",
+     "min": 1, "max": 25, "step": 1, "value": 10},
+], "data": {}},
+
+"scann_index": {"model": "ann_scann", "scene": True, "controls": [
+    {"id": "eta", "label": "eta x10 (weight on parallel error)",
+     "kind": "range", "min": 10, "max": 60, "step": 5, "value": 30},
+    {"id": "rerank", "label": "Rescore shortlist exactly", "kind": "range",
+     "min": 0, "max": 60, "step": 10, "value": 30},
+    {"id": "ks", "label": "Centroids", "kind": "range",
+     "min": 8, "max": 64, "step": 8, "value": 32},
+    {"id": "k", "label": "k (neighbours wanted)", "kind": "range",
+     "min": 1, "max": 25, "step": 1, "value": 10},
+], "data": {}},
+
 "permission_filtering_in_rag": {"model": "permissions", "controls": [
     {"id": "visible", "label": "Corpus visible to this user (%)", "kind": "range",
      "min": 1, "max": 100, "step": 1, "value": 20},
@@ -1102,6 +1208,965 @@ _t(
     ],
 )
 
+
+# =========================================================================
+# Vector index structures - one module per index type
+# =========================================================================
+
+
+_t(
+    slug="flat_index",
+    group_label="Scale",
+    level="Beginner",
+    title="Flat Index",
+    asked="What does a flat index do, and why is it still the right answer "
+          "sometimes?",
+    desc="Exhaustive search: every query compared against every vector. The "
+         "only exact index, the ground truth every approximate one is scored "
+         "against, and the correct choice more often than people expect.",
+    lead="A flat index does the obvious thing: it keeps the vectors in a list "
+         "and compares the query with <strong>all of them</strong>. It is the "
+         "only index that cannot be wrong, which makes it both the baseline "
+         "every other page here is measured against and, under a few hundred "
+         "thousand vectors, the one you should probably be using.",
+    say="\"Flat is brute force: O(n&middot;d) per query, exact by construction, "
+        "zero build time and zero extra memory. I use it as the recall "
+        "baseline, and I keep it in production until the corpus or the QPS "
+        "makes it too slow - which for most internal tools it never does.\"",
+    notice=[
+        "Recall is 1.0 because nothing is skipped &mdash; that is the definition.",
+        "Cost is linear in <em>both</em> corpus size and dimension.",
+        "Nothing to build, nothing to tune, nothing to go stale.",
+    ],
+    viz=WIDGETS["flat_index"],
+    sections=[
+        ("The algorithm, in full",
+         "<p>Compute the distance from the query to every stored vector, keep "
+         "the k smallest. That is the entire index. There is no build step, no "
+         "parameters, and no structure &mdash; a flat index is a list.</p>"
+         "<p>The cost is <span class=\"mono-font\">O(n &middot; d)</span> per "
+         "query, and both factors are real. A million 768-dimensional vectors "
+         "is 768 million multiply-adds for a single search: roughly 0.2 seconds "
+         "on one core, and a few milliseconds if the whole thing is a matrix "
+         "multiply on a GPU. That second number is why \"brute force\" is a "
+         "much weaker insult than it sounds.</p>"),
+        ("Why it is the ground truth",
+         "<p>Every other page in this group reports a <strong>recall</strong> "
+         "figure. Recall@k asks: of the k genuinely nearest vectors, how many "
+         "did the index return? To compute it you have to know the genuinely "
+         "nearest vectors, and the only way to know them is an exhaustive "
+         "search.</p>"
+         "<p>So a flat index is not merely the slow option, it is the "
+         "measuring instrument. Every approximate index you deploy should have "
+         "its recall measured against a flat search over a sample of your real "
+         "corpus and your real queries &mdash; not over a benchmark, because "
+         "recall depends on how your embeddings are distributed. An index "
+         "tuned to 0.95 on SIFT1M can be at 0.7 on your data with the same "
+         "parameters.</p>"),
+        ("What the slider is showing",
+         "<p>Move <strong>Fraction of the corpus scanned</strong> below 100% "
+         "and watch recall fall roughly in step with it. That is not a "
+         "property of any clever algorithm; it is what happens when you stop a "
+         "linear scan early. The vectors you did not reach are simply not "
+         "candidates.</p>"
+         "<p>This is the honest picture of what a flat index can and cannot "
+         "trade. It has exactly one dial &mdash; how much of the list you "
+         "read &mdash; and turning it down loses neighbours at random. Every "
+         "other index on these pages exists to make that dial <em>selective</em>: "
+         "to skip vectors that were unlikely to be near the query rather than "
+         "vectors that happened to be late in the array.</p>"),
+        ("When flat is genuinely correct",
+         "<ul>"
+         "<li><strong>Under about 100,000 vectors.</strong> With SIMD, a flat "
+         "scan of 100k&times;768 is a couple of milliseconds. An HNSW graph "
+         "would add memory, build time and a recall cliff to save time you "
+         "were not spending.</li>"
+         "<li><strong>When the corpus changes constantly.</strong> Inserting "
+         "into a flat index is an array append. Inserting into a graph index "
+         "means finding neighbours and rewiring; deleting means tombstoning "
+         "and eventually rebuilding.</li>"
+         "<li><strong>When recall must be exactly 1.</strong> Deduplication, "
+         "plagiarism detection, licence-key matching, anything where a missed "
+         "neighbour is a correctness bug rather than a slightly worse "
+         "ranking.</li>"
+         "<li><strong>Inside a filter.</strong> If a query is restricted to "
+         "one tenant's 5,000 documents, that subset is small even when the "
+         "whole corpus is not. A pre-filtered flat scan often beats fighting "
+         "an approximate index that was built over everything.</li>"
+         "</ul>"),
+        ("What it costs at scale",
+         "<p>The two numbers that decide when to leave flat behind are in the "
+         "readout. <strong>Memory</strong> is <span class=\"mono-font\">n "
+         "&times; d &times; 4</span> bytes for float32 &mdash; 3 GB at a "
+         "million 768-dimensional vectors, which is fine, and 300 GB at a "
+         "hundred million, which is not. <strong>Latency</strong> is linear, "
+         "so ten times the corpus is ten times the wait, with no knob to "
+         "soften it.</p>"
+         "<p>Note that those two problems have different solutions. Memory is "
+         "solved by <a href=\"product_quantization.html\">quantisation</a>, "
+         "which compresses the vectors and still scans all of them. Latency is "
+         "solved by <a href=\"ivf_flat_index.html\">partitioning</a> or a "
+         "<a href=\"hnsw_index.html\">graph</a>, which skip vectors and keep "
+         "them uncompressed. Most production indexes combine one of each, "
+         "which is exactly what <a href=\"ivf_pq_index.html\">IVF-PQ</a> is.</p>"),
+        ("Things to try",
+         "<ol>"
+         "<li>Drag the query into the empty space between clusters. The k "
+         "returned neighbours are still the true nearest ones &mdash; a flat "
+         "index has no notion of a region it might have missed.</li>"
+         "<li>Set <strong>scanned</strong> to 25%. Recall lands near 0.25: "
+         "with no structure, reading a quarter of the list finds about a "
+         "quarter of the answer.</li>"
+         "<li>Shrink the corpus and watch the comparison count fall exactly in "
+         "proportion. Linear means linear.</li>"
+         "</ol>"),
+        ("What to remember",
+         "<p>A flat index compares the query with every vector: exact, "
+         "O(n&middot;d) per query, no build step and no parameters. It is the "
+         "ground truth that every approximate index's recall is measured "
+         "against, and under a few hundred thousand vectors it is usually also "
+         "the right thing to ship. Reach for an approximate index when the "
+         "latency or the memory actually hurts &mdash; and measure the recall "
+         "you gave up against this.</p>"),
+    ],
+)
+
+
+_t(
+    slug="hnsw_index",
+    group_label="Scale",
+    level="Advanced",
+    title="HNSW",
+    asked="How does HNSW work, and which of its parameters do you tune at "
+          "query time?",
+    desc="A layered proximity graph walked greedily: sparse layers with long "
+         "edges to cross the space, a dense bottom layer to refine. The "
+         "default index in most vector databases, and why.",
+    lead="Connect every vector to its nearest neighbours, then stack several "
+         "such graphs where each layer is a random sample of the one below. "
+         "Search enters at the sparse top, takes a few long hops to get near, "
+         "and descends into progressively denser layers to refine. It is a "
+         "<strong>skip list applied to geometry</strong>, and it is the "
+         "default index in Qdrant, Weaviate, Milvus, pgvector and Elasticsearch.",
+    say="\"HNSW is a multi-layer navigable small-world graph. Greedy search "
+        "with a candidate list of width efSearch, descending layer by layer. "
+        "efSearch is the runtime recall/latency knob and can vary per query; M "
+        "and efConstruction are fixed when you build. The costs are memory - "
+        "the graph sits on top of the vectors - and painful deletes.\"",
+    notice=[
+        "The walk is greedy, so it can settle somewhere good but not best.",
+        "<code>efSearch</code> below k cannot return k results at all.",
+        "Build-time damage &mdash; M too small &mdash; cannot be fixed at query time.",
+    ],
+    viz=WIDGETS["hnsw_index"],
+    sections=[
+        ("The structure",
+         "<p>Every vector is inserted at a level drawn from an exponentially "
+         "decaying distribution, so roughly one in M lands on each successive "
+         "layer. Layer 0 contains everything; layer 1 a sample of it; layer 2 "
+         "a sample of that. Because the higher layers are sparse, the edges "
+         "between their nodes are long.</p>"
+         "<p>Set <strong>Layer drawn</strong> to 1 or 2 in the visualisation. "
+         "The edges you see span most of the plane. Set it back to 0 and the "
+         "edges are short and local. That contrast is the whole design: the "
+         "top layers exist to cover <em>distance</em> and the bottom layer to "
+         "provide <em>precision</em>.</p>"),
+        ("The search, drawn as it happens",
+         "<p>Start at the entry point on the top layer. Move to whichever "
+         "neighbour is closer to the query; repeat until no neighbour "
+         "improves; drop a layer and continue from there. On layer 0, instead "
+         "of keeping one current node, keep a candidate list of size "
+         "<span class=\"mono-font\">efSearch</span> and expand the closest "
+         "unexpanded member until none of them can improve on what you have.</p>"
+         "<p>The orange path in the visualisation is the descent that actually "
+         "happened for the query you are dragging, and the blue points are "
+         "every node the search touched. Drag the query into the empty region "
+         "in the middle and watch the path lengthen &mdash; there are fewer "
+         "nodes there, so the greedy walk has to travel.</p>"),
+        ("The three parameters, and which one you actually turn",
+         "<p><strong>efSearch</strong> is the only runtime parameter, and it "
+         "is the one to name in an interview. It is the width of the candidate "
+         "list: raise it for recall, lower it for latency, change it per query "
+         "if you like. Note what happens when you drop it below k &mdash; "
+         "recall falls off a cliff, because a candidate list of 4 cannot "
+         "produce 10 neighbours no matter how good the graph is.</p>"
+         "<p><strong>M</strong> is the number of edges per node, fixed at "
+         "build time. More edges means a better-connected graph, better recall "
+         "and more memory: the graph costs <span class=\"mono-font\">n &times; "
+         "M &times; 2 &times; 4</span> bytes on top of the vectors, which at "
+         "M = 16 and a million vectors is 128 MB.</p>"
+         "<p><strong>efConstruction</strong> controls how hard the builder "
+         "searches for good neighbours during insertion. It costs build time "
+         "only, and the result is baked in forever. Drop it to 4 here and "
+         "recall falls even at generous efSearch &mdash; a badly built graph "
+         "cannot be rescued at query time.</p>"),
+        ("What two dimensions cannot show you",
+         "<p>One honest caveat about the picture above. In two dimensions a "
+         "proximity graph is almost too good: M = 4 performs about as well as "
+         "M = 32, because in the plane a handful of edges already point in "
+         "every useful direction.</p>"
+         "<p>In 768 dimensions that stops being true. There are vastly more "
+         "directions to cover, distances concentrate so that near and far "
+         "neighbours differ by less, and a node with too few edges leaves "
+         "whole directions unreachable. That is why real deployments use "
+         "M = 16 to 64 rather than 4, and why the memory cost of HNSW is what "
+         "it is. The <em>structure</em> is what this page can show you "
+         "faithfully; the <em>difficulty</em> is what it cannot.</p>"),
+        ("How it fails",
+         "<p><strong>Local minima.</strong> Greedy search stops when no "
+         "neighbour is closer, which is not the same as arriving at the "
+         "nearest vector. A wider efSearch makes it less likely, never "
+         "impossible.</p>"
+         "<p><strong>Memory.</strong> The graph is stored alongside the "
+         "vectors and does not compress well. This is the reason to reach for "
+         "IVF-PQ or DiskANN instead when the corpus is large.</p>"
+         "<p><strong>Deletion.</strong> Removing a node can disconnect the "
+         "region it was bridging, so implementations tombstone instead and "
+         "rebuild periodically. A workload with heavy churn is HNSW's worst "
+         "case, and it is why an IVF index sometimes survives next to it.</p>"
+         "<p><strong>Filtered search.</strong> If a metadata filter removes "
+         "most of the corpus, the graph's edges mostly point at excluded "
+         "nodes, and the walk stalls. Every vector database handles this "
+         "differently and none handles it for free.</p>"),
+        ("Things to try",
+         "<ol>"
+         "<li>Set <strong>efSearch</strong> to 4 with k at 10. Recall caps at "
+         "0.4 &mdash; the candidate list is narrower than the answer.</li>"
+         "<li>Sweep efSearch upward and watch nodes visited and recall climb "
+         "together. This is the production knob, and the curve you are tracing "
+         "is the one you tune against.</li>"
+         "<li>Drop <strong>efConstruction</strong> to 4 and then raise "
+         "efSearch as far as it goes. Recall never fully recovers.</li>"
+         "<li>Set <strong>Layer drawn</strong> to 2 to see the long edges that "
+         "make the first few hops cheap.</li>"
+         "</ol>"),
+        ("What to remember",
+         "<p>HNSW stacks proximity graphs: sparse upper layers with long edges "
+         "to cross the space, a dense bottom layer to refine. Search is greedy "
+         "with a candidate list of width efSearch &mdash; the runtime knob. M "
+         "and efConstruction are fixed at build time and cap what efSearch can "
+         "reach. It gives the best recall-per-millisecond of any index here, "
+         "and pays in memory and in awkward deletes.</p>"),
+    ],
+)
+
+
+_t(
+    slug="ivf_flat_index",
+    group_label="Scale",
+    level="Intermediate",
+    title="IVF-Flat",
+    asked="How does an inverted file index work, and what does nprobe trade?",
+    desc="Cluster the vectors, then search only the few cells nearest the "
+         "query. The simplest approximate index that works, and the one whose "
+         "failure mode is easiest to see.",
+    lead="Run k-means over the corpus once. Every vector belongs to the cell "
+         "of its nearest centroid. At query time, compare the query with the "
+         "<strong>centroids</strong> &mdash; a few thousand comparisons "
+         "instead of a few million &mdash; open the nearest "
+         "<span class=\"mono-font\">nprobe</span> cells, and scan only what is "
+         "inside them.",
+    say="\"IVF partitions the space with k-means and probes the nearest nprobe "
+        "cells. nlist is usually about sqrt(n); nprobe is the runtime knob. It "
+        "misses neighbours that sit just across a cell boundary, it is far "
+        "cheaper to build than a graph, and it updates cleanly - which is why "
+        "it survives alongside HNSW.\"",
+    notice=[
+        "The centroid comparison is the index; everything else is a linear scan.",
+        "A true neighbour in an unopened cell is invisible &mdash; the red points.",
+        "Finer cells mean less work per probe and more probes needed.",
+    ],
+    viz=WIDGETS["ivf_flat_index"],
+    sections=[
+        ("Build, then search",
+         "<p><strong>Build.</strong> Run k-means with "
+         "<span class=\"mono-font\">nlist</span> centroids over a sample of "
+         "the corpus, then assign every vector to its nearest centroid. The "
+         "result is an inverted file: centroid ID &rarr; list of vector IDs. "
+         "The name comes from text search, where the same structure maps a "
+         "term to the documents containing it.</p>"
+         "<p><strong>Search.</strong> Compare the query with all "
+         "<span class=\"mono-font\">nlist</span> centroids, sort, take the "
+         "nearest <span class=\"mono-font\">nprobe</span>, and exhaustively "
+         "scan the vectors in those lists. The squares in the visualisation "
+         "are the centroids, filled where the cell was opened.</p>"
+         "<p>Total work is <span class=\"mono-font\">nlist + nprobe &times; "
+         "n/nlist</span> distance computations. Differentiating that gives the "
+         "usual rule of thumb: <span class=\"mono-font\">nlist &asymp; "
+         "&radic;n</span>, so a million vectors gets around 1,000 to 4,000 "
+         "cells.</p>"),
+        ("The failure mode, in red",
+         "<p>Drag the query onto a boundary between two clusters and watch red "
+         "points appear. Those are genuine top-k neighbours that live in a "
+         "cell the search never opened. The index did not rank them badly "
+         "&mdash; it never computed their distance at all.</p>"
+         "<p>This is IVF's entire weakness and it is a clean one to reason "
+         "about. A hard partition drawn through a continuous space will "
+         "sometimes cut through a neighbourhood, and any query near that cut "
+         "loses the neighbours on the far side. The fix is always the same: "
+         "raise nprobe until the cells you open cover the neighbourhood. The "
+         "cost is always the same too, because each extra probe is another "
+         "<span class=\"mono-font\">n/nlist</span> vectors scanned.</p>"),
+        ("Reading the two dials against each other",
+         "<p><strong>nprobe</strong> is the runtime knob, the direct analogue "
+         "of HNSW's efSearch. More probes, more recall, more latency, tuned "
+         "per query if you want.</p>"
+         "<p><strong>nlist</strong> is fixed at build time and it moves both "
+         "numbers at once. Raise it with nprobe held constant: each cell is "
+         "smaller, so fewer vectors are scanned and the search gets faster "
+         "&mdash; and recall drops, because the same nprobe now covers less of "
+         "the space. Raise nlist and nprobe together and you get back to where "
+         "you were.</p>"
+         "<p>The instructive extreme is <span class=\"mono-font\">nprobe = "
+         "nlist</span>: every cell opened, recall exactly 1.0, and a flat scan "
+         "with the cost of the centroid comparisons added on top. An index "
+         "that is asked for perfect recall is not an index.</p>"),
+        ("Why IVF is still here",
+         "<p>HNSW beats IVF-Flat on recall per millisecond, so why does every "
+         "vector database still ship IVF?</p>"
+         "<p><strong>Build cost.</strong> k-means over a sample, then one pass "
+         "to assign. Minutes where a graph takes hours, and the build "
+         "parallelises trivially.</p>"
+         "<p><strong>Updates.</strong> Inserting a vector means finding its "
+         "centroid and appending to a list. Deleting means removing it from "
+         "one list. Compare that with rewiring a graph. IVF only degrades "
+         "slowly as the data drifts away from the centroids, and the fix is a "
+         "periodic retrain rather than a rebuild.</p>"
+         "<p><strong>It composes.</strong> The cell structure is what "
+         "<a href=\"ivf_pq_index.html\">IVF-PQ</a> quantises residuals against, "
+         "and what makes sharding natural &mdash; cells are an obvious unit to "
+         "distribute. Most billion-scale systems are IVF-shaped underneath.</p>"),
+        ("Things to try",
+         "<ol>"
+         "<li>Set <strong>nprobe</strong> to 1 and drag the query around. In "
+         "the middle of a cluster recall is fine; near a boundary it "
+         "collapses. Same index, same parameter &mdash; the difference is "
+         "where the query landed.</li>"
+         "<li>Raise <strong>nlist</strong> to 96 with nprobe at 2. Far fewer "
+         "vectors compared, noticeably worse recall.</li>"
+         "<li>Push nprobe up until recall reaches 1.0, then look at how much "
+         "of the corpus you are scanning. That is the price of exactness.</li>"
+         "</ol>"),
+        ("What to remember",
+         "<p>IVF-Flat clusters the corpus with k-means and scans only the "
+         "nearest nprobe cells. nlist &asymp; &radic;n at build time; nprobe "
+         "is the runtime recall/latency knob. It misses true neighbours across "
+         "cell boundaries, which is visible and fixable with more probes. It "
+         "loses to HNSW on latency and wins on build time, update cost and "
+         "composability &mdash; and it is the skeleton that IVF-PQ hangs "
+         "compression on.</p>"),
+    ],
+)
+
+_t(
+    slug="product_quantization",
+    group_label="Scale",
+    level="Advanced",
+    title="Product Quantization",
+    asked="How does product quantization compress a vector, and why does "
+          "splitting it into subvectors help so much?",
+    desc="Split each vector into m pieces, replace each piece with the nearest "
+         "of 256 centroids, and store m bytes instead of 3 KB. The "
+         "multiplication of small codebooks is the whole trick.",
+    lead="Replace every vector with a short code. Split it into "
+         "<span class=\"mono-font\">m</span> subvectors, quantise each against "
+         "its own small codebook, and store the "
+         "<span class=\"mono-font\">m</span> centroid indices. Two codebooks "
+         "of 256 entries describe <strong>65,536</strong> distinct positions "
+         "while costing 512 centroids of storage &mdash; that multiplication "
+         "is why PQ works.",
+    say="\"PQ splits the vector into m subvectors and quantises each against "
+        "its own codebook of 2^nbits centroids. Storage is m bytes per vector "
+        "at 8 bits. Queries use asymmetric distance: build an m x 256 lookup "
+        "table once, then every candidate is m table lookups and m adds - no "
+        "arithmetic on the query side at all.\"",
+    notice=[
+        "The codebooks multiply: m codebooks of k give k<sup>m</sup> positions.",
+        "The query is never quantised &mdash; that is the &lsquo;asymmetric&rsquo; part.",
+        "PQ compresses; it does not prune. Every code is still scanned.",
+    ],
+    viz=WIDGETS["product_quantization"],
+    sections=[
+        ("What is actually stored",
+         "<p>Take a 768-dimensional vector and cut it into m = 96 chunks of 8 "
+         "dimensions. Each chunk gets its own codebook of 256 centroids, "
+         "trained by k-means over that chunk across the whole corpus. Encoding "
+         "a vector means finding the nearest centroid in each of the 96 "
+         "codebooks and storing 96 one-byte indices.</p>"
+         "<p><span class=\"mono-font\">768 &times; 4 = 3,072 bytes &rarr; 96 "
+         "bytes. A 32&times; reduction.</span> The vector itself is gone; what "
+         "remains is a recipe for approximately rebuilding it.</p>"
+         "<p>The visualisation does this in two dimensions with m = 2, so each "
+         "subspace is one axis and its codebook is a set of positions along "
+         "it. The faint grid is every position the index can represent, and "
+         "the blue line from each vector is the distance to where the index "
+         "thinks it is: the quantisation error, drawn.</p>"),
+        ("Why splitting is the whole idea",
+         "<p>Set <strong>m</strong> to 1. Now there is a single codebook and "
+         "every vector is replaced by one of "
+         "<span class=\"mono-font\">2<sup>nbits</sup></span> centroids &mdash; "
+         "plain vector quantisation. At 5 bits that is 32 possible positions "
+         "for 600 vectors, and recall is poor because the index genuinely "
+         "cannot tell most vectors apart.</p>"
+         "<p>Set m back to 2. Same bits per subquantizer, same number of "
+         "centroids <em>stored</em> &mdash; but now the positions "
+         "<em>multiply</em>: 32 &times; 32 = 1,024 representable points from "
+         "64 stored centroids. Recall jumps.</p>"
+         "<p>At real sizes this is dramatic. 96 codebooks of 256 entries is "
+         "24,576 centroids in memory, and they describe "
+         "<span class=\"mono-font\">256<sup>96</sup></span> distinct positions "
+         "&mdash; a number with 231 digits. Producing that many distinct codes "
+         "with a single codebook would require storing all of them. "
+         "\"Product\" in the name is literally the Cartesian product of the "
+         "subspace codebooks.</p>"),
+        ("Asymmetric distance, and why queries are cheap",
+         "<p>The obvious way to compare a query against a code is to decode "
+         "the code back into a vector and measure. PQ does something better: "
+         "it leaves the query exact and never reconstructs anything.</p>"
+         "<p>At query time, for each of the m subspaces, compute the distance "
+         "from the query's subvector to each of the 256 centroids in that "
+         "codebook. That is an <span class=\"mono-font\">m &times; 256</span> "
+         "lookup table, built once per query. Then the distance to any stored "
+         "code is m table lookups and m additions &mdash; no multiplications, "
+         "no decoding, and it is the same cost whatever d is.</p>"
+         "<p>It is called <strong>asymmetric</strong> because only one side is "
+         "quantised. Quantising the query too would be symmetric, slightly "
+         "faster, and measurably less accurate &mdash; you would be adding "
+         "the query's own quantisation error to every comparison for no "
+         "reason.</p>"),
+        ("The parameters, and how they trade",
+         "<p><strong>m</strong>, the number of subquantizers, must divide d. "
+         "Larger m means shorter subvectors, less information discarded, "
+         "better recall &mdash; and a longer code. At 8 bits, m is exactly "
+         "your bytes per vector.</p>"
+         "<p><strong>nbits</strong> is almost always 8, because a byte is the "
+         "unit hardware likes and 256 centroids per subspace is a good "
+         "operating point. Lower it here and watch the grid coarsen and recall "
+         "fall.</p>"
+         "<p>The useful way to hold this: <strong>the code length in bytes is "
+         "the dial</strong>, and m &times; nbits / 8 is that length. Everything "
+         "else is a consequence. Common choices at d = 768 are 96 bytes for "
+         "high recall, 32 bytes when memory is the binding constraint and a "
+         "reranking stage will clean up afterwards.</p>"),
+        ("What PQ does not do",
+         "<p>PQ is a <strong>compression</strong> scheme, not a search "
+         "structure. A pure PQ index still computes a distance for every "
+         "single vector in the corpus &mdash; it is a flat scan over short "
+         "codes rather than over full vectors. That is roughly 20&ndash;30 "
+         "times faster than scanning float32, which is a real win, but it is "
+         "still O(n).</p>"
+         "<p>So PQ is nearly always combined with something that prunes. "
+         "<a href=\"ivf_pq_index.html\">IVF-PQ</a> puts it inside cells, which "
+         "is the standard billion-scale index; DiskANN keeps PQ codes in RAM "
+         "to route a graph search whose full vectors live on SSD. Pure PQ on "
+         "its own is unusual outside of the case where you have a small "
+         "candidate set already and only memory hurts.</p>"),
+        ("Things to try",
+         "<ol>"
+         "<li>Set <strong>m = 1</strong> and note the representable-points "
+         "count. Set m = 2 at the same bits and watch it square.</li>"
+         "<li>Drop <strong>bits</strong> to 2. The grid becomes four lines "
+         "each way, the blue error lines get long, and the top-k answer starts "
+         "coming back wrong.</li>"
+         "<li>Watch the bytes-per-vector bar as you move the bits slider "
+         "&mdash; that is the number your RAM bill is proportional to.</li>"
+         "</ol>"),
+        ("What to remember",
+         "<p>PQ splits a vector into m subvectors and stores the index of the "
+         "nearest centroid in each subspace's codebook. m codebooks of k "
+         "centroids describe k<sup>m</sup> positions from m&middot;k stored "
+         "centroids, which is why the compression is so extreme. Queries build "
+         "an m &times; k distance table once and then cost m lookups per "
+         "candidate. It compresses but does not prune, so it is almost always "
+         "paired with IVF or a graph.</p>"),
+    ],
+)
+
+
+_t(
+    slug="ivf_pq_index",
+    group_label="Scale",
+    level="Advanced",
+    title="IVF-PQ",
+    asked="Why is IVF-PQ the standard billion-scale index, and what is the "
+          "residual doing?",
+    desc="Partition with IVF, compress with PQ, and quantise the residual "
+         "rather than the vector - which is what makes the same code length "
+         "far more accurate.",
+    lead="Two ideas that solve different problems, composed. "
+         "<strong>IVF</strong> prunes: only a few cells are opened. "
+         "<strong>PQ</strong> compresses: what is inside them is a short code, "
+         "not a vector. The detail that makes the combination work is that PQ "
+         "is applied to the <strong>residual</strong> &mdash; the offset from "
+         "the cell centroid &mdash; and not to the vector itself.",
+    say="\"IVF-PQ clusters, then product-quantises the residual from each cell "
+        "centroid. The residual is what makes it accurate: the same code "
+        "length describes a much smaller region, so the error drops for free. "
+        "A million 768-dim vectors goes from 3 GB to about 50 MB, and you add "
+        "a rerank stage on the shortlist to buy the recall back.\"",
+    notice=[
+        "The residual is centred on the cell, so the codebook resolution is local.",
+        "PQ distances are approximate &mdash; the ordering near the top is unreliable.",
+        "Reranking the shortlist with exact vectors recovers most of the loss.",
+    ],
+    viz=WIDGETS["ivf_pq_index"],
+    sections=[
+        ("The composition",
+         "<p>Build an IVF index as usual: k-means centroids, every vector "
+         "assigned to a cell. Then, instead of storing the vectors in each "
+         "list, store PQ codes. At query time, open the nearest "
+         "<span class=\"mono-font\">nprobe</span> cells and score the codes "
+         "inside them with a PQ lookup table.</p>"
+         "<p>The two savings are independent and they multiply. IVF means you "
+         "touch perhaps 1% of the corpus; PQ means each of those touches costs "
+         "a few table lookups on a 48-byte code rather than a dot product over "
+         "a 3 KB vector. Together they are the reason a billion vectors fits "
+         "on one machine.</p>"),
+        ("The residual is the part people skip",
+         "<p>Toggle <strong>Quantise the residual</strong> off and watch the "
+         "mean reconstruction error roughly quadruple, with no change to the "
+         "code length.</p>"
+         "<p>With the toggle off, one codebook has to describe positions "
+         "anywhere in the whole space, so its centroids are spread thin and "
+         "every vector is far from the nearest one. With it on, the value "
+         "being quantised is <span class=\"mono-font\">x &minus; "
+         "centroid(x)</span> &mdash; a small offset. Residuals from every cell "
+         "are similar in scale and centred on zero, so a single shared "
+         "codebook fits them tightly, and its resolution is effectively "
+         "<em>local to each cell</em>.</p>"
+         "<p>This is free accuracy: the same bits, the same memory, a much "
+         "smaller error. It is also why IVF-PQ is a genuine composition rather "
+         "than two techniques stacked &mdash; the partition does not just "
+         "prune, it gives the quantiser a better problem to solve.</p>"),
+        ("Reranking, and why almost everyone does it",
+         "<p>A PQ distance is an estimate. It is good enough to decide that a "
+         "vector is nowhere near the query, and not good enough to order the "
+         "top ten reliably &mdash; the errors are the same size as the "
+         "differences you are trying to resolve.</p>"
+         "<p>So production setups add a <strong>rerank</strong> stage: take "
+         "the top few hundred by PQ distance, fetch their full vectors, and "
+         "rescore exactly. Move the rerank slider here and watch recall climb "
+         "back toward 1.0.</p>"
+         "<p>The cost is a few hundred random reads. If the full vectors are "
+         "on SSD that is a few milliseconds; if they are not stored at all, "
+         "reranking is not available and you live with the PQ ordering. In "
+         "FAISS this is <span class=\"mono-font\">IndexRefineFlat</span> "
+         "wrapped around the IVF-PQ index, and skipping it is one of the most "
+         "common reasons a deployment's recall is worse than the tuning guide "
+         "promised.</p>"),
+        ("Sizing one at a billion vectors",
+         "<p>Say a billion 768-dimensional vectors, m = 64 subquantizers at 8 "
+         "bits, nlist = 100,000.</p>"
+         "<ul>"
+         "<li><strong>Codes:</strong> 1e9 &times; 64 bytes = <strong>64 "
+         "GB</strong>. Against 3 TB for float32.</li>"
+         "<li><strong>Centroids:</strong> 100,000 &times; 768 &times; 4 = 307 "
+         "MB, which is scanned in full on every query &mdash; at high nlist "
+         "the centroid scan becomes the bottleneck, which is why very large "
+         "indexes make it hierarchical.</li>"
+         "<li><strong>Scanned per query</strong> at nprobe = 32: about 320,000 "
+         "codes, roughly 0.03% of the corpus.</li>"
+         "</ul>"
+         "<p>The training cost is worth flagging: PQ codebooks and IVF "
+         "centroids are both learned from a sample, and if the corpus drifts "
+         "away from that sample the index degrades quietly &mdash; recall "
+         "falls with no error anywhere. Retraining is periodic maintenance, "
+         "not a one-off.</p>"),
+        ("Things to try",
+         "<ol>"
+         "<li>Turn <strong>residual</strong> off and on with rerank at 0. The "
+         "recall difference is the residual trick, and it costs nothing.</li>"
+         "<li>Set <strong>bits</strong> to 2 and then raise <strong>rerank</strong>. "
+         "Even a badly compressed index can produce a good shortlist &mdash; "
+         "which is the argument for aggressive compression plus reranking.</li>"
+         "<li>Compare the RAM figure with the flat index's. Two orders of "
+         "magnitude is the reason this index exists.</li>"
+         "</ol>"),
+        ("What to remember",
+         "<p>IVF-PQ partitions with k-means and stores PQ codes of the "
+         "<em>residual</em> from each cell centroid, which makes the same code "
+         "length far more accurate. Search opens nprobe cells and scores codes "
+         "by table lookup; a rerank stage rescores the shortlist with exact "
+         "vectors and buys back most of the lost recall. It is the default at "
+         "billion scale because it is the only structure here where memory, "
+         "not latency, is the thing being solved.</p>"),
+    ],
+)
+
+_t(
+    slug="diskann_index",
+    group_label="Scale",
+    level="Advanced",
+    title="DiskANN",
+    asked="How does DiskANN serve a billion vectors from one machine, and what "
+          "does alpha do?",
+    desc="A single flat graph built so a beam search arrives in a few hops, "
+         "because every hop is an SSD read. PQ codes in RAM to route, full "
+         "vectors on disk to rescore.",
+    lead="Every other graph index assumes the graph is in memory. DiskANN "
+         "assumes it is not. The cost that matters becomes the number of "
+         "<strong>random reads</strong>, not the number of distance "
+         "computations, and the whole design follows: one flat graph rather "
+         "than layers, a pruning rule that deliberately keeps long edges, and "
+         "compressed codes in RAM to steer a search whose real data is on SSD.",
+    say="\"DiskANN builds a Vamana graph - one layer, medoid entry, and a "
+        "robust-prune rule with a slack parameter alpha that keeps long-range "
+        "edges so the hop count stays low. PQ codes live in RAM to guide the "
+        "beam; the full vectors and adjacency live on SSD and are read only "
+        "for nodes actually visited. It serves a billion vectors from a single "
+        "machine, which no in-memory graph can.\"",
+    notice=[
+        "The unit of cost is a page read, about 100 &micro;s &mdash; not a FLOP.",
+        "<code>alpha</code> above 1 keeps long edges; at 1.0 the graph is all short ones.",
+        "One layer, not several &mdash; layers would mean more reads, not fewer.",
+    ],
+    viz=WIDGETS["diskann_index"],
+    sections=[
+        ("Why the cost model changes everything",
+         "<p>An in-memory graph search that visits 200 nodes is fast, because "
+         "a memory access is nanoseconds. The same search against an SSD is "
+         "200 random reads at roughly 100 microseconds each: 20 milliseconds, "
+         "and the arithmetic is free by comparison.</p>"
+         "<p>So DiskANN optimises a different quantity. The headline number in "
+         "the readout here is <strong>reads per query</strong>, and every "
+         "design decision is aimed at it. A structure that halves the "
+         "distance computations but adds a hop is a loss.</p>"
+         "<p>The payoff is a ratio nothing else on these pages can match. A "
+         "billion 768-dimensional vectors is 3 TB &mdash; impossible in RAM, "
+         "ordinary on an NVMe drive. The paper's claim is 5,000 queries per "
+         "second at 95% recall from a single 64 GB machine.</p>"),
+        ("Vamana: one graph, pruned with slack",
+         "<p>The graph is built by starting from a random one and repeatedly "
+         "improving it. For each node, run a search from the medoid, take "
+         "everything visited as a candidate set, and prune it down to R "
+         "neighbours with the <strong>robust prune</strong> rule:</p>"
+         "<p class=\"mono-font\">keep the closest candidate p*; then discard "
+         "any remaining candidate p&prime; for which alpha &middot; d(p*, "
+         "p&prime;) &le; d(node, p&prime;)</p>"
+         "<p>In words: drop an edge if an edge you already kept gets you close "
+         "to the same place. At <span class=\"mono-font\">alpha = 1</span> "
+         "that is a strict relative-neighbourhood rule and every surviving "
+         "edge is short. Above 1 the test is looser, so some long edges "
+         "survive.</p>"
+         "<p>Move the alpha slider from 1.0 to 1.2 and watch two things: the "
+         "blue long edges appear, and the read count roughly halves. Those are "
+         "the same fact. Long edges are shortcuts, and on a disk-resident "
+         "graph a shortcut is worth more than a good local mesh.</p>"),
+        ("Why one layer",
+         "<p>HNSW's layers are a way to get long-range hops: the sparse upper "
+         "layers have them by construction. DiskANN gets long-range hops from "
+         "the pruning rule instead, inside a single layer, and that is "
+         "deliberate.</p>"
+         "<p>Layers cost reads. Descending three levels means touching nodes "
+         "at each level, and on an SSD each of those is a page. A flat graph "
+         "with a fixed medoid entry point reaches the same neighbourhood in "
+         "fewer total reads, even though it visits more nodes per level. When "
+         "the cost model changes, the optimal structure changes with it "
+         "&mdash; which is the most transferable thing on this page.</p>"),
+        ("The memory-disk split",
+         "<p>This is the part that makes it practical.</p>"
+         "<p><strong>In RAM:</strong> a PQ code per vector, typically 32 "
+         "bytes. A billion of those is 32 GB. The beam search uses these "
+         "approximate distances to decide where to go next, so navigation "
+         "costs no I/O at all.</p>"
+         "<p><strong>On SSD:</strong> for each node, its full vector and its "
+         "adjacency list, stored together in one 4 KB page. Visiting a node is "
+         "exactly one read, and that read gets you both the exact distance and "
+         "the next hops &mdash; a layout decision worth as much as the "
+         "algorithm.</p>"
+         "<p>The result: routing is approximate and free, scoring is exact and "
+         "paid for only on nodes actually visited. The final ranking uses the "
+         "full vectors read along the way, so the PQ error never reaches the "
+         "answer.</p>"),
+        ("Building it, and the honest caveat",
+         "<p>Build time is the real cost. The graph is constructed with "
+         "searches over the whole dataset, twice, and at a billion vectors "
+         "that is hours on a large machine &mdash; the paper builds in "
+         "overlapping shards and merges. This is not an index you rebuild "
+         "casually.</p>"
+         "<p><strong>FreshDiskANN</strong> addresses updates with a "
+         "small in-memory index for recent writes, merged into the disk index "
+         "periodically &mdash; the same log-structured pattern a database uses "
+         "for the same reason.</p>"
+         "<p>And the caveat for this page: two dimensions is too easy to show "
+         "the recall side of the trade, so recall here stays near 1.0 and only "
+         "the read count moves. Take the read count as the honest measurement "
+         "and the recall as a formality &mdash; in 768 dimensions both move, "
+         "and the beam width L is what trades them.</p>"),
+        ("Things to try",
+         "<ol>"
+         "<li>Set <strong>alpha</strong> to 1.0, note the reads, then raise it "
+         "to 1.2. Fewer reads for the same answer &mdash; that is the paper's "
+         "contribution in one slider.</li>"
+         "<li>Turn on <strong>Draw the whole graph</strong> at alpha 1.0 and "
+         "again at 2.0. The second one has visible shortcuts across the "
+         "plane.</li>"
+         "<li>Lower <strong>L</strong> to 5. Fewer reads, and eventually the "
+         "beam is too narrow to hold the answer.</li>"
+         "</ol>"),
+        ("What to remember",
+         "<p>DiskANN optimises SSD reads rather than distance computations, "
+         "because that is what a disk-resident index actually spends. Vamana "
+         "builds one flat graph whose robust-prune rule, relaxed by alpha, "
+         "keeps deliberate long-range edges so the hop count stays low. PQ "
+         "codes in RAM steer the beam; full vectors and adjacency share a page "
+         "on SSD so one read serves both. It is the answer when the corpus "
+         "does not fit in memory and you have one machine.</p>"),
+    ],
+)
+
+
+_t(
+    slug="annoy_index",
+    group_label="Scale",
+    level="Intermediate",
+    title="Annoy",
+    asked="How do random projection trees find neighbours, and why does Annoy "
+          "build a forest?",
+    desc="Split the space with random hyperplanes, recursively, many times "
+         "over. One tree is a poor index; the union of a forest is a good one, "
+         "and it memory-maps straight off disk.",
+    lead="Pick two vectors at random, split the space along the plane midway "
+         "between them, recurse. That is one tree, and it is not a good index "
+         "&mdash; a neighbour on the wrong side of a split is invisible. Build "
+         "<strong>a forest of them</strong>, each with different random "
+         "splits, and take the union of the leaves: a neighbour separated in "
+         "one tree is almost always together in another.",
+    say="\"Annoy is a forest of random projection trees. Each split is the "
+        "hyperplane bisecting two randomly chosen points. n_trees is the "
+        "build-time knob, search_k the runtime one - it is a budget on "
+        "candidates across the whole forest, not per tree. The index is a "
+        "static mmap-able file, which is the actual reason Spotify built it.\"",
+    notice=[
+        "One tree cannot be fixed by searching harder &mdash; the split is the problem.",
+        "<code>search_k</code> is a budget over the forest, not per tree.",
+        "The index is immutable: adding a vector means rebuilding.",
+    ],
+    viz=WIDGETS["annoy_index"],
+    sections=[
+        ("Building one tree",
+         "<p>Take the vectors in a node. Choose two of them at random, compute "
+         "the hyperplane equidistant from both, and split. Recurse on each "
+         "side until a node holds fewer than K vectors &mdash; that is a "
+         "leaf.</p>"
+         "<p>The blue lines in the visualisation are the split planes of the "
+         "tree currently being drawn, and the blue points are the vectors in "
+         "the leaves that tree contributed. Change <strong>Tree drawn</strong> "
+         "and the partition is completely different, because the splits were "
+         "chosen at random.</p>"
+         "<p>Nothing is learned here. Compare that with IVF, whose partition "
+         "is fitted with k-means: Annoy's is arbitrary, which makes it fast to "
+         "build and individually much worse.</p>"),
+        ("Why a forest fixes it",
+         "<p>Set <strong>n_trees</strong> to 1 and raise "
+         "<strong>search_k</strong> as far as it goes. Recall stops improving "
+         "well short of 1.0. That is the key observation: a single tree's "
+         "failure is structural, and no amount of extra searching in it "
+         "helps.</p>"
+         "<p>Now raise n_trees. Recall climbs steadily, because each tree cuts "
+         "the space along a different random direction and it is unlikely that "
+         "many independent random planes all separate a query from the same "
+         "neighbour. The candidate set is the union of the leaves reached in "
+         "every tree, and it is rescored exactly at the end.</p>"
+         "<p>This is the same argument as a random forest in machine learning, "
+         "used for the same reason: individually weak, randomly varied, and "
+         "reliable in aggregate.</p>"),
+        ("search_k, and what it is a budget for",
+         "<p>The search maintains one priority queue across the roots of "
+         "<em>all</em> trees at once, ordered by how far the query is from "
+         "each split plane it has crossed. It pops the most promising node, "
+         "descends, and stops once <span class=\"mono-font\">search_k</span> "
+         "candidates have been collected.</p>"
+         "<p>Ordering by distance-to-plane is what makes the budget spend "
+         "itself well. A query sitting far inside a leaf's region will not "
+         "waste reads on the other side of that boundary; a query sitting "
+         "almost on a plane will explore both sides, in every tree, because "
+         "that is exactly where the neighbours might be.</p>"
+         "<p>Note that search_k is a budget over the forest and not per tree. "
+         "Doubling n_trees with search_k fixed gives you more diverse "
+         "candidates for the same work, up to the point where the budget is "
+         "spread too thin &mdash; which you can see here as the dip in recall "
+         "at many trees and a small budget.</p>"),
+        ("The reason it exists",
+         "<p>Annoy's accuracy-per-millisecond is worse than HNSW's. It is "
+         "still in production at Spotify and elsewhere, and the reason is in "
+         "the file format rather than the algorithm.</p>"
+         "<p>An Annoy index is a <strong>static file that is memory-mapped</strong>. "
+         "Many processes on a machine can share one copy at zero marginal "
+         "memory; the OS page cache decides what stays resident; a new index "
+         "is deployed by shipping a file and swapping a pointer; and a process "
+         "starts serving instantly rather than loading a graph into the "
+         "heap.</p>"
+         "<p>For a service that rebuilds its recommendations nightly and runs "
+         "many replicas, those properties can matter more than a factor of two "
+         "in query time. They are also the flip side of its main limitation: "
+         "the index is immutable, so there is no insert, no delete, and no "
+         "update &mdash; only a rebuild.</p>"),
+        ("Where it sits",
+         "<p>Choose Annoy when the corpus is rebuilt in batches rather than "
+         "updated, when several processes should share one index, or when you "
+         "want a dependency with no server and no tuning beyond two "
+         "numbers.</p>"
+         "<p>Choose <a href=\"hnsw_index.html\">HNSW</a> when you need the "
+         "best recall per millisecond and can afford the memory. Choose "
+         "<a href=\"ivf_pq_index.html\">IVF-PQ</a> when memory is the binding "
+         "constraint. Choose <a href=\"diskann_index.html\">DiskANN</a> when "
+         "the corpus does not fit in memory at all.</p>"),
+        ("Things to try",
+         "<ol>"
+         "<li>Set <strong>n_trees</strong> to 1 and sweep search_k to the "
+         "maximum. Recall plateaus well below 1.0 &mdash; you cannot search "
+         "your way out of a bad partition.</li>"
+         "<li>Hold search_k at 25 and raise n_trees from 1 to 20. Same "
+         "candidate budget, much better recall.</li>"
+         "<li>Step through <strong>Tree drawn</strong> and watch the split "
+         "planes move. Each is an independent random cut of the same "
+         "space.</li>"
+         "</ol>"),
+        ("What to remember",
+         "<p>Annoy splits the space with hyperplanes bisecting random pairs of "
+         "points, recursively, and builds many such trees. One tree is weak "
+         "and cannot be rescued by searching harder; the union of a forest is "
+         "strong. n_trees is the build knob, search_k the runtime budget "
+         "across the whole forest. Its real advantage is operational: a "
+         "static, memory-mappable file shared across processes &mdash; and its "
+         "real limitation is the same thing, because static means "
+         "rebuild-only.</p>"),
+    ],
+)
+
+
+_t(
+    slug="scann_index",
+    group_label="Scale",
+    level="Advanced",
+    title="ScaNN",
+    asked="What is anisotropic vector quantization, and why does it beat plain "
+          "quantization for inner product search?",
+    desc="Google's insight that for maximum inner product search, error along "
+         "a vector's own direction matters far more than error across it - so "
+         "the quantiser should not treat them equally.",
+    lead="Every quantiser on the previous pages minimises squared "
+         "reconstruction error, which treats all error as equally bad. For "
+         "<strong>maximum inner product search</strong> it is not: error "
+         "<em>parallel</em> to a vector changes its score against any query "
+         "that ranks it highly, while <em>perpendicular</em> error largely "
+         "cancels out. Weight the parallel part more and you get a better "
+         "index for the same bits.",
+    say="\"ScaNN's contribution is anisotropic vector quantization. For MIPS, "
+        "the parallel component of the residual is what distorts the inner "
+        "product for queries that would have ranked the vector highly, so the "
+        "loss weights it more than the perpendicular component. Same code "
+        "length, better ranking - and then a partition on top and an exact "
+        "rescoring pass at the end.\"",
+    notice=[
+        "At eta = 1 the loss is ordinary k-means &mdash; the assignments are identical.",
+        "The claim is about a query <em>workload</em>, not any single query.",
+        "The final rescoring pass is part of the design, not an afterthought.",
+    ],
+    viz=WIDGETS["scann_index"],
+    sections=[
+        ("The observation",
+         "<p>Take a stored vector <span class=\"mono-font\">x</span> and its "
+         "quantised version. The residual "
+         "<span class=\"mono-font\">r = q(x) &minus; x</span> can be split "
+         "into a component along <span class=\"mono-font\">x</span> and a "
+         "component perpendicular to it.</p>"
+         "<p>Now ask what those two components do to the inner product with a "
+         "query. The queries that matter for "
+         "<span class=\"mono-font\">x</span> &mdash; the ones where getting "
+         "<span class=\"mono-font\">x</span>'s score right decides whether it "
+         "is returned &mdash; are the ones roughly aligned with it. For those, "
+         "the parallel component adds or subtracts almost directly from the "
+         "score. The perpendicular component projects onto them weakly, and "
+         "across many such queries it averages out.</p>"
+         "<p>So the two kinds of error are not equally harmful, and a loss "
+         "that treats them equally is optimising the wrong thing. That is the "
+         "whole paper, and it applies to inner product search specifically "
+         "&mdash; for Euclidean nearest neighbour the argument does not "
+         "hold.</p>"),
+        ("What the slider does",
+         "<p><span class=\"mono-font\">eta</span> is the weight on the "
+         "parallel component. At <span class=\"mono-font\">eta = 1</span> the "
+         "loss is plain squared error and the assignment is identical to "
+         "ordinary k-means &mdash; the readout confirms zero vectors "
+         "moved.</p>"
+         "<p>Raise it and vectors start choosing different centroids: the blue "
+         "ones. They are accepting a larger total error in exchange for a "
+         "smaller error along their own direction, which is a bad trade under "
+         "the usual objective and a good one under this one.</p>"
+         "<p>The two recall bars are the measurement. Both are MIPS recall@k, "
+         "averaged over 48 fixed queries, one using the anisotropic "
+         "assignment and one using the plain one, against an exact "
+         "inner-product answer. The anisotropic bar is consistently ahead in "
+         "the middle of the eta range and falls back at the extremes &mdash; "
+         "which is the shape the paper reports.</p>"),
+        ("Why the average matters and one query does not",
+         "<p>The readout also shows the two objectives' recall for the single "
+         "query you are dragging, and those trade places constantly. That is "
+         "not noise in the demonstration; it is the nature of the claim.</p>"
+         "<p>Anisotropic quantisation does not promise a better answer for a "
+         "given query. It promises a better expected answer over the "
+         "distribution of queries that a vector would be a top result for. A "
+         "demonstration that showed one query and declared victory would be "
+         "measuring the wrong thing, so this page measures what the claim is "
+         "actually about &mdash; and shows you the single-query figure "
+         "alongside so you can see them disagree.</p>"),
+        ("The rest of the system",
+         "<p>Anisotropic quantisation is the novel part; ScaNN as shipped is "
+         "three stages, and the other two are conventional.</p>"
+         "<p><strong>Partition.</strong> A learned tree over the dataset, "
+         "restricting the search to a fraction of the leaves. This is IVF's "
+         "role and it does IVF's job.</p>"
+         "<p><strong>Score.</strong> Anisotropic quantisation with very short "
+         "codes &mdash; often 4 bits per dimension-group &mdash; scored with "
+         "SIMD lookups. Aggressively lossy on purpose.</p>"
+         "<p><strong>Rescore.</strong> Take the top few hundred and recompute "
+         "exact inner products from the full vectors.</p>"
+         "<p>That last stage is why the middle one can afford to be so lossy, "
+         "and it is the same argument as IVF-PQ's rerank: a cheap stage only "
+         "has to produce a good <em>candidate set</em>, and an exact stage on "
+         "a few hundred vectors fixes the ordering. Turn the rescoring slider "
+         "here to zero and watch both recall figures drop together.</p>"),
+        ("When to reach for it",
+         "<p>ScaNN wins on the ann-benchmarks glove-100-angular leaderboard "
+         "and is the right choice when the workload really is maximum inner "
+         "product search &mdash; recommendation scoring, retrieval with dot "
+         "product against unnormalised embeddings, two-tower models.</p>"
+         "<p>If your vectors are L2-normalised, inner product and cosine and "
+         "Euclidean ranking all coincide, and the anisotropy argument mostly "
+         "evaporates: with every vector the same length, the parallel "
+         "direction stops being special. Many embedding models normalise by "
+         "default, which is worth checking before choosing an index on the "
+         "strength of this result.</p>"
+         "<p>The practical drawbacks are that it is a library rather than a "
+         "database, tied to the TensorFlow ecosystem, with fewer integrations "
+         "than HNSW &mdash; which is why it appears less often in vector "
+         "database backends than its benchmark position suggests it "
+         "should.</p>"),
+        ("Things to try",
+         "<ol>"
+         "<li>Set <strong>eta</strong> to 1.0. The two bars become identical "
+         "and zero assignments change &mdash; this is the control "
+         "condition.</li>"
+         "<li>Raise eta to 2 or 3 and read the &lsquo;gain over plain "
+         "loss&rsquo; figure. Then push it to 6 and watch the gain shrink: "
+         "weighting the parallel error too heavily starts ignoring the "
+         "perpendicular error that also matters.</li>"
+         "<li>Set <strong>Rescore</strong> to 0. Both objectives lose a lot, "
+         "which is the argument for the rescoring stage rather than for either "
+         "loss.</li>"
+         "</ol>"),
+        ("What to remember",
+         "<p>ScaNN quantises with a loss that weights error along a vector's "
+         "own direction more heavily than error across it, because that is the "
+         "component that distorts inner products for the queries that would "
+         "have ranked the vector highly. Same code length, better MIPS recall "
+         "&mdash; measured over a workload, not a query. The full system is "
+         "partition, quantised scoring, then exact rescoring, and the last "
+         "stage is what lets the middle one be so lossy.</p>"),
+    ],
+)
 
 _t(
     slug="permission_filtering_in_rag",

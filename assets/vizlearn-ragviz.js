@@ -22,7 +22,15 @@
  *   </div>
  *
  * The spec is { controls: [...], data: {...} }. A model returns
- * { bars: [{label, value, max, tag, state}], stats: [[k, v], ...], note, badge }.
+ * { bars: [{label, value, max, tag, state}], stats: [[k, v], ...], note, badge },
+ * and may also return `scene`: a DOM element drawn above the bars.
+ *
+ * The scene slot exists for the vector-index modules, where the thing being
+ * explained is a *structure* - a Voronoi partition, a navigable graph, a
+ * quantisation lattice - and a bar chart of the outcome cannot show it. Those
+ * models live in assets/vizlearn-annviz.js and register themselves into the
+ * MODELS table exposed below, so the 44 pages that do not need them never
+ * download them.
  */
 (function () {
   'use strict';
@@ -721,6 +729,7 @@
     }
 
     var controlHost = block.querySelector('.vz-rv-controls');
+    var sceneHost = block.querySelector('.vz-rv-scene');
     var barHost = block.querySelector('.vz-rv-bars');
     var statHost = block.querySelector('.vz-rv-stats');
     var noteHost = block.querySelector('.vz-rv-note');
@@ -733,12 +742,23 @@
 
     function render(values) {
       values.__on = toggled;
+      /* A model that draws a scene may need to redraw it from its own event
+       * handler - dragging the query point on the vector-index pages. Models
+       * are called synchronously from here, so exposing the current render as
+       * a plain function for the duration of the call is enough, and is a lot
+       * less machinery than threading a callback through every model. */
+      window.VizRagViz.rerender = function () { render(values); };
       var out;
       try {
         out = model(values, spec.data || {});
       } catch (err) {
         if (window.console) console.error('vz-rv: model failed', err);
         return;
+      }
+      if (sceneHost) {
+        sceneHost.textContent = '';
+        if (out.scene) sceneHost.appendChild(out.scene);
+        sceneHost.hidden = !out.scene;
       }
       if (barHost) drawBars(barHost, out.bars || [], function (key) {
         toggled[key] = !toggled[key];
@@ -758,9 +778,29 @@
     for (var i = 0; i < blocks.length; i++) wire(blocks[i]);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
+  /* The registry, so assets/vizlearn-annviz.js can add the vector-index
+   * models without this file growing to carry code that 44 of the 52 pages
+   * in the track cannot use. It is read at DOMContentLoaded, and deferred
+   * scripts run in document order, so a companion loaded after this one has
+   * registered long before init() looks. */
+  window.VizRagViz = { MODELS: MODELS, el: el, round: round, init: init };
+
+  /* Wait for DOMContentLoaded unless the document is already finished.
+   *
+   * The obvious check is `readyState === 'loading'`, and it is wrong here.
+   * A deferred script executes *after* parsing, at which point readyState is
+   * already 'interactive' - so that check fell through to calling init()
+   * straight away, before the next deferred script had run. That was
+   * harmless while every model lived in this file, and broke the moment
+   * assets/vizlearn-annviz.js started registering models from a script
+   * loaded after this one: the mount found no model and left the block
+   * empty, with no error anywhere.
+   *
+   * 'interactive' means DOMContentLoaded has not fired yet, so listening is
+   * correct in that state too. Only 'complete' warrants running now. */
+  if (document.readyState === 'complete') {
     init();
+  } else {
+    document.addEventListener('DOMContentLoaded', init);
   }
 })();

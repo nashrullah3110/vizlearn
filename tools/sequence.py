@@ -21,6 +21,13 @@ from interview import QUESTIONS as _INTERVIEW_QUESTIONS
 _INTERVIEW = ["interview/%s.html" % q["slug"] for q in _INTERVIEW_QUESTIONS]
 
 SEQUENCE = {
+    "async_python": [
+        "async_python/event_loop_stepped_through.html",
+        "async_python/coroutines_tasks_and_await.html",
+        "async_python/running_work_concurrently.html",
+        "async_python/the_blocking_call_that_freezes_the_loop.html",
+        "async_python/queues_and_backpressure.html",
+    ],
     # Foundations the rest of the site quietly assumes.
     "maths": [
         "maths/equation_of_line.html",
@@ -402,6 +409,17 @@ SEQUENCE = {
         "gen_ai/bm25_and_sparse_retrieval.html",
         "gen_ai/indexing_in_vector_databases.html",
         "gen_ai/ann_indexing_hnsw_and_ivf.html",
+        # The eight index structures, in the order they build on each
+        # other: the exact baseline, then pruning, then compression, then the
+        # two designs that change the cost model (disk, and inner product).
+        "gen_ai/flat_index.html",
+        "gen_ai/ivf_flat_index.html",
+        "gen_ai/hnsw_index.html",
+        "gen_ai/annoy_index.html",
+        "gen_ai/product_quantization.html",
+        "gen_ai/ivf_pq_index.html",
+        "gen_ai/diskann_index.html",
+        "gen_ai/scann_index.html",
         "gen_ai/chunking_strategies_for_rag.html",
         "gen_ai/recursive_chunking.html",
         "gen_ai/structure_aware_chunking.html",
@@ -650,6 +668,17 @@ SEQUENCE = {
 # A curated cross-track route for someone starting from nothing. Each stage is
 # a handful of modules from the sequences above, in the order they build on
 # each other.
+# The fifteen generated architecture modules (tools/arch_topics.py) are
+# spliced in here rather than transcribed above. Their positions are a
+# property of the content - a detector cannot be read before IoU and NMS - so
+# they live beside it, and a new module needs one edit in one content file
+# instead of two edits in two.
+from arch_topics import splice as _splice_arch  # noqa: E402
+
+for _track in list(SEQUENCE):
+    SEQUENCE[_track] = _splice_arch(_track, SEQUENCE[_track])
+
+
 LEARNING_PATH = [
     {
         "title": "Groundwork",

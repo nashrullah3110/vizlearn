@@ -320,5 +320,63 @@ REFERENCES = {
     ("Introduction to Algorithms, chapter 3: Growth of Functions",
      "Cormen, Leiserson, Rivest & Stein", None),
 ],
+# ------------------------------------------------------- vector index structures
+"gen_ai/hnsw_index.html": [
+    ("Efficient and robust approximate nearest neighbor search using "
+     "Hierarchical Navigable Small World graphs",
+     "Malkov & Yashunin, IEEE TPAMI 2020", "https://arxiv.org/abs/1603.09320"),
+    ("hnswlib", "nmslib", "https://github.com/nmslib/hnswlib"),
+],
+"gen_ai/ivf_flat_index.html": [
+    ("Product Quantization for Nearest Neighbor Search",
+     "Jegou, Douze & Schmid, IEEE TPAMI 2011", None),
+    ("Guidelines to choose an index", "FAISS wiki",
+     "https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index"),
+],
+"gen_ai/ivf_pq_index.html": [
+    ("Product Quantization for Nearest Neighbor Search",
+     "Jegou, Douze & Schmid, IEEE TPAMI 2011", None),
+    ("Billion-scale similarity search with GPUs",
+     "Johnson, Douze & Jegou, 2017", "https://arxiv.org/abs/1702.08734"),
+],
+"gen_ai/product_quantization.html": [
+    ("Product Quantization for Nearest Neighbor Search",
+     "Jegou, Douze & Schmid, IEEE TPAMI 2011", None),
+    ("Optimized Product Quantization",
+     "Ge, He, Ke & Sun, IEEE TPAMI 2014", None),
+],
+"gen_ai/diskann_index.html": [
+    ("DiskANN: Fast Accurate Billion-point Nearest Neighbor Search on a "
+     "Single Node", "Subramanya, Devvrit, Kadekodi, Krishaswamy & Simhadri, "
+     "NeurIPS 2019", None),
+    ("FreshDiskANN: A Fast and Accurate Graph-Based ANN Index for "
+     "Streaming Similarity Search", "Singh et al., 2021",
+     "https://arxiv.org/abs/2105.09613"),
+],
+"gen_ai/annoy_index.html": [
+    ("Annoy: Approximate Nearest Neighbors Oh Yeah", "Erik Bernhardsson, Spotify",
+     "https://github.com/spotify/annoy"),
+],
+"gen_ai/scann_index.html": [
+    ("Accelerating Large-Scale Inference with Anisotropic Vector Quantization",
+     "Guo, Sun, Lindgren, Geng, Simcha, Chern & Kumar, ICML 2020",
+     "https://arxiv.org/abs/1908.10396"),
+    ("ScaNN", "Google Research",
+     "https://github.com/google-research/google-research/tree/master/scann"),
+],
+"gen_ai/flat_index.html": [
+    ("Guidelines to choose an index", "FAISS wiki",
+     "https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index"),
+    ("ANN-Benchmarks: A Benchmarking Tool for Approximate Nearest Neighbor "
+     "Algorithms", "Aumuller, Bernhardsson & Faithfull, Information Systems 2020",
+     "https://ann-benchmarks.com/"),
+],
 
 }
+
+# The named-architecture modules carry their citations beside their content
+# (tools/arch_topics.py) for the same reason their questions do: a paper
+# reference belongs next to the paragraph that leans on it.
+from arch_topics import REFERENCES as _ARCH_REFERENCES  # noqa: E402
+
+REFERENCES.update(_ARCH_REFERENCES)

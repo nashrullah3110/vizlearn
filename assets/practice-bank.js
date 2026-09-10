@@ -1644,6 +1644,101 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "async_python/coroutines_tasks_and_await.html",
+  "title": "Coroutines, Tasks and await",
+  "cat": "Async Python",
+  "q": [
+   {
+    "t": "What does this module say about “A coroutine is a plan, not an action”?",
+    "ans": "Define a function with async def and calling it does not run it. It hands you back a coroutine object — a description of work that has not started."
+   },
+   {
+    "t": "What does this module say about “await runs it, and waits for it”?",
+    "ans": "await does two things at once. It starts the coroutine, and it suspends the current one until that coroutine finishes, handing control back to the loop in the meantime. The value of the expression is whatever the coroutine returned."
+   },
+   {
+    "t": "What does this module say about “Tasks are what run concurrently”?",
+    "ans": "To make two coroutines make progress at the same time, you wrap each in a task . asyncio.create_task schedules a coroutine on the loop immediately and returns a handle; the coroutine starts running at the next await, whether or not you have awaited the handle yet."
+   }
+  ]
+ },
+ {
+  "path": "async_python/queues_and_backpressure.html",
+  "title": "Queues, Producers and Backpressure",
+  "cat": "Async Python",
+  "q": [
+   {
+    "t": "What does this module say about “The shape of almost every async program”?",
+    "ans": "Once a program does more than a single fan-out, it tends to settle into the same structure: something produces work, something else consumes it, and the two run at different speeds. A crawler finds URLs faster than it can fetch them. A log reader ingests lines faster than it can index them. A handler accepts requests faster than a downstream service can answer."
+   },
+   {
+    "t": "What does this module say about “Producer and consumer, running together”?",
+    "ans": "These editors run inside a browser event loop that is already going, so the examples finish with await main() . In a standalone .py script — run with python file.py — you write asyncio.run(main()) instead, which starts a loop, runs the coroutine, and closes it. The two are the same program with different entry points."
+   },
+   {
+    "t": "What does this module say about “Backpressure is the maxsize”?",
+    "ans": "maxsize=2 made the queue bounded , and a bounded queue is what creates backpressure : when it is full, put waits, so a fast producer is automatically slowed to the rate the consumer can keep up with. The producer never runs more than two items ahead."
+   }
+  ]
+ },
+ {
+  "path": "async_python/running_work_concurrently.html",
+  "title": "Running Work Concurrently: gather and TaskGroup",
+  "cat": "Async Python",
+  "q": [
+   {
+    "t": "What does this module say about “The shape of the win”?",
+    "ans": "The reason to reach for async is almost always the same: you have many independent waits — requests, queries, file reads — and doing them one after another wastes the time each one spends idle. Running them together collapses the total time from the sum of the waits to the longest single wait."
+   },
+   {
+    "t": "What does this module say about “What happens when one fails”?",
+    "ans": "By default, the first exception in any of the gathered coroutines stops the wait and propagates out of gather . The other coroutines are not cancelled, but their results are lost — you get the exception, not a partial list."
+   },
+   {
+    "t": "What does this module say about “TaskGroup: the modern default”?",
+    "ans": "gather has an awkward gap: when one coroutine fails, the others keep running unsupervised, and cleaning them up is your problem. Python 3.11 added asyncio.TaskGroup to close it, and it is now the recommended way to run concurrent work."
+   }
+  ]
+ },
+ {
+  "path": "async_python/the_blocking_call_that_freezes_the_loop.html",
+  "title": "The Blocking Call That Freezes the Loop",
+  "cat": "Async Python",
+  "q": [
+   {
+    "t": "What does this module say about “One thread means one blocker stops everything”?",
+    "ans": "The event loop runs on a single thread and can only switch coroutines when the running one hits an await . So a coroutine that stops awaiting — because it called something synchronous that takes real time — holds the one thread for that whole time, and every other coroutine, however unrelated, waits."
+   },
+   {
+    "t": "What does this module say about “Watch a heartbeat stall”?",
+    "ans": "Here a heartbeat prints a tick every 0.1 seconds — the kind of steady progress a healthy loop makes — while a second coroutine does a blocking time.sleep(0.3) instead of an async one."
+   },
+   {
+    "t": "What does this module say about “The fix: stop blocking the thread”?",
+    "ans": "The blocking call has to stop holding the thread. The direct fix — and the one this editor can show — is to use the async-native version of whatever you were doing. Here that means await asyncio.sleep in place of time.sleep ; in real code it means an async HTTP client ( httpx , aiohttp ) instead of requests , or an async database driver instead of a blocking one."
+   }
+  ]
+ },
+ {
+  "path": "async_python/event_loop_stepped_through.html",
+  "title": "The Event Loop, Stepped Through",
+  "cat": "Async Python",
+  "q": [
+   {
+    "t": "What does this module say about “The whole machine, in one sentence”?",
+    "ans": "Asynchronous Python runs on a single thread. There is no parallelism here and no second core doing work behind your back. What there is instead is an event loop : a plain loop that keeps a queue of coroutines that are ready to run, takes one, runs it until it voluntarily steps aside, and moves to the next."
+   },
+   {
+    "t": "What does this module say about “Watch two coroutines take turns”?",
+    "ans": "The clearest way to see the loop switching is to make two coroutines that yield control on purpose, with await asyncio.sleep(0) — a sleep of zero seconds whose only effect is to return to the loop."
+   },
+   {
+    "t": "What does this module say about “Where the concurrency actually comes from”?",
+    "ans": "Nothing above ran in parallel. A and B took turns on one thread, and the total work was the same as doing them one after another. So what is the loop for?"
+   }
+  ]
+ },
+ {
   "path": "computer_vision/one_by_one_convolutions.html",
   "title": "1x1 Convolutions",
   "cat": "Computer Vision",
@@ -2219,6 +2314,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/haar_cascade_detection.html",
+  "title": "Haar Cascade Detection Models",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Why does the integral image matter so much here?",
+    "o": [
+     "It compresses the image",
+     "It makes the sum inside any rectangle cost four lookups, regardless of the rectangle's size",
+     "It removes noise before detection",
+     "It converts the image to greyscale"
+    ],
+    "a": 1,
+    "w": "The sum inside a rectangle is ii(D) - ii(B) - ii(C) + ii(A). Four lookups, whether the rectangle is 4x4 or 200x200. That is what makes evaluating features at every scale affordable, and it is why the detector scales the feature rather than the image."
+   },
+   {
+    "t": "What is the cascade actually optimising?",
+    "o": [
+     "Accuracy on faces",
+     "The cost of rejecting the overwhelming majority of windows that contain no face",
+     "Memory usage",
+     "Robustness to rotation"
+    ],
+    "a": 1,
+    "w": "Nearly every one of the ~180,000 windows in a frame is not a face. Ordering classifiers cheapest-first means the average window is discarded after about ten feature evaluations instead of all 6,061."
+   },
+   {
+    "t": "A stage in the cascade is tuned to about 99.9% detection and about 50% false positives. Why is such a weak false-positive rate acceptable?",
+    "o": [
+     "Because faces are rare",
+     "Because the rates multiply down the chain: 0.5 to the 38th is negligible, while 0.999 to the 38th is still about 96%",
+     "Because a later stage can undo an earlier rejection",
+     "Because false positives are removed by the integral image"
+    ],
+    "a": 1,
+    "w": "A cascade multiplies both rates. Keeping each stage's detection rate extremely high is what protects the final recall, and the false-positive rate is allowed to be poor per stage because 38 of them compound."
+   },
+   {
+    "t": "What does a Haar feature actually compute?",
+    "o": [
+     "A learned convolution",
+     "The difference between the average intensity under its white rectangles and under its black ones",
+     "The gradient magnitude at a pixel",
+     "A histogram of oriented gradients"
+    ],
+    "a": 1,
+    "w": "It is a rectangle difference and nothing more. AdaBoost chooses which of the 160,000-odd candidate positions, sizes and shapes are worth keeping, and a threshold on each becomes a weak classifier."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/harris_corners.html",
   "title": "Harris Corners and Keypoints",
   "cat": "Computer Vision",
@@ -2337,6 +2483,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/inception_architecture.html",
+  "title": "InceptionNet",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Why must every branch of an inception module preserve the spatial size?",
+    "o": [
+     "To keep the receptive field constant",
+     "Because the outputs are concatenated along the channel axis, which requires identical height and width",
+     "To avoid aliasing",
+     "Because the pooling branch has no parameters"
+    ],
+    "a": 1,
+    "w": "Concatenation on dim=1 requires every other dimension to match. That is why the 1x1, 3x3 and 5x5 branches use padding 0, 1 and 2 respectively."
+   },
+   {
+    "t": "What does a 1x1 convolution actually do?",
+    "o": [
+     "Blurs the image",
+     "Applies a learned linear map across channels at each pixel independently, changing the channel count and nothing spatial",
+     "Downsamples by a factor of 1",
+     "Acts as an identity"
+    ],
+    "a": 1,
+    "w": "At each pixel it multiplies the C-vector of channels by a C' x C matrix. That is why it can cut 192 channels to 16 for a twelfth of the cost of running the 5x5 on all 192."
+   },
+   {
+    "t": "In the naive module the pooling branch passes its input channels straight through. Why is that a problem?",
+    "o": [
+     "Pooling loses information",
+     "The output has more channels than the input, so stacked modules grow without bound and cost grows quadratically",
+     "It has no parameters to train",
+     "It breaks the concatenation"
+    ],
+    "a": 1,
+    "w": "192 in, 64 + 128 + 32 + 192 = 416 out. The next module reads 416, the one after that reads more still, and convolution cost is proportional to input channels times output channels. The 1x1 projection on the pool branch is what stops it."
+   },
+   {
+    "t": "GoogLeNet has 6.8 M parameters to VGG-16's 138 M. What accounts for most of that gap?",
+    "o": [
+     "The inception modules are inherently tiny",
+     "GoogLeNet ends in global average pooling and one dense layer, where VGG has two 4096-wide dense layers holding 119 M parameters",
+     "GoogLeNet is shallower",
+     "GoogLeNet uses fewer channels throughout"
+    ],
+    "a": 1,
+    "w": "The nine inception modules hold about 5.9 M parameters. VGG's convolutional tower is 14.7 M - the same order. The 20x gap is almost entirely the classifier head."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/iou_and_non_max_suppression.html",
   "title": "IoU and Non-Max Suppression",
   "cat": "Computer Vision",
@@ -2352,6 +2549,57 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Non-Max Suppression”?",
     "ans": "NMS turns that overlap score into a cleanup rule. Sort every proposal by confidence, descending. Take the top one, keep it, and discard every remaining box whose IoU with it exceeds a threshold — those are treated as duplicate detections of the same object. Move to the next surviving box by confidence and repeat, until nothing is left to process."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/mask_rcnn.html",
+  "title": "Mask R-CNN",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "RoIPool rounds twice. Where?",
+    "o": [
+     "Once on the input image and once on the output",
+     "Once snapping the proposal to whole feature cells, and again snapping the bin boundaries inside it",
+     "Once on the class score and once on the box",
+     "Only during training"
+    ],
+    "a": 1,
+    "w": "Both roundings shift the region that is actually pooled. At stride 16, half a feature cell of error is eight pixels in the original image."
+   },
+   {
+    "t": "Why did that misalignment not matter for Faster R-CNN?",
+    "o": [
+     "Faster R-CNN used a different backbone",
+     "Its outputs are a class and a box - coarse, whole-region answers that survive an eight-pixel shift. A per-pixel mask does not",
+     "It used RoIAlign already",
+     "It ran at higher resolution"
+    ],
+    "a": 1,
+    "w": "This is the whole insight of the paper. The same operator was adequate for two tasks and disqualifying for the third, because only the third produces an answer per pixel."
+   },
+   {
+    "t": "Besides accuracy, what does bilinear sampling give that rounding does not?",
+    "o": [
+     "Lower memory use",
+     "A derivative with respect to the sampling location, so gradients can flow back to the box coordinates",
+     "Faster inference",
+     "Scale invariance"
+    ],
+    "a": 1,
+    "w": "Rounding is a step function with zero derivative almost everywhere, which silently cuts the gradient path to the coordinates. Bilinear interpolation is smooth in the location, which is also why it reappears in deformable convolutions and spatial transformers."
+   },
+   {
+    "t": "The mask head predicts one 28x28 mask per class rather than one mask with a per-pixel class softmax. Why?",
+    "o": [
+     "It is cheaper",
+     "The classification head has already decided the class, so the mask branch never has to make classes compete pixel by pixel",
+     "Because masks overlap",
+     "To support panoptic segmentation"
+    ],
+    "a": 1,
+    "w": "Decoupling the two questions is worth several points of AP. The mask loss only touches the ground-truth class's channel, so the branch answers 'which pixels are this object' without also having to answer 'what is it'."
    }
   ]
  },
@@ -2569,6 +2817,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "The number of paths from an input pixel to the output falls off roughly like a Gaussian away from the centre, so the rim of the theoretical field contributes very little."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/resnet_architecture.html",
+  "title": "ResNet",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "The paper's motivating observation was that a 56-layer plain network had higher TRAINING error than a 20-layer one. What does that rule out?",
+    "o": [
+     "Vanishing gradients",
+     "Overfitting",
+     "A learning rate that was too high",
+     "Insufficient data"
+    ],
+    "a": 1,
+    "w": "Overfitting means lower training error and higher test error. Higher training error with more capacity is a degradation problem: the deeper network can represent the shallower one exactly, and optimisation was not finding it."
+   },
+   {
+    "t": "Why does y = F(x) + x help the gradient?",
+    "o": [
+     "It normalises the activations",
+     "Differentiating gives dF/dx + 1, so there is always a path backwards with derivative exactly 1",
+     "It reduces the number of parameters",
+     "It makes the loss convex"
+    ],
+    "a": 1,
+    "w": "A plain stack multiplies the gradient by each layer's Jacobian, and a hundred factors below 1 is zero. The additive shortcut contributes a term of exactly 1 that no depth can shrink."
+   },
+   {
+    "t": "When is the shortcut a 1x1 convolution rather than a plain identity?",
+    "o": [
+     "In every block",
+     "At the first block of a stage, where the stride is 2 or the channel count changes, so the shapes would not otherwise match",
+     "Only in ResNet-50 and above",
+     "Only during training"
+    ],
+    "a": 1,
+    "w": "An addition needs matching shapes. Everywhere else in a stage the shortcut is a genuine identity with no parameters at all."
+   },
+   {
+    "t": "ResNet-34 and ResNet-50 have the same block counts (3, 4, 6, 3). Why is 50 only 3.8 M parameters larger despite 16 more weighted layers?",
+    "o": [
+     "It uses fewer channels",
+     "A bottleneck block runs its 3x3 at a quarter of the block's output width, so the expensive convolution is much narrower",
+     "It shares weights between stages",
+     "It has no dense layer"
+    ],
+    "a": 1,
+    "w": "The bottleneck projects down with a 1x1, does the 3x3 at that narrow width, then projects back up 4x. The 3x3 is the expensive layer and it never sees the full width."
    }
   ]
  },
@@ -2817,6 +3116,108 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/unet_architecture.html",
+  "title": "U-Net",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "What do the skip connections carry that the bottom of the U cannot?",
+    "o": [
+     "More channels",
+     "Spatial precision - the activations at full resolution, before pooling discarded where things were",
+     "The class labels",
+     "A larger receptive field"
+    ],
+    "a": 1,
+    "w": "Pooling builds semantics by throwing away location. The bottom of the U knows what is in the tile and has lost where. The skip is the only path that still holds the boundary at full resolution."
+   },
+   {
+    "t": "Why does the original U-Net output 388x388 for a 572x572 input?",
+    "o": [
+     "It crops the output deliberately",
+     "Its convolutions are unpadded, so every 3x3 removes one pixel from each border and the losses accumulate",
+     "The pooling is not exactly by 2",
+     "The skips are cropped"
+    ],
+    "a": 1,
+    "w": "Valid convolutions shrink the map. The benefit is that every output pixel is computed from context that was really present in the input, with no invented zero padding - which is what makes the overlap-tile strategy seamless."
+   },
+   {
+    "t": "Turning the skip connections off reduces the parameter count. Why is that a bad trade?",
+    "o": [
+     "It makes training slower",
+     "The decoder's finest available detail becomes whatever survived the pooling, so boundaries cannot be recovered at all",
+     "It breaks the receptive field",
+     "It removes the non-linearity"
+    ],
+    "a": 1,
+    "w": "The saving comes from decoder convolutions reading half as many input channels. What is lost is information, not capacity - and lost information cannot be recovered by a bigger decoder."
+   },
+   {
+    "t": "U-Net was trained on 30 images. What made that possible?",
+    "o": [
+     "The small parameter count",
+     "Elastic deformation augmentation, which generates plausible variation of the specimen rather than of the photograph",
+     "Transfer learning from ImageNet",
+     "The skip connections alone"
+    ],
+    "a": 1,
+    "w": "Flips and shifts produce images from the same specimen. Elastic warps produce images that look like different specimens, which is the variation the model actually needs to generalise over. A weighted loss on the gaps between touching cells was the other essential piece."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/vgg16_architecture.html",
+  "title": "VGG-16",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Two stacked 3x3 convolutions replace one 5x5. What do you gain?",
+    "o": [
+     "A larger receptive field",
+     "The same receptive field with 18C^2 parameters instead of 25C^2, and an extra non-linearity in between",
+     "Fewer multiply-accumulates",
+     "Translation invariance"
+    ],
+    "a": 1,
+    "w": "The receptive field is identical - that is the point. What changes is 28% fewer parameters and a ReLU in the middle, so the same window is computed by a more expressive function."
+   },
+   {
+    "t": "Where are VGG-16's 138 M parameters?",
+    "o": [
+     "Spread evenly across the 16 layers",
+     "Mostly in the 13 convolutions",
+     "89% in the three dense layers, with fc6 alone holding 102 M",
+     "Mostly in the max-pooling layers"
+    ],
+    "a": 2,
+    "w": "fc6 connects the flattened 25,088-value feature map to 4096 outputs: 102.7 M parameters in one layer. The convolutions hold 14.7 M in total, about 11%."
+   },
+   {
+    "t": "Which layers do most of the arithmetic?",
+    "o": [
+     "The dense layers, since they have most of the parameters",
+     "The convolutions - about 99% of the MACs, despite holding 11% of the parameters",
+     "The max-pools",
+     "It is split evenly"
+    ],
+    "a": 1,
+    "w": "A convolution's weights are reused at every spatial position, so few parameters do enormous work. A dense layer uses each weight exactly once per image. Parameter count and compute cost are different budgets."
+   },
+   {
+    "t": "Why can the original VGG-16 only accept 224x224 input?",
+    "o": [
+     "The convolutions require it",
+     "fc6 expects exactly 25,088 inputs, which is what 7x7x512 flattens to - a different input size gives a different flattened length",
+     "The max-pools require it",
+     "ImageNet images are all that size"
+    ],
+    "a": 1,
+    "w": "The convolutional tower handles any size. The dense head does not, because a fully-connected layer's weight matrix has a fixed input dimension. Replacing it with global average pooling removes the constraint entirely."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/vision_transformer_patches.html",
   "title": "Vision Transformer Patches",
   "cat": "Computer Vision",
@@ -2853,6 +3254,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Pre-trained on 300 million images it overtook the ResNet. With enough data it learns the structure convolution assumes, and gains flexibility convolution lacks."
+   }
+  ]
+ },
+ {
+  "path": "computer_vision/yolov8_detection.html",
+  "title": "YOLO v8",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "Where do the 8,400 predictions at 640x640 come from?",
+    "o": [
+     "8,400 anchor boxes",
+     "Three feature levels at strides 8, 16 and 32: 80^2 + 40^2 + 20^2 cells, one prediction each",
+     "The number of classes times the grid size",
+     "A fixed proposal budget"
+    ],
+    "a": 1,
+    "w": "v8 is anchor-free, so it is one prediction per cell rather than several. The three levels exist so that small objects are found by the fine grid and large ones by the coarse grid."
+   },
+   {
+    "t": "What does the box branch actually output per cell?",
+    "o": [
+     "Four numbers: x, y, width, height",
+     "Four 16-bin distributions over the distance to each box edge, collapsed by taking the expectation",
+     "An offset from the nearest anchor",
+     "A binary mask"
+    ],
+    "a": 1,
+    "w": "That is Distribution Focal Loss: 4 x 16 = 64 channels. A distribution can express uncertainty about an ambiguous boundary in a way a single regressed number cannot."
+   },
+   {
+    "t": "You raise the confidence threshold from 0.25 to 0.7 and your demo looks much cleaner. What has happened to your metrics?",
+    "o": [
+     "They have improved",
+     "Precision is up and recall is down, and the objects lost first are the hard ones - small, occluded, unusual",
+     "Nothing changed, it is only a display setting",
+     "mAP is unaffected by the confidence threshold"
+    ],
+    "a": 1,
+    "w": "A high threshold discards everything the model was unsure about, which is exactly the difficult cases. For computing mAP you use a very low threshold, because mAP integrates the whole precision-recall curve."
+   },
+   {
+    "t": "Why does lowering the NMS IoU threshold hurt in a crowd?",
+    "o": [
+     "It slows NMS down",
+     "Two genuinely distinct people standing close overlap by more than a low threshold, so the second is deleted as a duplicate of the first",
+     "It increases false positives",
+     "It changes the class scores"
+    ],
+    "a": 1,
+    "w": "NMS cannot tell a duplicate of one object from two real overlapping objects; it only sees IoU. That ambiguity is why Soft-NMS and set-prediction detectors like DETR exist."
    }
   ]
  },
@@ -4204,6 +4656,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "deep_learning/autoencoders_conceptual_and_pytorch.html",
+  "title": "Autoencoders in Depth",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "Why does an autoencoder need a bottleneck?",
+    "o": [
+     "To reduce training time",
+     "Without one the identity function is a perfect solution and nothing is learned",
+     "To make the decoder differentiable",
+     "To prevent vanishing gradients"
+    ],
+    "a": 1,
+    "w": "The constraint is the model. Forcing the data through fewer numbers than it arrived in is what makes the network choose what to keep, and that choice is the representation."
+   },
+   {
+    "t": "What is the relationship between a linear autoencoder and PCA?",
+    "o": [
+     "They are unrelated",
+     "A linear autoencoder trained to convergence spans the same subspace as the top-k principal components",
+     "PCA is a special case with one component",
+     "PCA is always better"
+    ],
+    "a": 1,
+    "w": "Baldi and Hornik proved it in 1989 - the squared reconstruction error has no non-global local minima, and every global minimum spans the principal subspace. It is why this page can compute the answer exactly instead of training."
+   },
+   {
+    "t": "Turning up the input corruption often gives a reconstruction closer to the CLEAN image than the input was. Why?",
+    "o": [
+     "The network was trained to denoise",
+     "The noise is spread across all input directions and the bottleneck only keeps a few of them, so most of it has nowhere to go",
+     "The sigmoid clips it",
+     "It is a numerical artefact"
+    ],
+    "a": 1,
+    "w": "Nothing on the page was trained to denoise. A denoising autoencoder makes it the explicit objective - corrupt the input, ask for the clean target - which pushes the same effect much further and is the ancestor of masked language modelling."
+   },
+   {
+    "t": "What does a VAE add that a plain autoencoder lacks?",
+    "o": [
+     "A deeper decoder",
+     "A KL term pushing the encoder's output toward a standard normal, so the latent space is filled in and can be sampled from",
+     "Convolutional layers",
+     "A smaller bottleneck"
+    ],
+    "a": 1,
+    "w": "The reconstruction loss only ever asks about points that came from real data, so a plain autoencoder is free to scatter codes into islands with nonsense between them. The KL term is what turns a compressor into a generative model."
+   }
+  ]
+ },
+ {
   "path": "deep_learning/backpropagation.html",
   "title": "Backpropagation and the Computational Graph",
   "cat": "Deep Learning",
@@ -4261,6 +4764,57 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What is meant by “Gradient accumulation” here?",
     "ans": ", above, which keeps the memory small and the effective batch large."
+   }
+  ]
+ },
+ {
+  "path": "deep_learning/collaborative_filtering.html",
+  "title": "Collaborative Filtering",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "Why do neighbourhood methods average deviations from each person's mean rather than raw ratings?",
+    "o": [
+     "To keep the numbers small",
+     "Because a generous rater and a harsh rater can agree perfectly about the ordering, and centring is what lets the method see that",
+     "To handle missing values",
+     "Because Pearson correlation requires it"
+    ],
+    "a": 1,
+    "w": "Someone who rates everything 4 and someone who rates everything 2 have identical preferences and very different numbers. Without centring, the generous rater drags every prediction upward."
+   },
+   {
+    "t": "In matrix factorisation, what do mu, b_u and b_i capture before any latent factor is used?",
+    "o": [
+     "Nothing useful",
+     "The global average, how generously this person rates, and how well liked this item is - which explains most of the variance in real ratings data",
+     "The number of ratings",
+     "The regularisation"
+    ],
+    "a": 1,
+    "w": "A bias-only model is a strong baseline. Only what the biases cannot explain is handed to the latent factors, and that residual is the part that encodes taste."
+   },
+   {
+    "t": "With 8 factors and 138 training ratings, low regularisation gives a much worse test RMSE. Why?",
+    "o": [
+     "The learning rate is too high",
+     "There are nearly twice as many latent parameters as observations, so the model fits the noise exactly unless something penalises large weights",
+     "The factors are correlated",
+     "The biases interfere"
+    ],
+    "a": 1,
+    "w": "Sixteen users and fifteen items at 8 factors each is 248 latent parameters for 138 observations. Regularisation is not a refinement here, it is what makes the model usable - which is why the Netflix Prize work was as much about it as about factorisation."
+   },
+   {
+    "t": "Why is item-based kNN the industry default over user-based?",
+    "o": [
+     "It is more accurate",
+     "Item-item similarities change slowly, so they can be precomputed offline and cached, and 'because you watched X' explains itself",
+     "It handles cold start",
+     "It needs less memory"
+    ],
+    "a": 1,
+    "w": "The reasons are operational. A film's audience is stable; a person's rating history changes with every session, so user-user similarities would have to be recomputed constantly."
    }
   ]
  },
@@ -4324,6 +4878,57 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What is meant by “Pseudo-labelling” here?",
     "ans": "— label the confident predictions on unlabelled data and train on them, carefully, since errors compound."
+   }
+  ]
+ },
+ {
+  "path": "deep_learning/deep_learning_for_recommendation_systems.html",
+  "title": "Deep Learning for Recommendation Systems",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "In a production neural recommender, where are almost all the parameters?",
+    "o": [
+     "In the dense layers",
+     "In the two embedding tables, which grow with the number of users and items rather than with the model design",
+     "In the output layer",
+     "In the optimiser state"
+    ],
+    "a": 1,
+    "w": "At 50 M users and 5 M items with 64-dimensional embeddings the tables are about 3.5 billion parameters and the network is a few thousand. Sharding, hashing and sparse gradients all follow from that ratio."
+   },
+   {
+    "t": "Why are the two towers kept separate until the final interaction?",
+    "o": [
+     "It trains faster",
+     "Item vectors can then be computed once offline and retrieved by approximate nearest neighbour, instead of running a forward pass per (user, item) pair",
+     "It reduces overfitting",
+     "The embeddings would collide otherwise"
+    ],
+    "a": 1,
+    "w": "If both ids went into one network at the input, scoring a catalogue would need one forward pass per item. The two-tower shape is what makes retrieval from millions of items tractable at request time."
+   },
+   {
+    "t": "A 2019 reproducibility study found tuned matrix factorisation matching or beating neural collaborative filtering. What is the right conclusion?",
+    "o": [
+     "Deep learning does not work for recommendation",
+     "Replacing a dot product with an MLP is not by itself a reason to expect an improvement; what deep models add is the ability to use side information",
+     "The study was flawed",
+     "Embeddings should be removed"
+    ],
+    "a": 1,
+    "w": "The neural results had been compared against weak baselines. Text, images, context and sequence are things a dot product between two id embeddings genuinely cannot accept - and that, not the interaction function, is the real gain."
+   },
+   {
+    "t": "What is the appeal of in-batch negatives?",
+    "o": [
+     "They are more informative than sampled ones",
+     "Every other item in the batch serves as a negative at no extra cost - a batch of 1,024 gives 1,023 negatives per example",
+     "They avoid the cold-start problem",
+     "They remove the need for a temperature"
+    ],
+    "a": 1,
+    "w": "The similarity matrix is computed anyway; the diagonal is the true pairs and everything off it is free supervision. The known weakness is that popular items appear in more batches and get over-penalised, which a logQ correction addresses."
    }
   ]
  },
@@ -4503,6 +5108,57 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Work the numbers”?",
     "ans": "Take age 30 and salary 60,000 with weights of 0.5 each. The salary term contributes 30,000 to the weighted sum and the age term contributes 15 — the age feature is invisible, and it would take a weight around 1000× larger to compete."
+   }
+  ]
+ },
+ {
+  "path": "deep_learning/gan_architecture.html",
+  "title": "GAN Architecture and Equilibrium",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "For a fixed generator, what is the optimal discriminator?",
+    "o": [
+     "A network trained to convergence",
+     "p_data(x) / (p_data(x) + p_g(x)) - a closed form, no training required",
+     "Always 0.5",
+     "The likelihood ratio p_data / p_g"
+    ],
+    "a": 1,
+    "w": "The objective decomposes pointwise, so maximising a log d + b log(1 - d) at each x gives d = a / (a + b). Substituting it back turns the game into a Jensen-Shannon divergence with a unique optimum at p_g = p_data."
+   },
+   {
+    "t": "Why does the minimax generator loss vanish when the generator is bad?",
+    "o": [
+     "The learning rate is too small",
+     "With almost no overlap D* is near 0 under the generator, and log(1 - D*) is flat there - so there is no gradient exactly when it is most needed",
+     "The discriminator overfits",
+     "The noise distribution is wrong"
+    ],
+    "a": 1,
+    "w": "A better discriminator means a worse generator gradient. The non-saturating form - maximise log D(G(z)) - has the same fixed point and a usable gradient in that regime, which is why every implementation uses it."
+   },
+   {
+    "t": "Why does the objective as written not penalise mode collapse?",
+    "o": [
+     "It does, through the divergence term",
+     "The discriminator judges one sample at a time, so it can say 'this looks fake' but never 'these are all the same'",
+     "Because the generator has too little capacity",
+     "Because the noise is Gaussian"
+    ],
+    "a": 1,
+    "w": "Nothing in the equation mentions diversity. A generator that finds one accepted output and repeats it is scoring perfectly. The fixes - minibatch discrimination, unrolled GANs, WGAN-GP - all give the discriminator batch-level information or change the distance."
+   },
+   {
+    "t": "At the global optimum, what does the discriminator output?",
+    "o": [
+     "1 for real and 0 for fake",
+     "0.5 everywhere, because the two distributions are identical and there is nothing to distinguish",
+     "It diverges",
+     "It depends on the architecture"
+    ],
+    "a": 1,
+    "w": "D* = p_data / (p_data + p_g), so if the two are equal it is 0.5 at every x, and V(D*, G) is exactly -log 4. A discriminator stuck at 0.5 is the success condition, not a failure to learn."
    }
   ]
  },
@@ -6674,6 +7330,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/annoy_index.html",
+  "title": "Annoy",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Annoy splits the space with hyperplanes bisecting random pairs of points, recursively, and builds many such trees. One tree is weak and cannot be rescued by searching harder; the union of a forest is strong. n_trees is the build knob, search_k the runtime budget across the whole forest."
+   },
+   {
+    "t": "What does this module say about “One tree”?",
+    "ans": "Take the vectors in a node. Choose two of them at random, compute the hyperplane equidistant from both, and split the set by which side each vector falls on. Recurse until a node holds fewer than K vectors — that is a leaf."
+   },
+   {
+    "t": "What does this module say about “Why one tree cannot be fixed”?",
+    "ans": "Set n_trees to 1 and sweep search_k to its maximum. Recall plateaus well short of 1.0 and stays there."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/bm25_and_sparse_retrieval.html",
   "title": "BM25 and Sparse Lexical Retrieval",
   "cat": "Gen AI",
@@ -6849,6 +7524,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/diskann_index.html",
+  "title": "DiskANN",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "DiskANN optimises SSD reads rather than distance computations, because that is what a disk-resident index actually spends. Vamana builds one flat graph whose robust-prune rule, relaxed by α, deliberately keeps long-range edges so the hop count stays low. PQ codes in RAM steer the beam; full vectors and adjacency share a page on SSD so one read serves both."
+   },
+   {
+    "t": "What does this module say about “When the cost model changes, the structure changes”?",
+    "ans": "An in-memory graph search that visits 200 nodes is fast, because a memory access is nanoseconds and the arithmetic dominates. The same search against an SSD is 200 random reads at roughly 100 microseconds each: 20 milliseconds, and the arithmetic is free by comparison."
+   },
+   {
+    "t": "What does this module say about “Vamana: one graph, pruned with slack”?",
+    "ans": "The graph algorithm is called Vamana. It starts from a random R-regular graph and improves it in two passes. For each node, in random order:"
+   }
+  ]
+ },
+ {
   "path": "gen_ai/distributed_retrieval_and_sharding.html",
   "title": "Distributed retrieval and sharding",
   "cat": "Gen AI",
@@ -6925,6 +7619,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/flat_index.html",
+  "title": "Flat Index",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A flat index compares the query against every vector: exact, O(n · d) , no build step, no parameters, and no way to go stale. It is the ground truth that every approximate index's recall is measured against, and under a few hundred thousand vectors it is usually also the right thing to ship."
+   },
+   {
+    "t": "What does this module say about “The algorithm, in full”?",
+    "ans": "Compute the distance from the query to every stored vector; keep the k smallest. That is the entire index. There is no build step, no parameters, and no structure — a flat index is a list, and \"flat\" means exactly that: no hierarchy, no partition, no graph."
+   },
+   {
+    "t": "What does this module say about “It is a matrix multiply, and that matters”?",
+    "ans": "The naive reading of \"compare against every vector\" is a loop. The useful reading is that a batch of queries against the whole corpus is a single matrix multiplication — Q × Xᵀ — which is the operation every piece of hardware built in the last decade is optimised for."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/groundedness_in_llm_evaluation.html",
   "title": "Groundedness in LLM evaluation",
   "cat": "Gen AI",
@@ -6940,6 +7653,25 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Why it is independent of correctness”?",
     "ans": "This is the distinction people collapse, and the four combinations are all real:"
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/hnsw_index.html",
+  "title": "HNSW",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "HNSW stacks proximity graphs — sparse upper layers with long edges to cross the space, a dense bottom layer to refine — and walks them greedily with a candidate list of width efSearch. efSearch is the runtime recall/latency knob; M and efConstruction are fixed at build time and cap what efSearch can reach. It gives the best recall per millisecond of any index here, and pays for it in memory and in awkward deletes."
+   },
+   {
+    "t": "What does this module say about “Two ideas, stacked”?",
+    "ans": "HNSW is short for Hierarchical Navigable Small World, and the name is a reasonable summary if you unpack it backwards."
+   },
+   {
+    "t": "What does this module say about “Building it”?",
+    "ans": "Each vector is assigned a maximum level drawn from an exponentially decaying distribution: level = floor(-ln(uniform) · mL) , with mL = 1/ln(M) . Roughly one node in M reaches each successive level, so layer sizes fall off geometrically and the top layer usually holds a handful of nodes."
    }
   ]
  },
@@ -7037,6 +7769,44 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Why fuse ranks, not raw scores”?",
     "ans": "A cosine similarity lives between -1 and 1. A BM25 score is an unbounded sum that depends on corpus size and term rarity. Averaging the two numbers directly is meaningless — a BM25 score of 8 is not \"worth\" anything in particular next to a cosine of 0.6. Reciprocal Rank Fusion sidesteps this by throwing the scores away and using only each document's position in each list."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/ivf_flat_index.html",
+  "title": "IVF-Flat",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "IVF-Flat clusters the corpus with k-means and scans only the nearest nprobe cells. nlist ≈ √n at build time; nprobe is the runtime recall/latency knob. It misses true neighbours across cell boundaries, visibly and fixably. It loses to HNSW on latency and wins on build time, update cost and composability — and it is the skeleton that IVF-PQ hangs compression on."
+   },
+   {
+    "t": "What does this module say about “The failure mode, in red”?",
+    "ans": "Drag the query onto a boundary between two clusters and red points appear. Those are genuine top-k neighbours living in a cell the search never opened. The index did not rank them badly — it never computed their distance."
+   },
+   {
+    "t": "What does this module say about “Reading the two dials against each other”?",
+    "ans": "nprobe is the runtime knob, the direct analogue of HNSW's efSearch. More probes, more recall, more latency, adjustable per query."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/ivf_pq_index.html",
+  "title": "IVF-PQ",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "IVF-PQ partitions with k-means and stores PQ codes of the residual from each cell centroid, which makes the same code length far more accurate. Search opens nprobe cells and scores codes by table lookup; a rerank stage rescores the shortlist with exact vectors and recovers most of the lost recall."
+   },
+   {
+    "t": "What does this module say about “Two problems, two solutions, composed”?",
+    "ans": "A billion vectors is hard for two independent reasons, and it is worth keeping them apart."
+   },
+   {
+    "t": "What does this module say about “The residual is the part people skip”?",
+    "ans": "Here is the detail that makes the combination more than the sum of its parts, and it is the one most explanations omit."
    }
   ]
  },
@@ -7220,6 +7990,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/product_quantization.html",
+  "title": "Product Quantization",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "PQ splits a vector into m subvectors and stores the index of the nearest centroid in each subspace's codebook. m codebooks of k centroids describe kᵐ positions from m·k stored centroids, which is why the compression is so extreme. Queries build an m × k distance table once and then cost m lookups per candidate, independent of dimension."
+   },
+   {
+    "t": "What does this module say about “Start with plain quantization”?",
+    "ans": "Before splitting anything, consider the obvious compression: run k-means over the whole corpus with 256 centroids and replace each vector with the index of its nearest one. Every vector becomes a single byte."
+   },
+   {
+    "t": "What does this module say about “The product trick”?",
+    "ans": "Product quantization escapes that by quantising *pieces* of the vector independently."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/quantization_in_llms.html",
   "title": "Quantization in LLMs",
   "cat": "Gen AI",
@@ -7372,6 +8161,25 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “The pipeline”?",
     "ans": "Only steps 3 to 5 happen per question. Steps 1 and 2 happen once, when the documents change — which is why RAG updates in the time it takes to re-index rather than the time it takes to retrain."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/scann_index.html",
+  "title": "ScaNN",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "ScaNN quantises with a loss that weights error along a vector's own direction more heavily than error across it, because that is the component that distorts inner products for the queries that would have ranked the vector highly. Same code length, better MIPS recall — measured over a workload, not a query."
+   },
+   {
+    "t": "What does this module say about “Not all quantization error is equally bad”?",
+    "ans": "Every quantiser on the previous pages minimises squared reconstruction error: put the centroids where they make ‖q(x) − x‖² as small as possible, summed over the corpus. That objective treats every direction of error as equally harmful."
+   },
+   {
+    "t": "What does this module say about “Why the average is the measurement”?",
+    "ans": "The readout shows two recall figures for the query you are dragging as well as the two averaged bars, and the single-query pair trade places constantly."
    }
   ]
  },
@@ -12494,6 +13302,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "natural_language_processing/glove.html",
+  "title": "GloVe",
+  "cat": "NLP",
+  "q": [
+   {
+    "t": "Why does GloVe's derivation start from a ratio of probabilities rather than a probability?",
+    "o": [
+     "Ratios are easier to compute",
+     "A raw conditional probability is dominated by how common the word is; the ratio cancels that and leaves only what distinguishes the two contexts",
+     "Probabilities can be zero",
+     "It makes the objective convex"
+    ],
+    "a": 1,
+    "w": "P(the | cat) and P(the | dog) are both large and tell you about 'the'. Their ratio is about 1, correctly reporting that 'the' distinguishes nothing. P(mouse | cat) / P(mouse | dog) is enormous, and that is the signal."
+   },
+   {
+    "t": "What is the weighting function f(x) for?",
+    "o": [
+     "Normalising the vectors",
+     "It is zero at zero, so pairs that never co-occur are dropped rather than requiring log 0; and it caps the influence of very frequent pairs",
+     "Preventing overfitting",
+     "Setting the learning rate"
+    ],
+    "a": 1,
+    "w": "Both jobs at once. Most of the count matrix is zeros, so f(0) = 0 is what makes the sum well defined at all, and the cap stops 'the' and 'of' from dominating the loss."
+   },
+   {
+    "t": "What is the main structural difference from word2vec?",
+    "o": [
+     "GloVe uses a neural network",
+     "GloVe fits corpus-wide co-occurrence counts once; word2vec makes a gradient step per window and never sees a corpus-level number",
+     "GloVe needs labelled data",
+     "GloVe produces contextual embeddings"
+    ],
+    "a": 1,
+    "w": "That is the 'global' in global vectors. It also means GloVe training parallelises over the count matrix, while word2vec streams text - and that GloVe is weaker on tiny corpora, where a pair seen once contributes one term and is done."
+   },
+   {
+    "t": "The final GloVe vector for a word is w + w~. Why sum them?",
+    "o": [
+     "To double the dimension",
+     "The two sets differ mainly by their random initialisation, so averaging them reduces noise - the paper reports a small consistent gain",
+     "Because the biases require it",
+     "To make the vectors unit length"
+    ],
+    "a": 1,
+    "w": "The objective is symmetric in the two roles, so neither set is privileged. word2vec discards the context matrix instead, which is a convention rather than a result."
+   }
+  ]
+ },
+ {
   "path": "natural_language_processing/how_lstm_processes_text.html",
   "title": "How LSTM Processes Text",
   "cat": "NLP",
@@ -12638,6 +13497,57 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Limitation 2: Order Blindness”?",
     "ans": "The standard fixed-size representation for text — bag of words — counts word occurrences and discards positions. \"Dog bites man\" and \"man bites dog\" produce bit-for-bit identical vectors , so the network is mathematically incapable of distinguishing them, no matter how long you train. Whatever information lives in the ordering is gone before the first neuron fires."
+   }
+  ]
+ },
+ {
+  "path": "natural_language_processing/machine_translation_encoder_decoder.html",
+  "title": "Machine Translation with an Encoder-Decoder",
+  "cat": "NLP",
+  "q": [
+   {
+    "t": "Greedy decoding translates “je ne parle pas français” as “i speak french”. What went wrong?",
+    "o": [
+     "The attention weights were wrong",
+     "It took the highest-probability second token, which is not the first token of the highest-probability sequence, and there is no way back",
+     "The model was undertrained",
+     "The length penalty was too high"
+    ],
+    "a": 1,
+    "w": "'speak' scores better than 'do' at that step. But 'do' leads to 'do not speak french', which is a far better sequence overall. Greedy search cannot see past one step, and the resulting error is semantic, not grammatical."
+   },
+   {
+    "t": "Why does an unnormalised beam search prefer short output?",
+    "o": [
+     "Short sentences are more common in training",
+     "Every additional token adds another negative log probability, so longer sequences always score lower",
+     "The end-of-sequence token has high probability",
+     "The beam fills up"
+    ],
+    "a": 1,
+    "w": "It is arithmetic, not a modelling issue. Dividing by ((5 + |Y|) / 6)^alpha compensates; alpha is tuned on a development set and has no principled value."
+   },
+   {
+    "t": "Where do the attention alignments come from?",
+    "o": [
+     "A separate alignment model trained on word pairs",
+     "They emerge from training on next-token prediction alone - nothing supervises them",
+     "Hand-written rules per language pair",
+     "The tokeniser"
+    ],
+    "a": 1,
+    "w": "Classical statistical MT had an explicit alignment component. Neural MT deleted it and got alignment as a side effect of translating well - which is why the French adjective-after-noun order shows up as a crossing in the heatmap."
+   },
+   {
+    "t": "Increasing the beam width past about 10 usually makes BLEU worse. Why is that surprising?",
+    "o": [
+     "It is not surprising - wider beams are slower",
+     "A wider beam is strictly better at finding high-probability sequences, so it means the model's highest-probability output is not its best output",
+     "Because the length penalty compensates",
+     "Because attention degrades"
+    ],
+    "a": 1,
+    "w": "Search is doing its job better and the result gets worse, which points at the model rather than the search: the true mode of the distribution tends to be short and generic, and a narrow beam's failure to find it is accidentally helpful."
    }
   ]
  },
@@ -12813,6 +13723,57 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “The example worth staring at”?",
     "ans": "\"The animal didn't cross the street because it was too tired.\" What does \"it\" refer to?"
+   }
+  ]
+ },
+ {
+  "path": "natural_language_processing/seq2seq_architecture.html",
+  "title": "Seq2Seq",
+  "cat": "NLP",
+  "q": [
+   {
+    "t": "What exactly is the bottleneck in a seq2seq model without attention?",
+    "o": [
+     "The vocabulary size",
+     "The decoder only ever sees the encoder's final hidden state - a fixed number of values regardless of how long the source was",
+     "Teacher forcing",
+     "The embedding dimension"
+    ],
+    "a": 1,
+    "w": "A five-word and a fifty-word sentence are compressed into the same H numbers. The explorer measures the consequence: early tokens have progressively less influence on that final state as the sentence grows."
+   },
+   {
+    "t": "The original paper reversed the source sentence and gained several BLEU points. What does that tell you?",
+    "o": [
+     "Reversal is a general preprocessing win",
+     "The bottleneck was real and position-dependent - putting the first source words nearest the decoder helped because distant tokens were being forgotten",
+     "The model was overfitting",
+     "The decoder was too small"
+    ],
+    "a": 1,
+    "w": "It is a blunt workaround that only makes sense if information decays with distance from the end of the encoding. That is exactly what the influence bars in the explorer show."
+   },
+   {
+    "t": "What does adding attention change about the encoder?",
+    "o": [
+     "It becomes bidirectional",
+     "Nothing - the encoder runs identically; its per-step states are kept rather than discarded",
+     "It stops being recurrent",
+     "It shares weights with the decoder"
+    ],
+    "a": 1,
+    "w": "The states were always being computed. Attention is the decision to keep them and read a weighted average at each decoder step, so the channel between the networks grows with the input instead of being fixed."
+   },
+   {
+    "t": "Why do attention weights sum to 1?",
+    "o": [
+     "To keep the magnitudes stable",
+     "They come from a softmax, so attention is always an allocation: attending more to one source word means attending less to another",
+     "Because the encoder states are normalised",
+     "It is an arbitrary convention"
+    ],
+    "a": 1,
+    "w": "The softmax makes the weights a distribution over source positions. The context vector is therefore a convex combination of encoder states - an average, never a sum that can grow without bound."
    }
   ]
  },
@@ -13131,6 +14092,57 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What is meant by “Watch for a dominating single term” here?",
     "ans": "that compresses everything else to illegibility. A log scale on the weights helps."
+   }
+  ]
+ },
+ {
+  "path": "natural_language_processing/word2vec.html",
+  "title": "Word2Vec",
+  "cat": "NLP",
+  "q": [
+   {
+    "t": "Why is negative sampling used instead of the full softmax?",
+    "o": [
+     "It gives better vectors",
+     "The softmax denominator requires a dot product against every word in the vocabulary on every step; negative sampling costs k+1 dot products",
+     "It avoids overfitting",
+     "It removes the need for two embedding matrices"
+    ],
+    "a": 1,
+    "w": "It replaces one multi-class question over 100,000 words with k+1 binary questions: is this pair real or invented. That is what made training on billions of tokens feasible."
+   },
+   {
+    "t": "What supplies the labels for word2vec training?",
+    "o": [
+     "Human annotation",
+     "The corpus itself - each word's neighbours are its targets, so unlabelled text becomes a supervised dataset",
+     "A pretrained model",
+     "A dictionary"
+    ],
+    "a": 1,
+    "w": "This is the distributional hypothesis turned into a training objective, and it is the same idea that masked language modelling and next-token prediction later scaled up."
+   },
+   {
+    "t": "Why does word2vec learn two vectors per word?",
+    "o": [
+     "One for training and one for inference",
+     "A centre vector and a context vector; with a single matrix a word's similarity with itself would be its own squared norm, which the objective would push upward",
+     "To support both skip-gram and CBOW",
+     "For numerical stability"
+    ],
+    "a": 1,
+    "w": "The dot product in the objective is always between a centre vector and a context vector. Most implementations discard the context matrix at the end - a convention, not a derivation. GloVe sums them instead."
+   },
+   {
+    "t": "What is the fundamental limitation these vectors have?",
+    "o": [
+     "They are too large",
+     "They are static: one vector per word type, so 'bank' has the same vector in 'river bank' and 'bank account'",
+     "They cannot be trained on large corpora",
+     "They require labelled data"
+    ],
+    "a": 1,
+    "w": "One vector per type, no matter the sentence. Removing that limitation - making the vector depend on context - is what ELMo, BERT and every transformer since are for."
    }
   ]
  },

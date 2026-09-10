@@ -1,0 +1,134 @@
+title: IVF-Flat: A Practical Guide
+intro: How does an inverted file index work, and what does nprobe trade?
+
+## Cluster once, probe a few
+
+An inverted file index has two phases and both are simple.
+
+**Build.** Run k-means with `nlist` centroids over a sample of the corpus,
+then assign every vector to its nearest centroid. The result is a map from
+centroid ID to a list of vector IDs — an inverted file. The name is borrowed
+from text search, where the same structure maps a term to the documents
+containing it.
+
+**Search.** Compare the query with all `nlist` centroids, sort them, take the
+nearest `nprobe`, and exhaustively scan the vectors in those lists.
+
+The squares in the visualisation are the centroids, filled where the cell was
+opened. Everything inside an opened cell is compared; everything else is
+invisible to this query.
+
+## Choosing nlist
+
+Total work per query is:
+
+```
+nlist            centroid comparisons
++ nprobe × n/nlist   vector comparisons
+```
+
+Those two terms pull in opposite directions. A small nlist means few centroids
+to scan and large cells to search; a large nlist means the reverse.
+Differentiating with respect to nlist gives a minimum near `nlist ≈ √n`, which
+is where the usual rule of thumb comes from:
+
+| Corpus | Suggested nlist | Vectors per cell |
+|---|---|---|
+| 100,000 | ~300 | ~330 |
+| 1,000,000 | ~1,000 | ~1,000 |
+| 10,000,000 | ~4,000 | ~2,500 |
+| 100,000,000 | ~16,000 | ~6,000 |
+
+FAISS's own guidance is `4·√n` to `16·√n` for large corpora, on the reasoning
+that the centroid scan vectorises well and the list scan does not. Above
+roughly 100,000 centroids the centroid comparison becomes the bottleneck on
+its own, at which point you need a second level — an index over the centroids
+— which is what `IVF_HNSW` and similar composite indexes do.
+
+Training matters too: k-means needs enough points per centroid to be
+meaningful, and FAISS warns below about 39 points per centroid. Asking for
+100,000 cells over a million vectors gives ten points each and produces
+centroids that describe noise.
+
+## The failure mode, in red
+
+Drag the query onto a boundary between two clusters and red points appear.
+Those are genuine top-k neighbours living in a cell the search never opened.
+The index did not rank them badly — it never computed their distance.
+
+This is IVF's entire weakness and it is a clean one. A hard partition drawn
+through a continuous space will sometimes cut through a neighbourhood, and any
+query near that cut loses whatever is on the far side. Note that the damage is
+**query-dependent**: the same index with the same nprobe is excellent for a
+query in the middle of a cell and poor for one on a boundary, which is why an
+average recall over a realistic query set is the only number worth quoting.
+
+The fix is always more probes, and the cost is always another `n/nlist`
+vectors scanned. There is no cleverness available here, which is in its way a
+virtue — the parameter does exactly one thing and you can reason about it.
+
+## Reading the two dials against each other
+
+**nprobe** is the runtime knob, the direct analogue of HNSW's efSearch. More
+probes, more recall, more latency, adjustable per query.
+
+**nlist** is fixed at build time and moves both numbers at once. Raise it with
+nprobe held constant: cells are smaller, fewer vectors are scanned, the search
+gets faster — and recall drops, because the same nprobe now covers less of the
+space. Raise both together and you are back where you started with a finer
+partition.
+
+The instructive extreme is `nprobe = nlist`: every cell opened, recall exactly
+1.0, and a flat scan with the centroid comparisons added as overhead. An index
+asked for perfect recall is not an index. That is worth internalising as the
+general shape of the trade — every approximate index degenerates to
+exhaustive search at its recall limit.
+
+## Why IVF is still here
+
+HNSW beats IVF-Flat on recall per millisecond. Every vector database still
+ships IVF, for three reasons that have nothing to do with query speed.
+
+**Build cost.** k-means over a sample, then one assignment pass. Minutes where
+a graph takes hours, and it parallelises trivially — each vector's assignment
+is independent.
+
+**Updates.** Inserting means finding the nearest centroid and appending to a
+list. Deleting means removing an ID from one list. No rewiring, no
+tombstoning, no rebuild. The index degrades slowly as the data drifts away
+from the centroids it was trained on, and the remedy is a periodic retrain
+rather than a reconstruction.
+
+**It composes.** The cell structure is what [IVF-PQ](ivf_pq_index.html)
+quantises residuals against, and it makes sharding natural — a cell is an
+obvious unit to put on a machine, and a query only needs the shards holding
+its nprobe cells. Most billion-scale systems are IVF-shaped underneath, even
+when a graph does the work inside each shard.
+
+```python
+import faiss
+
+d, nlist = 768, 1024
+quantizer = faiss.IndexFlatIP(d)                 # the centroid index
+index = faiss.IndexIVFFlat(quantizer, d, nlist, faiss.METRIC_INNER_PRODUCT)
+
+index.train(sample)      # k-means; needs enough points per centroid
+index.add(vectors)
+
+index.nprobe = 16        # the runtime knob, set per query if you like
+scores, ids = index.search(queries, 10)
+```
+
+`train` is a separate call for a reason: it learns the partition and it needs
+a representative sample, not the whole corpus. Training on a biased sample —
+the first million documents, all from one source — produces centroids that fit
+that source and cells that are badly unbalanced for everything else, which
+shows up as recall that varies by document type for no visible reason.
+
+## In one line
+
+IVF-Flat clusters the corpus with k-means and scans only the nearest nprobe
+cells. `nlist ≈ √n` at build time; nprobe is the runtime recall/latency knob.
+It misses true neighbours across cell boundaries, visibly and fixably. It
+loses to HNSW on latency and wins on build time, update cost and
+composability — and it is the skeleton that IVF-PQ hangs compression on.

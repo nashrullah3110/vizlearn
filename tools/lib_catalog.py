@@ -24,6 +24,7 @@ DIR_META = {
     "gen_ai": ("Gen AI", "robot"),
     "maths": ("Maths", "sigma"),
     "python": ("Python", "code"),
+    "async_python": ("Async Python", "code"),
     "pydantic": ("Pydantic", "code"),
     "fastapi": ("FastAPI", "code"),
     "numpy": ("NumPy", "sigma"),

@@ -1,0 +1,164 @@
+title: Flat Index: A Practical Guide
+intro: What does a flat index do, and why is it still the right answer sometimes?
+
+## The algorithm, in full
+
+Compute the distance from the query to every stored vector; keep the k
+smallest. That is the entire index. There is no build step, no parameters, and
+no structure — a flat index is a list, and "flat" means exactly that: no
+hierarchy, no partition, no graph.
+
+Every other page in this group describes a way of avoiding some of that work.
+This one is here because you cannot understand what they are avoiding, or what
+it costs them, without a clear picture of the thing they are avoiding.
+
+The cost is `O(n · d)` per query and both factors are real:
+
+| Corpus | Dimensions | Multiply-adds per query | One CPU core |
+|---|---|---|---|
+| 10,000 | 768 | 7.7 million | ~2 ms |
+| 100,000 | 768 | 77 million | ~20 ms |
+| 1,000,000 | 768 | 768 million | ~190 ms |
+| 10,000,000 | 768 | 7.7 billion | ~2 s |
+
+Those figures assume a few billion multiply-adds per second, which is what one
+modern core does with SIMD. Note the shape of the table: it is a straight line.
+Ten times the corpus is ten times the wait, and there is no parameter that
+softens it.
+
+## It is a matrix multiply, and that matters
+
+The naive reading of "compare against every vector" is a loop. The useful
+reading is that a batch of queries against the whole corpus is a single
+matrix multiplication — `Q × Xᵀ` — which is the operation every piece of
+hardware built in the last decade is optimised for.
+
+That changes the arithmetic considerably. The same million-vector search that
+takes 190 ms in a loop on one core takes a few milliseconds on a GPU, and can
+be batched so that a hundred queries cost barely more than one. "Brute force"
+sounds like a confession; in practice it is a well-optimised BLAS call.
+
+This is why the crossover point where an approximate index starts to win is
+much further out than people expect, and why it depends on your hardware and
+your batch size rather than on a rule of thumb.
+
+## Why it is the ground truth
+
+Every other page in this group reports a **recall** figure. Recall@k asks: of
+the k genuinely nearest vectors, how many did the index return? To compute
+that you need the genuinely nearest vectors, and the only way to get them is
+an exhaustive search.
+
+So a flat index is not merely the slow option — it is the measuring
+instrument. Any approximate index you deploy should have its recall measured
+against a flat search over a **sample of your own corpus and your own
+queries**.
+
+That last point is not pedantry. Recall depends on how your embeddings are
+distributed: how clustered they are, how the intrinsic dimensionality compares
+with the nominal one, whether queries come from the same distribution as the
+documents. An index tuned to 0.95 recall on the SIFT1M benchmark can sit at
+0.7 on your data with identical parameters. The published numbers tell you
+which algorithms are worth trying; they do not tell you what yours will do.
+
+A practical recipe: sample 1,000 real queries, run them against a flat index
+over your whole corpus, store the true top-100 for each, and check your
+production index against that set whenever you change a parameter or retrain
+an embedding model. It costs an hour of compute and it is the only honest
+number you will have.
+
+## What the scanned slider is showing
+
+Move **Fraction of the corpus scanned** below 100% and recall falls roughly in
+step: read a quarter of the list, get about a quarter of the answer.
+
+That is not the behaviour of a clever algorithm; it is what happens when you
+stop a linear scan early. The vectors you did not reach are not ranked badly,
+they are not candidates at all. And because the list is in arbitrary order,
+the ones you lose are arbitrary.
+
+This is the honest picture of what a flat index can trade. It has exactly one
+dial — how much of the list to read — and turning it down loses neighbours at
+random. **Every other index in this group exists to make that dial
+selective**: to skip vectors that were unlikely to be near the query rather
+than vectors that happened to be late in the array.
+
+Hold that framing while you read the other pages. IVF skips by partition,
+HNSW by graph connectivity, Annoy by random splits. All of them are answering
+the question "which vectors can I not bother with?", and all of them are
+sometimes wrong about it.
+
+## When flat is genuinely the right choice
+
+It is chosen more often than the literature suggests, for four good reasons.
+
+**Under a few hundred thousand vectors.** A flat scan of 100k × 768 is
+milliseconds. An HNSW graph over the same data adds memory, build time, a
+tuning surface and a recall cliff in order to save time you were not
+spending. Most internal search tools, most document collections, and most
+RAG systems over a company wiki are comfortably in this range.
+
+**When the corpus changes constantly.** Inserting into a flat index is an
+array append. Deleting is a tombstone or a swap-and-pop. Compare that with a
+graph index, where inserting means running a search to find neighbours and
+rewiring existing nodes, and deleting can disconnect the region a node was
+bridging.
+
+**When recall must be exactly 1.** Deduplication, plagiarism detection,
+near-duplicate merging, compliance matching. In these, a missed neighbour is a
+correctness bug rather than a slightly worse ranking, and "0.98 recall" means
+"wrong two per cent of the time".
+
+**Inside a filter.** If every query is scoped to one tenant, one project or
+one date range, the candidate set may be 5,000 vectors even when the corpus is
+50 million. A pre-filtered flat scan over the subset is both exact and fast,
+and it sidesteps the hardest problem in vector search — combining a metadata
+filter with an approximate index built over everything.
+
+## What it costs at scale
+
+Two numbers decide when to leave flat behind, and they have different fixes.
+
+**Memory** is `n × d × 4` bytes for float32: 3 GB at a million
+768-dimensional vectors, 300 GB at a hundred million. The fix for memory is
+compression — see [Product Quantization](product_quantization.html) — which
+shrinks each vector and still scans all of them.
+
+**Latency** is linear in n. The fix for latency is pruning — see
+[IVF-Flat](ivf_flat_index.html) or [HNSW](hnsw_index.html) — which skips
+vectors and keeps them uncompressed.
+
+Most production indexes combine one of each, because at scale both hurt. That
+combination is exactly what [IVF-PQ](ivf_pq_index.html) is, and knowing that
+memory and latency are separate problems with separate solutions is most of
+what you need to read that page.
+
+```python
+import numpy as np
+
+# A flat index is a matrix. There is nothing else to build.
+corpus = np.random.randn(100_000, 768).astype(np.float32)
+corpus /= np.linalg.norm(corpus, axis=1, keepdims=True)
+
+def search(queries, k=10):
+    # Cosine similarity on normalised vectors is a matrix multiply.
+    scores = queries @ corpus.T              # [Q, N]
+    idx = np.argpartition(-scores, k, axis=1)[:, :k]
+    # argpartition does not sort within the top k, so order it afterwards.
+    ordered = np.take_along_axis(
+        idx, np.argsort(-np.take_along_axis(scores, idx, 1), axis=1), 1)
+    return ordered
+```
+
+Two details in that snippet are the difference between a fast flat index and a
+slow one. `argpartition` is O(n) where a full `argsort` is O(n log n), and at
+a million vectors that is most of the query time. And normalising once at
+build time turns cosine similarity into a plain dot product, so the query does
+no division at all.
+
+## In one line
+
+A flat index compares the query against every vector: exact, `O(n · d)`, no
+build step, no parameters, and no way to go stale. It is the ground truth that
+every approximate index's recall is measured against, and under a few hundred
+thousand vectors it is usually also the right thing to ship.

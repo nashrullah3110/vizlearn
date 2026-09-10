@@ -1,0 +1,153 @@
+title: Product Quantization: A Practical Guide
+intro: How does product quantization compress a vector, and why does splitting it into subvectors help so much?
+
+## Start with plain quantization
+
+Before splitting anything, consider the obvious compression: run k-means over
+the whole corpus with 256 centroids and replace each vector with the index of
+its nearest one. Every vector becomes a single byte.
+
+The compression is spectacular and the index is useless. 256 centroids cannot
+describe a million distinct 768-dimensional vectors; the average error is
+enormous, and any two vectors sharing a centroid are indistinguishable to the
+index. To get useful resolution you would need a codebook with millions of
+entries — which you would then have to store, and which k-means could not
+train.
+
+Set **m = 1** in the visualisation to see exactly this. One codebook, a
+handful of representable positions, and the top-k answer collapses.
+
+## The product trick
+
+Product quantization escapes that by quantising *pieces* of the vector
+independently.
+
+Split a 768-dimensional vector into m = 96 chunks of 8 dimensions each. Give
+each chunk its own codebook of 256 centroids, trained by k-means over that
+chunk across the whole corpus. Encoding means finding the nearest centroid in
+each of the 96 codebooks and storing 96 one-byte indices.
+
+```
+768 × 4 = 3,072 bytes  →  96 bytes.  A 32× reduction.
+```
+
+Now count what those 96 bytes can express. Any combination of centroids is a
+valid code, so the number of representable vectors is `256⁹⁶` — a number with
+231 digits — from 24,576 stored centroids. That multiplication is the entire
+idea, and "product" in the name is literally the Cartesian product of the
+subspace codebooks.
+
+Set **m = 2** in the visualisation at the same bit depth. The number of
+representable points squares, the grid appears, and recall jumps. Same
+centroids stored; vastly more positions described.
+
+## Reading the picture
+
+With d = 2 and m = 2, each subspace is one axis and its codebook is a set of
+positions along it. The faint grid is every position the index can represent —
+the intersections are the reachable points. The blue line from each vector
+runs to where the index thinks that vector is: the quantisation error, drawn
+directly.
+
+Lower the bit depth and watch the grid coarsen and the blue lines lengthen.
+That growing error is what eventually costs you recall, and it is the only
+thing that does — PQ has no other failure mode.
+
+## Asymmetric distance, and why queries are cheap
+
+The obvious way to compare a query with a code is to decode the code back into
+a vector and measure. PQ does something better and leaves the query exact.
+
+For each of the m subspaces, compute the distance from the query's subvector
+to each of the 256 centroids in that subspace's codebook. That is an `m × 256`
+lookup table, built once per query. The distance from the query to any stored
+code is then:
+
+```
+d(q, code) ≈ table[0][code[0]] + table[1][code[1]] + … + table[m-1][code[m-1]]
+```
+
+m table lookups and m additions. No multiplications, no decoding, and — this
+is the part that matters — **the per-candidate cost no longer depends on d**.
+Scanning a million 96-byte codes is 96 million lookups; scanning a million
+768-dimensional float vectors is 768 million multiply-adds over eight times
+the memory bandwidth.
+
+It is called **asymmetric** because only one side is quantised. Quantising the
+query too would let you precompute a symmetric table between codebook entries,
+which is marginally faster and measurably less accurate: you would be adding
+the query's own quantisation error to every comparison for no benefit. Always
+use asymmetric distance unless something very unusual is going on.
+
+## The parameters
+
+**m**, the number of subquantizers, must divide d. Larger m means shorter
+subvectors, less information discarded per chunk, better recall — and a longer
+code. At 8 bits, m *is* your bytes per vector, which makes the trade easy to
+reason about.
+
+**nbits** is almost always 8. A byte is what hardware likes, 256 centroids per
+subspace is a good operating point, and the SIMD lookup implementations that
+make PQ fast assume it. Lower values exist for extreme compression and cost
+recall quickly.
+
+The useful way to hold this: **the code length in bytes is the dial**, equal
+to `m × nbits / 8`. Common choices at d = 768 are 96 bytes when recall matters
+and 32 bytes when memory is the binding constraint and a reranking stage will
+clean up afterwards.
+
+One structural assumption worth knowing: PQ splits dimensions in their
+original order, which implicitly assumes neighbouring dimensions belong
+together. For learned embeddings that is arbitrary. **OPQ** — optimised
+product quantization — learns a rotation of the space first, so that variance
+is balanced across the subspaces before splitting. It costs a matrix multiply
+per query and typically buys a few points of recall for free, which is why
+FAISS's `OPQ64_256,IVF...,PQ64` recipes are so common.
+
+## What PQ does not do
+
+PQ is a **compression** scheme, not a search structure. A pure PQ index still
+computes a distance for every vector in the corpus — it is a flat scan over
+short codes rather than over full vectors. That is roughly 20–30× faster than
+scanning float32, which is a real win, and it is still `O(n)`.
+
+So PQ is nearly always combined with something that prunes:
+
+- [IVF-PQ](ivf_pq_index.html) puts it inside cells. This is the standard
+  billion-scale index.
+- [DiskANN](diskann_index.html) keeps PQ codes in RAM to route a graph search
+  whose full vectors live on SSD.
+- [ScaNN](scann_index.html) changes the quantisation objective itself for
+  inner product search, then rescores exactly.
+
+Pure PQ on its own is unusual, and appears mainly where you already have a
+small candidate set and only memory hurts.
+
+```python
+import faiss
+
+d, m, nbits = 768, 96, 8
+index = faiss.IndexPQ(d, m, nbits)     # 96 bytes per vector
+
+index.train(sample)                    # trains m codebooks of 256 centroids
+index.add(vectors)
+scores, ids = index.search(queries, 10)
+
+# In practice, wrapped in something that prunes:
+quantizer = faiss.IndexFlatL2(d)
+ivfpq = faiss.IndexIVFPQ(quantizer, d, 1024, m, nbits)
+```
+
+`m` must divide `d` and FAISS will refuse otherwise — a constraint that
+catches people who change embedding models without changing the index recipe.
+768 divides by 96, 64, 48, 32 and 16; 1536 divides by all of those too, which
+is one small reason those dimensions are popular.
+
+## In one line
+
+PQ splits a vector into m subvectors and stores the index of the nearest
+centroid in each subspace's codebook. m codebooks of k centroids describe
+`kᵐ` positions from `m·k` stored centroids, which is why the compression is so
+extreme. Queries build an `m × k` distance table once and then cost m lookups
+per candidate, independent of dimension. It compresses but does not prune, so
+it is almost always paired with IVF or a graph.

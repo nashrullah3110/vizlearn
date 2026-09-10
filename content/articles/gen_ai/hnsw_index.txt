@@ -1,0 +1,163 @@
+title: HNSW: A Practical Guide
+intro: How does HNSW work, and which of its parameters do you tune at query time?
+
+## Two ideas, stacked
+
+HNSW is short for Hierarchical Navigable Small World, and the name is a
+reasonable summary if you unpack it backwards.
+
+A **small world** graph is one where any node can reach any other in a few
+hops, despite most edges being local. Social networks are the standard
+example: your friends are mostly nearby, and yet six handshakes reach anyone.
+The property comes from a small number of long-range edges among many short
+ones.
+
+**Navigable** adds a stronger requirement: not only does a short path exist,
+but a greedy walk can find it — at each step, move to whichever neighbour is
+closer to the target. That is a strong condition, and it is what makes search
+cheap, because greedy search needs no backtracking and no global view.
+
+**Hierarchical** is the mechanism for getting the long edges: build several
+graphs, each a random sample of the one below, and the sparse upper ones will
+have long edges by construction. This is a skip list applied to geometry, and
+Malkov and Yashunin say so explicitly in the paper.
+
+## Building it
+
+Each vector is assigned a maximum level drawn from an exponentially decaying
+distribution: `level = floor(-ln(uniform) · mL)`, with `mL = 1/ln(M)`. Roughly
+one node in M reaches each successive level, so layer sizes fall off
+geometrically and the top layer usually holds a handful of nodes.
+
+Insertion is a search followed by a rewiring:
+
+1. From the entry point, greedily descend the layers above the new node's
+   level, keeping one current node.
+2. From the node's own level down to 0, run a beam search of width
+   `efConstruction` to collect candidate neighbours.
+3. Connect to at most M of them, chosen by a **heuristic** rather than by
+   plain nearest-first.
+4. Add the reverse edges, and prune any neighbour that now exceeds its degree
+   limit using the same heuristic.
+
+Step 3 is the part worth understanding. Taking the M nearest candidates sounds
+right and produces a bad graph: in a dense cluster all M edges point into the
+same blob, and the graph becomes a set of cliques with no routes between them.
+
+The heuristic instead keeps a candidate only if it is closer to the new node
+than to any neighbour already kept. That systematically preserves edges
+pointing in *different directions*, including toward sparse regions. It is
+what keeps the graph navigable rather than merely well-connected, and it is
+the single most important line in the construction.
+
+## Searching it
+
+Start at the entry point on the top layer. Move to whichever neighbour is
+closer to the query; repeat until no neighbour improves; drop a layer and
+continue from the node you stopped at. On layer 0, instead of keeping one
+current node, keep a candidate list of size `efSearch` and expand the closest
+unexpanded member until none of them can improve on what you already hold.
+
+The orange path in the visualisation is the descent that actually happened for
+the query you are dragging. Drag it into the sparse middle region and the path
+lengthens, because there are fewer nodes there for the walk to step through.
+
+Note what the layer control shows. At layer 2 the edges span most of the
+plane; at layer 0 they are short and local. The upper layers exist to cover
+**distance** and the bottom layer to provide **precision**, and the descent
+hands off from one job to the other.
+
+## The three parameters
+
+| Parameter | When | What it does | Typical |
+|---|---|---|---|
+| `efSearch` | query | width of the candidate list | 40–400 |
+| `M` | build | edges per node | 16–64 |
+| `efConstruction` | build | effort spent finding good neighbours | 100–500 |
+
+**efSearch** is the only runtime parameter and the one to name if you are
+asked. Raise it for recall, lower it for latency, and vary it per query if
+some queries matter more than others. Watch what happens when it drops below
+k: recall falls off a cliff, because a candidate list of 4 cannot produce 10
+neighbours however good the graph is. `efSearch ≥ k` is a hard floor, and
+`efSearch ≈ 2k` is a sensible starting point.
+
+**M** is fixed at build time. More edges means better connectivity, better
+recall and more memory — the graph costs about `n × M × 2 × 4` bytes on top of
+the vectors, so M = 16 over a million vectors is 128 MB. Higher M helps most
+when the intrinsic dimensionality is high.
+
+**efConstruction** costs build time only and the result is permanent. Drop it
+to 4 in the visualisation and recall stays down even at generous efSearch: a
+badly built graph cannot be rescued at query time. The usual advice is to
+raise it until recall on a held-out sample stops improving, then stop, because
+beyond that you are paying build time for nothing.
+
+## What two dimensions cannot show you
+
+One honest caveat about the picture. In two dimensions a proximity graph is
+almost too good: M = 4 performs about as well as M = 32, because in the plane
+a handful of edges already point in every useful direction.
+
+In 768 dimensions that stops being true, for two related reasons. There are
+vastly more directions to cover, so a low-degree node leaves whole regions
+unreachable. And distances **concentrate**: as dimensionality rises, the ratio
+between the distance to the nearest neighbour and to a random point tends
+toward one, so the greedy walk's signal — "this neighbour is closer" — gets
+weaker at every step.
+
+That concentration is the reason approximate nearest neighbour search is hard
+at all, and it is the one thing a two-dimensional picture is structurally
+unable to show. Take the structure from this page and the difficulty from the
+benchmark numbers.
+
+## How it fails
+
+**Local minima.** Greedy search stops when no neighbour is closer, which is
+not the same as arriving at the nearest vector. A wider efSearch makes it less
+likely and never impossible; this is the irreducible source of HNSW's missing
+recall.
+
+**Memory.** The graph sits alongside the vectors and does not compress well.
+For a billion vectors this is disqualifying, which is why
+[DiskANN](diskann_index.html) exists.
+
+**Deletion.** Removing a node can disconnect the region it was bridging, so
+implementations mark it deleted and skip it during search, rebuilding
+periodically. A workload with heavy churn is HNSW's worst case, and one of the
+few places [IVF-Flat](ivf_flat_index.html) is genuinely preferable.
+
+**Filtered search.** If a metadata filter excludes most of the corpus, most
+edges point at excluded nodes and the walk stalls before finding enough
+results. Every vector database solves this differently — filtered graph
+traversal, pre-filtering into a flat scan, or building separate indexes per
+filter value — and none of them solves it for free.
+
+```python
+import hnswlib
+
+index = hnswlib.Index(space="cosine", dim=768)
+index.init_index(
+    max_elements=1_000_000,
+    M=16,                 # edges per node: memory and recall ceiling
+    ef_construction=200,  # build effort, permanent once built
+)
+index.add_items(vectors, ids)
+
+index.set_ef(64)          # efSearch: the runtime knob, >= k
+labels, distances = index.knn_query(query, k=10)
+```
+
+`set_ef` is separate from the constructor for a reason — it is the one you are
+expected to change per query or per deployment, while the other two are baked
+in at `init_index`. If you find yourself wanting to change M in production,
+you are looking at a rebuild.
+
+## In one line
+
+HNSW stacks proximity graphs — sparse upper layers with long edges to cross
+the space, a dense bottom layer to refine — and walks them greedily with a
+candidate list of width efSearch. efSearch is the runtime recall/latency knob;
+M and efConstruction are fixed at build time and cap what efSearch can reach.
+It gives the best recall per millisecond of any index here, and pays for it in
+memory and in awkward deletes.

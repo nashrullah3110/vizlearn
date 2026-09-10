@@ -1,0 +1,164 @@
+title: DiskANN: A Practical Guide
+intro: How does DiskANN serve a billion vectors from one machine, and what does alpha do?
+
+## When the cost model changes, the structure changes
+
+An in-memory graph search that visits 200 nodes is fast, because a memory
+access is nanoseconds and the arithmetic dominates. The same search against an
+SSD is 200 random reads at roughly 100 microseconds each: 20 milliseconds, and
+the arithmetic is free by comparison.
+
+That single substitution — a page read where there used to be a memory access
+— invalidates most of what [HNSW](hnsw_index.html) optimises for, and DiskANN
+is what you get when you redesign around it. The quantity to minimise is
+**reads per query**, and a structure that halves the distance computations
+while adding one hop is a loss.
+
+The payoff is a ratio nothing else here can match. A billion 768-dimensional
+vectors is 3 TB: impossible in RAM, ordinary on one NVMe drive. The paper's
+claim is over 5,000 queries per second at 95% recall from a single machine
+with 64 GB of memory.
+
+## Vamana: one graph, pruned with slack
+
+The graph algorithm is called Vamana. It starts from a random R-regular graph
+and improves it in two passes. For each node, in random order:
+
+1. Run a greedy search from the medoid toward that node, and take everything
+   the search visited as a candidate set.
+2. Prune the candidates down to at most R neighbours with the **robust prune**
+   rule.
+3. Add reverse edges, pruning any neighbour that now exceeds R.
+
+The robust prune rule is the contribution:
+
+```
+sort candidates by distance to the node
+repeat:
+  take the closest remaining candidate p*, keep it
+  discard any remaining p′ where  α · d(p*, p′) ≤ d(node, p′)
+```
+
+In words: discard an edge if an edge you already kept gets you close to the
+same place. Any node you can reach cheaply via p* does not need its own edge.
+
+At `α = 1` this is a strict relative-neighbourhood rule and every surviving
+edge is short — a careful local mesh. Above 1 the test is looser, so edges
+survive that a stricter rule would have called redundant, and those are
+disproportionately the **long** ones.
+
+Move the alpha slider from 1.0 to 1.2 and watch two things happen together:
+the blue long edges appear, and the read count roughly halves. Those are the
+same fact. A long edge is a shortcut, and on a disk-resident graph a shortcut
+is worth far more than a tidy local neighbourhood.
+
+The two passes matter too. The first pass at α = 1 builds a reasonable graph;
+the second at the real α revisits every node with a much better graph to
+search through, so the candidate sets are better and the surviving edges are
+better chosen. A single pass leaves the graph dependent on insertion order.
+
+## Why one layer
+
+HNSW gets its long-range hops from hierarchy: the sparse upper layers have
+long edges by construction. DiskANN gets them from the pruning rule instead,
+inside a single flat graph. That is deliberate.
+
+Layers cost reads. Descending three levels means touching nodes at each level,
+and on an SSD every one of those is a page. A flat graph with a fixed medoid
+entry point reaches the same neighbourhood in fewer **total** reads, even
+though it visits more nodes at the level it is working on.
+
+This is the most transferable idea on the page: the optimal structure is a
+function of the cost model, and a design that is clearly right in RAM can be
+clearly wrong on disk. The algorithms did not change; the hardware did.
+
+## The memory–disk split
+
+This is what makes it practical, and it is a layout decision as much as an
+algorithmic one.
+
+**In RAM:** one PQ code per vector, typically 32 bytes. A billion of those is
+32 GB. The beam search uses these approximate distances to decide where to go
+next, so **navigation costs no I/O at all**.
+
+**On SSD:** for each node, its full vector *and* its adjacency list, stored
+together in one 4 KB page. Visiting a node is exactly one read, and that read
+returns both the exact distance and the next hops.
+
+The consequences are neat. Routing is approximate and free; scoring is exact
+and paid for only on nodes actually visited; and because the full vectors come
+back along the way, the final ranking uses exact distances and the PQ error
+never reaches the answer. Compare that with [IVF-PQ](ivf_pq_index.html), where
+PQ error does reach the answer unless you add a separate rerank stage.
+
+## Beam width, and the one honest caveat
+
+`L` is the search beam: the size of the candidate list. The search repeatedly
+expands the closest unvisited candidate and stops when every candidate has
+been visited. Larger L means more reads and better recall, and it is the
+runtime knob — DiskANN's efSearch.
+
+Implementations also fetch several pages per round rather than one, because an
+NVMe drive serves parallel requests far better than sequential ones. The beam
+width therefore controls both accuracy and how much I/O parallelism you can
+extract, which is a coupling that does not exist in an in-memory index.
+
+The caveat for this page: two dimensions is too easy to show the recall side
+of the trade, so recall here stays near 1.0 and only the read count moves.
+Take the read count as the honest measurement — it responds correctly to both
+alpha and L — and treat the recall figure as a formality. In 768 dimensions
+both move, and L is what trades them.
+
+## Building and updating
+
+Build time is the real cost. The graph is constructed with full searches over
+the dataset, twice, and at a billion vectors that is hours on a large machine.
+The paper builds in overlapping clusters and merges the results, because the
+build itself needs more memory than the serving does.
+
+Updates are handled by **FreshDiskANN**: a small in-memory index absorbs
+recent writes, and it is merged into the disk index periodically. Deletes are
+tombstoned and applied at merge. This is the same log-structured merge pattern
+a database uses, for the same reason — random writes to a large on-disk
+structure are expensive, so you batch them.
+
+The practical read: DiskANN is for corpora that are large and change in
+batches. If your corpus is small enough for RAM, use HNSW. If it changes
+constantly and is large, you are looking at a sharded system with a hot
+in-memory tier, which is what FreshDiskANN essentially is.
+
+```python
+# DiskANN is a C++ library with Python bindings; the build is a separate step
+# from serving, and produces files rather than an in-process object.
+import diskannpy
+
+diskannpy.build_disk_index(
+    data=vectors,                 # float32 [n, d]
+    distance_metric="mips",
+    index_directory="index/",
+    complexity=128,               # L during build - candidate list size
+    graph_degree=64,              # R - max out-degree
+    search_memory_maximum=32.0,   # GB of RAM the served index may use
+    build_memory_maximum=256.0,   # GB the build may use
+    num_threads=64,
+)
+
+index = diskannpy.StaticDiskIndex(index_directory="index/", num_threads=8,
+                                  num_nodes_to_cache=100_000)
+ids, distances = index.search(query, k_neighbors=10, complexity=64)
+```
+
+`search_memory_maximum` is the parameter that makes DiskANN what it is: it is
+how much RAM the PQ codes may occupy, and it therefore sets the code length
+and the compression ratio. `num_nodes_to_cache` pins the most-visited nodes —
+those near the medoid, which every query touches — in memory, removing the
+first few reads of every search.
+
+## In one line
+
+DiskANN optimises SSD reads rather than distance computations, because that is
+what a disk-resident index actually spends. Vamana builds one flat graph whose
+robust-prune rule, relaxed by α, deliberately keeps long-range edges so the
+hop count stays low. PQ codes in RAM steer the beam; full vectors and adjacency
+share a page on SSD so one read serves both. It is the answer when the corpus
+does not fit in memory and you have one machine.

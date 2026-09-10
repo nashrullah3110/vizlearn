@@ -332,6 +332,46 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive union-find lesson - union by rank and path compression shown live, with the near-constant inverse Ackermann complexity."
  },
  {
+  "title": "Coroutines, Tasks and await",
+  "path": "async_python/coroutines_tasks_and_await.html",
+  "category": "Async Python",
+  "topic": "async_python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Queues, Producers and Backpressure",
+  "path": "async_python/queues_and_backpressure.html",
+  "category": "Async Python",
+  "topic": "async_python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Running Work Concurrently: gather and TaskGroup",
+  "path": "async_python/running_work_concurrently.html",
+  "category": "Async Python",
+  "topic": "async_python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "The Blocking Call That Freezes the Loop",
+  "path": "async_python/the_blocking_call_that_freezes_the_loop.html",
+  "category": "Async Python",
+  "topic": "async_python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "The Event Loop, Stepped Through",
+  "path": "async_python/event_loop_stepped_through.html",
+  "category": "Async Python",
+  "topic": "async_python",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "1x1 Convolutions",
   "path": "computer_vision/one_by_one_convolutions.html",
   "category": "Computer Vision",
@@ -468,6 +508,14 @@ window.VIZLEARN_MODULES = [
   "desc": "See a grayscale image for what it is: a grid of brightness numbers you can filter, threshold and edit directly."
  },
  {
+  "title": "Haar Cascade Detection Models",
+  "path": "computer_vision/haar_cascade_detection.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": "Drag a Haar rectangle feature over a face, watch the integral image sum it in four lookups, and see a cascade discard 24,000 windows."
+ },
+ {
   "title": "Harris Corners and Keypoints",
   "path": "computer_vision/harris_corners.html",
   "category": "Computer Vision",
@@ -500,12 +548,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Flip, rotate, zoom and add noise to an image, and see how augmentation multiplies a small training set into a larger one."
  },
  {
+  "title": "InceptionNet",
+  "path": "computer_vision/inception_architecture.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": "Run the four inception branches in parallel, then switch off the 1x1 bottleneck and watch one module jump from 128 M to 303 M MACs."
+ },
+ {
   "title": "IoU and Non-Max Suppression",
   "path": "computer_vision/iou_and_non_max_suppression.html",
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
   "desc": "A detector proposes four boxes for two objects. IoU measures the overlap, and Non-Max Suppression uses that number to throw the duplicates away."
+ },
+ {
+  "title": "Mask R-CNN",
+  "path": "computer_vision/mask_rcnn.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": "Drag a proposal on a feature map and watch RoIPool's double rounding move it eight input pixels while RoIAlign samples it exactly."
  },
  {
   "title": "Mean Average Precision",
@@ -580,6 +644,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "ResNet",
+  "path": "computer_vision/resnet_architecture.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": "Build ResNet-18 through -152 from one description and watch 25.56 M parameters and 4.1 GMACs fall out of the block counts."
+ },
+ {
   "title": "ResNet and Identity Shortcuts",
   "path": "computer_vision/resnet_and_identity_shortcuts.html",
   "category": "Computer Vision",
@@ -644,12 +716,36 @@ window.VIZLEARN_MODULES = [
   "desc": "Learn how Transfer Learning works in Convolutional Neural Networks, select models, and selectively unfreeze layers for fine-tuning."
  },
  {
+  "title": "U-Net",
+  "path": "computer_vision/unet_architecture.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": "Walk U-Net level by level: 572 in, 388 out, every skip crop computed, and the case for skip connections made by turning them off."
+ },
+ {
+  "title": "VGG-16",
+  "path": "computer_vision/vgg16_architecture.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": "Walk VGG-16 layer by layer and see why 89% of its 138 M parameters sit in three dense layers that do 1% of the work."
+ },
+ {
   "title": "Vision Transformer Patches",
   "path": "computer_vision/vision_transformer_patches.html",
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
   "desc": ""
+ },
+ {
+  "title": "YOLO v8",
+  "path": "computer_vision/yolov8_detection.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": "See all 8,400 raw YOLO predictions, then move the confidence and NMS thresholds and watch objects appear, duplicate and disappear."
  },
  {
   "title": "Aggregate Functions and the NULL Trap",
@@ -1004,6 +1100,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Autoencoders in Depth",
+  "path": "deep_learning/autoencoders_conceptual_and_pytorch.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": "Move an autoencoder's bottleneck and watch the reconstruction, the learned components and the exact error curve respond - no training run, no seed."
+ },
+ {
   "title": "Backpropagation and the Computational Graph",
   "path": "deep_learning/backpropagation.html",
   "category": "Deep Learning",
@@ -1028,6 +1132,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Compare stochastic, mini-batch and full-batch training, and see how batch size trades gradient noise against speed."
  },
  {
+  "title": "Collaborative Filtering",
+  "path": "deep_learning/collaborative_filtering.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": "Click any cell of a ratings matrix and watch user-kNN, item-kNN and matrix factorisation predict it, all scored on the same held-out ratings."
+ },
+ {
   "title": "Contrastive and Self-Supervised Learning",
   "path": "deep_learning/contrastive_learning.html",
   "category": "Deep Learning",
@@ -1042,6 +1154,14 @@ window.VIZLEARN_MODULES = [
   "topic": "dl",
   "icon": "network",
   "desc": "Feed mostly-zero inputs through a network and watch entire pathways go dormant, because anything multiplied by zero stays zero."
+ },
+ {
+  "title": "Deep Learning for Recommendation Systems",
+  "path": "deep_learning/deep_learning_for_recommendation_systems.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": "Two towers, an embedding table and an MLP: see why 99% of a neural recommender is lookup tables and what deep learning actually buys."
  },
  {
   "title": "Diffusion Models",
@@ -1082,6 +1202,14 @@ window.VIZLEARN_MODULES = [
   "topic": "dl",
   "icon": "network",
   "desc": "See what happens when one feature is measured in thousands and another in decimals, and how scaling rebalances the gradients."
+ },
+ {
+  "title": "GAN Architecture and Equilibrium",
+  "path": "deep_learning/gan_architecture.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": "Be the generator: move the distribution and watch the exact optimal discriminator, the -log 4 equilibrium and the vanishing gradient respond."
  },
  {
   "title": "Generative Adversarial Networks",
@@ -1540,6 +1668,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Learn ANN indexing: HNSW and IVF | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
+  "title": "Annoy",
+  "path": "gen_ai/annoy_index.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Learn Annoy | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
   "title": "BM25 and Sparse Lexical Retrieval",
   "path": "gen_ai/bm25_and_sparse_retrieval.html",
   "category": "Gen AI",
@@ -1612,6 +1748,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Learn Correctness in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
+  "title": "DiskANN",
+  "path": "gen_ai/diskann_index.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Learn DiskANN | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
   "title": "Distributed retrieval and sharding",
   "path": "gen_ai/distributed_retrieval_and_sharding.html",
   "category": "Gen AI",
@@ -1644,12 +1788,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Three stages, three jobs. Watch a model's answers move under supervised fine-tuning, then under preference optimisation, and watch reward hacking happen."
  },
  {
+  "title": "Flat Index",
+  "path": "gen_ai/flat_index.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Learn Flat Index | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
   "title": "Groundedness in LLM evaluation",
   "path": "gen_ai/groundedness_in_llm_evaluation.html",
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "Learn Groundedness in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "HNSW",
+  "path": "gen_ai/hnsw_index.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Learn HNSW | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Hallucination and Grounding",
@@ -1682,6 +1842,22 @@ window.VIZLEARN_MODULES = [
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "Run vector search and BM25 side by side and watch them disagree, then fuse the two rankings and see a document neither method alone ranked first win on consensus."
+ },
+ {
+  "title": "IVF-Flat",
+  "path": "gen_ai/ivf_flat_index.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Learn IVF-Flat | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "IVF-PQ",
+  "path": "gen_ai/ivf_pq_index.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Learn IVF-PQ | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Indexing in vector databases",
@@ -1738,6 +1914,14 @@ window.VIZLEARN_MODULES = [
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "Learn Permission filtering in RAG retrieval | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "Product Quantization",
+  "path": "gen_ai/product_quantization.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Learn Product Quantization | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Quantization in LLMs",
@@ -1802,6 +1986,14 @@ window.VIZLEARN_MODULES = [
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "Ask about a product no model has heard of. Watch retrieval score every chunk, paste the winners into the prompt, and turn a guess into a cited answer."
+ },
+ {
+  "title": "ScaNN",
+  "path": "gen_ai/scann_index.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Learn ScaNN | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Self-Query Retriever",
@@ -3052,6 +3244,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Interactive walkthrough of the Forget Gate in an LSTM cell - see how a sigmoid between 0 and 1 erases or preserves the cell state, and how forgetting compounds over time."
  },
  {
+  "title": "GloVe",
+  "path": "natural_language_processing/glove.html",
+  "category": "NLP",
+  "topic": "nlp",
+  "icon": "comments",
+  "desc": "Build the co-occurrence matrix, see the probability ratio that motivates GloVe computed from real counts, and fit the log-bilinear objective."
+ },
+ {
   "title": "How LSTM Processes Text",
   "path": "natural_language_processing/how_lstm_processes_text.html",
   "category": "NLP",
@@ -3114,6 +3314,14 @@ window.VIZLEARN_MODULES = [
   "topic": "nlp",
   "icon": "comments",
   "desc": "Discover why plain feed-forward neural networks struggle with sequences: fixed input size, order blindness, and no memory. Interactive demos on VizLearn."
+ },
+ {
+  "title": "Machine Translation with an Encoder-Decoder",
+  "path": "natural_language_processing/machine_translation_encoder_decoder.html",
+  "category": "NLP",
+  "topic": "nlp",
+  "icon": "comments",
+  "desc": "Watch attention align a French sentence to its English translation, then see greedy decoding drop the negation and beam search recover it."
  },
  {
   "title": "Multi-Head Attention",
@@ -3186,6 +3394,14 @@ window.VIZLEARN_MODULES = [
   "topic": "nlp",
   "icon": "comments",
   "desc": "The full n x n attention matrix over one sentence. Watch a pronoun resolve at layer 2, apply a causal mask, and see why word order needs encoding."
+ },
+ {
+  "title": "Seq2Seq",
+  "path": "natural_language_processing/seq2seq_architecture.html",
+  "category": "NLP",
+  "topic": "nlp",
+  "icon": "comments",
+  "desc": "Measure the seq2seq bottleneck directly: perturb each source token and watch how little of the early sentence survives to the final state."
  },
  {
   "title": "Sequential Data Preparation with Sliding Window",
@@ -3306,6 +3522,14 @@ window.VIZLEARN_MODULES = [
   "topic": "nlp",
   "icon": "comments",
   "desc": "Paste any text and watch a word cloud size each term by how often it appears, exposing what a document is really about."
+ },
+ {
+  "title": "Word2Vec",
+  "path": "natural_language_processing/word2vec.html",
+  "category": "NLP",
+  "topic": "nlp",
+  "icon": "comments",
+  "desc": "Train skip-gram with negative sampling in the page and watch the nearest neighbour of 'king' become 'queen' as the step count rises."
  },
  {
   "title": "Aggregations and axis",

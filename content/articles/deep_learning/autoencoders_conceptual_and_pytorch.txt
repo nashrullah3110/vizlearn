@@ -1,0 +1,200 @@
+title: Autoencoders in Depth
+intro: An encoder, a decoder, and a deliberately narrow gap between them - with the linear case solved exactly so the mechanism is visible.
+
+## The trick is the constraint
+
+An autoencoder is trained to reproduce its input. Stated like that it is
+absurd: the identity function scores perfectly and learns nothing.
+
+The constraint is what makes it a model. Force the network through a
+representation smaller than the input &mdash; 64 pixels into 4 numbers &mdash;
+and perfect reconstruction becomes impossible. The network has to decide what
+is worth keeping, and that decision *is* the learned representation.
+
+Three parts, and only one of them matters:
+
+- the **encoder** maps input to a code `z`;
+- the **bottleneck** is `z` itself, whose width you choose;
+- the **decoder** maps `z` back to something the size of the input.
+
+Move the bottleneck slider in the explorer and watch the reconstruction. At
+k = 1 the network has one number per image and everything looks like the same
+average shape. By k = 4 the six shapes are distinguishable. By k = 16 the
+reconstruction is close, and the compression is only 4&times;.
+
+## Why this page can be exact
+
+A linear autoencoder &mdash; no activation functions, just two matrices &mdash;
+trained to convergence on squared error provably spans the same subspace as the
+top-k principal components. Baldi and Hornik proved it in 1989: the squared
+reconstruction error has no local minima that are not global, and every global
+minimum spans the principal subspace.
+
+So the explorer does not train anything. It computes the principal components
+of the dataset directly and uses them as the encoder and decoder. There is no
+seed, no learning rate and no run-to-run variation, and every number on the
+page is exact.
+
+Two things follow immediately, and both are visible.
+
+**The error curve is the eigenvalue tail.** Reconstruction error at bottleneck
+k equals the sum of the eigenvalues from k+1 onward. That is why the curve in
+the explorer is smooth and monotone rather than jagged &mdash; it is not a
+training result, it is arithmetic.
+
+**The decoder columns are interpretable.** The six small tiles show what each
+latent dimension adds to the reconstruction when it is set to +1. Blue is
+negative. The first accounts for the most variance in the dataset, the second
+for the most of what is left, and so on; the percentages are printed on them.
+
+## The latent space is a space
+
+Set the two latent sliders to a coordinate no real image produced and watch the
+decoder draw something anyway.
+
+That is worth pausing on. The decoder is a function defined on the whole latent
+space, not a lookup table of the training set. Feeding it a point between two
+training images gives something between them; feeding it a point far outside
+gives something, though usually not something you want.
+
+This is exactly where a plain autoencoder stops and a variational autoencoder
+begins. Nothing in the reconstruction objective encourages the latent space to
+be *filled in*. The encoder can scatter the training data into isolated islands
+with nonsense between them, and the loss will not object &mdash; it only ever
+asks about points that came from real data. A VAE adds a KL term pushing the
+encoder's output distribution toward a standard normal, which pressures the
+codes to occupy a connected region and makes sampling from the latent space
+produce plausible output. That is the difference between a compressor and a
+generative model.
+
+## Denoising, without asking for it
+
+Turn the corruption slider up. The input tile gets noisy; the reconstruction
+mostly does not.
+
+Nothing here was trained to remove noise. The mechanism is the bottleneck: the
+noise is spread across all 64 directions of pixel space, the bottleneck keeps
+only k of them, and most of the noise has nowhere to go. The two error figures
+in the explorer make it concrete &mdash; at a narrow bottleneck the
+reconstruction is closer to the *clean* image than the corrupted input was.
+
+A **denoising autoencoder** makes this the explicit objective: corrupt the
+input, ask for the clean target. It is a stronger idea than it first appears,
+because it removes the last excuse for learning the identity &mdash; the
+identity is now actively wrong &mdash; and it forces the network to learn
+something about the structure of the data rather than about the data itself. It
+is also, in retrospect, the direct ancestor of masked language modelling and of
+diffusion models, both of which are "corrupt the input, predict what it was".
+
+## Non-linear, and what it buys
+
+If linear autoencoders are PCA, why build a deep one?
+
+Because the principal subspace is a **flat** subspace, and the structure in
+real data usually is not flat. Images of a rotating object trace a curve
+through pixel space; the best 2-plane through that curve is a poor description
+of it. A non-linear encoder can follow the curve, and a convolutional encoder
+can additionally exploit the fact that a shifted image is the same image
+&mdash; something a dense linear map has no way to know.
+
+The architecture stays the same three parts. The layer table in the explorer
+gives a convolutional autoencoder for 28&times;28 input, and the parameter
+counts update with the bottleneck you have selected.
+
+```python
+import torch
+import torch.nn as nn
+
+class ConvAutoencoder(nn.Module):
+    def __init__(self, latent=16):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.Conv2d(1, 16, 3, stride=2, padding=1), nn.ReLU(True),   # 28 -> 14
+            nn.Conv2d(16, 32, 3, stride=2, padding=1), nn.ReLU(True),  # 14 -> 7
+            nn.Flatten(),
+            nn.Linear(32 * 7 * 7, latent))
+        self.decoder = nn.Sequential(
+            nn.Linear(latent, 32 * 7 * 7), nn.ReLU(True),
+            nn.Unflatten(1, (32, 7, 7)),
+            nn.ConvTranspose2d(32, 16, 3, stride=2, padding=1,
+                               output_padding=1), nn.ReLU(True),       # 7 -> 14
+            nn.ConvTranspose2d(16, 1, 3, stride=2, padding=1,
+                               output_padding=1),                      # 14 -> 28
+            nn.Sigmoid())
+
+    def forward(self, x):
+        return self.decoder(self.encoder(x))
+
+model = ConvAutoencoder(latent=16)
+opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+loss_fn = nn.MSELoss()
+
+for images, _ in loader:          # the labels are not used at all
+    out = model(images)
+    loss = loss_fn(out, images)   # the target IS the input
+    opt.zero_grad(); loss.backward(); opt.step()
+```
+
+Three details that cause real trouble. `output_padding=1` is required on the
+transposed convolutions or 7 becomes 13 instead of 14 &mdash; stride-2
+downsampling is not exactly invertible and the ambiguity has to be resolved
+explicitly. `Sigmoid` on the output must match the input range: pair it with
+`MSELoss` or `BCELoss` on data in [0, 1], and if your data is normalised to
+[&minus;1, 1] use `Tanh` instead. And `for images, _ in loader` is the whole
+point of the method &mdash; the labels are discarded, because the supervision
+is the input itself.
+
+For the denoising variant, change one line:
+
+```python
+    noisy = images + 0.3 * torch.randn_like(images)
+    out = model(noisy.clamp(0, 1))
+    loss = loss_fn(out, images)     # corrupted in, clean out
+```
+
+## Choosing the bottleneck
+
+The bottleneck size is the one real hyperparameter, and the error curve in the
+explorer is the tool for choosing it.
+
+The curve is the tail sum of the eigenvalues, so its shape says something
+precise: how much of the dataset's variance is left unexplained after k
+directions. Where it drops steeply, each new dimension is buying a lot. Where
+it flattens, the remaining directions are describing noise and per-example
+detail rather than structure.
+
+The elbow is where to sit. Move the slider on this dataset and the curve falls
+sharply to about k = 5 and then flattens &mdash; six shapes with a little
+positional and thickness variation genuinely need about that many numbers.
+Choosing k = 12 does not make the model better; it makes it a slightly lossy
+copy machine, and the variance-retained figure will read close to 100% while
+the representation has stopped meaning anything.
+
+Two symptoms tell you which side of the elbow you are on. Too narrow and every
+reconstruction looks like the dataset average &mdash; watch k = 1 in the
+explorer. Too wide and the reconstruction is excellent while the latent space
+is useless for anything downstream, because the encoder has been allowed to
+pass the input through nearly unchanged rather than describe it.
+
+## What autoencoders are actually used for
+
+Not compression. JPEG is better, faster and does not need a GPU or a training
+set, and an autoencoder only compresses data resembling what it was trained on.
+
+What they are used for:
+
+- **Anomaly detection.** Train on normal data only; anything the model
+  reconstructs badly is unlike what it saw. This is a genuinely common
+  production use in manufacturing and monitoring, and it works because the
+  bottleneck refuses to represent what it has no basis for.
+- **The latent space of a diffusion model.** Stable Diffusion does not diffuse
+  in pixel space; it diffuses in the latent space of a trained autoencoder, at
+  roughly 1/8 the resolution per side. The autoencoder is what makes
+  high-resolution generation affordable.
+- **Pretraining and representation learning**, where masked autoencoders (MAE)
+  brought the idea back for vision transformers &mdash; mask 75% of the patches
+  and reconstruct them, which is the denoising objective at an extreme.
+
+The through-line is the same in all three: an autoencoder is a way to find out
+what a dataset's structure is, by forcing something to describe it in fewer
+numbers than it came in.

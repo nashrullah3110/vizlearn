@@ -1,0 +1,179 @@
+title: Machine Translation with an Encoder-Decoder
+intro: Two problems, not one - deciding what each output word depends on, and deciding which output sequence to emit.
+
+## Alignment, without an alignment model
+
+Statistical machine translation before 2014 had an explicit alignment
+component: a separate model, trained separately, deciding which source words
+each target word came from. It was a whole subfield.
+
+Neural translation deleted it, and got alignment for free. The attention
+weights &mdash; trained on nothing but "predict the next target token" &mdash;
+turn out to concentrate on the source words a translator would point at.
+
+The heatmap in the explorer shows this. Every row is one target word, every
+column one source word, and the row sums to 1. Look at the first sentence: `le
+chat noir` becomes `the black cat`, and the alignment **crosses**, because
+French puts the adjective after the noun. Target word 2 (`black`) attends to
+source word 3 (`noir`). No rule encoded that; a model that mis-aligned it would
+translate badly and be penalised.
+
+The second sentence shows the harder cases. French negation wraps the verb in
+two words, `ne ... pas`, where English uses one, `not` &mdash; so `not` attends
+to both. And `do` has nothing at all to align to: it exists only because English
+requires an auxiliary in negated sentences. Its attention is diffuse, which is
+the model correctly reporting that there is no source word to point at.
+
+The **entropy** statistic quantifies that. A sharp alignment is under about 0.6
+bits; a diffuse one is higher, and the "effective sources" figure converts it
+back into a count of words. Sliding the temperature control shows the two
+failure modes: flatten the distribution and the context vector becomes an
+average of the whole sentence, sharpen it too far and a word that genuinely
+depends on two source words can only look at one.
+
+## The second problem: which sequence?
+
+The model gives you a probability distribution over the next token, conditioned
+on the source and everything emitted so far. It does *not* give you a
+translation. Turning one into the other is a search over an exponentially large
+space, and it is a separate algorithm with its own settings.
+
+**Greedy decoding** takes the highest-probability token at each step. It is
+cheap, it is what people implement first, and it is wrong in a specific and
+damaging way.
+
+Select the second sentence in the explorer and set the beam width to 1. The
+model's own next-token table gives, after `i`:
+
+| next token | log p |
+|---|---|
+| speak | &minus;0.60 |
+| do | &minus;0.70 |
+| don't | &minus;1.50 |
+
+Greedy takes `speak`, and the output is **"i speak french"** &mdash; a fluent
+sentence with the opposite meaning, because the negation is gone and there is
+no way back. Widen the beam to 3 and `do` stays alive; it leads to `not`,
+`speak`, `french`, and a total log-probability of &minus;1.22 against greedy's
+&minus;2.25.
+
+That is the entire argument for beam search, and the example is chosen because
+the failure is *semantic*. Greedy decoding does not produce noticeably worse
+grammar. It produces confident, well-formed sentences that mean something else.
+
+## How beam search works
+
+Keep the k best partial sequences at every step. Expand each with every
+possible next token, score all the candidates, keep the best k again, and
+continue until they have all emitted end-of-sequence.
+
+The tree in the explorer draws this. Each row is one step, the surviving beams
+are the boxes, and the edges show which parent each came from. The best-scoring
+beam is highlighted, and you can watch it change parent partway down &mdash;
+which is exactly the moment beam search does something greedy cannot.
+
+Two things are worth knowing about the width. It is *not* exact search: beam
+search offers no guarantee of finding the highest-probability sequence, because
+a sequence whose prefix falls out of the top k at any step is gone forever. And
+increasing it does not monotonically help. Past roughly 10, translation quality
+measured by BLEU typically *degrades*, which is a well-documented and slightly
+uncomfortable result: the model's true highest-probability output tends to be
+short and dull, and a narrow beam's failure to find it is doing useful work.
+The statistic in the explorer comparing your beam against beam 5 is there to
+make the point that wider is often just the same answer for more compute.
+
+## The length penalty
+
+Every token multiplies another probability below 1, so a longer sequence has a
+lower total probability, always. Unnormalised, the search therefore prefers to
+stop early &mdash; it will truncate rather than finish the sentence.
+
+Set the length penalty **alpha to 0** in the explorer on the first sentence.
+The winning beam becomes "the cat", with a total log-probability of
+&minus;1.72, beating the full "the black cat sleeps on the mat" at &minus;2.10.
+The short output is not better; it is shorter.
+
+The standard fix divides the score by a function of length:
+
+```
+score = (sum of log probabilities) / ((5 + |Y|) / 6) ^ alpha
+```
+
+At alpha = 0.7 the full sentence scores &minus;1.225 against the truncation's
+&minus;1.409, and wins. Push alpha past 1 and the correction over-corrects: the
+model starts padding, because length is now rewarded on its own.
+
+This is a genuine hyperparameter with no principled value, tuned on a
+development set, and it is the reason two implementations of "the same" model
+produce different output.
+
+```python
+import torch
+
+def beam_search(model, src, beam=4, alpha=0.7, max_len=64, eos=2):
+    beams = [([bos], 0.0)]
+    finished = []
+    for _ in range(max_len):
+        candidates = []
+        for seq, logp in beams:
+            if seq[-1] == eos:
+                finished.append((seq, logp)); continue
+            logits = model(src, torch.tensor([seq]))[0, -1]
+            for tok, lp in zip(*logits.log_softmax(-1).topk(beam)):
+                candidates.append((seq + [int(tok)], logp + float(lp)))
+        if not candidates:
+            break
+        # Normalise by length BEFORE ranking, or short sequences always win.
+        candidates.sort(key=lambda c: c[1] / ((5 + len(c[0])) / 6) ** alpha,
+                        reverse=True)
+        beams = candidates[:beam]
+    finished.extend(beams)
+    return max(finished, key=lambda c: c[1] / ((5 + len(c[0])) / 6) ** alpha)[0]
+```
+
+The comment marks the mistake that is easiest to make: normalising after
+selection rather than before means the pruning at every step still has the
+short-sequence bias, and the penalty only affects the final pick.
+
+## Why it stops
+
+One mechanical detail decides how long the output is, and it is not a length
+parameter.
+
+The target vocabulary contains a special end-of-sequence token, and it is
+predicted like any other word. The model has learned, from the training data,
+that after a complete sentence the most likely next token is the one that ends
+it. Generation stops when that token is emitted &mdash; or when a maximum
+length is hit, which is a safety net rather than the intended path.
+
+This is why the length penalty operates where it does. The competition is
+between emitting end-of-sequence now and emitting another content word, and
+both are just entries in the same distribution. When the accumulated
+log-probability is the score, stopping is always locally attractive, because it
+is the only choice that stops making the score worse.
+
+Watch the beam table with the first sentence and alpha at 0: the winning
+sequence ends after two words, with `</s>` scoring &minus;0.95 against
+continuing. It is not that the model does not know the rest of the sentence; it
+is that the search prefers not to say it.
+
+The same mechanism produces the opposite failure in a badly-trained model.
+If end-of-sequence is under-predicted &mdash; common when training data has few
+short examples &mdash; generation runs to the length cap and produces a
+sentence that trails off mid-clause. Both failures look like decoder problems
+and are, at bottom, arithmetic about one token.
+
+## What changed, and what did not
+
+The recurrence in this architecture is gone &mdash; a transformer encoder and
+decoder replaced it, and the attention that was one component became the whole
+model. Word-level vocabularies are gone too, replaced by subword tokenisation,
+which is what stopped translations containing `<unk>` for every rare name.
+
+Everything on the second half of this page survived unchanged. A transformer
+still produces a distribution over the next token and still needs a search over
+sequences to turn that into output. Beam width and length penalty are still
+tuned per model. And a large language model generating text is doing exactly
+this, usually with sampling instead of beam search &mdash; temperature, top-k
+and nucleus sampling are alternative answers to the same question this page
+asks: given a next-token distribution, which sequence do you actually emit?

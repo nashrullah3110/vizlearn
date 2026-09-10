@@ -2183,3 +2183,10 @@ LABS.update(_MATH_CHECKS)
 from dl_topics import CHECKS as _DL_CHECKS  # noqa: E402
 
 LABS.update(_DL_CHECKS)
+
+# And the fifteen named-architecture modules (tools/arch_topics.py), which
+# span three tracks but share one explorer harness. Their questions are
+# written against that explorer, so they belong with it.
+from arch_topics import CHECKS as _ARCH_CHECKS  # noqa: E402
+
+LABS.update(_ARCH_CHECKS)

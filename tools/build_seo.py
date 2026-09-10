@@ -184,8 +184,15 @@ SHARED_SCRIPTS = (
     ("vizlearn-interview.js", "data-vz-iv"),
     # The retrieval widgets on the generated gen_ai/ pages.
     ("vizlearn-ragviz.js", "data-vz-rv"),
+    # The vector-index explorers, which register extra models into the
+    # harness above. Listed after it, because deferred scripts run in
+    # document order and this one reads window.VizRagViz at parse time.
+    ("vizlearn-annviz.js", "data-vz-ann"),
     # The image-processing harness on the generated computer_vision/ modules.
     ("vizlearn-cv.js", "data-vz-cv"),
+    # The architecture explorers: the named-model modules across computer
+    # vision, NLP and deep learning share one harness.
+    ("vizlearn-arch.js", "data-vz-arch"),
     # Query variants and two-transaction timelines on the database/ modules.
     # This only wires buttons; the SQL engine itself is vizlearn-sql.js above.
     ("vizlearn-dbq.js", "data-vz-dbq"),

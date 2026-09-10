@@ -1,0 +1,199 @@
+title: GAN Architecture and Equilibrium
+intro: Two networks with opposite goals, one closed-form solution for the discriminator, and a divergence that explains everything that goes wrong.
+
+## The game
+
+A generator maps noise to samples. A discriminator receives a sample and
+estimates the probability that it came from the real data rather than the
+generator. They are trained against each other:
+
+```
+min over G   max over D   E_data[log D(x)]  +  E_z[log(1 - D(G(z)))]
+```
+
+The discriminator wants that expression large. The generator wants it small.
+There is no target output for the generator anywhere &mdash; nobody says what a
+good sample looks like &mdash; only a second network's opinion, which improves
+as the generator does. That is what makes the approach interesting, and it is
+also the source of every difficulty in the rest of this page.
+
+## The discriminator has a closed form
+
+Here is the fact that makes this page exact rather than a demo. Hold the
+generator fixed. The objective is a sum over `x` of
+
+```
+p_data(x) log D(x) + p_g(x) log(1 - D(x))
+```
+
+and each `x` is independent of the others, so you can maximise pointwise.
+Differentiating `a log d + b log(1 - d)` and setting it to zero gives
+`d = a / (a + b)`, so:
+
+```
+D*(x) = p_data(x) / (p_data(x) + p_g(x))
+```
+
+The blue curve in the explorer is that formula. It needs no training, no seed
+and no learning rate. Where only real data lives it is 1; where only generated
+samples live it is 0; where the two densities are equal it is exactly 0.5.
+
+## Substituting it turns the game into a divergence
+
+Put `D*` back into the objective and the algebra collapses to:
+
+```
+V(D*, G) = -log 4 + 2 * JSD(p_data || p_g)
+```
+
+The Jensen-Shannon divergence is symmetric, non-negative, and zero only when
+the two distributions are identical. So the generator is minimising a genuine
+distance between distributions, and the game has a **unique global optimum** at
+`p_g = p_data`, where the value is `-log 4 = -1.386` and the discriminator is
+reduced to answering 0.5 everywhere &mdash; not because it is bad, but because
+there is nothing left to distinguish.
+
+Both numbers are on screen. Set the target to one mode and drag the generator's
+mean and spread until the divergence reaches 0; the value function arrives at
+&minus;1.386 at the same moment. That is the theorem, and it is being checked
+numerically as you move the slider.
+
+## Where the gradient goes
+
+Now set the generator's mean far from the data so the distributions barely
+overlap, and read the two gradient figures.
+
+With almost no overlap the optimal discriminator is correct about everything.
+Under the generator, `D* ~ 0`, and `log(1 - D*)` is flat there &mdash; it is
+already almost `log 1 = 0` and moving the generator slightly does not change it.
+**The gradient vanishes exactly when the generator is worst.**
+
+This is the trap. The better the discriminator, the more perfectly it separates
+the two, and the less the generator can learn. It is not an optimisation
+failure; it is a property of the loss.
+
+The original paper's own fix is in the same section that derives the problem.
+Instead of minimising `log(1 - D(G(z)))`, **maximise `log D(G(z))`** &mdash; the
+non-saturating form. Same fixed point, completely different gradient magnitude
+in exactly the regime where it matters. Switch the loss control in the explorer
+with the distributions separated and compare the two numbers; the ratio is the
+whole reason every implementation uses the second form.
+
+Later work went further: Wasserstein GAN replaced the divergence entirely,
+because the JSD between two distributions on disjoint supports is a constant
+(log 2) and therefore has no gradient at all, while the earth-mover distance
+still knows which direction is closer.
+
+## Mode collapse, exactly
+
+Set the target distribution to **two modes** and leave the generator narrow.
+
+The generator here is a single Gaussian, so it genuinely cannot cover two
+separated modes. Sitting on one of them scores far better than straddling the
+gap. The explorer says so, and there is a reason for reproducing the failure in
+a model too simple to avoid it: it isolates the part of mode collapse that has
+nothing to do with capacity.
+
+A real generator has ample capacity to cover both modes and collapses anyway.
+The objective is the reason. The discriminator judges **one sample at a time**.
+It can say "this looks real" or "this looks fake"; it has no way to say "these
+are all the same". So a generator that finds one output the discriminator
+accepts and produces it forever is scoring perfectly by the stated objective.
+Nothing in the equation at the top of this page mentions diversity.
+
+The fixes all amount to giving the discriminator batch-level information:
+minibatch discrimination gives it statistics across the batch, unrolled GANs
+let the generator see the discriminator's future response, and WGAN-GP changes
+the distance so the gradient keeps pointing at the uncovered mode.
+
+## The architecture
+
+The theory is distribution-shaped; the practice is a pair of convolutional
+networks. The DCGAN table in the explorer builds both at 64&times;64 and counts
+their parameters as you change the base width.
+
+Read the generator top to bottom: a 100-dimensional noise vector is projected
+and reshaped to 4&times;4&times;1024, then four transposed convolutions double
+the resolution each time to 64&times;64&times;3. The discriminator is the same
+thing reversed, strided convolutions halving the resolution down to a single
+logit.
+
+The near-symmetry is deliberate and it is the practical heart of GAN training.
+If the discriminator is much stronger it wins immediately and the generator's
+gradient disappears; much weaker and its judgement is noise. DCGAN's other
+rules are all stability patches on the same problem: strided convolutions
+rather than pooling, batch norm in both networks, no fully-connected hidden
+layers, ReLU in the generator and LeakyReLU in the discriminator.
+
+```python
+import torch.nn as nn
+
+class Generator(nn.Module):
+    def __init__(self, z=100, base=64, out_ch=3):
+        super().__init__()
+        def up(cin, cout, first=False, last=False):
+            layers = [nn.ConvTranspose2d(cin, cout, 4,
+                                         stride=1 if first else 2,
+                                         padding=0 if first else 1, bias=False)]
+            if last:
+                return nn.Sequential(*layers, nn.Tanh())
+            return nn.Sequential(*layers, nn.BatchNorm2d(cout), nn.ReLU(True))
+
+        self.net = nn.Sequential(
+            up(z, base * 8, first=True),   # 1x1   -> 4x4
+            up(base * 8, base * 4),        # 4x4   -> 8x8
+            up(base * 4, base * 2),        # 8x8   -> 16x16
+            up(base * 2, base),            # 16x16 -> 32x32
+            up(base, out_ch, last=True))   # 32x32 -> 64x64
+
+    def forward(self, z):
+        return self.net(z.view(z.size(0), -1, 1, 1))
+```
+
+`Tanh` on the output is not decoration: it bounds the generator's range to
+[&minus;1, 1], and the real images must be normalised to the same range or the
+discriminator can separate real from fake on scale alone and learns nothing
+about content. It is the most common first bug.
+
+## Reading the training curves, and why they tell you nothing
+
+One consequence of the theory above is worth stating on its own, because it
+catches everyone who trains a GAN for the first time.
+
+**The loss values do not indicate progress.** In ordinary supervised training a
+falling loss means the model is improving. Here the two losses are measured
+against each other, and both networks are moving. A discriminator loss near
+`log 2` means it cannot tell real from fake &mdash; which is either the
+equilibrium you wanted or a discriminator that has collapsed. A generator loss
+that falls steadily usually means the discriminator is losing, not that the
+samples are good.
+
+The value function in the explorer is the exception, and only because it is
+computed against the *optimal* discriminator rather than a network being
+trained alongside. In a real run you do not have `D*`, you have whatever your
+discriminator currently is, and the number it produces is not comparable
+between steps.
+
+So GAN progress is measured by looking at samples, or by a sample-based metric.
+**FID** &mdash; the Frechet Inception Distance &mdash; passes generated and real
+images through an Inception network, fits a Gaussian to each set of activations,
+and reports the distance between them. It is not a loss, it cannot be optimised
+directly, and it is the number papers actually report. It also has the property
+the training loss lacks: it penalises a generator that produces excellent
+samples with no variety, because a collapsed set of activations has the wrong
+covariance.
+
+## Where GANs stand now
+
+Diffusion models displaced GANs as the default for image generation, and the
+reason is on this page. A diffusion model has a **stable regression objective**
+&mdash; predict the noise that was added &mdash; with no second network to
+balance against, no equilibrium to reach and no mode collapse to detect. Trading
+adversarial training for a simple loss and more sampling steps turned out to be
+the right trade at scale.
+
+GANs remain the right tool where a single forward pass is required: real-time
+super-resolution, image-to-image translation, on-device generation. And the
+adversarial idea itself long outgrew image synthesis &mdash; domain-adversarial
+training, adversarial robustness and the discriminator in a perceptual loss are
+all this page's structure, applied to something else.

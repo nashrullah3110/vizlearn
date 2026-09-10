@@ -1,0 +1,139 @@
+title: Annoy: A Practical Guide
+intro: How do random projection trees find neighbours, and why does Annoy build a forest?
+
+## One tree
+
+Take the vectors in a node. Choose two of them at random, compute the
+hyperplane equidistant from both, and split the set by which side each vector
+falls on. Recurse until a node holds fewer than K vectors — that is a leaf.
+
+Searching one tree means walking down to the leaf containing the query and
+returning what is in it.
+
+The blue lines in the visualisation are the split planes of the tree currently
+drawn, and the blue points are the vectors in the leaves it contributed.
+Change **Tree drawn** and the partition is completely different, because the
+splitting pairs were chosen at random.
+
+Nothing is learned. Compare that with [IVF](ivf_flat_index.html), whose
+partition is fitted with k-means: Annoy's is arbitrary, which makes it very
+fast to build and, individually, much worse.
+
+## Why one tree cannot be fixed
+
+Set **n_trees** to 1 and sweep **search_k** to its maximum. Recall plateaus
+well short of 1.0 and stays there.
+
+This is the observation the whole design rests on. A single tree's failure is
+structural: a neighbour on the far side of a split near the query is in a
+different leaf, and no amount of extra searching inside that tree brings it
+back. Searching harder explores more of the *same* partition.
+
+Because the splits are random, this happens often. A random hyperplane through
+a dense neighbourhood will separate some genuinely close pairs, and with a
+tree of depth 12 there are twelve chances for that to happen to any given
+query.
+
+## Why a forest works
+
+Now raise n_trees. Recall climbs steadily, because each tree cuts the space
+along different random directions, and it is unlikely that many independent
+random planes all separate a query from the same neighbour. The candidate set
+is the union of the leaves reached across all trees, and it is rescored
+exactly at the end — so the trees only have to be good at *including* the
+right vectors, not at ranking them.
+
+This is the same argument as a random forest in machine learning, for the same
+reason. Individually weak and randomly varied; reliable in aggregate. The
+variance that makes any one tree unreliable is exactly what makes their union
+cover the space.
+
+The cost is linear: n_trees trees is n_trees times the memory and roughly
+n_trees times the build time. Spotify's guidance is to raise it as far as
+memory allows.
+
+## search_k, and what the budget buys
+
+The search does not walk each tree to completion in turn. It maintains one
+priority queue across the roots of **all** trees at once, ordered by how far
+the query is from each split plane it has crossed, pops the most promising
+node, descends, and stops once `search_k` candidates have been collected.
+
+Ordering by distance-to-plane is what makes the budget spend itself well. A
+query deep inside a leaf's region will not waste effort on the far side of
+that boundary; a query sitting almost on a plane will explore both sides, in
+every tree, because that is precisely where the missing neighbours would be.
+
+Two consequences worth internalising:
+
+- **search_k is a budget over the forest, not per tree.** Doubling n_trees
+  with search_k fixed gives more diverse candidates for the same work — up to
+  the point where the budget is spread too thin, which you can see here as the
+  dip in recall at many trees and a small budget.
+- **The default is `n_trees × n`**, which is why leaving it unset gets good
+  recall and unremarkable speed.
+
+## The reason it exists
+
+Annoy's accuracy per millisecond is worse than HNSW's. It is still in
+production at Spotify and elsewhere, and the reason is the file format rather
+than the algorithm.
+
+An Annoy index is a **static file that is memory-mapped**. That produces four
+properties that are hard to get any other way:
+
+- Many processes on one machine share a single copy at zero marginal memory.
+- The OS page cache decides what stays resident, so an index larger than RAM
+  degrades gracefully instead of failing.
+- Deploying a new index is shipping a file and swapping a pointer.
+- A process starts serving immediately rather than loading a graph into the
+  heap — which matters when you run many short-lived workers.
+
+For a service that rebuilds its recommendations nightly and runs many
+replicas, those can matter more than a factor of two in query time.
+
+They are also the flip side of the main limitation. The index is immutable:
+there is no insert, no delete, no update. Adding a vector means rebuilding.
+That is fine for nightly batch recommendations and disqualifying for a
+document store that users write to.
+
+## Where it sits
+
+| Choose | When |
+|---|---|
+| Annoy | batch-rebuilt corpus, many processes sharing one index, no server wanted |
+| [HNSW](hnsw_index.html) | best recall per millisecond, corpus fits in RAM, updates needed |
+| [IVF-PQ](ivf_pq_index.html) | memory is the binding constraint |
+| [DiskANN](diskann_index.html) | corpus does not fit in RAM at all |
+| [Flat](flat_index.html) | under a few hundred thousand vectors, or recall must be exact |
+
+```python
+from annoy import AnnoyIndex
+
+index = AnnoyIndex(768, "angular")     # angular = cosine on normalised vectors
+for i, v in enumerate(vectors):
+    index.add_item(i, v)
+
+index.build(n_trees=50)                # more trees: better recall, more memory
+index.save("index.ann")                # a plain file
+
+# In each serving process:
+loaded = AnnoyIndex(768, "angular")
+loaded.load("index.ann")               # mmap - near-instant, shared across processes
+ids = loaded.get_nns_by_vector(query, 10, search_k=-1)
+```
+
+`load` is an mmap, which is why it is instant and why several processes cost
+one copy. And `build` is terminal: after it, `add_item` raises. The API is
+telling you the same thing the architecture does — this is an index you
+rebuild, not one you maintain.
+
+## In one line
+
+Annoy splits the space with hyperplanes bisecting random pairs of points,
+recursively, and builds many such trees. One tree is weak and cannot be
+rescued by searching harder; the union of a forest is strong. n_trees is the
+build knob, search_k the runtime budget across the whole forest. Its real
+advantage is operational — a static, memory-mappable file shared across
+processes — and its real limitation is the same thing, because static means
+rebuild-only.

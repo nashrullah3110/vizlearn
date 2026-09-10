@@ -115,6 +115,18 @@ CSS = """
             color: var(--text-main); font-weight: 700; text-align: right;
         }
         .vz-rv-note { font-size: 0.78rem; line-height: 1.65; color: var(--text-muted); }
+
+        /* The drawn scene on the vector-index modules. The SVG carries its own
+           aspect ratio, so it only needs a width and something to stop a drag
+           being claimed by the browser as a page scroll. */
+        .vz-rv-scene { line-height: 0; }
+        .vz-ann-svg {
+            display: block;
+            width: 100%;
+            height: auto;
+            touch-action: none;
+            cursor: crosshair;
+        }
 """
 
 
@@ -140,9 +152,16 @@ def widget(entry):
 
     watch = "".join("<li>%s</li>" % w for w in entry.get("notice", []))
 
+    # A spec may ask for a drawn scene above the bars. Only the vector-index
+    # models use it, and the attribute is what build_seo hooks to decide
+    # whether a page needs assets/vizlearn-annviz.js - so a page that does not
+    # draw an index never downloads the code that draws one.
+    scene = '<div class="p-5 pb-0 vz-rv-scene" hidden></div>' if spec.get("scene") else ""
+    ann = " data-vz-ann" if spec.get("scene") else ""
+
     return """
         <div class="vz-rv grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in"
-             data-vz-rv data-model="%(model)s">
+             data-vz-rv data-model="%(model)s"%(ann)s>
             <script type="application/json" class="vz-rv-data">%(data)s</script>
             <div class="lg:col-span-3 space-y-6">
                 %(controls)s
@@ -157,9 +176,11 @@ def widget(entry):
         </div>
 """ % {
         "model": html.escape(spec["model"]),
+        "ann": ann,
         "data": data,
         "controls": card("Parameters", '<div class="p-5 vz-rv-controls"></div>'),
-        "bars": card("Visualisation", '<div class="p-5 vz-rv-bars"></div>',
+        "bars": card("Visualisation",
+                     scene + '<div class="p-5 vz-rv-bars"></div>',
                      '<span class="mono-font text-xs vz-rv-badge" '
                      'style="color: var(--text-muted)">&mdash;</span>'),
         "stats": card("Readout", '<div class="p-5 vz-rv-stats"></div>'

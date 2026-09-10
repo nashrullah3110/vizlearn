@@ -1,0 +1,165 @@
+title: Mask R-CNN
+intro: Faster R-CNN with a third head, and one fixed rounding bug that is the entire reason the third head works.
+
+## The architecture, in four parts
+
+Mask R-CNN inherits almost everything from Faster R-CNN and adds one branch.
+
+1. A **backbone with a feature pyramid** &mdash; usually ResNet-50 or -101 with
+   FPN &mdash; producing feature maps at strides 4, 8, 16 and 32.
+2. A **region proposal network** sliding over those maps, emitting a few
+   thousand class-agnostic "something is here" boxes, cut to around 1,000 by
+   NMS.
+3. **RoIAlign**, which crops a fixed-size feature patch for each proposal.
+4. Three **heads** on that patch: classification, box refinement, and the new
+   one, a mask.
+
+The heads are where the parameter budget sits, and the split is unintuitive:
+
+| Head | Input | Structure | Output | Parameters |
+|---|---|---|---|---|
+| classification | 7&times;7&times;256 | fc 12544&rarr;1024, fc 1024&rarr;1024 | 81 scores | ~13.9 M |
+| box | shares those two fc layers | | 4 &times; 80 offsets | ~0.33 M |
+| mask | 14&times;14&times;256 | 4 &times; conv3&times;3(256), deconv, conv1&times;1 | 80 &times; 28 &times; 28 | ~2.64 M |
+
+The mask head is the *cheapest* of the three despite producing 62,720 numbers,
+because it is fully convolutional and the box head is not.
+
+## The bug that mattered
+
+RoIPool, inherited from Fast R-CNN, converts an arbitrary region of a feature
+map into a fixed 7&times;7 grid. It does so with two roundings:
+
+1. The proposal's floating-point coordinates are snapped to whole feature cells.
+2. The 7&times;7 bin boundaries inside that region are snapped to whole cells
+   too.
+
+Drag the proposal in the explorer and watch the dashed red box &mdash; what
+RoIPool actually pools &mdash; jump around the solid orange one, which is what
+the RPN proposed. The statistic underneath translates the gap into input
+pixels: at stride 16, being half a feature cell out is **8 pixels** in the
+original image. At stride 32 it is 16.
+
+For classification this genuinely does not matter. The question "is this a cat"
+has the same answer whether your crop is eight pixels off, and the pooled
+features are a summary either way. For a mask it matters enormously, because
+the output is a per-pixel map that gets pasted back onto the image at that
+location. An eight-pixel systematic offset is visible in every single
+prediction.
+
+## RoIAlign
+
+RoIAlign removes both roundings. The region keeps its floating-point
+coordinates, the bins are divided exactly, and inside each bin four sample
+points are read by **bilinear interpolation** from the four nearest feature
+cells &mdash; then averaged.
+
+The dots in the explorer are those sample points. Watch them slide smoothly as
+you drag, where the red box jumps in discrete steps.
+
+The smoothness is the technical point, not just an aesthetic one. Bilinear
+interpolation is differentiable with respect to the sampling location, so
+gradients flow back to the box coordinates. Rounding is a step function whose
+derivative is zero everywhere it is defined, so RoIPool silently cut that path.
+
+The two pooled maps are drawn side by side with their mean absolute difference.
+Nudge the proposal width by a tenth of a cell: the RoIAlign map barely moves,
+the RoIPool map can change substantially. The paper reports that this change
+alone improves mask AP by around 10 points relative on COCO, and by up to 50%
+relative under the strict IoU=0.75 criterion &mdash; where being eight pixels
+out is precisely what decides a match.
+
+## Decoupling mask from class
+
+The second design decision is easy to miss. The mask head predicts **K
+separate masks**, one per class, and the loss is only applied to the channel of
+the ground-truth class.
+
+The alternative &mdash; one mask with a per-pixel softmax over classes &mdash;
+is what FCN-style semantic segmentation does, and it forces the classes to
+compete pixel by pixel. Mask R-CNN does not need that competition, because the
+classification head has already decided what the object is. Letting the mask
+branch answer "which pixels belong to *this* object" independently of "what
+class is it" is worth several points of AP, and it is why the mask branch never
+learns to suppress one class in favour of another.
+
+At inference you take the classification head's argmax and read only that
+channel's 28&times;28 mask, resize it to the predicted box, and threshold at
+0.5. The resize is why instance masks from this family have a characteristically
+soft, slightly blobby boundary: the real resolution of the answer is 28&times;28
+inside the box, however large the box is.
+
+## Which pyramid level a proposal is read from
+
+One detail sits between the RPN and RoIAlign and it is the reason the stride
+control on this page has three settings.
+
+With a feature pyramid there are four candidate maps to crop from, at strides
+4, 8, 16 and 32, and a proposal has to be assigned to one. Cropping a small
+object from the stride-32 map would give a region a couple of cells across,
+which contains almost nothing; cropping a large one from stride 4 wastes work
+and gives features with too little context.
+
+FPN assigns by size: a proposal of area *A* goes to level
+`k = floor(4 + log2(sqrt(A) / 224))`, clamped to the available range. A
+224&times;224 proposal &mdash; the ImageNet size, chosen deliberately &mdash;
+lands on level 4, at stride 16. Anything smaller drops to a finer level and
+anything larger rises to a coarser one.
+
+Switch the stride control in the explorer and watch the misalignment figure
+scale with it. The same half-cell rounding error is 2 pixels at stride 4 and 16
+pixels at stride 32, which is why the coarse levels are where RoIPool hurt
+most, and why the effect was largest on exactly the large objects that a
+detector otherwise finds easy.
+
+## The loss, and the multi-task balance
+
+```
+L = L_cls + L_box + L_mask
+```
+
+Three terms, equally weighted, plus the RPN's own two. `L_mask` is an average
+binary cross-entropy over the 28&times;28 grid of the correct class's channel
+only. It is worth noticing that nothing here is tuned: the paper does not
+weight the mask loss up or down, which is unusual for a multi-task network and
+suggests the three tasks are genuinely compatible rather than competing for
+capacity.
+
+```python
+import torchvision
+from torchvision.models.detection import maskrcnn_resnet50_fpn
+
+model = maskrcnn_resnet50_fpn(weights="DEFAULT").eval()
+out = model([image_tensor])[0]
+
+keep = out["scores"] > 0.5
+boxes = out["boxes"][keep]           # [N, 4]
+masks = out["masks"][keep]           # [N, 1, H, W], already pasted, soft
+labels = out["labels"][keep]
+
+binary = masks[:, 0] > 0.5           # the 0.5 threshold, applied explicitly
+```
+
+Two things in that snippet catch people. `masks` comes back already resized and
+pasted to full image resolution, and it is *soft* &mdash; probabilities, not
+booleans &mdash; so a threshold has to be applied, and 0.5 is a choice rather
+than a law. And the masks overlap: this is instance segmentation, so two
+instances can both claim a pixel, and resolving that into a single label per
+pixel is panoptic segmentation, which is a different task with a different
+metric.
+
+## What it left behind
+
+Mask R-CNN was state of the art in 2017 and is now the baseline that faster
+methods are measured against. YOLACT and SOLO produce instance masks in one
+stage; Mask2Former and the DETR family replace the whole propose-and-crop
+structure with set prediction and attention, and have no RoIAlign, no NMS and
+no anchors at all.
+
+But RoIAlign itself outlived the architecture. Any time you need to read a
+feature map at a location that is not on the grid &mdash; deformable
+convolutions, spatial transformers, keypoint heads, the 3-D detectors that
+project points into image features &mdash; the answer is bilinear sampling for
+exactly the reasons here: it is accurate and it is differentiable in the
+coordinate. The lesson generalises past detection: **if a location is
+continuous, do not round it.**

@@ -1,0 +1,187 @@
+title: Collaborative Filtering
+intro: Predict what someone will think of something they have never seen, using nothing but who rated what.
+
+## The only input is the matrix
+
+Content-based recommendation describes the items &mdash; genre, director,
+keywords &mdash; and matches them to a profile. Collaborative filtering has
+none of that. It has one thing: a matrix with users down the side, items across
+the top, and a rating in the cells that are filled.
+
+The matrix in the explorer is printed in full: sixteen people, fifteen titles,
+138 training ratings, and 37 more held back so that every method is scored on
+data none of them fitted. Click any cell and four methods will predict it.
+
+Two properties of that matrix drive everything.
+
+**It is mostly empty.** Here about a quarter of the cells are missing. On a real
+catalogue it is 99.9% or worse, because nobody has watched more than a
+vanishing fraction of a million titles. Every method below is a way of guessing
+a missing entry from the present ones.
+
+**Nothing in it says what an item is.** The words "sci-fi" and "romance" appear
+in the explorer for your benefit; no method reads them. That the methods
+recover the genre groups anyway is the point of the field.
+
+## User-based neighbours
+
+Find people who agreed with you in the past, and average what they thought of
+the thing you have not seen.
+
+Select **user-based kNN**, click an empty cell, and the neighbour table appears
+with the arithmetic. Read the columns carefully, because one of them is where
+the method's real content lives.
+
+Similarity is **Pearson correlation over the items both people rated**. It is a
+correlation, not an overlap count, so it asks whether two people's ratings move
+together rather than whether they are numerically close.
+
+Then the prediction:
+
+```
+prediction = your average
+           + sum over neighbours of  sim * (their rating - their average)
+             divided by  sum of |sim|
+```
+
+It averages **deviations**, not ratings. That matters more than it looks.
+Someone who rates everything 4 and someone who rates everything 2 can agree
+perfectly about which titles are better; centring each on their own mean is
+what lets the method notice that, and it is what stops a generous rater from
+dragging every prediction upward.
+
+Move the **k** slider. At k = 1 the prediction is one person's opinion and the
+error is high. Raising k averages more people and smooths, until eventually you
+are including neighbours who barely correlate and the extra noise costs more
+than the extra evidence buys.
+
+Click a cell where no neighbour has rated the item and the method falls back to
+the average, with a note. That is not a bug in the implementation &mdash; it is
+the **sparsity problem**, and on a real catalogue it is the common case rather
+than the exception.
+
+## Item-based neighbours
+
+Switch to **item-based kNN**. Instead of "people like you also liked", it is
+"people who liked this also liked", and the prediction combines your own
+ratings of similar items.
+
+Amazon's 2003 paper made this the industry default, for reasons that are
+practical rather than statistical. Item-item similarities are far more stable
+than user-user ones &mdash; a film's audience changes slowly, a person's taste
+and rating history change constantly &mdash; so the similarity matrix can be
+computed offline overnight and served from a cache. And it explains itself:
+"because you watched X" is a sentence you can put in the interface.
+
+On this matrix the two methods score similarly. On a real system with many more
+users than items, item-based wins on operational grounds before accuracy is
+discussed.
+
+## Matrix factorisation
+
+Both neighbourhood methods are local: they look at a handful of rows or
+columns. Matrix factorisation is global. It assumes the whole matrix is
+approximately low rank:
+
+```
+rating(u, i) ~ mu + b_u + b_i + p_u . q_i
+```
+
+Every user gets a vector `p_u`, every item a vector `q_i`, and the prediction is
+their dot product plus three offsets. The vectors are learned by gradient
+descent on the observed entries only &mdash; the missing ones are not treated as
+zero, they are simply not in the sum.
+
+Select it and look at the arithmetic line for your chosen cell. The three terms
+before the dot product are doing an enormous amount of work: `mu` is the global
+average, `b_u` is "this person rates generously", `b_i` is "this title is well
+liked". On real ratings data those three explain most of the variance before any
+latent factor is consulted, which is why a bias-only model is a genuinely
+strong baseline and why leaving the biases out is a common way to build a
+disappointing recommender.
+
+Then look at the item factor table. Sort it by any factor column and the three
+genres separate. Nobody supplied a genre. A factor is whatever direction best
+explains who rated what, and on this data that turns out to be genre &mdash; on
+a real catalogue the factors correspond to nothing nameable, which is the
+trade: accuracy for the ability to say why.
+
+Now move the **regularisation** slider with 5 or more factors selected. At 0.02
+the test RMSE is clearly worse than at 0.2. With 138 training ratings and eight
+factors for each of 31 users and items, the model carries nearly twice as many
+latent parameters as it has observations, and will fit the noise exactly unless
+something stops it. This is the clearest possible
+demonstration of why the Netflix Prize solutions were as much about
+regularisation as about factorisation.
+
+## Reading the comparison
+
+The bars at the bottom score every method on the same 37 held-out cells.
+Lower is better and the bars are drawn to scale, so a longer bar is a worse
+method.
+
+The ordering is the interesting part. The global average, at about 1.34, is the
+floor. The user's own average is *worse* than that, which is a real effect of a
+small sample: an average over eight or nine ratings is a noisy estimate, and a
+noisy personalised guess can be worse than an accurate impersonal one. Both
+neighbourhood methods beat both baselines clearly, landing near 0.9. Matrix
+factorisation, regularised sensibly, goes lower again, to about 0.78.
+
+Thirty-seven test cells is still a small sample and the caption says so &mdash;
+treat small differences as noise. The gap to the baselines is not small.
+
+One implementation detail that is easy to omit and worth about a tenth of an
+RMSE point: **clip the prediction to the rating scale**. A neighbourhood method
+extrapolates past the ends routinely &mdash; a user mean of 4.2 plus a positive
+deviation lands at 5.4 &mdash; and 5.4 is not a rating. Every prediction on this
+page is clipped to [1, 5] before it is shown or scored.
+
+```python
+import numpy as np
+
+# ratings: [U, I]; mask: [U, I] with 1 where a rating is observed.
+def sgd_factorise(ratings, mask, factors=8, steps=400, lr=0.02, reg=0.1, seed=0):
+    rng = np.random.default_rng(seed)
+    U, I = ratings.shape
+    P = rng.normal(0, 0.1, (U, factors))
+    Q = rng.normal(0, 0.1, (I, factors))
+    bu, bi = np.zeros(U), np.zeros(I)
+    mu = ratings[mask == 1].mean()
+    observed = list(zip(*np.nonzero(mask)))
+
+    for _ in range(steps):
+        for u, i in observed:                 # observed entries ONLY
+            pred = mu + bu[u] + bi[i] + P[u] @ Q[i]
+            err = ratings[u, i] - pred
+            bu[u] += lr * (err - reg * bu[u])
+            bi[i] += lr * (err - reg * bi[i])
+            pu = P[u].copy()
+            P[u] += lr * (err * Q[i] - reg * pu)
+            Q[i] += lr * (err * pu - reg * Q[i])
+    return P, Q, bu, bi, mu
+```
+
+The line to look at is `pu = P[u].copy()`. Update `P[u]` first and the `Q[i]`
+update uses the already-changed value, which is not the gradient you derived. It
+usually still trains, slightly worse, which is what makes it hard to notice.
+
+## What this cannot do
+
+**Cold start.** A new user has no ratings, so there are no neighbours and no
+learned vector. A new item has nobody who has rated it. Collaborative filtering
+is silent on both, and every production system pairs it with a content-based
+fallback for exactly this reason.
+
+**Popularity bias.** Popular items have more ratings, so they appear in more
+neighbourhoods and get recommended more, which earns them more ratings. The
+feedback loop is real, measurable, and the reason "diversity" and "serendipity"
+are metrics people actually track.
+
+**The missing entries are not missing at random.** People rate what they chose
+to consume, and they chose it because they expected to like it. The observed
+ratings are a biased sample of all possible ratings, and every method on this
+page quietly assumes they are not.
+
+The next page takes the same matrix and replaces the dot product with a neural
+network, which addresses none of these three &mdash; but does open the door to
+the side information that fixes the first.

@@ -3693,7 +3693,7 @@ have a tiny negative eigenvalue after rounding.
 
 The standard repairs: add a small multiple of the identity to the diagonal
 &mdash; *jitter*, or *ridge*, and the same idea as
-[ridge regression](ridge_and_lasso_regression.html); use a shrinkage estimator
+[ridge regression](../machine_learning/ridge_and_lasso_regression.html); use a shrinkage estimator
 such as Ledoit-Wolf; or clip the negative eigenvalues to zero and reassemble.
 
 ## Cholesky by hand, and the failure
@@ -4188,7 +4188,7 @@ objective.
 That bound is the ELBO &mdash; the evidence lower bound &mdash; and it is the
 objective a variational autoencoder trains on. EM alternates between tightening
 the bound and maximising it, which is exactly the two steps in
-[the Gaussian mixture module](gaussian_mixture_models.html).
+[the Gaussian mixture module](../machine_learning/gaussian_mixture_models.html).
 
 The gap between the bound and the truth is the KL divergence between the
 approximate posterior and the real one, which ties Jensen directly to

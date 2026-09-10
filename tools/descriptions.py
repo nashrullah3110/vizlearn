@@ -454,3 +454,9 @@ DESCRIPTIONS = {
     "python/reading_errors.html":
         "Read a traceback from the bottom up, recognise the common Python error types, and turn each message into the fix it points at.",
 }
+
+# The named-architecture modules (tools/arch_topics.py) write their own, one
+# per entry, so adding a module does not mean remembering to edit this file.
+from arch_topics import DESCRIPTIONS as _ARCH_DESCRIPTIONS  # noqa: E402
+
+DESCRIPTIONS.update(_ARCH_DESCRIPTIONS)

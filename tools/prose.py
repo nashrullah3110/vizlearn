@@ -50,6 +50,30 @@ INLINE_LEAD = re.compile(
 BOLD = re.compile(r"\*\*(.+?)\*\*", re.S)
 CODE = re.compile(r"`([^`]+)`")
 
+# [text](target), the markdown link.
+#
+# This was missing, and 70 content files were already written as though it
+# existed - so `[sharding](sharding_in_databases.html)` was rendering as that
+# literal string on live pages. Adding it fixes those and lets new articles
+# cross-reference without dropping into raw HTML mid-sentence.
+#
+# The target pattern is deliberately narrow. Article prose is full of things
+# that look like this and are not links: `items=[{"title": "Vectors"}], total=1`,
+# array slices, regex character classes. Requiring a link-shaped target - a
+# page, an anchor, a relative directory or an absolute URL, and no whitespace -
+# is what keeps those intact. Anything else is left exactly as written.
+LINK = re.compile(
+    r"(?<!!)\[([^\[\]]+)\]\("
+    r"((?:https?://|mailto:|\.\./|/|#)[^\s()]*|[\w./#-]+\.html(?:#[\w-]+)?|[\w./-]+/)"
+    r"\)")
+
+
+def link(text, href):
+    # An off-site link gets rel="noopener", matching what the references
+    # section emits; an internal one does not need it.
+    rel = ' rel="noopener"' if href.startswith(("http://", "https://")) else ""
+    return '<a href="%s"%s>%s</a>' % (href, rel, text)
+
 
 def code_span(text):
     """The inside of a `backtick span`, made safe to drop into the document.
@@ -68,9 +92,29 @@ def code_span(text):
 
 
 def inline(s):
-    """**bold** and `code`, left alone inside a tag's attributes."""
-    s = CODE.sub(lambda m: "<code>%s</code>" % code_span(m.group(1)), s)
-    return BOLD.sub(lambda m: "<strong>%s</strong>" % m.group(1), s)
+    """`code`, [links](page.html) and **bold**.
+
+    Code spans are pulled out first and put back last, so nothing inside a
+    pair of backticks is reinterpreted. That matters most for links: an
+    article showing `[0](x)` as a literal is showing code, not writing a
+    link, and running the link pass over the whole string would eat it.
+    """
+    parts, out = [], []
+    at = 0
+    for m in CODE.finditer(s):
+        parts.append(("text", s[at:m.start()]))
+        parts.append(("code", m.group(1)))
+        at = m.end()
+    parts.append(("text", s[at:]))
+
+    for kind, chunk in parts:
+        if kind == "code":
+            out.append("<code>%s</code>" % code_span(chunk))
+            continue
+        chunk = LINK.sub(lambda m: link(m.group(1), m.group(2)), chunk)
+        chunk = BOLD.sub(lambda m: "<strong>%s</strong>" % m.group(1), chunk)
+        out.append(chunk)
+    return "".join(out)
 
 
 def _list(lines, marker, tag):

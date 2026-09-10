@@ -1,0 +1,165 @@
+title: YOLO v8
+intro: One pass, 8,400 candidate boxes, and two thresholds that decide which of them you ever see.
+
+## One stage means one pass
+
+A two-stage detector like Faster R-CNN proposes regions, then classifies and
+refines each one. A one-stage detector does it in a single forward pass: the
+head emits, for every cell of every feature level, a class vector and a box.
+Nothing is proposed, nothing is cropped, nothing is re-run.
+
+That is where the speed comes from and also where the awkwardness comes from,
+because "every cell of every level" is a lot of boxes and almost all of them
+are wrong. At 640&times;640 with three levels:
+
+| Level | Stride | Grid | Predictions |
+|---|---|---|---|
+| P3 | 8 | 80 &times; 80 | 6,400 |
+| P4 | 16 | 40 &times; 40 | 1,600 |
+| P5 | 32 | 20 &times; 20 | 400 |
+| | | | **8,400** |
+
+Turn on the grid overlay in the explorer to see the three resolutions. P3's
+cells are 8 input pixels across, which is why it is the level that finds small
+objects; P5's are 32 across, which is why it handles large ones. This is the
+feature pyramid, and it is the reason a detector can span an order of magnitude
+of object size at all.
+
+## Backbone, neck, head
+
+Every modern detector has this three-part shape, and it is worth being able to
+name the parts.
+
+The **backbone** is a classification network with the classifier removed
+&mdash; in v8, a CSPDarknet variant whose repeating unit is the C2f block: a
+split, several bottleneck convolutions, and a concatenation of all the
+intermediate outputs. It produces feature maps at strides 8, 16 and 32.
+
+The **neck** mixes those levels. Semantic information is strongest at stride 32
+and spatial precision is strongest at stride 8, so a top-down path carries
+semantics down and a bottom-up path carries precision back up &mdash; the PAN
+arrangement, itself a descendant of FPN. Without it, the level that can see
+small objects has no idea what they are.
+
+The **head** turns each level into predictions. v8's head is *decoupled*: one
+small convolutional branch for classification and a separate one for box
+regression, rather than a single branch predicting both. Sharing them makes the
+two tasks fight over the same features, and separating them is worth about a
+point of mAP for a small amount of compute.
+
+## Anchor-free, and what that replaced
+
+Versions 2 through 7 were anchor-based: each cell carried several prior boxes
+of fixed size and aspect ratio, and the network predicted an offset from the
+nearest one. That meant a set of anchor dimensions had to be chosen per dataset
+&mdash; usually by k-means over the training boxes &mdash; and it meant three
+or more predictions per cell.
+
+v8 predicts, from each cell, the distances from that cell's centre to the four
+edges of the box. No priors, no offsets, one prediction per cell. The
+hyperparameter is gone.
+
+The regression is not a plain regression, though. Each of the four distances is
+predicted as a **distribution over 16 bins**, so the box branch emits
+4 &times; 16 = 64 channels per cell, and the actual distance is the expectation
+of that distribution. This is Distribution Focal Loss, and the reason for it is
+that box edges are genuinely ambiguous &mdash; where exactly does a blurred or
+occluded boundary lie? &mdash; and a distribution can express "probably 12,
+possibly 15" where a single number cannot. The network's own uncertainty
+becomes trainable.
+
+There is also no **objectness** score in v8. Older versions predicted "is there
+anything here" separately from "what is it"; v8's confidence is just the class
+score. One fewer output, one fewer loss term, one fewer thing to calibrate.
+
+Assignment during training is handled by **TaskAlignedAssigner**: rather than
+a fixed rule about which cell owns which object, it scores each candidate by a
+combination of its classification confidence and its IoU with the ground truth,
+and assigns the top few. Cells that are already good at both get the label,
+which is a mild form of the network choosing its own supervision.
+
+## The two thresholds
+
+Everything above is fixed at training time. The two controls in the explorer
+are not &mdash; they are applied after the forward pass, and changing them
+changes your reported metrics without retraining anything.
+
+**Confidence threshold.** Every prediction below it is discarded. Push it up in
+the explorer and boxes vanish; push it past 0.55 and the note changes to warn
+you, because the objects you lose first are exactly the hard ones &mdash; small,
+occluded, unusual pose &mdash; which are the ones with low scores. A high
+threshold makes a demo look clean and makes recall quietly terrible. The
+default of 0.25 for visualisation is a display choice; for computing mAP you
+use something like 0.001, because mAP integrates over the whole
+precision-recall curve and truncating it early just throws away area.
+
+**NMS IoU threshold.** Several neighbouring cells will each decide the same
+object is theirs, so the head emits a cluster of near-identical boxes. Non-
+maximum suppression sorts by confidence, keeps the top box, and deletes
+anything overlapping it by more than the threshold, per class. Turn NMS off in
+the explorer to see the raw cluster.
+
+The threshold is a genuine trade and the "crowd" scene is there to show it.
+Set it low, around 0.3, and two people standing close &mdash; who really do
+overlap by more than 0.3 &mdash; are treated as duplicates and one is deleted.
+Set it high, around 0.9, and duplicates survive. There is no value that is
+right for both a sparse scene and a dense one, which is why crowded-scene
+detection has its own literature: Soft-NMS, which decays scores instead of
+deleting, and set-prediction models like DETR, which have no NMS at all because
+their loss forbids duplicate predictions in the first place.
+
+```python
+from ultralytics import YOLO
+
+model = YOLO("yolov8n.pt")
+
+results = model.predict(
+    "street.jpg",
+    conf=0.25,     # the confidence cut
+    iou=0.7,       # the NMS IoU threshold
+    imgsz=640,     # must be a multiple of 32: strides are 8, 16, 32
+    max_det=300,
+)
+
+for box in results[0].boxes:
+    print(model.names[int(box.cls)], float(box.conf), box.xyxy[0].tolist())
+```
+
+`imgsz` has to be a multiple of 32 or the three levels do not divide evenly.
+Raising it improves small-object recall roughly in proportion to the extra
+pixels and costs latency quadratically &mdash; usually the single most
+effective knob, and the one people forget exists while they tune `conf`.
+
+## Why the model sizes are letters
+
+v8 ships as n, s, m, l and x &mdash; nano through extra-large &mdash; and they
+are the same architecture with two multipliers applied: one to the channel
+counts and one to the number of repeats in each C2f block. Nothing structural
+differs between them.
+
+That matters because it makes the accuracy/latency trade a dial rather than a
+choice of architecture, and because the scaling is predictable: roughly, depth
+and width both scale, so parameters grow faster than latency does. The nano
+model is around 3 M parameters and the extra-large around 68 M, for perhaps
+five points of COCO mAP between them.
+
+The practical sequence for picking one is the reverse of what people usually
+do. Start from the latency budget on the actual target hardware, pick the
+largest model that fits it, and only then look at accuracy. Choosing the model
+first and optimising afterwards usually ends in quantisation and pruning work
+that a smaller model would have made unnecessary.
+
+## Reading the mismatch counter
+
+The explorer's fourth statistic is **missed / duplicate / false**, recomputed
+as you move the sliders. It is worth playing with deliberately, because the
+three failure modes have three different causes:
+
+- **Missed** objects mean the confidence threshold is too high, or the object
+  is smaller than P3 can resolve.
+- **Duplicates** mean the NMS threshold is too high, or NMS is off.
+- **False positives** mean the confidence threshold is too low.
+
+Every real tuning session is spent trading these against each other, and mAP is
+the single number that summarises the whole curve so you do not have to pick a
+point on it until deployment.

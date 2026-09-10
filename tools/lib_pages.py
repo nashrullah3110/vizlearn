@@ -320,6 +320,27 @@ TOPICS = {
             "the mistakes are. Every editor fits a real model in your browser.",
         ],
     },
+    "async_python": {
+        "dir": "async_python",
+        "title": "Async Python",
+        "h1": "Async Python, by Running the Loop",
+        "lead": "The event loop, coroutines and tasks, and the patterns real "
+                "async code is built from - each one runnable in your browser.",
+        "keywords": "async python, asyncio, event loop, coroutines, await, "
+                    "asyncio gather, taskgroup, asyncio queue, backpressure, "
+                    "asyncio.to_thread, blocking the event loop",
+        "intro": [
+            "Async Python confuses people because it looks like threading and is "
+            "not: it is one thread running an event loop that lets coroutines "
+            "step aside at every await, so a thousand waits can overlap without "
+            "a thread each. This track builds that model from the loop up.",
+            "Every page runs. The examples end in await main() because the editor "
+            "already has a loop going, and each one prints the thing being "
+            "explained - the interleaving of two coroutines, the difference "
+            "between sequential awaits and concurrent tasks, a blocking call "
+            "freezing the loop, a bounded queue applying backpressure.",
+        ],
+    },
     "interview": {
         "dir": "interview",
         "title": "Interview Questions",
@@ -346,7 +367,7 @@ TOPICS = {
 
 # Display order on the hub and in the footer.
 TOPIC_ORDER = ["maths", "ml", "dl", "dsa", "nlp", "computer-vision", "db",
-               "gen-ai", "python", "pydantic", "fastapi", "numpy", "pandas", "matplotlib", "sklearn", "interview"]
+               "gen-ai", "python", "async_python", "pydantic", "fastapi", "numpy", "pandas", "matplotlib", "sklearn", "interview"]
 
 DIR_TO_TOPIC = {t["dir"]: k for k, t in TOPICS.items()}
 

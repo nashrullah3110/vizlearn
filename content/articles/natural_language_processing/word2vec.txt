@@ -1,0 +1,186 @@
+title: Word2Vec
+intro: A model with no hidden layer and no labels that learns, from nothing but adjacency, that "king" belongs next to "queen".
+
+## The setup: text labels itself
+
+Supervised learning needs labels. Text has none, and annotating enough of it to
+learn word meanings is not a project anyone was going to finish.
+
+The distributional hypothesis supplies the way out: **words that appear in
+similar contexts have similar meanings**. That is not a claim about semantics,
+it is a claim about statistics, and it turns an unlabelled corpus into a
+supervised dataset. Every position in every sentence becomes a training example
+where the input is one word and the target is its neighbour.
+
+Look at the token strip in the explorer. With a window of &plusmn;2 around
+`king` in "the king rules the kingdom", the model is asked to associate `king`
+with `the`, `rules`, and the second `the`. Slide the window control and the
+pair list under it changes. Nineteen sentences with a window of 2 give about
+300 pairs; the original paper's Google News corpus gave roughly 100 billion.
+
+## Two directions through the same window
+
+**Skip-gram** takes the centre word and predicts each context word separately.
+One centre with four neighbours becomes four training pairs.
+
+**CBOW** goes the other way: average the context vectors and predict the centre
+from them. One position becomes one training example.
+
+CBOW is faster, because it makes one update per position instead of 2&times;window,
+and it smooths over the context, which suits frequent words. Skip-gram makes
+many more updates from the same text, which is what lets it learn decent
+vectors for rare words &mdash; a rare word appears in few positions, and
+skip-gram wrings more gradient out of each one. In practice skip-gram with
+negative sampling is the default, and it is what the toggle in the explorer
+starts on.
+
+## The problem with the obvious objective
+
+Written as a proper probabilistic model, skip-gram wants:
+
+```
+P(context | centre) = exp(u_c . v_w) / sum over EVERY word in V of exp(u_k . v_w)
+```
+
+The denominator is the problem. Every gradient step requires a dot product
+against every word in the vocabulary. At |V| = 100,000 and a corpus of a
+billion tokens, that is the difference between a model you can train and one
+you cannot.
+
+## Negative sampling
+
+The fix is to stop asking a multi-class question. Instead of "which of 100,000
+words comes next", ask a much easier one: **"did this pair really occur, or did
+I make it up?"**
+
+For each real pair, draw k fake ones by sampling random words, and train a
+logistic classifier:
+
+```
+maximise   log sigma(u_context . v_centre)
+         + sum over k negatives of  log sigma(-u_negative . v_centre)
+```
+
+Each step now costs k+1 dot products instead of |V|. The explorer prints the
+arithmetic for one real pair: the dot product, the sigmoid of it, and the fact
+that it is being pushed toward 1 while k sampled words are pushed toward 0.
+
+Two details matter. The negatives are drawn from the unigram distribution
+**raised to the power 0.75**, not from the raw frequencies &mdash; a piece of
+tuning the authors report as working better than either the raw or the uniform
+distribution, and which has the effect of sampling common words often but not
+as often as they occur. And the paper pairs this with **subsampling**, which
+discards frequent tokens like `the` with high probability before pairs are even
+generated, so the model does not spend most of its updates learning that
+everything is near `the`.
+
+## What is actually learned
+
+There are **two** embedding matrices, and this surprises people. Every word has
+a vector for when it is the centre and a different vector for when it is
+context. The dot product in the objective is always between one of each.
+
+The reason is structural. If a single matrix were used, a word's similarity
+with itself would be its own squared norm, which the objective would then try
+to make large &mdash; and a word does not usually appear next to itself. Two
+matrices break that. Almost every implementation throws away the context matrix
+at the end and keeps the centre vectors, which is a convention rather than a
+derivation; GloVe, on the next page, sums the two instead.
+
+Push the step slider in the explorer from 0 upward and watch the neighbour
+table settle. At 0 the nearest word to `king` is whatever the random
+initialisation happened to put nearby. By a few thousand steps `queen` has
+arrived, and it arrived because those two words genuinely appear in the same
+positions in this corpus &mdash; `the ___ rules the kingdom` fits both.
+
+The scatter plot is a projection, and the caption says so. With 8 dimensions
+trained and 2 drawn, points that look adjacent may not be; the cosine table
+below it is the real answer. Set the dimension slider to 2 and the projection
+becomes the space itself &mdash; and the vectors get noticeably worse, because
+2 dimensions cannot hold enough distinct directions.
+
+## The analogy result, and how much to believe
+
+`king - man + woman ~ queen` is the demonstration that made word2vec famous.
+The geometry is real: consistent differences between related word pairs do show
+up as roughly parallel offsets in the space, because those pairs really do
+differ in their contexts in consistent ways.
+
+It is also weaker than the headline suggests. The standard evaluation excludes
+the three input words from the answer candidates, and without that exclusion the
+nearest vector to `king - man + woman` is very often `king` itself. Analogies
+work well for frequent, well-attested relations and poorly for rare ones. The
+corpus here is far too small to show the effect at all, which is the honest
+outcome and is why the explorer does not offer an analogy box.
+
+The other well-documented finding is that these vectors absorb the biases in
+the text they were trained on, in exactly the same geometry: occupational
+analogies from news corpora reproduce the gender distribution of those
+occupations in the corpus. That is not a flaw in the algorithm. The algorithm
+is doing its job; it is reporting what the corpus contains.
+
+```python
+from gensim.models import Word2Vec
+
+sentences = [s.split() for s in corpus]
+
+model = Word2Vec(
+    sentences,
+    vector_size=100,   # 100-300 is the usual range
+    window=5,          # +/- 5 tokens
+    sg=1,              # 1 = skip-gram, 0 = CBOW
+    negative=5,        # negative samples per positive pair
+    ns_exponent=0.75,  # the unigram^0.75 noise distribution
+    sample=1e-3,       # subsample tokens more frequent than this
+    min_count=5,       # ignore words seen fewer than five times
+    epochs=5,
+)
+
+model.wv.most_similar("king", topn=5)
+```
+
+`min_count=5` is the setting people regret leaving at 1. A word seen once has a
+vector determined almost entirely by its initialisation, and keeping thousands
+of them adds noise to every nearest-neighbour query while inflating the model.
+
+## Choosing the window, and what it changes
+
+The window size is not a tuning knob in the usual sense. It changes what kind
+of similarity the vectors encode.
+
+A **small window** (1&ndash;2) makes a word's context almost entirely
+syntactic: what can grammatically appear beside it. Vectors trained this way
+put words of the same part of speech together, and the nearest neighbours of a
+verb are other verbs in the same tense.
+
+A **large window** (8&ndash;10) makes the context topical: what tends to appear
+in the same passage. Neighbours become words about the same subject regardless
+of grammatical role, so `doctor` sits near `hospital` and `patient` rather than
+near other nouns in general.
+
+Neither is correct. If the vectors feed a parser, small is right; if they feed
+a topic classifier or a retrieval system, large is. Move the window control in
+the explorer and watch the pair count change &mdash; and note that on nineteen
+sentences even a window of 4 is reaching most of the way across a sentence, so
+the distinction only appears at a realistic corpus size.
+
+The related setting is what counts as a context at all. word2vec uses linear
+context &mdash; the tokens either side. Replacing that with **dependency
+context**, the words a syntactic parse links to, produces vectors whose
+neighbours are functionally rather than topically similar; that is the
+Levy and Goldberg result, and it is the clearest demonstration that "similar"
+in a word vector means "similar under whatever context you defined".
+
+## Where this leads
+
+Word2vec vectors are **static**: one vector per word type, so `bank` in "river
+bank" and "bank account" get the same one. That single limitation is what the
+next decade of the field was about. ELMo made the vector depend on the
+sentence; BERT made it depend on the whole sentence in both directions; every
+transformer since produces contextual embeddings by construction.
+
+The idea that survived intact is the one at the top of this page: **define a
+prediction task that the raw data already answers, and the representation falls
+out as a side effect**. Masked language modelling is that idea. So is next-token
+prediction, and so is contrastive learning in vision. Word2vec is where it was
+first made to work at scale.

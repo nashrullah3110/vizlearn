@@ -1,0 +1,148 @@
+title: ScaNN: A Practical Guide
+intro: What is anisotropic vector quantization, and why does it beat plain quantization for inner product search?
+
+## Not all quantization error is equally bad
+
+Every quantiser on the previous pages minimises squared reconstruction error:
+put the centroids where they make `‖q(x) − x‖²` as small as possible, summed
+over the corpus. That objective treats every direction of error as equally
+harmful.
+
+For **maximum inner product search** it is not. Here is the argument, and it
+is short enough to hold in your head.
+
+Take a stored vector `x` and its quantised version `q(x)`. Split the residual
+`r = q(x) − x` into a component along `x` and a component perpendicular to it:
+
+```
+r = r∥ + r⊥
+```
+
+Now ask what each does to the inner product with a query. The queries that
+matter for `x` — the ones where getting `x`'s score right decides whether it
+is returned at all — are the ones roughly *aligned* with `x`. That is what
+"scores highly under inner product" means.
+
+For a query aligned with `x`, the parallel component `r∥` adds or subtracts
+almost directly from the score. The perpendicular component `r⊥` projects onto
+that query only weakly, and across the set of such queries it points in
+essentially arbitrary directions and averages toward zero.
+
+So the two components have very different effects on the thing you care about,
+and an objective that weights them equally is optimising the wrong quantity.
+
+## The loss, and the slider
+
+Anisotropic vector quantization weights them differently:
+
+```
+loss = η · ‖r∥‖²  +  ‖r⊥‖²        with η > 1
+```
+
+`η` is the slider. At `η = 1` this is ordinary squared error and the
+assignment is identical to plain k-means — the readout confirms zero vectors
+changed centroid. That is the control condition, and it is worth setting first
+so you can see that the machinery does nothing until you ask it to.
+
+Raise η and vectors start choosing different centroids: the blue ones. They
+are accepting a larger *total* error in exchange for a smaller error along
+their own direction — a bad trade under the usual objective and a good one
+under this one.
+
+The paper derives η from a target: if you care about vectors whose inner
+product exceeds some threshold, that threshold implies a weight. In practice
+it is tuned, and the useful range is small — the gain here peaks around 2 to 3
+and shrinks by 6, because weighting the parallel error too heavily starts
+ignoring perpendicular error that does still matter.
+
+## Why the average is the measurement
+
+The readout shows two recall figures for the query you are dragging as well as
+the two averaged bars, and the single-query pair trade places constantly.
+
+That is not noise in the demonstration; it is the nature of the claim.
+Anisotropic quantisation does not promise a better answer for a *given* query.
+It promises a better expected answer over the distribution of queries for
+which a vector would be a top result. A demonstration that showed one query
+and declared victory would be measuring something the method never claimed.
+
+So the bars here are MIPS recall@k averaged over 48 fixed queries, computed by
+running both assignments against an exact inner-product answer. The
+anisotropic bar is consistently ahead in the middle of the η range, and the
+gap is a few points — which is the size of effect the paper reports, and the
+size worth having when it costs nothing at query time.
+
+## The rest of the system
+
+Anisotropic quantisation is the novel part. ScaNN as shipped is three stages
+and the other two are conventional, which is worth knowing because the
+benchmark numbers belong to the whole pipeline.
+
+**Partition.** A learned tree over the dataset restricts the search to a
+fraction of the leaves. This is [IVF](ivf_flat_index.html)'s role and it does
+IVF's job.
+
+**Score.** Anisotropic quantisation with short codes, scored with SIMD
+in-register lookups rather than memory-resident tables — the implementation
+detail that makes the scan fast enough to matter. Aggressively lossy on
+purpose.
+
+**Rescore.** Take the top few hundred and recompute exact inner products from
+the full vectors.
+
+That last stage is why the middle one can afford to be so lossy, and it is the
+same argument as [IVF-PQ](ivf_pq_index.html)'s rerank: a cheap stage only has
+to produce a good candidate *set*, and an exact stage over a few hundred
+vectors fixes the ordering. Set the rescoring slider to zero here and both
+recall figures fall together — which tells you that a good part of ScaNN's
+benchmark position is the rescoring, not the quantiser.
+
+## When the argument applies, and when it evaporates
+
+ScaNN leads the ann-benchmarks glove-100-angular leaderboard and is the right
+choice when the workload really is maximum inner product search:
+recommendation scoring, two-tower retrieval, dot product against unnormalised
+embeddings.
+
+There is an important caveat. **If your vectors are L2-normalised, the
+anisotropy argument mostly evaporates.** With every vector the same length,
+inner product, cosine and Euclidean ranking all coincide, and the parallel
+direction stops being special in the way the derivation needs. Many embedding
+models normalise by default — `sentence-transformers` does, OpenAI's
+embeddings arrive normalised — so this is worth checking before choosing an
+index on the strength of this result.
+
+The practical drawbacks are ecosystem rather than algorithmic: ScaNN is a
+library rather than a database, tied to TensorFlow, with fewer integrations
+than HNSW. That is why it appears less often in vector database backends than
+its benchmark position suggests it should.
+
+```python
+import scann
+
+# Vectors NOT normalised: the anisotropy argument needs varying magnitudes.
+searcher = (
+    scann.scann_ops_pybind.builder(dataset, 10, "dot_product")
+    .tree(num_leaves=2000, num_leaves_to_search=100, training_sample_size=250_000)
+    .score_ah(2, anisotropic_quantization_threshold=0.2)   # the eta of this page
+    .reorder(100)                                          # exact rescoring
+    .build()
+)
+
+neighbors, distances = searcher.search_batched(queries)
+```
+
+Three lines, three stages. `num_leaves_to_search` is IVF's nprobe under
+another name; `anisotropic_quantization_threshold` is the parameter this whole
+page is about; `reorder(100)` is the rescoring shortlist. Removing the
+`.reorder` call is the single change that most degrades the result, which is
+the same lesson as the IVF-PQ page from a different direction.
+
+## In one line
+
+ScaNN quantises with a loss that weights error along a vector's own direction
+more heavily than error across it, because that is the component that distorts
+inner products for the queries that would have ranked the vector highly. Same
+code length, better MIPS recall — measured over a workload, not a query. The
+full system is partition, quantised scoring, then exact rescoring, and the
+last stage is what lets the middle one be so lossy.

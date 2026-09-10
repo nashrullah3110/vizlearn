@@ -1,0 +1,142 @@
+title: IVF-PQ: A Practical Guide
+intro: Why is IVF-PQ the standard billion-scale index, and what is the residual doing?
+
+## Two problems, two solutions, composed
+
+A billion vectors is hard for two independent reasons, and it is worth keeping
+them apart.
+
+**Latency.** Comparing a query against a billion vectors takes seconds. The
+fix is pruning — organise the vectors so most are never examined. That is
+[IVF](ivf_flat_index.html).
+
+**Memory.** A billion 768-dimensional float32 vectors is 3 TB. The fix is
+compression — store something smaller than the vector. That is
+[PQ](product_quantization.html).
+
+IVF-PQ is both: cluster the corpus with k-means, then store PQ codes in each
+cell instead of vectors. Search opens the nearest `nprobe` cells and scores
+the codes inside them with a lookup table.
+
+The savings are independent and they multiply. IVF means touching perhaps 0.1%
+of the corpus; PQ means each of those touches costs a few table lookups on a
+48-byte code rather than a dot product over a 3 KB vector.
+
+## The residual is the part people skip
+
+Here is the detail that makes the combination more than the sum of its parts,
+and it is the one most explanations omit.
+
+PQ is applied to the **residual** — the offset from the cell centroid — not to
+the vector.
+
+```
+residual = x − centroid(x)
+code     = PQ_encode(residual)
+```
+
+Toggle **Quantise the residual** off in the visualisation and watch the mean
+reconstruction error jump, with no change to the code length at all.
+
+The reason is about the range each codebook has to cover. With the toggle off,
+one codebook must describe positions anywhere in the space, so its centroids
+are spread thin and every vector sits far from the nearest one. With it on,
+the values being quantised are small offsets from a cell centre. Residuals
+from every cell are similar in scale and centred on zero, so a single shared
+codebook fits them tightly — and its resolution is effectively **local to each
+cell**, because the cell centroid supplies the coarse position and the code
+only has to supply the correction.
+
+Same bits, same memory, several times less error. It is also the reason IVF-PQ
+is a genuine composition rather than two tricks stacked: the partition does
+not merely prune, it hands the quantiser a much easier problem.
+
+## Reranking, and why nearly everyone does it
+
+A PQ distance is an estimate. It is good enough to decide that a vector is
+nowhere near the query, and not good enough to order the top ten reliably —
+the reconstruction errors are the same size as the differences you are trying
+to resolve.
+
+So production setups add a **rerank** stage: take the top few hundred by PQ
+distance, fetch their full vectors, and rescore exactly. Move the rerank
+slider and watch recall climb back toward 1.0.
+
+The cost is a few hundred random reads. If the full vectors are on SSD that is
+a few milliseconds; if they were never stored, reranking is not available and
+you live with the PQ ordering. In FAISS this is `IndexRefineFlat` wrapped
+around the IVF-PQ index, and skipping it is one of the most common reasons a
+deployment's recall is worse than the tuning guide promised.
+
+Notice the general pattern, because it recurs everywhere in retrieval: a cheap
+stage produces a **candidate set**, an expensive stage produces the
+**ordering**. The cheap stage only has to be good at exclusion. This is the
+same argument as a bi-encoder followed by a cross-encoder reranker, and the
+same argument ScaNN uses for its rescoring pass.
+
+## Sizing one at a billion vectors
+
+Take a billion 768-dimensional vectors, m = 64 subquantizers at 8 bits, and
+nlist = 100,000.
+
+| Component | Size | Note |
+|---|---|---|
+| PQ codes | 64 GB | against 3 TB for float32 |
+| IVF centroids | 307 MB | scanned in full on every query |
+| Vectors on SSD | 3 TB | only if you want reranking |
+| Scanned at nprobe = 32 | ~320,000 codes | 0.03% of the corpus |
+
+Two things stand out. The codes fit in RAM on one large machine, which is the
+whole point. And the centroid scan — 100,000 comparisons per query — is
+becoming significant; past this scale you need an index over the centroids
+too, which is what composite recipes like `IVF262144_HNSW32` are for.
+
+The training cost deserves a mention: IVF centroids and PQ codebooks are both
+learned from a sample. If the corpus drifts away from that sample — a new
+document type, a new language, a re-embedded corpus — the index degrades
+quietly. Recall falls, nothing errors, and nobody notices until someone
+measures. Retraining is periodic maintenance, not a one-off.
+
+## Reading a FAISS factory string
+
+FAISS names these indexes with a factory string, and once you can read one the
+whole design space opens up:
+
+```
+OPQ64_256,IVF16384,PQ64
+│         │        └── product quantization, 64 subquantizers → 64 bytes/vector
+│         └────────── inverted file with 16,384 cells
+└──────────────────── learned rotation to 256 dims before quantising
+```
+
+Everything on these pages is in there: a rotation for
+[PQ](product_quantization.html)'s benefit, a partition from
+[IVF](ivf_flat_index.html), and the code length that sets your memory bill.
+Append `,RFlat` and you get the reranking stage.
+
+```python
+import faiss
+
+index = faiss.index_factory(768, "OPQ64_256,IVF16384,PQ64", faiss.METRIC_INNER_PRODUCT)
+index.train(sample)          # learns rotation, centroids and codebooks
+index.add(vectors)
+
+index.nprobe = 32
+# Rerank the shortlist against the exact vectors.
+refined = faiss.IndexRefineFlat(index, faiss.swig_ptr(vectors))
+refined.k_factor = 4         # shortlist 4k candidates, return k
+scores, ids = refined.search(queries, 10)
+```
+
+`k_factor` is the shortlist multiplier — the rerank slider on this page in
+production form. Raising it costs reads and buys recall, and it is usually the
+first thing to turn up when an IVF-PQ index underperforms.
+
+## In one line
+
+IVF-PQ partitions with k-means and stores PQ codes of the **residual** from
+each cell centroid, which makes the same code length far more accurate. Search
+opens nprobe cells and scores codes by table lookup; a rerank stage rescores
+the shortlist with exact vectors and recovers most of the lost recall. It is
+the default at billion scale because it is the only structure here where
+memory, not latency, is the thing being solved.

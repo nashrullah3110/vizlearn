@@ -1,0 +1,176 @@
+title: Seq2Seq
+intro: Two recurrent networks and a vector between them - and a measurement of exactly how much the sentence loses on the way through.
+
+## Why a new architecture was needed
+
+A plain recurrent network maps a sequence to a sequence of the same length. It
+tags parts of speech well and it labels named entities well, because those
+tasks have one output per input.
+
+Translation does not. "I do not speak French" is five English words and four
+French ones; the verb moves; the negation is one word in one language and two
+in the other. The output length is not known until the output is produced, and
+the alignment is not monotonic.
+
+Sutskever, Vinyals and Le's answer in 2014 was to split the problem. One
+network **reads** the source and stops, leaving its final hidden state. A
+second network **writes** the target, starting from that state, one token at a
+time, each token conditioned on the ones already emitted. Reading and writing
+are decoupled, so the lengths need not match.
+
+The training signal is the same one a language model uses: at each decoder
+step, predict the next target token, with the loss being cross-entropy against
+the real one. During training the decoder is fed the *true* previous token
+rather than its own guess &mdash; **teacher forcing** &mdash; which makes the
+gradient well behaved and creates the exposure-bias problem, because at
+inference the decoder must consume its own mistakes.
+
+## The bottleneck, measured
+
+The objection is immediate. A fifty-word sentence and a five-word sentence both
+have to be compressed into the same fixed vector. Where does the extra
+information go?
+
+Most explanations stop at asserting that it is lost. The explorer measures it.
+
+The encoder is a real recurrent network with fixed weights, so its hidden
+states are genuine computed values. To find out how much a given input token
+still matters at the end, the widget flips that token's embedding, re-runs the
+encoder, and measures how far the final state moved. That distance is the bar
+under each word.
+
+Watch two things:
+
+- **Push the sentence length up.** The bars at the front of the sentence
+  flatten toward nothing. The statistic reports the ratio of average influence
+  in the last third against the first third; at length 7 it is close to 1, and
+  by length 40 it is large.
+- **Push the hidden size down.** The same decay happens faster, because there
+  are fewer directions in the state to keep things separate in.
+
+The mechanism is not mysterious. The state is overwritten at every token, and
+whatever an early word contributed has been multiplied by the recurrent weight
+matrix once per subsequent token. If that matrix contracts &mdash; and a stable
+recurrence generally does &mdash; then a hundred multiplications is
+annihilation. LSTM and GRU gates were designed to hold a value against exactly
+this, and they push the horizon out considerably, but they do not remove it.
+
+The original paper's own workaround is worth knowing because it is so blunt:
+they **reversed the source sentence**. Feeding "sentence the reversed" puts the
+first source words nearest the end of the encoding, next to the first target
+words the decoder must produce, and this alone improved BLEU by several points.
+That a trick like that works is the clearest possible evidence that the
+bottleneck was real.
+
+## Attention, as a small change
+
+Turn **Attention** on in the explorer and look at what actually changed. The
+encoder is identical. It still reads left to right, still produces one hidden
+state per token.
+
+The difference is that those per-step states are **kept** rather than discarded.
+At each decoder step, the decoder computes a score against every encoder state,
+softmaxes the scores into weights that sum to 1, and reads a weighted average
+&mdash; the *context vector* &mdash; which it uses alongside its own state.
+
+```
+score_j   = f(decoder state, encoder state j)
+weight_j  = softmax over j of score_j
+context   = sum over j of weight_j * encoder state j
+```
+
+Nothing has to survive to the end of the sentence any more, because nothing has
+to travel. The channel between the two networks stops being H numbers and
+becomes n&times;H numbers, growing with the input rather than being fixed
+against it. The statistic in the explorer reports both.
+
+The attention bars for the current decoder step show which source words that
+step is reading. The weights sum to 1 by construction, so attention is always a
+question of *allocation*: attending more to one word necessarily means
+attending less to another.
+
+## What this became
+
+Read the attention equation again with the encoder removed and it is the whole
+of a transformer. Bahdanau's attention computes a compatibility between one
+query and a set of keys, softmaxes it, and averages the values. Scaled
+dot-product attention is that with `f` fixed to a dot product and divided by
+&radic;d&#8342;, and self-attention is that with the query coming from the same
+sequence as the keys.
+
+The 2017 paper's title &mdash; "Attention Is All You Need" &mdash; is a claim
+about this page: that once you have attention, the recurrence it was bolted
+onto is not carrying its weight. Removing it makes the whole sequence
+computable in parallel rather than one step at a time, which is the change that
+made scale possible.
+
+```python
+import torch
+import torch.nn as nn
+
+class Encoder(nn.Module):
+    def __init__(self, vocab, emb=256, hidden=512):
+        super().__init__()
+        self.embed = nn.Embedding(vocab, emb)
+        self.rnn = nn.GRU(emb, hidden, batch_first=True, bidirectional=True)
+
+    def forward(self, src):
+        # outputs: the per-step states attention needs, [B, T, 2H]
+        # h: the final state, all the no-attention decoder ever gets, [2, B, H]
+        outputs, h = self.rnn(self.embed(src))
+        return outputs, h
+
+class Attention(nn.Module):
+    def __init__(self, hidden=512):
+        super().__init__()
+        self.project = nn.Linear(hidden * 2, hidden)
+
+    def forward(self, query, keys, mask):
+        # query [B, H], keys [B, T, 2H]
+        scores = torch.bmm(self.project(keys), query.unsqueeze(2)).squeeze(2)
+        scores = scores.masked_fill(mask == 0, float("-inf"))   # ignore padding
+        weights = torch.softmax(scores, dim=1)
+        return torch.bmm(weights.unsqueeze(1), keys).squeeze(1), weights
+```
+
+The `masked_fill` line is the one that is quietly essential. Batched sequences
+are padded to equal length, and without the mask the softmax spreads probability
+onto padding tokens &mdash; the model learns to attend to nothing, and the bug
+shows up as mysteriously poor translation of short sentences in a batch of long
+ones.
+
+## Teacher forcing and the gap it leaves
+
+One detail of how these models are trained shapes how they fail, and it is
+invisible in the architecture diagram.
+
+During training the decoder is fed the **true** previous target token at every
+step. Feeding it its own previous prediction instead would mean that early in
+training it conditions on nonsense, and learning never gets started. Teacher
+forcing avoids that and makes every step's gradient independent of the
+others, which is also what lets the whole target sequence be processed in
+parallel.
+
+At inference there is no true previous token. The decoder must consume its own
+output, which means it is operating on a distribution of prefixes it never saw
+during training &mdash; **exposure bias**. One mistake shifts the context away
+from anything familiar, and the errors compound: a model that is 95% accurate
+per token is far worse than 95% accurate per twenty-token sentence.
+
+The mitigations are all partial. **Scheduled sampling** mixes in the model's
+own predictions during training with a probability that rises over time.
+Sequence-level training optimises a metric like BLEU on generated output
+directly, using reinforcement learning because the metric is not
+differentiable. And in practice, **beam search** helps more than either,
+because keeping several hypotheses alive means one bad token does not
+irrecoverably determine the rest &mdash; which is the subject of the next
+module.
+
+## What to carry forward
+
+Three ideas from this architecture outlived it entirely. **Encoder-decoder** as
+a shape, for any task where input and output are both sequences of unrelated
+length. **Teacher forcing** and its exposure-bias problem, which is why
+scheduled sampling and reinforcement-learning fine-tuning exist. And
+**attention**, which started as a patch for a fixed vector that was too small
+and ended up replacing the network it was patching.

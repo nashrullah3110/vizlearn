@@ -1,0 +1,214 @@
+title: VGG-16
+intro: One kernel size, one stride, sixteen weighted layers, and a parameter budget almost entirely in the wrong place.
+
+## The whole design, in one rule
+
+Before VGG, convolutional architectures were a grab bag of kernel sizes:
+AlexNet opened with an 11&times;11 stride-4 convolution, followed by 5&times;5s
+and then 3&times;3s. Simonyan and Zisserman asked what happens if you fix the
+kernel at the smallest size that still has a notion of direction &mdash;
+**3&times;3, stride 1, padding 1** &mdash; and get depth by stacking rather
+than by widening.
+
+That single rule generates the entire network. Spatial size never changes
+inside a block, because padding 1 on a 3&times;3 kernel is exactly
+size-preserving. It halves only at the five max-pools. Channels double at each
+pool, from 64 to 512, and then stop.
+
+| Block | Convolutions | Channels | Output at 224 |
+|---|---|---|---|
+| 1 | 2 | 64 | 112 &times; 112 |
+| 2 | 2 | 128 | 56 &times; 56 |
+| 3 | 3 | 256 | 28 &times; 28 |
+| 4 | 3 | 512 | 14 &times; 14 |
+| 5 | 3 | 512 | 7 &times; 7 |
+
+Thirteen convolutions, five pools, then flatten 7&times;7&times;512 = 25,088
+values into three fully-connected layers of 4096, 4096 and 1000.
+
+## Why two 3x3s beat one 5x5
+
+This is the argument the paper is actually about, and it is worth doing in
+numbers.
+
+A single 5&times;5 convolution with C input and C output channels has
+25C&sup2; parameters. Two stacked 3&times;3 convolutions have 9C&sup2; +
+9C&sup2; = **18C&sup2;** &mdash; 28% fewer &mdash; and their receptive field
+is identical: each output of the second layer depends on a 5&times;5 patch of
+the input.
+
+Three 3&times;3s reach 7&times;7 with 27C&sup2; parameters against 49C&sup2;,
+a 45% saving. And the stack has two ReLUs inside it where the single large
+kernel has none, so the same receptive field is now computed by a more
+expressive function rather than one linear map.
+
+This is the argument that ended large kernels in vision for a decade. It is
+also the argument that later got partially reversed &mdash; ConvNeXt and the
+modern large-kernel networks reopened it &mdash; but on the terms VGG set:
+depth of small kernels is the default, and anything else needs a reason.
+
+## Where the parameters actually are
+
+Push the layer table in the explorer to the bottom and the numbers stop being
+reasonable:
+
+| Layer | Parameters | Share |
+|---|---|---|
+| All 13 convolutions | 14,714,688 | 10.6% |
+| fc6 (25088 &rarr; 4096) | 102,764,544 | 74.3% |
+| fc7 (4096 &rarr; 4096) | 16,781,312 | 12.1% |
+| fc8 (4096 &rarr; 1000) | 4,097,000 | 3.0% |
+| **Total** | **138,357,544** | |
+
+**One layer is three quarters of the model.** fc6 takes the flattened
+7&times;7&times;512 feature map and connects every one of its 25,088 values to
+each of 4096 outputs. There is no weight sharing and no locality; it is a
+dense matrix with a hundred million entries, applied once per image.
+
+Now flip to the arithmetic view. The convolutions do about 15.3 billion
+multiply-accumulates per image and the dense layers about 0.12 billion. So:
+
+- the convolutions are **11% of the parameters and 99% of the compute**;
+- the dense layers are **89% of the parameters and 1% of the compute**.
+
+That inversion is the single most useful thing to take from this page. The
+parameter count tells you about memory, download size and overfitting risk.
+The MAC count tells you about latency and energy. They are not the same
+number, they are not even correlated here, and quoting one when you meant the
+other is a routine source of confusion.
+
+## What one 3x3 layer actually costs
+
+Take `conv3-64` in block 1, at 224&times;224. Its kernel is 3&times;3, it reads
+64 channels and writes 64:
+
+```
+parameters = 64 x 64 x 3 x 3 + 64 = 36,928
+positions  = 224 x 224 = 50,176
+MACs       = 36,864 x 50,176 = 1,849,688,064
+```
+
+One point eight billion multiply-accumulates from thirty-seven thousand
+numbers. The weights are reused at every position, which is the entire point of
+a convolution and the reason the arithmetic and the storage are so far apart.
+
+Now the same sum for fc6:
+
+```
+parameters = 25,088 x 4,096 + 4,096 = 102,764,544
+positions  = 1
+MACs       = 102,760,448
+```
+
+A hundred million parameters used exactly once each. Selecting any conv layer
+in the explorer prints its own version of this arithmetic; selecting a dense
+one prints the other kind. Doing it once by hand is what makes the two budgets
+stop feeling like the same number.
+
+## What replaced the head, and why
+
+Turn on **Swap the FC head for global average pooling** in the explorer. The
+parameter count falls from 138 M to about 15 M &mdash; a 9&times; reduction
+&mdash; and nothing else about the network changes.
+
+Global average pooling collapses each of the 512 final feature maps to its own
+mean, giving 512 numbers with no parameters at all, and a single 512&rarr;1000
+layer finishes the job. GoogLeNet did this in the same year VGG was published;
+ResNet did it the year after; it has been standard ever since.
+
+It buys three things beyond size. It removes the layer most prone to
+overfitting. It makes the network accept any input resolution, because the
+pool does not care how large the map it is averaging is &mdash; whereas fc6
+demands exactly 25,088 inputs, which is why the original VGG only accepts
+224&times;224. And it forces each final feature map to correspond to something
+class-relevant on its own, which is what makes class activation maps work.
+
+Move the input resolution slider with the FC head on, and watch the flattened
+size &mdash; and therefore fc6's parameter count &mdash; change with it. That
+dependency is the reason resolution was frozen.
+
+## Reading the shape of a network from its table
+
+The layer table is worth reading as a shape rather than a list, because the
+same shape recurs in almost every convolutional network built since.
+
+Follow two columns down it. The spatial size goes 224, 112, 56, 28, 14, 7
+&mdash; halving five times. The channel count goes 64, 128, 256, 512, 512
+&mdash; doubling four times and then stopping. Multiply them: the tensor at the
+first block holds 64 &times; 112&sup2; = 802,816 values, and at the last
+512 &times; 7&sup2; = 25,088. The representation shrinks by a factor of 32 as
+it goes.
+
+That is the whole compression story of a classifier. The input is 150,528
+numbers describing colour at positions; the output is 1,000 numbers describing
+belief about categories. Every block trades some spatial resolution for some
+semantic width, and the halve-and-double rule is the exchange rate.
+
+The rule is not arbitrary. Halving both spatial dimensions quarters the number
+of positions, and doubling the width quadruples the per-position cost of a
+convolution, so the arithmetic per block stays roughly constant while the
+information gets steadily more abstract. Move the resolution slider and watch
+the MAC column: the cost scales with the square of the input size, which is why
+resolution is the most effective single lever on inference latency, and why
+anyone optimising a vision model reaches for it before they reach for a smaller
+architecture.
+
+## The two questions to ask of any architecture
+
+VGG is the clearest place to learn a habit that pays off on every model after
+it: read the parameter budget and the arithmetic budget as **separate
+questions**, and ask which layers dominate each.
+
+Parameters answer "how large is the file, how much GPU memory does it occupy,
+and how much data will it take to fit". Multiply-accumulates answer "how long
+does one image take and how much energy does it cost". A layer can dominate one
+and be invisible in the other, and VGG's fc6 is the extreme case: three
+quarters of the model and under one per cent of the work.
+
+The inversion runs the other way too. A 3&times;3 convolution over 64 channels
+has 36,928 parameters &mdash; nothing &mdash; and applies every one of them at
+112&times;112 positions, which is 462 million multiply-accumulates for a layer
+you would not notice in a parameter table.
+
+Once you have the habit, the optimisation advice stops being folklore. If the
+model is too large to ship, look at the widest dense layers and the last
+stages. If it is too slow, look at the input resolution and the early stages.
+Those are different problems with different fixes, and confusing them is why
+people prune a network for weeks and find it runs at exactly the same speed.
+
+## VGG's real legacy
+
+As a classifier VGG is obsolete: ResNet-50 gets better ImageNet accuracy with
+a fifth of the parameters and a quarter of the arithmetic. Nobody should train
+one today.
+
+It survives for a different reason. Because the architecture is so plain
+&mdash; no residuals, no branches, no normalisation, just a stack of identical
+convolutions &mdash; its intermediate activations are unusually well behaved,
+and a **perceptual loss** computed on VGG features is still the standard
+choice in style transfer, super-resolution and image generation. When a paper
+says it optimises "VGG loss" or "LPIPS with a VGG backbone", this is the
+network being used, usually only up to `relu3_3` or `relu4_3`, with the
+hundred-million-parameter head discarded entirely.
+
+```python
+import torch
+import torchvision
+
+vgg = torchvision.models.vgg16(weights="IMAGENET1K_V1")
+
+# The 13 convolutions and 5 pools, without the 123 M-parameter classifier.
+features = vgg.features[:16].eval()          # up to relu3_3
+for p in features.parameters():
+    p.requires_grad_(False)
+
+def perceptual_loss(x, y):
+    return torch.nn.functional.l1_loss(features(x), features(y))
+```
+
+Two details matter in that snippet and both bite people. Slicing `.features`
+rather than using the whole model is what drops the dense head, and freezing
+the parameters is what keeps it a *loss* rather than a second network being
+trained. And whatever you feed it must be normalised with the ImageNet mean
+and standard deviation the weights were trained with, or the features are
+being read off a distribution the network has never seen.

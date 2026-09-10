@@ -1,0 +1,184 @@
+title: U-Net
+intro: An encoder that learns what is in the image, a decoder that puts it back where it was, and four wires between them doing most of the work.
+
+## Segmentation is classification with an address
+
+A classifier answers one question per image. A segmentation network answers one
+per pixel: for a 512&times;512 input it must produce 262,144 labelled outputs,
+each of which needs both *semantic* information (this is cell wall, not
+background) and *spatial* information (this exact pixel, not the one next to
+it).
+
+Those two requirements fight. Semantics needs a large receptive field, which
+means pooling, which destroys spatial precision. Precision needs full
+resolution, which means no pooling, which starves the receptive field. Every
+segmentation architecture is a way of having both, and U-Net's is the most
+direct: get the semantics by pooling all the way down, then get the precision
+back by wiring the pre-pooling activations forward.
+
+## The contracting path
+
+Each level is two 3&times;3 convolutions with ReLU, then a 2&times;2 max pool
+with stride 2. Channels double at every level: 64, 128, 256, 512, and 1024 at
+the bottom.
+
+Follow the level table in the explorer. At the paper's settings, a
+572&times;572 tile becomes 568&times;568 after two unpadded convolutions, then
+284&times;284 after pooling, then 280, then 140, and so on down to 28&times;28
+with 1024 channels. Each pooling step quadruples the receptive field of
+everything after it, which is how a network of 3&times;3 kernels ends up seeing
+a large enough neighbourhood to know what it is looking at.
+
+The widest layer is at the bottom. Read its parameter count in the table: at
+base 64 it holds around 6 M of the 31 M total, in one place, at the smallest
+spatial size. This is the same pattern as ResNet's fourth stage &mdash; deep
+and narrow spatially, so wide channels are affordable in compute even though
+they are expensive in memory.
+
+## The expanding path, and the crop
+
+Each decoder level does a 2&times;2 up-convolution &mdash; a transposed
+convolution that doubles the spatial size and halves the channels &mdash; then
+concatenates the matching encoder activation, then two more 3&times;3
+convolutions.
+
+The concatenation is the entire point of the architecture. The upsampled tensor
+carries 512 channels of semantic summary computed from a 68&times;68 view; the
+skip carries 512 channels of detail computed at 136&times;136, before that view
+was thrown away. Concatenating gives the following convolutions both, and lets
+them learn how to combine them.
+
+Turn **Skip connections** off in the explorer. The parameter count drops
+&mdash; the decoder convolutions now read half as many input channels &mdash;
+and that is the entire benefit. What you lose is stated in the note that
+appears: the finest spatial detail available to the decoder is now whatever
+survived four rounds of pooling, a 28&times;28 grid for a 572&times;572 input.
+Boundaries come back rounded and blobby, and no amount of decoder capacity
+fixes it, because the information is *gone*, not hidden.
+
+## Valid convolutions, and why the output is smaller
+
+Switch the padding control between **valid** and **same** and watch the output
+size change.
+
+The original uses unpadded ("valid") convolutions, so every 3&times;3 eats one
+pixel from each border. Over the whole network that adds up: 572&times;572 in,
+**388&times;388 out**. The skips therefore do not line up with the upsampled
+tensors either, and each has to be centre-cropped &mdash; by 8, 32, 80 and 176
+pixels at the four levels, as the table shows.
+
+That looks like an annoyance and is actually a deliberate guarantee. Every
+output pixel is computed from a neighbourhood that was fully present in the
+input. There are no border pixels whose context was invented by zero-padding.
+For a network run on tiles of a much larger microscopy image, that matters: the
+paper's "overlap-tile" strategy feeds overlapping tiles and keeps only the
+valid central output of each, so a large image is segmented seamlessly with no
+edge artefacts at the tile joins.
+
+Almost every implementation since uses `padding=1` instead, so input and output
+are the same size and no cropping is needed. It is simpler and usually fine.
+The cost is that the outermost pixels are predicted from partly-fabricated
+context, which shows up as a thin unreliable border &mdash; usually ignored,
+occasionally the source of a bug someone spends a day on.
+
+## Trained on thirty images
+
+U-Net won the 2015 ISBI cell tracking challenge with a training set of **30
+images**. That is the fact that made it famous, and it was not achieved by
+architecture alone.
+
+The other half was augmentation, specifically **elastic deformation**: random
+smooth warps of the image and its mask, which is a realistic model of how
+biological tissue actually varies. Shift, rotation and flip augmentation
+generate images that look like other images from the same microscope. Elastic
+deformation generates images that look like other *specimens*. For a domain
+with thirty labelled examples, that difference is everything.
+
+There is a third piece worth knowing: a **weighted cross-entropy loss** with a
+weight map computed per image that heavily upweights the narrow gaps between
+touching cells. Without it a network trained on this data merges adjacent cells
+into one blob, because getting the thin separating line wrong costs almost
+nothing in unweighted pixel accuracy. This is the general lesson: with a class
+imbalance of a few thousand to one, the loss has to be told what matters, and
+per-pixel accuracy will not tell it.
+
+```python
+import torch
+import torch.nn as nn
+
+def block(cin, cout):
+    return nn.Sequential(
+        nn.Conv2d(cin, cout, 3, padding=1), nn.BatchNorm2d(cout), nn.ReLU(inplace=True),
+        nn.Conv2d(cout, cout, 3, padding=1), nn.BatchNorm2d(cout), nn.ReLU(inplace=True))
+
+class UNet(nn.Module):
+    def __init__(self, cin=3, classes=2, base=64, depth=4):
+        super().__init__()
+        chans = [base * 2 ** i for i in range(depth + 1)]
+        self.downs = nn.ModuleList()
+        for c in chans[:-1]:
+            self.downs.append(block(cin, c)); cin = c
+        self.bottom = block(chans[-2], chans[-1])
+        self.ups = nn.ModuleList()
+        self.convs = nn.ModuleList()
+        for c in reversed(chans[:-1]):
+            self.ups.append(nn.ConvTranspose2d(c * 2, c, 2, stride=2))
+            self.convs.append(block(c * 2, c))     # c from the skip + c upsampled
+        self.head = nn.Conv2d(base, classes, 1)
+        self.pool = nn.MaxPool2d(2)
+
+    def forward(self, x):
+        skips = []
+        for d in self.downs:
+            x = d(x); skips.append(x); x = self.pool(x)
+        x = self.bottom(x)
+        for up, conv, skip in zip(self.ups, self.convs, reversed(skips)):
+            x = up(x)
+            x = conv(torch.cat([skip, x], dim=1))   # the skip, concatenated
+        return self.head(x)
+```
+
+The line to stare at is `block(c * 2, c)` in the decoder. That `c * 2` is the
+skip's channels plus the upsampled tensor's channels, and it is what the
+explorer's "decoder input" column is reporting. Remove the concatenation and it
+becomes `block(c, c)` &mdash; which is why turning the skips off saves
+parameters.
+
+## Choosing the depth
+
+The **Levels** control is the one with a real trade behind it, and the level
+table is where to read it.
+
+Each level doubles the receptive field of everything below it and quarters the
+spatial size. Too few levels and the deepest layer has never seen a
+neighbourhood large enough to identify a structure by its context &mdash; it
+will segment texture rather than objects. Too many and the bottom of the U is
+a handful of pixels holding a thousand channels, which is a lot of parameters
+describing very little, and the decoder has more upsampling to invent.
+
+The rule of thumb that comes out of it: the bottom of the U should be roughly
+the size of the largest structure you need to reason about, in units of the
+bottom's own stride. For 512&times;512 tiles of cell imagery, four levels puts
+the bottom at 32&times;32 with a receptive field of about 140 pixels &mdash;
+comfortably larger than a cell, comfortably smaller than the tile.
+
+Watch what happens at the extremes in the explorer. Drop to two levels with a
+572-pixel tile and the widest layer is only 256 channels; the parameter count
+falls by most of the model. Push to five with a small tile and the valid-
+convolution arithmetic runs out entirely, which the explorer reports rather
+than silently producing a nonsense number &mdash; the tile size has to be
+chosen so every pooling step divides evenly, and that constraint is why the
+paper's input is the odd-looking 572 rather than 512.
+
+## What came after
+
+**Attention U-Net** puts a gate on each skip so the decoder can suppress
+irrelevant regions the encoder passed forward. **U-Net++** replaces the four
+direct skips with a dense nest of intermediate convolutions, on the argument
+that the encoder and decoder features at the same level are semantically
+mismatched. **nnU-Net** did something more interesting: it left the
+architecture essentially alone and automated everything around it &mdash;
+preprocessing, patch size, batch size, augmentation, postprocessing &mdash; and
+beat specialised architectures across dozens of medical benchmarks. That result
+is worth sitting with. Ten years on, the strongest argument in the area is
+still that a plain U-Net, configured well, is hard to beat.
