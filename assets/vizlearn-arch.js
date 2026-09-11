@@ -423,9 +423,20 @@
 
         var draw = spec.build(ctx);
 
+        /* Controls above the drawing, not below it.
+         *
+         * Every widget's stage is the diagram FOLLOWED BY its derived
+         * readouts - headline stats, the parameter and arithmetic bars, the
+         * full layer table - which on VGG-16 is 3,800px of page. With the
+         * panel appended last, the sliders sat that far beneath the picture
+         * they steer: you could not see a shape change while dragging, which
+         * is the entire point of the explorer. The readout travels with the
+         * controls because it is their numeric echo. */
+        var head = h("div", "arch-head");
+        if (panel.childNodes.length) head.appendChild(panel);
+        head.appendChild(readoutEl);
+        root.appendChild(head);
         root.appendChild(stage);
-        root.appendChild(panel);
-        root.appendChild(readoutEl);
         draw();
         root.dataset.vzArchReady = "1";
     }
