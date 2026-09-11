@@ -125,6 +125,37 @@ the first million documents, all from one source — produces centroids that fit
 that source and cells that are badly unbalanced for everything else, which
 shows up as recall that varies by document type for no visible reason.
 
+## Cells are not the same size
+
+The `nlist ≈ √n` arithmetic assumes every cell holds `n/nlist` vectors. On real
+embeddings, none of them do.
+
+k-means puts centroids where the data is, and embeddings are clustered rather
+than evenly spread &mdash; so a corpus of support tickets with one enormous
+"password reset" region and a long tail of rare topics produces cells whose
+populations differ by one or two orders of magnitude. FAISS reports this as an
+**imbalance factor**, where 1.0 would be perfectly even; real corpora commonly
+sit well above it.
+
+Two consequences follow, and the second is the one that causes incidents.
+
+**The latency you tuned is an average.** A query whose nprobe cells happen to
+be the large ones scans several times more vectors than one landing in the
+tail, at identical nprobe. So p99 latency is much worse than the mean, and it
+is worst for exactly the common queries that land in the dense regions.
+
+**Sharding by cell inherits the imbalance.** A cell is the obvious unit to put
+on a machine, and if one cell holds a twentieth of the corpus then one machine
+holds a twentieth of the corpus and serves the queries most likely to probe it.
+
+The mitigations are all partial. Training on a genuinely representative sample
+stops the imbalance being worse than the data warrants. Raising nlist makes
+cells smaller in absolute terms without making them relatively more even.
+Spherical k-means helps when the embeddings are normalised. And some systems
+split oversized cells after training, which breaks the clean `n/nlist`
+arithmetic but bounds the worst case. Whichever you pick, report p99 rather
+than the mean.
+
 ## In one line
 
 IVF-Flat clusters the corpus with k-means and scans only the nearest nprobe
@@ -132,3 +163,26 @@ cells. `nlist ≈ √n` at build time; nprobe is the runtime recall/latency knob
 It misses true neighbours across cell boundaries, visibly and fixably. It
 loses to HNSW on latency and wins on build time, update cost and
 composability — and it is the skeleton that IVF-PQ hangs compression on.
+
+## Questions people ask
+
+<strong>What should nprobe be?</strong> Start around 1&ndash;2% of nlist and tune against measured recall on your own queries. It is a runtime knob, so it can differ per query &mdash; a "related documents" sidebar and a compliance search do not need the same recall, and they do not have to share a value.
+
+<strong>Why does recall vary so much between queries?</strong> Because the damage is query-dependent by construction. A query in the middle of a cell is served well; one sitting on a boundary loses whatever is on the far side. Only average recall over a realistic query set means anything, and a single-query demo of an IVF index is close to meaningless.
+
+<strong>How much training data does k-means need?</strong> FAISS warns below roughly 39 points per centroid. Asking for 100,000 cells over a million vectors gives ten points each and produces centroids that describe noise. The sample also has to be representative: train on the first million documents from one source and you get cells that are badly unbalanced for everything else, which surfaces as recall that varies by document type for no visible reason.
+
+<strong>Can I change nlist after building?</strong> No &mdash; nlist *is* the partition, so changing it is a retrain and a full re-add. That asymmetry is worth planning around: nprobe is free to change at any time, nlist is a rebuild.
+
+<strong>IVF or HNSW?</strong> HNSW wins on recall per millisecond and nothing else on this list. IVF wins on build time (minutes against hours), update cost (append to a list against rewiring a graph) and composability. If your corpus churns, or you need to shard, that usually settles it before latency is discussed.
+
+<strong>Why is `nprobe = nlist` pointless?</strong> Because it is a flat scan with the centroid comparisons added as pure overhead, at recall exactly 1.0. It is worth knowing as the general shape of the trade: every approximate index degenerates into exhaustive search at its recall limit.
+
+## Recap in one screen
+
+- Build is k-means with nlist centroids plus one assignment pass; search compares the query against all centroids and exhaustively scans the nearest nprobe cells.
+- Work per query is `nlist + nprobe · n/nlist`, minimised near `nlist ≈ √n`; FAISS suggests `4√n` to `16√n` at large scale, because the centroid scan vectorises and the list scan does not.
+- The failure mode is a hard partition through a continuous space: true neighbours in an unopened cell are never scored at all, rather than scored badly.
+- nprobe is the runtime recall/latency knob. nlist is fixed at build and moves both numbers at once.
+- Real cells are badly uneven, so per-query latency varies far more than the arithmetic suggests &mdash; quote p99.
+- It outlived its latency disadvantage because of build cost, update cost and composability: most billion-scale systems are IVF-shaped underneath.

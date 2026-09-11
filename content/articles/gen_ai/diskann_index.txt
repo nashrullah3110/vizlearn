@@ -162,3 +162,30 @@ robust-prune rule, relaxed by α, deliberately keeps long-range edges so the
 hop count stays low. PQ codes in RAM steer the beam; full vectors and adjacency
 share a page on SSD so one read serves both. It is the answer when the corpus
 does not fit in memory and you have one machine.
+
+## Questions people ask
+
+<strong>What is actually being minimised?</strong> Reads per query, not distance computations. An SSD read is around 100 microseconds where a memory access is nanoseconds, so a change that halves the arithmetic while adding one hop is a loss. That single substitution invalidates most of what an in-memory graph optimises for.
+
+<strong>What does alpha do?</strong> It loosens the pruning test, so edges survive that a strict relative-neighbourhood rule would have discarded as redundant &mdash; and those are disproportionately the long ones. Moving from 1.0 to 1.2 makes long edges appear and roughly halves the read count, and those are the same fact: a long edge is a shortcut, and on a disk-resident graph a shortcut is worth far more than a tidy local mesh.
+
+<strong>Why no hierarchy, when HNSW's layers exist precisely to supply long edges?</strong> Because layers cost reads. Descending levels means touching nodes at each one, and on an SSD every one of those is a page. A flat graph with a fixed medoid entry point reaches the same neighbourhood in fewer *total* reads, even though it visits more nodes at the level it is working on.
+
+<strong>Why does one read give both the distance and the next hop?</strong> Because each node's full vector and its adjacency list are stored together in a single 4 KB page. That layout is what makes navigation free: the PQ codes in RAM steer the beam, and visiting a node costs exactly one read that returns everything needed to continue.
+
+<strong>Does PQ error reach the answer?</strong> No, and that is the structural advantage over [IVF-PQ](ivf_pq_index.html). The codes only route the search; the exact vectors arrive on the pages actually visited, so the final ranking is exact without needing a separate rerank stage bolted on.
+
+<strong>How do I update it?</strong> Through FreshDiskANN's pattern: a small in-memory index absorbs recent writes and is merged into the disk index periodically, with deletes tombstoned until the merge. It is the log-structured merge trade a database makes, for the same reason &mdash; random writes into a large on-disk structure are expensive, so you batch them.
+
+<strong>When should I not use it?</strong> When the corpus fits in RAM, where [HNSW](hnsw_index.html) is simply better; and when it is both large and constantly changing, where what you actually want is a sharded system with a hot in-memory tier &mdash; which is roughly what FreshDiskANN is.
+
+## Recap in one screen
+
+- The cost model changed &mdash; a page read where there used to be a memory access &mdash; and the structure follows from it. Minimise reads, not distance computations.
+- Vamana starts from a random R-regular graph and improves it in two passes of greedy-search-then-robust-prune, adding reverse edges and re-pruning as it goes.
+- Robust prune discards an edge when an edge already kept gets you close to the same place; α > 1 relaxes that test and is what preserves the long shortcuts.
+- The second pass matters: the first at α = 1 builds something reasonable to search through, so the second's candidate sets are better and the graph stops depending on insertion order.
+- PQ codes in RAM &mdash; 32 bytes a vector, 32 GB at a billion &mdash; route for free; the full vector and its adjacency share one 4 KB page on SSD.
+- L is the runtime knob, and it also governs how much NVMe request parallelism you can extract, a coupling no in-memory index has.
+- Build is hours at a billion vectors and needs more memory than serving does; updates go through an in-memory tier and a periodic merge.
+- In two dimensions only the read count moves, so take that as the honest measurement here and the recall figure as a formality.

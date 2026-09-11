@@ -161,3 +161,27 @@ candidate list of width efSearch. efSearch is the runtime recall/latency knob;
 M and efConstruction are fixed at build time and cap what efSearch can reach.
 It gives the best recall per millisecond of any index here, and pays for it in
 memory and in awkward deletes.
+
+## Questions people ask
+
+<strong>Which parameter do I tune in production?</strong> efSearch, and only efSearch. M and efConstruction are baked in at `init_index`, so wanting to change either is a rebuild &mdash; which is worth knowing before you pick them rather than after.
+
+<strong>Why did recall collapse when I lowered efSearch?</strong> Because a candidate list narrower than k cannot produce k neighbours however good the graph is. `efSearch ≥ k` is a hard floor rather than a guideline, and `efSearch ≈ 2k` is a sensible starting point.
+
+<strong>Is a higher efConstruction always better?</strong> Only up to a point you can measure: raise it until recall on a held-out sample stops improving, then stop, because past that you are paying build time for nothing. What matters more is that it cannot be fixed later &mdash; a badly built graph cannot be rescued at query time by any efSearch.
+
+<strong>How much memory does the graph itself add?</strong> Roughly `n × M × 2 × 4` bytes on top of the vectors, so M = 16 over a million vectors is about 128 MB. It does not compress well, and that is precisely the constraint [DiskANN](diskann_index.html) was designed around.
+
+<strong>How do I delete?</strong> Mostly you do not. Removing a node can disconnect the region it was bridging, so implementations mark it deleted and skip it during search, then rebuild periodically. A workload with heavy churn is HNSW's worst case and one of the few places [IVF-Flat](ivf_flat_index.html) is genuinely the better index.
+
+<strong>Why does filtered search behave so badly?</strong> Because if a filter excludes most of the corpus, most edges point at excluded nodes and the greedy walk stalls before it has collected k results. Every vector database answers this differently &mdash; filtered traversal, pre-filtering into a flat scan, or a separate index per filter value &mdash; and none of the answers is free.
+
+## Recap in one screen
+
+- Unpack the name backwards: *small world* gives short paths from mostly-local edges, *navigable* means a greedy walk can find them, *hierarchical* is the mechanism that supplies the long edges.
+- Levels come from an exponentially decaying distribution with `mL = 1/ln(M)`, so roughly one node in M reaches each successive layer and the top holds a handful.
+- The construction heuristic is the important line: keep a candidate only if it is closer to the new node than to any neighbour already kept. Taking the M nearest instead produces cliques with no routes between them.
+- Upper layers cover **distance**, layer 0 supplies **precision**, and the descent hands off from one job to the other.
+- efSearch is the only runtime knob and has a hard floor at k; M and efConstruction are fixed at build and cap what efSearch can ever reach.
+- Best recall per millisecond of any index here, paid for in memory, awkward deletes and filtered search.
+- Two dimensions flatter it: M = 4 looks as good as M = 32 in the plane, and distance concentration &mdash; the thing that makes the problem hard at 768 dimensions &mdash; cannot be drawn.

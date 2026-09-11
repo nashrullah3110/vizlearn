@@ -41,6 +41,27 @@ PREFIX = "../"
 
 CSS = """
         .vz-rv-control + .vz-rv-control { margin-top: 1.15rem; }
+
+        /* Below lg the three columns stack and the Parameters card becomes
+           full width, but the controls stayed in one narrow column - so the
+           sliders ran a long way past the scene they drive. On
+           ivf_pq_index at 375x812 the scene, its bars and six controls came
+           to 1,049px against an 812px screen, and only three of the six
+           could be on screen with the picture at once. Laying them out
+           across the width the stacked card already has brings that to
+           793px and all six. The desktop rail is narrower than the 130px
+           floor, so nothing changes there. */
+        @media (max-width: 1023px) {
+            .vz-rv-controls {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+                gap: 0.85rem;
+                align-items: start;
+            }
+            .vz-rv-control + .vz-rv-control { margin-top: 0; }
+            .vz-rv-chead { margin-bottom: 0.35rem; }
+            .vz-rv-bars { padding-top: 0.85rem; padding-bottom: 1rem; }
+        }
         .vz-rv-chead {
             display: flex; justify-content: space-between; align-items: center;
             margin-bottom: 0.5rem; gap: 0.5rem;

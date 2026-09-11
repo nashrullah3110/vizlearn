@@ -128,6 +128,33 @@ one copy. And `build` is terminal: after it, `add_item` raises. The API is
 telling you the same thing the architecture does — this is an index you
 rebuild, not one you maintain.
 
+## K, the leaf size you do not get to choose
+
+The recursion stops when a node holds fewer than K vectors. Unlike
+[IVF](ivf_flat_index.html)'s nlist, K is not a parameter you set: Annoy derives
+it so that a leaf storing item ids occupies the same space as an internal node
+storing a split plane, which keeps the on-disk node format uniform and the file
+mmap-friendly. `build(n_trees)` really is the whole build-time surface.
+
+It is still worth knowing what K governs, because it explains the shape of the
+index. Tree depth is roughly `log2(n / K)`, so a million vectors with leaves of
+a few dozen gives a depth in the mid-teens. Every level is one more random
+hyperplane sitting between the query and a potential neighbour &mdash; which is
+the mechanism behind the earlier observation that a deep tree has many chances
+to separate a genuinely close pair.
+
+That also explains why n_trees is the only knob that matters and why it has to
+be large. You cannot make an individual tree less likely to cut through a
+neighbourhood, because the cut *is* the structure. You can only draw more
+independent partitions and take the union, which is why the guidance here is
+"as many trees as memory allows" where a learned index's guidance is a formula.
+
+The comparison with IVF is the instructive part. Both partition the space; one
+fits the partition to the data and gets a good one, the other draws it at random
+and compensates with repetition. The random version needs no training sample and
+costs almost nothing to build &mdash; which is exactly the trade that makes it
+attractive for something rebuilt nightly.
+
 ## In one line
 
 Annoy splits the space with hyperplanes bisecting random pairs of points,
@@ -137,3 +164,26 @@ build knob, search_k the runtime budget across the whole forest. Its real
 advantage is operational — a static, memory-mappable file shared across
 processes — and its real limitation is the same thing, because static means
 rebuild-only.
+
+## Questions people ask
+
+<strong>How many trees?</strong> As many as memory allows &mdash; that is Spotify's own guidance and it is not a hedge. Memory and build time are both linear in n_trees while recall climbs steadily, so the ceiling is a budget rather than a point of diminishing returns you can calculate.
+
+<strong>Does search_k need to scale with n_trees?</strong> Yes. It is one budget spent across the whole forest, so adding trees without raising it spreads the same effort more thinly and recall can actually dip. The default is `n_trees × n`, which is why leaving it unset gives good recall and unremarkable speed.
+
+<strong>Why not just search one tree harder?</strong> Because a single tree's failure is structural rather than a matter of effort. A neighbour on the far side of a split near the query sits in a different leaf, and searching harder only explores more of the same partition &mdash; recall plateaus well short of 1.0 and stays there.
+
+<strong>Can I add vectors to a built index?</strong> No. After `build()`, `add_item` raises. Adding a vector means rebuilding, which is fine for nightly batch recommendations and disqualifying for a document store users write to.
+
+<strong>Why use it at all when HNSW is more accurate per millisecond?</strong> For the file format rather than the algorithm. A static memory-mapped file means many processes share one copy at no marginal memory, an index larger than RAM degrades through the page cache instead of failing, deployment is a file swap, and a worker serves immediately rather than loading a graph into its heap.
+
+<strong>Which metric should I choose?</strong> `angular` is cosine on normalised vectors and the usual answer for embeddings. It is fixed at construction and baked into the file, so it is not a decision you revisit without a rebuild.
+
+## Recap in one screen
+
+- Split by the hyperplane bisecting two randomly chosen points and recurse to leaves. Nothing is learned, which is why the build is cheap and one tree is weak.
+- One tree cannot be rescued by searching harder: its misses lie on the far side of splits it has already made.
+- A forest works for the random-forest reason &mdash; many independent random planes rarely all separate a query from the same neighbour.
+- search_k is a budget across every tree at once, spent in order of distance to the split planes crossed, so effort goes where the missing neighbours would be.
+- The candidate set is rescored exactly at the end, so the trees only need to be good at *including* the right vectors, not at ranking them.
+- Its advantage and its limitation are one fact: a static mmapped file is cheap to share and impossible to update.

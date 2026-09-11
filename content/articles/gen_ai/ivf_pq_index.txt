@@ -132,6 +132,40 @@ scores, ids = refined.search(queries, 10)
 production form. Raising it costs reads and buys recall, and it is usually the
 first thing to turn up when an IVF-PQ index underperforms.
 
+## Which stage is costing you the recall
+
+An IVF-PQ index has three places recall can leak and they have three different
+fixes. Guessing which is responsible is how tuning sessions get long, and there
+is a short ablation that simply tells you.
+
+Take four measurements over the same query set:
+
+| Measurement | What it isolates |
+|---|---|
+| Flat, exhaustive | the ground truth, 1.0 by definition |
+| IVF-Flat at your nlist and nprobe | pruning loss only |
+| IVF-PQ, no rerank | pruning + quantisation loss |
+| IVF-PQ with rerank | what you actually ship |
+
+Each consecutive gap attributes the loss to one stage:
+
+- **Flat to IVF-Flat** is the partition missing true neighbours across cell
+  boundaries. The fix is more probes, or a larger nlist with nprobe raised to
+  match.
+- **IVF-Flat to IVF-PQ** is quantisation error. The fix is a longer code, OPQ,
+  or checking that residual encoding is actually on.
+- **IVF-PQ to IVF-PQ with rerank** is *ordering* error rather than candidate
+  error, and the fix is a larger `k_factor`.
+
+This answers the question people ask first &mdash; raise nprobe, or lengthen the
+code? &mdash; with a number instead of a guess. If the first gap is 0.02 and the
+second is 0.15, no amount of extra probing will help you.
+
+The reason it is worth the hour: the three fixes cost different things. More
+probes cost latency, a longer code costs memory, and a bigger shortlist costs
+random reads. Which you can afford is a property of your deployment, and
+without the ablation you will often spend the one you have least of.
+
 ## In one line
 
 IVF-PQ partitions with k-means and stores PQ codes of the **residual** from
@@ -140,3 +174,26 @@ opens nprobe cells and scores codes by table lookup; a rerank stage rescores
 the shortlist with exact vectors and recovers most of the lost recall. It is
 the default at billion scale because it is the only structure here where
 memory, not latency, is the thing being solved.
+
+## Questions people ask
+
+<strong>Why quantise the residual rather than the vector?</strong> Because it makes the codebook's resolution effectively local to each cell. Residuals from every cell are small, centred on zero and similar in scale, so one shared codebook fits them tightly, where quantising raw vectors asks the same centroids to cover the whole space. Same bits, same memory, several times less error.
+
+<strong>Do I have to rerank?</strong> If you want the top-10 *ordering* to be right, effectively yes. A PQ distance is good enough to rule a vector out and not good enough to order the shortlist, because the reconstruction errors are the same size as the differences you are trying to resolve. Skipping it is among the most common reasons a deployment's recall falls short of what the tuning guide promised.
+
+<strong>What does `k_factor` do?</strong> It is the shortlist multiplier: take `k_factor × k` candidates by PQ distance, rescore them against exact vectors, return k. Raising it costs random reads and buys recall, and it is usually the first thing to turn up when an IVF-PQ index underperforms.
+
+<strong>Where does the memory actually go at a billion vectors?</strong> The PQ codes at m = 64 are 64 GB against 3 TB for float32, which is the entire point &mdash; they fit in RAM on one large machine. The IVF centroids at nlist = 100,000 are only 307 MB, but they are scanned in full on every query, which is why composite recipes put an index over the centroids at that scale.
+
+<strong>Recall dropped months after deployment and nothing changed. Why?</strong> Because both the IVF centroids and the PQ codebooks are learned from a sample. When the corpus drifts away from it &mdash; a new document type, a new language, a re-embedded corpus &mdash; the index degrades quietly: recall falls, nothing errors, and nobody notices until someone measures. Retraining is periodic maintenance, not a one-off.
+
+<strong>How do I read `OPQ64_256,IVF16384,PQ64`?</strong> As a pipeline. `PQ64` is 64 subquantizers, so 64 bytes per vector; `IVF16384` is 16,384 cells; `OPQ64_256` is the learned rotation applied before quantising. Append `,RFlat` and you have the reranking stage too.
+
+## Recap in one screen
+
+- Two independent problems: latency, fixed by pruning (IVF), and memory, fixed by compression (PQ). IVF-PQ is both, and because the savings are independent they multiply.
+- PQ encodes the **residual** from the cell centroid, not the vector. The partition hands the quantiser an easier problem, which is what makes this a composition rather than two tricks stacked.
+- Search opens nprobe cells and scores codes by table lookup; a rerank stage then rescores the shortlist against exact vectors.
+- The recurring pattern: a cheap stage produces the candidate *set*, an expensive stage produces the *ordering*. The cheap stage only has to be good at exclusion.
+- At a billion vectors the codes fit in RAM and the centroid scan itself starts to be the bottleneck.
+- Centroids and codebooks are trained on a sample, so corpus drift degrades recall silently.

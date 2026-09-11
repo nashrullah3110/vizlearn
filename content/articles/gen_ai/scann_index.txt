@@ -138,6 +138,37 @@ page is about; `reorder(100)` is the rescoring shortlist. Removing the
 `.reorder` call is the single change that most degrades the result, which is
 the same lesson as the IVF-PQ page from a different direction.
 
+## What to check before choosing it
+
+Two measurements decide whether any of this applies to your workload, and both
+take minutes.
+
+**Are your vectors actually varying in length?** Compute the norms and look at
+the spread. If they are all 1.0 &mdash; which they are if you used
+`sentence-transformers` with its default, or OpenAI's embedding endpoint
+&mdash; the anisotropy derivation has nothing to work with, because the
+parallel direction is only special when magnitude carries information. Inner
+product, cosine and Euclidean rankings all coincide there, and a plain
+quantiser is doing the same job for less trouble.
+
+**Is your ranking genuinely maximum inner product?** Two-tower retrieval
+scoring unnormalised item vectors is. Semantic search over normalised sentence
+embeddings is not, even when the library calls the metric `dot_product`.
+
+If both answers are yes, the remaining thing to get right is the baseline.
+ScaNN's benchmark position belongs to a three-stage pipeline &mdash; partition,
+lossy quantised scoring, exact rescoring &mdash; so the honest comparison is
+[IVF-PQ](ivf_pq_index.html) **with** its refinement stage, which has the same
+shape. Comparing against plain [HNSW](hnsw_index.html), which rescores nothing,
+credits the quantiser with the rescoring pass. That is the same confusion the
+rescoring slider on this page exists to expose.
+
+And if both answers are no, the idea is still worth having. Decomposing
+quantisation error into a component that moves the score and one that mostly
+does not is the transferable part, and the question it poses &mdash; which
+errors is my ranking actually sensitive to? &mdash; recurs wherever a cheap
+approximation feeds an ordering.
+
 ## In one line
 
 ScaNN quantises with a loss that weights error along a vector's own direction
@@ -146,3 +177,26 @@ inner products for the queries that would have ranked the vector highly. Same
 code length, better MIPS recall — measured over a workload, not a query. The
 full system is partition, quantised scoring, then exact rescoring, and the
 last stage is what lets the middle one be so lossy.
+
+## Questions people ask
+
+<strong>What does η actually change?</strong> Which centroid each vector is assigned to, and nothing else. At η = 1 the assignment is identical to plain k-means; raise it and vectors begin accepting a larger *total* error in exchange for a smaller error along their own direction. The useful range is narrow &mdash; the gain peaks around 2 to 3 and shrinks by 6, because weighting the parallel error too heavily starts ignoring perpendicular error that does still matter.
+
+<strong>Why does a single query sometimes get worse?</strong> Because the claim is about an expectation, not a query. Anisotropic quantisation promises a better expected answer over the distribution of queries for which a vector would be a top result. A demonstration that showed one query and declared victory would be measuring something the method never claimed.
+
+<strong>Does it help if my embeddings are normalised?</strong> Mostly no, and it is the first thing to check. With every vector the same length, inner product, cosine and Euclidean ranking coincide and the parallel direction stops being special in the way the derivation needs.
+
+<strong>How much of the benchmark result is the quantiser?</strong> Not all of it, and not most of it. ScaNN as shipped is partition, quantised scoring, then exact rescoring of a few hundred candidates &mdash; and removing `.reorder()` degrades the result more than any η setting does.
+
+<strong>What is the fair baseline?</strong> IVF-PQ with refinement, because it is the same three-stage shape. Benchmarking a rescoring pipeline against a non-rescoring one attributes the rescoring to the quantiser.
+
+<strong>Why is it less common in vector databases than its benchmark position suggests?</strong> Ecosystem rather than algorithm: it is a library rather than a database, tied to TensorFlow, with fewer integrations than HNSW. The algorithm is not what is holding it back.
+
+## Recap in one screen
+
+- Squared reconstruction error treats every direction of error as equally harmful. For maximum inner product search it is not.
+- Split the residual into components parallel and perpendicular to the stored vector. For the queries that would rank that vector highly &mdash; those roughly aligned with it &mdash; the parallel part moves the score almost directly while the perpendicular part averages toward zero.
+- The loss weights them `η : 1` with η > 1. At η = 1 it is exactly k-means, which is the control condition worth setting first.
+- The payoff is a few points of MIPS recall at the same code length, measured over a workload rather than a query.
+- The shipped system is three stages: learned partition, anisotropic quantised scoring with in-register SIMD lookups, then exact rescoring. The last is what lets the middle one be so lossy.
+- If your vectors are L2-normalised the argument mostly evaporates &mdash; check the norms before choosing an index on the strength of this result.

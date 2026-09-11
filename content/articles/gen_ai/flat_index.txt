@@ -162,3 +162,26 @@ A flat index compares the query against every vector: exact, `O(n · d)`, no
 build step, no parameters, and no way to go stale. It is the ground truth that
 every approximate index's recall is measured against, and under a few hundred
 thousand vectors it is usually also the right thing to ship.
+
+## Questions people ask
+
+<strong>Is brute force really acceptable in production?</strong> Far more often than the literature suggests, because it is a BLAS call rather than a loop. A million 768-dimensional vectors is about 190 ms on one core, a few milliseconds on a GPU, and batching means a hundred queries cost barely more than one. The crossover where an approximate index starts to win is a function of your hardware and batch size, not a vector count you can look up.
+
+<strong>Do I have to scan the whole corpus for every query just to measure recall?</strong> No, only once. Sample about 1,000 real queries, run them against a full flat scan, store the true top-100, and reuse that fixed set every time you change a parameter or retrain an embedding model. It costs an hour of compute and it is the only honest recall number you will have.
+
+<strong>Why does `argpartition` matter so much?</strong> Because at a million vectors the top-k selection, not the dot products, can dominate the query. `argpartition` is O(n) where a full `argsort` is O(n log n), and you then sort only the k you kept.
+
+<strong>Is float16 worth it?</strong> Usually. It halves the memory, most CPUs convert on the fly, and for cosine over normalised embeddings the ranking difference is generally below measurement noise. It is the cheapest 2&times; available before you reach for a scheme that needs training.
+
+<strong>Does adding vectors mean reindexing?</strong> No &mdash; it is an array append, and deleting is a tombstone or a swap-and-pop. This is the property you give up first when you move to a graph, and the reason flat indexes survive in write-heavy systems.
+
+<strong>My approximate index reports 0.95 recall on a benchmark but feels worse in production. Why?</strong> Because recall is a property of your data, not of the algorithm. An index tuned to 0.95 on SIFT1M can sit at 0.7 on your embeddings with identical parameters, depending on how clustered they are, how the intrinsic dimensionality compares with the nominal one, and whether queries come from the same distribution as the documents. Published numbers tell you what to try, not what yours will do.
+
+## Recap in one screen
+
+- The whole algorithm: distance to every stored vector, keep the k smallest. No build step, no parameters, nothing that can go stale.
+- `O(n · d)` and linear in both &mdash; but the batched form is a matrix multiply, which is the one operation all modern hardware is built for.
+- It is the measuring instrument: every recall figure on every other index is defined against an exhaustive search, and it has to be run on your own corpus and queries.
+- Its single dial, fraction scanned, is *non-selective* &mdash; stopping early loses arbitrary neighbours. Every other index here exists to make that dial selective.
+- Genuinely the right choice under a few hundred thousand vectors, under constant churn, when recall must be exactly 1, or inside a tight metadata filter.
+- Memory and latency are separate problems with separate fixes: compression shrinks vectors and still scans them all, pruning skips vectors and keeps them whole.

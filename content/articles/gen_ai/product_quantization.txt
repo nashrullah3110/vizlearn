@@ -143,6 +143,40 @@ catches people who change embedding models without changing the index recipe.
 768 divides by 96, 64, 48, 32 and 16; 1536 divides by all of those too, which
 is one small reason those dimensions are popular.
 
+## PQ, int8 and binary
+
+PQ is not the only way to make a vector smaller, and the alternatives have
+become far more common since it was published. At d = 768 they line up like
+this:
+
+| Scheme | Bytes per vector | Ratio | Training |
+|---|---|---|---|
+| float32 | 3,072 | 1&times; | none |
+| float16 | 1,536 | 2&times; | none |
+| int8 scalar quantization | 768 | 4&times; | one calibration pass |
+| PQ, m = 96 at 8 bits | 96 | 32&times; | k-means per subspace |
+| binary, 1 bit per dimension | 96 | 32&times; | none |
+
+**Scalar quantization** stores each dimension as one byte against a recorded
+range. There is no codebook, calibration is a single pass, and on normalised
+embeddings the ranking loss is usually small enough to ignore. It is the
+cheapest real compression available and the first thing to try.
+
+**Binary quantization** keeps one bit per dimension &mdash; the sign &mdash; and
+scores with Hamming distance, which is an XOR and a popcount. It lands at the
+same 96 bytes as PQ-96 with no training at all, and it works better than it
+sounds on high-dimensional embeddings *provided* a rescoring pass over the
+shortlist fixes the ordering. That proviso is the same one
+[IVF-PQ](ivf_pq_index.html) needs, for the same reason.
+
+**Matryoshka embeddings** are orthogonal to all of it: the model is trained so
+that the first 256 of its 768 dimensions are themselves a usable embedding, so
+you truncate rather than quantise &mdash; and you can still quantise afterwards.
+
+What PQ retains is accuracy per byte at aggressive ratios, and the fact that it
+composes with a partition through residual encoding. If 4&times; is enough, int8
+is less work than any of this.
+
 ## In one line
 
 PQ splits a vector into m subvectors and stores the index of the nearest
@@ -151,3 +185,26 @@ centroid in each subspace's codebook. m codebooks of k centroids describe
 extreme. Queries build an `m × k` distance table once and then cost m lookups
 per candidate, independent of dimension. It compresses but does not prune, so
 it is almost always paired with IVF or a graph.
+
+## Questions people ask
+
+<strong>Why does splitting help so much?</strong> Because representable positions *multiply* while stored centroids only add. m codebooks of k centroids describe `kᵐ` positions from `m·k` stored centroids &mdash; at m = 96 and k = 256, that is 256⁹⁶ positions from 24,576 centroids. Plain quantization has to store every position it can represent.
+
+<strong>Should nbits ever be anything but 8?</strong> Rarely. A byte is what hardware likes, 256 centroids per subspace is a good operating point, and the SIMD lookup implementations that make PQ fast assume it. Lower values exist for extreme compression and lose recall quickly.
+
+<strong>Should I use OPQ?</strong> Usually yes. PQ splits dimensions in their original order, which implicitly assumes neighbouring dimensions belong together &mdash; arbitrary for a learned embedding. OPQ learns a rotation that balances variance across the subspaces first, costs one matrix multiply per query, and typically buys a few points of recall.
+
+<strong>Why asymmetric distance instead of decoding the code?</strong> Because it leaves the query exact. Quantising the query too would let you precompute a symmetric table between codebook entries, which is marginally faster and measurably less accurate &mdash; you would be adding the query's own quantisation error to every comparison for no benefit.
+
+<strong>FAISS rejected my m. Why?</strong> Because m must divide d. 768 divides by 96, 64, 48, 32 and 16, and so does 1536 &mdash; one small reason those embedding dimensions are popular. This is what catches people who change embedding model without revisiting the index recipe.
+
+<strong>Is PQ an index?</strong> No, it is a compression scheme. A pure PQ index still computes a distance for every vector in the corpus &mdash; a flat scan over short codes, perhaps 20&ndash;30&times; faster than scanning float32, and still `O(n)`. It is almost always wrapped in something that prunes.
+
+## Recap in one screen
+
+- Quantise pieces rather than the whole vector: m subvectors, each with its own 256-entry codebook, stored as m one-byte indices.
+- 3,072 bytes becomes 96 at m = 96. The compression comes from the Cartesian product of the codebooks &mdash; which is what "product" in the name means.
+- A query builds an `m × 256` distance table once, then each candidate costs m lookups and m additions: no multiplications, no decoding, and a cost independent of d.
+- Asymmetric is the default because only the stored side is quantised, so the query contributes no error of its own.
+- Quantisation error is PQ's only failure mode. It shows up as recall and as nothing else.
+- It compresses without pruning, so pair it with IVF, a graph, or a rescoring stage &mdash; pure PQ on its own is unusual.
