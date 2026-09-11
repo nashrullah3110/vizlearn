@@ -1,0 +1,272 @@
+title: Threads or Processes: What Is and Is Not Shared
+intro: Threads share everything and cannot run Python at once. Processes run Python at once and share nothing - so the real question is what your data costs to send.
+
+## Two models, one difference
+
+Threads in a process share one address space. Every global, every module, every
+open object is the same object seen from all of them, which is why they are
+cheap to start and why they need [locks](locks_and_the_ways_they_go_wrong.html).
+They are also subject to the [GIL](the_gil_and_what_it_locks.html), so they
+never run Python simultaneously.
+
+Processes have separate address spaces. Each has its own interpreter, its own
+GIL, its own copy of every module, and no access whatsoever to the others'
+objects. They do run Python simultaneously, on as many cores as you have.
+
+| | Threads | Processes |
+|---|---|---|
+| Run Python at the same time | no | **yes** |
+| Share objects | everything | nothing |
+| Start-up cost | microseconds | tens of milliseconds |
+| Memory per worker | a stack | a whole interpreter |
+| Passing data | free, it is the same object | **pickled, copied, unpickled** |
+| Crash containment | takes the process down | isolated |
+| What you need | locks | a serialisation story |
+
+The last two rows of that table are where projects actually get stuck. "Use
+processes for CPU-bound work" is correct and it is the easy half. The hard half
+is that nothing crosses the boundary unless it can be **pickled**, and the
+pickle is a copy that is paid for twice.
+
+These editors run in a browser interpreter with no OS threads and no
+<code>_multiprocessing</code> module, so the pool examples are shown with their
+CPython output. The pickle boundary, though, is entirely real here &mdash; and
+it is the part that decides whether a design works.
+
+## The boundary is pickle
+
+Sending an argument to a worker process means serialising it, writing the bytes
+to a pipe, and reconstructing it on the other side. So the question "can I use
+a process pool for this?" is really "can this be pickled, and how big is it?"
+
+```python-run
+import pickle, time, threading
+
+def size(obj):
+    return len(pickle.dumps(obj))
+
+print("what crosses, and what it costs")
+print("  int 42            ", size(42), "bytes")
+print("  dict of 3 lists   ", size({"a": [1, 2, 3]}), "bytes")
+print("  list of 100,000   ", size(list(range(100_000))), "bytes")
+
+big = list(range(1_000_000))
+t0 = time.perf_counter(); blob = pickle.dumps(big); t1 = time.perf_counter()
+t2 = time.perf_counter(); pickle.loads(blob);        t3 = time.perf_counter()
+print("  list of 1,000,000 ", len(blob), "bytes")
+print(f"  dumps {1000*(t1-t0):.0f} ms, loads {1000*(t3-t2):.0f} ms  <- paid on every call")
+
+print()
+print("and what cannot cross at all:")
+for label, obj in [("a lock", threading.Lock()),
+                   ("a generator", (x for x in [1])),
+                   ("an open file", open("/dev/null"))]:
+    try:
+        pickle.dumps(obj)
+    except TypeError as e:
+        print("  %-14s TypeError: %s" % (label, e))
+```
+
+```
+what crosses, and what it costs
+  int 42             5 bytes
+  dict of 3 lists    29 bytes
+  list of 100,000    368931 bytes
+  list of 1,000,000  4871352 bytes
+  dumps 53 ms, loads 143 ms  <- paid on every call
+ 
+and what cannot cross at all:
+  a lock         TypeError: cannot pickle '_thread.lock' object
+  a generator    TypeError: cannot pickle 'generator' object
+  an open file   TypeError: cannot pickle 'TextIOWrapper' instances
+```
+
+Read the bottom three first. A lock, a generator and an open file cannot be
+pickled, and the reason is the same in each case: they refer to something that
+only means anything inside the process that made it. A lock is a handle on
+operating-system state; a generator is a paused stack frame; a file object
+wraps a descriptor belonging to one process. There is no honest way to copy any
+of them, so <code>pickle</code> refuses rather than producing something broken.
+
+That refusal is what turns "just use a process pool" into a redesign. A worker
+function that closes over a database connection, a file handle, a logger with
+an open socket, or a lambda will fail at submit time rather than doing anything
+useful. The usual answer is to send the *description* and build the object
+inside the worker &mdash; pass a path, not a file; pass a DSN, not a connection
+&mdash; which is why process-pool worker functions tend to take plain data and
+construct everything they need.
+
+Then read the timings. Five million bytes for a million integers, tens of
+milliseconds to serialise and more to rebuild, and both happen on every call.
+If the work a worker does is smaller than the cost of sending it its arguments,
+a pool makes the program slower, and this is much easier to hit than it sounds.
+
+## What a pool actually does
+
+With that in mind, the code is unremarkable:
+
+```python
+from concurrent.futures import ProcessPoolExecutor
+import time
+
+def work(n):
+    total = 0
+    for i in range(n):
+        total += i * i
+    return total
+
+N = 5_000_000
+
+if __name__ == "__main__":          # required on spawn platforms
+    t0 = time.perf_counter()
+    work(N); work(N); work(N); work(N)
+    print(f"sequential:    {time.perf_counter() - t0:.2f}s")
+
+    t0 = time.perf_counter()
+    with ProcessPoolExecutor(max_workers=4) as pool:
+        list(pool.map(work, [N] * 4))
+    print(f"four processes: {time.perf_counter() - t0:.2f}s")
+```
+
+```
+sequential:    2.35s
+four processes: 0.71s
+```
+
+Four processes, four cores, and roughly the speed-up you would hope for. Note
+what made this a good case: the arguments are one integer each, the results are
+one integer each, and each call does a substantial amount of work. The boundary
+cost is nothing and the parallelism is real.
+
+The <code>if __name__ == "__main__"</code> guard is not decoration. On Windows
+and macOS a new process **spawns** &mdash; it starts a fresh interpreter and
+imports your module to find the worker function &mdash; so without the guard,
+the module-level code runs again in every child, which starts more children,
+recursively. On Linux the default was <code>fork</code>, which copies the
+parent instead and does not need the guard; that changed in 3.14, where
+<code>forkserver</code> became the default because <code>fork</code> in a
+process with threads is genuinely unsafe. Write the guard.
+
+## The three start methods
+
+The start method decides what a child begins life with, and it is the setting
+behind most "it works on my machine" reports:
+
+| Method | What the child gets | Notes |
+|---|---|---|
+| <code>fork</code> | a copy of the parent, lazily | fast; unsafe with threads or locks held |
+| <code>spawn</code> | a fresh interpreter, then your module imported | slow, needs picklable everything, safest |
+| <code>forkserver</code> | a fork of a small clean server process | the 3.14 default on Linux |
+
+<code>fork</code> is why some code appears to share objects with its children:
+they inherit a copy, so a global that was populated before the fork is visible
+&mdash; and then diverges the moment either side writes to it. Code written
+against that behaviour breaks on <code>spawn</code>, where the child starts
+from a clean import and sees nothing the parent computed at runtime. Setting
+<code>multiprocessing.set_start_method("spawn")</code> in development is the
+cheapest way to find out whether you depend on it.
+
+## Measure the payload, do not assume it
+
+The obvious way to shrink what crosses the boundary is to send a compact buffer
+instead of a container of objects. It is worth testing that intuition rather
+than acting on it:
+
+```python-run
+import pickle, array
+
+n = 200_000
+cases = {
+    "small ints (0..n)":      list(range(n)),
+    "large ints (2**60 + i)": [2**60 + i for i in range(n)],
+}
+for label, data in cases.items():
+    arr = array.array("q", data)
+    L, A = len(pickle.dumps(data)), len(pickle.dumps(arr))
+    print(f"{label:<24} list {L:>9,}  array {A:>9,}  array is {A/L:.2f}x the list")
+```
+
+```
+small ints (0..n)        list   869,203  array 1,600,089  array is 1.84x the list
+large ints (2**60 + i)   list 2,000,684  array 1,600,089  array is 0.80x the list
+```
+
+The intuition is wrong half the time. An <code>array("q")</code> spends a
+fixed eight bytes per element whatever the value, while pickle encodes small
+integers in one or two bytes and large ones in nine. So for counters and
+indices the "compact" buffer is nearly twice the size, and for genuinely large
+values it is a fifth smaller.
+
+The transferable habit is the one line that settled it:
+<code>len(pickle.dumps(x))</code> on a representative argument. It takes a
+second, it is the number that decides whether a process pool can win, and it is
+not reliably predictable from the type.
+
+For numpy arrays the answer is different again and worth knowing: they pickle
+as a raw buffer plus a small header, so the payload is the data and nothing
+else. That is why array-shaped work tends to survive the boundary when
+object-shaped work does not &mdash; and why
+<code>multiprocessing.shared_memory</code>, which passes a name instead of a
+copy, is the escape hatch for the cases where even that is too much.
+
+## When neither is the answer
+
+Two escapes are worth knowing, because the threads-or-processes framing hides
+them.
+
+**Let the library do it.** numpy, pandas, scipy, and anything built on BLAS
+release the GIL inside their C loops, so a vectorised operation already uses
+your cores without threads or processes in your code. Rewriting a Python loop
+as an array operation is frequently a larger win than parallelising the loop,
+and it removes the concurrency question entirely.
+
+**Use both.** The common production shape is a small pool of processes, each
+running many threads or an event loop. Processes get past the GIL; the threads
+inside each handle the waiting. A four-process, thirty-thread server is not a
+compromise, it is the answer to "our work is partly CPU-bound and mostly I/O",
+which is what most services are.
+
+## Where it goes wrong
+
+**Assuming an object will pickle.** Locks, sockets, generators, open files,
+lambdas and local functions will not. The failure arrives at submit time, and
+the fix is usually to send a description and build the object in the worker.
+
+**Sending large arrays through the boundary.** Copying a gigabyte per call
+costs more than the work. For numpy specifically,
+<code>multiprocessing.shared_memory</code> passes a handle instead of a copy.
+
+**Omitting the <code>__main__</code> guard.** On spawn platforms the module is
+re-imported in every child, and without the guard that starts more children.
+
+**Expecting globals to be shared.** Each process has its own. A counter
+incremented in a worker is incremented in that worker's copy and nowhere else;
+results have to come back through the return value or a
+<code>Manager</code>.
+
+**Using processes for I/O.** Threads are cheaper, share the data, and are not
+waiting on the GIL anyway, because a blocked thread has already released it.
+
+## Questions people ask
+
+<strong>How many processes?</strong> Start at <code>os.cpu_count()</code> for CPU-bound work and expect to tune down &mdash; more processes than cores just adds context switching and memory. If the work is mixed, the count that matters is how many are computing at once, not how many exist.
+
+<strong>Why is my process pool slower than sequential?</strong> Almost always the boundary. Measure <code>len(pickle.dumps(arg))</code> for a typical call: if sending the arguments and receiving the result costs more than the function does, a pool cannot win. Batch the work into fewer, larger calls.
+
+<strong>Can processes share a counter?</strong> Only through something built for it &mdash; <code>multiprocessing.Value</code>, a <code>Manager</code> proxy, or shared memory. A plain global is per-process, and the version that increments it in a worker and prints zero in the parent is a standard first surprise.
+
+<strong>Do threads use multiple cores at all?</strong> The OS can schedule them on different cores, and they still cannot run Python simultaneously. The exception is time spent inside C code that has released the GIL, which is why a numpy-heavy threaded program sometimes does scale.
+
+<strong>Is <code>fork</code> really unsafe?</strong> With threads, yes. The child inherits the memory but only the calling thread, so any lock held by another thread at the moment of the fork is held forever in the child, by nobody. That is why 3.14 changed the Linux default to <code>forkserver</code>.
+
+<strong>What about subinterpreters?</strong> Since 3.12 each has its own GIL, so they give parallelism inside one process without the pickle cost of a pipe &mdash; though sharing data between them is deliberately restricted. It is the most interesting middle ground in this table and still the newest.
+
+## Recap in one screen
+
+- Threads share one address space and never run Python at once; processes run Python at once and share nothing.
+- So the choice is not really threads-versus-processes. It is whether your data can cross a process boundary, and what that costs.
+- The boundary is pickle. Locks, generators, open files and lambdas cannot cross, because each refers to state that only exists in one process.
+- A million-integer list is ~4.9 MB and tens of milliseconds each way, paid on every call. If that exceeds the work, the pool loses.
+- Good process work takes small arguments, returns small results, and computes a lot in between.
+- Write the <code>if __name__ == "__main__"</code> guard, and know your start method: <code>fork</code> inherits a copy, <code>spawn</code> starts clean and needs everything picklable.
+- Often the right answer is neither: vectorise so a C library releases the GIL for you, or run threads inside a few processes.

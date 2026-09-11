@@ -196,6 +196,8 @@ SHARED_SCRIPTS = (
     # The async_python explorers: a loop stepper, two timelines, the freeze
     # and a queue depth chart, one per module in that track.
     ("vizlearn-asyncviz.js", "data-vz-async"),
+    # The threads-and-processes explorers on the concurrency/ modules.
+    ("vizlearn-conviz.js", "data-vz-con"),
     # Query variants and two-transaction timelines on the database/ modules.
     # This only wires buttons; the SQL engine itself is vizlearn-sql.js above.
     ("vizlearn-dbq.js", "data-vz-dbq"),

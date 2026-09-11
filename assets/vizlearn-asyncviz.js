@@ -547,7 +547,9 @@
                     series.push({t: t, d: depth});
                     t += dt;
                 }
-                var total = Math.max(t, dt);
+                // consumed is incremented when the consumer TAKES an item, so the
+                // loop exits before the last one is finished; consFree is when it is.
+                var total = Math.max(t, consFree);
 
                 // depth step chart
                 var W = 620, padL = 40, padR = 14, top = 18, plotH = 96;

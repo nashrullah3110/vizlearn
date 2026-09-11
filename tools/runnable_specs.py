@@ -238,6 +238,19 @@ SPECS = {
         "label": "Python",
         "filename": "example_%02d.py",
     },
+    "concurrency": {
+        # threading, queue, dis, pickle and concurrent.futures are all stdlib,
+        # so nothing to install. Note what these editors CANNOT do: the
+        # browser interpreter has no OS threads, so Thread.start(),
+        # ThreadPoolExecutor, multiprocessing and os.fork raise. The runnable
+        # blocks on this track therefore execute mechanism that is real
+        # single-threaded - bytecode, the lock protocol, the pickle boundary,
+        # the Future state machine - and anything needing a second thread is a
+        # plain fence with its output beside it.
+        "packages": "",
+        "label": "Python",
+        "filename": "example_%02d.py",
+    },
     "async_python": {
         # asyncio is stdlib, so nothing to install. The examples end in
         # `await main()`: the runner (assets/vizlearn-python.js) allows a

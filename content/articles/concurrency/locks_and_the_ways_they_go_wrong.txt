@@ -1,0 +1,361 @@
+title: Locks, and the Four Ways They Go Wrong
+intro: A lock is two methods and a rule. Almost every problem with one is a question of which lock, what it guards, how long it is held, and in what order.
+
+## The whole protocol
+
+A <code>threading.Lock</code> has two operations. <code>acquire()</code> takes
+it, waiting if another thread holds it; <code>release()</code> hands it back.
+Everything else is a consequence, and all of it can be watched from one
+thread:
+
+```python-run
+import threading
+
+lk = threading.Lock()
+print("fresh lock, locked?", lk.locked())
+
+lk.acquire()
+print("after acquire:     ", lk.locked())
+print("acquire again, non-blocking:", lk.acquire(blocking=False),
+      "<- False means another acquire would have waited")
+print("acquire again, with a timeout:", lk.acquire(timeout=0.05),
+      "<- gave up rather than hanging")
+
+lk.release()
+print("after release:     ", lk.locked())
+try:
+    lk.release()
+except RuntimeError as e:
+    print("releasing twice:    RuntimeError:", e)
+```
+
+```
+fresh lock, locked? False
+after acquire:      True
+acquire again, non-blocking: False <- False means another acquire would have waited
+acquire again, with a timeout: False <- gave up rather than hanging
+after release:      False
+releasing twice:    RuntimeError: release unlocked lock
+```
+
+Four things in that output are the whole API. A lock is either held or not.
+<code>blocking=False</code> and <code>timeout=</code> turn "wait forever" into
+a question you can answer, which is the only way to write code that reports
+contention instead of hanging on it. And releasing an unheld lock is an error
+rather than a no-op, which is worth knowing because it is how a
+<code>try/finally</code> written slightly wrong announces itself.
+
+Note what the second line proves: this single thread just failed to acquire a
+lock it already holds. That is not a quirk of the sandbox &mdash; a
+<code>Lock</code> has no concept of an owner, so "already held" is all it
+knows, even when the holder is you.
+
+The editors here run in a browser interpreter with no OS threads, so the
+protocol above is real and the two-thread examples are shown with the output
+they produce on CPython.
+
+## with, not acquire
+
+Every lock should be taken with a context manager:
+
+```python
+with lock:
+    counter += 1
+```
+
+rather than:
+
+```python
+lock.acquire()
+counter += 1          # if this raises, the lock is never released
+lock.release()
+```
+
+The second form is a deadlock waiting for an exception. Anything that raises
+between the two calls leaves the lock held forever, and every other thread
+that wants it blocks permanently &mdash; a hang with no traceback and no
+obvious cause, because the thread that broke the invariant has long since
+moved on. <code>with</code> releases on the way out however the block exits,
+including on an exception and on a <code>return</code>.
+
+If you genuinely need the two-call form &mdash; acquiring in one function and
+releasing in another, which is usually a design worth revisiting &mdash; then
+the release belongs in a <code>finally</code>.
+
+## Lock or RLock
+
+A plain <code>Lock</code> is not reentrant: the same thread taking it twice
+deadlocks against itself. An <code>RLock</code> counts, and the same thread may
+take it repeatedly as long as it releases the same number of times.
+
+```python-run
+import threading
+
+rl = threading.RLock()
+rl.acquire(); rl.acquire()
+print("RLock taken twice by one thread: fine")
+rl.release(); rl.release()
+print("and released twice:              fine")
+
+plain = threading.Lock()
+plain.acquire()
+print("plain Lock, same thread again:", plain.acquire(timeout=0.05),
+      "<- it would have waited for itself, forever")
+plain.release()
+```
+
+```
+RLock taken twice by one thread: fine
+and released twice:              fine
+plain Lock, same thread again: False <- it would have waited for itself, forever
+```
+
+The reason this matters is that self-deadlock rarely looks like taking a lock
+twice. It looks like a locked method calling another locked method on the same
+object:
+
+```python
+class Counter:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._n = 0
+
+    def bump(self):
+        with self._lock:
+            self._n += 1
+
+    def bump_twice(self):
+        with self._lock:      # held here...
+            self.bump()       # ...and bump() wants it too. Hangs.
+```
+
+<code>RLock</code> fixes that instance and is also a warning sign: if your
+public methods call each other while holding a lock, the lock is doing two
+jobs. The alternative is a private unlocked <code>_bump</code> that both
+public methods call inside their own <code>with</code>, which keeps the lock
+shallow and the ownership obvious.
+
+## How long to hold it
+
+A lock serialises everything inside it, so the block is the part of your
+program that cannot go faster with more threads. The cost of the lock itself is
+measurable:
+
+```python-run
+import threading, time
+
+N = 200_000
+lock = threading.Lock()
+counter = 0
+
+t0 = time.perf_counter()
+for _ in range(N):
+    counter += 1
+bare = time.perf_counter() - t0
+
+counter = 0
+t0 = time.perf_counter()
+for _ in range(N):
+    with lock:
+        counter += 1
+inside = time.perf_counter() - t0
+
+counter = 0
+t0 = time.perf_counter()
+with lock:
+    for _ in range(N):
+        counter += 1
+outside = time.perf_counter() - t0
+
+print(f"{N:,} increments")
+print(f"  no lock                {bare*1000:6.0f} ms")
+print(f"  lock inside the loop   {inside*1000:6.0f} ms   ({inside/bare:.1f}x)")
+print(f"  lock outside the loop  {outside*1000:6.0f} ms   ({outside/bare:.1f}x)")
+```
+
+```
+200,000 increments
+  no lock                    99 ms
+  lock inside the loop      312 ms   (3.1x)
+  lock outside the loop      89 ms   (0.9x)
+```
+
+Taking the lock two hundred thousand times triples the cost of the loop.
+Taking it once is indistinguishable from not taking it at all. The absolute
+milliseconds depend on the interpreter &mdash; this browser build is slower
+than CPython &mdash; but the shape is the point, and the editor prints whatever
+your runtime measures.
+
+Which pulls in two directions, and the tension is the real design work.
+
+**Hold it too briefly** and you pay per-acquire overhead, and you may not
+actually be protecting the invariant &mdash; two separate locked blocks are two
+atomic operations, not one, so anything that must be consistent across both
+needs one block around both.
+
+**Hold it too long** and you have serialised your program. A lock held across a
+network call is the extreme case: every other thread waits for your HTTP
+request. The rule that follows is to hold a lock over the shortest region that
+still contains the whole invariant, and never across I/O.
+
+## The deadlock you write by accident
+
+Two locks and two threads that take them in opposite orders is the classic, and
+it needs nothing exotic:
+
+```python
+# thread A                      # thread B
+with lock_accounts:             with lock_audit:
+    with lock_audit:                with lock_accounts:
+        transfer()                      record()
+```
+
+Thread A holds <code>accounts</code> and waits for <code>audit</code>. Thread B
+holds <code>audit</code> and waits for <code>accounts</code>. Neither will ever
+release, because releasing is the thing each is waiting to be able to do. The
+program does not crash; it stops, which is considerably harder to diagnose.
+
+The explorer above this article is that situation: two threads, two locks, and
+a toggle that makes both take them in the same order. There is no clever fix
+&mdash; **a global ordering on locks** is the fix. Number them, always acquire
+in ascending order, and a cycle becomes impossible, because a cycle requires
+somebody to go backwards.
+
+Where an ordering is impractical, the fallback is a timeout:
+
+```python
+if not lock_audit.acquire(timeout=1.0):
+    lock_accounts.release()      # back off, let the other thread win
+    raise CouldNotLock("audit")
+```
+
+That converts a permanent hang into a recoverable error, which is strictly
+better and still worse than an ordering. It also introduces livelock, where
+two threads politely back off and retry in lockstep forever; randomising the
+retry delay is the usual answer.
+
+## The other three primitives, and when each is right
+
+A lock answers "only one at a time". Three neighbours answer different
+questions, and reaching for a lock when you wanted one of these is its own
+category of mistake:
+
+```python-run
+import threading
+
+ev = threading.Event()
+print("Event      is_set?", ev.is_set(), "| wait(0.05) ->", ev.wait(0.05), "(timed out)")
+ev.set()
+print("           after set:", ev.is_set(), "| wait() ->", ev.wait(), "(returns at once)")
+
+sem = threading.Semaphore(2)
+print()
+print("Semaphore(2)  three non-blocking acquires:",
+      sem.acquire(blocking=False), sem.acquire(blocking=False), sem.acquire(blocking=False))
+sem.release(); sem.release()
+
+loose = threading.Semaphore(1)
+loose.release(); loose.release()
+print("Semaphore     stray releases accepted; permits now", loose._value, "<- silent bug")
+
+bounded = threading.BoundedSemaphore(1)
+bounded.acquire(); bounded.release()
+try:
+    bounded.release()
+except ValueError as e:
+    print("BoundedSemaphore  one release too many -> ValueError:", e)
+
+cond = threading.Condition()
+with cond:
+    print()
+    print("Condition  wait(0.05) ->", cond.wait(0.05), "(nobody notified)")
+    cond.notify_all()
+    print("           notify_all() with no waiters is a no-op, not an error")
+```
+
+```
+Event      is_set? False | wait(0.05) -> False (timed out)
+           after set: True | wait() -> True (returns at once)
+
+Semaphore(2)  three non-blocking acquires: True True False
+Semaphore     stray releases accepted; permits now 3 <- silent bug
+BoundedSemaphore  one release too many -> ValueError: Semaphore released too many times
+
+Condition  wait(0.05) -> False (nobody notified)
+           notify_all() with no waiters is a no-op, not an error
+```
+
+**Event** is a one-way flag with waiting attached. It is for "has the thing
+happened yet" &mdash; startup finished, shutdown requested &mdash; and the
+right shape for asking a pool of workers to stop: they check
+<code>stop.is_set()</code> between items, and one <code>set()</code> reaches
+all of them. Note that <code>wait()</code> returns the flag's state rather
+than <code>None</code>, so <code>if not ev.wait(timeout):</code> is how you
+distinguish "it happened" from "I gave up".
+
+**Semaphore** counts permits instead of excluding. Three connections to a
+service that tolerates three: <code>Semaphore(3)</code>, and the fourth caller
+waits. The output above shows why **BoundedSemaphore** is usually the better
+choice &mdash; a plain one silently accepts releases that were never matched by
+an acquire, so a bug that leaks permits raises the cap instead of raising an
+error. That is the same argument as a plain <code>Lock</code> erroring on a
+double release, and the plain <code>Semaphore</code> is the odd one out.
+
+**Condition** is a lock plus a way to wait for what it protects to change. The
+pattern is always the same, and the <code>while</code> is not optional:
+
+```python
+with cond:
+    while not predicate():
+        cond.wait()
+    # the predicate is true and we hold the lock
+```
+
+A wakeup does not promise the predicate is true &mdash; another thread may have
+been woken first and taken the thing &mdash; so re-checking in a loop is what
+makes it correct. In practice a
+[<code>queue.Queue</code>](queues_between_threads.html) is a <code>Condition</code>
+that has already been written correctly, and reaching for the queue rather
+than the primitive is usually the right call.
+
+## Where it goes wrong
+
+**Manual acquire and release.** One exception between them and the lock is held
+forever. Use <code>with</code>.
+
+**A different lock for the same data.** Two threads taking two different locks
+around one variable are not synchronised at all. A lock protects what everyone
+agrees it protects.
+
+**Locking the write but not the read.** A reader that takes no lock can observe
+a half-finished update. Every access needs the lock, including read-only ones
+that then act on what they saw.
+
+**Holding a lock across I/O.** Correct and slow enough to look like a hang, and
+it can turn a slow remote server into a stalled process.
+
+**Taking two locks in whatever order reads best.** That is how the deadlock
+above gets written. Pick an order once, write it down, follow it everywhere.
+
+## Questions people ask
+
+<strong>Should I just use <code>RLock</code> everywhere?</strong> It is a little slower and it hides a design smell, because needing reentrancy usually means a locked method is calling another locked method. Reach for <code>Lock</code> first; if you need <code>RLock</code>, ask whether a private unlocked helper would be clearer.
+
+<strong>How do I know if a lock is being contended?</strong> Take it with <code>acquire(timeout=...)</code> or <code>blocking=False</code> and count the failures. A lock that is never contended is cheap and a lock that is always contended is your bottleneck &mdash; and neither is visible without measuring, because both look identical in the source.
+
+<strong>Is <code>Condition</code> just a lock?</strong> It is a lock plus a way to wait for a change to what the lock protects. Use it when a thread needs to block until a predicate becomes true &mdash; the pattern is <code>while not ready: cond.wait()</code> inside <code>with cond:</code>, and the loop matters because a wakeup does not guarantee the predicate.
+
+<strong>What is a <code>Semaphore</code> for?</strong> Counting rather than excluding: it allows N holders instead of one, which is how you cap concurrent access to a pool of connections. A <code>Semaphore(1)</code> behaves like a lock but does not error on a stray release, which is why <code>BoundedSemaphore</code> exists.
+
+<strong>Do I need a lock if I only ever append to a list?</strong> No &mdash; <code>append</code> is one C call and cannot be interleaved. You need one the moment you read the list and then act on what you read, which is [check-then-act](race_conditions_in_python.html) again.
+
+<strong>Can I detect a deadlock at runtime?</strong> Not from inside the deadlocked threads, which is the problem. <code>faulthandler.dump_traceback_later()</code> will print every thread's stack after a timeout, and two stacks sitting in <code>acquire</code> on different locks is the signature. Prevention through ordering is the real answer.
+
+## Recap in one screen
+
+- A lock is <code>acquire</code> and <code>release</code>; everything else &mdash; <code>locked()</code>, <code>blocking=False</code>, <code>timeout=</code> &mdash; is a way to ask about it without hanging.
+- Always take it with <code>with</code>. The manual form leaks the lock on any exception, and the symptom is a hang with no traceback.
+- <code>Lock</code> is not reentrant, so a locked method calling another locked method deadlocks against itself. <code>RLock</code> counts, and signals that the lock is doing two jobs.
+- Granularity is a real trade: 200,000 acquires tripled a loop's cost, while one acquire around the loop was free. Hold it over the smallest region containing the whole invariant, and never across I/O.
+- Two locks taken in two orders is a deadlock. A global acquisition order makes cycles impossible; timeouts downgrade a hang to an error, and bring livelock with them.
+- A lock only protects what every thread agrees it protects, on every access, including the read-only ones.

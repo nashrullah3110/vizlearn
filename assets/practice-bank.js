@@ -3309,6 +3309,139 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "concurrency/choosing_threads_processes_or_async.html",
+  "title": "Choosing Between Threads, Processes and Async",
+  "cat": "Concurrency",
+  "q": [
+   {
+    "t": "What does this module say about “The question that decides it”?",
+    "ans": "Everything on this track collapses into one distinction. While your program is slow, is it holding the interpreter or waiting for something else ?"
+   },
+   {
+    "t": "What does this module say about “Measuring the unit of work”?",
+    "ans": "Before choosing, measure one unit. Everything downstream is arithmetic on this number:"
+   },
+   {
+    "t": "What does this module say about “Where the ceiling comes from”?",
+    "ans": "The explorer above draws the three curves, and the shape they share is worth naming. Amdahl's law says that if a fraction *s* of the work is irreducibly serial, the best possible speed-up on any number of workers is 1/*s*."
+   }
+  ]
+ },
+ {
+  "path": "concurrency/queues_between_threads.html",
+  "title": "Handing Work Between Threads with a Queue",
+  "cat": "Concurrency",
+  "q": [
+   {
+    "t": "What does this module say about “Why a queue rather than a lock”?",
+    "ans": "The previous pages built up a set of primitives and a set of ways to misuse them: a lock you must take on every access, a Condition whose wait must sit in a while loop, a race waiting in any check-then-act. A queue.Queue is those three things already put together by someone who got the details right."
+   },
+   {
+    "t": "What does this module say about “A worker pool that stops cleanly”?",
+    "ans": "Here is the whole pattern on CPython. Three workers, a bounded queue, and a shutdown that does not guess:"
+   },
+   {
+    "t": "What does this module say about “Bounded, and why it matters”?",
+    "ans": "maxsize is the difference between a queue that paces your program and a queue that hides a leak."
+   }
+  ]
+ },
+ {
+  "path": "concurrency/locks_and_the_ways_they_go_wrong.html",
+  "title": "Locks, and the Four Ways They Go Wrong",
+  "cat": "Concurrency",
+  "q": [
+   {
+    "t": "What does this module say about “The whole protocol”?",
+    "ans": "A threading.Lock has two operations. acquire() takes it, waiting if another thread holds it; release() hands it back. Everything else is a consequence, and all of it can be watched from one thread:"
+   },
+   {
+    "t": "What does this module say about “Lock or RLock”?",
+    "ans": "A plain Lock is not reentrant: the same thread taking it twice deadlocks against itself. An RLock counts, and the same thread may take it repeatedly as long as it releases the same number of times."
+   },
+   {
+    "t": "What does this module say about “How long to hold it”?",
+    "ans": "A lock serialises everything inside it, so the block is the part of your program that cannot go faster with more threads. The cost of the lock itself is measurable:"
+   }
+  ]
+ },
+ {
+  "path": "concurrency/race_conditions_in_python.html",
+  "title": "Race Conditions: Why x += 1 Is Three Operations",
+  "cat": "Concurrency",
+  "q": [
+   {
+    "t": "What does this module say about “One statement, several bytecodes”?",
+    "ans": "The previous page ended on a fact worth repeating, because everything here follows from it: a thread switch can only happen *between* bytecodes, so a single bytecode is atomic with respect to other threads. That sounds reassuring until you ask how many bytecodes an ordinary line of Python is."
+   },
+   {
+    "t": "What does this module say about “The lost update, step by step”?",
+    "ans": "Take two threads, each running counter += 1 exactly once, starting from zero. The expected answer is 2. Here are the same six steps in two different orders:"
+   },
+   {
+    "t": "What does this module say about “At scale, and why testing misses it”?",
+    "ans": "With two increments the damage is at most one. With two threads each doing a hundred thousand increments, the damage is however many times the switch happened to land in a gap:"
+   }
+  ]
+ },
+ {
+  "path": "concurrency/the_gil_and_what_it_locks.html",
+  "title": "The GIL, and What It Actually Locks",
+  "cat": "Concurrency",
+  "q": [
+   {
+    "t": "What does this module say about “One lock, and what holds it”?",
+    "ans": "A CPython process has a global interpreter lock , and the rule around it is short: a thread must hold the GIL to execute Python bytecode. Threads are real operating-system threads — the kernel schedules them, they have their own stacks, they can sit on different cores — and exactly one of them at a time is permitted to run your Python code."
+   },
+   {
+    "t": "What does this module say about “Where the switch happens”?",
+    "ans": "The GIL is not held for the whole of a function. The interpreter drops and reacquires it periodically, and the period is a setting you can read:"
+   },
+   {
+    "t": "What does this module say about “What \"releases the GIL\" actually means”?",
+    "ans": "The GIL is released around operations that do not need the interpreter. There are two large categories and knowing which you are in predicts whether threads will help:"
+   }
+  ]
+ },
+ {
+  "path": "concurrency/threads_or_processes.html",
+  "title": "Threads or Processes: What Is and Is Not Shared",
+  "cat": "Concurrency",
+  "q": [
+   {
+    "t": "What does this module say about “Two models, one difference”?",
+    "ans": "Threads in a process share one address space. Every global, every module, every open object is the same object seen from all of them, which is why they are cheap to start and why they need locks . They are also subject to the GIL , so they never run Python simultaneously."
+   },
+   {
+    "t": "What does this module say about “The boundary is pickle”?",
+    "ans": "Sending an argument to a worker process means serialising it, writing the bytes to a pipe, and reconstructing it on the other side. So the question \"can I use a process pool for this?\" is really \"can this be pickled, and how big is it?\""
+   },
+   {
+    "t": "What does this module say about “The three start methods”?",
+    "ans": "The start method decides what a child begins life with, and it is the setting behind most \"it works on my machine\" reports:"
+   }
+  ]
+ },
+ {
+  "path": "concurrency/concurrent_futures.html",
+  "title": "concurrent.futures: One Interface for Both",
+  "cat": "Concurrency",
+  "q": [
+   {
+    "t": "What does this module say about “One interface, two backends”?",
+    "ans": "concurrent.futures exists so that the decision from the previous page is a one-word change. Both executors have the same methods, so switching between them is switching a class name:"
+   },
+   {
+    "t": "What does this module say about “A Future is a small state machine”?",
+    "ans": "A Future is a box that does not have a result yet. It has four states, and you can put one through all of them by hand:"
+   },
+   {
+    "t": "What does this module say about “Where the exception goes”?",
+    "ans": "Submitting work that raises does not raise at submit time, and does not print anything. The exception is stored on the future and re-raised when you ask for the result:"
+   }
+  ]
+ },
+ {
   "path": "database/aggregate_functions_in_sql.html",
   "title": "Aggregate Functions and the NULL Trap",
   "cat": "Database",

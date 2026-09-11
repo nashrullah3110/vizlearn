@@ -748,6 +748,62 @@ window.VIZLEARN_MODULES = [
   "desc": "See all 8,400 raw YOLO predictions, then move the confidence and NMS thresholds and watch objects appear, duplicate and disappear."
  },
  {
+  "title": "Choosing Between Threads, Processes and Async",
+  "path": "concurrency/choosing_threads_processes_or_async.html",
+  "category": "Concurrency",
+  "topic": "concurrency",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Handing Work Between Threads with a Queue",
+  "path": "concurrency/queues_between_threads.html",
+  "category": "Concurrency",
+  "topic": "concurrency",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Locks, and the Four Ways They Go Wrong",
+  "path": "concurrency/locks_and_the_ways_they_go_wrong.html",
+  "category": "Concurrency",
+  "topic": "concurrency",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Race Conditions: Why x += 1 Is Three Operations",
+  "path": "concurrency/race_conditions_in_python.html",
+  "category": "Concurrency",
+  "topic": "concurrency",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "The GIL, and What It Actually Locks",
+  "path": "concurrency/the_gil_and_what_it_locks.html",
+  "category": "Concurrency",
+  "topic": "concurrency",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "Threads or Processes: What Is and Is Not Shared",
+  "path": "concurrency/threads_or_processes.html",
+  "category": "Concurrency",
+  "topic": "concurrency",
+  "icon": "code",
+  "desc": ""
+ },
+ {
+  "title": "concurrent.futures: One Interface for Both",
+  "path": "concurrency/concurrent_futures.html",
+  "category": "Concurrency",
+  "topic": "concurrency",
+  "icon": "code",
+  "desc": ""
+ },
+ {
   "title": "Aggregate Functions and the NULL Trap",
   "path": "database/aggregate_functions_in_sql.html",
   "category": "Database",

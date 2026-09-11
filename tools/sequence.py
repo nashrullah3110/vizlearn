@@ -21,6 +21,15 @@ from interview import QUESTIONS as _INTERVIEW_QUESTIONS
 _INTERVIEW = ["interview/%s.html" % q["slug"] for q in _INTERVIEW_QUESTIONS]
 
 SEQUENCE = {
+    "concurrency": [
+        "concurrency/the_gil_and_what_it_locks.html",
+        "concurrency/race_conditions_in_python.html",
+        "concurrency/locks_and_the_ways_they_go_wrong.html",
+        "concurrency/threads_or_processes.html",
+        "concurrency/concurrent_futures.html",
+        "concurrency/queues_between_threads.html",
+        "concurrency/choosing_threads_processes_or_async.html",
+    ],
     "async_python": [
         "async_python/event_loop_stepped_through.html",
         "async_python/coroutines_tasks_and_await.html",

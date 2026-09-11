@@ -1,0 +1,392 @@
+title: concurrent.futures: One Interface for Both
+intro: One API over threads and processes, and a Future is a small state machine you can drive by hand to see exactly what it promises.
+
+## One interface, two backends
+
+<code>concurrent.futures</code> exists so that the decision from the
+[previous page](threads_or_processes.html) is a one-word change. Both
+executors have the same methods, so switching between them is switching a
+class name:
+
+```python
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+
+with ThreadPoolExecutor(max_workers=8) as pool:      # waiting-bound work
+    results = list(pool.map(fetch, urls))
+
+with ProcessPoolExecutor(max_workers=4) as pool:     # computing-bound work
+    results = list(pool.map(crunch, chunks))
+```
+
+That symmetry is the library's whole selling point, and it is honest as far as
+it goes. What it does not change is the pickle boundary: the thread version
+will accept any callable and any argument, and the process version will only
+accept what can cross. So the one-word change works in one direction more
+often than the other, and a design that started with threads and closes over a
+database connection will not become a process pool by editing a class name.
+
+Two things are worth using instead of the older <code>threading.Thread</code>
+plumbing even when you only want threads. The pool is bounded, so you cannot
+accidentally start ten thousand workers. And **exceptions come back to you**
+rather than being printed by a dying thread and lost.
+
+The editors here run in a browser interpreter with no OS threads, so
+<code>ThreadPoolExecutor</code> raises and the pool examples are shown with
+their CPython output. The <code>Future</code> itself, though, needs no threads
+at all &mdash; and it is the part worth understanding, because everything the
+executors do is described by it.
+
+## A Future is a small state machine
+
+A <code>Future</code> is a box that does not have a result yet. It has four
+states, and you can put one through all of them by hand:
+
+```python-run
+from concurrent.futures import Future
+
+f = Future()
+print("fresh:            state", f._state, "| done?", f.done())
+
+f.set_running_or_notify_cancel()
+print("running:          state", f._state, "| cancel now?", f.cancel(), "<- too late")
+
+f.set_result(42)
+print("finished:         state", f._state, "| done?", f.done(), "| result()", f.result())
+
+g = Future()
+print()
+print("cancel while pending:", g.cancel(), "->", g._state)
+print("  result() on it now raises:", end=" ")
+try:
+    g.result()
+except Exception as e:
+    print(type(e).__name__)
+```
+
+```
+fresh:            state PENDING | done? False
+running:          state RUNNING | cancel now? False <- too late
+finished:         state FINISHED | done? True | result() 42
+ 
+cancel while pending: True -> CANCELLED
+  result() on it now raises: CancelledError
+```
+
+That is the entire contract. A future is <code>PENDING</code> until a worker
+picks it up, <code>RUNNING</code> while the worker has it,
+<code>FINISHED</code> once a result or an exception is set, and
+<code>CANCELLED</code> if it was cancelled before starting.
+
+The line that answers the most common question is the third one:
+<code>cancel()</code> returns <code>False</code> once the work is running.
+There is no mechanism to interrupt a running Python function, so
+"cancelling" a submitted job only works if it has not started. A queue of a
+thousand submitted tasks can be cancelled almost entirely; the handful in
+flight will run to completion whatever you do.
+
+## Where the exception goes
+
+Submitting work that raises does not raise at submit time, and does not print
+anything. The exception is stored on the future and re-raised when you ask for
+the result:
+
+```python-run
+from concurrent.futures import Future
+
+f = Future()
+f.set_running_or_notify_cancel()
+f.set_exception(ValueError("the worker failed"))
+
+print("done?     ", f.done())
+print("exception():", repr(f.exception()))
+print("result() re-raises it here:", end=" ")
+try:
+    f.result()
+except ValueError as e:
+    print(repr(e))
+
+log = []
+g = Future()
+g.add_done_callback(lambda fu: log.append(("callback saw", fu.result())))
+g.set_running_or_notify_cancel()
+g.set_result("done")
+print()
+print("add_done_callback fired:", log)
+```
+
+```
+done?      True
+exception(): ValueError('the worker failed')
+result() re-raises it here: ValueError('the worker failed')
+ 
+add_done_callback fired: [('callback saw', 'done')]
+```
+
+<code>exception()</code> asks without raising; <code>result()</code> raises.
+Which means the way you consume the results decides whether you ever find out
+about a failure, and that is the trap in the next section.
+
+<code>add_done_callback</code> runs as soon as the future settles &mdash;
+immediately if it has already settled by the time you attach it, which is what
+the output above shows. It runs on whichever thread set the result, so it should
+be short and must not raise.
+
+## The mistake that swallows errors
+
+Three ways to consume the same pool, and one of them silently discards
+failures:
+
+```python
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def work(n):
+    if n == 3:
+        raise ValueError("three is bad")
+    return n * 2
+
+with ThreadPoolExecutor(max_workers=4) as pool:
+    # 1. submit and never look: the exception is stored and dropped.
+    for n in range(5):
+        pool.submit(work, n)
+    print("submitted and ignored: no error appeared")
+
+with ThreadPoolExecutor(max_workers=4) as pool:
+    # 2. map: raises when you reach the bad item while iterating.
+    try:
+        for value in pool.map(work, range(5)):
+            print("map gave", value)
+    except ValueError as e:
+        print("map raised at the bad item:", e)
+
+with ThreadPoolExecutor(max_workers=4) as pool:
+    # 3. as_completed: every result is inspected, failures included.
+    futures = {pool.submit(work, n): n for n in range(5)}
+    for fut in as_completed(futures):
+        n = futures[fut]
+        if fut.exception():
+            print(f"n={n} failed: {fut.exception()}")
+        else:
+            print(f"n={n} -> {fut.result()}")
+```
+
+```
+submitted and ignored: no error appeared
+map gave 0
+map gave 2
+map gave 4
+map raised at the bad item: three is bad
+n=0 -> 0
+n=1 -> 2
+n=2 -> 4
+n=3 failed: three is bad
+n=4 -> 8
+```
+
+The first block is the bug. Five jobs ran, one failed, and the program printed
+a cheerful line and carried on &mdash; because nothing ever called
+<code>result()</code>, so nothing ever re-raised. A fire-and-forget
+<code>submit</code> is how a pool loses errors, and it is extremely common in
+code that only cares about side effects.
+
+<code>map</code> is convenient and lazily ordered: it yields in argument order,
+so reaching the failure stops the iteration and you never see the results
+after it. Good for "all or nothing", wrong when you want the other four.
+
+<code>as_completed</code> is the form to default to. Results arrive as they
+finish, the dictionary keeps the mapping back to the input, and checking
+<code>exception()</code> on each one means no failure can be missed. It is more
+lines and it is the only one of the three that reports everything.
+
+## Waiting on some, not all
+
+<code>wait</code> is the general form both of the others are conveniences over.
+It returns two sets and lets you decide what to do with the stragglers:
+
+```python-run
+from concurrent.futures import Future, wait, as_completed, FIRST_COMPLETED
+
+quick, slow = Future(), Future()
+for f in (quick, slow):
+    f.set_running_or_notify_cancel()
+quick.set_result("fast replica answered")
+
+done, pending = wait([quick, slow], return_when=FIRST_COMPLETED)
+print("done:", len(done), "pending:", len(pending))
+print("first answer:", done.pop().result())
+
+for f in pending:
+    print("cancelling the straggler:", f.cancel(), "<- it is already RUNNING")
+
+settled = sorted(str(f.result()) for f in as_completed([quick])
+                 if not f.exception())
+print("as_completed over settled futures:", settled)
+```
+
+```
+done: 1 pending: 1
+first answer: fast replica answered
+cancelling the straggler: False <- it is already RUNNING
+as_completed over settled futures: ['fast replica answered']
+```
+
+The last two lines are the honest ending to the hedged-request pattern. You can
+take the first answer, and you cannot actually stop the other worker, because
+it is already running. What <code>cancel</code> saves you is the *queued* work,
+not the in-flight work &mdash; so hedging in Python buys latency and costs the
+duplicated effort whatever you do.
+
+<code>shutdown(wait=False, cancel_futures=True)</code> is the same idea for the
+whole pool: it drops everything still queued and lets whatever started finish.
+
+## Sizing a pool, and the defaults you inherit
+
+Leaving <code>max_workers</code> unset is common and the two executors default
+very differently, because they are sized for different constraints:
+
+```python-run
+import os
+from concurrent.futures import ThreadPoolExecutor
+
+print("os.cpu_count() here:", os.cpu_count())
+
+# Constructing an executor starts no threads, so the default is readable
+# even in a sandbox that cannot run one.
+tp = ThreadPoolExecutor()
+print("ThreadPoolExecutor() max_workers:", tp._max_workers,
+      "= min(32, cpu_count + 4)")
+
+for n in (1, 4, 8, 64):
+    print(f"  on a {n:>2}-core machine: threads default to {min(32, n + 4):>2},"
+          f" processes default to {n:>2}")
+```
+
+```
+os.cpu_count() here: 1
+ThreadPoolExecutor() max_workers: 5 = min(32, cpu_count + 4)
+  on a  1-core machine: threads default to  5, processes default to  1
+  on a  4-core machine: threads default to  8, processes default to  4
+  on a  8-core machine: threads default to 12, processes default to  8
+  on a 64-core machine: threads default to 32, processes default to 64
+```
+
+The process default is <code>cpu_count()</code>, which is right, because
+computing in parallel is limited by cores. The thread default is
+<code>min(32, cpu_count + 4)</code>, which is a compromise rather than an
+answer: threads are for waiting, and how many waits you can usefully have in
+flight has nothing to do with your core count. The <code>+ 4</code> is there so
+a single-core machine still overlaps some I/O, and the cap of 32 is there so
+nobody accidentally opens hundreds of connections.
+
+So for I/O work, set it deliberately. The number you want is roughly the
+concurrency the *other end* is happy with &mdash; a rate limit, a connection
+pool size, a politeness budget for someone else's API &mdash; and it is
+frequently higher than 32 and occasionally much lower.
+
+## Giving each worker its own setup
+
+The pickle boundary from [the previous page](threads_or_processes.html) has a
+direct answer in this API, and it is easy to miss:
+<code>initializer</code> runs once per worker, in the worker, before it takes
+any job.
+
+```python
+from concurrent.futures import ProcessPoolExecutor
+
+connection = None
+
+def setup(dsn):
+    global connection
+    connection = connect(dsn)          # built in the worker, never pickled
+
+def handle(row_id):
+    return connection.fetch(row_id)    # uses the worker's own connection
+
+with ProcessPoolExecutor(max_workers=4,
+                         initializer=setup,
+                         initargs=("postgres://...",)) as pool:
+    results = list(pool.map(handle, row_ids))
+```
+
+This is the standard shape for "the worker needs something unpicklable". The
+DSN is a string and crosses happily; the connection is built on the far side
+and lives for the life of the worker, so four workers make four connections
+rather than one per task. The same pattern covers a loaded model, a compiled
+regex cache, or an open file handle.
+
+Two cautions. A module-level global is genuinely the right tool here, because
+each process has its own and there is nothing to race against &mdash; that is
+the one place in this whole track where a mutable global is not a smell. And an
+exception inside <code>initializer</code> is reported as a
+<code>BrokenProcessPool</code> on the *first submit*, which is a confusing
+place to meet it, so keep the initializer small and let it fail loudly.
+
+## What it does not give you
+
+It is worth being clear about the edges, because the interface is clean enough
+to suggest it solves more than it does.
+
+**No cancellation of running work.** Covered above and worth repeating, because
+it is the single most common false expectation. There is no safe way to
+interrupt a running Python function, so a "cancel" button built on
+<code>Future.cancel</code> works only for the queue behind the workers.
+
+**No progress reporting.** A future is binary: pending or settled. If you need
+"37% done", the worker has to publish it &mdash; through a
+[queue](queues_between_threads.html), a shared counter under a
+[lock](locks_and_the_ways_they_go_wrong.html), or a callback &mdash; and
+<code>as_completed</code> counting finished items is usually the cheapest
+approximation.
+
+**No backpressure.** <code>submit</code> never blocks. A producer faster than
+the pool queues work without limit, and the queue is unbounded, so a loop that
+submits a million jobs builds a million futures in memory before the pool has
+finished the first hundred. If the work arrives as a stream rather than a list,
+a bounded queue with a fixed number of workers is the shape that applies
+pressure back &mdash; which is the [next page](queues_between_threads.html).
+
+**No ordering guarantees beyond <code>map</code>.** Completion order is
+whatever it is. If order matters, either use <code>map</code> or carry the index
+in the result.
+
+## Where it goes wrong
+
+**Fire-and-forget <code>submit</code>.** The exception is stored on a future
+nobody reads, and the failure disappears. Keep the futures and check them.
+
+**Expecting <code>cancel()</code> to stop running work.** It cannot. It only
+un-queues work that has not started.
+
+**Using the executor as a context manager and expecting it to be quick.**
+<code>with</code> calls <code>shutdown(wait=True)</code> on exit, so the block
+does not finish until every submitted job does.
+
+**Submitting to a <code>ProcessPoolExecutor</code> what cannot be pickled.** A
+lambda, a local function, an open file, a lock. It fails at submit, which is at
+least loud &mdash; see [the boundary](threads_or_processes.html).
+
+**Sizing the pool by cores for I/O work.** Cores are the limit for computing.
+For waiting, the limit is what the other end tolerates, and it is usually much
+higher.
+
+## Questions people ask
+
+<strong><code>map</code> or <code>as_completed</code>?</strong> <code>map</code> when you want results in argument order and a failure should stop everything. <code>as_completed</code> when you want each result as it lands and want to see every failure &mdash; which is most of the time, and the reason the extra three lines are worth it.
+
+<strong>Does <code>map</code> run lazily?</strong> The submission is eager &mdash; every item is queued immediately, so <code>map</code> over a million items queues a million futures &mdash; while the *iteration* is lazy and in order. Use <code>chunksize</code> with a process pool to amortise the boundary cost over several items per trip.
+
+<strong>How do I get a timeout?</strong> <code>result(timeout=...)</code> and <code>as_completed(..., timeout=...)</code> raise <code>TimeoutError</code>. What they do not do is stop the work &mdash; the future is still running and the worker is still occupied, so a timeout here is "I stopped waiting", not "it stopped".
+
+<strong>Can I nest pools?</strong> Nesting process pools deadlocks easily and is best avoided; the usual pattern is one process pool whose workers each use threads. A thread pool inside a process pool worker is fine and common.
+
+<strong>Why did my pool hang at exit?</strong> Because <code>shutdown(wait=True)</code> is the default, so the interpreter waits for every submitted job. If jobs can hang, give them their own timeouts &mdash; the pool will not impose one.
+
+<strong>Is this the same as asyncio's Future?</strong> No, and they are not interchangeable. <code>asyncio.Future</code> is awaitable and bound to an event loop; <code>concurrent.futures.Future</code> is blocking and thread-based. <code>asyncio.wrap_future</code> converts one into the other, which is how you await a thread-pool job.
+
+## Recap in one screen
+
+- One interface over both backends, so the threads-or-processes decision is a class name &mdash; in one direction, because the process pool still needs everything to pickle.
+- A <code>Future</code> has four states: <code>PENDING</code>, <code>RUNNING</code>, <code>FINISHED</code>, <code>CANCELLED</code>. Driving one by hand shows the whole contract.
+- <code>cancel()</code> only works before the work starts. Nothing can interrupt a running Python function.
+- An exception is stored on the future and re-raised by <code>result()</code>. A <code>submit</code> whose future is never read discards the failure silently.
+- <code>map</code> gives argument order and stops at the first failure; <code>as_completed</code> gives completion order and lets you inspect every one. Default to the second.
+- <code>wait(..., return_when=FIRST_COMPLETED)</code> is the general form, and it is honest about the stragglers: you can drop queued work, not running work.

@@ -341,6 +341,32 @@ TOPICS = {
             "freezing the loop, a bounded queue applying backpressure.",
         ],
     },
+    "concurrency": {
+        "dir": "concurrency",
+        "title": "Concurrency",
+        "h1": "Threads, Processes and the GIL",
+        "lead": "What the interpreter lock actually locks, why an increment "
+                "can lose a count, and when a process is the only thing that "
+                "helps - with the mechanism runnable on every page.",
+        "keywords": "python gil, global interpreter lock, python threading, "
+                    "race condition python, threading lock, multiprocessing vs "
+                    "threading, concurrent.futures, threadpoolexecutor, "
+                    "picklingerror, cpu bound vs io bound",
+        "intro": [
+            "Python's threads are real operating-system threads that are not "
+            "allowed to run Python at the same time. One lock - the GIL - is "
+            "held by whichever thread is executing bytecode, which is why "
+            "threads help a program that waits and do nothing for a program "
+            "that computes.",
+            "This track builds that from the bytecode up: the three "
+            "operations an increment compiles to, the switch that lands "
+            "between them, the lock protocol that prevents it, and the pickle "
+            "boundary that decides what a process can be sent. A note on "
+            "every page: the browser interpreter has no OS threads, so the "
+            "editors run the mechanism and the thread-spawning examples are "
+            "shown with their output.",
+        ],
+    },
     "interview": {
         "dir": "interview",
         "title": "Interview Questions",
@@ -367,7 +393,7 @@ TOPICS = {
 
 # Display order on the hub and in the footer.
 TOPIC_ORDER = ["maths", "ml", "dl", "dsa", "nlp", "computer-vision", "db",
-               "gen-ai", "python", "async_python", "pydantic", "fastapi", "numpy", "pandas", "matplotlib", "sklearn", "interview"]
+               "gen-ai", "python", "async_python", "concurrency", "pydantic", "fastapi", "numpy", "pandas", "matplotlib", "sklearn", "interview"]
 
 DIR_TO_TOPIC = {t["dir"]: k for k, t in TOPICS.items()}
 

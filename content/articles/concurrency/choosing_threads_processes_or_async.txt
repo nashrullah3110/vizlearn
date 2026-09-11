@@ -1,0 +1,265 @@
+title: Choosing Between Threads, Processes and Async
+intro: One measurement decides it, and it is not a matter of taste. The question is whether your program is holding the interpreter or waiting for something else.
+
+## The question that decides it
+
+Everything on this track collapses into one distinction. While your program is
+slow, is it **holding the interpreter** or **waiting for something else**?
+
+Holding the interpreter is CPU-bound work: a loop, a parse, a transform, a
+model. The [GIL](the_gil_and_what_it_locks.html) means one thread at a time
+may do it, so threads cannot overlap it and neither can async. Only separate
+interpreters &mdash; processes &mdash; get past that.
+
+Waiting is I/O-bound work: a socket, a disk, a database, a subprocess. The
+waiting thread has released the GIL, so waits genuinely overlap. Threads work,
+and async works with far less memory per concurrent wait.
+
+That is the whole decision table:
+
+| Your program is | Use | Because |
+|---|---|---|
+| waiting, a few hundred at a time | **threads** | simple, and a blocked thread has released the GIL |
+| waiting, thousands at a time | **async** | a coroutine costs an object; a thread costs a stack |
+| computing | **processes** | a separate interpreter is the only way past the GIL |
+| computing on arrays | **a C library** | numpy releases the GIL for you, with no concurrency in your code |
+| both | **processes of threads** | a few processes, each overlapping its own waiting |
+
+The failure mode this page exists to prevent is picking from that table by
+reputation rather than by measurement. "Async is modern" and "threads are
+legacy" are not entries in it.
+
+## Measuring the unit of work
+
+Before choosing, measure one unit. Everything downstream is arithmetic on this
+number:
+
+```python-run
+import time
+
+def work(n):
+    total = 0
+    for i in range(n):
+        total += i * i
+    return total
+
+n = 200_000
+t0 = time.perf_counter(); work(n); t1 = time.perf_counter()
+one = t1 - t0
+print(f"one unit of CPU-bound work: {one*1000:.0f} ms")
+print()
+
+SPAWN = 0.030   # a process costs roughly this to start and hand data to
+print(f"{'units':>6} {'sequential':>11} {'threads':>9} {'processes':>11}")
+for w in (1, 2, 4, 8):
+    seq = w * one
+    thr = w * one              # the GIL serialises bytecode: no gain at all
+    pro = one + SPAWN * w      # units run at once, but each process costs
+    print(f"{w:>6} {seq*1000:>10.0f}ms {thr*1000:>8.0f}ms {pro*1000:>10.0f}ms")
+```
+
+```
+one unit of CPU-bound work: 87 ms
+
+ units  sequential   threads   processes
+     1         87ms       87ms        117ms
+     2        175ms      175ms        147ms
+     4        350ms      350ms        207ms
+     8        699ms      699ms        327ms
+```
+
+The absolute milliseconds depend on your machine and this browser build is
+slower than CPython, so the editor prints whatever yours measures. Three
+readings hold regardless.
+
+**The threads column equals the sequential column.** Not "a bit better" &mdash;
+identical, because the work is bytecode and only one thread may execute it. The
+switching makes it marginally worse in practice.
+
+**At one unit, processes are slower.** 117 ms against 87. The spawn and the
+pickle are real costs, and below some amount of work they exceed the saving.
+That threshold is the single most useful thing to know before parallelising
+anything.
+
+**The gap widens with size.** By eight units the process version is twice as
+fast, and it keeps improving until you run out of cores.
+
+The <code>SPAWN</code> constant is a model, deliberately visible so you can
+replace it with your own measurement. The real value depends on the start
+method and, much more, on what your arguments cost to
+[pickle](threads_or_processes.html).
+
+## Where the ceiling comes from
+
+The explorer above draws the three curves, and the shape they share is worth
+naming. Amdahl's law says that if a fraction *s* of the work is irreducibly
+serial, the best possible speed-up on any number of workers is 1/*s*.
+
+For Python that fraction is not an abstraction, it is the part holding the GIL.
+A program that spends 30% of its time computing in Python and 70% waiting has
+*s* = 0.3 under threads, so a thread pool can never be more than about 3.3
+times faster however many threads you add &mdash; and it will reach most of
+that by four. The
+[cpu-to-wall ratio](the_gil_and_what_it_locks.html) measured on the first page
+of this track *is* that fraction, handed to you rather than guessed.
+
+This is why the honest answer to "how many workers?" is usually smaller than
+people expect, and why measuring two workers against one tells you almost
+everything: if doubling the workers does not roughly halve the time, adding
+more will not either.
+
+## The crossover, as a number you can use
+
+"Processes are slower for small tasks" is only actionable once you know how
+small. The threshold falls straight out of the two costs: with *w* workers,
+processes win when `w·t > t + SPAWN·w`, which rearranges to
+`t > SPAWN·w/(w-1)`.
+
+```python-run
+import time
+
+def work(n):
+    total = 0
+    for i in range(n):
+        total += i * i
+    return total
+
+# Calibrate: how long does one iteration cost on this machine?
+N = 200_000
+t0 = time.perf_counter(); work(N); per_iter = (time.perf_counter() - t0) / N
+print(f"one loop iteration: {per_iter*1e9:.0f} ns")
+
+SPAWN = 0.030
+print(f"assuming {SPAWN*1000:.0f} ms to start a process and send its arguments\n")
+print(f"{'workers':>8} {'task must exceed':>18} {'= iterations':>14}")
+for w in (2, 4, 8, 16):
+    # processes win when  w*t > t + SPAWN*w   =>   t > SPAWN*w/(w-1)
+    threshold = SPAWN * w / (w - 1)
+    print(f"{w:>8} {threshold*1000:>15.0f} ms {int(threshold/per_iter):>14,}")
+```
+
+```
+one loop iteration: 376 ns
+assuming 30 ms to start a process and send its arguments
+
+ workers   task must exceed   = iterations
+       2              60 ms        159,574
+       4              40 ms        106,382
+       8              34 ms         91,185
+      16              32 ms         85,106
+```
+
+Two things about that table are more useful than the exact figures.
+
+The threshold **barely moves** past four workers. It converges on
+<code>SPAWN</code> itself, because with many workers the parallel part goes to
+almost nothing and you are left paying the overhead. So "a task worth sending
+to another process takes at least a few tens of milliseconds" is a rule of
+thumb with arithmetic behind it, not folklore.
+
+And expressed in iterations it is a *lot* of work &mdash; around a hundred
+thousand here. That is why parallelising a function called on small inputs
+almost never pays, and why the fix is nearly always to batch: send one call
+with a thousand items rather than a thousand calls with one, so the fixed cost
+is paid once instead of a thousand times. <code>chunksize</code> on
+<code>Pool.map</code> and <code>ProcessPoolExecutor.map</code> exists for
+exactly this.
+
+Substitute your own <code>SPAWN</code> to make it real. Measure it as the time
+for a pool to run a trivial function once, which captures the start-up and the
+[pickle cost](threads_or_processes.html) of your actual arguments together
+&mdash; and if your arguments are large, that constant will dominate everything
+else on this page.
+
+## The three shapes, side by side
+
+The same job &mdash; fetch twenty URLs &mdash; written three ways, with the
+output each produces on CPython:
+
+```python
+# Sequential: the waits add up.
+for url in urls:
+    fetch(url)
+```
+
+```python
+# Threads: the waits overlap. One line of setup, ordinary blocking code inside.
+from concurrent.futures import ThreadPoolExecutor
+with ThreadPoolExecutor(max_workers=20) as pool:
+    list(pool.map(fetch, urls))
+```
+
+```python
+# Async: the waits overlap, and nothing costs a thread stack.
+import asyncio, httpx
+async def main():
+    async with httpx.AsyncClient() as client:
+        await asyncio.gather(*(client.get(u) for u in urls))
+asyncio.run(main())
+```
+
+```
+sequential: 4.10s
+threads:    0.31s
+async:      0.28s
+```
+
+Twenty waits of roughly 200 ms each. Threads and async both collapse them to
+about the longest single wait, and the difference between them is noise at this
+size. That is the point: **at twenty concurrent waits, the choice does not
+matter for speed.** It matters for other reasons.
+
+Threads let you keep writing ordinary blocking code, which means the existing
+library works and the diff is three lines. Async requires the whole path to be
+async &mdash; an async HTTP client, an async database driver, no
+[blocking calls anywhere](../async_python/the_blocking_call_that_freezes_the_loop.html)
+&mdash; which is a much larger commitment and buys a much higher ceiling. At
+twenty, take the threads. At twenty thousand, the thread stacks are gigabytes
+and async is the only one of the two that fits.
+
+## Where it goes wrong
+
+**Rewriting for async to speed up computation.** It has exactly the same
+ceiling as threads, because it is one thread. The answer is processes.
+
+**Threads for CPU work.** No speed-up, and the switching makes it slightly
+slower. This is the most common mistake in this whole area.
+
+**Processes for tiny tasks.** The spawn and the pickle cost more than the work.
+Batch into fewer, larger calls, and measure the crossover.
+
+**Async everywhere because it is faster.** It is not faster per wait; it is
+cheaper per concurrent wait. Below a few hundred, threads are simpler and the
+ecosystem is larger.
+
+**One blocking call in an async program.** It stops every coroutine, and it is
+easy to introduce by importing the wrong client. The async track covers
+[exactly this](../async_python/the_blocking_call_that_freezes_the_loop.html).
+
+**Choosing before measuring.** The cpu-to-wall ratio takes two lines and
+settles it. Almost every long argument about this is two people who have not
+run it.
+
+## Questions people ask
+
+<strong>What if my work is mixed?</strong> Split it. Do the computing in a process pool and the waiting in threads or a loop &mdash; the standard production shape is a handful of processes, each running threads or an event loop. Trying to pick one mechanism for a mixed workload is how you end up with the worst of both.
+
+<strong>Is async always better than threads for I/O?</strong> No. It is better at *scale*, because a coroutine costs an object and a thread costs a stack. Below a few hundred concurrent waits, threads are simpler, work with every existing blocking library, and perform the same.
+
+<strong>How do I know if a library is CPU-bound or I/O-bound?</strong> Measure the ratio of <code>time.process_time</code> to <code>time.perf_counter</code> around a call. Near 1 means it is computing and holding the GIL; near 0 means it is waiting and has released it. It works on third-party code you have not read.
+
+<strong>Do more cores help a threaded Python program?</strong> Only for the parts inside C code that released the GIL. For pure-Python work, the second core sits idle no matter how many threads you start, which is what the middle column of the table above is showing.
+
+<strong>What about the free-threaded build?</strong> It removes the GIL ceiling, so the threads column stops equalling the sequential column &mdash; and it makes [races](race_conditions_in_python.html) easier to hit, because two threads genuinely run at once. It is experimental in 3.13; the table above describes every interpreter most people are running today.
+
+<strong>Is <code>ProcessPoolExecutor</code> always the answer for CPU work?</strong> It is the default answer. The better one, when the work is array-shaped, is to stop writing the loop in Python &mdash; a vectorised numpy operation releases the GIL inside C and uses your cores with no concurrency in your code at all.
+
+## Recap in one screen
+
+- One question: while it is slow, is your program holding the interpreter or waiting for something else?
+- Holding it means CPU-bound: threads and async both have the same ceiling of one, and processes are the only way past it.
+- Waiting means I/O-bound: the GIL is already released, so threads overlap the waits and async does the same for far less memory per wait.
+- Measure one unit of work first. Below some size, spawning a process costs more than the work it saves &mdash; at one unit above, 117 ms against 87.
+- Amdahl's law sets the ceiling, and the serial fraction is measurable: it is the cpu-to-wall ratio, not a guess.
+- At twenty concurrent waits, threads and async are the same speed; pick threads for the smaller commitment. At twenty thousand, only async fits in memory.
+- Mixed workloads want both: a few processes, each overlapping its own waiting.

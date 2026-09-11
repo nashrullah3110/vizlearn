@@ -25,6 +25,7 @@ DIR_META = {
     "maths": ("Maths", "sigma"),
     "python": ("Python", "code"),
     "async_python": ("Async Python", "code"),
+    "concurrency": ("Concurrency", "code"),
     "pydantic": ("Pydantic", "code"),
     "fastapi": ("FastAPI", "code"),
     "numpy": ("NumPy", "sigma"),

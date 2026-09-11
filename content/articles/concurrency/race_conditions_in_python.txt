@@ -1,0 +1,389 @@
+title: Race Conditions: Why x += 1 Is Three Operations
+intro: The GIL makes one bytecode atomic. An increment is not one bytecode, and the gap is where a count goes missing.
+
+## One statement, several bytecodes
+
+The [previous page](the_gil_and_what_it_locks.html) ended on a fact worth
+repeating, because everything here follows from it: a thread switch can only
+happen *between* bytecodes, so a single bytecode is atomic with respect to
+other threads. That sounds reassuring until you ask how many bytecodes an
+ordinary line of Python is.
+
+```python-run
+import dis
+
+counter = 0
+
+def bump():
+    global counter
+    counter += 1
+
+print("counter += 1 compiles to:")
+for i in dis.get_instructions(bump):
+    print("   ", i.opname, i.argrepr)
+```
+
+```
+counter += 1 compiles to:
+    RESUME 
+    LOAD_GLOBAL counter
+    LOAD_CONST 1
+    BINARY_OP +=
+    STORE_GLOBAL counter
+    RETURN_CONST None
+```
+
+Read the middle three. <code>LOAD_GLOBAL</code> reads the current value,
+<code>BINARY_OP</code> adds one to it, and <code>STORE_GLOBAL</code> writes the
+result back. A **read**, a **modify**, and a **write** &mdash; three separate
+steps, with two gaps between them, and a thread switch is allowed to land in
+either gap.
+
+That is the whole mechanism. There is nothing subtle left; the rest of this
+page is about what happens when the switch lands there.
+
+The editors here run in a browser interpreter with no OS threads, so the
+two-thread versions are shown with their CPython output and the interleaving
+itself is simulated &mdash; which turns out to be an advantage, because a real
+race is intermittent and a simulated one happens every time.
+
+## The lost update, step by step
+
+Take two threads, each running <code>counter += 1</code> exactly once, starting
+from zero. The expected answer is 2. Here are the same six steps in two
+different orders:
+
+```python-run
+# The three steps are the three bytecodes from the block above:
+# read the value, add to it, write it back.
+def run(order):
+    shared = {"counter": 0}
+    regs, log = {}, []
+    for op, tag in order:
+        if op == "read":
+            regs[tag] = shared["counter"]
+            log.append(f"{tag} reads  counter = {regs[tag]}")
+        elif op == "add":
+            regs[tag] += 1
+            log.append(f"{tag} adds   -> {regs[tag]} (in its own register)")
+        else:
+            shared["counter"] = regs[tag]
+            log.append(f"{tag} writes counter = {regs[tag]}")
+    return shared["counter"], log
+
+steps = lambda tag: [("read", tag), ("add", tag), ("write", tag)]
+T1, T2 = steps("T1"), steps("T2")
+
+plans = {
+    "no switch (T1 finishes first)": T1 + T2,
+    "switch after T1 reads":         [T1[0], T2[0], T2[1], T2[2], T1[1], T1[2]],
+}
+for name, order in plans.items():
+    final, log = run(order)
+    print(name)
+    for entry in log:
+        print("   ", entry)
+    print("    => counter =", final, "after two increments\n")
+```
+
+```
+no switch (T1 finishes first)
+    T1 reads  counter = 0
+    T1 adds   -> 1 (in its own register)
+    T1 writes counter = 1
+    T2 reads  counter = 1
+    T2 adds   -> 2 (in its own register)
+    T2 writes counter = 2
+    => counter = 2 after two increments
+
+switch after T1 reads
+    T1 reads  counter = 0
+    T2 reads  counter = 0
+    T2 adds   -> 1 (in its own register)
+    T2 writes counter = 1
+    T1 adds   -> 1 (in its own register)
+    T1 writes counter = 1
+    => counter = 1 after two increments
+```
+
+In the second order both threads read zero. Each then computes 1 in its own
+register, entirely correctly, and each writes 1. Two increments happened and
+the counter advanced once: the second write did not build on the first, it
+**replaced** it. Nothing was corrupted and no operation was interrupted
+half-way &mdash; every individual step did exactly what it should.
+
+That is what makes this class of bug hard. There is no broken line to find.
+The defect is in the *interleaving*, which is not written down anywhere in the
+program.
+
+## At scale, and why testing misses it
+
+With two increments the damage is at most one. With two threads each doing a
+hundred thousand increments, the damage is however many times the switch
+happened to land in a gap:
+
+```python
+import threading
+
+counter = 0
+
+def bump_many(n):
+    global counter
+    for _ in range(n):
+        counter += 1
+
+threads = [threading.Thread(target=bump_many, args=(100_000,)) for _ in range(2)]
+for t in threads: t.start()
+for t in threads: t.join()
+
+print("expected:", 200_000)
+print("actual:  ", counter)
+```
+
+```
+expected: 200000
+actual:   137216
+```
+
+Sixty thousand increments gone, and the number is different on every run. Two
+properties of that output are the reason races survive code review.
+
+It is **non-deterministic**: the same program gives 200000, 137216 or 199998
+depending on when the operating system happened to switch. A test that asserts
+the total can pass a hundred times and fail on the hundred and first.
+
+And it is **load-dependent**: with the loop set to 1,000 rather than 100,000,
+most runs come out exactly right, because the whole loop often completes
+inside one 5 ms slice. Small tests hide it and production finds it.
+
+## The same bug wearing different clothes
+
+A lost update is the famous version. The more common one in real code is
+**check-then-act**, which does not look like an increment at all:
+
+```python-run
+# "If the key is missing, create it" is a read and a write with a gap.
+# Each thread acts on what ITS OWN check saw.
+def run(order):
+    store, seen, log = {}, {}, []
+    for op, tag in order:
+        if op == "check":
+            seen[tag] = "k" in store
+            log.append(f"{tag} checks 'k' in store -> {seen[tag]}")
+        elif op == "init":
+            if not seen[tag]:
+                store["k"] = []
+                log.append(f"{tag} acts on that: store['k'] = []")
+            else:
+                log.append(f"{tag} acts on that: nothing to do")
+        else:
+            store["k"].append(tag)
+            log.append(f"{tag} appends -> {store['k']}")
+    return store, log
+
+steps = lambda tag: [("check", tag), ("init", tag), ("append", tag)]
+T1, T2 = steps("T1"), steps("T2")
+
+plans = {
+    "no switch":                T1 + T2,
+    "switch after both checks": [T1[0], T2[0], T1[1], T1[2], T2[1], T2[2]],
+}
+for name, order in plans.items():
+    store, log = run(order)
+    print(name)
+    for entry in log:
+        print("   ", entry)
+    print("    => store =", store, "\n")
+```
+
+```
+no switch
+    T1 checks 'k' in store -> False
+    T1 acts on that: store['k'] = []
+    T1 appends -> ['T1']
+    T2 checks 'k' in store -> True
+    T2 acts on that: nothing to do
+    T2 appends -> ['T1', 'T2']
+    => store = {'k': ['T1', 'T2']} 
+
+switch after both checks
+    T1 checks 'k' in store -> False
+    T2 checks 'k' in store -> False
+    T1 acts on that: store['k'] = []
+    T1 appends -> ['T1']
+    T2 acts on that: store['k'] = []
+    T2 appends -> ['T2']
+    => store = {'k': ['T2']}
+```
+
+Both threads looked, both correctly saw the key was missing, and both created
+it. T2's fresh list replaced the one T1 had already appended to, so T1's item
+is gone &mdash; and note that nothing was *overwritten* in the increment sense.
+The value that disappeared was written into a container that was then thrown
+away.
+
+This shape hides everywhere: a lazily-built cache, a "create the directory if
+it does not exist", a counter dictionary, an "insert if not present" against a
+database. The giveaway is a gap between deciding and doing, and the decision
+going stale inside it.
+
+Two of these have a one-line fix that removes the gap rather than locking it.
+<code>dict.setdefault(k, [])</code> does the check and the create in one C
+call, and <code>collections.defaultdict(list)</code> does it at lookup time.
+Both are safe for exactly the reason <code>append</code> is: the whole thing is
+one trip into C with no Python running in the middle.
+
+## Which operations are already safe
+
+Not every line needs protecting, and the rule is mechanical: an operation
+implemented as a single bytecode &mdash; or as one call into C that does not
+run Python in the middle &mdash; cannot be interleaved.
+
+```python-run
+import dis
+
+def append_one(lst):  lst.append(1)
+def index_incr(d):    d["n"] += 1
+def swap(a, b):       return b, a
+
+for fn in (append_one, index_incr, swap):
+    ops = [i.opname for i in dis.get_instructions(fn)
+           if i.opname not in ("RESUME", "RETURN_CONST", "RETURN_VALUE")]
+    print("%-12s %d ops: %s" % (fn.__name__, len(ops), ops))
+```
+
+```
+append_one   4 ops: ['LOAD_FAST', 'LOAD_ATTR', 'LOAD_CONST', 'CALL']
+index_incr   9 ops: ['LOAD_FAST', 'LOAD_CONST', 'COPY', 'COPY', 'BINARY_SUBSCR', 'LOAD_CONST', 'BINARY_OP', 'SWAP', 'SWAP', 'STORE_SUBSCR']
+swap         3 ops: ['LOAD_FAST', 'LOAD_FAST', 'BUILD_TUPLE']
+```
+
+<code>list.append</code> ends in a single <code>CALL</code> into C that appends
+and returns without running any Python, so the append itself cannot be split
+&mdash; which is why appending to a list from several threads does not lose
+items. <code>d["n"] += 1</code> is nine operations with a
+<code>BINARY_SUBSCR</code> read and a <code>STORE_SUBSCR</code> write at
+opposite ends, and it is exactly as unsafe as the global version.
+
+The practical list that follows:
+
+| Operation | Safe from other threads? |
+|---|---|
+| <code>lst.append(x)</code>, <code>lst.pop()</code> | yes, one C call |
+| <code>d[k] = v</code> | yes |
+| <code>d.setdefault(k, v)</code> | yes |
+| <code>x += 1</code>, <code>d[k] += 1</code> | **no**, read-modify-write |
+| <code>if k not in d: d[k] = v</code> | **no**, check then act |
+| <code>lst[0], lst[1] = lst[1], lst[0]</code> | **no** |
+
+The second and fifth rows are the same shape as the increment and are worth
+recognising: **check-then-act** is a read and a write with a gap, whatever it
+looks like. Relying on this table is also fragile, because it describes the
+current compiler rather than the language. The robust habit is to protect
+shared mutable state with a [lock](locks_and_the_ways_they_go_wrong.html) and
+stop reasoning about bytecode counts.
+
+## The fixes, in order of preference
+
+**Do not share the state.** A thread that owns its data has no race. Give each
+worker its own accumulator and combine at the end, or hand results back through
+a [queue](queues_between_threads.html). This removes the problem rather than
+managing it and is almost always the right first answer.
+
+**Use a lock.** Wrapping the read-modify-write in
+<code>with lock:</code> makes the three steps one indivisible unit. It is the
+general answer and it is the [next page](locks_and_the_ways_they_go_wrong.html).
+
+**Use something already atomic.** <code>itertools.count()</code> hands out
+distinct integers safely because <code>next()</code> is one C call. A
+<code>queue.Queue</code> is internally locked. <code>collections.deque</code>
+has thread-safe appends and pops at both ends.
+
+## The fix, measured
+
+Here is the same two-thread program with the three steps made indivisible, on
+CPython:
+
+```python
+import threading
+
+counter = 0
+lock = threading.Lock()
+
+def bump_many(n):
+    global counter
+    for _ in range(n):
+        with lock:
+            counter += 1
+
+threads = [threading.Thread(target=bump_many, args=(100_000,)) for _ in range(2)]
+for t in threads: t.start()
+for t in threads: t.join()
+
+print("expected:", 200_000)
+print("actual:  ", counter)
+```
+
+```
+expected: 200000
+actual:   200000
+```
+
+Exactly right, and exactly right on every run, which is the property the
+unlocked version could not offer. <code>with lock:</code> means a thread must
+hold the lock to be inside the block, so the read, the add and the write happen
+with no other thread able to interleave between them. The switch can still land
+mid-block &mdash; the GIL does not care about your lock &mdash; but the other
+thread will immediately block on <code>acquire</code> and hand the interpreter
+straight back.
+
+What it costs is worth knowing before you reach for it everywhere. Acquiring
+and releasing a lock two hundred thousand times is real work, and the loop
+above is measurably slower than the broken one. It is also *correct*, which is
+the trade being made, and the way to get most of the speed back is to hold the
+lock around the loop rather than around the line &mdash; which is the
+granularity question the [next page](locks_and_the_ways_they_go_wrong.html)
+measures.
+
+## Where it goes wrong
+
+**Assuming the GIL protects statements.** It protects bytecodes. A statement is
+usually several.
+
+**Testing with small numbers.** A short loop finishes inside one time slice and
+the race never fires. Push the iteration count up by a hundred and it appears.
+
+**Fixing it by adding a sleep.** Changing the timing hides a race rather than
+removing it; the interleaving is still legal and will happen under different
+load.
+
+**Protecting the write but not the read.** A lock only helps if *every* access
+to the shared state takes it, including the ones that only read and then
+decide.
+
+**Assuming a debugger will show you.** Running under a debugger or a profiler
+changes the scheduling, so the class of bug most in need of one is the class
+least likely to reproduce under it.
+
+## Questions people ask
+
+<strong>Why is the count different every run?</strong> Because the operating system decides when to switch threads, and it does not decide the same way twice. The number of lost updates is the number of times a switch landed between a read and a write, which is a property of that particular run.
+
+<strong>Is <code>counter += 1</code> safe if it is the only shared thing?</strong> No &mdash; being the only shared variable does not make it fewer bytecodes. Two threads incrementing one integer is the canonical race, and it is the example on this page.
+
+<strong>Does making it a local variable fix it?</strong> Yes, and that is the first fix above rather than a trick. A local is private to the call, so two threads have two of them; the race only exists because the name resolves to one shared object.
+
+<strong>Is <code>+=</code> on a list also a race?</strong> It is, and it is worse than it looks, because <code>lst += [x]</code> mutates in place and rebinds. Use <code>append</code>, which is the single C call.
+
+<strong>What about the free-threaded build?</strong> Races get easier to hit, not harder. Under the GIL a switch can only land between bytecodes; without it two threads genuinely execute at once, so an interleaving that was rare becomes common. Code that passed by luck is the code that breaks first.
+
+<strong>How do I find one in an existing program?</strong> Look for shared mutable state and then for read-modify-write or check-then-act against it &mdash; the shapes in the table above. Raising the thread count and the iteration count makes an intermittent failure reproducible far more reliably than reading the code does.
+
+## Recap in one screen
+
+- A switch lands only between bytecodes, so one bytecode is atomic and a statement generally is not.
+- <code>counter += 1</code> is <code>LOAD_GLOBAL</code>, <code>BINARY_OP</code>, <code>STORE_GLOBAL</code>: read, modify, write, with two gaps.
+- If both threads read before either writes, the second write replaces the first instead of building on it. Every individual step was correct; the interleaving was not.
+- The damage scales with how often a switch lands in a gap, which is why the total differs every run and why small tests pass.
+- One C call cannot be split, so <code>append</code> and <code>d[k] = v</code> are safe while <code>d[k] += 1</code> and check-then-act are not.
+- Preferred fixes in order: stop sharing the state, take a lock around every access, or use something already atomic.

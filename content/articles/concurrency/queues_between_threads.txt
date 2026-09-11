@@ -1,0 +1,281 @@
+title: Handing Work Between Threads with a Queue
+intro: A queue is a lock, a condition and a deque already assembled correctly - which is why it is the one piece of threading plumbing you should reach for first.
+
+## Why a queue rather than a lock
+
+The previous pages built up a set of primitives and a set of ways to misuse
+them: a [lock](locks_and_the_ways_they_go_wrong.html) you must take on every
+access, a <code>Condition</code> whose wait must sit in a
+<code>while</code> loop, a [race](race_conditions_in_python.html) waiting in
+any check-then-act. A <code>queue.Queue</code> is those three things already
+put together by someone who got the details right.
+
+It is internally locked, so <code>put</code> and <code>get</code> are safe from
+any number of threads with no locking of your own. It blocks when it has
+nothing to give and &mdash; if you bound it &mdash; when it has nowhere to put
+something. And it turns shared mutable state into **message passing**, which is
+the design that removes races rather than guarding them: an item is owned by
+the producer, then by the queue, then by exactly one consumer, and never by two
+things at once.
+
+The rule that follows is worth adopting as a default. If threads need to
+coordinate, try to express it as work items flowing through a queue before
+reaching for a lock around shared state. The queue version is usually shorter
+and it is much harder to get subtly wrong.
+
+These editors run in a browser interpreter with no OS threads, so the full API
+below is real and exercisable from one thread, and the multi-threaded worker
+pool is shown with its CPython output.
+
+## The whole API, from one thread
+
+```python-run
+import queue
+
+q = queue.Queue(maxsize=2)
+print("empty?", q.empty(), "| qsize", q.qsize(), "| full?", q.full())
+
+q.put("a"); q.put("b")
+print("after two puts: qsize", q.qsize(), "| full?", q.full())
+
+try:
+    q.put_nowait("c")
+except queue.Full:
+    print("put_nowait on a full queue -> queue.Full "
+          "(a plain put() would have blocked here)")
+
+print("unfinished_tasks:", q.unfinished_tasks)
+print("get ->", q.get()); q.task_done()
+print("get ->", q.get()); q.task_done()
+print("unfinished_tasks:", q.unfinished_tasks)
+
+q.join()
+print("join() returned immediately: every item was marked done")
+
+try:
+    q.task_done()
+except ValueError as e:
+    print("one task_done too many -> ValueError:", e)
+
+try:
+    q.get_nowait()
+except queue.Empty:
+    print("get_nowait on an empty queue -> queue.Empty "
+          "(a plain get() would have blocked forever)")
+```
+
+```
+empty? True | qsize 0 | full? False
+after two puts: qsize 2 | full? True
+put_nowait on a full queue -> queue.Full (a plain put() would have blocked here)
+unfinished_tasks: 2
+get -> a
+get -> b
+unfinished_tasks: 0
+join() returned immediately: every item was marked done
+one task_done too many -> ValueError: task_done() called too many times
+get_nowait on an empty queue -> queue.Empty (a plain get() would have blocked forever)
+```
+
+Everything the queue does is in that output. The two pairs are the part to
+internalise.
+
+<code>put</code>/<code>get</code> **block**; <code>put_nowait</code>/
+<code>get_nowait</code> **raise**. Blocking is what you want almost always,
+because it is how the queue paces the two sides. Raising is for the cases where
+waiting is the wrong behaviour &mdash; shedding load deliberately, or draining
+a queue you know is finished.
+
+<code>task_done</code>/<code>join</code> is a counter, not a queue length.
+<code>unfinished_tasks</code> went up on each <code>put</code> and down on each
+<code>task_done</code>, and <code>join</code> returns when it reaches zero.
+That is a different question from "is the queue empty": an item that has been
+taken but not yet finished is out of the queue and still unfinished, which is
+exactly the state you need to wait for at shutdown.
+
+## A worker pool that stops cleanly
+
+Here is the whole pattern on CPython. Three workers, a bounded queue, and a
+shutdown that does not guess:
+
+```python
+import queue, threading
+
+def worker(name, q, results):
+    while True:
+        item = q.get()
+        try:
+            if item is None:            # the sentinel: one per worker
+                return
+            results.append((name, item * item))
+        finally:
+            q.task_done()
+
+q = queue.Queue(maxsize=4)
+results = []
+workers = [threading.Thread(target=worker, args=(f"w{i}", q, results),
+                            daemon=True)
+           for i in range(3)]
+for t in workers:
+    t.start()
+
+for n in range(9):
+    q.put(n)
+q.join()                                 # every item handled
+
+for _ in workers:                        # now tell each worker to stop
+    q.put(None)
+for t in workers:
+    t.join()
+
+print("items handled:", len(results))
+print("squares:", sorted(v for _, v in results))
+```
+
+```
+items handled: 9
+squares: [0, 1, 4, 9, 16, 25, 36, 49, 64]
+```
+
+Four details in that code carry the weight.
+
+<code>task_done</code> is in a <code>finally</code>. If the work raises and the
+call is skipped, <code>unfinished_tasks</code> never reaches zero and
+<code>join</code> waits forever &mdash; a hang at shutdown with no error, which
+is the most common way this pattern fails.
+
+<code>join</code> comes before the sentinels. It proves the work is finished
+before anything is asked to stop, so there is no window where a worker exits
+with items still queued.
+
+There is **one sentinel per worker**, because each <code>None</code> is
+consumed by exactly one <code>get</code>. Putting a single sentinel stops one
+worker and leaves the other two blocked forever &mdash; a classic, and the
+reason many people prefer a <code>threading.Event</code> flag that every worker
+can see, or simply daemon threads and no shutdown at all.
+
+<code>daemon=True</code> means the interpreter will not wait for these threads
+at exit. It is a safety net rather than the plan; a daemon thread killed at
+interpreter exit does not run <code>finally</code> blocks, so anything holding
+a file or a transaction should be shut down properly, not abandoned.
+
+## Bounded, and why it matters
+
+<code>maxsize</code> is the difference between a queue that paces your program
+and a queue that hides a leak.
+
+Unbounded, <code>put</code> never blocks. A producer faster than its consumers
+simply accumulates: the queue grows, memory grows, and the program dies of an
+allocation failure a long way from the cause. The symptom looks like a leak and
+is a missing bound.
+
+Bounded, a full <code>put</code> blocks until a consumer takes something out,
+so the producer is automatically slowed to the rate the consumers can sustain.
+That is **backpressure**, it costs one argument, and the explorer above this
+article is the depth of a bounded queue over time under producer and consumer
+rates you choose &mdash; including the flat stretch where the producer is
+waiting.
+
+The value to pick is a statement about how far ahead you are willing to let the
+producer run, in items. It is a contract rather than a tuning number: a bound
+of 100 means "up to 100 items may be buffered", and the right figure follows
+from how large an item is and how stale a buffered one may become.
+
+## The variants, and the async cousin
+
+<code>queue.LifoQueue</code> returns the most recent item first, which turns a
+breadth-first crawl into a depth-first one with no other change.
+<code>queue.PriorityQueue</code> returns the smallest first and expects
+comparable items, so the shape is <code>q.put((priority, payload))</code>
+&mdash; and a tuple whose second element is not comparable will raise when two
+priorities tie, which is why a monotonic counter is usually wedged in between.
+
+<code>queue.SimpleQueue</code> is worth knowing for one property: it is
+unbounded, has no <code>task_done</code>, and is reentrant, so it is the only
+one safe to use from a signal handler or a <code>__del__</code>.
+
+And the deliberate near-duplicate: <code>asyncio.Queue</code> has almost the
+same interface and is **not** thread-safe, while <code>queue.Queue</code> is
+thread-safe and blocks the thread rather than awaiting. Using the wrong one is
+a real bug in both directions &mdash; a <code>queue.Queue.get()</code> inside a
+coroutine freezes the event loop, which is
+[the blocking call problem](../async_python/the_blocking_call_that_freezes_the_loop.html),
+and an <code>asyncio.Queue</code> touched from two threads corrupts quietly. To
+bridge the two, use <code>loop.call_soon_threadsafe</code>,
+<code>asyncio.run_coroutine_threadsafe</code>, or the
+<code>janus</code> library, which exists precisely for this.
+
+## Getting results back out
+
+A queue is one-way, which is the question the worked example dodged by
+appending to a shared list. That works because <code>list.append</code> is one
+C call and cannot be interleaved &mdash; but it loses the association between
+an item and its result, and it does not let a caller wait for *its* answer.
+
+Three patterns, in increasing order of how much they give you.
+
+**A second queue.** Workers <code>put</code> onto a results queue and the main
+thread drains it. Simple, and the ordering is completion order, so anything
+that needs to match a result to its request has to carry an identifier in the
+message. This is the shape most pipelines end up with.
+
+**A future in the item.** Put <code>(work, future)</code> pairs on the queue,
+and have the worker call <code>future.set_result(...)</code>. Now any caller
+can wait on exactly its own answer, with a timeout, and exceptions propagate
+properly through <code>set_exception</code>. This is essentially what
+<code>ThreadPoolExecutor</code> does internally, which is a good argument for
+[using it instead](concurrent_futures.html) when the work is a set of
+independent calls.
+
+**A queue per requester.** Heavier, and the right answer when a requester needs
+a stream of replies rather than one, or when replies must stay ordered
+per-requester.
+
+The rule that falls out: a queue is the right tool when work **flows** &mdash;
+an open-ended stream, consumed by a fixed number of workers, where the
+producer should be paced. When you have a known list of independent calls and
+want their results, an executor is less code and already solves the result and
+exception plumbing. Reaching for a queue there means reimplementing
+<code>submit</code>.
+
+## Where it goes wrong
+
+**An unbounded queue with a fast producer.** It grows until memory runs out.
+Set <code>maxsize</code>.
+
+**<code>task_done</code> not in a <code>finally</code>.** One exception in a
+worker and <code>join</code> hangs forever with nothing logged.
+
+**One sentinel for several workers.** Each is consumed once, so the rest stay
+blocked on <code>get</code>.
+
+**Branching on <code>qsize()</code>.** It is a snapshot that another thread can
+invalidate before the next line. Let <code>put</code> and <code>get</code> do
+the waiting; the count is for logging, not control.
+
+**Using <code>queue.Queue</code> in a coroutine.** Its <code>get</code> blocks
+the thread, so it stops the event loop. Use <code>asyncio.Queue</code> there.
+
+## Questions people ask
+
+<strong>Sentinels or an Event?</strong> An <code>Event</code> scales better: one <code>set()</code> is seen by every worker, where sentinels need one per worker and exact bookkeeping. Sentinels remain useful when workers must finish the queued work first, because the sentinel is ordered behind it and a flag is not.
+
+<strong>How many workers?</strong> For waiting-bound work, as many as the far end tolerates; for computing-bound work, threads will not help at all and the answer is [processes](threads_or_processes.html). The queue's value is that this becomes one number in one place.
+
+<strong>Do I need <code>join</code> if I use sentinels?</strong> Not strictly, but the two answer different questions. <code>join</code> tells you the work is done; joining the threads tells you the workers have exited. Doing both, in that order, is what makes shutdown deterministic.
+
+<strong>Is <code>get</code> fair between workers?</strong> Roughly, and it is not guaranteed. Items go to whichever worker the OS wakes, so a run where one worker takes more than its share is normal and not a bug.
+
+<strong>Can I put anything in it?</strong> Any object &mdash; it is the same process, so nothing is pickled and nothing is copied. That is a real advantage over a [process pool](threads_or_processes.html), and it is also why the item is still shared mutable state: two threads holding the same object still need a lock if they both mutate it.
+
+<strong>What if a worker dies?</strong> The item is lost and <code>unfinished_tasks</code> never decrements, so <code>join</code> hangs. Wrapping the body in <code>try/finally</code> with <code>task_done</code> in the <code>finally</code> is what keeps a crashing worker from hanging the shutdown.
+
+## Recap in one screen
+
+- A queue is a lock, a condition and a deque already assembled correctly, so it is the first thing to reach for rather than the last.
+- It converts shared mutable state into message passing: an item has exactly one owner at a time, which removes races instead of guarding them.
+- <code>put</code>/<code>get</code> block and pace the program; <code>put_nowait</code>/<code>get_nowait</code> raise <code>Full</code>/<code>Empty</code> for when waiting is wrong.
+- <code>task_done</code>/<code>join</code> is a counter of outstanding items, not a queue length &mdash; an item taken but unfinished is neither in the queue nor done.
+- Put <code>task_done</code> in a <code>finally</code>, call <code>join</code> before sending sentinels, and send one sentinel per worker.
+- <code>maxsize</code> is backpressure and the difference between pacing a producer and hiding a leak.
+- <code>queue.Queue</code> is thread-safe and blocking; <code>asyncio.Queue</code> is neither. They are not interchangeable in either direction.

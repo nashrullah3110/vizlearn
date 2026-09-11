@@ -1,0 +1,278 @@
+title: The GIL, and What It Actually Locks
+intro: Python's threads are real OS threads that are not allowed to run Python at the same time. One lock explains why threads help a program that waits and do nothing for a program that computes.
+
+## One lock, and what holds it
+
+A CPython process has a **global interpreter lock**, and the rule around it is
+short: a thread must hold the GIL to execute Python bytecode. Threads are real
+operating-system threads &mdash; the kernel schedules them, they have their own
+stacks, they can sit on different cores &mdash; and exactly one of them at a
+time is permitted to run your Python code.
+
+Two consequences follow, and almost everything else about Python threading is
+downstream of them.
+
+A program that spends its time **waiting** gets faster with threads, because a
+thread that is blocked on a socket, a file or a timer is not running bytecode
+and has handed the GIL back. Ten threads can wait at once.
+
+A program that spends its time **computing** does not get faster with threads,
+because computing *is* running bytecode, and only one thread may. Two threads
+doing arithmetic take turns, and the total time is what one thread would have
+taken plus the cost of the switching.
+
+These editors run in a browser interpreter that has no OS threads at all, so
+<code>Thread.start()</code>, <code>ThreadPoolExecutor</code> and
+<code>multiprocessing</code> raise here rather than working. That is worth
+proving rather than asserting:
+
+```python-run
+import threading
+
+try:
+    threading.Thread(target=lambda: None).start()
+except RuntimeError as e:
+    print("in this sandbox:", e)
+
+print("threads alive right now:", threading.active_count())
+print("and this one is:", threading.main_thread().name)
+```
+
+```
+in this sandbox: can't start new thread
+threads alive right now: 1
+and this one is: MainThread
+```
+
+So every runnable block on this track demonstrates a mechanism that is real in
+single-threaded Python &mdash; the bytecode an increment compiles to, the lock
+protocol, the pickle boundary, the Future state machine. Anything that needs a
+second thread appears as a plain block with the output it produces on CPython,
+which is flagged where it happens.
+
+## Where the switch happens
+
+The GIL is not held for the whole of a function. The interpreter drops and
+reacquires it periodically, and the period is a setting you can read:
+
+```python-run
+import sys, dis
+
+print("switch interval:", sys.getswitchinterval(), "seconds")
+print("so a one-second pure-Python loop offers about",
+      int(1 / sys.getswitchinterval()), "chances to switch")
+
+def tight(n):
+    total = 0
+    for i in range(n):
+        total += i
+    return total
+
+ops = [i.opname for i in dis.get_instructions(tight)]
+print()
+print("bytecodes in that loop body:", len(ops))
+print("the loop itself:", [o for o in ops if "FOR" in o or "JUMP" in o])
+
+sys.setswitchinterval(0.001)
+print()
+print("after setswitchinterval(0.001):", sys.getswitchinterval())
+```
+
+```
+switch interval: 0.005 seconds
+so a one-second pure-Python loop offers about 200 chances to switch
+
+bytecodes in that loop body: 15
+the loop itself: ['FOR_ITER', 'JUMP_BACKWARD']
+
+after setswitchinterval(0.001): 0.001
+```
+
+Five milliseconds is the default, and it is a **time** interval rather than a
+bytecode count &mdash; that changed in Python 3.2, and older explanations that
+talk about "every 100 ticks" describe the interpreter as it was before then. A
+thread runs for up to 5 ms, then the interpreter asks it to drop the GIL so
+another thread can take it.
+
+Lowering the interval makes switching more responsive and adds overhead, since
+every switch costs work and cache locality. Raising it does the reverse. It is
+very rarely the right thing to change: if switching cadence is your problem,
+the shape of the program usually is.
+
+The important word above is *offers*. A switch can only happen between
+bytecodes, and a single bytecode is atomic with respect to other threads. That
+is the fact the [next page](race_conditions_in_python.html) is built on,
+because it means the safety of an operation depends on how many bytecodes it
+compiles to.
+
+## What "releases the GIL" actually means
+
+The GIL is released around operations that do not need the interpreter. There
+are two large categories and knowing which you are in predicts whether threads
+will help:
+
+| Operation | GIL | Threads help? |
+|---|---|---|
+| <code>time.sleep</code> | released | yes |
+| socket read/write, <code>requests.get</code> | released while waiting | yes |
+| file read/write | released | yes |
+| <code>hashlib</code> on a large buffer | released | yes |
+| numpy elementwise maths on a big array | released | yes |
+| a pure-Python <code>for</code> loop | **held** | no |
+| building or walking a dict or list | **held** | no |
+| <code>json.loads</code> | **held** | no |
+
+The pattern is that C code which does not touch Python objects can drop the
+lock for its duration. That is why a numpy-heavy program sometimes does scale
+with threads and an equivalent loop written in Python never does, and it is
+also why "is this library a thin wrapper over C?" is a practical question
+rather than a pedantic one.
+
+## Two threads on CPU work
+
+This is the measurement that cannot run here, so here it is with the output it
+produces on CPython:
+
+```python
+import time
+from concurrent.futures import ThreadPoolExecutor
+
+def work(n):
+    total = 0
+    for i in range(n):
+        total += i * i
+    return total
+
+N = 5_000_000
+
+t0 = time.perf_counter()
+work(N); work(N)
+print(f"one after the other: {time.perf_counter() - t0:.2f}s")
+
+t0 = time.perf_counter()
+with ThreadPoolExecutor(max_workers=2) as pool:
+    list(pool.map(work, [N, N]))
+print(f"two threads:         {time.perf_counter() - t0:.2f}s")
+```
+
+```
+one after the other: 1.18s
+two threads:         1.21s
+```
+
+Two threads, two cores available, and the work took slightly *longer* than
+doing it sequentially. Nothing is broken: the two threads took turns holding
+the GIL, so the arithmetic was serialised anyway, and the switching added a
+few per cent. Swap <code>ThreadPoolExecutor</code> for
+<code>ProcessPoolExecutor</code> in that snippet and the time roughly halves,
+which is the subject of
+[threads or processes](threads_or_processes.html).
+
+Run the same comparison with <code>time.sleep(1)</code> as the work and the
+numbers invert completely &mdash; two seconds sequentially, one second with two
+threads &mdash; because sleeping releases the lock. Same threads, same pool,
+opposite result, and the only thing that changed is whether the work needed
+the interpreter.
+
+## Deciding before you commit
+
+Before writing the threaded version, it is worth knowing which side of the
+table above your program is on, and there is a two-line measurement that
+answers it. <code>time.perf_counter</code> measures elapsed time;
+<code>time.process_time</code> measures CPU time actually consumed by the
+process. Their ratio is the answer:
+
+```python
+import time
+
+w0, c0 = time.perf_counter(), time.process_time()
+run_the_thing()
+wall = time.perf_counter() - w0
+cpu = time.process_time() - c0
+print(f"wall {wall:.2f}s  cpu {cpu:.2f}s  ratio {cpu/wall:.2f}")
+```
+
+```
+a pure-Python loop   wall 0.61s  cpu 0.61s  ratio 1.00
+an HTTP request      wall 0.42s  cpu 0.01s  ratio 0.02
+```
+
+A ratio near 1 means the process was computing the whole time: the work is
+CPU-bound, it was holding the GIL, and threads will do nothing for it. A ratio
+near 0 means the process was mostly waiting with the lock released, and threads
+will overlap that waiting almost perfectly.
+
+This one is shown rather than run because <code>time.process_time</code>
+returns 0 under the browser interpreter &mdash; it is not implemented there, so
+the ratio would read 0.00 for both cases and tell you nothing. On CPython it
+is the fastest useful measurement in this whole area.
+
+The number also tells you your ceiling in advance. A ratio of 0.7 means 70% of
+the time is spent holding the GIL, so even infinite threads can only remove
+the other 30%: that is Amdahl's law with the serial fraction handed to you by a
+measurement rather than guessed, and it is drawn for all three models on
+[choosing between threads, processes and async](choosing_threads_processes_or_async.html).
+
+## Why it is there at all
+
+The GIL is easy to present as a historical embarrassment, and it is worth
+knowing what it buys, because that explains why removing it took twenty years.
+
+It makes **reference counting** safe without per-object locks. Every Python
+object carries a count of how many things refer to it, updated constantly
+&mdash; on every assignment, every function call, every list append. Making
+those updates safe for concurrent threads means either one big lock, or atomic
+operations on every single one, which costs speed in the single-threaded case
+that most programs actually are.
+
+It also gives **C extension authors** a guarantee they have relied on for
+decades: while your extension holds the GIL, no other thread is mutating
+Python objects underneath it. A large amount of the scientific stack was
+written against that promise.
+
+What changed recently is worth tracking. Python 3.12 gave each
+**subinterpreter** its own GIL, so separate interpreters in one process can
+run Python simultaneously. And Python 3.13 ships an experimental
+**free-threaded** build with no GIL at all, which makes reference counting
+atomic and costs single-threaded performance to do it. Neither is the default
+yet, and on any interpreter you are likely to be running today the rule at the
+top of this page still holds.
+
+## Where it goes wrong
+
+**Reaching for threads to speed up computation.** The most common mistake, and
+the GIL means it produces no speed-up at all. CPU-bound work needs processes.
+
+**Concluding threads are useless.** They are the right tool for waiting, which
+is what most programs spend their time doing. A web scraper, a file crawler
+and an API client all scale with threads.
+
+**Assuming a C library releases the lock.** Many do and some do not, and the
+documentation often does not say. The only reliable answer is to measure the
+threaded version against the sequential one.
+
+**Tuning the switch interval.** It almost never helps, and a lower value
+increases overhead. Change the structure instead.
+
+## Questions people ask
+
+<strong>Are Python threads real OS threads?</strong> Yes. The kernel creates and schedules them, and they can be on different cores &mdash; they simply cannot execute Python bytecode at the same time, because that requires the GIL. "Not parallel" is about the interpreter, not about the threads.
+
+<strong>How many threads should I use for I/O?</strong> More than the number of cores, because they are mostly waiting rather than computing &mdash; the ceiling is whatever the remote end tolerates and the memory each thread's stack costs. Dozens is routine; thousands is where async becomes the better shape.
+
+<strong>Does the GIL make my code thread-safe?</strong> No, and this is the most expensive misunderstanding about it. It guarantees that one *bytecode* is atomic, not one statement. <code>counter += 1</code> is several bytecodes, and a switch can land in the middle &mdash; the [next page](race_conditions_in_python.html) is entirely about that.
+
+<strong>Will the free-threaded build fix my program?</strong> It removes the parallelism ceiling and it does not remove the need for locks &mdash; in fact it makes races easier to hit, because two threads really do run simultaneously. Code that was accidentally correct because of the GIL's coarse granularity can break there.
+
+<strong>Why not just use subinterpreters?</strong> Since 3.12 each has its own GIL, so they genuinely run Python in parallel, and sharing data between them is deliberately restrictive. It is a promising middle ground and still young; the stdlib interface is <code>interpreters</code> and it arrived in 3.13.
+
+<strong>Does <code>asyncio</code> avoid the GIL?</strong> No, it sidesteps the question. Async runs one thread and overlaps waiting, so the GIL is never contended because nothing is competing for it. For CPU-bound work async has exactly the same ceiling as threads &mdash; see [choosing between the three](choosing_threads_processes_or_async.html).
+
+## Recap in one screen
+
+- Threads are real OS threads; holding the GIL is the price of executing Python bytecode, and only one thread may hold it.
+- So threads overlap **waiting** and never overlap **computing**. That single sentence predicts whether threading will help.
+- The interpreter offers a switch every 5 ms by default (<code>sys.getswitchinterval</code>), and a switch can only land between bytecodes.
+- I/O, <code>time.sleep</code>, and C code that does not touch Python objects release the lock. Pure-Python loops, dict work and <code>json.loads</code> hold it.
+- Two threads on CPU work measure slightly slower than sequential; the same test with <code>time.sleep</code> measures twice as fast.
+- The GIL buys cheap reference counting and a guarantee C extensions were written against. 3.12 gave subinterpreters their own; 3.13 ships an experimental build without one.
