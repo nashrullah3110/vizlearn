@@ -179,3 +179,24 @@ parameter per channel. Multiply that by the whole network and it is where the
 "25.50 M or 25.56 M?" discrepancy in parameter counts usually comes from: the
 BN parameters are 53,000 of the total, and whether a count includes them
 depends on the tool.
+## Questions people ask
+
+<strong>Is the shortcut always the identity?</strong> No, and this is the most common misreading. At the first block of stages 2, 3 and 4 the stride is 2 and the width doubles, so the shapes cannot match and a trained 1&times;1 projection carries the shortcut instead. Those projections are the one place the clean-identity argument does not literally hold.
+
+<strong>Why `bias=False` on every convolution?</strong> Because the batch norm immediately after has its own per-channel shift, so a bias would be a second additive constant with no extra expressive power. It also explains part of why published counts disagree: BN's weights and shifts are about 53,000 parameters in ResNet-50, and whether a tool counts them varies.
+
+<strong>Does the degradation result mean deeper is worse?</strong> It means deeper *plain* stacks were harder to optimise, not smaller in capacity &mdash; the 56-layer network had higher **training** error than the 20-layer one, which rules out overfitting. Residuals add no capacity; they make a solution the network could already represent reachable by gradient descent.
+
+<strong>Where does the ReLU go relative to the addition?</strong> Add first, then activate. The identity-mappings follow-up tested the alternatives and found that anything sitting on the shortcut path &mdash; a ReLU, a scaling, a gate &mdash; makes very deep networks harder to train. Pre-activation ordering is the variant that helps past 200 layers.
+
+<strong>Why is ResNet-50 still the default backbone?</strong> Pretrained weights in every framework, stage strides of 4/8/16/32 that detection necks and segmentation decoders assume, undramatic fine-tuning on small datasets, and accuracy close enough to modern alternatives that beating it is rarely where a project's win actually is.
+
+<strong>What is the cheapest accuracy I am leaving on the table?</strong> The bag-of-tricks changes: a three-convolution stem instead of the 7&times;7, and moving the downsampling stride from the 1&times;1 to the 3&times;3 so the 1&times;1 stops discarding three quarters of its input pixels. That second one is a genuine bug in the original, worth 1&ndash;2% ImageNet accuracy for almost nothing, and shipped in most libraries as the "D" variant.
+
+## Recap in one screen
+
+- One design with two knobs &mdash; block type and blocks per stage. The five famous models are points in that space, not five architectures.
+- `y = F(x) + x` makes the identity the default, and differentiating gives `dF/dx + 1`, so there is always a path back with derivative exactly 1.
+- Widths 64/128/256/512 with the spatial size halving each time keeps MACs roughly level per stage while parameters quadruple.
+- Early stages are cheap to store and expensive to run; late stages the reverse. That tells you which end to attack for latency and which for size.
+- The stage outputs C2&ndash;C5 at strides 4/8/16/32 are a convention the whole detection ecosystem is built on.

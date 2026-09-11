@@ -197,3 +197,25 @@ super-resolution, image-to-image translation, on-device generation. And the
 adversarial idea itself long outgrew image synthesis &mdash; domain-adversarial
 training, adversarial robustness and the discriminator in a perceptual loss are
 all this page's structure, applied to something else.
+## Questions people ask
+
+<strong>My discriminator loss went to zero &mdash; is that good?</strong> It is the failure mode, not success. With the supports barely overlapping the optimal discriminator is right about everything, `log(1 - D)` is flat there, and the generator's gradient vanishes exactly when it is worst. Use the non-saturating form, and if it persists, weaken the discriminator &mdash; fewer updates, a lower learning rate &mdash; or change the objective to WGAN-GP, whose gradient does not die on disjoint supports.
+
+<strong>What should the losses look like when training is healthy?</strong> There is no target curve, because both losses are measured against a moving opponent. A discriminator loss near `log 2 = 0.693` means it cannot separate real from fake, which is either the equilibrium you wanted or a discriminator that has given up, and the two look identical on the plot. Judge by samples and by FID.
+
+<strong>How do I tell mode collapse from merely bad samples?</strong> By diversity rather than quality. Generate a few hundred samples from different noise and look for repeats; FID catches it because a collapsed set of activations has the wrong covariance, where any per-sample quality score will not. The discriminator only ever judges one sample at a time, so nothing in the objective mentions variety at all.
+
+<strong>Why `Tanh` on the generator, and what breaks without it?</strong> It bounds the output to [&minus;1, 1], and the real images must be normalised to that same range. Otherwise the discriminator can separate real from fake on scale alone and never has to learn anything about content. It is the most common first bug and it presents as "training looks fine, samples are noise".
+
+<strong>Should I train the discriminator more than the generator?</strong> The original algorithm allows k discriminator steps per generator step and used k = 1. A stronger discriminator gives a better gradient *direction* in theory and a vanished one in practice under the saturating loss, so the two networks are usually kept close in capacity. With WGAN-GP extra critic steps genuinely help, which is a consequence of the different distance rather than a general rule.
+
+<strong>Are GANs still worth learning now that diffusion has won?</strong> For two reasons. A GAN generates in a single forward pass, which still decides the matter for real-time super-resolution, image-to-image translation and on-device generation. And the adversarial structure long outgrew image synthesis &mdash; domain-adversarial training, adversarial robustness and the discriminator inside a perceptual loss are all this page applied elsewhere.
+
+## Recap in one screen
+
+- A min-max game with no target output for the generator anywhere &mdash; only a second network's opinion, which improves as the generator does.
+- Hold the generator fixed and the optimal discriminator has a closed form, `D*(x) = p_data / (p_data + p_g)`, which needs no training at all.
+- Substituting it turns the game into `2 . JSD - log 4`, so there is a unique optimum at `p_g = p_data` where the value is &minus;1.386 and `D = 0.5` everywhere.
+- Where the distributions barely overlap the saturating loss has almost no gradient, which is precisely why every implementation maximises `log D(G(z))` instead.
+- Mode collapse is the objective, not the capacity: a generator that finds one accepted output and repeats it forever is scoring perfectly by the stated goal.
+- The loss values do not measure progress. Samples do, and FID does, because it penalises a generator with no variety.

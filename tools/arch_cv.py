@@ -238,6 +238,27 @@ hand-designed first convolutional layer &mdash; a small set of local
 difference filters, applied everywhere, whose responses are thresholded and
 combined. The difference is that the next twenty years were spent learning
 those filters rather than enumerating them.
+## Questions people ask
+
+<strong>Why does it fail on a face that is only slightly turned?</strong> Because the features encode a fixed brightness layout &mdash; a dark eye band above a lighter cheek, a light nose bridge between two darker eyes. Rotating the head moves those rectangles relative to each other and the responses the cascade thresholds on collapse. Past roughly 15&deg; the frontal model degrades sharply, and the usual answer is a second cascade trained on profiles rather than a fix to the first.
+
+<strong>Can it find faces smaller than 24&times;24?</strong> No. The search grows the window from the trained size upward and never shrinks below it, so 24&times;24 is the floor. Distant faces in a wide shot need the frame upsampled first, and doubling the image quadruples the window count.
+
+<strong>Is the integral image an approximation?</strong> No, it is exact. It is a cumulative sum, so the four-corner formula recovers any rectangle's total precisely in integer arithmetic. The costs are one extra table per frame and a wide enough integer type &mdash; a 1080p frame of 8-bit pixels sums to about 5&times;10<sup>8</sup>, which is why these tables are 32-bit or wider.
+
+<strong>Why grayscale?</strong> The feature is a brightness difference, so colour carries nothing it can read. Converting once per frame also makes the integral image a third of the size.
+
+<strong>Why does it fire on things that are obviously not faces?</strong> Each stage is tuned for about 99.9% detection at roughly 50% false positives &mdash; the guarantee lives in the product across 38 stages, not in any one of them. And a dark-light-dark band is exactly what the early features test, so bookshelves and railings genuinely do excite them. With 180,000 windows per frame even a tiny per-window rate leaves survivors, which is what `minNeighbors` is for.
+
+<strong>Should I train my own cascade?</strong> Rarely, now. `opencv_traincascade` wants thousands of positives and tens of thousands of negatives and can run for days, and the result still inherits the pose sensitivity. If the object is rigid, near-frontal and inference has to be CPU-only it is viable; otherwise fine-tuning a small CNN detector is less work and better.
+
+## Recap in one screen
+
+- One feature is a subtraction: the mean under the white rectangles minus the mean under the black ones.
+- The integral image makes any rectangle sum four lookups regardless of size, which is why the detector scales the *feature* rather than the image.
+- AdaBoost is used as a feature selector over more than 160,000 candidates; the shipped detector keeps 6,061 of them across 38 stages.
+- The cascade is where the speed lives: stage one costs two features and removes about half of all windows, and the average window dies after about ten.
+- It assumes a fixed brightness layout, so it is a controlled-pose detector. Everything after it learned the filters instead of enumerating them.
 """,
     [
         {"q": "Why does the integral image matter so much here?",
@@ -544,6 +565,27 @@ the parameters is what keeps it a *loss* rather than a second network being
 trained. And whatever you feed it must be normalised with the ImageNet mean
 and standard deviation the weights were trained with, or the features are
 being read off a distribution the network has never seen.
+## Questions people ask
+
+<strong>Why is the input frozen at 224&times;224?</strong> Because fc6 is a dense matrix expecting exactly 25,088 inputs, which is 7&times;7&times;512 &mdash; and 7&times;7 is what 224 becomes after five halvings. Feed it 256&times;256 and the flatten produces 8&times;8&times;512 = 32,768 values, which does not fit the matrix. Global average pooling removes the constraint entirely, which is why every architecture after VGG accepts any resolution.
+
+<strong>VGG-16 or VGG-19 &mdash; does the difference matter?</strong> Rarely. VGG-19 adds one convolution to each of the last three blocks and about 20 M parameters, for a few tenths of a point of ImageNet accuracy. For perceptual loss the 16-layer version is the conventional choice and the one most published numbers assume.
+
+<strong>Which parameter count is right, 138 M or 134 M?</strong> Both get quoted. 138,357,544 includes the 1000-way fc8; smaller figures usually come from a model with the classifier removed or replaced. Check what a count includes before comparing two of them.
+
+<strong>Why does it use so much GPU memory for its size?</strong> Because activations, not weights, dominate training memory. The first block holds 64&times;224&times;224 values per image &mdash; 3.2 M numbers &mdash; and every one is kept for the backward pass, while the 102 M-parameter fc6 stores 4,096. That is why VGG batch sizes are small even though ResNet-50 is deeper.
+
+<strong>Is `relu3_3` or `relu4_3` the right layer for perceptual loss?</strong> Earlier layers reward matching texture and colour; later ones reward matching structure and tolerate texture differences. Style transfer usually takes several at once, super-resolution one of those two. There is no correct answer, only a choice about what you want preserved.
+
+<strong>Should I fine-tune VGG for a new task?</strong> You can, and it will work, but you are paying 138 M parameters for accuracy ResNet-50 exceeds at 25.6 M. Reach for VGG when you specifically want its features &mdash; a loss, a published comparison &mdash; not as a default backbone.
+
+## Recap in one screen
+
+- One rule generates the network: 3&times;3, stride 1, padding 1, with the spatial size changing only at the five max-pools.
+- Two stacked 3&times;3s match a 5&times;5's receptive field for 18C&sup2; parameters against 25C&sup2;, and add a non-linearity in between.
+- The convolutions are 11% of the parameters and 99% of the arithmetic; the dense head is 89% and 1%. Read the two budgets as separate questions.
+- fc6 alone is 102 M parameters used once per image. Global average pooling replaces it, cuts the model about 9&times;, and frees the input resolution.
+- Obsolete as a classifier, still standard as a perceptual-loss backbone &mdash; sliced before the head, frozen, and fed ImageNet-normalised input.
 """,
     [
         {"q": "Two stacked 3x3 convolutions replace one 5x5. What do you gain?",
@@ -800,6 +842,27 @@ projection down and a projection back up. ResNet's bottleneck block is exactly
 that pattern. So is MobileNet's inverted residual, so is the feed-forward block
 of a transformer, and so is every "reduce, operate, expand" structure you will
 meet from here on.
+## Questions people ask
+
+<strong>Why does a 1&times;1 convolution do anything at all?</strong> Because it is not spatial &mdash; it is a learned matrix applied to the channel vector at every pixel. With 192 inputs and 96 outputs it is a 192&times;96 change of basis performed identically everywhere, and it can discard, combine or duplicate channels. It only looks trivial if you picture convolution as something that happens in space.
+
+<strong>Where do the per-branch channel counts come from?</strong> From tuning, not a formula. Table 1 of the paper lists them per module and they are not a pattern &mdash; 4d puts 288 channels in its 3&times;3 branch and 64 in its 5&times;5. This is the part of Inception that did not generalise, and the reason later architectures preferred one repeating block with a width multiplier.
+
+<strong>Is GoogLeNet the same thing as Inception-v1?</strong> Yes. GoogLeNet is the specific 22-layer ILSVRC 2014 entry; Inception is the module and the family. Inception-v3 is the version most people actually load, and it expects 299&times;299 input rather than 224.
+
+<strong>Why did the auxiliary classifiers go away?</strong> They existed to push gradient into the early layers of a network too deep to train otherwise. Batch normalisation and then residual connections solved that properly, and the paper's own follow-up concluded the auxiliary heads had acted as regularisers rather than gradient highways. Nothing replaced them because nothing needed to.
+
+<strong>If it has 20&times; fewer parameters than VGG, why is it not 20&times; faster?</strong> Because parameters are not latency. Four branches mean four kernel launches, four output allocations and a gather, and the fixed cost per launch does not shrink as hardware gets faster &mdash; so measured latency is consistently worse than the MAC count predicts. Depthwise separable convolutions have the same problem more severely.
+
+<strong>Should I use an Inception model today?</strong> For new work, no: a ResNet or a modern efficient network is easier to train and better supported. Inception-v3 still matters in one place, though &mdash; the Inception Score and FID are defined on its activations, so it remains load-bearing infrastructure for generative-model evaluation.
+
+## Recap in one screen
+
+- The module runs 1&times;1, 3&times;3, 5&times;5 and a pool branch in parallel and concatenates along channels, so the next layer picks the scale.
+- Concatenation requires every branch to preserve spatial size, which is what the per-branch padding of 0, 1 and 2 is for.
+- A 1&times;1 reduction in front of the expensive branches cuts module 3a from 303 M to 128 M MACs *and* shrinks its output from 416 to 256 channels.
+- The pool branch's projection is what stops the channel count growing without bound as modules are stacked.
+- GoogLeNet is 6.8 M parameters against VGG's 138 M, mostly because it ends in global average pooling. The transferable idea is reduce, operate, expand.
 """,
     [
         {"q": "Why must every branch of an inception module preserve the "
@@ -1075,6 +1138,27 @@ parameter per channel. Multiply that by the whole network and it is where the
 "25.50 M or 25.56 M?" discrepancy in parameter counts usually comes from: the
 BN parameters are 53,000 of the total, and whether a count includes them
 depends on the tool.
+## Questions people ask
+
+<strong>Is the shortcut always the identity?</strong> No, and this is the most common misreading. At the first block of stages 2, 3 and 4 the stride is 2 and the width doubles, so the shapes cannot match and a trained 1&times;1 projection carries the shortcut instead. Those projections are the one place the clean-identity argument does not literally hold.
+
+<strong>Why `bias=False` on every convolution?</strong> Because the batch norm immediately after has its own per-channel shift, so a bias would be a second additive constant with no extra expressive power. It also explains part of why published counts disagree: BN's weights and shifts are about 53,000 parameters in ResNet-50, and whether a tool counts them varies.
+
+<strong>Does the degradation result mean deeper is worse?</strong> It means deeper *plain* stacks were harder to optimise, not smaller in capacity &mdash; the 56-layer network had higher **training** error than the 20-layer one, which rules out overfitting. Residuals add no capacity; they make a solution the network could already represent reachable by gradient descent.
+
+<strong>Where does the ReLU go relative to the addition?</strong> Add first, then activate. The identity-mappings follow-up tested the alternatives and found that anything sitting on the shortcut path &mdash; a ReLU, a scaling, a gate &mdash; makes very deep networks harder to train. Pre-activation ordering is the variant that helps past 200 layers.
+
+<strong>Why is ResNet-50 still the default backbone?</strong> Pretrained weights in every framework, stage strides of 4/8/16/32 that detection necks and segmentation decoders assume, undramatic fine-tuning on small datasets, and accuracy close enough to modern alternatives that beating it is rarely where a project's win actually is.
+
+<strong>What is the cheapest accuracy I am leaving on the table?</strong> The bag-of-tricks changes: a three-convolution stem instead of the 7&times;7, and moving the downsampling stride from the 1&times;1 to the 3&times;3 so the 1&times;1 stops discarding three quarters of its input pixels. That second one is a genuine bug in the original, worth 1&ndash;2% ImageNet accuracy for almost nothing, and shipped in most libraries as the "D" variant.
+
+## Recap in one screen
+
+- One design with two knobs &mdash; block type and blocks per stage. The five famous models are points in that space, not five architectures.
+- `y = F(x) + x` makes the identity the default, and differentiating gives `dF/dx + 1`, so there is always a path back with derivative exactly 1.
+- Widths 64/128/256/512 with the spatial size halving each time keeps MACs roughly level per stage while parameters quadruple.
+- Early stages are cheap to store and expensive to run; late stages the reverse. That tells you which end to attack for latency and which for size.
+- The stage outputs C2&ndash;C5 at strides 4/8/16/32 are a convention the whole detection ecosystem is built on.
 """,
     [
         {"q": "The paper's motivating observation was that a 56-layer plain "
@@ -1349,6 +1433,27 @@ preprocessing, patch size, batch size, augmentation, postprocessing &mdash; and
 beat specialised architectures across dozens of medical benchmarks. That result
 is worth sitting with. Ten years on, the strongest argument in the area is
 still that a plain U-Net, configured well, is hard to beat.
+## Questions people ask
+
+<strong>Concatenate the skip, or add it?</strong> Concatenate, in the original. Adding forces the encoder's detail and the decoder's semantics into the same channels, so the following convolution cannot tell them apart; concatenating keeps them separate and lets it weigh them. Addition is cheaper and appears in ResNet-style decoders, but it is a different architecture rather than an implementation shortcut.
+
+<strong>Why 572&times;572 and not 512?</strong> Because unpadded convolutions shrink the map and every pooling step still has to divide evenly. 572 is chosen so the arithmetic survives four levels down and back. With `padding=1` the constraint relaxes to "divisible by 2<sup>levels</sup>", which is why modern implementations use round numbers.
+
+<strong>Valid or same padding?</strong> Same (`padding=1`) unless you are tiling a larger image. Valid convolutions guarantee every output pixel had genuine context, which is what makes the overlap-tile strategy seamless; same padding needs no cropping and costs you a thin border predicted partly from zeros.
+
+<strong>Transposed convolution or upsample-then-convolve?</strong> Either works. Transposed convolutions can produce checkerboard artefacts when the kernel size is not divisible by the stride; bilinear upsampling followed by a 3&times;3 avoids that and carries fewer parameters, which is why most current implementations choose it.
+
+<strong>Why does my model merge touching objects?</strong> Because an unweighted per-pixel loss barely notices the thin line between them &mdash; a few hundred pixels out of a quarter of a million. The paper's answer was a per-image weight map upweighting exactly those gaps; the modern answers are Dice or focal loss, or predicting the boundary as its own class.
+
+<strong>Does it really only need thirty images?</strong> The result is real, but not from the architecture alone. Elastic deformation is what made it work: a smooth random warp of tissue produces something that looks like a different *specimen*, where shift and flip only produce another photograph of the same one. With weak augmentation, thirty images is not enough.
+
+## Recap in one screen
+
+- Segmentation needs semantics, which wants pooling, and precision, which does not. U-Net gets both by pooling all the way down and wiring the pre-pooling activations forward.
+- Each encoder level is two 3&times;3s then a 2&times;2 pool with channels doubling; each decoder level up-converts, concatenates the skip, and convolves twice.
+- The skips *are* the architecture. Without them the finest detail the decoder can see is whatever survived four poolings &mdash; a 28&times;28 grid for a 572&times;572 tile &mdash; and no decoder capacity recovers it.
+- Choose depth so the bottom of the U is roughly the size of the largest structure you must reason about, measured in the bottom's own stride.
+- nnU-Net is the result to remember: configured well, the plain architecture is still hard to beat.
 """,
     [
         {"q": "What do the skip connections carry that the bottom of the U "
@@ -1607,6 +1712,27 @@ three failure modes have three different causes:
 Every real tuning session is spent trading these against each other, and mAP is
 the single number that summarises the whole curve so you do not have to pick a
 point on it until deployment.
+## Questions people ask
+
+<strong>Why are there 8,400 predictions for maybe five objects?</strong> Because a one-stage head emits one prediction per cell per level, and 80&sup2; + 40&sup2; + 20&sup2; = 8,400 cells at 640&times;640. Almost all are background, and the confidence cut plus NMS reduce them to the handful you see. Nothing is proposed and nothing is cropped, which is exactly where the speed comes from.
+
+<strong>What confidence threshold should I use?</strong> Two answers for two jobs. For a demo or a production filter, something like 0.25 &mdash; a display choice. For computing mAP, something like 0.001, because mAP integrates the whole precision-recall curve and a high cut simply discards area. Reporting mAP measured at 0.25 understates your own model.
+
+<strong>Why does it miss small objects?</strong> P3 has stride 8, so its cells are 8 input pixels across and an object a few pixels wide leaves almost no signal at any level. Raising `imgsz` is the fix, roughly in proportion to the extra pixels &mdash; usually a bigger win than any threshold change, and it costs latency quadratically.
+
+<strong>Why does my `imgsz` get rounded?</strong> It has to be a multiple of 32 so strides 8, 16 and 32 all divide evenly. That is also why 640 and 1280 are the conventional sizes.
+
+<strong>Two overlapping people became one box &mdash; is that the model failing?</strong> Usually not; it is NMS. Two people standing close genuinely overlap by more than a 0.3 IoU threshold, so one is deleted as a duplicate. Raise the threshold and duplicates survive instead. No single value is right for both sparse and crowded scenes, which is why Soft-NMS and set-prediction models like DETR exist.
+
+<strong>How do I choose between n, s, m, l and x?</strong> Backwards from how it is usually done. They are one architecture with a width and a depth multiplier &mdash; roughly 3 M to 68 M parameters for about five points of COCO mAP &mdash; so start from the latency budget on the hardware you will really deploy to, take the largest model that fits, and look at accuracy last.
+
+## Recap in one screen
+
+- One pass, one prediction per cell per level: 6,400 + 1,600 + 400 = 8,400 candidates at 640&times;640.
+- Backbone, neck, head &mdash; features at strides 8/16/32, a PAN neck carrying semantics down and precision back up, and a decoupled head so classification and regression stop fighting over the same features.
+- Anchor-free: each cell predicts four edge distances, each as a distribution over 16 bins, so the box branch emits 64 channels and the model's own uncertainty becomes trainable.
+- Both thresholds are applied after the forward pass. Confidence decides what you see; NMS IoU decides what counts as a duplicate. Neither needs retraining.
+- Missed means confidence too high or the object is below P3's resolution, duplicates mean NMS IoU too high, false positives mean confidence too low.
 """,
     [
         {"q": "Where do the 8,400 predictions at 640x640 come from?",
@@ -1866,6 +1992,28 @@ project points into image features &mdash; the answer is bilinear sampling for
 exactly the reasons here: it is accurate and it is differentiable in the
 coordinate. The lesson generalises past detection: **if a location is
 continuous, do not round it.**
+## Questions people ask
+
+<strong>Why did rounding hurt masks but not classification?</strong> Because the two answers have different shapes. "Is this a cat" survives a crop that is eight pixels off &mdash; the pooled features are a summary either way. A mask is a per-pixel map pasted back at that location, so a systematic eight-pixel offset is visible in every single prediction. Same error, very different consequence.
+
+<strong>Why does the gradient argument matter as much as the accuracy one?</strong> Bilinear interpolation is differentiable with respect to the sampling location, so gradients reach the box coordinates. Rounding is a step function whose derivative is zero wherever it is defined, so RoIPool silently severed that path. RoIAlign did not only reduce an error, it restored a training signal.
+
+<strong>Why are the masks 28&times;28?</strong> That is the mask head's output grid, resized to the predicted box at inference. So the real resolution of the answer is 28&times;28 inside the box however large the box is, which is exactly why instance masks from this family have soft, slightly blobby boundaries &mdash; and why later work raised the grid or refined boundaries separately, as PointRend does.
+
+<strong>Why one mask per class instead of a per-pixel softmax?</strong> Because the classification head has already decided what the object is, so the mask branch only has to answer "which pixels belong to this object". A per-pixel softmax makes the classes compete pixel by pixel &mdash; what FCN-style semantic segmentation does &mdash; and it costs several points of AP here.
+
+<strong>Why do my masks overlap?</strong> Because this is instance segmentation: every instance gets its own independent mask and two can both claim a pixel. Forcing one label per pixel is panoptic segmentation, a different task with a different metric. The returned masks are also soft probabilities, so the 0.5 threshold is a choice rather than a law.
+
+<strong>Which pyramid level does a proposal get cropped from?</strong> By area: `k = floor(4 + log2(sqrt(A) / 224))`, clamped to the available levels. A 224&times;224 proposal lands on stride 16 &mdash; the ImageNet size, chosen deliberately &mdash; and smaller objects drop to finer levels. That is why the half-cell rounding error scaled from 2 pixels at stride 4 to 16 at stride 32, and why the damage was worst on the large objects a detector otherwise finds easy.
+
+## Recap in one screen
+
+- Faster R-CNN plus one branch: an FPN backbone, RPN proposals, an RoIAlign crop, then classification, box and mask heads.
+- The mask head is the cheapest of the three despite emitting 62,720 numbers, because it is fully convolutional and the box head is not.
+- RoIPool rounded twice &mdash; the region to whole feature cells, then the bin boundaries. At stride 16 half a cell is 8 input pixels.
+- RoIAlign keeps the floating-point coordinates and samples by bilinear interpolation: about 10 points of relative mask AP, and up to 50% at the strict IoU=0.75.
+- The masks are per-class, independent, 28&times;28 inside the box, soft, and allowed to overlap.
+- If a location is continuous, do not round it &mdash; the idea that outlived the architecture.
 """,
     [
         {"q": "RoIPool rounds twice. Where?",

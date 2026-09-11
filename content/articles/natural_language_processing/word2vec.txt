@@ -184,3 +184,24 @@ prediction task that the raw data already answers, and the representation falls
 out as a side effect**. Masked language modelling is that idea. So is next-token
 prediction, and so is contrastive learning in vision. Word2vec is where it was
 first made to work at scale.
+## Questions people ask
+
+<strong>Skip-gram or CBOW?</strong> Skip-gram with negative sampling, unless the corpus is large and training time is the binding constraint. CBOW makes one update per position and skip-gram makes 2&times;window, so skip-gram wrings more out of the same text and produces much better vectors for rare words; CBOW is faster and smooths frequent ones.
+
+<strong>How many dimensions?</strong> 100&ndash;300 for most corpora, and the released Google News vectors are 300. Below about 50 there are not enough distinct directions to keep meanings apart &mdash; set the explorer's dimension control to 2 and the neighbour table visibly degrades &mdash; and past 300 the gains are marginal while every lookup costs more.
+
+<strong>Why two embedding matrices, and which one do I keep?</strong> A word needs different vectors for its centre and context roles, or its similarity with itself becomes its own squared norm, which the objective would then try to enlarge &mdash; and words rarely appear next to themselves. Almost every implementation keeps the centre matrix and discards the context one. That is a convention, not a derivation; GloVe sums them instead.
+
+<strong>Why the 0.75 exponent on the noise distribution?</strong> Because sampling negatives from raw frequency draws `the` almost every time, and sampling uniformly draws words that never occur in real contexts. Unigram<sup>0.75</sup> sits between the two. The paper reports it as an empirical result rather than deriving it, and the same exponent turns up independently in GloVe's weighting function.
+
+<strong>Does `king - man + woman = queen` really work?</strong> The geometry is real, but the demonstration is stage-managed: the standard evaluation removes the three input words from the candidate set, and without that exclusion the nearest vector is very often `king` itself. It holds up for frequent, well-attested relations and poorly for rare ones.
+
+<strong>Do the vectors encode the corpus's biases?</strong> Yes, and through the same geometry that makes analogies work &mdash; occupational analogies drawn from news text reproduce the occupational gender distribution of that text. The algorithm is not malfunctioning; it is reporting what the corpus contains, which is why every debiasing method is a post-hoc intervention on the vectors rather than a fix to the objective.
+
+## Recap in one screen
+
+- The distributional hypothesis turns an unlabelled corpus into a supervised dataset: every position in every sentence becomes a training example.
+- Skip-gram predicts each context word from the centre; CBOW predicts the centre from the averaged context.
+- A softmax over the whole vocabulary is unaffordable, so negative sampling replaces "which of |V| words" with "is this pair real", at k+1 dot products per step.
+- Negatives come from unigram<sup>0.75</sup>, and frequent tokens are subsampled away before pairs are even generated.
+- There are two embedding matrices, and the vectors are **static** &mdash; one per word type, so both senses of `bank` share it. That single limitation is what ELMo, BERT and every transformer since set out to remove.

@@ -163,3 +163,24 @@ three failure modes have three different causes:
 Every real tuning session is spent trading these against each other, and mAP is
 the single number that summarises the whole curve so you do not have to pick a
 point on it until deployment.
+## Questions people ask
+
+<strong>Why are there 8,400 predictions for maybe five objects?</strong> Because a one-stage head emits one prediction per cell per level, and 80&sup2; + 40&sup2; + 20&sup2; = 8,400 cells at 640&times;640. Almost all are background, and the confidence cut plus NMS reduce them to the handful you see. Nothing is proposed and nothing is cropped, which is exactly where the speed comes from.
+
+<strong>What confidence threshold should I use?</strong> Two answers for two jobs. For a demo or a production filter, something like 0.25 &mdash; a display choice. For computing mAP, something like 0.001, because mAP integrates the whole precision-recall curve and a high cut simply discards area. Reporting mAP measured at 0.25 understates your own model.
+
+<strong>Why does it miss small objects?</strong> P3 has stride 8, so its cells are 8 input pixels across and an object a few pixels wide leaves almost no signal at any level. Raising `imgsz` is the fix, roughly in proportion to the extra pixels &mdash; usually a bigger win than any threshold change, and it costs latency quadratically.
+
+<strong>Why does my `imgsz` get rounded?</strong> It has to be a multiple of 32 so strides 8, 16 and 32 all divide evenly. That is also why 640 and 1280 are the conventional sizes.
+
+<strong>Two overlapping people became one box &mdash; is that the model failing?</strong> Usually not; it is NMS. Two people standing close genuinely overlap by more than a 0.3 IoU threshold, so one is deleted as a duplicate. Raise the threshold and duplicates survive instead. No single value is right for both sparse and crowded scenes, which is why Soft-NMS and set-prediction models like DETR exist.
+
+<strong>How do I choose between n, s, m, l and x?</strong> Backwards from how it is usually done. They are one architecture with a width and a depth multiplier &mdash; roughly 3 M to 68 M parameters for about five points of COCO mAP &mdash; so start from the latency budget on the hardware you will really deploy to, take the largest model that fits, and look at accuracy last.
+
+## Recap in one screen
+
+- One pass, one prediction per cell per level: 6,400 + 1,600 + 400 = 8,400 candidates at 640&times;640.
+- Backbone, neck, head &mdash; features at strides 8/16/32, a PAN neck carrying semantics down and precision back up, and a decoupled head so classification and regression stop fighting over the same features.
+- Anchor-free: each cell predicts four edge distances, each as a distribution over 16 bins, so the box branch emits 64 channels and the model's own uncertainty becomes trainable.
+- Both thresholds are applied after the forward pass. Confidence decides what you see; NMS IoU decides what counts as a duplicate. Neither needs retraining.
+- Missed means confidence too high or the object is below P3's resolution, duplicates mean NMS IoU too high, false positives mean confidence too low.

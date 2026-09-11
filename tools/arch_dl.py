@@ -252,6 +252,28 @@ super-resolution, image-to-image translation, on-device generation. And the
 adversarial idea itself long outgrew image synthesis &mdash; domain-adversarial
 training, adversarial robustness and the discriminator in a perceptual loss are
 all this page's structure, applied to something else.
+## Questions people ask
+
+<strong>My discriminator loss went to zero &mdash; is that good?</strong> It is the failure mode, not success. With the supports barely overlapping the optimal discriminator is right about everything, `log(1 - D)` is flat there, and the generator's gradient vanishes exactly when it is worst. Use the non-saturating form, and if it persists, weaken the discriminator &mdash; fewer updates, a lower learning rate &mdash; or change the objective to WGAN-GP, whose gradient does not die on disjoint supports.
+
+<strong>What should the losses look like when training is healthy?</strong> There is no target curve, because both losses are measured against a moving opponent. A discriminator loss near `log 2 = 0.693` means it cannot separate real from fake, which is either the equilibrium you wanted or a discriminator that has given up, and the two look identical on the plot. Judge by samples and by FID.
+
+<strong>How do I tell mode collapse from merely bad samples?</strong> By diversity rather than quality. Generate a few hundred samples from different noise and look for repeats; FID catches it because a collapsed set of activations has the wrong covariance, where any per-sample quality score will not. The discriminator only ever judges one sample at a time, so nothing in the objective mentions variety at all.
+
+<strong>Why `Tanh` on the generator, and what breaks without it?</strong> It bounds the output to [&minus;1, 1], and the real images must be normalised to that same range. Otherwise the discriminator can separate real from fake on scale alone and never has to learn anything about content. It is the most common first bug and it presents as "training looks fine, samples are noise".
+
+<strong>Should I train the discriminator more than the generator?</strong> The original algorithm allows k discriminator steps per generator step and used k = 1. A stronger discriminator gives a better gradient *direction* in theory and a vanished one in practice under the saturating loss, so the two networks are usually kept close in capacity. With WGAN-GP extra critic steps genuinely help, which is a consequence of the different distance rather than a general rule.
+
+<strong>Are GANs still worth learning now that diffusion has won?</strong> For two reasons. A GAN generates in a single forward pass, which still decides the matter for real-time super-resolution, image-to-image translation and on-device generation. And the adversarial structure long outgrew image synthesis &mdash; domain-adversarial training, adversarial robustness and the discriminator inside a perceptual loss are all this page applied elsewhere.
+
+## Recap in one screen
+
+- A min-max game with no target output for the generator anywhere &mdash; only a second network's opinion, which improves as the generator does.
+- Hold the generator fixed and the optimal discriminator has a closed form, `D*(x) = p_data / (p_data + p_g)`, which needs no training at all.
+- Substituting it turns the game into `2 . JSD - log 4`, so there is a unique optimum at `p_g = p_data` where the value is &minus;1.386 and `D = 0.5` everywhere.
+- Where the distributions barely overlap the saturating loss has almost no gradient, which is precisely why every implementation maximises `log D(G(z))` instead.
+- Mode collapse is the objective, not the capacity: a generator that finds one accepted output and repeats it forever is scoring perfectly by the stated goal.
+- The loss values do not measure progress. Samples do, and FID does, because it penalises a generator with no variety.
 """,
     [
         {"q": "For a fixed generator, what is the optimal discriminator?",
@@ -544,6 +566,28 @@ What they are used for:
 The through-line is the same in all three: an autoencoder is a way to find out
 what a dataset's structure is, by forcing something to describe it in fewer
 numbers than it came in.
+## Questions people ask
+
+<strong>If a linear autoencoder is PCA, is it literally PCA?</strong> It spans the same *subspace*, which is not the same as finding the same axes. Nothing in the objective makes the encoder's directions orthogonal or orders them by variance, so a trained linear autoencoder's units are generally rotations and mixtures of principal components. This page uses the actual components, which is why its per-dimension tiles are interpretable and a trained model's would not be.
+
+<strong>Why is my autoencoder just copying the input?</strong> Because the bottleneck is not binding. If the code is as wide as the input, or the decoder can simply undo the encoder, the identity is available and it is the optimum &mdash; the loss is doing what you asked. Narrow the code, or switch to a denoising objective where the identity is actively wrong.
+
+<strong>Autoencoder or VAE?</strong> Compressor or generative model. Nothing in the reconstruction loss asks the latent space to be filled in, so a plain autoencoder is free to scatter codes into isolated islands with nonsense in between &mdash; the loss only ever asks about points that came from real data. If you intend to sample from the latent space, you need the KL term that pushes the codes toward a connected region.
+
+<strong>Why does the transposed convolution need `output_padding=1`?</strong> Because stride-2 downsampling is not exactly invertible: inputs of 13 and 14 both map to 7, so going back up the ambiguity has to be resolved explicitly. Leave it out and 7 becomes 13 rather than 14, and the shape error surfaces somewhere further down the decoder.
+
+<strong>Which output activation and loss go together?</strong> Match the data range. `Sigmoid` with `MSELoss` or `BCELoss` for data in [0, 1]; `Tanh` with `MSELoss` for data in [&minus;1, 1]. Mismatch them and part of the target sits outside the activation's range, so the model spends its capacity saturating instead of reconstructing.
+
+<strong>Is it actually any good for compression?</strong> No. JPEG is better, faster, needs no GPU and no training set, and an autoencoder only compresses data that resembles what it was trained on. The real uses are anomaly detection, supplying the latent space a diffusion model works in, and representation pretraining.
+
+## Recap in one screen
+
+- The constraint is the model. Forcing the input through a narrower code makes perfect reconstruction impossible, and what the network chooses to keep *is* the representation.
+- A linear autoencoder trained to convergence spans the top-k principal subspace, which is why this page is exact arithmetic rather than a training run with a seed.
+- The error curve is the eigenvalue tail &mdash; error at bottleneck k is the sum of eigenvalues from k+1 onward &mdash; so the elbow is a real thing to read, not a heuristic.
+- Denoising falls out of the bottleneck for free, because noise spreads across every direction and only k of them survive. Making it the explicit objective is the direct ancestor of masked language modelling and of diffusion.
+- Non-linearity buys the ability to follow curved structure, which a flat principal subspace describes badly.
+- Too narrow and every reconstruction is the dataset average; too wide and the reconstruction is excellent while the code has stopped meaning anything.
 """,
     [
         {"q": "Why does an autoencoder need a bottleneck?",
@@ -826,6 +870,28 @@ page quietly assumes they are not.
 The next page takes the same matrix and replaces the dot product with a neural
 network, which addresses none of these three &mdash; but does open the door to
 the side information that fixes the first.
+## Questions people ask
+
+<strong>Pearson or cosine similarity?</strong> Pearson centres each person on their own mean, so it asks whether two people's ratings move together rather than whether they are numerically close &mdash; which is what you want when one rater is generous and another is harsh. On implicit positive-only data there is no mean to centre against, and cosine is the standard choice instead.
+
+<strong>User-based or item-based?</strong> Item-based, usually, and on operational grounds before accuracy is discussed. Item-item similarities are far more stable &mdash; a title's audience changes slowly where a person's history changes constantly &mdash; so the matrix can be computed offline and served from a cache, and "because you watched X" is a sentence that fits in the interface.
+
+<strong>Why is the user's own average worse than the global average?</strong> Small-sample noise. An average over eight or nine ratings is a poor estimate of anything, and a noisy personalised guess genuinely can lose to an accurate impersonal one. It is worth remembering as the cheapest available proof that personalisation is not automatically an improvement.
+
+<strong>How many latent factors should I use?</strong> Fewer than you would guess on small data, and the regularisation matters more than the count. With 138 training ratings and eight factors across 31 users and items the model carries nearly twice as many latent parameters as it has observations, and it will fit the noise exactly unless something stops it &mdash; which is why the Netflix Prize solutions were as much about regularisation as about factorisation.
+
+<strong>Should I fill the missing entries with zeros?</strong> No. A missing rating is not a rating of zero, and treating it as one tells the model that everything unseen is terrible. The loss is summed over observed entries only, which is what makes this the factorisation of a partially-observed matrix rather than of a mostly-zero one.
+
+<strong>Why clip the predictions?</strong> Because neighbourhood methods extrapolate past the ends of the scale routinely &mdash; a user mean of 4.2 plus a positive deviation lands at 5.4, and 5.4 is not a rating anyone can give. Clipping to the scale is one line and worth roughly a tenth of an RMSE point.
+
+## Recap in one screen
+
+- The only input is who rated what. Nothing tells any method what an item *is*, and that the factors recover the genre groups anyway is the whole point of the field.
+- Neighbourhood methods average **deviations** from each person's own mean, which is what lets a generous rater and a harsh one be recognised as agreeing.
+- Item-based is the industry default because item-item similarity is stable enough to precompute and explainable enough to show the user.
+- Factorisation is global and low-rank, and its three offsets &mdash; global, user, item &mdash; explain most of the variance before a single latent factor is consulted.
+- When latent parameters outnumber observations, regularisation is the difference between a model and a memoriser.
+- Cold start, popularity bias, and ratings that are not missing at random are the three problems none of this addresses.
 """,
     [
         {"q": "Why do neighbourhood methods average deviations from each "
@@ -1105,6 +1171,28 @@ or when you need to retrieve from millions of items by nearest neighbour. Reach
 for sequence models when the recent session matters more than the long-run
 profile. And measure ranking metrics on held-out interactions throughout,
 because RMSE on a rating is not what a recommender is for.
+## Questions people ask
+
+<strong>Does replacing the dot product with an MLP help?</strong> On its own, usually not. In 2019 Dacrema, Cremonesi and Jannach reproduced the published neural recommendation results and found a properly tuned matrix factorisation matched or beat most of them &mdash; the neural models had been measured against weak baselines. On this page's data factorisation reaches about 0.76 RMSE where the MLP settles near 0.83.
+
+<strong>Then what does deep learning actually buy?</strong> The ability to accept anything other than an id: item text and images, which solves item cold start; context such as time and device; the recent session through a sequence model; and several objectives at once as separate heads on shared towers. Every one is a capability factorisation lacks, and none of them is "the MLP learns a better interaction".
+
+<strong>Why keep the two towers separate?</strong> So the item tower can be run once per item, offline, with its outputs stored in a vector index &mdash; leaving only the user tower to run per request, and turning "find the best items" into a nearest-neighbour query. Concatenate the two ids at the input instead and every (user, item) pair needs its own forward pass, which makes retrieval from millions impossible.
+
+<strong>Why normalise the tower outputs?</strong> Because it makes the final score a cosine similarity, which is what nearest-neighbour indexes are built for. Skip the normalisation and the index no longer matches the training objective &mdash; the model is trained under one geometry and served under another, and the retrieval quality quietly drops.
+
+<strong>Where do negatives come from with implicit feedback?</strong> You sample them, and the strategy matters more than the architecture. Uniform sampling makes the task too easy, popularity-based sampling is harder and usually better, and in-batch negatives are what large two-tower systems use because a batch of 1,024 supplies 1,023 negatives at no cost. In-batch sampling does over-penalise popular items, which production systems correct with a logQ term.
+
+<strong>Why does recommender training infrastructure look nothing like vision's?</strong> Because the parameters are in the embedding tables rather than the network. At 50 million users and 5 million items with 64 dimensions the tables hold about 3.5 billion parameters against a few thousand in the dense layers, and sharded parameter servers, id hashing, sparse gradients and the retrieval/ranking split all follow from that one ratio.
+
+## Recap in one screen
+
+- An id has no numeric meaning, so it goes through an embedding table &mdash; and that table's size is set by the catalogue, not by any modelling decision.
+- Two towers joined only at the last step is what makes retrieval a nearest-neighbour query instead of millions of forward passes.
+- The interaction function is the least important choice on the page. A tuned dot product is a strong baseline that a good deal of published neural work failed to beat.
+- What deep learning genuinely adds is side information, context, sequence and multiple objectives.
+- Almost no real system has ratings. Implicit feedback is positive-only, so negatives are sampled and squared error gives way to a ranking loss.
+- The parameters live in the tables, which is the single fact behind sharding, hashing, sparse gradients and staged retrieval.
 """,
     [
         {"q": "In a production neural recommender, where are almost all the "

@@ -181,3 +181,25 @@ or when you need to retrieve from millions of items by nearest neighbour. Reach
 for sequence models when the recent session matters more than the long-run
 profile. And measure ranking metrics on held-out interactions throughout,
 because RMSE on a rating is not what a recommender is for.
+## Questions people ask
+
+<strong>Does replacing the dot product with an MLP help?</strong> On its own, usually not. In 2019 Dacrema, Cremonesi and Jannach reproduced the published neural recommendation results and found a properly tuned matrix factorisation matched or beat most of them &mdash; the neural models had been measured against weak baselines. On this page's data factorisation reaches about 0.76 RMSE where the MLP settles near 0.83.
+
+<strong>Then what does deep learning actually buy?</strong> The ability to accept anything other than an id: item text and images, which solves item cold start; context such as time and device; the recent session through a sequence model; and several objectives at once as separate heads on shared towers. Every one is a capability factorisation lacks, and none of them is "the MLP learns a better interaction".
+
+<strong>Why keep the two towers separate?</strong> So the item tower can be run once per item, offline, with its outputs stored in a vector index &mdash; leaving only the user tower to run per request, and turning "find the best items" into a nearest-neighbour query. Concatenate the two ids at the input instead and every (user, item) pair needs its own forward pass, which makes retrieval from millions impossible.
+
+<strong>Why normalise the tower outputs?</strong> Because it makes the final score a cosine similarity, which is what nearest-neighbour indexes are built for. Skip the normalisation and the index no longer matches the training objective &mdash; the model is trained under one geometry and served under another, and the retrieval quality quietly drops.
+
+<strong>Where do negatives come from with implicit feedback?</strong> You sample them, and the strategy matters more than the architecture. Uniform sampling makes the task too easy, popularity-based sampling is harder and usually better, and in-batch negatives are what large two-tower systems use because a batch of 1,024 supplies 1,023 negatives at no cost. In-batch sampling does over-penalise popular items, which production systems correct with a logQ term.
+
+<strong>Why does recommender training infrastructure look nothing like vision's?</strong> Because the parameters are in the embedding tables rather than the network. At 50 million users and 5 million items with 64 dimensions the tables hold about 3.5 billion parameters against a few thousand in the dense layers, and sharded parameter servers, id hashing, sparse gradients and the retrieval/ranking split all follow from that one ratio.
+
+## Recap in one screen
+
+- An id has no numeric meaning, so it goes through an embedding table &mdash; and that table's size is set by the catalogue, not by any modelling decision.
+- Two towers joined only at the last step is what makes retrieval a nearest-neighbour query instead of millions of forward passes.
+- The interaction function is the least important choice on the page. A tuned dot product is a strong baseline that a good deal of published neural work failed to beat.
+- What deep learning genuinely adds is side information, context, sequence and multiple objectives.
+- Almost no real system has ratings. Implicit feedback is positive-only, so negatives are sampled and squared error gives way to a ranking loss.
+- The parameters live in the tables, which is the single fact behind sharding, hashing, sparse gradients and staged retrieval.

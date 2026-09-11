@@ -168,3 +168,24 @@ projection down and a projection back up. ResNet's bottleneck block is exactly
 that pattern. So is MobileNet's inverted residual, so is the feed-forward block
 of a transformer, and so is every "reduce, operate, expand" structure you will
 meet from here on.
+## Questions people ask
+
+<strong>Why does a 1&times;1 convolution do anything at all?</strong> Because it is not spatial &mdash; it is a learned matrix applied to the channel vector at every pixel. With 192 inputs and 96 outputs it is a 192&times;96 change of basis performed identically everywhere, and it can discard, combine or duplicate channels. It only looks trivial if you picture convolution as something that happens in space.
+
+<strong>Where do the per-branch channel counts come from?</strong> From tuning, not a formula. Table 1 of the paper lists them per module and they are not a pattern &mdash; 4d puts 288 channels in its 3&times;3 branch and 64 in its 5&times;5. This is the part of Inception that did not generalise, and the reason later architectures preferred one repeating block with a width multiplier.
+
+<strong>Is GoogLeNet the same thing as Inception-v1?</strong> Yes. GoogLeNet is the specific 22-layer ILSVRC 2014 entry; Inception is the module and the family. Inception-v3 is the version most people actually load, and it expects 299&times;299 input rather than 224.
+
+<strong>Why did the auxiliary classifiers go away?</strong> They existed to push gradient into the early layers of a network too deep to train otherwise. Batch normalisation and then residual connections solved that properly, and the paper's own follow-up concluded the auxiliary heads had acted as regularisers rather than gradient highways. Nothing replaced them because nothing needed to.
+
+<strong>If it has 20&times; fewer parameters than VGG, why is it not 20&times; faster?</strong> Because parameters are not latency. Four branches mean four kernel launches, four output allocations and a gather, and the fixed cost per launch does not shrink as hardware gets faster &mdash; so measured latency is consistently worse than the MAC count predicts. Depthwise separable convolutions have the same problem more severely.
+
+<strong>Should I use an Inception model today?</strong> For new work, no: a ResNet or a modern efficient network is easier to train and better supported. Inception-v3 still matters in one place, though &mdash; the Inception Score and FID are defined on its activations, so it remains load-bearing infrastructure for generative-model evaluation.
+
+## Recap in one screen
+
+- The module runs 1&times;1, 3&times;3, 5&times;5 and a pool branch in parallel and concatenates along channels, so the next layer picks the scale.
+- Concatenation requires every branch to preserve spatial size, which is what the per-branch padding of 0, 1 and 2 is for.
+- A 1&times;1 reduction in front of the expensive branches cuts module 3a from 303 M to 128 M MACs *and* shrinks its output from 416 to 256 channels.
+- The pool branch's projection is what stops the channel count growing without bound as modules are stacked.
+- GoogLeNet is 6.8 M parameters against VGG's 138 M, mostly because it ends in global average pooling. The transferable idea is reduce, operate, expand.

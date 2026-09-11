@@ -177,3 +177,24 @@ tuned per model. And a large language model generating text is doing exactly
 this, usually with sampling instead of beam search &mdash; temperature, top-k
 and nucleus sampling are alternative answers to the same question this page
 asks: given a next-token distribution, which sequence do you actually emit?
+## Questions people ask
+
+<strong>Why does greedy decoding fail so badly here?</strong> Because the damage is semantic rather than grammatical. After `i`, `speak` outscores `do` by about a tenth of a nat, and taking it deletes the negation with no route back &mdash; "i speak french" is perfectly fluent and means the opposite. Greedy decoding rarely produces bad grammar; it produces confident, well-formed sentences that say something else.
+
+<strong>Is a wider beam always better?</strong> No, in two ways. It is not exact search &mdash; a prefix that falls out of the top k at any step is gone permanently &mdash; and past a width of roughly 10, BLEU typically *degrades*. The model's true highest-probability output tends to be short and dull, so a narrow beam's failure to find it is quietly doing useful work.
+
+<strong>What should the length penalty be?</strong> There is no principled value; it is tuned on a development set, usually somewhere around 0.6&ndash;0.7. At alpha = 0 the search truncates, because a shorter sequence multiplies fewer probabilities below 1 and therefore always scores better. Past alpha = 1 the correction over-corrects and the model pads, because length is now rewarded on its own.
+
+<strong>Where does the length normalisation go in the loop?</strong> Before ranking, not after. Normalising only the final pick leaves every intermediate pruning step with the full short-sequence bias, so the penalty appears to be applied and mostly is not. It is the easiest version of this bug to ship because the output is plausible.
+
+<strong>What decides how long the output is?</strong> Not a length setting. End-of-sequence is an ordinary vocabulary entry competing with the content words, and because every extra token lowers the accumulated log-probability, stopping is always locally attractive &mdash; which is exactly what the length penalty exists to counteract. The opposite failure comes from under-predicted end-of-sequence, usually from training data with few short examples: generation runs to the cap and trails off mid-clause.
+
+<strong>Does any of this survive the transformer?</strong> The whole second half of the page does. A transformer still emits a distribution over the next token and still needs a search to turn that into text, and beam width and length penalty are still tuned per model. Temperature, top-k and nucleus sampling are alternative answers to the same question: given a next-token distribution, what do you actually emit?
+
+## Recap in one screen
+
+- Two separate problems, not one: what each output word depends on, and which output sequence to emit.
+- Attention weights deliver alignment for free, trained on nothing but next-token prediction &mdash; including crossing alignments, and one target word attending to two source words as `not` does to `ne` and `pas`.
+- A target word with no source counterpart, like the auxiliary `do`, gets diffuse attention. That is the model correctly reporting there is nothing to point at.
+- Greedy decoding is cheap and fails semantically; beam search keeps k prefixes alive so a single token cannot determine the rest of the sentence.
+- Accumulated log-probability always favours stopping early, so the score is divided by a function of length &mdash; with an exponent that is tuned, not derived.

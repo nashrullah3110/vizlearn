@@ -186,3 +186,24 @@ hand-designed first convolutional layer &mdash; a small set of local
 difference filters, applied everywhere, whose responses are thresholded and
 combined. The difference is that the next twenty years were spent learning
 those filters rather than enumerating them.
+## Questions people ask
+
+<strong>Why does it fail on a face that is only slightly turned?</strong> Because the features encode a fixed brightness layout &mdash; a dark eye band above a lighter cheek, a light nose bridge between two darker eyes. Rotating the head moves those rectangles relative to each other and the responses the cascade thresholds on collapse. Past roughly 15&deg; the frontal model degrades sharply, and the usual answer is a second cascade trained on profiles rather than a fix to the first.
+
+<strong>Can it find faces smaller than 24&times;24?</strong> No. The search grows the window from the trained size upward and never shrinks below it, so 24&times;24 is the floor. Distant faces in a wide shot need the frame upsampled first, and doubling the image quadruples the window count.
+
+<strong>Is the integral image an approximation?</strong> No, it is exact. It is a cumulative sum, so the four-corner formula recovers any rectangle's total precisely in integer arithmetic. The costs are one extra table per frame and a wide enough integer type &mdash; a 1080p frame of 8-bit pixels sums to about 5&times;10<sup>8</sup>, which is why these tables are 32-bit or wider.
+
+<strong>Why grayscale?</strong> The feature is a brightness difference, so colour carries nothing it can read. Converting once per frame also makes the integral image a third of the size.
+
+<strong>Why does it fire on things that are obviously not faces?</strong> Each stage is tuned for about 99.9% detection at roughly 50% false positives &mdash; the guarantee lives in the product across 38 stages, not in any one of them. And a dark-light-dark band is exactly what the early features test, so bookshelves and railings genuinely do excite them. With 180,000 windows per frame even a tiny per-window rate leaves survivors, which is what `minNeighbors` is for.
+
+<strong>Should I train my own cascade?</strong> Rarely, now. `opencv_traincascade` wants thousands of positives and tens of thousands of negatives and can run for days, and the result still inherits the pose sensitivity. If the object is rigid, near-frontal and inference has to be CPU-only it is viable; otherwise fine-tuning a small CNN detector is less work and better.
+
+## Recap in one screen
+
+- One feature is a subtraction: the mean under the white rectangles minus the mean under the black ones.
+- The integral image makes any rectangle sum four lookups regardless of size, which is why the detector scales the *feature* rather than the image.
+- AdaBoost is used as a feature selector over more than 160,000 candidates; the shipped detector keeps 6,061 of them across 38 stages.
+- The cascade is where the speed lives: stage one costs two features and removes about half of all windows, and the average window dies after about ten.
+- It assumes a fixed brightness layout, so it is a controlled-pose detector. Everything after it learned the filters instead of enumerating them.

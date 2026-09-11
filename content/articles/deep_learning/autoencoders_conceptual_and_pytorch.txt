@@ -198,3 +198,25 @@ What they are used for:
 The through-line is the same in all three: an autoencoder is a way to find out
 what a dataset's structure is, by forcing something to describe it in fewer
 numbers than it came in.
+## Questions people ask
+
+<strong>If a linear autoencoder is PCA, is it literally PCA?</strong> It spans the same *subspace*, which is not the same as finding the same axes. Nothing in the objective makes the encoder's directions orthogonal or orders them by variance, so a trained linear autoencoder's units are generally rotations and mixtures of principal components. This page uses the actual components, which is why its per-dimension tiles are interpretable and a trained model's would not be.
+
+<strong>Why is my autoencoder just copying the input?</strong> Because the bottleneck is not binding. If the code is as wide as the input, or the decoder can simply undo the encoder, the identity is available and it is the optimum &mdash; the loss is doing what you asked. Narrow the code, or switch to a denoising objective where the identity is actively wrong.
+
+<strong>Autoencoder or VAE?</strong> Compressor or generative model. Nothing in the reconstruction loss asks the latent space to be filled in, so a plain autoencoder is free to scatter codes into isolated islands with nonsense in between &mdash; the loss only ever asks about points that came from real data. If you intend to sample from the latent space, you need the KL term that pushes the codes toward a connected region.
+
+<strong>Why does the transposed convolution need `output_padding=1`?</strong> Because stride-2 downsampling is not exactly invertible: inputs of 13 and 14 both map to 7, so going back up the ambiguity has to be resolved explicitly. Leave it out and 7 becomes 13 rather than 14, and the shape error surfaces somewhere further down the decoder.
+
+<strong>Which output activation and loss go together?</strong> Match the data range. `Sigmoid` with `MSELoss` or `BCELoss` for data in [0, 1]; `Tanh` with `MSELoss` for data in [&minus;1, 1]. Mismatch them and part of the target sits outside the activation's range, so the model spends its capacity saturating instead of reconstructing.
+
+<strong>Is it actually any good for compression?</strong> No. JPEG is better, faster, needs no GPU and no training set, and an autoencoder only compresses data that resembles what it was trained on. The real uses are anomaly detection, supplying the latent space a diffusion model works in, and representation pretraining.
+
+## Recap in one screen
+
+- The constraint is the model. Forcing the input through a narrower code makes perfect reconstruction impossible, and what the network chooses to keep *is* the representation.
+- A linear autoencoder trained to convergence spans the top-k principal subspace, which is why this page is exact arithmetic rather than a training run with a seed.
+- The error curve is the eigenvalue tail &mdash; error at bottleneck k is the sum of eigenvalues from k+1 onward &mdash; so the elbow is a real thing to read, not a heuristic.
+- Denoising falls out of the bottleneck for free, because noise spreads across every direction and only k of them survive. Making it the explicit objective is the direct ancestor of masked language modelling and of diffusion.
+- Non-linearity buys the ability to follow curved structure, which a flat principal subspace describes badly.
+- Too narrow and every reconstruction is the dataset average; too wide and the reconstruction is excellent while the code has stopped meaning anything.

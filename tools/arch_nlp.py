@@ -236,6 +236,27 @@ prediction task that the raw data already answers, and the representation falls
 out as a side effect**. Masked language modelling is that idea. So is next-token
 prediction, and so is contrastive learning in vision. Word2vec is where it was
 first made to work at scale.
+## Questions people ask
+
+<strong>Skip-gram or CBOW?</strong> Skip-gram with negative sampling, unless the corpus is large and training time is the binding constraint. CBOW makes one update per position and skip-gram makes 2&times;window, so skip-gram wrings more out of the same text and produces much better vectors for rare words; CBOW is faster and smooths frequent ones.
+
+<strong>How many dimensions?</strong> 100&ndash;300 for most corpora, and the released Google News vectors are 300. Below about 50 there are not enough distinct directions to keep meanings apart &mdash; set the explorer's dimension control to 2 and the neighbour table visibly degrades &mdash; and past 300 the gains are marginal while every lookup costs more.
+
+<strong>Why two embedding matrices, and which one do I keep?</strong> A word needs different vectors for its centre and context roles, or its similarity with itself becomes its own squared norm, which the objective would then try to enlarge &mdash; and words rarely appear next to themselves. Almost every implementation keeps the centre matrix and discards the context one. That is a convention, not a derivation; GloVe sums them instead.
+
+<strong>Why the 0.75 exponent on the noise distribution?</strong> Because sampling negatives from raw frequency draws `the` almost every time, and sampling uniformly draws words that never occur in real contexts. Unigram<sup>0.75</sup> sits between the two. The paper reports it as an empirical result rather than deriving it, and the same exponent turns up independently in GloVe's weighting function.
+
+<strong>Does `king - man + woman = queen` really work?</strong> The geometry is real, but the demonstration is stage-managed: the standard evaluation removes the three input words from the candidate set, and without that exclusion the nearest vector is very often `king` itself. It holds up for frequent, well-attested relations and poorly for rare ones.
+
+<strong>Do the vectors encode the corpus's biases?</strong> Yes, and through the same geometry that makes analogies work &mdash; occupational analogies drawn from news text reproduce the occupational gender distribution of that text. The algorithm is not malfunctioning; it is reporting what the corpus contains, which is why every debiasing method is a post-hoc intervention on the vectors rather than a fix to the objective.
+
+## Recap in one screen
+
+- The distributional hypothesis turns an unlabelled corpus into a supervised dataset: every position in every sentence becomes a training example.
+- Skip-gram predicts each context word from the centre; CBOW predicts the centre from the averaged context.
+- A softmax over the whole vocabulary is unaffordable, so negative sampling replaces "which of |V| words" with "is this pair real", at k+1 dot products per step.
+- Negatives come from unigram<sup>0.75</sup>, and frequent tokens are subsampled away before pairs are even generated.
+- There are two embedding matrices, and the vectors are **static** &mdash; one per word type, so both senses of `bank` share it. That single limitation is what ELMo, BERT and every transformer since set out to remove.
 """,
     [
         {"q": "Why is negative sampling used instead of the full softmax?",
@@ -526,6 +547,27 @@ embedding layer of a small model trained on little data. Between the two, GloVe
 and skip-gram perform similarly on most benchmarks once the corpus and
 dimension are matched, and the practical difference is that GloVe's training
 parallelises trivially over the count matrix while word2vec streams text.
+## Questions people ask
+
+<strong>GloVe or word2vec?</strong> With the corpus and dimension matched they score similarly on most benchmarks, so it is rarely the interesting decision. The real difference is operational: GloVe trains over a precomputed count matrix and parallelises trivially, while word2vec streams text and holds up better on small corpora, because there a pair contributes many independent gradient steps instead of one least-squares term.
+
+<strong>Why fit the logarithm of the count?</strong> Because the signal lives in *ratios* of co-occurrence probabilities, and the logarithm is what turns a ratio into a difference of vectors that a dot product can express. Fitting raw counts would also ask a bounded dot product to span several orders of magnitude, which it cannot do.
+
+<strong>Do I have to build the count matrix myself?</strong> Usually not &mdash; the released vectors cover 6 billion to 840 billion tokens. If you do build one, note that the matrix, not the optimisation, is the expensive part: it is |V|&sup2; in the worst case, which is why implementations store it sparsely and only ever visit the non-zero cells.
+
+<strong>What are `x_max` and `alpha` actually doing?</strong> Two jobs in one function. `f(0) = 0` drops the zero cells &mdash; most of the matrix, and where `log` is undefined &mdash; from the sum entirely. The cap past `x_max` stops the handful of enormous counts involving `the` and `of` from dominating the loss so thoroughly that every other pair is fitted only incidentally.
+
+<strong>Why sum `w` and `w~` at the end?</strong> Because the two sets differ only by their random initialisation, so averaging them cancels some noise; the paper reports a small consistent gain. word2vec's habit of discarding the context matrix is the alternative convention, and neither is derived from anything.
+
+<strong>Why normalise before comparing vectors?</strong> Because a vector's norm correlates with its word's frequency, so an unnormalised dot product quietly ranks common words above relevant ones. Cosine similarity is the standard measure for these embeddings, and forgetting the normalisation is a silent bug rather than a loud one.
+
+## Recap in one screen
+
+- GloVe summarises the whole corpus into a co-occurrence matrix first; the training loop never touches the text again.
+- Neighbours are weighted by 1/d, so proximity counts as evidence and distance weakens it without the hard edge a plain window imposes.
+- Individual conditional probabilities are dominated by frequency. The *ratio* between two of them cancels that out, and is where the information actually is.
+- The objective fits `w_i . w~_j + b_i + b~_j` to `log X_ij`, with the biases absorbing "this word is common" so the dot product only has to explain what is specific to the pair.
+- The weighting function does two things at once: zero at zero to drop empty cells, flat past `x_max` so the most frequent pairs cannot own the loss.
 """,
     [
         {"q": "Why does GloVe's derivation start from a ratio of probabilities "
@@ -792,6 +834,28 @@ length. **Teacher forcing** and its exposure-bias problem, which is why
 scheduled sampling and reinforcement-learning fine-tuning exist. And
 **attention**, which started as a patch for a fixed vector that was too small
 and ended up replacing the network it was patching.
+## Questions people ask
+
+<strong>Why not just use a bigger hidden state?</strong> Because that moves the horizon without removing it. The state is overwritten at every token and multiplied by the recurrent matrix once per token after it, and a contracting matrix applied a hundred times annihilates whatever an early word contributed, however many dimensions it had. Attention removes the need for anything to survive the trip at all.
+
+<strong>LSTMs fixed vanishing gradients &mdash; is the bottleneck not already solved?</strong> They are two different problems. Gates let a value persist across many steps and push the usable horizon out considerably, but the channel between encoder and decoder is still H numbers no matter how long the input is. Attention changes that channel from H to n&times;H, and that is a change in kind rather than degree.
+
+<strong>Why did reversing the source sentence help so much?</strong> It puts the first source words nearest the end of the encoding, next to the first target words the decoder has to produce, which shortens the path for the tokens generated earliest. That a trick this blunt bought several BLEU points is the clearest evidence available that the bottleneck was real and severe.
+
+<strong>Is attention the same thing as alignment?</strong> It behaves like alignment without being trained as it &mdash; the weights come from "predict the next token" and nothing else, yet they concentrate where a translator would point. The difference that matters: attention is a soft allocation summing to 1, so it always points somewhere, including when no source word corresponds to the token being emitted.
+
+<strong>If teacher forcing causes exposure bias, why use it?</strong> Because without it the decoder spends early training conditioned on its own nonsense and never gets started. It also makes each step's gradient independent of the others, which is what lets the whole target sequence be processed in parallel. Scheduled sampling and sequence-level training are partial mitigations; in practice beam search helps more than either.
+
+<strong>Do I really need the padding mask?</strong> Yes. Batches are padded to equal length, and without the mask the softmax spreads probability onto padding tokens &mdash; the model learns to attend to nothing. The symptom is short sentences translating badly when they share a batch with long ones, which is a long way from the cause.
+
+## Recap in one screen
+
+- Split reading from writing: one network consumes the source and stops, another emits the target conditioned on what it has already produced. The two lengths never have to match.
+- The fixed vector is a real bottleneck, and it is measurable &mdash; flip one input token, re-run the encoder, and see how far the final state moves.
+- Attention keeps the per-step encoder states instead of discarding them and reads a weighted average, so the channel grows with the input rather than staying fixed against it.
+- The weights sum to 1, which makes attention a question of allocation: attending more to one word is attending less to another.
+- Teacher forcing during training and self-consumption at inference is exposure bias, and it compounds &mdash; 95% accuracy per token is far worse than 95% per sentence.
+- Take the recurrence out of the attention equation and what is left is a transformer.
 """,
     [
         {"q": "What exactly is the bottleneck in a seq2seq model without "
@@ -1066,6 +1130,27 @@ tuned per model. And a large language model generating text is doing exactly
 this, usually with sampling instead of beam search &mdash; temperature, top-k
 and nucleus sampling are alternative answers to the same question this page
 asks: given a next-token distribution, which sequence do you actually emit?
+## Questions people ask
+
+<strong>Why does greedy decoding fail so badly here?</strong> Because the damage is semantic rather than grammatical. After `i`, `speak` outscores `do` by about a tenth of a nat, and taking it deletes the negation with no route back &mdash; "i speak french" is perfectly fluent and means the opposite. Greedy decoding rarely produces bad grammar; it produces confident, well-formed sentences that say something else.
+
+<strong>Is a wider beam always better?</strong> No, in two ways. It is not exact search &mdash; a prefix that falls out of the top k at any step is gone permanently &mdash; and past a width of roughly 10, BLEU typically *degrades*. The model's true highest-probability output tends to be short and dull, so a narrow beam's failure to find it is quietly doing useful work.
+
+<strong>What should the length penalty be?</strong> There is no principled value; it is tuned on a development set, usually somewhere around 0.6&ndash;0.7. At alpha = 0 the search truncates, because a shorter sequence multiplies fewer probabilities below 1 and therefore always scores better. Past alpha = 1 the correction over-corrects and the model pads, because length is now rewarded on its own.
+
+<strong>Where does the length normalisation go in the loop?</strong> Before ranking, not after. Normalising only the final pick leaves every intermediate pruning step with the full short-sequence bias, so the penalty appears to be applied and mostly is not. It is the easiest version of this bug to ship because the output is plausible.
+
+<strong>What decides how long the output is?</strong> Not a length setting. End-of-sequence is an ordinary vocabulary entry competing with the content words, and because every extra token lowers the accumulated log-probability, stopping is always locally attractive &mdash; which is exactly what the length penalty exists to counteract. The opposite failure comes from under-predicted end-of-sequence, usually from training data with few short examples: generation runs to the cap and trails off mid-clause.
+
+<strong>Does any of this survive the transformer?</strong> The whole second half of the page does. A transformer still emits a distribution over the next token and still needs a search to turn that into text, and beam width and length penalty are still tuned per model. Temperature, top-k and nucleus sampling are alternative answers to the same question: given a next-token distribution, what do you actually emit?
+
+## Recap in one screen
+
+- Two separate problems, not one: what each output word depends on, and which output sequence to emit.
+- Attention weights deliver alignment for free, trained on nothing but next-token prediction &mdash; including crossing alignments, and one target word attending to two source words as `not` does to `ne` and `pas`.
+- A target word with no source counterpart, like the auxiliary `do`, gets diffuse attention. That is the model correctly reporting there is nothing to point at.
+- Greedy decoding is cheap and fails semantically; beam search keeps k prefixes alive so a single token cannot determine the rest of the sentence.
+- Accumulated log-probability always favours stopping early, so the score is divided by a function of length &mdash; with an exponent that is tuned, not derived.
 """,
     [
         {"q": "Greedy decoding translates “je ne parle pas français” as “i "

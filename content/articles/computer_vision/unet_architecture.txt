@@ -182,3 +182,24 @@ preprocessing, patch size, batch size, augmentation, postprocessing &mdash; and
 beat specialised architectures across dozens of medical benchmarks. That result
 is worth sitting with. Ten years on, the strongest argument in the area is
 still that a plain U-Net, configured well, is hard to beat.
+## Questions people ask
+
+<strong>Concatenate the skip, or add it?</strong> Concatenate, in the original. Adding forces the encoder's detail and the decoder's semantics into the same channels, so the following convolution cannot tell them apart; concatenating keeps them separate and lets it weigh them. Addition is cheaper and appears in ResNet-style decoders, but it is a different architecture rather than an implementation shortcut.
+
+<strong>Why 572&times;572 and not 512?</strong> Because unpadded convolutions shrink the map and every pooling step still has to divide evenly. 572 is chosen so the arithmetic survives four levels down and back. With `padding=1` the constraint relaxes to "divisible by 2<sup>levels</sup>", which is why modern implementations use round numbers.
+
+<strong>Valid or same padding?</strong> Same (`padding=1`) unless you are tiling a larger image. Valid convolutions guarantee every output pixel had genuine context, which is what makes the overlap-tile strategy seamless; same padding needs no cropping and costs you a thin border predicted partly from zeros.
+
+<strong>Transposed convolution or upsample-then-convolve?</strong> Either works. Transposed convolutions can produce checkerboard artefacts when the kernel size is not divisible by the stride; bilinear upsampling followed by a 3&times;3 avoids that and carries fewer parameters, which is why most current implementations choose it.
+
+<strong>Why does my model merge touching objects?</strong> Because an unweighted per-pixel loss barely notices the thin line between them &mdash; a few hundred pixels out of a quarter of a million. The paper's answer was a per-image weight map upweighting exactly those gaps; the modern answers are Dice or focal loss, or predicting the boundary as its own class.
+
+<strong>Does it really only need thirty images?</strong> The result is real, but not from the architecture alone. Elastic deformation is what made it work: a smooth random warp of tissue produces something that looks like a different *specimen*, where shift and flip only produce another photograph of the same one. With weak augmentation, thirty images is not enough.
+
+## Recap in one screen
+
+- Segmentation needs semantics, which wants pooling, and precision, which does not. U-Net gets both by pooling all the way down and wiring the pre-pooling activations forward.
+- Each encoder level is two 3&times;3s then a 2&times;2 pool with channels doubling; each decoder level up-converts, concatenates the skip, and convolves twice.
+- The skips *are* the architecture. Without them the finest detail the decoder can see is whatever survived four poolings &mdash; a 28&times;28 grid for a 572&times;572 tile &mdash; and no decoder capacity recovers it.
+- Choose depth so the bottom of the U is roughly the size of the largest structure you must reason about, measured in the bottom's own stride.
+- nnU-Net is the result to remember: configured well, the plain architecture is still hard to beat.

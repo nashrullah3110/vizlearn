@@ -212,3 +212,24 @@ the parameters is what keeps it a *loss* rather than a second network being
 trained. And whatever you feed it must be normalised with the ImageNet mean
 and standard deviation the weights were trained with, or the features are
 being read off a distribution the network has never seen.
+## Questions people ask
+
+<strong>Why is the input frozen at 224&times;224?</strong> Because fc6 is a dense matrix expecting exactly 25,088 inputs, which is 7&times;7&times;512 &mdash; and 7&times;7 is what 224 becomes after five halvings. Feed it 256&times;256 and the flatten produces 8&times;8&times;512 = 32,768 values, which does not fit the matrix. Global average pooling removes the constraint entirely, which is why every architecture after VGG accepts any resolution.
+
+<strong>VGG-16 or VGG-19 &mdash; does the difference matter?</strong> Rarely. VGG-19 adds one convolution to each of the last three blocks and about 20 M parameters, for a few tenths of a point of ImageNet accuracy. For perceptual loss the 16-layer version is the conventional choice and the one most published numbers assume.
+
+<strong>Which parameter count is right, 138 M or 134 M?</strong> Both get quoted. 138,357,544 includes the 1000-way fc8; smaller figures usually come from a model with the classifier removed or replaced. Check what a count includes before comparing two of them.
+
+<strong>Why does it use so much GPU memory for its size?</strong> Because activations, not weights, dominate training memory. The first block holds 64&times;224&times;224 values per image &mdash; 3.2 M numbers &mdash; and every one is kept for the backward pass, while the 102 M-parameter fc6 stores 4,096. That is why VGG batch sizes are small even though ResNet-50 is deeper.
+
+<strong>Is `relu3_3` or `relu4_3` the right layer for perceptual loss?</strong> Earlier layers reward matching texture and colour; later ones reward matching structure and tolerate texture differences. Style transfer usually takes several at once, super-resolution one of those two. There is no correct answer, only a choice about what you want preserved.
+
+<strong>Should I fine-tune VGG for a new task?</strong> You can, and it will work, but you are paying 138 M parameters for accuracy ResNet-50 exceeds at 25.6 M. Reach for VGG when you specifically want its features &mdash; a loss, a published comparison &mdash; not as a default backbone.
+
+## Recap in one screen
+
+- One rule generates the network: 3&times;3, stride 1, padding 1, with the spatial size changing only at the five max-pools.
+- Two stacked 3&times;3s match a 5&times;5's receptive field for 18C&sup2; parameters against 25C&sup2;, and add a non-linearity in between.
+- The convolutions are 11% of the parameters and 99% of the arithmetic; the dense head is 89% and 1%. Read the two budgets as separate questions.
+- fc6 alone is 102 M parameters used once per image. Global average pooling replaces it, cuts the model about 9&times;, and frees the input resolution.
+- Obsolete as a classifier, still standard as a perceptual-loss backbone &mdash; sliced before the head, frozen, and fed ImageNet-normalised input.

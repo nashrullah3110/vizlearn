@@ -163,3 +163,25 @@ project points into image features &mdash; the answer is bilinear sampling for
 exactly the reasons here: it is accurate and it is differentiable in the
 coordinate. The lesson generalises past detection: **if a location is
 continuous, do not round it.**
+## Questions people ask
+
+<strong>Why did rounding hurt masks but not classification?</strong> Because the two answers have different shapes. "Is this a cat" survives a crop that is eight pixels off &mdash; the pooled features are a summary either way. A mask is a per-pixel map pasted back at that location, so a systematic eight-pixel offset is visible in every single prediction. Same error, very different consequence.
+
+<strong>Why does the gradient argument matter as much as the accuracy one?</strong> Bilinear interpolation is differentiable with respect to the sampling location, so gradients reach the box coordinates. Rounding is a step function whose derivative is zero wherever it is defined, so RoIPool silently severed that path. RoIAlign did not only reduce an error, it restored a training signal.
+
+<strong>Why are the masks 28&times;28?</strong> That is the mask head's output grid, resized to the predicted box at inference. So the real resolution of the answer is 28&times;28 inside the box however large the box is, which is exactly why instance masks from this family have soft, slightly blobby boundaries &mdash; and why later work raised the grid or refined boundaries separately, as PointRend does.
+
+<strong>Why one mask per class instead of a per-pixel softmax?</strong> Because the classification head has already decided what the object is, so the mask branch only has to answer "which pixels belong to this object". A per-pixel softmax makes the classes compete pixel by pixel &mdash; what FCN-style semantic segmentation does &mdash; and it costs several points of AP here.
+
+<strong>Why do my masks overlap?</strong> Because this is instance segmentation: every instance gets its own independent mask and two can both claim a pixel. Forcing one label per pixel is panoptic segmentation, a different task with a different metric. The returned masks are also soft probabilities, so the 0.5 threshold is a choice rather than a law.
+
+<strong>Which pyramid level does a proposal get cropped from?</strong> By area: `k = floor(4 + log2(sqrt(A) / 224))`, clamped to the available levels. A 224&times;224 proposal lands on stride 16 &mdash; the ImageNet size, chosen deliberately &mdash; and smaller objects drop to finer levels. That is why the half-cell rounding error scaled from 2 pixels at stride 4 to 16 at stride 32, and why the damage was worst on the large objects a detector otherwise finds easy.
+
+## Recap in one screen
+
+- Faster R-CNN plus one branch: an FPN backbone, RPN proposals, an RoIAlign crop, then classification, box and mask heads.
+- The mask head is the cheapest of the three despite emitting 62,720 numbers, because it is fully convolutional and the box head is not.
+- RoIPool rounded twice &mdash; the region to whole feature cells, then the bin boundaries. At stride 16 half a cell is 8 input pixels.
+- RoIAlign keeps the floating-point coordinates and samples by bilinear interpolation: about 10 points of relative mask AP, and up to 50% at the strict IoU=0.75.
+- The masks are per-class, independent, 28&times;28 inside the box, soft, and allowed to overlap.
+- If a location is continuous, do not round it &mdash; the idea that outlived the architecture.
