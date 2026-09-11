@@ -193,6 +193,9 @@ SHARED_SCRIPTS = (
     # The architecture explorers: the named-model modules across computer
     # vision, NLP and deep learning share one harness.
     ("vizlearn-arch.js", "data-vz-arch"),
+    # The async_python explorers: a loop stepper, two timelines, the freeze
+    # and a queue depth chart, one per module in that track.
+    ("vizlearn-asyncviz.js", "data-vz-async"),
     # Query variants and two-transaction timelines on the database/ modules.
     # This only wires buttons; the SQL engine itself is vizlearn-sql.js above.
     ("vizlearn-dbq.js", "data-vz-dbq"),

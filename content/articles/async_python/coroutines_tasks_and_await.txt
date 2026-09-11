@@ -122,6 +122,106 @@ bug. <code>result = fetch(2)</code> without an await binds the coroutine object,
 not its result; the arithmetic you do on it next fails in a way whose cause is
 three lines up.
 
+## Driving a coroutine by hand
+
+"A coroutine is a plan, not an action" is literally true, and you can prove it
+without a loop at all. A coroutine object is a *resumable* object: it supports
+<code>send</code>, and driving it is exactly what the event loop does.
+
+```python-run
+async def greet():
+    return "hi"
+
+c = greet()
+print("type:", type(c).__name__)
+try:
+    c.send(None)                  # the loop advances a coroutine exactly like this
+except StopIteration as stop:
+    print("returned:", stop.value)
+```
+
+```
+type: coroutine
+returned: hi
+```
+
+<code>send(None)</code> starts the coroutine and runs it until it either
+suspends or finishes. This one never awaits, so it finishes immediately, and a
+finished coroutine signals its result by raising
+<code>StopIteration</code> with the return value attached &mdash; which is the
+same protocol a generator uses, because that is what coroutines were built on.
+
+Now the whole mechanism is visible. The loop holds a coroutine and calls
+<code>send</code>. If the coroutine suspends at an await, control comes back to
+the loop, which goes and does something else and calls <code>send</code> again
+once whatever was awaited is ready. When <code>StopIteration</code> finally
+arrives, the loop takes <code>.value</code> as the result and hands it to
+whoever was awaiting. "The loop drives it" is not a metaphor for something more
+complicated; it is this three-line pattern in a queue.
+
+You never write this in real code &mdash; <code>await</code> is the readable
+form of it. It is worth seeing once because it makes the rest of asyncio stop
+being magical: a task is an object that owns a coroutine and knows how to keep
+calling <code>send</code> on it.
+
+## Cancelling a task
+
+Creating tasks is half of managing them; stopping them is the other half, and
+the half that is usually missing. A task can be cancelled, and cancellation
+works by raising <code>CancelledError</code> *inside* the coroutine at whatever
+await it is suspended on.
+
+```python-run
+import asyncio
+
+async def slow():
+    try:
+        await asyncio.sleep(10)
+        return "finished"
+    except asyncio.CancelledError:
+        print("slow: saw CancelledError")
+        raise                       # re-raise: swallowing it breaks cancellation
+
+async def main():
+    t = asyncio.create_task(slow())
+    await asyncio.sleep(0.05)
+    t.cancel()
+    try:
+        await t
+    except asyncio.CancelledError:
+        print("main: task.cancelled() is", t.cancelled())
+
+    try:
+        await asyncio.wait_for(asyncio.sleep(10), timeout=0.1)
+    except asyncio.TimeoutError:
+        print("wait_for gave up and raised TimeoutError")
+
+await main()
+```
+
+```
+slow: saw CancelledError
+main: task.cancelled() is True
+wait_for gave up and raised TimeoutError
+```
+
+Three things in that output are worth naming. <code>t.cancel()</code> does not
+stop the task on the spot &mdash; it *requests* cancellation, and the error is
+delivered the next time the loop gets to that task. Awaiting a cancelled task
+re-raises <code>CancelledError</code> in the awaiter, which is why the
+<code>try</code> around <code>await t</code> is there rather than optional. And
+<code>asyncio.wait_for</code> is cancellation with a deadline attached: it
+cancels the inner coroutine on timeout and raises
+<code>TimeoutError</code>, so a timeout is not a separate mechanism but the same
+one on a timer. On 3.11 and later <code>asyncio.timeout()</code> is the context-
+manager form and reads better around several statements.
+
+The <code>raise</code> in the <code>except</code> block is the part to copy.
+Catching <code>CancelledError</code> to run cleanup is correct and normal;
+catching it and *not* re-raising tells the loop the task declined to be
+cancelled, so the thing that asked &mdash; a TaskGroup, a <code>wait_for</code>,
+a shutdown handler &mdash; hangs waiting for a task that is still running.
+
 ## Where it goes wrong
 
 **Calling instead of awaiting.** <code>fetch(2)</code> builds a coroutine and
@@ -138,3 +238,26 @@ immediately blocked on it, gaining nothing.
 **An orphaned task.** A task nobody holds a reference to can be garbage-collected
 mid-flight, and an unhandled exception inside it may never surface. Keep the
 handle, and await it.
+
+## Questions people ask
+
+<strong>When do I need <code>create_task</code> rather than <code>await</code>?</strong> Await when you need the result before you can do anything else. Use a task when you want the work happening *while* you carry on. Two awaits in a row are two things in sequence; two tasks are two things at once.
+
+<strong>Does <code>create_task</code> start the coroutine immediately?</strong> It schedules it immediately, which is not quite the same. It begins running at the next opportunity the loop gets &mdash; the next time the current coroutine awaits &mdash; so the work starts before you await the handle, which is the entire reason the timings differ above.
+
+<strong>Is <code>gather</code> just a nicer <code>create_task</code>?</strong> Close. It wraps each argument in a task, so it gives you the same overlap plus results in call order and one place to handle failure. It is covered in [running work concurrently](running_work_concurrently.html), along with TaskGroup, which additionally cancels siblings when one fails.
+
+<strong>What happens to a task nobody keeps a reference to?</strong> It can be garbage-collected mid-flight, and an exception inside it may never be reported. Keep the handle &mdash; or better, create it inside a TaskGroup, which holds it for you and makes the lifetime visible.
+
+<strong>Should I ever catch <code>CancelledError</code>?</strong> Yes, to clean up &mdash; and then re-raise. Swallowing it tells the loop your task refuses to stop, and whatever requested the cancellation waits forever on a task that is still going.
+
+<strong>Why did my exception disappear?</strong> Because an exception inside a task is stored on the task, not raised where it was created. It only surfaces when something awaits the task or reads its result. An un-awaited failing task is the standard way for an async error to vanish.
+
+## Recap in one screen
+
+- <code>async def</code> is a factory for coroutine objects. Calling one runs nothing; it hands back a resumable object.
+- That object is driven by <code>send(None)</code>, and a finished coroutine returns its value by raising <code>StopIteration</code>. The loop is that pattern in a queue.
+- <code>await</code> both starts a coroutine and waits for it, so a row of awaits is strictly sequential &mdash; overlap never comes from <code>await</code> alone.
+- <code>create_task</code> schedules work on the loop now and returns a handle, which is where concurrency actually comes from: two 0.2 s waits take 0.40 s awaited in turn and 0.20 s as tasks.
+- <code>cancel()</code> requests cancellation by raising <code>CancelledError</code> at the task's current await; catch it to clean up, then always re-raise.
+- <code>wait_for</code> (or <code>asyncio.timeout</code>) is that same mechanism with a deadline, so a timeout is cancellation rather than a separate feature.

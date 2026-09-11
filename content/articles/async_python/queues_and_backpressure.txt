@@ -107,6 +107,106 @@ feed have that shape, and the queue is what decouples "how fast work arrives"
 from "how fast we handle it" &mdash; with the bound as the safety valve between
 them.
 
+## A worker pool that shuts down cleanly
+
+The section above describes <code>task_done</code> and <code>join</code>; this is
+what they look like in the pattern you will actually write. Three workers share
+one bounded queue, the producer waits for the queue to drain, and then the
+workers are cancelled.
+
+```python-run
+import asyncio
+
+async def worker(name, q, done):
+    while True:
+        item = await q.get()
+        try:
+            await asyncio.sleep(0.05)
+            done.append((name, item))
+        finally:
+            q.task_done()                     # always, or join() never returns
+
+async def main():
+    q = asyncio.Queue(maxsize=3)
+    done = []
+    workers = [asyncio.create_task(worker(f"w{i}", q, done)) for i in range(3)]
+
+    for i in range(9):
+        await q.put(i)
+    await q.join()                            # returns when every item is done
+
+    for w in workers:
+        w.cancel()
+    await asyncio.gather(*workers, return_exceptions=True)
+
+    print("items handled:", len(done))
+    counts = {}
+    for name, _ in done:
+        counts[name] = counts.get(name, 0) + 1
+    print("per worker:", dict(sorted(counts.items())))
+
+await main()
+```
+
+```
+items handled: 9
+per worker: {'w0': 3, 'w1': 3, 'w2': 3}
+```
+
+Nine items, three each, with no coordination between the workers &mdash; the
+queue hands each item to exactly one <code>get</code>, so the sharing is
+automatic. Four details in that code are the ones that matter.
+
+<code>task_done</code> is in a <code>finally</code>. If the work raises and the
+call is skipped, <code>join</code> waits forever for an item that has been taken
+but never acknowledged, and the program hangs at the end with no error. Putting
+it in <code>finally</code> is not tidiness, it is what makes <code>join</code>
+trustworthy.
+
+<code>join</code> replaces the sentinel. The earlier example pushed
+<code>None</code> to tell the consumer to stop, which needs one sentinel per
+consumer and gets fiddly with several. <code>join</code> asks the queue directly
+whether everything has been handled.
+
+The workers are cancelled, not asked to stop. A <code>while True</code> worker
+has no exit condition, and it does not need one: once <code>join</code> returns,
+the work is provably finished, so cancelling is correct rather than abrupt.
+
+And <code>gather(..., return_exceptions=True)</code> collects the cancellations.
+Without it the <code>CancelledError</code>s surface as "task exception was never
+retrieved" noise on shutdown.
+
+## The other queue types, and the non-blocking calls
+
+<code>asyncio.Queue</code> has two siblings that change only the order items
+come out in. <code>LifoQueue</code> returns the most recent first, which turns a
+crawler's frontier from breadth-first into depth-first with no other change.
+<code>PriorityQueue</code> returns the smallest first and expects comparable
+items, so the usual shape is <code>await q.put((priority, payload))</code>
+&mdash; and a tuple whose second element is not comparable will raise when two
+priorities tie, which is why an incrementing counter is often wedged in between.
+
+Both <code>put</code> and <code>get</code> also have non-waiting forms.
+<code>put_nowait</code> raises <code>asyncio.QueueFull</code> rather than
+suspending, and <code>get_nowait</code> raises <code>asyncio.QueueEmpty</code>.
+They exist for the case where waiting is the wrong behaviour &mdash; a metrics
+pipeline that would rather drop a sample than slow the thing producing it, for
+instance:
+
+```python
+try:
+    q.put_nowait(sample)
+except asyncio.QueueFull:
+    dropped += 1          # shedding load on purpose, and counting it
+```
+
+That is a deliberate choice to trade data for latency, and the counter is what
+keeps it honest. It is worth contrasting with the default: <code>await
+q.put(...)</code> propagates the pressure back to the producer, while
+<code>put_nowait</code> with a <code>QueueFull</code> handler absorbs it by
+discarding. Both are legitimate and they are opposites, so the decision belongs
+in the code with a comment rather than in whichever call you typed first.
+
 ## Where it goes wrong
 
 **An unbounded queue with a fast producer.** It grows until memory runs out. Set
@@ -123,3 +223,27 @@ everything &mdash; see [the blocking call](the_blocking_call_that_freezes_the_lo
 **Reading qsize and acting on it.** By the time you branch on
 <code>q.qsize()</code>, another coroutine may have changed it. Let <code>put</code>
 and <code>get</code> do the waiting; the count is for observing, not for control.
+
+## Questions people ask
+
+<strong>What should maxsize be?</strong> However far ahead of the consumer you are willing to let the producer run, expressed in items. It is a contract rather than a tuning number: a queue of 100 means "up to 100 items of work may be buffered", and the right value follows from how big an item is and how stale a buffered one may be.
+
+<strong>Is an unbounded queue ever right?</strong> When the producer is naturally slower than the consumer, or the total volume is small and known. Otherwise it converts backpressure into memory growth, and the failure looks like a leak rather than a missing bound.
+
+<strong>Sentinels or <code>join</code>?</strong> <code>join</code>, once there is more than one consumer &mdash; a sentinel needs one per worker and the bookkeeping gets error-prone. Sentinels stay useful when consumers must finish in a particular order, or when the producer cannot know the work is complete.
+
+<strong>Why does my program hang at the end?</strong> Almost always a missing <code>task_done</code> on some path, so <code>join</code> is still waiting; or consumers blocked on <code>await q.get()</code> with nothing left to arrive and no cancellation. Both look like a deadlock and are really a missing shutdown signal.
+
+<strong>Can I use a <code>queue.Queue</code> from the standard library?</strong> Not inside a coroutine. Its <code>get</code> blocks the thread rather than awaiting, which freezes the loop exactly as [any blocking call does](the_blocking_call_that_freezes_the_loop.html). <code>asyncio.Queue</code> is not thread-safe either &mdash; to bridge a thread and a loop, use <code>run_coroutine_threadsafe</code> or <code>janus</code>.
+
+<strong>How many workers?</strong> Enough to saturate whatever they are waiting on, and no more than it tolerates &mdash; the same question a [semaphore](running_work_concurrently.html) answers for a fixed list of work. The queue makes it a single number you can change in one place, which is most of the appeal.
+
+## Recap in one screen
+
+- Producer, consumer and a queue between them is the shape most real async programs settle into, because the two sides run at different speeds.
+- Both <code>put</code> and <code>get</code> are awaitable, so either side can wait for the other without blocking the loop.
+- <code>maxsize</code> is the backpressure. A full queue suspends <code>put</code>, which paces the producer to the consumer's rate automatically.
+- Unbounded means the producer never waits, and a fast producer then grows the queue until memory runs out.
+- <code>task_done</code> in a <code>finally</code> plus <code>await q.join()</code> is the reliable "all drained" signal, and it replaces per-worker sentinels.
+- Cancel the workers after <code>join</code> returns, and collect the cancellations with <code>gather(..., return_exceptions=True)</code>.
+- <code>put_nowait</code> with a <code>QueueFull</code> handler is the opposite policy &mdash; shed load instead of applying backpressure &mdash; and should be a stated decision.

@@ -123,7 +123,7 @@ is why this snippet is shown rather than run. And for CPU-bound work a thread
 does not help even where threads exist, because the work still contends for the
 one interpreter; that belongs in a separate process.
 
-## Why it hides so well## Why it hides so well
+## Why it hides so well
 
 This bug rarely shows up in development and reliably shows up under load, for a
 structural reason. With one user, one blocking call just makes that one request a
@@ -159,6 +159,101 @@ that prevent it in the first place: use async-native libraries in coroutines
 database driver over a blocking one), and wrap anything unavoidably synchronous
 in <code>to_thread</code>.
 
+## Measuring the freeze
+
+"The loop froze" is a claim you can put a number on, and doing so is how this
+bug gets found in a system too large to eyeball. The measurement is called
+**loop lag**: ask the loop to wake you in 50&nbsp;ms, see how long it actually
+took, and the difference is how long something else held the thread.
+
+```python-run
+import asyncio, time
+
+async def monitor(samples, n):
+    for _ in range(n):
+        t0 = time.perf_counter()
+        await asyncio.sleep(0.05)             # ask the loop for 50 ms
+        samples.append(time.perf_counter() - t0)
+
+async def hog():
+    await asyncio.sleep(0.12)
+    time.sleep(0.25)                          # a blocking call, mid-run
+
+async def main():
+    samples = []
+    await asyncio.gather(monitor(samples, 6), hog())
+    worst = max(samples)
+    print(f"asked for 0.050s; worst actual was {worst:.3f}s")
+    print(f"peak loop lag: {(worst - 0.05) * 1000:.0f} ms")
+
+await main()
+```
+
+```
+asked for 0.050s; worst actual was 0.270s
+peak loop lag: 220 ms
+```
+
+A 50&nbsp;ms sleep took 270. The extra 220&nbsp;ms is the blocking call: the
+monitor's timer came due on schedule and the loop could not act on it, because
+<code>time.sleep</code> was holding the only thread. Nothing here inspects the
+blocking code &mdash; the freeze is measured entirely from the outside, by a
+coroutine that only knows how long it waited.
+
+That is what makes the technique useful in production. A coroutine like
+<code>monitor</code>, sampling continuously and reporting its worst lag, needs no
+knowledge of what the rest of the program does and will catch any blocking call
+anywhere in it. Healthy loops sit at a lag of a millisecond or two; sustained
+tens of milliseconds means something is holding the thread, and the shape of the
+spikes usually identifies which request path it is on.
+
+The built-in version of the same idea is debug mode, which is cheaper to switch
+on and coarser:
+
+```python
+import asyncio
+
+async def main():
+    ...
+
+asyncio.run(main(), debug=True)     # warns: "Executing ... took N seconds"
+```
+
+With debug on, asyncio logs a warning naming any callback that ran longer than
+<code>loop.slow_callback_duration</code> (0.1&nbsp;s by default, and adjustable).
+That turns an invisible freeze into a log line with a source location in it,
+which is usually enough to find the call. Debug mode also warns about coroutines
+that were never awaited and tasks that were destroyed while pending, so it is
+worth switching on in development regardless of this bug.
+
+## An inventory of what actually blocks
+
+The awkward part of this bug is that blocking calls do not look distinctive. Here
+is the list that accounts for almost every real case, with what to do about each:
+
+| Blocking call | Fix |
+|---|---|
+| <code>requests.get</code>, <code>urllib</code> | <code>httpx</code> or <code>aiohttp</code> |
+| <code>time.sleep</code> | <code>await asyncio.sleep</code> |
+| <code>psycopg2</code>, <code>sqlite3</code>, most DB drivers | an async driver: <code>asyncpg</code>, <code>aiosqlite</code> |
+| <code>open().read()</code> on a large file | <code>aiofiles</code>, or <code>to_thread</code> |
+| <code>json.loads</code> on a huge payload | <code>to_thread</code>, or parse less |
+| A regex over a very long string | <code>to_thread</code> |
+| <code>subprocess.run</code> | <code>asyncio.create_subprocess_exec</code> |
+| A tight numeric loop, model inference | a **process** pool, not a thread |
+
+Three fixes, and the choice between them is not a preference. An async-native
+library is always the right answer when one exists, because it makes the wait a
+real await. <code>to_thread</code> is for I/O-bound calls with no async version,
+and it works because the blocking C call releases the interpreter lock while it
+waits. For CPU-bound work neither helps: the computation needs the interpreter
+the whole time, so a thread contends for the same lock and only a separate
+process genuinely moves the work off the loop.
+
+The rule that follows is worth keeping as a habit rather than a debugging step.
+Inside a coroutine, every call either awaits or returns fast. Anything that does
+neither needs one of the three fixes above before it goes in.
+
 ## Where it goes wrong
 
 **A synchronous HTTP or database call in a coroutine.** The classic. It freezes
@@ -174,3 +269,27 @@ contends for the interpreter. Heavy computation belongs in a process pool.
 **Trusting that it is fine because it works in testing.** One user hides the bug;
 concurrency exposes it. Test the loop under load, or run with
 <code>debug=True</code> and watch for slow-callback warnings.
+
+## Questions people ask
+
+<strong>How do I tell whether a library blocks?</strong> Its API tells you. If the call is awaited it does not block; if it returns a value directly and does real I/O, it does. There is no way to tell from the shape of the line, which is the whole problem &mdash; <code>requests.get(url)</code> and <code>await client.get(url)</code> look almost identical.
+
+<strong>Is a small blocking call acceptable?</strong> It depends entirely on your latency budget and concurrency. A 2&nbsp;ms call is noise; the same call in a handler serving 500 requests a second costs a full second of loop time every second. That is the arithmetic to do, rather than reasoning about whether it "feels" slow.
+
+<strong>Why does <code>to_thread</code> help at all if Python has a global lock?</strong> Because a blocking I/O call releases the lock while it waits. The thread parks in the operating system, the interpreter is free, and the loop keeps running. For pure computation nothing is released, so the lock is held and a thread buys you nothing.
+
+<strong>Does <code>to_thread</code> work in these editors?</strong> No, and the article shows it rather than running it for that reason. The browser interpreter has no OS threads, so <code>asyncio.to_thread</code> produces the same freeze as <code>time.sleep</code> &mdash; the escape hatch is real in CPython and unavailable in this sandbox.
+
+<strong>How many threads can I hand work to?</strong> The default executor is small and shared, so a burst of <code>to_thread</code> calls queues rather than running at once. If threaded work is routine, create a <code>ThreadPoolExecutor</code> sized deliberately and use <code>loop.run_in_executor</code>.
+
+<strong>Why does it only break in production?</strong> Because one user hides it. With one request in flight, a blocking call just makes that request slow, which reads as the network. With a hundred concurrent requests, it freezes all of them for its duration &mdash; so the symptom stops being "one slow endpoint" and becomes "the service periodically stops responding", which points nowhere.
+
+## Recap in one screen
+
+- One thread and no preemption, so a synchronous call does not slow the loop down &mdash; it stops it entirely until the call returns.
+- The signature is a burst: a heartbeat goes silent for the length of the blocking call and then fires all its backed-up ticks at once.
+- Measure it rather than guessing. Loop lag &mdash; asked-for sleep against actual &mdash; catches any blocking call from the outside, and <code>debug=True</code> logs the slow callback with a location.
+- Three fixes, chosen by the kind of work: an async-native library where one exists, <code>to_thread</code> for I/O-bound calls without one, a **process** for anything CPU-bound.
+- <code>to_thread</code> works because blocking I/O releases the interpreter lock. Computation does not release it, which is why threads do not help there.
+- Inside a coroutine, every call should either await or return fast. Anything else needs a fix before it goes in.
+- It hides in development and appears under load, because concurrency is what turns one slow request into every request stalling.

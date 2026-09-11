@@ -28,15 +28,15 @@ CRUMB = "Async Python"
 # slug, category (breadcrumb leaf / grouping), and the hub card icon. Order here
 # is the learning order; reorder to change prev/next.
 TOPICS = [
-    {"slug": "event_loop_stepped_through", "cat": "Foundations",
+    {"slug": "event_loop_stepped_through", "widget": "loop", "vizname": "One turn of the loop at a time", "cat": "Foundations",
      "svg": '<svg aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><circle cx="80" cy="45" r="26" fill="none" stroke="var(--accent-primary)" stroke-width="4"/><path d="M80 19 l7 -6 l-1 12 z" fill="var(--accent-primary)"/><circle cx="80" cy="45" r="5" fill="var(--text-main)"/></svg>'},
-    {"slug": "coroutines_tasks_and_await", "cat": "Foundations",
+    {"slug": "coroutines_tasks_and_await", "widget": "overlap", "vizname": "Awaited in turn, or run as tasks", "cat": "Foundations",
      "svg": '<svg aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="24" y="30" width="40" height="12" rx="3" fill="var(--accent-primary)" opacity="0.9"/><rect x="72" y="30" width="16" height="12" rx="3" fill="var(--bg-surface)" stroke="var(--border-subtle)" stroke-width="2"/><rect x="96" y="30" width="40" height="12" rx="3" fill="var(--accent-primary)" opacity="0.9"/><rect x="24" y="52" width="112" height="12" rx="3" fill="var(--border-subtle)" opacity="0.5"/></svg>'},
-    {"slug": "running_work_concurrently", "cat": "Running work",
+    {"slug": "running_work_concurrently", "widget": "limit", "vizname": "Fan-out, with a concurrency limit", "cat": "Running work",
      "svg": '<svg aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="20" y="24" width="70" height="10" rx="3" fill="var(--accent-primary)"/><rect x="20" y="40" width="55" height="10" rx="3" fill="var(--accent-primary)" opacity="0.8"/><rect x="20" y="56" width="40" height="10" rx="3" fill="var(--accent-primary)" opacity="0.6"/><line x1="100" y1="18" x2="100" y2="72" stroke="var(--text-main)" stroke-width="2" stroke-dasharray="4 4"/></svg>'},
-    {"slug": "the_blocking_call_that_freezes_the_loop", "cat": "Pitfalls",
+    {"slug": "the_blocking_call_that_freezes_the_loop", "widget": "freeze", "vizname": "Where the heartbeat stops", "cat": "Pitfalls",
      "svg": '<svg aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="20" y="38" width="120" height="14" rx="3" fill="var(--border-subtle)" opacity="0.5"/><rect x="70" y="26" width="20" height="38" rx="3" fill="var(--accent-primary)"/><line x1="70" y1="26" x2="90" y2="64" stroke="var(--bg-surface)" stroke-width="3"/></svg>'},
-    {"slug": "queues_and_backpressure", "cat": "Patterns",
+    {"slug": "queues_and_backpressure", "widget": "queue", "vizname": "Queue depth, and where put() waits", "cat": "Patterns",
      "svg": '<svg aria-hidden="true" viewBox="0 0 160 90" class="w-full h-full"><rect x="30" y="34" width="22" height="22" rx="3" fill="var(--accent-primary)"/><rect x="58" y="34" width="22" height="22" rx="3" fill="var(--accent-primary)" opacity="0.7"/><rect x="86" y="34" width="22" height="22" rx="3" fill="none" stroke="var(--border-subtle)" stroke-width="2"/><path d="M116 45 l14 0 m-6 -5 l6 5 l-6 5" fill="none" stroke="var(--text-main)" stroke-width="2"/></svg>'},
 ]
 
@@ -80,13 +80,30 @@ def page(t):
         "title": esc(title),
         "lead": esc(lead),
     }
+    viz = """
+    <section class="px-4 md:px-8 pb-2 max-w-[1600px] mx-auto w-full">
+        <div class="card-container animate-fade-in" data-vz-viz>
+            <div class="card-header"><h2 class="font-bold text-lg" style="color: var(--text-main)">%(vizname)s</h2></div>
+            <div class="p-4 md:p-5">
+                <div class="vz-as" data-vz-async>
+                    <script type="application/json" class="as-config">%(cfg)s</script>
+                    <p class="vz-as-fallback">This explorer needs JavaScript: every
+                    time, depth and lag on it is computed in the page rather than
+                    downloaded as an image.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+""" % {"vizname": esc(t["vizname"]),
+       "cfg": json.dumps({"widget": t["widget"]}, ensure_ascii=False)}
+
     mount = """    <!-- auto-article-vizlearn -->
     <section class="px-4 md:px-8 pb-8 max-w-[1600px] mx-auto w-full" data-vz-prose>
         <div class="card-container animate-fade-in">
         </div>
     </section>
 """
-    return head + shell.header(PREFIX) + main + mount + shell.close(PREFIX)
+    return head + shell.header(PREFIX) + main + viz + mount + shell.close(PREFIX)
 
 
 def catalog_entry(existing):

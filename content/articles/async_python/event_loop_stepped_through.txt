@@ -104,6 +104,106 @@ for a long time *without* awaiting, the entire loop is frozen for that whole
 time, because nothing can take the thread away from it. Cooperation only works if
 everyone cooperates.
 
+## What one turn of the loop actually does
+
+The loop is not a metaphor. It is a `while` loop over three data structures,
+and knowing them is enough to predict any scheduling question:
+
+- a **ready queue** of callbacks to run now;
+- a **heap of timers**, ordered by when each is due;
+- an **I/O selector** holding the sockets the loop is watching.
+
+One iteration does four things in order. Run everything currently on the ready
+queue. Work out how long until the earliest timer is due. Ask the selector for
+I/O events, using that as its timeout. Then move whatever fired &mdash; sockets
+that became readable, timers that came due &mdash; onto the ready queue for the
+next pass.
+
+<code>await asyncio.sleep(0)</code> is the smallest possible interaction with
+that machinery: it puts the current coroutine straight back on the ready queue
+and returns to the loop, so anything already queued runs before your next line.
+<code>loop.call_soon</code> appends a plain callback to the same queue, and
+<code>loop.call_later</code> puts one on the timer heap instead.
+
+```python-run
+import asyncio
+
+async def main():
+    loop = asyncio.get_running_loop()
+    ran = []
+    loop.call_soon(lambda: ran.append("soon A"))
+    loop.call_soon(lambda: ran.append("soon B"))
+    loop.call_later(0.05, lambda: ran.append("timer 50ms"))
+
+    await asyncio.sleep(0)          # one trip through the loop
+    print("after one turn: ", ran)
+
+    await asyncio.sleep(0.1)        # long enough for the timer
+    print("after the timer:", ran)
+
+await main()
+```
+
+```
+after one turn:  ['soon A', 'soon B']
+after the timer: ['soon A', 'soon B', 'timer 50ms']
+```
+
+After a single <code>await asyncio.sleep(0)</code> both <code>call_soon</code>
+callbacks have already run, because one trip through the loop drains the ready
+queue. The 50&nbsp;ms timer has not, because it is not due yet &mdash; it is
+sitting on the heap until an iteration whose selector timeout expires moves it
+across. That is the entire scheduler: a queue for now, a heap for later, and one
+poll that waits for whichever arrives first.
+
+## One loop per thread, and why these editors say await main()
+
+<code>asyncio.run</code> is not a way of calling a coroutine. It creates a fresh
+event loop, runs the coroutine until it finishes, and then closes the loop. That
+is why it belongs at the top of a program and nowhere else &mdash; and why
+calling it while a loop is already running is an error rather than a nested run:
+
+```python-run
+import asyncio
+
+async def work():
+    return "done"
+
+# This editor already has a loop running, so asyncio.run cannot start another.
+coro = work()
+try:
+    asyncio.run(coro)
+except RuntimeError as e:
+    print("RuntimeError:", e)
+finally:
+    coro.close()
+
+print("there is a running loop here:", asyncio.get_running_loop() is not None)
+```
+
+```
+RuntimeError: asyncio.run() cannot be called from a running event loop
+there is a running loop here: True
+```
+
+That error is exactly why every editor on this track finishes with
+<code>await main()</code>. The page already has a loop &mdash; the browser's
+&mdash; and from inside a running loop a coroutine can simply be awaited. A
+standalone script has no loop yet, so there <code>asyncio.run(main())</code> is
+how you get one.
+
+Two related functions come up constantly.
+<code>asyncio.get_running_loop()</code> returns the loop that is running and
+raises if there is none, which is what you want inside a coroutine. The older
+<code>asyncio.get_event_loop()</code> would *create* one when none existed,
+which made starting a second loop by accident easy; that is why it is
+deprecated. If you need the loop, ask for the running one.
+
+The loop is also per-thread. A second thread has no loop until something creates
+one there, and an object belonging to one loop cannot be awaited on another.
+That constraint is what <code>asyncio.run_coroutine_threadsafe</code> exists for
+&mdash; it is how synchronous code on another thread hands work to a loop.
+
 ## Where it goes wrong
 
 **Expecting parallelism.** The loop runs one thing at a time. For work that is
@@ -120,3 +220,26 @@ changed after it.
 **Confusing "started" with "running".** Creating a coroutine object does not run
 it, and neither does the loop until you hand it over &mdash; which is what
 [coroutines, tasks and await](coroutines_tasks_and_await.html) is about.
+
+## Questions people ask
+
+<strong>Is async faster than threads?</strong> Not at running code &mdash; it runs strictly less at once, because there is one thread. It is far cheaper at *waiting*: a coroutine suspended at an await costs a small object, where a blocked thread costs a stack and a context switch. Thousands of simultaneous waits are routine for a loop and expensive for threads.
+
+<strong>Does async help CPU-bound work?</strong> No. One thread, no preemption, so a computation holds it until it finishes and every other coroutine stops. Processes are the answer there &mdash; <code>multiprocessing</code> or a <code>ProcessPoolExecutor</code>.
+
+<strong>What does <code>await asyncio.sleep(0)</code> actually do?</strong> It returns to the loop and puts the coroutine straight back on the ready queue, so whatever was already queued runs before your next line. It is the idiomatic way to yield the thread partway through a long loop, and that is the only reason to call it.
+
+<strong>Can I run two loops at once?</strong> Not in one thread &mdash; <code>asyncio.run</code> inside a running loop raises the RuntimeError above. Separate threads may each own a loop, and work moves between them with <code>run_coroutine_threadsafe</code>.
+
+<strong>Why does my coroutine never run?</strong> Because you called it rather than awaiting or scheduling it. <code>main()</code> builds a coroutine object and runs nothing; something has to drive it. Python's "coroutine was never awaited" warning says precisely this, and is worth promoting to an error.
+
+<strong>Can another coroutine run between two of my lines?</strong> Only if one of them is an await. That is the guarantee cooperative scheduling buys: your code between two awaits is atomic with respect to other coroutines, so none of them can observe a half-finished update. Across an await, assume anything may have run.
+
+## Recap in one screen
+
+- One thread, one loop, and a coroutine that runs until it voluntarily awaits. No preemption, no parallelism.
+- The loop is a ready queue, a timer heap and an I/O selector. An iteration drains the queue, then polls for whichever event comes due first.
+- <code>await</code> is the only place a switch can happen, which is what makes the code between two awaits atomic against other coroutines.
+- Three states, and following them predicts any async program: exactly one coroutine *running*, the rest *ready* in the queue or *waiting* on an unresolved await.
+- The win is overlapped **waiting**, not parallel computing. A thousand coroutines can be waiting at once on one thread; a thousand threads is a different proposition.
+- Cooperation is mandatory. A coroutine that runs a long time without awaiting freezes every other one for exactly that long.
