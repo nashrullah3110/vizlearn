@@ -43,9 +43,14 @@ GROUPS = {
         "blurb": "Hash tables, what they promise, what voids the promise, and "
                  "the problems they collapse.",
     },
+    "semantics": {
+        "label": "Python semantics",
+        "blurb": "The \"do you actually know Python\" round: yield, defaults, "
+                 "identity, copying, closures, decorators and with.",
+    },
 }
 
-GROUP_ORDER = ["strings", "lists", "dicts"]
+GROUP_ORDER = ["strings", "lists", "dicts", "semantics"]
 
 
 # --------------------------------------------------------------------------
@@ -493,6 +498,71 @@ def m_prefixmap():
                 'font-family="monospace" fill="%s">prefix -> count</text>' % A)
 
 
+def m_lazy():
+    """One value at a time, out of something that never fills up."""
+    return _svg('<rect x="16" y="34" width="40" height="24" rx="4" fill="%s" '
+                'stroke="%s" stroke-width="2"/>' % (I, A)
+                + _arrow(60, 46, 92, 46)
+                + '<rect x="96" y="36" width="18" height="20" rx="3" fill="%s"/>' % A
+                + '<rect x="120" y="40" width="12" height="12" rx="3" fill="%s" '
+                  'opacity="0.45"/>' % A
+                + '<rect x="138" y="43" width="8" height="6" rx="2" fill="%s" '
+                  'opacity="0.2"/>' % A
+                + _label("one at a time"))
+
+
+def m_layers():
+    """Two outer boxes, one shared inner pair - the shallow copy."""
+    return _svg('<rect x="14" y="22" width="58" height="40" rx="5" fill="none" '
+                'stroke="%s" stroke-width="2"/>' % A
+                + '<rect x="88" y="22" width="58" height="40" rx="5" fill="none" '
+                  'stroke="%s" stroke-width="2" stroke-dasharray="4 3"/>' % M
+                + '<rect x="62" y="34" width="36" height="16" rx="3" fill="%s"/>' % A
+                + _label("one inner, two outers"))
+
+
+def m_cell():
+    """Three functions, one shared cell."""
+    out = []
+    for i in range(3):
+        out.append('<rect x="%d" y="20" width="26" height="16" rx="3" '
+                   'fill="none" stroke="%s" stroke-width="2"/>'
+                   % (24 + i * 40, A))
+        out.append(_arrow(37 + i * 40, 36, 80, 52, M))
+    out.append('<rect x="66" y="52" width="28" height="18" rx="3" fill="%s"/>' % A)
+    return _svg("".join(out) + _label("one cell", 80, 84))
+
+
+def m_wrap():
+    """A function replaced by a wrapper around it."""
+    return _svg('<rect x="30" y="24" width="100" height="40" rx="6" fill="none" '
+                'stroke="%s" stroke-width="2" stroke-dasharray="5 3"/>' % A
+                + '<rect x="52" y="34" width="56" height="20" rx="4" fill="%s"/>' % A
+                + _label("wrapper, then the function"))
+
+
+def m_guard():
+    """enter, body, exit - and the exit happens either way."""
+    return _svg('<rect x="22" y="26" width="116" height="14" rx="3" fill="%s" '
+                'opacity="0.35"/>' % A
+                + '<rect x="40" y="44" width="80" height="14" rx="3" fill="%s" '
+                  'stroke="%s" stroke-width="2"/>' % (I, M)
+                + '<rect x="22" y="62" width="116" height="14" rx="3" fill="%s" '
+                  'opacity="0.9"/>' % A
+                + _label("exit runs either way", 80, 88))
+
+
+def m_condense():
+    """A loop body collapsing into one instruction."""
+    out = []
+    for i in range(4):
+        out.append('<rect x="20" y="%d" width="%d" height="8" rx="2" fill="%s" '
+                   'opacity="0.55"/>' % (24 + i * 11, 46 - i * 6, M))
+    out.append(_arrow(76, 42, 100, 42))
+    out.append('<rect x="104" y="36" width="42" height="14" rx="3" fill="%s"/>' % A)
+    return _svg("".join(out) + _label("one opcode", 124, 62))
+
+
 MOTIFS = {
     "lock": m_lock, "slice": m_slice, "codepoint": m_codepoint, "bytes": m_bytes,
     "identity": m_identity, "find": m_find, "palindrome": m_palindrome,
@@ -506,6 +576,8 @@ MOTIFS = {
     "hashtable": m_hashtable, "hashable": m_hashable, "quadratic": m_quadratic,
     "lru": m_lru, "consecutive": m_consecutive, "sets": m_sets,
     "mutate": m_mutate, "memo": m_memo, "prefixmap": m_prefixmap,
+    "lazy": m_lazy, "layers": m_layers, "cell": m_cell, "wrap": m_wrap,
+    "guard": m_guard, "condense": m_condense,
 }
 
 # Motifs taking a variant argument, so two questions sharing a technique still
@@ -567,6 +639,15 @@ CARD = {
     "memoisation-with-a-dictionary": "memo",
     "design-a-hashmap": "buckets",
     "grouping-and-inverting-dictionaries": "mapping",
+    # python semantics
+    "what-does-yield-actually-do": "lazy",
+    "the-mutable-default-argument": "alias",
+    "is-versus-equals": "identity",
+    "shallow-versus-deep-copy": "layers",
+    "closures-and-late-binding": "cell",
+    "what-a-decorator-replaces": "wrap",
+    "what-with-guarantees": "guard",
+    "why-a-comprehension-is-faster": "condense",
 }
 
 
@@ -588,8 +669,10 @@ def _assemble():
     from interview_strings import STRINGS
     from interview_lists import LISTS
     from interview_dicts import DICTS
+    from interview_semantics import SEMANTICS
 
-    by_group = {"strings": STRINGS, "lists": LISTS, "dicts": DICTS}
+    by_group = {"strings": STRINGS, "lists": LISTS, "dicts": DICTS,
+                "semantics": SEMANTICS}
     out = []
     for key in GROUP_ORDER:
         for i, q in enumerate(by_group[key]):

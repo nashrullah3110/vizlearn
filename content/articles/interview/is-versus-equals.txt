@@ -1,0 +1,123 @@
+title: `is` vs `==`, and why 257 is not 257
+intro: What is the difference between is and ==, and why does `a is b` sometimes surprise you with integers?
+
+## The question, and what it is testing
+
+<code>==</code> asks "same value", <code>is</code> asks "same object". They coincide for small integers and short strings because CPython <strong>caches</strong> those objects, and they coincide for repeated literals because the compiler <strong>folds</strong> them &mdash; two different accidents, neither of which the language promises. Use <code>is</code> only for singletons.
+
+<p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
+
+## Run it
+
+The cache boundary, the folding that hides it, and the nan case where equality and identity openly disagree.
+
+The cache boundary - and the constant folding that hides it.
+
+```python-run
+a, b = int("256"), int("256")      # built at runtime, so no folding
+c, d = int("257"), int("257")
+print("256:  a == b", a == b, "| a is b", a is b, " <- cached")
+print("257:  c == d", c == d, "| c is d", c is d, " <- past the cache")
+
+e = 257
+f = 257
+print("literals: e is f", e is f, " <- the compiler, not the cache")
+```
+
+
+For anything mutable the two never agree unless you aliased on purpose.
+
+```python-run
+x, y = [1, 2], [1, 2]
+print("lists: x == y", x == y, "| x is y", x is y)
+y = x                               # NOW they are the same object
+print("after y = x:      x is y", x is y)
+
+print()
+print("where identity is genuinely the question:")
+print("  None is a singleton:", None is None)
+MISSING = object()
+print("  a sentinel is only ever itself:", MISSING is object())
+```
+
+
+And the case where the two operators openly disagree.
+
+```python-run
+import math
+
+nan = float("nan")
+print("nan == nan:", nan == nan, "  <- IEEE says not equal to itself")
+print("nan is nan:", nan is nan, "   <- but it is the same object")
+print("nan in [nan]:", nan in [nan], " <- `in` tries identity first")
+
+print()
+print("the float trap with the same shape:")
+print("  0.1 + 0.2 == 0.3 ->", 0.1 + 0.2 == 0.3)
+print("  math.isclose    ->", math.isclose(0.1 + 0.2, 0.3))
+```
+
+## Two different questions
+
+<p><code>a == b</code> calls <code>a.__eq__(b)</code>, which a type defines however it likes. <code>a is b</code> compares the addresses of the two objects and cannot be overridden by anything.</p><p>So <code>==</code> is a question about values and <code>is</code> is a question about storage. Confusing them usually works, which is the problem: the code passes its tests on small inputs and fails on a value that happens to fall outside a cache.</p>
+
+## The small-integer cache, and the folding on top of it
+
+<p>CPython pre-creates every integer from &minus;5 to 256 at startup and hands out the same object whenever one is needed. So <code>int('256') is int('256')</code> is <code>True</code> and <code>int('257') is int('257')</code> is <code>False</code>.</p><p>There is a second, separate mechanism that makes this hard to demonstrate. Constants written in one code block are folded by the compiler, so <code>e = 257; f = 257</code> puts <em>one</em> constant in the code object and <code>e is f</code> is <code>True</code> &mdash; nothing to do with the cache, and it is why the same experiment gives different answers in a script and at a REPL prompt.</p><p>Short strings that look like identifiers get the same treatment through interning. The lesson is not the boundaries; it is that these are decisions an interpreter is free to change.</p>
+
+## Where is belongs
+
+<p>Three cases, and essentially nothing else.</p><p><strong>Singletons.</strong> <code>x is None</code>, <code>x is True</code>, <code>x is False</code>. There is exactly one of each, so identity is the correct test and it is faster than <code>==</code> besides.</p><p><strong>Sentinels.</strong> <code>_MISSING = object()</code>, then <code>if arg is _MISSING</code>. The whole point of the object is that nothing else can be it.</p><p><strong>Genuine aliasing questions.</strong> "Are these two names the same list?" is an identity question, and it is what you want when checking whether a caller handed you the object you already hold.</p>
+
+## The follow-up: `==` that disagrees with itself
+
+<p>"Can <code>x == x</code> be False?" Yes. <code>float('nan') == float('nan')</code> is <code>False</code> by IEEE rule, and so is <code>nan == nan</code> for the same object &mdash; while <code>nan is nan</code> is <code>True</code>. That is the cleanest possible demonstration that the two operators are answering different questions, and it is why <code>x in [float('nan')]</code> can be True: the container check tries <code>is</code> first as a shortcut.</p>
+
+## What to say out loud
+
+<p>== compares values through __eq__; is compares object identity. They agree on small ints and interned strings because CPython caches them, which is an implementation detail I would never rely on. I use is only for None, True, False and sentinel objects.</p>
+
+<p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence and then talking for another minute until something wrong comes out.</p>
+
+## What to notice while it runs
+
+<ul>
+<li><code>int('256')</code> twice gives one object; <code>int('257')</code> gives two.</li>
+<li>Writing <code>257</code> twice as literals gives one object again &mdash; that is the compiler, not the cache.</li>
+<li>For lists, <code>==</code> and <code>is</code> never agree unless you aliased deliberately.</li>
+</ul>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>The cache boundaries are not a language guarantee.</strong> PyPy, MicroPython and a future CPython are free to differ, so any behaviour that depends on them is a bug that happens to pass today.</p>
+
+<p><strong><code>x is not None</code> reads better than <code>not x is None</code></strong> and is the same operator. Worth using, because the second form invites a misparse.</p>
+
+<p><strong>Do not use <code>is</code> to test for emptiness or truth.</strong> <code>if x is True</code> fails for <code>1</code>, for a non-empty list, and for anything with <code>__bool__</code> - which is almost certainly not what you meant.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"Should you ever use <code>is</code> on strings?"</strong> No, outside of sentinels. Interning makes it appear to work for short literals and it stops working for anything computed at runtime, which is the worst possible failure pattern - correct in development, wrong on real input.</p>
+
+<p><strong>"What about <code>==</code> on floats?"</strong> A different trap with the same shape: <code>0.1 + 0.2 == 0.3</code> is <code>False</code>. Use <code>math.isclose</code>, and mention it unprompted if the question involves numeric comparison at all.</p>
+
+<p><strong>"How do you make <code>==</code> work on your own class?"</strong> Define <code>__eq__</code> - and then <code>__hash__</code>, because defining <code>__eq__</code> alone sets <code>__hash__</code> to <code>None</code> and makes instances unhashable. Two objects that compare equal must hash equally, or they break dictionaries. <code>@dataclass(frozen=True)</code> generates both correctly.</p>
+
+## Common wrong answers
+
+<p><strong>"<code>is</code> is faster, so use it for comparisons."</strong> It is faster, and it answers a different question. Speed is not a reason to ask the wrong thing.</p>
+
+<p><strong>"Small integers are interned up to 1000."</strong> &minus;5 to 256. Quoting a wrong boundary confidently is worse than saying "a small range, and I would not depend on it".</p>
+
+<p><strong>"<code>==</code> always calls <code>__eq__</code>."</strong> Container membership checks identity first as a shortcut, which is why <code>nan in [nan]</code> is <code>True</code> while <code>nan == nan</code> is <code>False</code>.</p>
+
+## Recap in one screen
+
+- int('256') twice gives one object; int('257') gives two.
+- Writing 257 twice as literals gives one object again - that is the compiler, not the cache.
+- For lists, == and is never agree unless you aliased deliberately.
+- The one-line answer: == asks "same value", is asks "same object".
+- Worth trying: Change 257 to 256 in the int() lines and watch is flip. Then try -6, which is one below the cache at the other end.
+- Worth trying: Compare "hello" is "hello" with "hello world" is "hello world". Identifier-like strings are interned; ones with a space often are not.

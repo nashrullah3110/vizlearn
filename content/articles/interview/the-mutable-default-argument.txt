@@ -1,0 +1,139 @@
+title: Why does this default argument remember?
+intro: What does def f(x, acc=[]) do on the second call, and why?
+
+## The question, and what it is testing
+
+Because the default is evaluated <strong>once, when the <code>def</code> statement runs</strong> &mdash; not on each call. One list is created, attached to the function object, and reused by every call that does not pass its own, so mutations accumulate across calls. The fix is <code>None</code> as the default and build the real value inside the body.
+
+<p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
+
+## Run it
+
+The accumulation, the shared object read straight off the function, and the two-line fix - plus the same bug wearing a clock.
+
+The accumulation, and the shared object read straight off the function.
+
+```python-run
+def collect(item, into=[]):
+    into.append(item)
+    return into
+
+print("first  call:", collect("a"))
+print("second call:", collect("b"))
+print("third  call:", collect("c"))
+
+print("collect.__defaults__ ->", collect.__defaults__)
+print("the same list every time:", collect.__defaults__[0] is collect("d"))
+```
+
+
+The fix is two lines, and a private sentinel covers the case where None is itself a legitimate value.
+
+```python-run
+def collect_ok(item, into=None):
+    if into is None:                 # build it per call, in the body
+        into = []
+    into.append(item)
+    return into
+
+print("fixed, first :", collect_ok("a"))
+print("fixed, second:", collect_ok("b"))
+print("passing your own still works:", collect_ok("c", ["x"]))
+
+MISSING = object()
+
+def fetch(key, default=MISSING):
+    if default is MISSING:
+        return "no default was given"
+    return f"default was given: {default!r}"
+
+print()
+print(fetch("k"))
+print(fetch("k", None), "<- None is now distinguishable from absent")
+```
+
+
+The same rule with no list in sight, which is how it reaches production.
+
+```python-run
+import time
+
+def stamped(value, at=time.time()):   # frozen when def ran
+    return (value, at)
+
+first = stamped("one")
+time.sleep(0.05)
+second = stamped("two")
+print("same timestamp for both calls:", first[1] == second[1])
+print("because time.time() ran once, at definition time")
+print()
+print("first :", first)
+print("second:", second)
+```
+
+## Defaults are evaluated once
+
+<p>A <code>def</code> statement is executable code. When it runs, Python evaluates the default expressions and stores the resulting objects on the function &mdash; you can read them back from <code>f.__defaults__</code>. They are not re-evaluated per call, because there is nothing left to evaluate.</p><p>For an immutable default that distinction is invisible: sharing one <code>0</code> or one <code>""</code> between calls has no consequences, because nothing can change it. For a list, a dict, a set or a class instance it is the whole bug, because the shared object accumulates every mutation any call makes.</p>
+
+## The sentinel, and why None
+
+<p>The fix is two lines:</p><pre><code>def collect(item, into=None):
+    if into is None:
+        into = []</code></pre><p>Now the list is built by the body, so each call gets its own. <code>None</code> is the conventional sentinel because it is a singleton and <code>is None</code> is unambiguous.</p><p>Use a private sentinel object instead when <code>None</code> is a legitimate value a caller might pass &mdash; <code>_MISSING = object()</code>, then <code>if into is _MISSING</code>. That distinction matters for wrappers and configuration functions where "not given" and "given as None" mean different things.</p>
+
+## Where it actually bites
+
+<p>Almost never with a literal <code>[]</code>, because that is the version everybody has been warned about. It bites through things that do not look like defaults at all:</p><p><code>def f(when=datetime.now())</code> freezes one timestamp at import time and returns it forever, which is the same bug wearing a clock. <code>def f(cfg={})</code> in a class body gives every instance the same dictionary. And a default whose value comes from a module-level mutable &mdash; <code>def f(opts=DEFAULT_OPTS)</code> &mdash; hands callers a reference they can mutate for everyone.</p><p>The general rule that covers all of them: a default should be an immutable value, or <code>None</code>.</p>
+
+## Why the language does not just fix it
+
+<p>Re-evaluating defaults per call would make every call pay for the expression, and it would make the value depend on when the call happened rather than on the definition &mdash; which is its own class of surprise. Early binding is also what makes the <code>lambda i=i: i</code> trick work for <a href="closures-and-late-binding.html">late-bound closures</a>, where evaluating once at definition time is exactly the behaviour you want. It is a consistent rule that is wrong for one kind of value, rather than an oversight.</p>
+
+## What to say out loud
+
+<p>Defaults are evaluated once at definition time, so a mutable default is one shared object for the life of the function. The second call sees what the first one appended. I use None as the sentinel and create the list inside the function.</p>
+
+<p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence and then talking for another minute until something wrong comes out.</p>
+
+## What to notice while it runs
+
+<ul>
+<li>The list exists before any call &mdash; it is stored on <code>f.__defaults__</code>.</li>
+<li>Each call appends to the <em>same</em> object, so the return value grows.</li>
+<li>The <code>None</code> version builds a new list per call, which is what the caller expected all along.</li>
+</ul>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>Passing your own argument leaves the shared default untouched</strong>, which is exactly why the bug survives testing: any test that supplies the list never sees it.</p>
+
+<p><strong>The shared object is per <em>function</em>, not per module or per instance.</strong> A method with a mutable default shares one object across every instance of the class, which looks like a class attribute bug and is not.</p>
+
+<p><strong>Mutating an argument the caller passed is the same class of surprise</strong>, without any default involved. If a function appends to a list it was given, say so in the name or the docstring - or copy on the way in.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"How would you catch this in code review?"</strong> Any mutable literal in a signature: <code>[]</code>, <code>{}</code>, <code>set()</code>, or a call that builds one. Linters flag it (<code>B006</code> in flake8-bugbear), which is the honest answer - you catch it with a tool rather than with vigilance.</p>
+
+<p><strong>"What do dataclasses do about it?"</strong> They refuse. <code>field: list = []</code> raises <code>ValueError: mutable default</code> at class creation, and you write <code>field: list = dataclasses.field(default_factory=list)</code> instead. That is the same fix as the None sentinel, made mandatory - and a good thing to cite, because it shows the language designers agreed it was a trap.</p>
+
+<p><strong>"Is a default that calls a function also evaluated once?"</strong> Yes. <code>def f(t=time.time())</code> and <code>def f(conn=connect())</code> both run once, at definition time, which is how a stale timestamp or a connection opened at import ends up in production.</p>
+
+## Common wrong answers
+
+<p><strong>"Python caches the return value of the function."</strong> It caches nothing. One default <em>object</em> is created once and shared; the function runs fully every call.</p>
+
+<p><strong>"Use a tuple instead."</strong> It removes the symptom by making mutation impossible, and it changes the type the caller gets. Correct answer is <code>None</code> plus a build in the body.</p>
+
+<p><strong>"It is a bug in Python."</strong> It is consistent early binding, and the same rule is the standard fix for <a href="closures-and-late-binding.html">late-bound closures</a>. Calling it a bug suggests you have not seen where the behaviour is useful.</p>
+
+## Recap in one screen
+
+- The list exists before any call - it is stored on f.__defaults__.
+- Each call appends to the same object, so the return value grows.
+- The None version builds a new list per call, which is what the caller expected all along.
+- The one-line answer: Because the default is evaluated once, when the def statement runs - not on each call.
+- Worth trying: Call collect("z", []) between two bare calls. Passing your own argument leaves the shared default untouched, which is why the bug hides in tests that always pass one.
+- Worth trying: Change the default to into=() and watch it raise instead. An immutable default cannot accumulate - it can only fail loudly, which is better.

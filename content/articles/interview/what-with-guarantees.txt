@@ -1,0 +1,175 @@
+title: What does `with` guarantee when the body raises?
+intro: What does the with statement actually do, and what happens to an exception raised inside it?
+
+## The question, and what it is testing
+
+<code>with</code> calls <code>__enter__</code>, runs the body, and calls <code>__exit__</code> <strong>however the body ends</strong> &mdash; normally, by <code>return</code>, or by exception. <code>__exit__</code> is told what went wrong, and if it returns something truthy the exception is suppressed.
+
+<p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
+
+## Run it
+
+All three exits observed from inside __exit__, the suppression case, and a return from the body that still runs the cleanup.
+
+All three exits, observed from inside __exit__.
+
+```python-run
+class Tracked:
+    def __init__(self, name, swallow=False):
+        self.name, self.swallow = name, swallow
+
+    def __enter__(self):
+        print(f"  enter {self.name}")
+        return self                      # this is what `as` binds
+
+    def __exit__(self, exc_type, exc, tb):
+        seen = exc_type.__name__ if exc_type else None
+        print(f"  exit  {self.name}  (exception seen: {seen})")
+        return self.swallow              # truthy SWALLOWS the exception
+
+print("1. normal exit:")
+with Tracked("A"):
+    print("  body")
+
+print()
+print("2. the body raises - __exit__ still runs, and is told what:")
+try:
+    with Tracked("B"):
+        raise ValueError("boom")
+except ValueError as e:
+    print("  propagated to here:", e)
+
+print()
+print("3. __exit__ returns True, so the exception is suppressed:")
+with Tracked("C", swallow=True):
+    raise ValueError("silenced")
+print("  execution continues, with no except clause")
+```
+
+
+A return from inside the body cannot skip the cleanup either.
+
+```python-run
+class Tracked:
+    def __init__(self, name):
+        self.name = name
+    def __enter__(self):
+        print(f"  enter {self.name}")
+        return self
+    def __exit__(self, *exc):
+        print(f"  exit  {self.name}")
+        return False
+
+def f():
+    with Tracked("D"):
+        return "returned"
+
+print("f() ->", f())
+
+print()
+print("and the comma form nests, so an earlier exit still runs:")
+try:
+    with Tracked("E"), Tracked("F"):
+        raise RuntimeError("inside both")
+except RuntimeError as e:
+    print("  propagated:", e)
+```
+
+
+The generator form, and why the try/finally is not optional.
+
+```python-run
+from contextlib import contextmanager, suppress
+
+@contextmanager
+def guarded(label):
+    print(f"  enter {label}")
+    try:
+        yield label
+    finally:
+        print(f"  exit  {label}  (finally always runs)")
+
+print("with the body raising:")
+try:
+    with guarded("G") as name:
+        raise RuntimeError("from " + name)
+except RuntimeError as e:
+    print("  propagated:", e)
+
+print()
+print("contextlib.suppress is the whole of case 3:")
+with suppress(FileNotFoundError):
+    open("/no/such/file")
+print("  carried on, nothing raised")
+```
+
+## The protocol, in full
+
+<p><code>with expr as name:</code> does four things. It evaluates <code>expr</code>. It calls <code>__enter__()</code> on the result and binds the return value to <code>name</code> &mdash; note that this is <em>not</em> necessarily the object itself, which is why <code>open()</code> can return a file and a lock can return <code>None</code>. It runs the body. Then it calls <code>__exit__(exc_type, exc, traceback)</code>.</p><p>The last step is the point. It happens on a normal fall-through, on a <code>return</code> from inside the body, on a <code>break</code>, and on an exception. That is a stronger promise than <code>try/finally</code> written by hand, only because it is harder to forget.</p>
+
+## Suppression, and why it is rare
+
+<p>A truthy return from <code>__exit__</code> tells Python the exception has been handled, and execution continues after the block. It is a real feature with one common use &mdash; <code>contextlib.suppress(FileNotFoundError)</code> is a context manager whose entire job is to return <code>True</code> for the types you named.</p><p>Writing it yourself is usually a mistake, because a manager that swallows exceptions silently is a manager that hides bugs. The convention is to return <code>None</code> and let the exception through, doing cleanup on the way out. If you do suppress, suppress one specific type and nothing else.</p>
+
+## contextlib, and the generator form
+
+<p>Writing a class with two dunder methods for a two-line cleanup is heavy, and <code>contextlib.contextmanager</code> removes it:</p><pre><code>@contextmanager
+def timed(label):
+    start = time.perf_counter()
+    try:
+        yield                  # the body runs here
+    finally:
+        print(label, time.perf_counter() - start)</code></pre><p>Everything before the <code>yield</code> is <code>__enter__</code>; everything after is <code>__exit__</code>. The <code>try/finally</code> is not optional &mdash; without it, an exception in the body propagates out of the <code>yield</code> and the cleanup never runs, which quietly defeats the entire purpose.</p><p><code>ExitStack</code> is the other one worth knowing: it manages a variable number of managers, so you can enter a list of files without a nested <code>with</code> per file.</p>
+
+## The follow-up: why not just use try/finally
+
+<p>You can, and <code>with</code> compiles to roughly that. The difference is that the cleanup lives with the <em>resource</em> rather than with every call site, so it cannot be forgotten at the twelfth place the resource is used. It also composes: <code>with a, b:</code> nests correctly, and both exits run even if the first one raises.</p><p>The async counterpart is <code>async with</code> and <code>__aenter__</code>/<code>__aexit__</code>, which is what an async HTTP client or database session uses &mdash; same protocol, awaitable methods.</p>
+
+## What to say out loud
+
+<p>with is the context manager protocol: __enter__ before the body, __exit__ after it, guaranteed, including on an exception or a return. __exit__ receives the exception details, and returning True from it suppresses the exception - which is exactly what contextlib.suppress does. I use it for anything with a cleanup that must happen.</p>
+
+<p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence and then talking for another minute until something wrong comes out.</p>
+
+## What to notice while it runs
+
+<ul>
+<li><code>__exit__</code> runs in all three cases &mdash; that is the guarantee being bought.</li>
+<li>It is <em>told</em> the exception type, so cleanup can behave differently on failure.</li>
+<li>Returning <code>True</code> swallows the exception; returning <code>None</code> lets it propagate.</li>
+</ul>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong><code>with a, b:</code> is not the same as two separate blocks on failure.</strong> It nests, so if <code>b</code>'s <code>__enter__</code> raises, <code>a</code>'s <code>__exit__</code> still runs - which is the behaviour you want and the reason to prefer the comma form over two statements.</p>
+
+<p><strong>A <code>@contextmanager</code> generator can only be used once.</strong> The object it returns is a one-shot generator, so re-entering the same manager instance raises. Call the factory again instead, or write a class.</p>
+
+<p><strong>Suppressing broadly hides bugs.</strong> If <code>__exit__</code> returns <code>True</code> unconditionally, every exception in every body disappears - including <code>KeyboardInterrupt</code> and typos. Suppress one named type or nothing.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"What if <code>__enter__</code> itself raises?"</strong> Then <code>__exit__</code> is <strong>not</strong> called, because the block was never entered. This catches people: any resource acquired partway through <code>__enter__</code> has to be cleaned up inside <code>__enter__</code> itself. It is also why <code>ExitStack</code> exists for multi-resource setup.</p>
+
+<p><strong>"How do you manage a variable number of resources?"</strong> <code>contextlib.ExitStack</code>: enter each one into the stack and it unwinds them all in reverse on exit, however many there are. The alternative - a recursive or dynamically nested <code>with</code> - is not writable.</p>
+
+<p><strong>"What is the async equivalent?"</strong> <code>async with</code>, backed by <code>__aenter__</code> and <code>__aexit__</code>, which are coroutines. Same protocol, awaitable methods, and it is what an async HTTP client or database session gives you.</p>
+
+## Common wrong answers
+
+<p><strong>"<code>with</code> catches exceptions."</strong> It does not. It guarantees the cleanup and lets the exception through, unless <code>__exit__</code> returns something truthy - which is unusual and should be deliberate.</p>
+
+<p><strong>"It is just <code>try/finally</code>."</strong> Same effect, worse locality: the cleanup lives at every call site instead of with the resource. That is the argument, and the interviewer is usually listening for it.</p>
+
+<p><strong>"<code>__exit__</code> receives the block's return value."</strong> It receives the exception type, value and traceback - or three <code>None</code>s. It never sees the body's result.</p>
+
+## Recap in one screen
+
+- __exit__ runs in all three cases - that is the guarantee being bought.
+- It is told the exception type, so cleanup can behave differently on failure.
+- Returning True swallows the exception; returning None lets it propagate.
+- The one-line answer: with calls __enter__, runs the body, and calls __exit__ however the body ends - normally, by return, or by exception.
+- Worth trying: Delete the try/finally from guarded and re-run case 5. The exit line disappears - the bug that makes a hand-written context manager worse than none.
+- Worth trying: Replace case 3 with contextlib.suppress(ValueError) and confirm it behaves the same. That is all suppress is.

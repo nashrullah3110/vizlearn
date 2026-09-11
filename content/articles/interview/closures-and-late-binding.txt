@@ -1,0 +1,140 @@
+title: Why do all these functions return the same value?
+intro: What does [lambda: i for i in range(3)] give you when you call each one, and why?
+
+## The question, and what it is testing
+
+A closure captures the <strong>variable</strong>, not the value it had when the function was defined. All three lambdas share one cell holding <code>i</code>, and they read it when called &mdash; by which time the loop has finished and left it at 2. Bind a value with a default argument, or make a new scope with a factory.
+
+<p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
+
+## Run it
+
+The shared cell, both fixes, and the same bug with def instead of lambda so it is clear the syntax is not the cause.
+
+The shared cell, read straight off the functions.
+
+```python-run
+late = [lambda: i for i in range(3)]
+print("late binding: ", [f() for f in late], "<- all 2")
+
+print("cells per function:", [len(f.__closure__) for f in late])
+print("the shared cell holds:", late[0].__closure__[0].cell_contents)
+print("same cell object:", late[0].__closure__[0] is late[1].__closure__[0])
+
+i = 99                                # the cell is live, not a snapshot
+print("after rebinding i = 99:", [f() for f in late])
+```
+
+
+The two fixes, and what each one actually does.
+
+```python-run
+early = [lambda i=i: i for i in range(3)]
+print("default-arg fix:", [f() for f in early])
+print("no closure at all:", early[0].__closure__, "<- the value is on the function")
+
+def make(i):
+    return lambda: i
+
+factory = [make(i) for i in range(3)]
+print()
+print("factory fix:    ", [f() for f in factory])
+print("separate cells: ", [f.__closure__[0].cell_contents for f in factory])
+
+import functools
+partial = [functools.partial(lambda x: x, i) for i in range(3)]
+print("functools.partial:", [f() for f in partial])
+```
+
+
+It is not about lambda - and called inside the loop, late binding is what you wanted.
+
+```python-run
+def build():
+    out = []
+    for i in range(3):
+        def show():
+            return i
+        out.append(show)
+    return out
+
+print("with def instead:", [f() for f in build()], "<- identical")
+print("called in the loop:", [(lambda: i)() for i in range(3)])
+
+def counter():
+    n = 0
+    def bump():
+        nonlocal n                   # rebind in the enclosing scope
+        n += 1
+        return n
+    return bump
+
+c = counter()
+print()
+print("late binding as a feature:", c(), c(), c())
+```
+
+## Capturing a name, not a value
+
+<p>When a nested function refers to a variable from an enclosing scope, Python does not copy the value in. It stores a reference to a <strong>cell</strong> &mdash; a small box holding that variable &mdash; and reads the cell when the function runs. You can see them: <code>f.__closure__</code> is a tuple of cells, and <code>.cell_contents</code> is what each holds right now.</p><p>A loop body is not a new scope in Python, so every iteration refers to the same <code>i</code> and therefore the same cell. Three lambdas, one cell, one answer. This is not a quirk of <code>lambda</code>: a nested <code>def</code> in the same loop behaves identically.</p>
+
+## The two fixes, and what they really do
+
+<p><strong>A default argument.</strong> <code>lambda i=i: i</code> works because default expressions are evaluated when the function object is created, so the current value is captured and stored on the function. It is the shortest fix and it changes the signature, which means a caller can override it &mdash; usually harmless, occasionally surprising.</p><p><strong>A factory.</strong> <code>def make(i): return lambda: i</code> gives each closure a genuinely separate scope, because each call to <code>make</code> creates its own frame and its own cell. It is more code and it is the version that scales to closing over several variables. <code>functools.partial(op, i)</code> is the same idea from the standard library.</p>
+
+## Why late binding is the right default
+
+<p>It is easy to read this as a design mistake. It is the behaviour that makes ordinary closures work: a function that closes over <code>self</code>, a counter, or a configuration dictionary is supposed to see the <em>current</em> value, not a snapshot from whenever it was defined. Mutual recursion between two nested functions relies on it, and so does any callback that reads state updated after it was registered.</p><p>The loop case is the one place where you wanted a snapshot and the language gave you a reference. Every other closure in your program is benefiting from the same rule.</p>
+
+## Where it bites in real code
+
+<p>Callbacks registered in a loop &mdash; buttons, handlers, retry functions &mdash; all firing with the last item. Tasks created in a loop and appended to a list. And <code>functools.reduce</code>-style pipelines built by stacking lambdas over a loop variable.</p><p>The tell is always the same: several functions built in a loop, called after it. If they are called inside the loop, late binding reads the value you expected and the bug never appears &mdash; which is why this survives testing so well.</p>
+
+## What to say out loud
+
+<p>Python closures are late-binding: they look the variable up at call time, not definition time. So every lambda in that loop sees the final value. I fix it with a default argument, lambda i=i: i, which evaluates i when the lambda is created, or with a factory function so each closure gets its own scope.</p>
+
+<p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence and then talking for another minute until something wrong comes out.</p>
+
+## What to notice while it runs
+
+<ul>
+<li>The three functions share <em>one</em> cell &mdash; that is why they agree.</li>
+<li><code>lambda i=i: i</code> captures a value because defaults are evaluated at definition time.</li>
+<li>The factory version has three separate cells, each with its own value.</li>
+</ul>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>The cell is live, not a snapshot.</strong> Rebinding the variable after the functions are built changes what they all return - which is occasionally the feature and usually the bug.</p>
+
+<p><strong>The default-argument fix changes the signature.</strong> A caller can pass their own value and override the captured one. Harmless in a loop of throwaway callbacks, worth avoiding in a public API.</p>
+
+<p><strong>Comprehensions have their own scope, but the loop variable is still shared by closures built inside them</strong> - the scope stops the name leaking out, it does not give each iteration its own cell.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"How do you share <em>mutable</em> state between closures on purpose?"</strong> That is what late binding gives you for free: several closures over the same cell all see each other's writes. To rebind rather than mutate, the inner function needs <code>nonlocal</code>; without it an assignment creates a new local and the outer variable never changes.</p>
+
+<p><strong>"What is the difference between <code>nonlocal</code> and <code>global</code>?"</strong> <code>nonlocal</code> rebinds in the nearest enclosing <em>function</em> scope; <code>global</code> rebinds at module level. Reaching for <code>global</code> to fix a closure is a common wrong turn - it works in a script and breaks the moment the code is called twice or from two threads.</p>
+
+<p><strong>"Does this happen with asyncio too?"</strong> Yes, and it is worse there because the call is deferred by construction. <code>for url in urls: tasks.append(asyncio.create_task(fetch(url)))</code> is fine because <code>fetch(url)</code> is called immediately - but a lambda or a closure referring to <code>url</code> inside the task body sees the last one.</p>
+
+## Common wrong answers
+
+<p><strong>"Declare <code>i</code> global."</strong> Wrong scope, and it makes the functions depend on module state. It also does not fix anything: a global is still one name looked up at call time.</p>
+
+<p><strong>"It is a <code>lambda</code> problem."</strong> A nested <code>def</code> in the same loop behaves identically. Saying "lambda" suggests the cause is the syntax rather than the scope.</p>
+
+<p><strong>"Copy <code>i</code> inside the lambda."</strong> There is nothing to copy at definition time, because the body does not run then. The default-argument form works precisely because defaults <em>are</em> evaluated then.</p>
+
+## Recap in one screen
+
+- The three functions share one cell - that is why they agree.
+- lambda i=i: i captures a value because defaults are evaluated at definition time.
+- The factory version has three separate cells, each with its own value.
+- The one-line answer: A closure captures the variable, not the value it had when the function was defined.
+- Worth trying: Rebind i = 99 after building late and call them again. They all return 99 - the cell is live, not a snapshot.
+- Worth trying: Replace the factory with functools.partial(lambda x: x, i) and check it gives [0, 1, 2] too. Same idea, different spelling.

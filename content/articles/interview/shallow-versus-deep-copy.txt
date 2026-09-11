@@ -1,0 +1,147 @@
+title: Shallow copy vs deep copy
+intro: What is the difference between a shallow and a deep copy, and which one does list(x) give you?
+
+## The question, and what it is testing
+
+A shallow copy builds a <strong>new container holding the same objects</strong>. A deep copy rebuilds the objects too, recursively. Slicing, <code>list()</code>, <code>dict.copy()</code> and <code>copy.copy()</code> are all shallow &mdash; so mutating a nested value through one name is visible through the other.
+
+<p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
+
+## Run it
+
+The divergence at the inner level, the leak demonstrated by one append, and the cycle deepcopy survives.
+
+Where the two diverge, and the one append that proves it.
+
+```python-run
+import copy
+
+original = [[1, 2], [3, 4]]
+shallow = copy.copy(original)
+deep = copy.deepcopy(original)
+
+print("outer objects all differ:")
+print("  shallow is original:", shallow is original)
+print("  deep is original   :", deep is original)
+print()
+print("but the inner lists are shared by the shallow copy:")
+print("  original[0] is shallow[0]:", original[0] is shallow[0])
+print("  original[0] is deep[0]   :", original[0] is deep[0])
+
+original[0].append(99)
+print()
+print("after original[0].append(99):")
+print("  original:", original)
+print("  shallow :", shallow, "<- changed too")
+print("  deep    :", deep, "<- untouched")
+```
+
+
+Every other spelling of copy is the shallow one, for dicts as well as lists.
+
+```python-run
+import copy
+
+original = [[1, 2], [3, 4]]
+for label, made in (("original[:]", original[:]),
+                    ("list(original)", list(original)),
+                    ("original.copy()", original.copy()),
+                    ("[*original]", [*original]),
+                    ("copy.copy(...)", copy.copy(original))):
+    print(f"  {label:<18} shares inner:", made[0] is original[0])
+
+d = {"a": [1]}
+print()
+print("dictionaries too:")
+print("  dict(d)   shares:", dict(d)["a"] is d["a"])
+print("  d.copy()  shares:", d.copy()["a"] is d["a"])
+print("  {**d}     shares:", {**d}["a"] is d["a"])
+```
+
+
+And the two things a naive recursive copy would get wrong.
+
+```python-run
+import copy
+
+cyclic = [1, 2]
+cyclic.append(cyclic)              # a list containing itself
+clone = copy.deepcopy(cyclic)
+print("deepcopy of a cyclic list terminated:", clone[2] is clone)
+
+shared = [0]
+twice = [shared, shared]
+dcopy = copy.deepcopy(twice)
+print("sharing preserved, not duplicated:", dcopy[0] is dcopy[1])
+print("and it is not the original:       ", dcopy[0] is shared)
+
+t = ([1, 2], 3)
+t[0].append(99)
+print()
+print("a tuple is only as immutable as its contents:", t)
+```
+
+## What "shallow" means precisely
+
+<p>A shallow copy allocates a new container and fills it with the <em>same references</em> the original holds. So the outer objects are independent &mdash; appending to the copy does not lengthen the original &mdash; and every element is shared.</p><p>For flat data that distinction never appears. A list of integers or strings copies shallowly and behaves exactly as you would want, because the shared elements are immutable and nobody can change them. The bug needs two ingredients: nesting, and mutation.</p>
+
+## Everything is shallow unless you asked
+
+<p>These are all the same operation: <code>b = a[:]</code>, <code>b = list(a)</code>, <code>b = a.copy()</code>, <code>b = copy.copy(a)</code>, <code>b = [*a]</code>, and <code>dict(d)</code> for dictionaries. One level.</p><p><code>copy.deepcopy</code> is the only one in that list that recurses. It also handles the two things a naive recursion would get wrong: <strong>cycles</strong>, via a memo of objects already copied, so a list containing itself does not hang; and <strong>identity sharing</strong>, so if the same object appears twice in the source it appears twice as the same object in the result rather than being duplicated.</p>
+
+## What deepcopy costs, and when to avoid it
+
+<p>It walks the entire object graph and rebuilds it, so it is proportional to the total size rather than the top-level length, and it is slow enough to notice in a loop. It also copies things you may not want copied: a nested object holding a database connection, an open file or a lock either fails or produces a duplicate that is meaningless.</p><p>Classes control this. <code>__deepcopy__</code> and <code>__copy__</code> let a type define what copying means, and <code>copy.deepcopy</code> falls back to the pickle protocol (<code>__reduce_ex__</code>) &mdash; which is why objects that cannot be pickled frequently cannot be deep-copied either, for the same reason.</p><p>The cheapest fix is often neither: restructure so the nested mutable is not shared in the first place, or use immutable values so copying is unnecessary.</p>
+
+## The follow-up: the nested-list multiplication bug
+
+<p>"What does <code>[[0] * 3] * 3</code> give you?" A list of three references to <em>one</em> inner list, so setting <code>grid[0][0]</code> sets the first cell of every row. It is the same fact as this page &mdash; the outer sequence was copied and the inner one was shared &mdash; arriving through multiplication rather than through a copy call. The fix is a comprehension, which evaluates <code>[0] * 3</code> once per row.</p>
+
+## What to say out loud
+
+<p>A shallow copy copies the outer container and shares the contents, so nested mutation leaks between them. copy.deepcopy rebuilds the whole tree. Slicing and list() are shallow, which is fine for flat data and a bug for nested data.</p>
+
+<p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence and then talking for another minute until something wrong comes out.</p>
+
+## What to notice while it runs
+
+<ul>
+<li>Both copies are new <em>outer</em> objects &mdash; that part is not the difference.</li>
+<li>The shallow copy shares the inner lists, which is where the mutation leaks.</li>
+<li><code>original[:]</code> and <code>list(original)</code> behave exactly like <code>copy.copy</code>.</li>
+</ul>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>Tuples are only as immutable as their contents.</strong> <code>([1, 2], 3)</code> cannot be reassigned and its inner list can still be appended to, so a tuple is not a defence against the problem on this page.</p>
+
+<p><strong>A dict comprehension over a dict is shallow too</strong>, as is <code>{**d}</code>. Every spelling of "make me a new dict from this one" shares the values.</p>
+
+<p><strong><code>copy.deepcopy</code> on a large structure can be slower than recomputing it.</strong> Worth saying out loud, because it shows you are costing the fix rather than reaching for the safest-sounding call.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"How do you copy something that holds a socket or a lock?"</strong> Define <code>__deepcopy__</code>, or <code>__getstate__</code>/<code>__setstate__</code> to say what should be carried and what should be rebuilt. Otherwise <code>deepcopy</code> falls through to the pickle protocol and fails on exactly the attributes that cannot be serialised.</p>
+
+<p><strong>"Is <code>deepcopy</code> ever the wrong tool even when you need independence?"</strong> Often. It is proportional to the whole object graph, so in a loop it dominates. The cheaper answers are to restructure so the nested mutable is not shared, or to use immutable values so no copy is needed - both remove the question rather than answering it.</p>
+
+<p><strong>"What does <code>[[0] * 3] * 3</code> give you?"</strong> Three references to one inner list, so <code>grid[0][0] = 1</code> sets the first cell of every row. Same fact as this page, reached through multiplication. The fix is a comprehension, which evaluates the inner list once per row.</p>
+
+## Common wrong answers
+
+<p><strong>"<code>list(x)</code> gives you an independent copy."</strong> One level. Nested mutables are shared, which is the entire question.</p>
+
+<p><strong>"<code>deepcopy</code> is always the safe default."</strong> It is slow, it copies things you may not want duplicated, and it fails on unpicklable attributes. Safe is not the same as correct.</p>
+
+<p><strong>"<code>dict.copy()</code> copies the nested dictionaries."</strong> It does not. Neither does <code>dict(d)</code> nor a dict comprehension over it.</p>
+
+## Recap in one screen
+
+- Both copies are new outer objects - that part is not the difference.
+- The shallow copy shares the inner lists, which is where the mutation leaks.
+- original[:] and list(original) behave exactly like copy.copy.
+- The one-line answer: A shallow copy builds a new container holding the same objects.
+- Worth trying: Make the inner values immutable - [(1, 2), (3, 4)] - and try to reproduce the leak. You cannot, which is the argument for immutable values over defensive copying.
+- Worth trying: Put an open file in the structure and call deepcopy. The failure is the same one pickle gives, because deepcopy falls back to the same protocol.

@@ -9728,6 +9728,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/shallow-versus-deep-copy.html",
+  "title": "Shallow copy vs deep copy",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "A shallow copy of [[1,2],[3,4]] gives you:",
+    "o": [
+     "A completely independent structure",
+     "A new outer list holding the same two inner lists",
+     "The same object",
+     "A new outer list with new empty inner lists"
+    ],
+    "a": 1,
+    "w": "The container is new and the contents are shared, which is exactly where nested mutation leaks between the two."
+   },
+   {
+    "t": "Which of these is NOT shallow?",
+    "o": [
+     "a[:]",
+     "list(a)",
+     "copy.deepcopy(a)",
+     "a.copy()"
+    ],
+    "a": 2,
+    "w": "deepcopy is the only one that recurses into the contents. The rest are one level deep with different spellings."
+   },
+   {
+    "t": "Why does deepcopy not hang on a list that contains itself?",
+    "o": [
+     "It detects lists specially",
+     "It keeps a memo of objects already copied and reuses it",
+     "It has a recursion limit",
+     "It refuses cyclic input"
+    ],
+    "a": 1,
+    "w": "The memo makes the self-reference point at the new copy, which terminates and preserves the shape."
+   },
+   {
+    "t": "When is a shallow copy perfectly safe?",
+    "o": [
+     "Never",
+     "When the elements are immutable, so sharing them has no consequences",
+     "Only for lists of length 1",
+     "When the copy is read-only"
+    ],
+    "a": 1,
+    "w": "The bug needs nesting and mutation. Immutable elements remove the second ingredient."
+   }
+  ]
+ },
+ {
   "path": "interview/sliding-window-maximum.html",
   "title": "Sliding window maximum",
   "cat": "Interview",
@@ -9964,6 +10015,159 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Popping an empty list raises. It is the failure mode most likely to appear live in an interview."
+   }
+  ]
+ },
+ {
+  "path": "interview/what-with-guarantees.html",
+  "title": "What does `with` guarantee when the body raises?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "When is __exit__ called?",
+    "o": [
+     "Only on a normal exit",
+     "However the body ends: normally, by return, or by exception",
+     "Only if no exception occurred",
+     "Only when the object is garbage collected"
+    ],
+    "a": 1,
+    "w": "That unconditional call is the entire guarantee the with statement buys."
+   },
+   {
+    "t": "What does returning True from __exit__ do?",
+    "o": [
+     "Re-raises the exception",
+     "Suppresses the exception, so execution continues after the block",
+     "Logs it",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "It tells Python the exception was handled. contextlib.suppress is a context manager built entirely on this."
+   },
+   {
+    "t": "What does `as name` bind?",
+    "o": [
+     "The context manager object",
+     "Whatever __enter__ returns",
+     "The exception",
+     "The result of the body"
+    ],
+    "a": 1,
+    "w": "Which is why open() gives a file object and some managers give None."
+   },
+   {
+    "t": "In the @contextmanager form, why is try/finally around the yield required?",
+    "o": [
+     "To satisfy the decorator",
+     "Because an exception in the body propagates through the yield and would skip the cleanup",
+     "To return a value",
+     "It is optional and only stylistic"
+    ],
+    "a": 1,
+    "w": "Without it the cleanup does not run on failure, which defeats the purpose of using a context manager at all."
+   }
+  ]
+ },
+ {
+  "path": "interview/what-does-yield-actually-do.html",
+  "title": "What does `yield` actually do?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "What does calling a function containing yield do?",
+    "o": [
+     "Runs the body and returns a list",
+     "Returns a generator object without running the body",
+     "Runs the body up to the first yield",
+     "Raises unless you iterate it"
+    ],
+    "a": 1,
+    "w": "The call builds a generator that owns a frame which has never started. The body runs on the first next(), not on the call."
+   },
+   {
+    "t": "Why does iterating a generator a second time produce nothing?",
+    "o": [
+     "It is cached",
+     "The frame is closed once the body returns, and that is terminal",
+     "It raises StopIteration immediately",
+     "Only generator expressions behave this way"
+    ],
+    "a": 1,
+    "w": "GEN_CLOSED is a final state. The second loop runs zero times and does not error, which is what makes it a hard bug to see."
+   },
+   {
+    "t": "The memory advantage of a generator comes from:",
+    "o": [
+     "Compression",
+     "Producing items on demand instead of storing them all",
+     "Using C instead of Python",
+     "Reusing one integer object"
+    ],
+    "a": 1,
+    "w": "Only the current item and the frame exist at any moment, so the footprint is constant in the length of the sequence."
+   },
+   {
+    "t": "Which of these does a generator NOT support?",
+    "o": [
+     "for loops",
+     "len()",
+     "next()",
+     "being passed to sum()"
+    ],
+    "a": 1,
+    "w": "The length is not known without running it to the end, so there is nothing for len() to report."
+   }
+  ]
+ },
+ {
+  "path": "interview/what-a-decorator-replaces.html",
+  "title": "What does a decorator actually replace?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "@shout above def greet is equivalent to:",
+    "o": [
+     "greet = shout",
+     "greet = shout(greet)",
+     "shout(greet()) on every call",
+     "greet.shout()"
+    ],
+    "a": 1,
+    "w": "Decoration is one assignment performed at definition time, which is why everything else about decorators follows."
+   },
+   {
+    "t": "Why does __name__ become 'wrapper'?",
+    "o": [
+     "functools renames it",
+     "Because the name now refers to the wrapper function, which has its own metadata",
+     "Decorators delete the docstring",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "The original object is unchanged; the name simply points at a different function now."
+   },
+   {
+    "t": "What does functools.wraps set that helps inspect.signature?",
+    "o": [
+     "__signature__",
+     "__wrapped__",
+     "__code__",
+     "__globals__"
+    ],
+    "a": 1,
+    "w": "__wrapped__ points back at the original, so signature() reports the real parameters instead of (*args, **kwargs)."
+   },
+   {
+    "t": "Why does a decorator taking an argument need three nested functions?",
+    "o": [
+     "For performance",
+     "Because the argument, the function and the call each arrive separately",
+     "To support stacking",
+     "It does not; two is enough"
+    ],
+    "a": 1,
+    "w": "@X calls X(fn), so if X is repeat(3), then repeat(3) has to return a decorator, which returns the wrapper."
    }
   ]
  },
@@ -10248,6 +10452,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/closures-and-late-binding.html",
+  "title": "Why do all these functions return the same value?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "What do the three lambdas in [lambda: i for i in range(3)] return?",
+    "o": [
+     "0, 1, 2",
+     "2, 2, 2",
+     "None",
+     "A TypeError"
+    ],
+    "a": 1,
+    "w": "They share one cell holding i and read it when called, by which time the loop has left it at 2."
+   },
+   {
+    "t": "A Python closure captures:",
+    "o": [
+     "A copy of the value",
+     "A reference to the variable's cell, read at call time",
+     "The whole enclosing frame",
+     "Nothing; it re-executes the enclosing function"
+    ],
+    "a": 1,
+    "w": "That is what late binding means, and it is why the value can change between definition and call."
+   },
+   {
+    "t": "Why does lambda i=i: i fix it?",
+    "o": [
+     "Defaults are re-evaluated per call",
+     "Defaults are evaluated at definition time, so the current value is captured",
+     "It creates a new cell",
+     "Parameters cannot be closed over"
+    ],
+    "a": 1,
+    "w": "The same early-binding rule that makes a mutable default a bug is exactly what you want here."
+   },
+   {
+    "t": "Is this specific to lambda?",
+    "o": [
+     "Yes",
+     "No - a nested def in the same loop behaves identically",
+     "Only in comprehensions",
+     "Only in Python 2"
+    ],
+    "a": 1,
+    "w": "The rule is about scopes and cells, not about which syntax created the function."
+   }
+  ]
+ },
+ {
   "path": "interview/the-nested-list-multiplication-bug.html",
   "title": "Why does [[0]*3]*3 break?",
   "cat": "Interview",
@@ -10328,6 +10583,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/the-mutable-default-argument.html",
+  "title": "Why does this default argument remember?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "When is a default argument expression evaluated?",
+    "o": [
+     "On every call",
+     "Once, when the def statement runs",
+     "On the first call only",
+     "When the module is garbage collected"
+    ],
+    "a": 1,
+    "w": "The def statement evaluates the defaults and stores the objects on the function, so there is nothing left to re-evaluate per call."
+   },
+   {
+    "t": "Why is def f(x=0) harmless while def f(x=[]) is not?",
+    "o": [
+     "Integers are faster",
+     "The int is immutable, so sharing one between calls has no consequences",
+     "0 is falsy",
+     "Python special-cases numbers"
+    ],
+    "a": 1,
+    "w": "Both are shared. Only the mutable one can accumulate changes, so only the mutable one is a bug."
+   },
+   {
+    "t": "The conventional fix is:",
+    "o": [
+     "Copy the default at the top of the body",
+     "Use None as the default and build the value in the body",
+     "Declare the argument global",
+     "Use a tuple instead and convert it"
+    ],
+    "a": 1,
+    "w": "None is an immutable singleton, so the shared default is harmless, and the real value is created per call."
+   },
+   {
+    "t": "Why prefer a private sentinel over None in some APIs?",
+    "o": [
+     "It is faster",
+     "Because None may be a legitimate value the caller wants to pass",
+     "None cannot be compared with is",
+     "Sentinels are required by type checkers"
+    ],
+    "a": 1,
+    "w": "If None is meaningful input, you cannot use it to mean \"not given\". _MISSING = object() distinguishes the two."
+   }
+  ]
+ },
+ {
   "path": "interview/why-is-in-slow-on-a-list.html",
   "title": "Why is `in` slow on a list but fast on a set?",
   "cat": "Interview",
@@ -10368,6 +10674,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/why-a-comprehension-is-faster.html",
+  "title": "Why is a comprehension faster than the same loop?",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why is a comprehension faster than an append loop?",
+    "o": [
+     "It runs in C",
+     "It uses a dedicated LIST_APPEND opcode instead of a per-iteration attribute lookup and call",
+     "It preallocates the list",
+     "It is parallelised"
+    ],
+    "a": 1,
+    "w": "The saving is the per-item lookup and call. Everything else about the two loops is the same."
+   },
+   {
+    "t": "How does the speed-up scale with n?",
+    "o": [
+     "It grows with n",
+     "It is a constant factor - both forms are O(n)",
+     "It only applies below 1000 items",
+     "It disappears for large n"
+    ],
+    "a": 1,
+    "w": "Per-item overhead differs; the number of items does not. Neither form changes complexity."
+   },
+   {
+    "t": "When must you use a loop instead?",
+    "o": [
+     "When the list is large",
+     "When the body needs a statement - try, break, logging, or two operations",
+     "When filtering",
+     "When the input is a generator"
+    ],
+    "a": 1,
+    "w": "A comprehension's body is one expression, so anything needing statements does not fit."
+   },
+   {
+    "t": "If the result is consumed once, a generator expression saves you:",
+    "o": [
+     "Time, by a large factor",
+     "Memory - the time is about the same",
+     "Both time and memory, always",
+     "Nothing"
+    ],
+    "a": 1,
+    "w": "It never builds the list, so memory is constant instead of proportional to n. Per-item __next__ calls mean the runtime is roughly a wash, which the editor measures."
+   }
+  ]
+ },
+ {
   "path": "interview/why-must-dict-keys-be-hashable.html",
   "title": "Why must dictionary keys be hashable?",
   "cat": "Interview",
@@ -10404,6 +10761,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "You redefined equality, so the identity-based default hash no longer agrees with it. @dataclass(frozen=True) does both correctly."
+   }
+  ]
+ },
+ {
+  "path": "interview/is-versus-equals.html",
+  "title": "`is` vs `==`, and why 257 is not 257",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "What does `is` compare?",
+    "o": [
+     "Values, using __eq__",
+     "Object identity, which cannot be overridden",
+     "Types",
+     "Hashes"
+    ],
+    "a": 1,
+    "w": "It compares whether the two names refer to the same object. No type can change its behaviour."
+   },
+   {
+    "t": "Why is int('257') is int('257') False?",
+    "o": [
+     "257 is not hashable",
+     "Only integers from -5 to 256 are cached, so each call built a new object",
+     "int() always returns a new object",
+     "It is a bug"
+    ],
+    "a": 1,
+    "w": "CPython pre-creates a small range of integers. Outside it, equal values are separate objects."
+   },
+   {
+    "t": "Why does e = 257; f = 257; e is f give True?",
+    "o": [
+     "The cache extends further for literals",
+     "The compiler folds repeated constants in one code block into one object",
+     "Assignment always aliases",
+     "It does not"
+    ],
+    "a": 1,
+    "w": "A second, unrelated mechanism. It is why the classic demo gives different answers depending on how you run it."
+   },
+   {
+    "t": "When should you use `is`?",
+    "o": [
+     "For all comparisons, it is faster",
+     "For None, True, False and sentinel objects",
+     "For strings and numbers",
+     "Never"
+    ],
+    "a": 1,
+    "w": "Singletons and sentinels are the cases where identity is genuinely the question being asked."
    }
   ]
  },

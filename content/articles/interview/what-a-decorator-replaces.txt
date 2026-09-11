@@ -1,0 +1,165 @@
+title: What does a decorator actually replace?
+intro: What does the @ syntax do, and why do decorated functions need functools.wraps?
+
+## The question, and what it is testing
+
+<code>@shout</code> above <code>def greet</code> is exactly <code>greet = shout(greet)</code>. The name now refers to whatever the decorator returned &mdash; usually a wrapper function &mdash; so the original's name and docstring are gone unless you copy them across with <code>functools.wraps</code>.
+
+<p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
+
+## Run it
+
+The metadata before and after, the wraps fix, and a decorator with an argument so the three layers are visible.
+
+What the @ line replaces, and what that costs.
+
+```python-run
+def shout(fn):
+    def wrapper(*args, **kwargs):
+        return fn(*args, **kwargs).upper()
+    return wrapper
+
+@shout
+def greet(name):
+    "Say hello politely."
+    return f"hello {name}"
+
+print("it works:", greet("ada"))
+print("but the name now refers to the wrapper:")
+print("  __name__:", greet.__name__)
+print("  __doc__ :", greet.__doc__)
+
+def plain(name):
+    "Say hello politely."
+    return f"hello {name}"
+plain = shout(plain)                  # @shout was exactly this
+print("  manual version, same result:", plain.__name__)
+```
+
+
+functools.wraps copies the metadata across, which is what makes the signature survive.
+
+```python-run
+import functools, inspect
+
+def shout_wraps(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        return fn(*args, **kwargs).upper()
+    return wrapper
+
+@shout_wraps
+def greet2(name):
+    "Say hello politely."
+    return f"hello {name}"
+
+print("with functools.wraps:")
+print("  __name__   :", greet2.__name__)
+print("  __doc__    :", greet2.__doc__)
+print("  __wrapped__:", greet2.__wrapped__.__name__)
+print("  signature  :", inspect.signature(greet2), "<- not (*args, **kwargs)")
+```
+
+
+A decorator taking an argument needs three layers - one per thing it receives.
+
+```python-run
+import functools
+
+def repeat(times):                    # takes the argument
+    def decorator(fn):                # takes the function
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs): # takes the call
+            for _ in range(times):
+                result = fn(*args, **kwargs)
+            return result
+        return wrapper
+    return decorator
+
+calls = []
+
+@repeat(3)
+def record():
+    calls.append(1)
+    return len(calls)
+
+print("@repeat(3) ->", record(), "| calls made:", len(calls))
+```
+
+## It is one assignment
+
+<p>There is no special decorator machinery. These two are the same program:</p><pre><code>@shout
+def greet(name): ...
+
+# is exactly
+def greet(name): ...
+greet = shout(greet)</code></pre><p>Which tells you three things immediately. It runs once, when the <code>def</code> is executed, not on every call. The decorator receives the function object and can return literally anything &mdash; a different function, a class instance, or a string, though the last one will confuse everybody. And stacked decorators apply bottom-up: the one nearest the <code>def</code> wraps first.</p>
+
+## Why wraps exists
+
+<p>If the decorator returns a new function, the name now refers to that function, and it has its own <code>__name__</code>, its own empty <code>__doc__</code> and its own signature. Everything that reads those breaks quietly: <code>help()</code> becomes useless, documentation tools generate entries for a function called <code>wrapper</code>, and test frameworks that discover by name misbehave.</p><p><code>functools.wraps</code> is a decorator for your wrapper that copies <code>__name__</code>, <code>__doc__</code>, <code>__module__</code>, <code>__qualname__</code> and <code>__dict__</code> across, and sets <code>__wrapped__</code> to the original. That last one is what lets <code>inspect.signature</code> report the real signature rather than <code>(*args, **kwargs)</code>.</p>
+
+## Decorators that take arguments
+
+<p><code>@repeat(3)</code> needs one more layer, and the reason follows from the assignment rule. <code>@X</code> calls <code>X(fn)</code>; so if <code>X</code> is written as <code>repeat(3)</code>, then <code>repeat(3)</code> must itself <em>return</em> a decorator:</p><pre><code>def repeat(times):            # takes the argument
+    def decorator(fn):        # takes the function
+        @functools.wraps(fn)
+        def wrapper(*a, **k): # takes the call
+            for _ in range(times):
+                result = fn(*a, **k)
+            return result
+        return wrapper
+    return decorator</code></pre><p>Three levels, one per thing being received. Getting the count wrong is the standard mistake, and the symptom is a <code>TypeError</code> about a function not being callable, or a decorator that returns <code>None</code>.</p>
+
+## The follow-up: what else can decorate
+
+<p>Anything callable. A class with <code>__call__</code> is a common choice when the decorator needs state &mdash; a cache, a call count, a registry &mdash; because instance attributes are tidier than <code>nonlocal</code>. And the standard library's own decorators are worth naming: <code>functools.lru_cache</code> for <a href="../interview/memoisation-with-a-dictionary.html">memoisation</a>, <code>property</code>, <code>staticmethod</code>, <code>classmethod</code>, <code>contextlib.contextmanager</code> and <code>dataclasses.dataclass</code> &mdash; which returns the same class with methods added rather than a wrapper, proving the return value need not be a function at all.</p>
+
+## What to say out loud
+
+<p>The @ line is syntax for reassigning the name: greet = shout(greet). So the name ends up pointing at the wrapper, which is why __name__ and __doc__ change and tracebacks get less useful. functools.wraps copies the metadata over and sets __wrapped__ so introspection still works.</p>
+
+<p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence and then talking for another minute until something wrong comes out.</p>
+
+## What to notice while it runs
+
+<ul>
+<li>Decoration happens once, at definition time &mdash; not per call.</li>
+<li>Without <code>wraps</code>, <code>__name__</code> becomes <code>wrapper</code> and the docstring disappears.</li>
+<li><code>__wrapped__</code> is the escape hatch back to the original.</li>
+</ul>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>A decorator can return anything.</strong> <code>property</code> returns a descriptor and <code>dataclass</code> returns the same class with methods added - so "a decorator wraps a function" is the common case, not the rule.</p>
+
+<p><strong>Decorating a method needs care about <code>self</code>.</strong> The wrapper receives it as the first positional argument, so <code>*args</code> handles it - but the ordering with <code>staticmethod</code> and <code>classmethod</code> matters, and those two go closest to the <code>def</code>.</p>
+
+<p><strong>Exceptions from the wrapper appear in the traceback.</strong> Every decorator adds a frame, which is why a heavily decorated call site produces tracebacks with more wrapper lines than application lines.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"How do you write one that works with and without arguments?"</strong> Inspect the first argument: if it is callable and it is the only one, you were used bare and should decorate it immediately; otherwise return a decorator. It is fiddly, which is why most libraries simply require the parentheses.</p>
+
+<p><strong>"What should you know about <code>functools.lru_cache</code>?"</strong> It stores results on the function, keyed by the arguments - so the arguments must be hashable, and the cache keeps them alive. Decorating a method caches <code>self</code>, which keeps every instance alive for the life of the process: a real and common memory leak. <code>maxsize=None</code> makes it unbounded.</p>
+
+<p><strong>"In what order do stacked decorators apply?"</strong> Bottom-up. The one nearest the <code>def</code> receives the original function, and the one at the top receives whatever the others returned - which is why <code>@app.route</code> goes on top and <code>@staticmethod</code> goes on the bottom.</p>
+
+## Common wrong answers
+
+<p><strong>"The <code>@</code> calls the function."</strong> It calls the <em>decorator</em>, once, with the function as its argument. Nothing calls the function until you do.</p>
+
+<p><strong>"<code>functools.wraps</code> makes it faster."</strong> It copies metadata. There is no performance claim to make, and the wrapper still costs one extra call per invocation.</p>
+
+<p><strong>"The decorator runs on every call."</strong> The decoration runs once, at definition. The <em>wrapper</em> runs on every call, and keeping those two separate is most of understanding decorators.</p>
+
+## Recap in one screen
+
+- Decoration happens once, at definition time - not per call.
+- Without wraps, __name__ becomes wrapper and the docstring disappears.
+- __wrapped__ is the escape hatch back to the original.
+- The one-line answer: @shout above def greet is exactly greet = shout(greet).
+- Worth trying: Remove the @functools.wraps line and call help(greet2). What disappears is what every documentation tool also loses.
+- Worth trying: Stack @shout and @repeat(2) in both orders. The one nearest the def wraps first, and the outputs differ.

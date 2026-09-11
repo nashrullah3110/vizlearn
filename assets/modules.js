@@ -2372,6 +2372,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Learn Search in a rotated sorted array | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
+  "title": "Shallow copy vs deep copy",
+  "path": "interview/shallow-versus-deep-copy.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Shallow copy vs deep copy | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
   "title": "Sliding window maximum",
   "path": "interview/sliding-window-maximum.html",
   "category": "Interview",
@@ -2418,6 +2426,30 @@ window.VIZLEARN_MODULES = [
   "topic": "interview",
   "icon": "interview",
   "desc": "Learn Valid parentheses | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "What does `with` guarantee when the body raises?",
+  "path": "interview/what-with-guarantees.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn What does `with` guarantee when the body raises? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "What does `yield` actually do?",
+  "path": "interview/what-does-yield-actually-do.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn What does `yield` actually do? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "What does a decorator actually replace?",
+  "path": "interview/what-a-decorator-replaces.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn What does a decorator actually replace? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What does slicing a string cost?",
@@ -2476,6 +2508,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Learn Why are Python strings immutable? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
+  "title": "Why do all these functions return the same value?",
+  "path": "interview/closures-and-late-binding.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Why do all these functions return the same value? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
   "title": "Why does [[0]*3]*3 break?",
   "path": "interview/the-nested-list-multiplication-bug.html",
   "category": "Interview",
@@ -2492,6 +2532,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Learn Why does `is` sometimes work on strings? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
+  "title": "Why does this default argument remember?",
+  "path": "interview/the-mutable-default-argument.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Why does this default argument remember? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
   "title": "Why is `in` slow on a list but fast on a set?",
   "path": "interview/why-is-in-slow-on-a-list.html",
   "category": "Interview",
@@ -2500,12 +2548,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Learn Why is `in` slow on a list but fast on a set? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
+  "title": "Why is a comprehension faster than the same loop?",
+  "path": "interview/why-a-comprehension-is-faster.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn Why is a comprehension faster than the same loop? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
   "title": "Why must dictionary keys be hashable?",
   "path": "interview/why-must-dict-keys-be-hashable.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
   "desc": "Learn Why must dictionary keys be hashable? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+ },
+ {
+  "title": "`is` vs `==`, and why 257 is not 257",
+  "path": "interview/is-versus-equals.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "Learn `is` vs `==`, and why 257 is not 257 | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "find() vs index() vs `in` — which one?",
