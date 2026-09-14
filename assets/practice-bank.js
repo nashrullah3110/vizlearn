@@ -8688,6 +8688,108 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/daily-temperatures.html",
+  "title": "Daily temperatures, and the monotonic stack",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "What does the stack hold?",
+    "o": [
+     "Temperatures",
+     "Indices whose answer is not yet known",
+     "The answers",
+     "Days already resolved"
+    ],
+    "a": 1,
+    "w": "Indices, so the answer can be computed as a difference - and they are exactly the days still waiting for a warmer one."
+   },
+   {
+    "t": "Why is the algorithm O(n) despite a while loop inside a for loop?",
+    "o": [
+     "The while loop runs at most twice",
+     "Each index is pushed once and popped at most once, so the total work is bounded by 2n",
+     "Because the input is sorted",
+     "It is not; it is O(n log n)"
+    ],
+    "a": 1,
+    "w": "Count by element, not by iteration. A long inner loop on one step is paid for by empty inner loops on others."
+   },
+   {
+    "t": "What happens to indices still on the stack at the end?",
+    "o": [
+     "They are resolved with the last value",
+     "Their answer stays 0, because no warmer day ever arrived",
+     "They cause an error",
+     "They are popped and discarded"
+    ],
+    "a": 1,
+    "w": "Being on the stack means nothing warmer was found, which is exactly what 0 is supposed to mean."
+   },
+   {
+    "t": "To find the next SMALLER element instead, you would:",
+    "o": [
+     "Reverse the input",
+     "Flip the comparison, making the stack increasing",
+     "Use a queue",
+     "Sort first"
+    ],
+    "a": 1,
+    "w": "Direction of monotonicity and the comparison are the same decision; nothing else in the algorithm changes."
+   }
+  ]
+ },
+ {
+  "path": "interview/design-a-min-stack.html",
+  "title": "Design a stack that reports its minimum in O(1)",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why keep a second stack rather than a single minimum variable?",
+    "o": [
+     "It is faster to read",
+     "Because popping the minimum has to restore the previous one, and a variable has nothing to fall back to",
+     "To support duplicates",
+     "To avoid recursion"
+    ],
+    "a": 1,
+    "w": "The structure needs the minimum at every level, which is exactly what a parallel stack stores."
+   },
+   {
+    "t": "Why is the comparison on push <= rather than <?",
+    "o": [
+     "It is faster",
+     "So each duplicate minimum gets its own entry and survives a pop",
+     "To keep the stacks the same length",
+     "It makes no difference"
+    ],
+    "a": 1,
+    "w": "With strictly less, two equal minimums share one entry, and the first pop removes the minimum for both of them."
+   },
+   {
+    "t": "How long is the min stack after pushing 1, 2, 3?",
+    "o": [
+     "3",
+     "1",
+     "2",
+     "0"
+    ],
+    "a": 1,
+    "w": "Only the first push is a new minimum, so the min stack holds one entry. Space is proportional to how often the minimum changes, not to n."
+   },
+   {
+    "t": "What does the pair variant trade?",
+    "o": [
+     "Time for space",
+     "A fixed two slots per element, for being much easier to get right",
+     "O(1) min for O(n) min",
+     "Nothing; it is strictly better"
+    ],
+    "a": 1,
+    "w": "It always stores a minimum per element rather than only when the minimum changes - worse in the best case, and simpler."
+   }
+  ]
+ },
+ {
   "path": "interview/design-an-lru-cache.html",
   "title": "Design an LRU cache",
   "cat": "Interview",
@@ -8804,6 +8906,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Two rows suffice. The cost is that you can no longer walk the table back to recover which edits were made."
+   }
+  ]
+ },
+ {
+  "path": "interview/evaluate-reverse-polish-notation.html",
+  "title": "Evaluate reverse Polish notation",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "In a - b, which value was popped first?",
+    "o": [
+     "a",
+     "b",
+     "Either; it does not matter",
+     "Both at once"
+    ],
+    "a": 1,
+    "w": "The first pop is the top of the stack, which is the right-hand operand. Getting it backwards negates the result."
+   },
+   {
+    "t": "Why int(a / b) rather than a // b?",
+    "o": [
+     "It is faster",
+     "// floors, and postfix truncates toward zero - they differ when one operand is negative",
+     "// does not work on integers",
+     "They are identical"
+    ],
+    "a": 1,
+    "w": "-7 // 2 is -4 while int(-7 / 2) is -3. They agree for positive operands, so the bug only appears on a negative test case."
+   },
+   {
+    "t": "What does the stack depth at the end tell you?",
+    "o": [
+     "Nothing useful",
+     "Exactly one value means well-formed; more means operands nothing consumed",
+     "The number of operators",
+     "The recursion depth"
+    ],
+    "a": 1,
+    "w": "Each number adds one and each binary operator nets minus one, so a valid expression ends at depth 1."
+   },
+   {
+    "t": "Why does postfix need no parentheses?",
+    "o": [
+     "It only allows two operands",
+     "The token order already fixes the evaluation order",
+     "Operators have no precedence",
+     "It is evaluated right to left"
+    ],
+    "a": 1,
+    "w": "An operator's operands are always the most recent unconsumed values, which is what the top of the stack holds."
    }
   ]
  },
@@ -9044,6 +9197,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "A later entry reached by probing past the deleted slot becomes unreachable. Tombstones let probes continue while allowing reuse."
+   }
+  ]
+ },
+ {
+  "path": "interview/queue-from-two-stacks.html",
+  "title": "Implement a queue using two stacks",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why does pouring one stack into the other give FIFO order?",
+    "o": [
+     "Because stacks are sorted",
+     "A stack reverses; reversing twice restores the original order, so the oldest item ends up on top",
+     "Because the inbox is kept sorted",
+     "It does not; the order is LIFO"
+    ],
+    "a": 1,
+    "w": "The inbox holds them newest-first and the outbox oldest-first. Pouring is the conversion."
+   },
+   {
+    "t": "What makes dequeue O(1) amortised rather than O(n)?",
+    "o": [
+     "The inbox is always small",
+     "Pouring only when the outbox is empty, so each element crosses once in its lifetime",
+     "Python lists are fast",
+     "Nothing; it is O(n)"
+    ],
+    "a": 1,
+    "w": "Total moves for n items is n. One call can be O(n), and n calls together are still O(n)."
+   },
+   {
+    "t": "What is the cost of a single worst-case dequeue?",
+    "o": [
+     "O(1)",
+     "O(n)",
+     "O(log n)",
+     "O(n log n)"
+    ],
+    "a": 1,
+    "w": "The call that finds an empty outbox moves everything across. Amortised O(1) does not mean O(1) worst case, and the difference matters under a latency budget."
+   },
+   {
+    "t": "Implementing a stack from two queues instead:",
+    "o": [
+     "Works with the same amortised trick",
+     "Forces one of the two operations to be O(n) - the asymmetry is the point",
+     "Is impossible",
+     "Needs three queues"
+    ],
+    "a": 1,
+    "w": "A queue hands you the wrong end, and no shuffling amortises that away. Saying so is the right answer."
    }
   ]
  },

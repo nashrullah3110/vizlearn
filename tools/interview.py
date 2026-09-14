@@ -43,6 +43,12 @@ GROUPS = {
         "blurb": "Hash tables, what they promise, what voids the promise, and "
                  "the problems they collapse.",
     },
+    "stacks": {
+        "label": "Stacks & queues",
+        "blurb": "Push, pop, and the four questions that follow: a stack that "
+                 "knows its own minimum, postfix, monotonic stacks, and "
+                 "building one structure from another.",
+    },
     "semantics": {
         "label": "Python semantics",
         "blurb": "The \"do you actually know Python\" round: yield, defaults, "
@@ -50,7 +56,7 @@ GROUPS = {
     },
 }
 
-GROUP_ORDER = ["strings", "lists", "dicts", "semantics"]
+GROUP_ORDER = ["strings", "lists", "dicts", "stacks", "semantics"]
 
 
 # --------------------------------------------------------------------------
@@ -563,6 +569,62 @@ def m_condense():
     return _svg("".join(out) + _label("one opcode", 124, 62))
 
 
+def m_minstack():
+    """A stack beside the running minimum it carries."""
+    out = []
+    for i, v in enumerate((5, 4, 6, 3)):
+        out.append('<rect x="30" y="%d" width="34" height="12" rx="3" '
+                   'fill="%s" stroke="%s" stroke-width="1.5"/>'
+                   % (18 + i * 15, I, M))
+    for i, hot in enumerate((0, 1, 1, 1)):
+        out.append('<rect x="96" y="%d" width="34" height="12" rx="3" '
+                   'fill="%s"/>' % (18 + i * 15, A if hot else I))
+    out.append(_label("data", 47, 88))
+    out.append(_label("mins", 113, 88))
+    return _svg("".join(out))
+
+
+def m_rpn():
+    """Tokens on the left feeding a stack on the right."""
+    out = []
+    for i, t in enumerate(("4", "13", "/")):
+        out.append('<rect x="%d" y="34" width="22" height="18" rx="3" '
+                   'fill="%s" stroke="%s" stroke-width="1.5"/>'
+                   % (14 + i * 26, I, M))
+    out.append(_arrow(92, 43, 112, 43))
+    for i in range(2):
+        out.append('<rect x="116" y="%d" width="30" height="14" rx="3" '
+                   'fill="%s"/>' % (44 - i * 17, A))
+    return _svg("".join(out) + _label("tokens -> stack", 80, 78))
+
+
+def m_monotonic():
+    """A decreasing run, then the arrival that resolves it."""
+    out = []
+    for i, h in enumerate((34, 28, 22, 16)):
+        out.append('<rect x="%d" y="%d" width="18" height="%d" rx="2" '
+                   'fill="%s" opacity="0.55"/>' % (18 + i * 22, 62 - h, h, M))
+    out.append('<rect x="106" y="16" width="18" height="46" rx="2" fill="%s"/>' % A)
+    out.append(_arrow(124, 30, 40, 30, A))
+    return _svg("".join(out) + _label("one arrival resolves several", 80, 80))
+
+
+def m_twostacks():
+    """Two stacks, and the pour between them."""
+    out = []
+    for i in range(3):
+        out.append('<rect x="22" y="%d" width="34" height="12" rx="3" '
+                   'fill="%s" stroke="%s" stroke-width="1.5"/>'
+                   % (24 + i * 15, I, M))
+    for i in range(2):
+        out.append('<rect x="104" y="%d" width="34" height="12" rx="3" '
+                   'fill="%s"/>' % (39 + i * 15, A))
+    out.append(_arrow(60, 45, 100, 45))
+    out.append(_label("inbox", 39, 84))
+    out.append(_label("outbox", 121, 84))
+    return _svg("".join(out))
+
+
 MOTIFS = {
     "lock": m_lock, "slice": m_slice, "codepoint": m_codepoint, "bytes": m_bytes,
     "identity": m_identity, "find": m_find, "palindrome": m_palindrome,
@@ -578,6 +640,8 @@ MOTIFS = {
     "mutate": m_mutate, "memo": m_memo, "prefixmap": m_prefixmap,
     "lazy": m_lazy, "layers": m_layers, "cell": m_cell, "wrap": m_wrap,
     "guard": m_guard, "condense": m_condense,
+    "minstack": m_minstack, "rpn": m_rpn, "monotonic": m_monotonic,
+    "twostacks": m_twostacks,
 }
 
 # Motifs taking a variant argument, so two questions sharing a technique still
@@ -648,6 +712,11 @@ CARD = {
     "what-a-decorator-replaces": "wrap",
     "what-with-guarantees": "guard",
     "why-a-comprehension-is-faster": "condense",
+    # stacks and queues
+    "design-a-min-stack": "minstack",
+    "evaluate-reverse-polish-notation": "rpn",
+    "daily-temperatures": "monotonic",
+    "queue-from-two-stacks": "twostacks",
 }
 
 
@@ -670,9 +739,10 @@ def _assemble():
     from interview_lists import LISTS
     from interview_dicts import DICTS
     from interview_semantics import SEMANTICS
+    from interview_stacks import STACKS
 
     by_group = {"strings": STRINGS, "lists": LISTS, "dicts": DICTS,
-                "semantics": SEMANTICS}
+                "stacks": STACKS, "semantics": SEMANTICS}
     out = []
     for key in GROUP_ORDER:
         for i, q in enumerate(by_group[key]):

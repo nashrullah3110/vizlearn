@@ -1,0 +1,185 @@
+title: Design a stack that reports its minimum in O(1)
+intro: Design a stack with push, pop, top and min, all in O(1).
+
+## The question, and what it is testing
+
+Keep a <strong>second stack of minimums</strong>. On push, copy the value onto it whenever it is less than <em>or equal to</em> the current minimum; on pop, remove it from both if it was the top of both. <code>min()</code> is then one read. The <code>&lt;=</code> is the whole question &mdash; strictly less breaks on duplicates.
+
+## Run it
+
+Both versions of the comparison, on the sequence that separates them.
+
+```python-run
+class MinStackBroken:
+    def __init__(self):
+        self.data, self.mins = [], []
+    def push(self, x):
+        self.data.append(x)
+        if not self.mins or x < self.mins[-1]:    # STRICTLY less: the bug
+            self.mins.append(x)
+    def pop(self):
+        v = self.data.pop()
+        if self.mins and v == self.mins[-1]:
+            self.mins.pop()
+        return v
+    def min(self):
+        return self.mins[-1]
+
+
+class MinStack:
+    def __init__(self):
+        self.data, self.mins = [], []
+    def push(self, x):
+        self.data.append(x)
+        if not self.mins or x <= self.mins[-1]:   # <= keeps one per duplicate
+            self.mins.append(x)
+    def pop(self):
+        v = self.data.pop()
+        if self.mins and v == self.mins[-1]:
+            self.mins.pop()
+        return v
+    def top(self):
+        return self.data[-1]
+    def min(self):
+        return self.mins[-1]
+
+for name, cls in (("strictly <", MinStackBroken), ("<=        ", MinStack)):
+    s = cls()
+    for x in (2, 1, 1):          # 1 pushed twice: the duplicate minimum
+        s.push(x)
+    s.pop()                      # remove one of the 1s
+    print(f"{name}  push 2,1,1 then one pop -> min() = {s.min()}   (correct: 1)")
+```
+
+The min stack grows only when the minimum changes, which is the honest answer to how much extra space it costs.
+
+```python-run
+class MinStack:
+    def __init__(self):
+        self.data, self.mins = [], []
+    def push(self, x):
+        self.data.append(x)
+        if not self.mins or x <= self.mins[-1]:   # <= keeps one per duplicate
+            self.mins.append(x)
+    def pop(self):
+        v = self.data.pop()
+        if self.mins and v == self.mins[-1]:
+            self.mins.pop()
+        return v
+    def top(self):
+        return self.data[-1]
+    def min(self):
+        return self.mins[-1]
+
+s = MinStack()
+for x in (5, 4, 6, 3, 7, 3):
+    s.push(x)
+print("after pushing 5,4,6,3,7,3")
+print("  data:", s.data)
+print("  mins:", s.mins, "<- one entry per level where the minimum changed")
+
+ascending = MinStack()
+for x in (1, 2, 3, 4, 5):
+    ascending.push(x)
+print()
+print("ascending input 1..5")
+print("  mins:", ascending.mins, "<- the best case: one entry")
+```
+
+And the pair variant: easier to get right, at a fixed cost per element.
+
+```python-run
+class MinStack:
+    def __init__(self):
+        self.data, self.mins = [], []
+    def push(self, x):
+        self.data.append(x)
+        if not self.mins or x <= self.mins[-1]:   # <= keeps one per duplicate
+            self.mins.append(x)
+    def pop(self):
+        v = self.data.pop()
+        if self.mins and v == self.mins[-1]:
+            self.mins.pop()
+        return v
+    def top(self):
+        return self.data[-1]
+    def min(self):
+        return self.mins[-1]
+
+class PairStack:
+    def __init__(self):
+        self.stack = []
+    def push(self, x):
+        current = x if not self.stack else min(x, self.stack[-1][1])
+        self.stack.append((x, current))
+    def pop(self):
+        return self.stack.pop()[0]
+    def min(self):
+        return self.stack[-1][1]
+
+
+values = (5, 4, 6, 3, 7, 3)
+two = MinStack(); pair = PairStack()
+for x in values:
+    two.push(x); pair.push(x)
+print("pair variant stores:", pair.stack)
+print("same minimum:", pair.min() == two.min())
+print()
+print("extra slots used for", len(values), "pushes:")
+print("  two stacks:", len(two.mins), "<- only when the minimum changed")
+print("  pairs     :", len(pair.stack), "<- always one per element")
+```
+
+## Why a scan is not allowed
+
+<p>The obvious <code>min()</code> walks the stack, which is O(n) and is exactly what the question forbids. Caching a single minimum in a variable is the next attempt and it fails on pop: when the minimum is removed, there is nothing to fall back to, and finding the new one is another scan.</p><p>So the structure has to remember the minimum <em>at every level</em>. A parallel stack does that: entry <code>k</code> is the minimum of the first <code>k</code> pushes, so popping a level restores the previous answer for free.</p>
+
+## The <= that everybody gets wrong first
+
+<p>Push 2, then 1, then 1. With <code>&lt;</code> the min stack is <code>[2, 1]</code>; with <code>&lt;=</code> it is <code>[2, 1, 1]</code>. Now pop once. Both versions remove a 1 from the data, and the strictly-less version also removed its only 1 from the min stack &mdash; so it reports 2 while a 1 is still in the stack.</p><p>The editor below runs both and prints the two answers side by side. It is the single most common bug in this question, and an interviewer who asks for duplicates is asking about exactly this line.</p>
+
+## The one-stack variants
+
+<p>Two alternatives come up as follow-ups, and both are worth knowing.</p><p><strong>Store pairs.</strong> Push <code>(value, min_so_far)</code> and the minimum is <code>stack[-1][1]</code>. Simpler to get right, and it costs one extra number per element rather than one per new minimum &mdash; worse in the best case, identical in the worst.</p><p><strong>Store deltas.</strong> Keep one stack and push the difference from the current minimum, tracking the minimum in a variable. It is O(1) extra space, it is genuinely clever, and it is fiddly enough that mentioning it as an option scores better than attempting it under time pressure.</p>
+
+## What the question is testing
+
+<p>Whether you can turn "report an aggregate cheaply" into "keep the aggregate as part of the structure". That is the transferable idea: the same move gives a queue with O(1) minimum (two deques, the monotonic one), a sliding-window maximum, and a stack that reports its sum. The interviewer usually follows with one of those.</p><p>The second thing being tested is whether you volunteer the duplicate case yourself. Saying "I will use <code>&lt;=</code> so equal minimums each get an entry" before being asked is the answer they are listening for.</p>
+
+## What to say out loud
+
+<p>A second stack holding the minimum at each level. Push copies the value onto the min stack when it is less than or equal to the current minimum; pop removes it from the min stack if it matches. min() is the top of that stack, so it is O(1). The trap is using strictly less than, which loses a duplicate minimum on the first pop.</p>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong><code>min()</code> on an empty stack.</strong> Decide whether it raises or returns a sentinel, and say which before writing it - an <code>IndexError</code> from <code>self.mins[-1]</code> is a reasonable answer if it is deliberate.</p>
+
+<p><strong>Space is proportional to how often the minimum changes</strong>, not to n. An ascending sequence leaves the min stack at length 1; a descending one makes it as long as the data. Worth stating, because it is the honest answer to "how much extra space?"</p>
+
+<p><strong>The two stacks must stay in step.</strong> Any method that touches <code>data</code> without considering <code>mins</code> - a <code>clear()</code>, a bulk load, a <code>__setitem__</code> - is where this class breaks later.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"Now make it report the maximum too."</strong> One more parallel stack with the comparison mirrored to <code>&gt;=</code>. Worth saying out loud that the duplicate case flips with it - the same <code>&lt;=</code> trap appears as <code>&gt;=</code>, and getting one right and the other wrong is a common slip.</p>
+
+<p><strong>"Can you do it in O(1) extra space?"</strong> Yes, by storing the difference from the current minimum rather than the value, and keeping the minimum in a variable. When you pop a value that <em>is</em> the minimum, the stored delta tells you what the previous minimum was. It is genuinely clever and fiddly under time pressure - naming it and then writing the two-stack version is the better answer.</p>
+
+<p><strong>"What about a queue with O(1) minimum?"</strong> Harder, and the answer is a monotonic deque rather than a second stack: keep candidates in increasing order and discard from the back anything a new arrival makes irrelevant. That is the same structure as <a href="daily-temperatures.html">the monotonic stack</a> and as sliding-window maximum.</p>
+
+## Common wrong answers
+
+<p><strong>"Keep the minimum in a variable and update it on push."</strong> Correct until the first pop. When the minimum leaves, there is nothing to fall back to and finding the new one is an O(n) scan.</p>
+
+<p><strong>"Sort the stack, or keep it sorted."</strong> A sorted stack is not a stack any more - push stops being O(1), and pop returns the wrong element.</p>
+
+<p><strong>"Use <code>min(self.data)</code>; it is a builtin so it is fast."</strong> Builtin and still O(n). The question asks for O(1), and "it is implemented in C" does not change the complexity.</p>
+
+## Recap in one screen
+
+- The min stack holds one entry per level at which the minimum changed, not one per element.
+- Pushing 1 twice pushes 1 onto the min stack twice - that is what <= buys.
+- After the pop, the minimum is still 1, because the second copy is underneath.
+- Worth trying: Change <= back to < in MinStack and run the ascending sequence (1, 2, 3). Both versions agree there, which is why the bug survives a casual test.
+- Worth trying: Add a max() as well. One more parallel stack, and the same >= question arrives in mirror image.

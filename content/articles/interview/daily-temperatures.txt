@@ -1,0 +1,159 @@
+title: Daily temperatures, and the monotonic stack
+intro: For each day, how many days until a warmer temperature? Return 0 if there is none.
+
+## The question, and what it is testing
+
+Keep a stack of <strong>indices whose answer is not known yet</strong>, with temperatures decreasing from the bottom. When a warmer day arrives it resolves every index it beats, popping them. Each index is pushed once and popped at most once, so the nested loop is still <strong>O(n)</strong>.
+
+## Run it
+
+The brute force and the stack, with their operation counts.
+
+```python-run
+def brute(temps):
+    out = [0] * len(temps)
+    checks = 0
+    for i in range(len(temps)):
+        for j in range(i + 1, len(temps)):
+            checks += 1
+            if temps[j] > temps[i]:
+                out[i] = j - i
+                break
+    return out, checks
+
+
+def monotonic(temps):
+    out = [0] * len(temps)
+    stack = []                        # indices, temperatures decreasing
+    pushes = pops = 0
+    for i, t in enumerate(temps):
+        while stack and temps[stack[-1]] < t:
+            j = stack.pop(); pops += 1
+            out[j] = i - j            # i is the first warmer day for j
+        stack.append(i); pushes += 1
+    return out, pushes, pops
+
+temps = [73, 74, 75, 71, 69, 72, 76, 73]
+b_out, checks = brute(temps)
+m_out, pushes, pops = monotonic(temps)
+print("temps    :", temps)
+print("brute    :", b_out, " comparisons:", checks)
+print("monotonic:", m_out, " pushes:", pushes, "pops:", pops)
+print("same answer:", b_out == m_out)
+print()
+print("each index is pushed once and popped at most once, so the total is")
+print(f"{pushes} + {pops} = {pushes + pops} operations for n = {len(temps)}")
+```
+
+The shape that looks worst for the inner loop - and the 2n bound as a number.
+
+```python-run
+def monotonic(temps):
+    out = [0] * len(temps)
+    stack = []                        # indices, temperatures decreasing
+    pushes = pops = 0
+    for i, t in enumerate(temps):
+        while stack and temps[stack[-1]] < t:
+            j = stack.pop(); pops += 1
+            out[j] = i - j            # i is the first warmer day for j
+        stack.append(i); pushes += 1
+    return out, pushes, pops
+
+worst = list(range(2_000, 0, -1)) + [9_999]   # all decreasing, then a spike
+_, p, q = monotonic(worst)
+print(f"n = {len(worst)} (all decreasing, then one spike)")
+print(f"  pushes {p:,}  pops {q:,}  total {p + q:,}  <- about 2n, not n^2")
+print(f"  n^2 would be {len(worst) ** 2:,}")
+
+print()
+rising = list(range(1, 2_002))                # every day resolves the last
+_, p2, q2 = monotonic(rising)
+print(f"strictly rising input, n = {len(rising)}")
+print(f"  pushes {p2:,}  pops {q2:,}  total {p2 + q2:,}  <- the same bound")
+```
+
+And the decision the problem statement usually leaves out.
+
+```python-run
+def monotonic(temps):
+    out = [0] * len(temps)
+    stack = []                        # indices, temperatures decreasing
+    pushes = pops = 0
+    for i, t in enumerate(temps):
+        while stack and temps[stack[-1]] < t:
+            j = stack.pop(); pops += 1
+            out[j] = i - j            # i is the first warmer day for j
+        stack.append(i); pushes += 1
+    return out, pushes, pops
+
+def monotonic_loose(temps):
+    out = [0] * len(temps); stack = []
+    for i, t in enumerate(temps):
+        while stack and temps[stack[-1]] <= t:     # <= instead of <
+            j = stack.pop(); out[j] = i - j
+        stack.append(i)
+    return out
+
+
+flat = [70, 70, 70, 71]
+print("temps", flat)
+print("  strictly warmer  (<) :", monotonic(flat)[0])
+print("  at least as warm (<=):", monotonic_loose(flat))
+print()
+print("with < , an equal day does not resolve the earlier one, so day 0")
+print("waits for 71. With <= , each equal day resolves its predecessor.")
+```
+
+## The question behind the question
+
+<p>"Days until something bigger" is the <strong>next greater element</strong> problem, and recognising it is most of the value here. The brute force is a scan forward from every position, O(n&sup2;), and it is doing the same comparisons over and over.</p><p>The insight is to invert it. Instead of asking each day to look forward for its answer, let each day <em>announce itself</em> to the days still waiting. A day is waiting precisely because nothing warmer has arrived, which means the waiting days are in decreasing order of temperature &mdash; and a decreasing sequence you only ever append to or trim from the end is a stack.</p>
+
+## Why the nested loop is not quadratic
+
+<p>This is the part interviewers probe, because the code has a <code>while</code> inside a <code>for</code> and looks O(n&sup2;).</p><p>Count the work by element rather than by iteration. Each index is pushed exactly once. Each index is popped at most once, and once popped it never returns. So the total number of stack operations across the whole run is at most 2n, whatever the shape of the input &mdash; the inner loop can be long on one iteration only by being empty on others.</p><p>The editor below prints the push and pop counts, including for a 2,000-element worst case, so the 2n bound is a number rather than an assertion. This accounting argument is called amortised analysis, and naming it is worth doing.</p>
+
+## Decreasing or increasing, and strict or not
+
+<p>Two decisions define the variant, and they are where the off-by-one errors live.</p><p><strong>Direction.</strong> A decreasing stack finds the next <em>greater</em> element; an increasing stack finds the next <em>smaller</em> one. The comparison in the <code>while</code> is the only thing that changes.</p><p><strong>Strictness.</strong> <code>&lt;</code> versus <code>&lt;=</code> decides what happens on equal values &mdash; whether "warmer" means strictly warmer. With <code>&lt;</code> an equal temperature does not resolve the earlier day, which is the usual reading of this problem. If the interviewer says "at least as warm", it flips.</p>
+
+## Where else this shape appears
+
+<p>Once the pattern is visible it is everywhere: the largest rectangle in a histogram, trapping rain water, the stock span problem, sliding-window maximum (with a deque rather than a stack), and removing k digits to make the smallest number. All of them keep a monotonic sequence of candidates and discard the ones that a new arrival has made irrelevant.</p><p>The tell, in any problem statement: "the next" or "the previous" element that is bigger or smaller. That phrasing is the monotonic stack asking to be used.</p>
+
+## What to say out loud
+
+<p>A monotonic decreasing stack of indices. For each day I pop every index whose temperature is lower than today's and record the difference as their answer, then push today. Each index is pushed and popped at most once, so it is O(n) time and O(n) space - the inner while loop does not make it quadratic.</p>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>Equal temperatures.</strong> Whether "warmer" is strict decides the answer, and the problem statement often does not say. Ask, or state your assumption - the editor prints both variants on a run of equal values.</p>
+
+<p><strong>The answer array is the output, not the stack.</strong> A common slip is to build the result by appending as things resolve, which produces the answers in resolution order rather than by day.</p>
+
+<p><strong>Space is O(n) in the worst case</strong> - a strictly decreasing input leaves every index on the stack until the end. If the interviewer asks for O(1) space, this approach cannot give it and the honest answer is that the brute force is the only O(1)-space option.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"What is the largest rectangle in a histogram?"</strong> The same stack with the comparison arranged so a shorter bar resolves the taller ones behind it, and the width comes from the index difference. It is the hardest of this family and it is the standard escalation from this question.</p>
+
+<p><strong>"Sliding-window maximum."</strong> A monotonic <em>deque</em> rather than a stack, because entries leave from both ends: the front when it falls out of the window, the back when a bigger arrival makes it irrelevant. Same discard rule, one more exit.</p>
+
+<p><strong>"Can you do it right to left instead?"</strong> Yes, and some people find it easier: walk backwards, popping anything not warmer than the current day, and the answer for each day is the index left on top. Same complexity, same structure, and worth knowing because half the published solutions are written that way.</p>
+
+## Common wrong answers
+
+<p><strong>"The while inside the for makes it O(n<sup>2</sup>)."</strong> The commonest wrong answer, and the one the question exists to test. Count by element: each index is pushed once and popped at most once, so the total is bounded by 2n.</p>
+
+<p><strong>"Store temperatures on the stack."</strong> Then you cannot compute the distance, which is the thing being asked for. Indices carry both the value (via a lookup) and the position.</p>
+
+<p><strong>"Sort the temperatures first."</strong> Sorting destroys the order, and the answer is entirely about order. Any solution that begins by sorting has answered a different question.</p>
+
+## Recap in one screen
+
+- The stack holds indices, not temperatures - the answer is a distance.
+- One warm day can resolve several waiting days at once.
+- Anything still on the stack at the end never found a warmer day, so it stays 0.
+- Worth trying: Reverse the comparison to > and you have "days until a colder temperature" - the same code, an increasing stack, a different question.
+- Worth trying: Return the index of the next warmer day instead of the distance. One character changes, and it is the version most other next-greater-element problems actually want.

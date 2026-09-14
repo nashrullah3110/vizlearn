@@ -1,0 +1,157 @@
+title: Evaluate reverse Polish notation
+intro: Evaluate an expression in postfix notation, for example ['4','13','5','/','+'].
+
+## The question, and what it is testing
+
+Push numbers; on an operator, <strong>pop two and push the result</strong>. Two details decide whether it is correct: the <em>first</em> value popped is the right-hand operand, which only matters for <code>-</code> and <code>/</code>; and the division truncates toward zero, which is <code>int(a / b)</code> and not <code>a // b</code>.
+
+## Run it
+
+The evaluator, on two standard expressions.
+
+```python-run
+def evaluate(tokens):
+    stack = []
+    for t in tokens:
+        if t not in ("+", "-", "*", "/"):
+            stack.append(int(t))
+            continue
+        b = stack.pop()                  # FIRST pop is the right operand
+        a = stack.pop()
+        if t == "+":   stack.append(a + b)
+        elif t == "-": stack.append(a - b)
+        elif t == "*": stack.append(a * b)
+        else:          stack.append(int(a / b))   # truncate toward zero
+    if len(stack) != 1:
+        raise ValueError("malformed: %d values left" % len(stack))
+    return stack[0]
+
+print("4 13 5 / +        ->", evaluate(["4", "13", "5", "/", "+"]), "(expect 6)")
+print("5 1 2 + 4 * + 3 - ->", evaluate(["5","1","2","+","4","*","+","3","-"]),
+      "(expect 14)")
+print("a single number is valid:", evaluate(["42"]))
+```
+
+Pop order, with the case that hides the bug printed beside the case that reveals it.
+
+```python-run
+def evaluate(tokens):
+    stack = []
+    for t in tokens:
+        if t not in ("+", "-", "*", "/"):
+            stack.append(int(t))
+            continue
+        b = stack.pop()                  # FIRST pop is the right operand
+        a = stack.pop()
+        if t == "+":   stack.append(a + b)
+        elif t == "-": stack.append(a - b)
+        elif t == "*": stack.append(a * b)
+        else:          stack.append(int(a / b))   # truncate toward zero
+    if len(stack) != 1:
+        raise ValueError("malformed: %d values left" % len(stack))
+    return stack[0]
+
+def evaluate_swapped(tokens):
+    stack = []
+    for t in tokens:
+        if t not in ("+", "-", "*", "/"):
+            stack.append(int(t)); continue
+        a = stack.pop(); b = stack.pop()          # swapped on purpose
+        stack.append({"+": a + b, "-": a - b, "*": a * b,
+                      "/": int(a / b)}[t])
+    return stack[0]
+
+
+print("3 4 -   correct:", evaluate(["3","4","-"]),
+      " swapped:", evaluate_swapped(["3","4","-"]))
+print("3 4 +   correct:", evaluate(["3","4","+"]),
+      " swapped:", evaluate_swapped(["3","4","+"]), " <- agrees, so + hides it")
+print("8 2 /   correct:", evaluate(["8","2","/"]),
+      " swapped:", evaluate_swapped(["8","2","/"]))
+```
+
+The division that differs on negatives, and the two ways an expression can be malformed.
+
+```python-run
+def evaluate(tokens):
+    stack = []
+    for t in tokens:
+        if t not in ("+", "-", "*", "/"):
+            stack.append(int(t))
+            continue
+        b = stack.pop()                  # FIRST pop is the right operand
+        a = stack.pop()
+        if t == "+":   stack.append(a + b)
+        elif t == "-": stack.append(a - b)
+        elif t == "*": stack.append(a * b)
+        else:          stack.append(int(a / b))   # truncate toward zero
+    if len(stack) != 1:
+        raise ValueError("malformed: %d values left" % len(stack))
+    return stack[0]
+
+print("the division trap:")
+for a, b in ((-7, 2), (7, -2), (7, 2)):
+    print(f"  {a:>3} / {b:<3}  a // b = {a // b:>3}   int(a / b) = {int(a / b):>3}")
+print("only the negative cases differ, which is why this bug ships")
+
+print()
+for bad in (["1", "+"], ["1", "2", "3", "+"]):
+    try:
+        evaluate(bad)
+    except (IndexError, ValueError) as e:
+        print(f"  {bad} -> {type(e).__name__}: {e}")
+```
+
+## Why postfix needs no parentheses
+
+<p>In infix, <code>4 + 13 / 5</code> is ambiguous without precedence rules, and <code>(4 + 13) / 5</code> needs brackets to say the other thing. Postfix encodes the order in the token sequence itself, so there is nothing left to disambiguate &mdash; and that is why it evaluates with a stack and no parser.</p><p>The rule is mechanical. A number has no dependencies, so it waits on the stack. An operator's operands are always the most recent unconsumed values, which is exactly what "top of the stack" means.</p>
+
+## The two lines that are wrong in most first attempts
+
+<p><strong>Pop order.</strong> <code>b = pop(); a = pop()</code> and then <code>a - b</code>. Getting it backwards gives the right answer for <code>+</code> and <code>*</code> and the negated or reciprocal answer for <code>-</code> and <code>/</code> &mdash; which is why the bug survives the first test case anybody tries.</p><p><strong>Division.</strong> Python's <code>//</code> floors, so <code>-7 // 2</code> is <code>-4</code>. Postfix, like C and like every version of this problem, truncates toward zero and wants <code>-3</code>. <code>int(a / b)</code> gives that; <code>math.trunc(a / b)</code> says it more explicitly. For positive operands the two agree, so this is another bug that only appears on the test case with a negative number in it.</p>
+
+## What the stack depth tells you
+
+<p>The depth is a validity check you get for free. Every number adds one; every binary operator removes one net. So a well-formed expression of <em>n</em> numbers and <em>n&minus;1</em> operators ends at depth 1.</p><p>Two failure modes follow, and an interviewer may ask for both. Popping from an empty stack means an operator with too few operands &mdash; malformed. Finishing with more than one value means numbers that nothing consumed, which is also malformed. Checking both is three lines and is the difference between a solution and a robust one.</p>
+
+## The follow-up: converting from infix
+
+<p>"How would you get postfix in the first place?" The shunting-yard algorithm, and it is the same structure twice: one stack for operators, one output list. Numbers go straight to the output; an operator pops every operator of higher or equal precedence before pushing itself; brackets push and pop. Worth being able to name even if you are not asked to write it &mdash; it is the reason postfix exists as an intermediate form.</p>
+
+## What to say out loud
+
+<p>A stack. Numbers get pushed; an operator pops two operands, applies itself and pushes the result. The order matters - the first pop is the right operand - and for division I use int(a / b) rather than //, because Python floors and postfix expects truncation toward zero. At the end the stack holds exactly one value.</p>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>Division by zero.</strong> <code>int(a / b)</code> raises <code>ZeroDivisionError</code>; decide whether that propagates or becomes a domain error of your own, and say so rather than discovering it.</p>
+
+<p><strong>Multi-digit and negative literals.</strong> <code>int(t)</code> handles both, but a tokeniser that splits on characters rather than whitespace will turn <code>-4</code> into an operator and a number.</p>
+
+<p><strong>A single number is a valid expression.</strong> <code>["42"]</code> should return 42, and a loop that requires at least one operator will not.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"How would you produce the postfix in the first place?"</strong> The shunting-yard algorithm: one stack for operators, one output list. Numbers go straight out; an operator pops every operator of higher or equal precedence before pushing itself; a closing bracket pops until the opener. Worth naming even if you are not asked to write it.</p>
+
+<p><strong>"What about unary minus?"</strong> It breaks the pop-two rule, so it needs either a distinct token (<code>~</code> or <code>neg</code>) or arity tracked per operator. Raising this unprompted is a good sign - it is the first thing that stops the evaluator being four lines.</p>
+
+<p><strong>"Evaluate prefix notation instead."</strong> Same stack, scanned right to left - and the pop order reverses, so the first pop becomes the <em>left</em> operand. It is a two-character change and it catches people who memorised the code rather than the reason.</p>
+
+## Common wrong answers
+
+<p><strong>"<code>a = pop(); b = pop()</code> then <code>a - b</code>."</strong> The swap. It gives the right answer for <code>+</code> and <code>*</code>, so the first test case passes and subtraction is negated.</p>
+
+<p><strong>"Use <code>a // b</code> for integer division."</strong> Python floors, postfix truncates. They agree on positive operands and differ by one on negatives, so this ships.</p>
+
+<p><strong>"Use <code>eval()</code>."</strong> It does not evaluate postfix at all, and offering it signals you have not read the question. Mentioning that you would never <code>eval</code> untrusted input is fine; offering it as the solution is not.</p>
+
+## Recap in one screen
+
+- Numbers accumulate; an operator is the only thing that shrinks the stack.
+- 13 / 5 becomes 2, not 2.6 - integer division, truncated.
+- Exactly one value remains, and that is the result.
+- Worth trying: Add % and **. The modulo has the same sign disagreement as division, and exponentiation is the first operator here that is not commutative or associative.
+- Worth trying: Feed it ["2", "0", "/"]. Decide whether the right answer is an exception or a sentinel, and say which before you write it.

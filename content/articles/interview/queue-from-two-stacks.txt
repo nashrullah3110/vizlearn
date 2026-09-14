@@ -1,0 +1,184 @@
+title: Implement a queue using two stacks
+intro: Implement a FIFO queue using only stacks. What is the cost of each operation?
+
+## The question, and what it is testing
+
+Two stacks: push onto the <strong>inbox</strong>, pop from the <strong>outbox</strong>. When the outbox is empty, pour the whole inbox into it &mdash; which reverses the order, turning LIFO into FIFO. Pouring <em>only when empty</em> is what makes dequeue <strong>O(1) amortised</strong>; pouring every time makes it O(n).
+
+## Run it
+
+FIFO through interleaved operations, which is the part worth checking.
+
+```python-run
+class Queue:
+    """Amortised O(1): pour only when the outbox is empty."""
+    def __init__(self):
+        self.inbox, self.outbox = [], []
+        self.moves = 0
+    def enqueue(self, x):
+        self.inbox.append(x)
+    def dequeue(self):
+        if not self.outbox:                  # ONLY when empty
+            while self.inbox:
+                self.outbox.append(self.inbox.pop())
+                self.moves += 1
+        if not self.outbox:
+            raise IndexError("dequeue from an empty queue")
+        return self.outbox.pop()
+
+q = Queue()
+for x in "abc":
+    q.enqueue(x)
+first, second = q.dequeue(), q.dequeue()
+q.enqueue("d")                       # enqueued AFTER two dequeues
+third, fourth = q.dequeue(), q.dequeue()
+print("dequeue order:", first, second, third, fourth, " <- FIFO preserved")
+print("c was enqueued before d, and c came out first:", third == "c")
+
+try:
+    Queue().dequeue()
+except IndexError as e:
+    print("empty queue ->", e)
+```
+
+The cost of the emptiness check, measured on the same workload.
+
+```python-run
+class Queue:
+    """Amortised O(1): pour only when the outbox is empty."""
+    def __init__(self):
+        self.inbox, self.outbox = [], []
+        self.moves = 0
+    def enqueue(self, x):
+        self.inbox.append(x)
+    def dequeue(self):
+        if not self.outbox:                  # ONLY when empty
+            while self.inbox:
+                self.outbox.append(self.inbox.pop())
+                self.moves += 1
+        if not self.outbox:
+            raise IndexError("dequeue from an empty queue")
+        return self.outbox.pop()
+
+class QueueEager:
+    """The version that pours every time: O(n) per dequeue."""
+    def __init__(self):
+        self.inbox, self.outbox = [], []
+        self.moves = 0
+    def enqueue(self, x):
+        self.inbox.append(x)
+    def dequeue(self):
+        while self.inbox:
+            self.outbox.append(self.inbox.pop()); self.moves += 1
+        v = self.outbox.pop()
+        while self.outbox:                   # and pour back again
+            self.inbox.append(self.outbox.pop()); self.moves += 1
+        return v
+
+
+N = 400
+for name, cls in (("amortised (pour when empty)", Queue),
+                  ("eager (pour every time)   ", QueueEager)):
+    inst = cls()
+    for i in range(N):
+        inst.enqueue(i)
+    for i in range(N):
+        inst.dequeue()
+    print(f"  {name}  {N} enqueues + {N} dequeues -> {inst.moves:,} moves")
+
+print()
+print("  each element crosses between the stacks ONCE in its whole life,")
+print(f"  so the total is {N} moves for n = {N} - not {N} moves per call.")
+```
+
+One dequeue can still be O(n) - amortised is a claim about the total.
+
+```python-run
+class Queue:
+    """Amortised O(1): pour only when the outbox is empty."""
+    def __init__(self):
+        self.inbox, self.outbox = [], []
+        self.moves = 0
+    def enqueue(self, x):
+        self.inbox.append(x)
+    def dequeue(self):
+        if not self.outbox:                  # ONLY when empty
+            while self.inbox:
+                self.outbox.append(self.inbox.pop())
+                self.moves += 1
+        if not self.outbox:
+            raise IndexError("dequeue from an empty queue")
+        return self.outbox.pop()
+
+q = Queue()
+for i in range(1_000):
+    q.enqueue(i)
+
+before = q.moves
+q.dequeue()
+print("a single dequeue after 1,000 enqueues moved", q.moves - before, "items")
+
+before = q.moves
+q.dequeue()
+print("the next one moved", q.moves - before, "- the outbox was already full")
+
+for _ in range(998):
+    q.dequeue()
+print()
+print("total moves for the whole run:", q.moves, "for 1,000 items")
+print("that is the amortised bound: O(n) in total, O(n) for one worst call.")
+```
+
+## Why reversing twice gives FIFO
+
+<p>A stack reverses what you put into it. Pour one stack into another and you have reversed it again, which restores the original order &mdash; so the item pushed first ends up on top of the second stack, which is exactly the front of a queue.</p><p>That is the whole trick, and it is worth stating in one sentence in an interview: <em>the inbox has them newest-first, the outbox has them oldest-first, and pouring is what converts between the two</em>.</p>
+
+## The emptiness check is the entire complexity argument
+
+<p>The naive version pours on every dequeue &mdash; and, to keep enqueue working, pours back afterwards. That is O(n) per call and O(n&sup2;) for n dequeues. The editor below measures it: 400 operations cost 160,000 moves that way, against 400 the right way.</p><p>Pouring only when the outbox is empty means each element crosses once in its entire life. Total moves for n items is n, so the average cost per dequeue is constant even though one individual dequeue can touch every element. That is amortised O(1), and the distinction between "amortised O(1)" and "O(1) worst case" is what the follow-up question is about.</p>
+
+## When amortised is not good enough
+
+<p>Amortised bounds are about totals, and some systems care about the worst single call. A real-time audio callback or a request with a latency budget cannot afford the one dequeue that moves ten thousand items, even if the average is fine.</p><p>The honest answer is that this structure cannot fix that &mdash; and naming the alternatives is what a strong answer does. Move a constant number of items per operation instead of all of them (incremental rebuilding), or use a structure that is O(1) worst case outright, which in Python is <code>collections.deque</code>. Which leads to the real-world footnote: nobody builds a queue from two stacks in production. The question is about reasoning, and it is fair to say so while still answering it.</p>
+
+## The mirror question
+
+<p>"Now implement a stack using two queues." It is the same idea and strictly worse: one of the two operations has to become O(n), because a queue gives you the wrong end and no amount of shuffling amortises away. Either push moves everything into the second queue behind the new item, or pop moves n&minus;1 items across to reach the last one.</p><p>There is no trick that makes both O(1) here, and saying that directly is the right answer &mdash; the asymmetry between the two questions is the thing being tested.</p>
+
+## What to say out loud
+
+<p>One stack for incoming, one for outgoing. Enqueue pushes onto the inbox. Dequeue pops the outbox, and if the outbox is empty first it moves everything across, which reverses the order into FIFO. Enqueue is O(1); dequeue is O(1) amortised, because each element moves between the stacks exactly once in its lifetime, even though a single dequeue can be O(n).</p>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>Dequeue from empty.</strong> The outbox is empty and so is the inbox, so the pour moves nothing and the pop raises. Check it explicitly rather than letting an <code>IndexError</code> escape from an internal list.</p>
+
+<p><strong><code>peek()</code> needs the same pour.</strong> Forgetting the emptiness check there is the standard bug in the extension, and it returns the newest item instead of the oldest.</p>
+
+<p><strong>Nobody ships this.</strong> <code>collections.deque</code> is O(1) at both ends and is what production code uses. Saying that while still answering the question shows you know why it is being asked.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"What is the worst case for a single dequeue?"</strong> O(n) - the call that finds an empty outbox moves everything. The answer they want is the distinction: amortised O(1) is a statement about the total across n operations, not about any one of them.</p>
+
+<p><strong>"Now implement a stack from two queues."</strong> The mirror, and strictly worse: one of the two operations has to be O(n), because a queue hands you the wrong end and no shuffling amortises that away. Saying so directly is the right answer.</p>
+
+<p><strong>"How would you make dequeue O(1) worst case?"</strong> Not with this structure. Either move a constant number of items per operation (incremental rebuilding, which keeps both stacks partially filled), or use a structure that is O(1) outright - <code>collections.deque</code>, which is a doubly-linked list of blocks.</p>
+
+## Common wrong answers
+
+<p><strong>"Pour on every dequeue so the outbox is always current."</strong> Correct output, O(n) per call, O(n<sup>2</sup>) overall. The editor measures it as 160,000 moves against 400 for the same workload.</p>
+
+<p><strong>"Amortised O(1) means every operation is O(1)."</strong> It means the total for n operations is O(n). One call can still touch every element, which matters under a latency budget.</p>
+
+<p><strong>"Use one stack and reverse it when needed."</strong> Reversing is O(n) and you have to reverse back to keep pushing cheap - which is the eager version with extra steps.</p>
+
+## Recap in one screen
+
+- Enqueue never reorders anything - it is always one push.
+- The pour happens only when the outbox is empty, and it reverses the order.
+- While the outbox has items, dequeue does no moving at all.
+- Worth trying: Add peek(). It needs the same emptiness check as dequeue, and forgetting it is the standard bug in this extension.
+- Worth trying: Try implementing a stack from two queues and count the moves. One of the two operations stays O(n) however you arrange it, which is the asymmetry worth being able to explain.
