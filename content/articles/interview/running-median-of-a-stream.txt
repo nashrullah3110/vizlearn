@@ -1,0 +1,184 @@
+title: Find the median of a data stream
+intro: Numbers arrive one at a time. Report the median after each one.
+
+## The question, and what it is testing
+
+Split the values in half: a <strong>max-heap of the lower half</strong> and a <strong>min-heap of the upper half</strong>. Their roots are the two middle values, so the median is one or two reads. Each insert pushes, moves one across and rebalances &mdash; O(log n) in, O(1) out.
+
+## Run it
+
+The three-line insert, checked against statistics.median at every step.
+
+```python-run
+import heapq, random, statistics, time
+
+class RunningMedian:
+    def __init__(self):
+        self.low = []      # max-heap, stored negated
+        self.high = []     # min-heap
+
+    def add(self, x):
+        heapq.heappush(self.low, -x)                        # always push low
+        heapq.heappush(self.high, -heapq.heappop(self.low)) # move its largest
+        if len(self.high) > len(self.low):                  # rebalance
+            heapq.heappush(self.low, -heapq.heappop(self.high))
+
+    def median(self):
+        if len(self.low) > len(self.high):
+            return float(-self.low[0])
+        return (-self.low[0] + self.high[0]) / 2
+
+
+random.seed(11)
+stream = [random.randint(0, 1000) for _ in range(2_000)]
+
+m = RunningMedian()
+seen, ok = [], True
+for i, x in enumerate(stream):
+    m.add(x); seen.append(x)
+    if abs(m.median() - statistics.median(seen)) > 1e-9:
+        ok = False; print("MISMATCH at", i); break
+print("matches statistics.median at every one of", len(stream), "steps:", ok)
+print("invariant len(low) - len(high) in (0, 1):",
+      len(m.low) - len(m.high) in (0, 1))
+print("heap sizes:", len(m.low), len(m.high))
+```
+
+Against re-sorting the stream on every query.
+
+```python-run
+import heapq, random, statistics, time
+
+class RunningMedian:
+    def __init__(self):
+        self.low = []      # max-heap, stored negated
+        self.high = []     # min-heap
+
+    def add(self, x):
+        heapq.heappush(self.low, -x)
+        heapq.heappush(self.high, -heapq.heappop(self.low))
+        if len(self.high) > len(self.low):
+            heapq.heappush(self.low, -heapq.heappop(self.high))
+
+    def median(self):
+        if len(self.low) > len(self.high):
+            return float(-self.low[0])
+        return (-self.low[0] + self.high[0]) / 2
+
+random.seed(11)
+stream = [random.randint(0, 1000) for _ in range(2_000)]
+
+# Against re-sorting on every query.
+def by_sorting(stream):
+    out, data = [], []
+    for x in stream:
+        data.append(x); data.sort()
+        n = len(data)
+        out.append(float(data[n // 2]) if n % 2
+                   else (data[n // 2 - 1] + data[n // 2]) / 2)
+    return out
+
+t0 = time.perf_counter()
+heap_out, mm = [], RunningMedian()
+for x in stream:
+    mm.add(x); heap_out.append(mm.median())
+a = time.perf_counter() - t0
+
+t0 = time.perf_counter(); sort_out = by_sorting(stream); b = time.perf_counter() - t0
+print()
+print("same medians throughout:", heap_out == sort_out)
+print(f"  two heaps          {a*1000:7.1f} ms   O(log n) per insert")
+print(f"  re-sort each time  {b*1000:7.1f} ms   ({b/a:.0f}x slower)")
+```
+
+And what the negation is hiding.
+
+```python-run
+import heapq, random, statistics, time
+
+class RunningMedian:
+    def __init__(self):
+        self.low = []      # max-heap, stored negated
+        self.high = []     # min-heap
+
+    def add(self, x):
+        heapq.heappush(self.low, -x)
+        heapq.heappush(self.high, -heapq.heappop(self.low))
+        if len(self.high) > len(self.low):
+            heapq.heappush(self.low, -heapq.heappop(self.high))
+
+    def median(self):
+        if len(self.low) > len(self.high):
+            return float(-self.low[0])
+        return (-self.low[0] + self.high[0]) / 2
+
+random.seed(11)
+stream = [random.randint(0, 1000) for _ in range(2_000)]
+
+mm = RunningMedian()
+for x in stream:
+    mm.add(x)
+
+# The negation is the only reason this looks odd.
+print()
+print("low half holds:", sorted((-v for v in mm.low), reverse=True)[:5], "...")
+print("high half holds:", sorted(mm.high)[:5], "...")
+print("the two roots are the middle:", -mm.low[0], mm.high[0])
+```
+
+## Why two heaps and not one sorted list
+
+<p>A sorted list gives an O(1) median and an O(n) insert, because everything after the insertion point shifts. A single heap gives an O(log n) insert and no useful median at all &mdash; a heap knows its extreme, not its middle.</p><p>Two heaps back to back give both. The largest of the small half and the smallest of the large half sit next to each other in sorted order, and both are heap roots. So the structure keeps exactly the two values you need at exactly the two positions a heap makes cheap.</p>
+
+## The insert, and why it is three operations
+
+<p>The naive version &mdash; compare against a root and push to the appropriate side &mdash; is correct and has an awkward number of cases. The compact form has none:</p><pre><code>heappush(low, -x)                      # always to the low side
+heappush(high, -heappop(low))          # move its largest across
+if len(high) &gt; len(low):
+    heappush(low, -heappop(high))      # rebalance</code></pre><p>Pushing then immediately moving the largest guarantees the value lands on the correct side whatever it was, because the max-heap has already floated the biggest low value to the top. The third line keeps the sizes within one. Three heap operations, no branching on value, and it is the version worth memorising.</p>
+
+## The negation, and what it costs
+
+<p><code>heapq</code> implements a min-heap only, so a max-heap is built by negating on the way in and again on the way out. It works for numbers and it is the standard trick.</p><p>It does not work for anything that is not negatable &mdash; strings, tuples, objects. For those, either wrap each item in a class with a reversed <code>__lt__</code>, or push <code>(-priority, item)</code> when only the key needs reversing. Mentioning the limitation is worth doing, because the negation trick is the first thing that breaks when the question changes from integers to records.</p>
+
+## The follow-ups
+
+<p><strong>"What about a sliding window median?"</strong> Harder, because values now leave as well as arrive and a heap cannot remove an arbitrary element. The standard answer is <em>lazy deletion</em>: keep a count of values due to be removed and discard them when they reach a root. The other answer is a structure built for it, like a sorted container with O(log n) insert and delete.</p><p><strong>"What if you only need an approximate median?"</strong> Then this is overkill, and the real-world answer is a sketch &mdash; t-digest or a reservoir sample &mdash; which trades exactness for constant memory. Worth naming, because production percentile monitoring is built on those rather than on two heaps.</p>
+
+## What to say out loud
+
+<p>Two heaps. A max-heap for the lower half, a min-heap for the upper half, kept within one element of each other in size. The median is the root of the larger heap, or the average of the two roots when they are equal. Insert is O(log n) and the median is O(1). Python only has a min-heap, so the low half stores negated values.</p>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>The first element.</strong> One heap is empty, so any median that reads both roots will raise. The size check has to come first.</p>
+
+<p><strong>Even counts.</strong> The median is the average of two roots, so the return type becomes a float. Returning an int for odd counts and a float for even ones is a real inconsistency to decide on deliberately.</p>
+
+<p><strong>The negation only works for numbers.</strong> Strings, tuples and objects cannot be negated, so a max-heap of those needs a wrapper class with a reversed <code>__lt__</code>.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"Now do a sliding-window median."</strong> Harder, because values leave as well as arrive and a heap cannot delete an arbitrary element. The standard answer is lazy deletion - count what is due to be removed and discard it when it surfaces at a root - or a structure built for it, such as a sorted container with O(log n) insert and delete.</p>
+
+<p><strong>"What if you only need an approximate median?"</strong> Then two heaps are overkill. t-digest or a reservoir sample gives percentiles in constant memory, which is what production monitoring actually uses.</p>
+
+<p><strong>"Report an arbitrary percentile, not the median."</strong> The same split with the sizes kept at a different ratio - the roots then straddle the 90th percentile instead of the middle. Getting the rebalance condition right is the whole change.</p>
+
+## Common wrong answers
+
+<p><strong>"Keep a sorted list and index the middle."</strong> O(1) median and O(n) insert, because everything after the insertion point shifts. It is the baseline to mention and not the answer.</p>
+
+<p><strong>"Use one heap."</strong> A heap knows its extreme, not its middle. There is no way to read a median off a single heap.</p>
+
+<p><strong>"Compare against a root and push to the right side."</strong> Correct, and it has more cases than the three-line version - and the cases are where the bugs live. Push low, move the max across, rebalance.</p>
+
+## Recap in one screen
+
+- The two roots are the middle of the data - that is the whole design.
+- Every insert goes through both heaps, which is what keeps them balanced.
+- The low half is negated, because heapq is a min-heap only.
+- Worth trying: Remove the rebalance line and watch the medians drift. It fails silently rather than raising, which is why the check against statistics.median is in the code.
+- Worth trying: Feed it a sorted stream instead of a random one. The heaps still balance, because the rebalance depends on sizes rather than on values.

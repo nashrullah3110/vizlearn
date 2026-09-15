@@ -1,0 +1,156 @@
+title: Top k frequent elements
+intro: Return the k most frequent elements in a list.
+
+## The question, and what it is testing
+
+Count, then keep a <strong>min-heap of size k</strong>. The root is the weakest of the current best k, so one comparison rejects any candidate that cannot beat it &mdash; and most of the input is rejected that way. O(n log k) rather than O(n log n), and the gap is real once the number of distinct values is large.
+
+## Run it
+
+Sorting everything against a heap of size k, at 200,000 items.
+
+```python-run
+import heapq, random, time
+from collections import Counter
+
+random.seed(7)
+words = [random.randint(0, 40_000) for _ in range(200_000)]
+counts = Counter(words)
+k = 10
+print("n =", len(words), " distinct =", len(counts), " k =", k)
+
+# 1. sort everything, take a slice: O(n log n)
+t0 = time.perf_counter()
+by_sort = [w for w, _ in sorted(counts.items(), key=lambda kv: -kv[1])[:k]]
+a = time.perf_counter() - t0
+
+# 2. a heap of size k: O(n log k)
+t0 = time.perf_counter()
+by_heap = [w for w, _ in heapq.nlargest(k, counts.items(), key=lambda kv: kv[1])]
+b = time.perf_counter() - t0
+```
+
+And the O(n) version, which removes the log factor without necessarily winning the clock.
+
+```python-run
+import heapq, random, time
+from collections import Counter
+
+random.seed(7)
+words = [random.randint(0, 40_000) for _ in range(200_000)]
+counts = Counter(words)
+k = 10
+
+# 3. bucket by count: O(n), because a count cannot exceed n
+def by_buckets(counts, k):
+    if not counts:
+        return []
+    buckets = [[] for _ in range(max(counts.values()) + 1)]
+    for key, c in counts.items():
+        buckets[c].append(key)
+    out = []
+    for c in range(len(buckets) - 1, 0, -1):
+        for key in buckets[c]:
+            out.append(key)
+            if len(out) == k:
+                return out
+    return out
+
+t0 = time.perf_counter()
+by_bucket = by_buckets(counts, k)
+c = time.perf_counter() - t0
+
+by_sort = [w for w, _ in sorted(counts.items(), key=lambda kv: -kv[1])[:k]]
+by_heap = [w for w, _ in heapq.nlargest(k, counts.items(), key=lambda kv: kv[1])]
+print("all three pick the same counts:",
+      sorted(counts[w] for w in by_sort)
+      == sorted(counts[w] for w in by_heap)
+      == sorted(counts[w] for w in by_bucket))
+print(f"  buckets     {c*1000:7.1f} ms   O(n), level with the heap at this size")
+```
+
+Where the log k actually comes from: how little of the input ever enters the heap.
+
+```python-run
+import heapq, random, time
+from collections import Counter
+
+random.seed(7)
+words = [random.randint(0, 40_000) for _ in range(200_000)]
+counts = Counter(words)
+k = 10
+
+# Where the log k actually comes from: how little ever enters the heap.
+def top_k(pairs, k):
+    heap = []
+    entered = skipped = 0
+    for key, cnt in pairs:
+        if len(heap) < k:
+            heapq.heappush(heap, (cnt, key)); entered += 1
+        elif cnt > heap[0][0]:
+            heapq.heapreplace(heap, (cnt, key)); entered += 1
+        else:
+            skipped += 1                # rejected by ONE comparison
+    return sorted(heap, reverse=True), entered, skipped
+
+kept, entered, skipped = top_k(counts.items(), k)
+print()
+print(f"of {len(counts):,} distinct values:")
+print(f"  {entered:,} ever entered the heap")
+print(f"  {skipped:,} were rejected by a single comparison against the root")
+print(f"  the heap never held more than {k}")
+```
+
+## Why the root is the whole trick
+
+<p>A min-heap of size k has a useful property: its root is the <em>weakest</em> member of the best k seen so far. So the question "could this candidate belong in the answer?" is one comparison against the root, and if the answer is no the candidate is discarded without ever entering the heap.</p><p>The editor below counts it: with 200,000 items and k = 10, only 136 of them ever touched the heap. The other 199,864 cost one comparison each. That is where the log k comes from &mdash; not from clever bookkeeping, but from rejecting almost everything cheaply.</p>
+
+## The three answers, and when each is right
+
+<p><strong>Heap of size k</strong> &mdash; O(n log k). The default answer, and the one to give first. <code>heapq.nlargest(k, ...)</code> is this, already written.</p><p><strong>Full sort</strong> &mdash; O(n log n). Better when k is a large fraction of n, because then log k is log n and the heap is paying overhead for nothing. Also better when n is small enough that constants dominate, which is more often than the complexity suggests: CPython's sort is C and a heap loop is Python.</p><p><strong>Bucket sort</strong> &mdash; O(n). Available because the counts are bounded: a count cannot exceed n, so you can bucket by count and read the buckets from the top with no comparisons at all. It is the answer an interviewer is fishing for when they ask "can you do better than n log k?" &mdash; though note what the editor measures: it comes out level with <code>nlargest</code> rather than ahead, because removing a log factor does not beat a C implementation at this size. The complexity win is real; the wall-clock win needs a much larger n or k.</p>
+
+## Quickselect, and why it is usually the wrong answer to give
+
+<p>There is an O(n) average-case option: partition around a pivot like quicksort but recurse into one side only, stopping when the pivot lands at position k. It is genuinely O(n) expected and O(n&sup2;) worst case, and <code>numpy.partition</code> implements it.</p><p>Mentioning it is good; reaching for it first is usually not. It mutates the input, it does not stream, the worst case needs median-of-medians to fix, and the constant factor means it rarely beats <code>nlargest</code> in practice. The strong answer is the heap, with quickselect named as the theoretical improvement.</p>
+
+## What the question is testing
+
+<p>Whether you notice that the answer set is bounded. A great many problems say "the best k" and the instinct is to sort everything and take a slice &mdash; which computes a total order nobody asked for. Keeping only k candidates and rejecting against the weakest of them is the reusable move, and it reappears in streaming top-n, nearest-neighbour search and leaderboards.</p><p>The second thing is whether you ask about ties. "The k most frequent" is ambiguous when counts are equal, and saying so before writing is the difference between a correct answer and a complete one.</p>
+
+## What to say out loud
+
+<p>Count with a Counter, then keep a min-heap of size k keyed on the count. For each item, if the heap is short push it; otherwise compare against the root and replace only if it is bigger. That is O(n log k). heapq.nlargest does exactly this. If k is close to n I would just sort, and if the counts are small integers bucket sort is O(n).</p>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>Ties.</strong> "The k most frequent" is ambiguous when counts are equal. Ask, or state the tie-break - and note that the tuple in the heap already picks one for you, probably not the one you meant.</p>
+
+<p><strong>k larger than the number of distinct values.</strong> <code>nlargest</code> returns everything; a hand-rolled heap should too, rather than raising.</p>
+
+<p><strong>k = 0.</strong> An empty answer, and a loop that assumes the heap is non-empty will index a root that is not there.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"Can you do better than O(n log k)?"</strong> Yes: bucket by count. A count cannot exceed n, so there are at most n+1 buckets and reading them from the top is linear with no comparisons. It is the answer they are fishing for, and the editor shows it coming out level with <code>nlargest</code> in wall-clock terms - the complexity win is real and the constant factor is not.</p>
+
+<p><strong>"What if the data does not fit in memory?"</strong> The heap already streams: it holds k items and never needs the rest, so one pass over a file works unchanged. Counting is the part that does not - for that you need a bounded counter such as count-min sketch, and then the top-k is approximate.</p>
+
+<p><strong>"What about quickselect?"</strong> O(n) expected by partitioning around a pivot and recursing into one side only. Worth naming; rarely worth choosing. It mutates the input, does not stream, needs median-of-medians to fix the O(n<sup>2</sup>) worst case, and loses to <code>nlargest</code> on constants.</p>
+
+## Common wrong answers
+
+<p><strong>"Sort by count and slice."</strong> Correct and O(n log n). Fine as a first answer if you say it is the baseline; wrong as a final answer when k is small.</p>
+
+<p><strong>"Use a max-heap of all the items."</strong> Building it is O(n) and popping k times is O(k log n) - which is defensible - but it holds the whole input. The point of the size-k heap is bounded memory.</p>
+
+<p><strong>"Push a tuple of (key, count)."</strong> Then the heap orders alphabetically. The count has to come first, and this silently returns a wrong answer rather than failing.</p>
+
+## Recap in one screen
+
+- The heap never grows past k - that is what makes each operation log k.
+- Most candidates are rejected by one comparison against the root.
+- The root is the smallest of the kept values, not the largest.
+- Worth trying: Set k equal to the number of distinct values and compare the timings again. The heap loses, which is the honest boundary of the recommendation.
+- Worth trying: Break the ties deliberately: make two values share a count and decide whether the answer should be alphabetical. The heap's tuple already decides for you, and probably not the way you intended.

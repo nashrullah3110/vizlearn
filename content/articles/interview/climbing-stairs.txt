@@ -1,0 +1,211 @@
+title: Climbing stairs: the DP that is Fibonacci
+intro: You can climb 1 or 2 steps at a time. How many ways to reach step n?
+
+## The question, and what it is testing
+
+<code>ways(n) = ways(n-1) + ways(n-2)</code>, because the last move was either one step or two. That is Fibonacci. Written as plain recursion it is <strong>exponential</strong>; the same recurrence computed once per value is O(n), and since only the last two values are ever needed it is <strong>O(1) space</strong>.
+
+## Run it
+
+The call count for plain recursion, which is the argument for everything that follows.
+
+```python-run
+import functools, sys
+
+calls = 0
+
+def naive(n):
+    """Correct, and exponential: the subproblems overlap."""
+    global calls
+    calls += 1
+    if n <= 2:
+        return n
+    return naive(n - 1) + naive(n - 2)
+
+print("plain recursion:")
+for n in (10, 20, 25):
+    calls = 0
+    v = naive(n)
+    print(f"  ways({n:>2}) = {v:>7,}   calls: {calls:>9,}")
+print("  the call count grows exponentially, not linearly")
+
+@functools.lru_cache(maxsize=None)
+def memo(n):
+    """Top-down: same recurrence, each value computed once."""
+    if n <= 2:
+        return n
+    return memo(n - 1) + memo(n - 2)
+
+def table(n):
+    """Bottom-up: no recursion, so no stack limit."""
+    if n <= 2:
+        return n
+    best = [0] * (n + 1)
+    best[1], best[2] = 1, 2
+    for i in range(3, n + 1):
+        best[i] = best[i - 1] + best[i - 2]
+    return best[n]
+
+def rolling(n):
+    """Only the last two entries are ever read."""
+    if n <= 2:
+        return n
+    a, b = 1, 2
+    for _ in range(n - 2):
+        a, b = b, a + b
+    return b
+```
+
+The three fixes, agreeing, with the space each one uses.
+
+```python-run
+import functools, sys
+
+calls = 0
+
+def naive(n):
+    global calls
+    calls += 1
+    if n <= 2:
+        return n
+    return naive(n - 1) + naive(n - 2)
+
+@functools.lru_cache(maxsize=None)
+def memo(n):
+    if n <= 2:
+        return n
+    return memo(n - 1) + memo(n - 2)
+
+def table(n):
+    if n <= 2:
+        return n
+    best = [0] * (n + 1)
+    best[1], best[2] = 1, 2
+    for i in range(3, n + 1):
+        best[i] = best[i - 1] + best[i - 2]
+    return best[n]
+
+def rolling(n):
+    if n <= 2:
+        return n
+    a, b = 1, 2
+    for _ in range(n - 2):
+        a, b = b, a + b
+    return b
+
+n = 30
+print()
+print(f"ways({n}):")
+print(f"  memoised  {memo(n):>8,}   cache holds {memo.cache_info().currsize} entries")
+print(f"  table     {table(n):>8,}   list of {n + 1} ints")
+print(f"  rolling   {rolling(n):>8,}   2 variables")
+print("  all agree:", memo(n) == table(n) == rolling(n))
+print("  and they agree with the naive version at n=25:",
+      naive(25) == rolling(25))
+
+print()
+print("it is Fibonacci:")
+print("  ways(1..10) =", [rolling(i) for i in range(1, 11)])
+```
+
+And the reason bottom-up is not merely a preference.
+
+```python-run
+import functools, sys
+
+calls = 0
+
+def naive(n):
+    global calls
+    calls += 1
+    if n <= 2:
+        return n
+    return naive(n - 1) + naive(n - 2)
+
+@functools.lru_cache(maxsize=None)
+def memo(n):
+    if n <= 2:
+        return n
+    return memo(n - 1) + memo(n - 2)
+
+def table(n):
+    if n <= 2:
+        return n
+    best = [0] * (n + 1)
+    best[1], best[2] = 1, 2
+    for i in range(3, n + 1):
+        best[i] = best[i - 1] + best[i - 2]
+    return best[n]
+
+def rolling(n):
+    if n <= 2:
+        return n
+    a, b = 1, 2
+    for _ in range(n - 2):
+        a, b = b, a + b
+    return b
+
+# The reason to prefer bottom-up when n is large.
+print()
+print("recursion limit:", sys.getrecursionlimit())
+try:
+    memo.cache_clear()
+    memo(4_000)
+except RecursionError as e:
+    print("  memo(4000) -> RecursionError:", str(e)[:40])
+print("  rolling(4000) has", len(str(rolling(4_000))), "digits and no stack cost")
+```
+
+## Where the recurrence comes from
+
+<p>Work backwards from the destination rather than forwards from the start. To be standing on step <em>n</em>, the previous step was either <em>n&minus;1</em> (and you took one step) or <em>n&minus;2</em> (and you took two). Those two sets of routes are disjoint and together they are all of them, so the counts add.</p><p>That is the whole derivation, and it is worth saying in exactly that form: <em>every route ends with one of two moves, so partition by the last move</em>. The same sentence derives the recurrence for coin change, for house robber, and for most one-dimensional DP.</p><p>The base cases are where people slip. <code>ways(1) = 1</code> and <code>ways(2) = 2</code> &mdash; and if you define <code>ways(0) = 1</code> (one way to stand still) the recurrence works from <code>n = 2</code> and the sequence lines up with standard Fibonacci.</p>
+
+## Why plain recursion is exponential
+
+<p><code>ways(5)</code> calls <code>ways(4)</code> and <code>ways(3)</code>; <code>ways(4)</code> calls <code>ways(3)</code> again. The recursion tree has two branches at almost every node and a depth of n, so the number of calls grows like the golden ratio to the n &mdash; and the editor below prints it: 109 calls at n = 10, 13,529 at n = 20, over 150,000 at n = 25.</p><p>This is <strong>overlapping subproblems</strong>, and it is one of the two conditions that make a problem a DP problem. The other is <strong>optimal substructure</strong>: the answer for n is built from the answers for smaller n, unchanged by how you got there. Naming both is a good way to show you know why the method applies rather than pattern-matching to it.</p>
+
+## Four versions, in the order to present them
+
+<p><strong>Recursion</strong> &mdash; states the recurrence clearly and is unusable. Write it, say it is exponential, move on.</p><p><strong>Memoised recursion</strong> &mdash; <code>@functools.lru_cache</code> on the same function. One line, O(n) time, O(n) space, and it keeps the recursive shape that made the recurrence obvious. This is <em>top-down</em>.</p><p><strong>A forwards table</strong> &mdash; <em>bottom-up</em>, no recursion, no stack depth limit. Same complexity, and it makes the next step visible.</p><p><strong>Two variables</strong> &mdash; because the table is only ever read two entries back. O(1) space, and the version to end on. Offering all four in that order, briefly, is worth more than jumping straight to the last one: the interviewer wants the reasoning, and the reasoning is the ladder.</p>
+
+## The follow-ups
+
+<p><strong>"What if you can climb 1, 2 or 3 steps?"</strong> The recurrence gains a term and the rolling window becomes three variables. The general version &mdash; any set of allowed step sizes &mdash; is coin change counting combinations, which is the <a href="coin-change.html">next question</a>.</p><p><strong>"Can it be faster than O(n)?"</strong> Yes, and this is the answer that surprises people: Fibonacci has a closed form, and matrix exponentiation computes it in O(log n) multiplications. Worth naming; not worth writing unless asked, because the numbers get big enough that the multiplications stop being O(1).</p>
+
+## What to say out loud
+
+<p>The last move was either a single step from n-1 or a double from n-2, so ways(n) = ways(n-1) + ways(n-2) with ways(1) = 1 and ways(2) = 2. It is Fibonacci. Naive recursion is exponential because the subproblems overlap, so I either memoise or fill a table forwards - and since only the last two entries are read, two variables are enough. O(n) time, O(1) space.</p>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>n = 0 and n = 1.</strong> Decide whether standing still counts as one way. Defining <code>ways(0) = 1</code> makes the recurrence work from n = 2 with no special cases.</p>
+
+<p><strong>Large n.</strong> The numbers get big - <code>rolling(4000)</code> has 836 digits. Python handles it; a language with fixed-width integers overflows silently.</p>
+
+<p><strong>Recursion depth.</strong> The memoised version dies around n = 1000 by default. That is the practical argument for bottom-up, not a stylistic one.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"What if you can climb 1, 2 or 3 steps?"</strong> One more term in the recurrence and a three-variable window. The general version - an arbitrary set of step sizes - is coin change counting combinations.</p>
+
+<p><strong>"Can it be faster than O(n)?"</strong> Yes. Fibonacci has a closed form, and matrix exponentiation gets it in O(log n) multiplications. Worth naming; not worth writing, because at that size the multiplications stop being O(1).</p>
+
+<p><strong>"What if some steps are broken and cannot be used?"</strong> The recurrence gains a guard: <code>ways(n) = 0</code> for a broken step, and the rest is unchanged. It is a good check on whether you understand the recurrence or memorised the Fibonacci answer.</p>
+
+## Common wrong answers
+
+<p><strong>"It is 2 to the n, one choice per step."</strong> That counts sequences of moves without requiring them to land on n. The constraint is the total, which is what makes it Fibonacci rather than exponential.</p>
+
+<p><strong>"Memoisation and dynamic programming are different things."</strong> They are the same recurrence computed top-down or bottom-up. Presenting them as alternatives rather than as two directions is a common muddle.</p>
+
+<p><strong>"Just use lru_cache and stop."</strong> Correct and it keeps O(n) space plus a recursion depth that fails around n = 1000. The editor shows the RecursionError.</p>
+
+## Recap in one screen
+
+- The call count roughly doubles per extra step - that is the overlap, measured.
+- Filling forwards computes each value exactly once.
+- Only the last two entries are ever read, which is why the table can go.
+- Worth trying: Raise the naive call to naive(30) and watch the count. It is about 1.6 times worse per step, which is the golden ratio showing up in the runtime.
+- Worth trying: Add a third step size - a, b, c = b, c, a + b + c - and check ways(1..8) against counting by hand for small n.

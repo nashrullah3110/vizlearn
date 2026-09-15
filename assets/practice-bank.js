@@ -8608,6 +8608,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/binary-search-on-the-answer.html",
+  "title": "Binary search on the answer, not the array",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "What is being binary searched?",
+    "o": [
+     "The array of weights",
+     "The range of possible answers - capacities",
+     "The days",
+     "A sorted copy of the input"
+    ],
+    "a": 1,
+    "w": "There is no sorted array in the input. What is sorted is the sequence of feasible/infeasible answers."
+   },
+   {
+    "t": "What property must the predicate have?",
+    "o": [
+     "It must be O(1)",
+     "It must be monotonic - once true, true for everything larger",
+     "It must be invertible",
+     "It must be exact"
+    ],
+    "a": 1,
+    "w": "Monotonicity is what makes the answer space sorted, and without it a probe tells you nothing about the other half."
+   },
+   {
+    "t": "What is the complexity?",
+    "o": [
+     "O(log n)",
+     "O(n log(range of answers))",
+     "O(n)",
+     "O(n squared)"
+    ],
+    "a": 1,
+    "w": "Logarithmically many probes, each costing a linear feasibility pass - and the log is over the magnitude of the answer range, not over n."
+   },
+   {
+    "t": "Why is lo initialised to max(weights)?",
+    "o": [
+     "To make the search faster",
+     "Because a single package must fit in one trip, so smaller capacities can never work",
+     "Because it is the answer for D = n",
+     "It is arbitrary"
+    ],
+    "a": 1,
+    "w": "The bounds have to bracket the boundary. Starting below the feasible range risks returning an answer that does not work."
+   }
+  ]
+ },
+ {
   "path": "interview/valid-palindrome.html",
   "title": "Check whether a string is a palindrome",
   "cat": "Interview",
@@ -8644,6 +8695,108 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "You get exactly one chance to delete, so it is one linear scan plus at most two more - not a recursive explosion."
+   }
+  ]
+ },
+ {
+  "path": "interview/climbing-stairs.html",
+  "title": "Climbing stairs: the DP that is Fibonacci",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Where does ways(n) = ways(n-1) + ways(n-2) come from?",
+    "o": [
+     "Trial and error",
+     "Partitioning routes by the last move, which was either one step or two",
+     "The number of steps",
+     "Counting permutations"
+    ],
+    "a": 1,
+    "w": "The two sets of routes are disjoint and together are all of them, so the counts add. The same reasoning derives most 1-D recurrences."
+   },
+   {
+    "t": "Why is plain recursion exponential here?",
+    "o": [
+     "Function calls are slow",
+     "The subproblems overlap, so the same values are recomputed many times",
+     "It uses too much memory",
+     "Because of the base case"
+    ],
+    "a": 1,
+    "w": "ways(3) is computed once for ways(4) and again for ways(5), and so on down the tree. Overlapping subproblems is the condition that makes memoisation pay."
+   },
+   {
+    "t": "Why can the table be replaced by two variables?",
+    "o": [
+     "To save time",
+     "Because the recurrence only ever reads two entries back",
+     "Because n is small",
+     "It cannot; the table is required"
+    ],
+    "a": 1,
+    "w": "Space in a DP is set by how far back the recurrence reaches, not by n."
+   },
+   {
+    "t": "What does the sequence turn out to be?",
+    "o": [
+     "Powers of two",
+     "Fibonacci",
+     "Triangular numbers",
+     "Catalan numbers"
+    ],
+    "a": 1,
+    "w": "Same recurrence, offset base cases. Recognising it is worth saying out loud, and it opens the O(log n) follow-up."
+   }
+  ]
+ },
+ {
+  "path": "interview/coin-change.html",
+  "title": "Coin change, and why greedy is wrong",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why is greedy wrong for coins [1, 3, 4] and amount 6?",
+    "o": [
+     "It runs too slowly",
+     "It takes the 4 first and is then forced into two 1s, three coins against the optimal two",
+     "It cannot handle a 1 coin",
+     "It is not wrong"
+    ],
+    "a": 1,
+    "w": "Committing to the largest coin removes the 3+3 option. Greedy has no lookahead."
+   },
+   {
+    "t": "What is the recurrence?",
+    "o": [
+     "best[a] = best[a-1] + 1",
+     "best[a] = 1 + min(best[a - c]) over coins c that fit",
+     "best[a] = sum of best[a - c]",
+     "best[a] = a // max(coins)"
+    ],
+    "a": 1,
+    "w": "Partition by the last coin used; the rest of the amount is a smaller subproblem that is already solved."
+   },
+   {
+    "t": "Why use infinity for unreachable amounts rather than -1?",
+    "o": [
+     "It is faster",
+     "Infinity survives the min and the +1 correctly, where a -1 sentinel corrupts the arithmetic",
+     "-1 is not a valid list value",
+     "There is no difference"
+    ],
+    "a": 1,
+    "w": "min(-1, anything) picks the sentinel and then +1 makes it 0, which is silently wrong."
+   },
+   {
+    "t": "Why is O(amount x coins) called pseudo-polynomial?",
+    "o": [
+     "Because it is approximate",
+     "Because amount is a value, not an input length - the table is exponential in the number of bits",
+     "Because the coins are unsorted",
+     "Because it uses recursion"
+    ],
+    "a": 1,
+    "w": "Doubling the number of digits in the amount multiplies the work by ten, not by two. It is fine for thousands and hopeless for billions."
    }
   ]
  },
@@ -9001,6 +9154,108 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/running-median-of-a-stream.html",
+  "title": "Find the median of a data stream",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "What do the two heap roots represent?",
+    "o": [
+     "The minimum and maximum",
+     "The two middle values of the data seen so far",
+     "The first and last inserted",
+     "The mean and the mode"
+    ],
+    "a": 1,
+    "w": "The largest of the low half and the smallest of the high half are adjacent in sorted order - the middle."
+   },
+   {
+    "t": "Why push to the low heap and immediately move its largest across?",
+    "o": [
+     "To save memory",
+     "It puts the value on the correct side without any case analysis",
+     "heapq requires it",
+     "To keep the heaps sorted"
+    ],
+    "a": 1,
+    "w": "The max-heap floats the biggest low value to the root, so moving it across is always the right transfer."
+   },
+   {
+    "t": "Why is the low half stored negated?",
+    "o": [
+     "To save space",
+     "Because heapq is a min-heap only, so negation makes it behave as a max-heap",
+     "To handle negative inputs",
+     "For stability"
+    ],
+    "a": 1,
+    "w": "Python has no max-heap. Negating on the way in and out is the standard workaround, and it only works for negatable values."
+   },
+   {
+    "t": "What are the costs?",
+    "o": [
+     "O(1) insert, O(log n) median",
+     "O(log n) insert, O(1) median",
+     "O(n) insert, O(1) median",
+     "O(log n) for both"
+    ],
+    "a": 1,
+    "w": "Three heap operations per insert, and the median is one or two root reads."
+   }
+  ]
+ },
+ {
+  "path": "interview/first-and-last-position.html",
+  "title": "First and last position of a target",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why can't a plain binary search answer 'first occurrence'?",
+    "o": [
+     "It is too slow",
+     "It stops at whichever occurrence mid happened to hit",
+     "It cannot handle duplicates at all",
+     "It returns a boolean"
+    ],
+    "a": 1,
+    "w": "Any of the duplicates is a valid stopping point, so you have to search for the boundary instead of the value."
+   },
+   {
+    "t": "What does bisect_right return?",
+    "o": [
+     "The last occurrence",
+     "One past the last occurrence",
+     "The first occurrence",
+     "The midpoint of the run"
+    ],
+    "a": 1,
+    "w": "Which is why the last index is right - 1, and why right - left is the count."
+   },
+   {
+    "t": "How do you tell that a value is absent?",
+    "o": [
+     "bisect_left returns -1",
+     "bisect_left equals bisect_right - the bracketed range is empty",
+     "It raises ValueError",
+     "bisect_right returns len(a)"
+    ],
+    "a": 1,
+    "w": "Both return the same insertion point, so the run has zero width. Neither function ever returns -1."
+   },
+   {
+    "t": "What is the only difference between the two hand-written loops?",
+    "o": [
+     "The loop condition",
+     "< becomes <=, so equal elements are stepped over rather than stopped at",
+     "One searches backwards",
+     "The initial value of hi"
+    ],
+    "a": 1,
+    "w": "One character. Being able to point at it and say what it does is the question."
+   }
+  ]
+ },
+ {
   "path": "interview/first-non-repeating-character.html",
   "title": "First non-repeating character",
   "cat": "Interview",
@@ -9117,6 +9372,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Converting each value to a tuple makes it hashable and the inversion legal."
+   }
+  ]
+ },
+ {
+  "path": "interview/house-robber.html",
+  "title": "House robber: the 0-1 choice",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "What is the recurrence?",
+    "o": [
+     "best(i) = best(i-1) + house[i]",
+     "best(i) = max(best(i-1), best(i-2) + house[i])",
+     "best(i) = max(house[i], best(i-1))",
+     "best(i) = sum of every other house"
+    ],
+    "a": 1,
+    "w": "Skip the house and keep the previous best, or take it and add to the best from two back. Those two cases are exhaustive."
+   },
+   {
+    "t": "Why does taking a house use best(i-2) rather than best(i-1)?",
+    "o": [
+     "To save space",
+     "Because the adjacent house is then off limits",
+     "Because the array is 0-indexed",
+     "It is arbitrary"
+    ],
+    "a": 1,
+    "w": "That is the constraint: robbing a house rules out its neighbour, so the rest of the answer comes from two back."
+   },
+   {
+    "t": "Why can the table be replaced by two variables?",
+    "o": [
+     "Because n is small",
+     "Because the recurrence never reads further back than two entries",
+     "Because the values are positive",
+     "It cannot"
+    ],
+    "a": 1,
+    "w": "DP space is set by how far back the recurrence reaches. Here that is two, so two names suffice."
+   },
+   {
+    "t": "For houses in a circle, the standard solution is:",
+    "o": [
+     "A different recurrence",
+     "Run the linear version twice - excluding the first house, then the last - and take the better",
+     "Sort the houses first",
+     "Double the array"
+    ],
+    "a": 1,
+    "w": "Every valid selection excludes at least one end, so one of the two runs contains the optimum. A single house needs its own guard."
    }
   ]
  },
@@ -9452,6 +9758,57 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/longest-increasing-subsequence.html",
+  "title": "Longest increasing subsequence, twice",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "In the quadratic version, what does best[i] mean?",
+    "o": [
+     "The answer for the first i elements",
+     "The length of the longest increasing run ending at index i",
+     "The value at position i",
+     "The number of comparisons so far"
+    ],
+    "a": 1,
+    "w": "\"Ending at i\" is what admits a recurrence - you need to know what the run ends with to know whether it can be extended."
+   },
+   {
+    "t": "What does tails[k] hold?",
+    "o": [
+     "The kth element of the answer",
+     "The smallest possible tail of an increasing run of length k+1",
+     "The kth largest value",
+     "A count"
+    ],
+    "a": 1,
+    "w": "Which is why it stays sorted, and why replacing an entry with a smaller value never loses anything."
+   },
+   {
+    "t": "Is the final tails array the longest increasing subsequence?",
+    "o": [
+     "Yes, always",
+     "No - only its length is the answer; the contents need not be a subsequence in order",
+     "Only if the input is sorted",
+     "Only for strictly increasing runs"
+    ],
+    "a": 1,
+    "w": "On [10,9,2,5,3,7,101,18] tails ends as [2,3,7,18], but 18 comes after 101 in the input. Recovering the real run needs predecessor pointers."
+   },
+   {
+    "t": "How do you switch from strictly increasing to non-decreasing?",
+    "o": [
+     "Sort the input first",
+     "Use bisect_right instead of bisect_left",
+     "Reverse the array",
+     "Change the base case"
+    ],
+    "a": 1,
+    "w": "bisect_left makes an equal value replace; bisect_right makes it extend. One call, two problems."
+   }
+  ]
+ },
+ {
   "path": "interview/longest-palindromic-substring.html",
   "title": "Longest palindromic substring",
   "cat": "Interview",
@@ -9608,6 +9965,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "That is why such functions often take tuples where you would expect lists - the constraint comes from the cache."
+   }
+  ]
+ },
+ {
+  "path": "interview/merge-k-sorted-sequences.html",
+  "title": "Merge k sorted sequences",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "How large does the heap get?",
+    "o": [
+     "N, the total number of values",
+     "k, one per list",
+     "log k",
+     "k squared"
+    ],
+    "a": 1,
+    "w": "Only the head of each list can be the next output, so only k values are ever candidates."
+   },
+   {
+    "t": "Why does each heap entry carry the list index?",
+    "o": [
+     "To sort the output",
+     "So the popped value can be replaced by its own list's successor",
+     "To count the lists",
+     "It does not need to"
+    ],
+    "a": 1,
+    "w": "The replacement must come from the same list. Without the tag there is no way to know which list that is."
+   },
+   {
+    "t": "What is heapq.merge's actual advantage over sorted(concatenation)?",
+    "o": [
+     "It is always faster",
+     "It is lazy - O(k) memory and the first value immediately",
+     "It handles unsorted input",
+     "It is stable and sorted is not"
+    ],
+    "a": 1,
+    "w": "For full materialisation sorted() is usually faster in CPython. The win is memory and first-result latency."
+   },
+   {
+    "t": "Where does the k-way merge get used in practice?",
+    "o": [
+     "Hash joins",
+     "External sorting: sorted chunks on disk merged back into one stream",
+     "Binary search",
+     "Graph traversal"
+    ],
+    "a": 1,
+    "w": "It is the merge step whenever the data is too large for memory, which is also why the laziness matters."
    }
   ]
  },
@@ -10099,6 +10507,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "A window relies on the sum growing monotonically as it grows. If everything is positive, the window works and uses O(1) space."
+   }
+  ]
+ },
+ {
+  "path": "interview/top-k-frequent-elements.html",
+  "title": "Top k frequent elements",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Why a min-heap rather than a max-heap for top k?",
+    "o": [
+     "Min-heaps are faster",
+     "The root is the weakest kept value, so one comparison rejects a candidate",
+     "heapq only provides min-heaps",
+     "To keep the answer sorted"
+    ],
+    "a": 1,
+    "w": "You need cheap access to the thing you would evict, which is the smallest of the best k."
+   },
+   {
+    "t": "What is the complexity?",
+    "o": [
+     "O(n)",
+     "O(n log k)",
+     "O(n log n)",
+     "O(k log n)"
+    ],
+    "a": 1,
+    "w": "Each of n items costs at most one heap operation on a heap bounded at size k."
+   },
+   {
+    "t": "When is a full sort the better choice?",
+    "o": [
+     "Never",
+     "When k is a large fraction of n, so log k is already log n",
+     "When the input is unsorted",
+     "When k is 1"
+    ],
+    "a": 1,
+    "w": "The heap's advantage is that k is small. Once it is not, the sort's C implementation wins on constants."
+   },
+   {
+    "t": "How can top k be done in O(n)?",
+    "o": [
+     "With a faster heap",
+     "Bucket by count, since a count cannot exceed n, then read the buckets from the top",
+     "By sorting with radix sort",
+     "It cannot"
+    ],
+    "a": 1,
+    "w": "Bounded integer keys make counting sort applicable, which removes comparisons entirely."
    }
   ]
  },
@@ -10965,6 +11424,57 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "You redefined equality, so the identity-based default hash no longer agrees with it. @dataclass(frozen=True) does both correctly."
+   }
+  ]
+ },
+ {
+  "path": "interview/binary-search-without-an-off-by-one.html",
+  "title": "Write binary search without an off-by-one",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "In the half-open form, what does hi mean?",
+    "o": [
+     "The last valid index",
+     "One past the last candidate - hi is never itself a candidate",
+     "The midpoint",
+     "The array length minus one"
+    ],
+    "a": 1,
+    "w": "Exclusive hi is what lets hi = mid keep mid as a candidate while still shrinking the range."
+   },
+   {
+    "t": "Why must one branch be lo = mid + 1 rather than lo = mid?",
+    "o": [
+     "For speed",
+     "Because a[mid] was ruled out, and without the +1 the range can stop shrinking",
+     "To handle duplicates",
+     "It makes no difference"
+    ],
+    "a": 1,
+    "w": "When hi is lo + 1, mid equals lo, so lo = mid leaves the range unchanged and the loop never ends."
+   },
+   {
+    "t": "What does lo hold when the loop exits?",
+    "o": [
+     "-1 if absent",
+     "The insertion point: where the value is, or where it would go",
+     "The midpoint of the array",
+     "The array length"
+    ],
+    "a": 1,
+    "w": "Which is why one extra comparison converts it into found or not found - and why bisect returns it directly."
+   },
+   {
+    "t": "Why does lo + (hi - lo) // 2 appear in C implementations?",
+    "o": [
+     "It is faster",
+     "lo + hi can overflow a fixed-width integer; Python's integers cannot",
+     "It handles negative indices",
+     "It rounds differently"
+    ],
+    "a": 1,
+    "w": "A real bug that sat in the JDK for years. In Python the simple form is safe, but knowing why the idiom exists is the point."
    }
   ]
  },

@@ -2148,8 +2148,32 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Binary search on the answer, not the array",
+  "path": "interview/binary-search-on-the-answer.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
   "title": "Check whether a string is a palindrome",
   "path": "interview/valid-palindrome.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Climbing stairs: the DP that is Fibonacci",
+  "path": "interview/climbing-stairs.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Coin change, and why greedy is wrong",
+  "path": "interview/coin-change.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
@@ -2220,6 +2244,22 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Find the median of a data stream",
+  "path": "interview/running-median-of-a-stream.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "First and last position of a target",
+  "path": "interview/first-and-last-position.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
   "title": "First non-repeating character",
   "path": "interview/first-non-repeating-character.html",
   "category": "Interview",
@@ -2238,6 +2278,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Group records and invert a dictionary",
   "path": "interview/grouping-and-inverting-dictionaries.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "House robber: the 0-1 choice",
+  "path": "interview/house-robber.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
@@ -2308,6 +2356,14 @@ window.VIZLEARN_MODULES = [
   "desc": ""
  },
  {
+  "title": "Longest increasing subsequence, twice",
+  "path": "interview/longest-increasing-subsequence.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
   "title": "Longest palindromic substring",
   "path": "interview/longest-palindromic-substring.html",
   "category": "Interview",
@@ -2334,6 +2390,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Memoisation: caching with a dictionary",
   "path": "interview/memoisation-with-a-dictionary.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Merge k sorted sequences",
+  "path": "interview/merge-k-sorted-sequences.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
@@ -2430,6 +2494,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Subarray sum equals k",
   "path": "interview/subarray-sum-equals-k.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Top k frequent elements",
+  "path": "interview/top-k-frequent-elements.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
@@ -2590,6 +2662,14 @@ window.VIZLEARN_MODULES = [
  {
   "title": "Why must dictionary keys be hashable?",
   "path": "interview/why-must-dict-keys-be-hashable.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": ""
+ },
+ {
+  "title": "Write binary search without an off-by-one",
+  "path": "interview/binary-search-without-an-off-by-one.html",
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",

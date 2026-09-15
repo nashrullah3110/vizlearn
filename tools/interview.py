@@ -49,6 +49,21 @@ GROUPS = {
                  "knows its own minimum, postfix, monotonic stacks, and "
                  "building one structure from another.",
     },
+    "heaps": {
+        "label": "Heaps & top-k",
+        "blurb": "When you need the best few rather than all of them: a heap "
+                 "of size k, a k-way merge, and a running median.",
+    },
+    "binsearch": {
+        "label": "Binary search",
+        "blurb": "The invariant rather than the shape: half-open ranges, "
+                 "duplicate boundaries, and searching a space of answers.",
+    },
+    "dp": {
+        "label": "Dynamic programming",
+        "blurb": "Overlapping subproblems, a case where greedy is plainly "
+                 "wrong, and the rolling variables that remove the table.",
+    },
     "semantics": {
         "label": "Python semantics",
         "blurb": "The \"do you actually know Python\" round: yield, defaults, "
@@ -56,7 +71,8 @@ GROUPS = {
     },
 }
 
-GROUP_ORDER = ["strings", "lists", "dicts", "stacks", "semantics"]
+GROUP_ORDER = ["strings", "lists", "dicts", "stacks", "heaps", "binsearch",
+               "dp", "semantics"]
 
 
 # --------------------------------------------------------------------------
@@ -625,6 +641,132 @@ def m_twostacks():
     return _svg("".join(out))
 
 
+def m_topk():
+    """A tall bar kept, short ones rejected against a threshold line."""
+    out = []
+    for i, h in enumerate((14, 40, 8, 30, 46, 10)):
+        keep = h > 20
+        out.append('<rect x="%d" y="%d" width="16" height="%d" rx="2" fill="%s" '
+                   'opacity="%s"/>' % (18 + i * 22, 66 - h, h, A if keep else M,
+                                       "0.95" if keep else "0.4"))
+    out.append('<line x1="12" y1="46" x2="148" y2="46" stroke="%s" '
+               'stroke-width="1.6" stroke-dasharray="4 3"/>' % A)
+    return _svg("".join(out) + _label("kept above the root", 80, 82))
+
+
+def m_merge():
+    """Three streams converging into one."""
+    out = []
+    for i, y in enumerate((24, 45, 66)):
+        out.append('<rect x="14" y="%d" width="40" height="10" rx="3" '
+                   'fill="%s" opacity="%s"/>' % (y - 5, A, 0.9 - i * 0.2))
+        out.append(_arrow(58, y, 84, 45, M))
+    out.append('<rect x="92" y="38" width="54" height="14" rx="3" fill="%s"/>' % A)
+    return _svg("".join(out) + _label("one sorted stream", 80, 84))
+
+
+def m_median():
+    """Two heaps back to back, roots meeting in the middle."""
+    out = []
+    for i in range(3):
+        out.append('<rect x="%d" y="%d" width="18" height="12" rx="3" '
+                   'fill="%s" opacity="%s"/>' % (16 + i * 20, 40, M, 0.5))
+    out.append('<rect x="62" y="28" width="18" height="36" rx="3" fill="%s"/>' % A)
+    out.append('<rect x="84" y="28" width="18" height="36" rx="3" fill="%s"/>' % A)
+    for i in range(3):
+        out.append('<rect x="%d" y="%d" width="18" height="12" rx="3" '
+                   'fill="%s" opacity="%s"/>' % (106 + i * 20, 40, M, 0.5))
+    return _svg("".join(out) + _label("two roots are the middle", 80, 82))
+
+
+def m_halfopen():
+    """A shrinking half-open range."""
+    out = []
+    for i, (x, w) in enumerate(((16, 128), (16, 64), (48, 32), (48, 16))):
+        out.append('<rect x="%d" y="%d" width="%d" height="10" rx="3" '
+                   'fill="%s" opacity="%s"/>' % (x, 20 + i * 14, w, A,
+                                                 0.35 + i * 0.2))
+    return _svg("".join(out) + _label("[lo, hi) halves each step", 80, 86))
+
+
+def m_boundary():
+    """A run of equal values bracketed at both ends."""
+    out = []
+    for i in range(6):
+        inside = 1 <= i <= 3
+        out.append('<rect x="%d" y="36" width="20" height="22" rx="3" '
+                   'fill="%s" stroke="%s" stroke-width="2"/>'
+                   % (18 + i * 22, A if inside else I, A if inside else B))
+    out.append(_arrow(40, 76, 40, 62))
+    out.append(_arrow(106, 76, 106, 62))
+    return _svg("".join(out) + _label("left            right", 80, 88))
+
+
+def m_predicate():
+    """no-no-no-yes-yes: the monotonic flip."""
+    out = []
+    for i in range(6):
+        ok = i >= 3
+        out.append('<rect x="%d" y="34" width="20" height="20" rx="3" '
+                   'fill="%s" opacity="%s"/>' % (18 + i * 22, A if ok else M,
+                                                 "0.95" if ok else "0.35"))
+    out.append('<line x1="83" y1="26" x2="83" y2="62" stroke="%s" '
+               'stroke-width="2"/>' % A)
+    return _svg("".join(out) + _label("no | yes: search the flip", 80, 80))
+
+
+def m_stairs():
+    """Steps, with two arrows arriving at the top one."""
+    out = []
+    for i in range(4):
+        out.append('<rect x="%d" y="%d" width="28" height="%d" rx="2" '
+                   'fill="%s" opacity="0.5"/>' % (16 + i * 30, 62 - i * 12,
+                                                  12 + i * 12, M))
+    out.append(_arrow(104, 30, 130, 22))
+    out.append(_arrow(76, 42, 130, 22))
+    return _svg("".join(out) + _label("one step, or two", 80, 84))
+
+
+def m_coins():
+    """Two ways to make the same amount, one shorter."""
+    out = []
+    for i, r in enumerate((9, 6, 6)):
+        out.append('<circle cx="%d" cy="28" r="%d" fill="%s" opacity="0.45"/>'
+                   % (28 + i * 26, r, M))
+    for i in range(2):
+        out.append('<circle cx="%d" cy="60" r="9" fill="%s"/>' % (32 + i * 26, A))
+    out.append(_label("greedy: 3", 112, 32))
+    out.append(_label("optimal: 2", 112, 64))
+    return _svg("".join(out))
+
+
+def m_lis():
+    """A rising run picked out of a jumbled sequence."""
+    pts = ((16, 52), (34, 60), (52, 44), (70, 30), (88, 50), (106, 22), (124, 38))
+    keep = {2, 3, 5}
+    out = []
+    for i, (x, y) in enumerate(pts):
+        out.append('<circle cx="%d" cy="%d" r="%d" fill="%s" opacity="%s"/>'
+                   % (x, y, 5 if i in keep else 4, A if i in keep else M,
+                      "0.95" if i in keep else "0.35"))
+    out.append('<path d="M 52 44 L 70 30 L 106 22" fill="none" stroke="%s" '
+               'stroke-width="2"/>' % A)
+    return _svg("".join(out) + _label("longest rising run", 80, 80))
+
+
+def m_robber():
+    """Alternate houses taken, neighbours ruled out."""
+    out = []
+    for i in range(5):
+        take = i in (0, 2, 4)
+        out.append('<rect x="%d" y="%d" width="22" height="%d" rx="2" '
+                   'fill="%s" opacity="%s"/>'
+                   % (16 + i * 28, 62 - (26 if take else 14),
+                      26 if take else 14, A if take else M,
+                      "0.95" if take else "0.3"))
+    return _svg("".join(out) + _label("no two adjacent", 80, 82))
+
+
 MOTIFS = {
     "lock": m_lock, "slice": m_slice, "codepoint": m_codepoint, "bytes": m_bytes,
     "identity": m_identity, "find": m_find, "palindrome": m_palindrome,
@@ -642,6 +784,9 @@ MOTIFS = {
     "guard": m_guard, "condense": m_condense,
     "minstack": m_minstack, "rpn": m_rpn, "monotonic": m_monotonic,
     "twostacks": m_twostacks,
+    "topk": m_topk, "merge": m_merge, "median": m_median,
+    "halfopen": m_halfopen, "boundary": m_boundary, "predicate": m_predicate,
+    "stairs": m_stairs, "coins": m_coins, "lis": m_lis, "robber": m_robber,
 }
 
 # Motifs taking a variant argument, so two questions sharing a technique still
@@ -717,6 +862,19 @@ CARD = {
     "evaluate-reverse-polish-notation": "rpn",
     "daily-temperatures": "monotonic",
     "queue-from-two-stacks": "twostacks",
+    # heaps and top-k
+    "top-k-frequent-elements": "topk",
+    "merge-k-sorted-sequences": "merge",
+    "running-median-of-a-stream": "median",
+    # binary search
+    "binary-search-without-an-off-by-one": "halfopen",
+    "first-and-last-position": "boundary",
+    "binary-search-on-the-answer": "predicate",
+    # dynamic programming
+    "climbing-stairs": "stairs",
+    "coin-change": "coins",
+    "longest-increasing-subsequence": "lis",
+    "house-robber": "robber",
 }
 
 
@@ -740,9 +898,13 @@ def _assemble():
     from interview_dicts import DICTS
     from interview_semantics import SEMANTICS
     from interview_stacks import STACKS
+    from interview_heaps import HEAPS
+    from interview_binsearch import BINSEARCH
+    from interview_dp import DP
 
     by_group = {"strings": STRINGS, "lists": LISTS, "dicts": DICTS,
-                "stacks": STACKS, "semantics": SEMANTICS}
+                "stacks": STACKS, "heaps": HEAPS, "binsearch": BINSEARCH,
+                "dp": DP, "semantics": SEMANTICS}
     out = []
     for key in GROUP_ORDER:
         for i, q in enumerate(by_group[key]):

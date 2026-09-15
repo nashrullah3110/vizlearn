@@ -1,0 +1,250 @@
+title: Longest increasing subsequence, twice
+intro: Find the length of the longest strictly increasing subsequence. Can you do better than O(n squared)?
+
+## The question, and what it is testing
+
+The quadratic version is the honest first answer: <code>best[i]</code> is the longest run ending at <code>i</code>, found by looking back at every earlier element. The O(n log n) version keeps a <strong>tails</strong> array where <code>tails[k]</code> is the smallest tail of any increasing run of length <code>k+1</code>, and binary searches it. Its length is the answer &mdash; its contents are not the subsequence.
+
+## Run it
+
+Both versions, agreeing on the length.
+
+```python-run
+import bisect, random, time
+
+def lis_quadratic(a):
+    """best[i] = longest increasing run ENDING at i."""
+    if not a:
+        return 0, 0
+    best = [1] * len(a)
+    comparisons = 0
+    for i in range(len(a)):
+        for j in range(i):
+            comparisons += 1
+            if a[j] < a[i] and best[j] + 1 > best[i]:
+                best[i] = best[j] + 1
+    return max(best), comparisons
+
+
+def lis_nlogn(a):
+    """tails[k] = smallest possible tail of an increasing run of length k+1."""
+    tails = []
+    for x in a:
+        i = bisect.bisect_left(tails, x)   # bisect_right for non-decreasing
+        if i == len(tails):
+            tails.append(x)                # extends the longest run
+        else:
+            tails[i] = x                   # lowers a tail; length unchanged
+    return len(tails), tails
+
+
+def lis_with_sequence(a):
+    """The same algorithm, keeping predecessors so the run can be rebuilt."""
+    tails, tail_idx, prev = [], [], [-1] * len(a)
+    for i, x in enumerate(a):
+        k = bisect.bisect_left(tails, x)
+        if k == len(tails):
+            tails.append(x); tail_idx.append(i)
+        else:
+            tails[k] = x; tail_idx[k] = i
+        prev[i] = tail_idx[k - 1] if k > 0 else -1
+    out, cur = [], tail_idx[-1]
+    while cur != -1:
+        out.append(a[cur]); cur = prev[cur]
+    return list(reversed(out))
+
+
+demo = [10, 9, 2, 5, 3, 7, 101, 18]
+q, comps = lis_quadratic(demo)
+n, tails = lis_nlogn(demo)
+print("input:", demo)
+print(f"  quadratic: {q}   ({comps} comparisons)")
+print(f"  n log n  : {n}   tails = {tails}")
+print("  agree on the length:", q == n)
+```
+
+Whether tails is the subsequence - checked on two inputs rather than claimed on one.
+
+```python-run
+import bisect, random, time
+
+def lis_quadratic(a):
+    if not a:
+        return 0, 0
+    best = [1] * len(a)
+    comparisons = 0
+    for i in range(len(a)):
+        for j in range(i):
+            comparisons += 1
+            if a[j] < a[i] and best[j] + 1 > best[i]:
+                best[i] = best[j] + 1
+    return max(best), comparisons
+
+
+def lis_nlogn(a):
+    tails = []
+    for x in a:
+        i = bisect.bisect_left(tails, x)
+        if i == len(tails):
+            tails.append(x)
+        else:
+            tails[i] = x
+    return len(tails), tails
+
+
+def lis_with_sequence(a):
+    tails, tail_idx, prev = [], [], [-1] * len(a)
+    for i, x in enumerate(a):
+        k = bisect.bisect_left(tails, x)
+        if k == len(tails):
+            tails.append(x); tail_idx.append(i)
+        else:
+            tails[k] = x; tail_idx[k] = i
+        prev[i] = tail_idx[k - 1] if k > 0 else -1
+    out, cur = [], tail_idx[-1]
+    while cur != -1:
+        out.append(a[cur]); cur = prev[cur]
+    return list(reversed(out))
+
+demo = [10, 9, 2, 5, 3, 7, 101, 18]
+
+def is_subsequence(sub, a):
+    it = iter(a)
+    return all(any(x == y for y in it) for x in sub)
+
+print()
+print("tails is not, in general, the subsequence. Checked rather than claimed:")
+for case in ([10, 9, 2, 5, 3, 7, 101, 18], [2, 6, 8, 3, 4, 5, 1]):
+    _, t = lis_nlogn(case)
+    seq = lis_with_sequence(case)
+    print(f"  input {case}")
+    print(f"    tails {t}  -> a valid subsequence of the input? {is_subsequence(t, case)}")
+    print(f"    rebuilt {seq}  -> valid? {is_subsequence(seq, case)}")
+print("  on the second input the 1 is the LAST element, so it cannot precede")
+print("  the 3 - the length is right and the contents are not the answer.")
+```
+
+The cost that separates them, and the one call that changes the question.
+
+```python-run
+import bisect, random, time
+
+def lis_quadratic(a):
+    if not a:
+        return 0, 0
+    best = [1] * len(a)
+    comparisons = 0
+    for i in range(len(a)):
+        for j in range(i):
+            comparisons += 1
+            if a[j] < a[i] and best[j] + 1 > best[i]:
+                best[i] = best[j] + 1
+    return max(best), comparisons
+
+
+def lis_nlogn(a):
+    tails = []
+    for x in a:
+        i = bisect.bisect_left(tails, x)
+        if i == len(tails):
+            tails.append(x)
+        else:
+            tails[i] = x
+    return len(tails), tails
+
+
+def lis_with_sequence(a):
+    tails, tail_idx, prev = [], [], [-1] * len(a)
+    for i, x in enumerate(a):
+        k = bisect.bisect_left(tails, x)
+        if k == len(tails):
+            tails.append(x); tail_idx.append(i)
+        else:
+            tails[k] = x; tail_idx[k] = i
+        prev[i] = tail_idx[k - 1] if k > 0 else -1
+    out, cur = [], tail_idx[-1]
+    while cur != -1:
+        out.append(a[cur]); cur = prev[cur]
+    return list(reversed(out))
+
+demo = [10, 9, 2, 5, 3, 7, 101, 18]
+
+random.seed(5)
+big = [random.randint(0, 10**6) for _ in range(1_200)]
+t0 = time.perf_counter(); a1, c1 = lis_quadratic(big); x = time.perf_counter() - t0
+t0 = time.perf_counter(); a2, _  = lis_nlogn(big);      y = time.perf_counter() - t0
+print()
+print(f"n = {len(big)}")
+print(f"  quadratic {x*1000:7.1f} ms   ({c1:,} comparisons)  -> {a1}")
+print(f"  n log n   {y*1000:7.1f} ms                         -> {a2}")
+print(f"  agree: {a1 == a2}   speed-up {x/y:.0f}x")
+
+# Strict against non-decreasing: one function call.
+flat = [1, 3, 3, 3, 5]
+def lis_non_decreasing(a):
+    tails = []
+    for x in a:
+        i = bisect.bisect_right(tails, x)
+        if i == len(tails): tails.append(x)
+        else:               tails[i] = x
+    return len(tails)
+
+print()
+print("input", flat)
+print("  strictly increasing (bisect_left) :", lis_nlogn(flat)[0])
+print("  non-decreasing      (bisect_right):", lis_non_decreasing(flat))
+```
+
+## The quadratic version first
+
+<p><code>best[i]</code> = the length of the longest increasing subsequence <em>ending at index i</em>. To compute it, look at every <code>j &lt; i</code> with <code>a[j] &lt; a[i]</code> and take the best of those, plus one. The answer is the maximum over all <code>best[i]</code>.</p><p>It is O(n&sup2;), it is four lines, and it is the right thing to write first. The "ending at i" framing is the part worth saying aloud: without it people try to define <code>best[i]</code> as "the answer for the first i elements", which does not admit a recurrence, because you cannot tell whether the run can be extended.</p>
+
+## What the tails array actually holds
+
+<p>This is the part that is usually recited without being understood. <code>tails[k]</code> is the <strong>smallest value that can end an increasing subsequence of length k+1</strong>, among everything seen so far.</p><p>Two facts follow. It is sorted, because a longer run must end higher than the best ending of a shorter one &mdash; which is what makes the binary search legal. And overwriting an entry never breaks anything: replacing a tail with a smaller value keeps the same achievable length while making future extensions easier.</p><p>So each element does one of two things. If it exceeds every tail, it extends the longest run and the array grows. Otherwise it replaces the first tail that is not smaller than it &mdash; <code>bisect_left</code> &mdash; and the length is unchanged.</p>
+
+## The trap: tails is not the answer
+
+<p>Run it on <code>[2, 6, 8, 3, 4, 5, 1]</code> and the final tails array is <code>[1, 3, 4, 5]</code>. The length, 4, is correct. The contents are not a subsequence of the input at all &mdash; the 1 is the <em>last</em> element, so it cannot precede the 3. The real answer is <code>[2, 3, 4, 5]</code>.</p><p>What makes this trap dangerous is that tails often <em>is</em> a valid subsequence by coincidence: on <code>[10, 9, 2, 5, 3, 7, 101, 18]</code> it comes out as <code>[2, 3, 7, 18]</code>, which is genuinely increasing and genuinely a subsequence. Checking one example proves nothing here. If the actual subsequence is wanted, keep a predecessor index for each element as it is placed and walk the chain backwards &mdash; the editor below does that, and checks both against the input rather than asserting.</p>
+
+## Strict, non-strict, and the follow-ups
+
+<p><code>bisect_left</code> gives <em>strictly</em> increasing: an equal value replaces rather than extends. <code>bisect_right</code> gives non-decreasing, where equal values extend the run. One function call, two different problems &mdash; and the problem statement often does not say which it wants.</p><p>The name to know is <strong>patience sorting</strong>, after the card game: each tail is the top card of a pile, and you place each new card on the leftmost pile whose top is not smaller. The number of piles is the answer. It is also the basis of the <code>difflib</code> patience diff, which is a good thing to be able to mention.</p>
+
+## What to say out loud
+
+<p>The O(n squared) version: best[i] is the length of the longest increasing run ending at i, computed by scanning everything before i. For O(n log n) I keep an array where position k holds the smallest possible tail of a run of length k+1 - it stays sorted, so each element is placed with a binary search: extend the array if it beats every tail, otherwise overwrite the first tail that is not smaller. The length of that array is the answer. If I need the actual subsequence I keep predecessor pointers, because the tails array is not it.</p>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>Empty input.</strong> Length 0, and the quadratic version's <code>max(best)</code> raises on an empty list.</p>
+
+<p><strong>All equal values.</strong> Strictly increasing gives 1, non-decreasing gives n. Which one the problem wants is frequently unstated.</p>
+
+<p><strong>Strictly decreasing input.</strong> The answer is 1 and the tails array is length 1, overwritten every step - the case worth tracing if the replacement logic looks suspicious.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"Return the subsequence, not the length."</strong> Keep a predecessor index per element and walk it backwards. It has to be said explicitly because the tails array is not the answer - the editor checks both against the input.</p>
+
+<p><strong>"Longest non-decreasing instead."</strong> <code>bisect_right</code> rather than <code>bisect_left</code>. One call, and on <code>[1,3,3,3,5]</code> the answer changes from 3 to 5.</p>
+
+<p><strong>"What is patience sorting?"</strong> This algorithm, named after the card game: each tail is the top card of a pile and each new card goes on the leftmost pile whose top is not smaller. The number of piles is the answer, and it is also the basis of patience diff.</p>
+
+## Common wrong answers
+
+<p><strong>"The tails array is the subsequence."</strong> The single most common error. On <code>[2,6,8,3,4,5,1]</code> tails ends as <code>[1,3,4,5]</code>, and the 1 is the last element of the input - so it is not a subsequence at all.</p>
+
+<p><strong>"Sort the array and find the longest common subsequence."</strong> O(n<sup>2</sup>) at best and it is a much harder algorithm for the same answer. It is a real technique and the wrong tool here.</p>
+
+<p><strong>"best[i] is the answer for the first i elements."</strong> That does not admit a recurrence, because you cannot tell whether the run can be extended. It has to be 'ending at i'.</p>
+
+## Recap in one screen
+
+- tails stays sorted, which is what licenses the binary search.
+- A replacement never changes the length - it lowers a tail so it is easier to extend.
+- The final tails contents are not a valid subsequence.
+- Worth trying: Print tails after every element of [2, 6, 8, 3, 4, 5, 1] and watch the final 1 overwrite the 2. That single step is where the array stops being a subsequence of the input.
+- Worth trying: Swap bisect_left for bisect_right and re-run on [1, 3, 3, 3, 5]. One call, and the answer changes from 3 to 5.

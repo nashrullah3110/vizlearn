@@ -1,0 +1,196 @@
+title: House robber: the 0-1 choice
+intro: Each house holds some money and you cannot rob two adjacent ones. What is the most you can take?
+
+## The question, and what it is testing
+
+At each house there are exactly two options: <strong>skip it</strong> and keep the best from the previous house, or <strong>take it</strong> and add it to the best from two houses back. <code>best(i) = max(best(i-1), best(i-2) + house[i])</code> &mdash; and since nothing reaches further back than two, two variables replace the whole table.
+
+## Run it
+
+Three implementations checked against each other, including the empty list.
+
+```python-run
+def brute(houses):
+    """Every subset with no two adjacent. Exponential, and the ground truth."""
+    best = 0
+    for mask in range(1 << len(houses)):
+        if mask & (mask >> 1):            # two adjacent bits set: invalid
+            continue
+        best = max(best, sum(h for i, h in enumerate(houses) if mask >> i & 1))
+    return best
+
+
+def table(houses):
+    """best(i) = max(best(i-1), best(i-2) + house[i])."""
+    if not houses:
+        return 0
+    best = [0] * (len(houses) + 1)
+    best[1] = houses[0]
+    for i in range(2, len(houses) + 1):
+        best[i] = max(best[i - 1], best[i - 2] + houses[i - 1])
+    return best[-1]
+
+
+def rolling(houses):
+    """Two variables, because the recurrence only looks two back."""
+    skip = take = 0
+    for h in houses:
+        skip, take = max(skip, take), skip + h
+    return max(skip, take)
+
+
+cases = [[2, 7, 9, 3, 1], [2, 1, 1, 2], [5], [], [1, 2, 3, 1], [4, 1, 2, 7, 5, 3, 1]]
+print(f"{'houses':<24} {'brute':>6} {'table':>6} {'rolling':>8}  agree")
+for houses in cases:
+    b, t, r = brute(houses), table(houses), rolling(houses)
+    print(f"{str(houses):<24} {b:>6} {t:>6} {r:>8}  {b == t == r}")
+```
+
+Why greedy fails, on the case that shows it.
+
+```python-run
+def brute(houses):
+    best = 0
+    for mask in range(1 << len(houses)):
+        if mask & (mask >> 1):
+            continue
+        best = max(best, sum(h for i, h in enumerate(houses) if mask >> i & 1))
+    return best
+
+
+def table(houses):
+    if not houses:
+        return 0
+    best = [0] * (len(houses) + 1)
+    best[1] = houses[0]
+    for i in range(2, len(houses) + 1):
+        best[i] = max(best[i - 1], best[i - 2] + houses[i - 1])
+    return best[-1]
+
+
+def rolling(houses):
+    skip = take = 0
+    for h in houses:
+        skip, take = max(skip, take), skip + h
+    return max(skip, take)
+
+# Greedy fails, and this is the case that shows it.
+def every_other(houses):
+    return max(sum(houses[0::2]), sum(houses[1::2]))
+
+print()
+print("take every other house:")
+for houses in ([2, 1, 1, 2], [2, 7, 9, 3, 1]):
+    print(f"  {houses}  every-other {every_other(houses)}  optimal {rolling(houses)}",
+          "<- greedy loses" if every_other(houses) != rolling(houses) else "")
+```
+
+The tuple assignment that is load-bearing, and the circular variant.
+
+```python-run
+def brute(houses):
+    best = 0
+    for mask in range(1 << len(houses)):
+        if mask & (mask >> 1):
+            continue
+        best = max(best, sum(h for i, h in enumerate(houses) if mask >> i & 1))
+    return best
+
+
+def table(houses):
+    if not houses:
+        return 0
+    best = [0] * (len(houses) + 1)
+    best[1] = houses[0]
+    for i in range(2, len(houses) + 1):
+        best[i] = max(best[i - 1], best[i - 2] + houses[i - 1])
+    return best[-1]
+
+
+def rolling(houses):
+    skip = take = 0
+    for h in houses:
+        skip, take = max(skip, take), skip + h
+    return max(skip, take)
+
+# The tuple assignment is load-bearing.
+def rolling_broken(houses):
+    skip = take = 0
+    for h in houses:
+        skip = max(skip, take)            # updated FIRST: now wrong
+        take = skip + h                   # adds h to a value including its neighbour
+    return max(skip, take)
+
+print()
+print("updating skip before take, instead of simultaneously:")
+for houses in ([2, 7, 9, 3, 1], [2, 1, 1, 2]):
+    print(f"  {houses}  correct {rolling(houses)}  broken {rolling_broken(houses)}")
+
+# The circular variant: run it twice, and mind the single house.
+def circular(houses):
+    if len(houses) == 1:
+        return houses[0]                  # both slices would be empty
+    return max(rolling(houses[1:]), rolling(houses[:-1]))
+
+print()
+print("houses in a circle (first and last are adjacent):")
+for houses in ([2, 3, 2], [1, 2, 3, 1], [5], [2, 7, 9, 3, 1]):
+    print(f"  {str(houses):<16} linear {rolling(houses):>3}   circular {circular(houses):>3}")
+```
+
+## Partition by the last decision
+
+<p>The same move as every other question in this group: look at the final choice. Either the last house was robbed or it was not.</p><p>If it was not, the answer is whatever was best for the houses before it &mdash; <code>best(i-1)</code>. If it was, its neighbour cannot have been, so the answer is its value plus the best for everything up to two houses back &mdash; <code>best(i-2) + house[i]</code>. Those two cases are exhaustive and disjoint, so the answer is the larger.</p><p>The base cases are worth stating explicitly, because off-by-ones here are common: <code>best(0) = 0</code> (no houses) and <code>best(1) = house[0]</code>. Indexing the table from 1 while the list is indexed from 0 is where the confusion comes from, and the rolling version below makes it disappear.</p>
+
+## Why greedy fails, and what to check
+
+<p>"Take every other house" is the intuition, and it is wrong: <code>[2, 1, 1, 2]</code> gives 3 taking the odd positions, where taking the two 2s gives 4. "Always take the biggest remaining" is also wrong, for the same reason it fails in <a href="coin-change.html">coin change</a> &mdash; no lookahead.</p><p>The editor checks the DP against brute force over every valid subset on several inputs, including the empty list and a single house. That is worth doing rather than asserting, because the recurrence is short enough to look obviously right while being wrong at the edges.</p>
+
+## The rolling version, and why it is the one to write
+
+<pre><code>skip = take = 0
+for h in houses:
+    skip, take = max(skip, take), skip + h
+return max(skip, take)</code></pre><p>Two names, one pass, no indices. <code>skip</code> is the best with the current house not taken, <code>take</code> the best with it taken &mdash; and the simultaneous assignment is what makes it correct: <code>take</code> uses the <em>old</em> <code>skip</code>, which is exactly the two-houses-back value.</p><p>Writing it in two steps instead, without the tuple assignment, is the bug: updating <code>skip</code> first means <code>take</code> adds the current house to a value that already includes its neighbour. It is the same hazard as swapping without a temporary.</p>
+
+## The circular variant
+
+<p>"Now the houses are in a circle." The first and last are adjacent, so they cannot both be robbed &mdash; and the neat resolution is to run the linear solution twice: once on <code>houses[1:]</code> and once on <code>houses[:-1]</code>, then take the better. Every valid selection excludes at least one of the two ends, so one of the runs contains the optimum.</p><p>The single-house case needs a guard, because both slices are empty and the answer should be that house. That edge is the whole difficulty of the variant, and volunteering it is what an interviewer is listening for.</p>
+
+## What to say out loud
+
+<p>At each house I either skip it, keeping best(i-1), or take it and add house[i] to best(i-2), because the neighbour is then off limits. So best(i) is the max of those two. That is O(n) time, and because the recurrence only looks two back I keep two variables instead of an array, so O(1) space. If the houses are in a circle, the first and last are adjacent, so I run it twice - once excluding the first house, once excluding the last - and take the better.</p>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>Empty list.</strong> Zero, and a table version indexing <code>best[1]</code> raises before the loop starts.</p>
+
+<p><strong>One house.</strong> Take it. The circular variant needs this as a special case, because both of its slices are empty.</p>
+
+<p><strong>Negative values.</strong> The recurrence still works, because skipping is always permitted - worth checking rather than assuming, and worth asking about if the problem says 'money'.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"The houses are in a circle."</strong> The first and last are adjacent, so run the linear version twice - once without the first house, once without the last - and take the better. Every valid selection excludes an end, so one run contains the optimum. A single house needs its own guard.</p>
+
+<p><strong>"Houses arranged in a tree."</strong> Same take-or-skip decision, computed bottom-up: for each node return the best with it robbed and the best without, and combine at the parent. It is the natural escalation and it is where the two-value return pays off.</p>
+
+<p><strong>"No two houses within k of each other."</strong> <code>best(i-k-1) + house[i]</code>, and the rolling window grows from two variables to k+1. The recurrence is the same shape with a longer reach.</p>
+
+## Common wrong answers
+
+<p><strong>"Take every other house."</strong> Wrong on <code>[2,1,1,2]</code>: alternating gives 3 where taking the two 2s gives 4.</p>
+
+<p><strong>"Always take the largest remaining house."</strong> Greedy with no lookahead, and it fails for the same reason it fails in coin change.</p>
+
+<p><strong>"skip = max(skip, take); take = skip + h."</strong> Sequential instead of simultaneous, so <code>take</code> reads the <em>new</em> skip and adds the house to a value that already includes its neighbour. The editor prints 22 against the correct 12.</p>
+
+## Recap in one screen
+
+- Two options per house, and the recurrence is just the better of them.
+- Taking a house means the answer comes from two back, not one.
+- Nothing reads further back than two, which is why the table can go.
+- Worth trying: Add a negative house value and decide what should happen. The recurrence still works because skipping is always allowed, which is worth checking rather than assuming.
+- Worth trying: Change the rule to "no two houses within k of each other". The recurrence becomes best(i-k-1) + house[i], and the rolling window grows from two variables to k+1.

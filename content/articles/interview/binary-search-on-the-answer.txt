@@ -1,0 +1,199 @@
+title: Binary search on the answer, not the array
+intro: Given package weights and D days, what is the smallest ship capacity that delivers them all in time?
+
+## The question, and what it is testing
+
+There is no array to search here. The trick is that <em>feasibility is monotonic</em>: if a capacity works, every larger one works too. So the answers form a sorted sequence of no-no-no-yes-yes, and binary search finds the boundary &mdash; with an O(n) feasibility check in place of an array lookup.
+
+## Run it
+
+The probe table: five probes over a range of forty-six candidates.
+
+```python-run
+def min_capacity(weights, D):
+    """Smallest ship capacity that delivers every package within D days."""
+    def days_needed(capacity):
+        days, load = 1, 0
+        for w in weights:
+            if load + w > capacity:       # greedy: start a new day
+                days += 1
+                load = 0
+            load += w
+        return days
+
+    lo, hi = max(weights), sum(weights)   # must fit one package; one day at most
+    probes = []
+    while lo < hi:
+        mid = (lo + hi) // 2
+        d = days_needed(mid)
+        probes.append((mid, d, d <= D))
+        if d <= D:
+            hi = mid                      # this works, so nothing larger is needed
+        else:
+            lo = mid + 1                  # too slow, so rule it and everything below out
+    return lo, probes, days_needed
+
+
+weights = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+D = 5
+answer, probes, days_needed = min_capacity(weights, D)
+
+print("weights:", weights, " D =", D)
+print()
+print("capacity | days | feasible")
+for cap, d, ok in probes:
+    print(f"   {cap:>5}  |  {d:>3} | {'yes' if ok else 'no'}")
+print()
+print("smallest capacity that works:", answer)
+```
+
+Monotonicity is what licenses the search, so check it rather than assume it.
+
+```python-run
+def min_capacity(weights, D):
+    def days_needed(capacity):
+        days, load = 1, 0
+        for w in weights:
+            if load + w > capacity:
+                days += 1
+                load = 0
+            load += w
+        return days
+
+    lo, hi = max(weights), sum(weights)
+    probes = []
+    while lo < hi:
+        mid = (lo + hi) // 2
+        d = days_needed(mid)
+        probes.append((mid, d, d <= D))
+        if d <= D:
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo, probes, days_needed
+
+weights = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+D = 5
+answer, probes, days_needed = min_capacity(weights, D)
+
+# Monotonicity is what licenses the search. Check it explicitly.
+print()
+print("the predicate flips exactly once:")
+for cap in range(answer - 3, answer + 3):
+    d = days_needed(cap)
+    print(f"  capacity {cap:>2} -> {d} days,",
+          "feasible" if d <= D else "not feasible")
+
+candidates = sum(weights) - max(weights) + 1
+print()
+print(f"brute force: {candidates} capacities from {max(weights)} to {sum(weights)}")
+print(f"binary search: {len(probes)} probes, each an O(n) pass")
+```
+
+The same shape on a different question, to show it is a pattern and not a trick.
+
+```python-run
+def min_capacity(weights, D):
+    def days_needed(capacity):
+        days, load = 1, 0
+        for w in weights:
+            if load + w > capacity:
+                days += 1
+                load = 0
+            load += w
+        return days
+
+    lo, hi = max(weights), sum(weights)
+    probes = []
+    while lo < hi:
+        mid = (lo + hi) // 2
+        d = days_needed(mid)
+        probes.append((mid, d, d <= D))
+        if d <= D:
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo, probes, days_needed
+
+weights = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+D = 5
+answer, probes, days_needed = min_capacity(weights, D)
+
+# The same shape, a different question: minimum eating speed.
+import math
+
+def min_speed(piles, hours):
+    def hours_needed(speed):
+        return sum(math.ceil(p / speed) for p in piles)
+    lo, hi = 1, max(piles)
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if hours_needed(mid) <= hours:
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo
+
+piles = [30, 11, 23, 4, 20]
+print()
+print("piles:", piles)
+for h in (5, 6, 8):
+    s = min_speed(piles, h)
+    print(f"  finish in {h} hours -> speed {s:>2}",
+          f"(takes {sum(math.ceil(p/s) for p in piles)} hours)")
+print("same structure: a monotonic predicate, checked in O(n), searched in log")
+```
+
+## Recognising it
+
+<p>The tell is a question of the form "what is the smallest <em>X</em> such that something is possible" &mdash; smallest capacity, minimum speed, fewest days, largest minimum distance. There is no sorted array in the input, which is why the shape gets missed.</p><p>What is sorted is the <strong>answer space</strong>. If you can write a function <code>feasible(x)</code> that is <code>False</code> for every <code>x</code> below the answer and <code>True</code> for every <code>x</code> at or above it, then the sequence <code>feasible(lo) ... feasible(hi)</code> is sorted &mdash; and finding where it flips is exactly binary search.</p>
+
+## The three things to establish before writing the loop
+
+<p><strong>The predicate.</strong> Here, "can capacity <code>c</code> deliver everything in <code>D</code> days?" Greedily load until the next package would overflow, then start a new day. One pass, O(n), and greedy is optimal for it because leaving room spare can never reduce the day count.</p><p><strong>Monotonicity.</strong> A bigger ship cannot need more days. State it &mdash; this is the step that makes the search valid, and an interviewer will ask why you are allowed to binary search something with no array in it.</p><p><strong>The bounds.</strong> <code>lo = max(weights)</code>, because a package must fit in one trip. <code>hi = sum(weights)</code>, because that always finishes in one day. Getting the low bound wrong &mdash; starting at 1, or at 0 &mdash; produces a search over capacities that can never work, and the loop returns an infeasible answer rather than looping forever, which is worse.</p>
+
+## Cost, and the shape of it
+
+<p>O(n log(sum &minus; max)): a logarithmic number of probes, each costing a linear pass. Note that the log is over the <em>magnitude</em> of the answer range rather than the size of the input, which is unusual and worth saying &mdash; it means the complexity depends on the numbers, not just on how many there are.</p><p>The editor below prints the probe table. Ten packages give a range of 46 candidate capacities and the search settles it in five probes.</p>
+
+## The same shape, four other questions
+
+<p><strong>Koko eating bananas</strong> &mdash; smallest eating speed to finish in H hours. Identical, with <code>ceil(pile / speed)</code> as the per-pile cost.</p><p><strong>Split an array into k subarrays</strong> minimising the largest sum. The predicate is "can we do it with all parts at most <code>m</code>", and it is the same greedy pass.</p><p><strong>Aggressive cows / maximum minimum distance</strong> &mdash; place k items as far apart as possible. The monotonicity flips direction: large distances are infeasible, so you search for the last <code>True</code> instead of the first.</p><p><strong>The square root of an integer</strong>, or any inverse of a monotonic function. Once the pattern is visible, "is there a monotonic predicate here?" becomes a routine question to ask of any minimisation problem.</p>
+
+## What to say out loud
+
+<p>I binary search the answer rather than an array. The predicate is 'can this capacity finish in D days', which I can check in one pass, and it is monotonic - if a capacity works, anything bigger works. So the feasible capacities are a suffix, and I search for the first one. Bounds are max weight to total weight, so it is O(n log sum).</p>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>Verify the monotonicity.</strong> If the predicate flips more than once, binary search returns a boundary that means nothing. Printing it either side of the answer is cheap insurance.</p>
+
+<p><strong>The bounds must bracket the answer.</strong> Too low and the search can return an infeasible value; too high only costs a probe or two. When in doubt, err high.</p>
+
+<p><strong>The log is over the magnitude of the answer range</strong>, not the input length - so the complexity depends on the size of the numbers. Worth stating, because it is unusual.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"Koko eating bananas."</strong> Identical: smallest speed such that the total hours fit, with <code>ceil(pile / speed)</code> per pile. If you can see that these are the same question, you have the pattern.</p>
+
+<p><strong>"Split an array into k parts minimising the largest sum."</strong> The predicate is 'can it be done with every part at most m', checked greedily in one pass. Same search, same monotonicity.</p>
+
+<p><strong>"Maximise the minimum distance when placing k items."</strong> The monotonicity reverses - large distances are infeasible - so you search for the last feasible value instead of the first. Recognising that the direction flips is the test.</p>
+
+## Common wrong answers
+
+<p><strong>"There is nothing sorted, so binary search does not apply."</strong> The answer space is sorted, even when the input is not. That reframing is the entire question.</p>
+
+<p><strong>"Start the range at 1."</strong> Sometimes harmless and sometimes not. The lower bound must be feasible-or-below by construction; for capacity that is <code>max(weights)</code>, because a single package has to fit.</p>
+
+<p><strong>"Check feasibility by trying all arrangements."</strong> The greedy pass is O(n) and optimal here. Searching arrangements makes each probe exponential and throws the whole benefit away.</p>
+
+## Recap in one screen
+
+- The thing being searched is a range of answers, not the input.
+- Each probe costs a full O(n) pass - the feasibility check.
+- The predicate flips exactly once, which is what makes it searchable.
+- Worth trying: Set lo = 1 instead of max(weights) and look at the answer. It is still correct here - work out why, and then find an input where it would not be.
+- Worth trying: Change the question to "the largest minimum gap when placing k items". The monotonicity reverses, so you search for the last feasible value instead of the first.

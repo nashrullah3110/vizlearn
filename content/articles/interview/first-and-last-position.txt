@@ -1,0 +1,176 @@
+title: First and last position of a target
+intro: Find the first and last index of a value in a sorted array with duplicates. O(log n).
+
+## The question, and what it is testing
+
+A plain binary search finds <em>some</em> occurrence, and which one depends on where <code>mid</code> landed. The boundaries need two searches: <code>bisect_left</code> for the first index where the value could go, <code>bisect_right</code> for one past the last. Together they bracket the run &mdash; and their difference is the count.
+
+## Run it
+
+Both boundaries, and the three questions one pair of calls answers.
+
+```python-run
+import bisect
+
+a = [1, 2, 2, 2, 5, 8]
+print("a =", a)
+print("bisect_left (a, 2) =", bisect.bisect_left(a, 2), " <- first index a 2 could go")
+print("bisect_right(a, 2) =", bisect.bisect_right(a, 2), " <- one past the last 2")
+
+def first_last(a, x):
+    lo = bisect.bisect_left(a, x)
+    if lo == len(a) or a[lo] != x:
+        return (-1, -1)
+    return (lo, bisect.bisect_right(a, x) - 1)
+
+print()
+for x in (2, 5, 3, 9):
+    print(f"  first_last(a, {x}) = {first_last(a, x)}")
+
+# The same two calls answer three questions.
+left, right = bisect.bisect_left(a, 2), bisect.bisect_right(a, 2)
+print()
+print("one pair of calls gives:")
+print("  first index :", left)
+print("  last index  :", right - 1)
+print("  count       :", right - left)
+print("  the run     :", a[left:right])
+```
+
+By hand: the two loops differ by a single character.
+
+```python-run
+import bisect
+
+a = [1, 2, 2, 2, 5, 8]
+
+def first_last(a, x):
+    lo = bisect.bisect_left(a, x)
+    if lo == len(a) or a[lo] != x:
+        return (-1, -1)
+    return (lo, bisect.bisect_right(a, x) - 1)
+
+# By hand: the two loops differ by one character.
+def lower(a, x):
+    lo, hi = 0, len(a)
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if a[mid] < x:  lo = mid + 1
+        else:           hi = mid
+    return lo
+
+def upper(a, x):
+    lo, hi = 0, len(a)
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if a[mid] <= x: lo = mid + 1      # <= instead of <
+        else:           hi = mid
+    return lo
+
+print()
+print("hand-written agrees with bisect:")
+for x in (1, 2, 5, 8, 3):
+    print(f"  x={x}  lower {lower(a,x)}=={bisect.bisect_left(a,x)}",
+          f" upper {upper(a,x)}=={bisect.bisect_right(a,x)}",
+          lower(a,x)==bisect.bisect_left(a,x) and upper(a,x)==bisect.bisect_right(a,x))
+```
+
+Absent values, and the key= parameter that does not transform the needle.
+
+```python-run
+import bisect
+
+a = [1, 2, 2, 2, 5, 8]
+
+def first_last(a, x):
+    lo = bisect.bisect_left(a, x)
+    if lo == len(a) or a[lo] != x:
+        return (-1, -1)
+    return (lo, bisect.bisect_right(a, x) - 1)
+
+# Absent values: equal boundaries, and the index is still useful.
+print()
+for x in (0, 3, 100):
+    l, r = bisect.bisect_left(a, x), bisect.bisect_right(a, x)
+    print(f"  x={x:>3}  left={l} right={r}  present:", l != r,
+          f" would insert at {l}")
+
+# key= does NOT transform the needle (Python 3.10+).
+people = [("ann", 22), ("bob", 30), ("cas", 41)]
+i = bisect.bisect_left(people, 30, key=lambda p: p[1])
+print()
+print("searching records by age with key=:", i, "->", people[i])
+print("note the needle is 30, not ('x', 30)")
+```
+
+## Why a plain search is not enough
+
+<p>With duplicates, the standard loop stops at whichever occurrence <code>mid</code> hit first. That is a correct answer to "is it there" and no answer at all to "where does the run start" &mdash; and scanning left from the hit is O(n) in the worst case, which throws away the reason for using binary search.</p><p>The fix is to stop searching for the value and start searching for the <em>boundary</em>. On finding a match, do not return: keep going in the direction of the edge you want. That is the only change, and it is what both <code>bisect</code> functions do.</p>
+
+## left and right, precisely
+
+<p><code>bisect_left(a, x)</code> returns the first index <code>i</code> such that <code>a[i] &gt;= x</code>. So everything before it is strictly less than <code>x</code>, and if <code>x</code> is present, <code>i</code> is its first occurrence.</p><p><code>bisect_right(a, x)</code> returns the first index <code>i</code> such that <code>a[i] &gt; x</code>. So it is one past the last occurrence, and the last index is <code>right - 1</code>.</p><p>Three consequences, and they are why the pair is worth memorising. <code>left == right</code> means absent. <code>right - left</code> is the count. And <code>a[left:right]</code> is the run itself, as a slice.</p>
+
+## Writing it by hand
+
+<p>The interviewer usually wants the loop, not the import. It is the half-open search from the <a href="binary-search-without-an-off-by-one.html">previous question</a> with one comparison changed:</p><pre><code>def lower(a, x):          # bisect_left
+    lo, hi = 0, len(a)
+    while lo &lt; hi:
+        mid = (lo + hi) // 2
+        if a[mid] &lt; x:  lo = mid + 1
+        else:            hi = mid
+    return lo
+
+def upper(a, x):          # bisect_right
+    lo, hi = 0, len(a)
+    while lo &lt; hi:
+        mid = (lo + hi) // 2
+        if a[mid] &lt;= x: lo = mid + 1   # &lt;= is the only difference
+        else:            hi = mid
+    return lo</code></pre><p>One character. <code>&lt;</code> stops at the first element not less than <code>x</code>; <code>&lt;=</code> steps over every element equal to it. Being able to point at that character and say what it does is the whole question.</p>
+
+## The key= trap
+
+<p><code>bisect</code> gained a <code>key=</code> parameter in Python 3.10, and it behaves differently from <code>sorted(key=...)</code> in a way that catches people: the <em>needle</em> is not passed through the key. So searching a list of records by one field means comparing against the field value directly, not against a record:</p><pre><code>i = bisect_left(people, 30, key=lambda p: p.age)</code></pre><p>Before 3.10 the standard workaround was to keep a parallel list of just the keys and search that &mdash; which is still what you do when the key is expensive to compute, because <code>key=</code> calls it on every probe.</p>
+
+## What to say out loud
+
+<p>Two binary searches. bisect_left gives the first index where the value could be inserted, bisect_right gives one past the last, so the answer is left and right minus one. If left equals right the value is absent. Each is O(log n), and the difference between them is the count, which is usually the next thing I am asked for.</p>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>Absent values.</strong> <code>left == right</code>, and the shared index is still useful - it is where the value would go.</p>
+
+<p><strong>A value larger than everything.</strong> <code>bisect_left</code> returns <code>len(a)</code>, so indexing <code>a[lo]</code> raises. Check the bound before the equality.</p>
+
+<p><strong>The whole array is the value.</strong> <code>left = 0</code> and <code>right = len(a)</code>, so the last index is <code>len(a) - 1</code> - worth checking, because it is where a missing minus-one shows up.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"Count occurrences of a value."</strong> <code>bisect_right - bisect_left</code>. Same two calls, third question answered for free, and it is the most common follow-up.</p>
+
+<p><strong>"Insert while keeping the list sorted."</strong> <code>bisect.insort</code>, which is <code>bisect_left</code> plus a list insert - O(log n) to find and O(n) to shift. Worth saying that the search is not the expensive half.</p>
+
+<p><strong>"Search a list of records by one field."</strong> <code>key=</code> from Python 3.10, with the needle being the key value rather than a record. Before that, a parallel list of keys - which is still the right answer when the key is expensive, because <code>key=</code> is called on every probe.</p>
+
+<p><strong>&quot;How would you find the number of elements less than x?&quot;</strong> <code>bisect_left(a, x)</code>, directly - the insertion point <em>is</em> that count, because everything before it is strictly smaller. The same call answers &quot;how many are greater than x&quot; as <code>len(a) - bisect_right(a, x)</code>. Recognising that an insertion point is a count is worth more than the boundary problem itself; it is how range queries on sorted data get answered without a scan.</p>
+
+<p><strong>&quot;What if the array is rotated, or sorted descending?&quot;</strong> <code>bisect</code> assumes ascending order and returns nonsense otherwise, silently. For descending data the usual fix is to search a negated view or reverse the comparison in a hand-written loop; for rotated data the boundary search no longer applies at all, because the sequence is not monotonic.</p>
+
+## Common wrong answers
+
+<p><strong>"Find one occurrence, then scan outwards."</strong> O(n) in the worst case, which throws away the reason for binary searching. A run of a million identical values makes it a linear scan.</p>
+
+<p><strong>"bisect_right gives the last index."</strong> One past it. The off-by-one here is the single most common error in this question.</p>
+
+<p><strong>"If bisect_left returns a valid index, the value is present."</strong> It always returns a valid insertion point, including for values that are absent. The <code>a[lo] != x</code> check is not optional.</p>
+
+## Recap in one screen
+
+- A plain search finds an arbitrary occurrence - that is why this needs a different loop.
+- bisect_right is one past the last, so the last index is right - 1.
+- When the value is absent the two are equal, which is the not-found test.
+- Worth trying: Remove the a[lo] != x check and search for 3. You get (4, 3) - a last index before the first, which is what an unguarded insertion point looks like.
+- Worth trying: Build a parallel list of ages and bisect that instead of using key=. That is the pre-3.10 idiom and still the right one when the key is expensive.

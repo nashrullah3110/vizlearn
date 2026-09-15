@@ -1,0 +1,189 @@
+title: Coin change, and why greedy is wrong
+intro: Given coin denominations and an amount, what is the fewest coins that make it?
+
+## The question, and what it is testing
+
+Take the biggest coin first and you get the wrong answer: with <code>[1, 3, 4]</code> for 6, greedy picks 4+1+1 &mdash; three coins &mdash; where 3+3 is two. The fix is a table: <code>best[a] = 1 + min(best[a - c])</code> over the coins that fit, in <strong>O(amount &times; coins)</strong>.
+
+## Run it
+
+The case that separates greedy from optimal.
+
+```python-run
+def greedy(coins, amount):
+    """Biggest coin first. Correct for some systems, not in general."""
+    used, left = [], amount
+    for c in sorted(coins, reverse=True):
+        while left >= c:
+            left -= c
+            used.append(c)
+    return used if left == 0 else None
+
+
+def fewest(coins, amount):
+    """best[a] = 1 + min(best[a - c]) over coins that fit."""
+    INF = float("inf")
+    best = [0] + [INF] * amount
+    pick = [None] * (amount + 1)          # for reconstructing the coins
+    for a in range(1, amount + 1):
+        for c in coins:
+            if c <= a and best[a - c] + 1 < best[a]:
+                best[a] = best[a - c] + 1
+                pick[a] = c
+    if best[amount] == INF:
+        return -1, []
+    coins_used, a = [], amount
+    while a > 0:
+        coins_used.append(pick[a])
+        a -= pick[a]
+    return int(best[amount]), sorted(coins_used)
+
+
+coins, amount = [1, 3, 4], 6
+g = greedy(coins, amount)
+n, used = fewest(coins, amount)
+print(f"coins {coins}  amount {amount}")
+print(f"  greedy : {g} -> {len(g)} coins")
+print(f"  optimal: {used} -> {n} coins")
+print("  greedy loses because it commits to the 4 and cannot undo it")
+```
+
+And the currency where greedy is safe, checked across a hundred amounts.
+
+```python-run
+def greedy(coins, amount):
+    used, left = [], amount
+    for c in sorted(coins, reverse=True):
+        while left >= c:
+            left -= c
+            used.append(c)
+    return used if left == 0 else None
+
+
+def fewest(coins, amount):
+    INF = float("inf")
+    best = [0] + [INF] * amount
+    pick = [None] * (amount + 1)
+    for a in range(1, amount + 1):
+        for c in coins:
+            if c <= a and best[a - c] + 1 < best[a]:
+                best[a] = best[a - c] + 1
+                pick[a] = c
+    if best[amount] == INF:
+        return -1, []
+    coins_used, a = [], amount
+    while a > 0:
+        coins_used.append(pick[a])
+        a -= pick[a]
+    return int(best[amount]), sorted(coins_used)
+
+# Greedy IS optimal for canonical systems - which is why the intuition sticks.
+print()
+print("real currency [1, 5, 10, 25]:")
+agree = True
+for amt in range(1, 100):
+    gg = greedy([1, 5, 10, 25], amt)
+    dd, _ = fewest([1, 5, 10, 25], amt)
+    if len(gg) != dd:
+        agree = False
+        print(f"  disagree at {amt}: greedy {len(gg)}, optimal {dd}")
+print("  greedy matches the optimum for every amount 1..99:", agree)
+```
+
+The edges, and the word that matters about the complexity.
+
+```python-run
+def greedy(coins, amount):
+    used, left = [], amount
+    for c in sorted(coins, reverse=True):
+        while left >= c:
+            left -= c
+            used.append(c)
+    return used if left == 0 else None
+
+
+def fewest(coins, amount):
+    INF = float("inf")
+    best = [0] + [INF] * amount
+    pick = [None] * (amount + 1)
+    for a in range(1, amount + 1):
+        for c in coins:
+            if c <= a and best[a - c] + 1 < best[a]:
+                best[a] = best[a - c] + 1
+                pick[a] = c
+    if best[amount] == INF:
+        return -1, []
+    coins_used, a = [], amount
+    while a > 0:
+        coins_used.append(pick[a])
+        a -= pick[a]
+    return int(best[amount]), sorted(coins_used)
+
+# The edges.
+print()
+print("amount 0 needs no coins:", fewest([1, 2, 5], 0))
+print("unreachable amounts give -1:", fewest([5, 10], 3))
+print("a single coin that fits exactly:", fewest([7], 7))
+
+# Cost, and the word that matters.
+amount = 5_000
+n, _ = fewest([1, 3, 4], amount)
+print()
+print(f"amount {amount:,} with 3 coins -> {n} coins")
+print(f"  table entries filled: {amount:,}  (amount x coins operations)")
+print("  note 'amount' is a VALUE, not a length: this is pseudo-polynomial")
+```
+
+## The counterexample is the answer
+
+<p>Almost everyone offers greedy first, because it is what people do with actual money and it works. The single most useful thing to have ready is the smallest case where it fails: <strong>coins 1, 3, 4 and amount 6</strong>. Greedy takes 4, then can only use 1s, and ends at three coins. The optimum is 3 + 3.</p><p>Offering that unprompted is worth more than the DP itself, because it shows you tested the obvious approach instead of assuming it. And it explains why the intuition is so strong: greedy <em>is</em> optimal for canonical coin systems, which is what every real currency is designed to be. The editor checks [1, 5, 10, 25] and greedy matches the DP on every amount.</p>
+
+## The recurrence, and the direction to fill it
+
+<p>Partition by the last coin. If the final coin used is <code>c</code>, the rest of the amount cost <code>best[a - c]</code> &mdash; so <code>best[a] = 1 + min(best[a - c])</code> over every coin that fits.</p><p>Fill upwards from <code>best[0] = 0</code>, because every entry depends only on smaller ones. That ordering is the whole of bottom-up DP and it is why no recursion is needed: by the time you reach <code>a</code>, everything it depends on is already final.</p><p>Use <code>float("inf")</code> for unreachable amounts rather than a sentinel like &minus;1. Infinity survives the <code>min</code> and the <code>+ 1</code> correctly; &minus;1 does not, and mixing the sentinel into the arithmetic is the standard bug in this problem.</p>
+
+## Fewest coins versus how many ways
+
+<p>Two different questions share this setup and the difference is a loop order, which is worth knowing because interviewers switch between them.</p><p><strong>Fewest coins</strong> &mdash; this page. The loops can go in either order, because <code>min</code> does not care.</p><p><strong>How many ways to make the amount</strong> &mdash; <code>ways[0] = 1</code> and <code>ways[a] += ways[a - c]</code>. Here the order decides <em>what you are counting</em>: coins on the outside and amounts inside counts combinations (order does not matter); amounts outside and coins inside counts permutations. It is the same two loops swapped, and the results differ &mdash; a genuinely nasty detail and a favourite follow-up.</p>
+
+## What it costs, and when it is too much
+
+<p>O(amount &times; coins) time and O(amount) space. Note that <code>amount</code> is a <em>value</em>, not an input length, so the table is exponential in the number of bits of the input &mdash; this is a pseudo-polynomial algorithm, and coin change with unbounded denominations is NP-hard in general.</p><p>In practice that means it is fine for amounts in the thousands and wrong for amounts in the billions. Saying "O(amount times coins), and note amount is the value so this is pseudo-polynomial" is a strong close, because it shows you know the difference between the size of an input and the magnitude of it.</p>
+
+## What to say out loud
+
+<p>Greedy does not work in general - with coins 1, 3, 4 and amount 6 it gives three coins where two is optimal. So a table: best[a] is one plus the minimum over best[a - c] for each coin c that fits, filled upwards from 0. O(amount times number of coins) time, O(amount) space. Greedy happens to be optimal for canonical systems like real currency, which is why the intuition is so strong.</p>
+
+## Edge cases to raise
+
+<p>Volunteering these is most of what separates a correct answer from a good one.</p>
+
+<p><strong>Amount 0.</strong> Zero coins, not one and not an error. <code>best[0] = 0</code> is the base case that makes the rest work.</p>
+
+<p><strong>Unreachable amounts.</strong> Coins of 5 and 10 cannot make 3. The answer is -1, and it has to survive the reconstruction step too.</p>
+
+<p><strong>A coin larger than the amount.</strong> Skipped by the <code>c <= a</code> guard. Without it the index goes negative and Python silently wraps to the end of the list - a wrong answer rather than a crash.</p>
+
+## The follow-ups interviewers ask
+
+<p><strong>"Count the number of ways instead of the fewest coins."</strong> <code>ways[0] = 1</code> and <code>ways[a] += ways[a - c]</code> - and now the loop order decides what you count. Coins outside counts combinations; amounts outside counts permutations. Same two loops, different answers.</p>
+
+<p><strong>"Return the actual coins, not just the count."</strong> Record which coin won at each amount and walk the chain back from the target. The editor does it, and it is asked for more often than not.</p>
+
+<p><strong>"What if each coin can be used only once?"</strong> That is 0/1 knapsack, and the fix is the loop direction: iterate the amount downwards so each coin is considered once per amount. Getting that direction wrong is the classic knapsack bug.</p>
+
+## Common wrong answers
+
+<p><strong>"Greedy: take the largest coin that fits."</strong> Wrong in general, and the counterexample to have ready is coins 1, 3, 4 for amount 6 - greedy gives three coins, optimal is two.</p>
+
+<p><strong>"Use -1 for unreachable amounts."</strong> It corrupts the arithmetic: <code>min</code> picks the sentinel and <code>+1</code> turns it into 0. Infinity behaves correctly.</p>
+
+<p><strong>"It is polynomial, so it scales."</strong> It is pseudo-polynomial - the table is sized by the amount's <em>value</em>, so adding a digit multiplies the work by ten. Fine for thousands, hopeless for billions.</p>
+
+## Recap in one screen
+
+- Every entry is built from a smaller amount, which is why filling upwards works.
+- Greedy commits to the 4 and cannot undo it.
+- Unreachable amounts stay at infinity and become -1.
+- Worth trying: Find another coin set where greedy fails. [1, 5, 12] for 15 is one - greedy gives 12+1+1+1, four coins, against 5+5+5.
+- Worth trying: Change it to count the number of ways instead, then swap the two loops. The answers differ, and working out which one counts combinations is the standard follow-up.
