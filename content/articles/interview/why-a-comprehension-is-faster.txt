@@ -7,6 +7,10 @@ Yes, by a little, and for a specific reason: the loop looks up <code>out.append<
 
 <p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
 
+The difference is visible in the bytecode. The loop body contains `LOAD_ATTR` to look up `.append`, `CALL_FUNCTION` to invoke it, and `POP_TOP` to discard the return value &mdash; three extra instructions per iteration. The comprehension replaces all of that with a single `LIST_APPEND` opcode that writes directly to the list being built, with no attribute lookup and no Python-level function call overhead. The speedup is roughly 10&ndash;30% in CPython, depending on what the loop body does &mdash; the simpler the per-element work, the more the overhead dominates. Generator expressions and `dict`/`set` comprehensions have their own dedicated opcodes and follow the same pattern.
+
+This page times both forms across several input sizes, prints the relevant bytecodes side by side with `dis.dis`, and covers the follow-up questions: whether a comprehension changes the complexity (it does not), where the speed gap disappears (when the per-element work is expensive enough to dwarf the call overhead), and when a loop is the right choice regardless (when you need early exit, exception handling, or side effects).
+
 ## Run it
 
 Best-of-five timings, because these are noisy, and then the per-iteration bytecode of each form so the cause is visible rather than asserted.
