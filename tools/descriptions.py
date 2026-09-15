@@ -453,6 +453,10 @@ DESCRIPTIONS = {
         "Define a function, pass it arguments, and see why printing a result is not the same as returning one.",
     "python/reading_errors.html":
         "Read a traceback from the bottom up, recognise the common Python error types, and turn each message into the fix it points at.",
+    "concurrency/choosing_threads_processes_or_async.html":
+        "Choose between threads, processes, or async based on your I/O pattern and GIL constraints.",
+    "concurrency/locks_and_the_ways_they_go_wrong.html":
+        "Understand deadlocks, livelocks, race conditions and how to avoid them in concurrent code.",
 }
 
 # The named-architecture modules (tools/arch_topics.py) write their own, one
