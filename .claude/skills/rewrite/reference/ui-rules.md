@@ -132,3 +132,50 @@ builds an `.arch-head` wrapper holding the control panel and readout and appends
 it before the stage. Before that fix the sliders sat under a 3,800px canvas
 (9,984px on the autoencoders page) and were unreachable without scrolling past
 the thing they controlled.
+
+## 5. All eleven visualisation engines, checked
+
+`liveness.js` was run against one page per engine. All eleven pass: they mount,
+draw, and change when a control is driven.
+
+| hook | engine | example page |
+|---|---|---|
+| `data-vz-arch` | named architectures | `computer_vision/haar_cascade_detection` |
+| `data-vz-async` | asyncio widgets | `async_python/coroutines_tasks_and_await` |
+| `data-vz-con` | concurrency widgets | `concurrency/concurrent_futures` |
+| `data-vz-rv` | RAG / vector indexes | `gen_ai/ann_indexing_hnsw_and_ivf` |
+| `data-vz-iv` | interview walkthroughs | `interview/accidental-quadratic-complexity` |
+| `data-vz-ml` | machine learning | `machine_learning/dbscan_clustering` |
+| `data-vz-math` | maths | `maths/central_limit_theorem` |
+| `data-vz-cv` | computer vision | `computer_vision/affine_transforms` |
+| `data-vz-db` | database models | `database/document_model_vs_rows` |
+| `data-vz-dl` | deep learning | `deep_learning/autoencoders` |
+| `data-vz-sql` | SQL runner | `database/case_and_views_in_sql` |
+
+Two real defects came out of that sweep, both now fixed:
+
+- **The article card was left-aligned on 98 pages.** `build_rag.py` emits
+  `<section class="mt-12 animate-fade-in" data-vz-prose>` with no `mx-auto`, so
+  the 1080px cap applied and the card then sat at x=32 while every band below
+  it was centred at x=173. Affected gen_ai (44), maths (14), python (12), nlp
+  (7), database (6), machine_learning (6), deep_learning (5) and
+  computer_vision (4). Fixed by putting `margin-inline: auto` on
+  `[data-vz-prose]` in the stylesheet, so a builder that forgets `mx-auto`
+  cannot reintroduce it.
+- **`data-vz-rv` has no svg and no canvas.** It renders its bars as plain divs,
+  which is fine. An earlier version of the liveness check required a drawing
+  surface and reported the whole engine as broken.
+
+### Three ways this check gives false failures
+
+Learned the hard way while writing it:
+
+1. **No window size.** The pane starts with `innerWidth === 0`; every geometric
+   check reads zero. Call `resize_window` to 1440x900 first.
+2. **A cached stylesheet.** The service worker serves an old `vizlearn.css`, so
+   a CSS fix looks like it did not work — it reported `columnCount: 2` for a
+   rule that had been deleted and rebuilt. Load the page with `?fresh=1`, and
+   confirm CSS against the built file rather than a browser read.
+3. **Controls below a short chart are fine.** The original defect was sliders
+   under a 3,800px canvas. Controls 300px under a 300px chart are both on
+   screen at once. The check allows up to one screen height.
