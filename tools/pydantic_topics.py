@@ -3804,7 +3804,7 @@ Now `Content` is a named type you can use anywhere, and adding a fourth member i
 
 ## Optional is a union too
 
-Worth noticing, because it demystifies a thing people treat as special: `Optional[X]` is exactly `Union[X, None]`, and everything above applies to it.
+Worth noticing, because it clarifies a thing people treat as special: `Optional[X]` is exactly `Union[X, None]`, and everything above applies to it.
 
 It happens to be the least ambiguous union possible, since `None` is only ever itself and nothing converts to it. That is why `Optional` never causes the problems this module describes, and why it is safe to reach for without thinking.
 

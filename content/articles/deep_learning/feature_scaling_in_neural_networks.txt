@@ -11,7 +11,7 @@ Scaling makes the valley round. With comparable input ranges the gradients are c
 
 ## Standardisation and normalisation
 
-<strong>Standardisation (z-score)</strong> centres on zero with unit variance:<p>x&prime; = (x &minus; &mu;) / &sigma;</p><p>Output is unbounded but typically within &minus;3 to +3. It preserves the shape of the distribution and handles outliers without letting them compress everything else. This is the sensible default for neural networks.</p><strong>Min-max normalisation</strong> maps to a fixed range, usually [0, 1]:<p>x&prime; = (x &minus; min) / (max &minus; min)</p><p>Useful when a bounded input is required, and fragile: a single extreme outlier sets the maximum and squashes every ordinary value into a narrow band near zero.</p><strong>Robust scaling</strong> uses the median and interquartile range instead of mean and standard deviation, which is the right choice when outliers are present and genuine.
+<strong>Standardisation (z-score)</strong> centres on zero with unit variance:<p>x&prime; = (x &minus; &mu;) / &sigma;</p><p>Output is unbounded but typically within &minus;3 to +3. It preserves the shape of the distribution and handles outliers without letting them compress everything else. This is the sensible default for neural networks.</p><strong>Min-max normalisation</strong> maps to a fixed range, usually [0, 1]:<p>x&prime; = (x &minus; min) / (max &minus; min)</p><p>Useful when a bounded input is required, and fragile: a single extreme outlier sets the maximum and squashes every ordinary value into a narrow band near zero.</p><strong>Reliable scaling</strong> uses the median and interquartile range instead of mean and standard deviation, which is the right choice when outliers are present and genuine.
 
 ## Work the numbers
 
@@ -33,7 +33,7 @@ Three things go wrong at once.
 
 <strong>The loss surface becomes a ravine.</strong> Steep in one direction, nearly flat in another. A learning rate small enough to be stable in the steep direction is far too small to make progress in the flat one, so training crawls.
 
-<strong>Activations saturate.</strong> A weighted sum in the tens of thousands pushes a sigmoid or tanh flat against its asymptote, where the derivative is essentially zero and the unit stops learning.
+<strong>Activations saturate.</strong> A weighted sum in the tens of thousands pushes a sigmoid or tanh flat against its asymptote, where the derivative is in effect zero and the unit stops learning.
 
 <strong>Initialisation assumptions break.</strong> He and Xavier initialisation both assume inputs of roughly unit variance. Feed a variance of 10⁹ and the first layer's activations are enormous from the first forward pass.
 
@@ -45,13 +45,13 @@ The fix is one line, and it is not optional. Unlike tree models, which compare f
 |---|---|---|---|
 |Standardisation|(x &minus; &mu;) / &sigma;|Mean 0, sd 1|The default for networks|
 |Min-max|(x &minus; min) / (max &minus; min)|Range 0&ndash;1|Bounded inputs such as pixels|
-|Robust|(x &minus; median) / IQR|Median 0|Outliers present|
+|Reliable|(x &minus; median) / IQR|Median 0|Outliers present|
 
 <strong>Standardisation</strong> is the usual choice. It is unbounded, so an outlier does not compress everything else into a narrow band, and zero-centred inputs suit the symmetric initialisation schemes.
 
 <strong>Min-max</strong> guarantees a range, which is why pixel values are divided by 255. Its weakness is sensitivity to outliers: one extreme value squashes every other value towards zero.
 
-<strong>Robust scaling</strong> uses the median and interquartile range, so a handful of extreme values cannot distort the transformation.
+<strong>Reliable scaling</strong> uses the median and interquartile range, so a handful of extreme values cannot distort the transformation.
 
 For heavily skewed features &mdash; income, counts, populations &mdash; a log transform <em>before</em> scaling usually helps more than the choice of scaler, because it addresses the shape rather than just the range.
 
@@ -193,7 +193,7 @@ print("layers fix the rest of them, continuously.")
 - <strong>Fitting the scaler on the full dataset.</strong> Computing the mean and standard deviation before splitting leaks test information into training. Fit on train, then <span class="mono-font">transform</span> validation and test with those same statistics.
 - <strong>Refitting the scaler at inference.</strong> Production data must use the training statistics. Fitting a new scaler on a single incoming batch produces silently wrong inputs.
 - <strong>Scaling one-hot columns.</strong> They are already on a comparable scale, and standardising them destroys sparsity by making every zero non-zero.
-- <strong>Min-max with outliers.</strong> One extreme value compresses everything else into a sliver of the range. Use standardisation or robust scaling.
+- <strong>Min-max with outliers.</strong> One extreme value compresses everything else into a sliver of the range. Use standardisation or reliable scaling.
 - <strong>Scaling the target without inverting it.</strong> If you scale y for training, predictions come back in scaled units and must be transformed back before they mean anything.
 
 ## In one line
@@ -243,7 +243,7 @@ Note that scaling does not help underfitting or overfitting directly &mdash; it 
 ## Recap in one screen
 
 - Networks need inputs on a comparable scale, or the loss surface becomes a ravine and activations saturate.
-- Standardise by default; min-max for bounded inputs; robust scaling when outliers are present.
+- Standardise by default; min-max for bounded inputs; reliable scaling when outliers are present.
 - Log-transform heavily skewed features before scaling.
 - Fit the scaler on training data only, and ship it with the model.
 - Trees do not need it; every distance-based, regularised or gradient-trained model does.

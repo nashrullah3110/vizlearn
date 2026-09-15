@@ -3,15 +3,13 @@ intro: One synchronous call in a coroutine stops every other coroutine dead. It 
 
 ## One thread means one blocker stops everything
 
-The [event loop](event_loop_stepped_through.html) runs on a single thread and can
-only switch coroutines when the running one hits an <code>await</code>. So a
-coroutine that stops awaiting &mdash; because it called something synchronous that
-takes real time &mdash; holds the one thread for that whole time, and every other
-coroutine, however unrelated, waits.
+Async Python runs on cooperative multitasking. The [event loop](event_loop_stepped_through.html) runs on a single thread and can only switch coroutines when the running one hits an <code>await</code>. So a coroutine that stops awaiting &mdash; because it called something synchronous that takes real time &mdash; holds the one thread for that whole time, and every other coroutine, however unrelated, waits.
 
-Nothing enforces cooperation. The loop cannot preempt a coroutine mid-call, so a
-blocking line does not slow the loop down, it *pauses it entirely* until the line
-returns.
+Nothing enforces cooperation. The loop cannot preempt a coroutine mid-call, so a blocking line does not slow the loop down, it *pauses it entirely* until the line returns.
+
+The danger is that nothing warns you. A call like <code>requests.get(url)</code> inside a coroutine compiles fine, runs fine on its own, and only breaks once you have other [coroutines and tasks](coroutines_tasks_and_await.html) that need to run at the same time. By then the bug is in production and expressing itself as mysterious latency spikes rather than a clear error.
+
+This page shows exactly how a blocking call freezes the loop, how to spot it, and how to fix it by pushing the work to a thread with <code>run_in_executor</code>.
 
 ## Watch a heartbeat stall
 

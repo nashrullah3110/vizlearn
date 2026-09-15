@@ -26,11 +26,11 @@ and improves it in two passes. For each node, in random order:
 
 1. Run a greedy search from the medoid toward that node, and take everything
    the search visited as a candidate set.
-2. Prune the candidates down to at most R neighbours with the **robust prune**
+2. Prune the candidates down to at most R neighbours with the **reliable prune**
    rule.
 3. Add reverse edges, pruning any neighbour that now exceeds R.
 
-The robust prune rule is the contribution:
+The reliable prune rule is the contribution:
 
 ```
 sort candidates by distance to the node
@@ -125,7 +125,7 @@ structure are expensive, so you batch them.
 The practical read: DiskANN is for corpora that are large and change in
 batches. If your corpus is small enough for RAM, use HNSW. If it changes
 constantly and is large, you are looking at a sharded system with a hot
-in-memory tier, which is what FreshDiskANN essentially is.
+in-memory tier, which is what FreshDiskANN in effect is.
 
 ```python
 # DiskANN is a C++ library with Python bindings; the build is a separate step
@@ -158,7 +158,7 @@ first few reads of every search.
 
 DiskANN optimises SSD reads rather than distance computations, because that is
 what a disk-resident index actually spends. Vamana builds one flat graph whose
-robust-prune rule, relaxed by α, deliberately keeps long-range edges so the
+reliable-prune rule, relaxed by α, deliberately keeps long-range edges so the
 hop count stays low. PQ codes in RAM steer the beam; full vectors and adjacency
 share a page on SSD so one read serves both. It is the answer when the corpus
 does not fit in memory and you have one machine.
@@ -182,8 +182,8 @@ does not fit in memory and you have one machine.
 ## Recap in one screen
 
 - The cost model changed &mdash; a page read where there used to be a memory access &mdash; and the structure follows from it. Minimise reads, not distance computations.
-- Vamana starts from a random R-regular graph and improves it in two passes of greedy-search-then-robust-prune, adding reverse edges and re-pruning as it goes.
-- Robust prune discards an edge when an edge already kept gets you close to the same place; α > 1 relaxes that test and is what preserves the long shortcuts.
+- Vamana starts from a random R-regular graph and improves it in two passes of greedy-search-then-reliable-prune, adding reverse edges and re-pruning as it goes.
+- Reliable prune discards an edge when an edge already kept gets you close to the same place; α > 1 relaxes that test and is what preserves the long shortcuts.
 - The second pass matters: the first at α = 1 builds something reasonable to search through, so the second's candidate sets are better and the graph stops depending on insertion order.
 - PQ codes in RAM &mdash; 32 bytes a vector, 32 GB at a billion &mdash; route for free; the full vector and its adjacency share one 4 KB page on SSD.
 - L is the runtime knob, and it also governs how much NVMe request parallelism you can extract, a coupling no in-memory index has.

@@ -25,13 +25,13 @@ The fit is therefore willing to move a long way to reduce one large residual,
 even at the cost of small increases across every other point. That is not a bug
 in the implementation; it is what the objective function asks for.
 
-## Leverage: where it sits matters as much as how far off it is
+## Use: where it sits matters as much as how far off it is
 
 Drag the point up while keeping it near the middle of the x range, then drag it
 up while keeping it at the far right. The second position moves the line much
 more.
 
-That difference is **leverage**. A regression line pivots roughly about the mean
+That difference is **uses**. A regression line pivots roughly about the mean
 of x, so a point near that mean is close to the pivot and has little turning
 effect no matter how far off it is vertically. A point at the extreme of x sits
 at the end of a long lever.
@@ -39,11 +39,11 @@ at the end of a long lever.
 The distinction is worth having in three words:
 
 - **Outlier** &mdash; unusual in y, a large residual.
-- **High leverage** &mdash; unusual in x, far from the pivot.
+- **High uses** &mdash; unusual in x, far from the pivot.
 - **Influential** &mdash; both, so removing it changes the model. This is the
   one that matters, and Cook's distance is the standard way to measure it.
 
-A high-leverage point that happens to lie on the trend is harmless. A moderate
+A high-uses point that happens to lie on the trend is harmless. A moderate
 outlier in the middle is harmless. The combination is not.
 
 ## Before you remove anything
@@ -70,7 +70,7 @@ and the reader is entitled to know which they have.
 
 ## Ways to be less fragile
 
-**Robust loss.** Huber loss is squared for small residuals and linear for large
+**Reliable loss.** Huber loss is squared for small residuals and linear for large
 ones, so a distant point pulls hard but not quadratically hard. RANSAC fits on
 random subsets and keeps the consensus.
 
@@ -90,7 +90,7 @@ usually a sign the column was on the wrong scale.
 
 ## Why position matters as much as distance
 
-The reason one far-off point wrecks a fit and another leaves it alone is leverage,
+The reason one far-off point wrecks a fit and another leaves it alone is uses,
 and squared error is what makes it bite. Least squares minimises the *sum of
 squared* residuals, so a point twice as far off contributes four times the penalty
 and one ten times as far contributes a hundred times &mdash; the line will travel a
@@ -104,9 +104,9 @@ its vertical error applies:
 |large residual, at the extreme of x|large &mdash; the end of a long lever|
 
 That gives three distinct things worth separating: an **outlier** is unusual in y,
-**high leverage** is unusual in x, and only their combination &mdash;
+**high uses** is unusual in x, and only their combination &mdash;
 **influential** &mdash; actually moves the model, which is what Cook's distance
-measures. A high-leverage point sitting on the trend is harmless; a mid-range
+measures. A high-uses point sitting on the trend is harmless; a mid-range
 outlier is harmless; the far-right outlier is the one that quietly rewrites the
 answer. Which is also why "delete anything beyond three standard deviations" is
 self-defeating: the outlier has already inflated the standard deviation the rule
@@ -123,12 +123,12 @@ These are not outliers; they are missing values wearing a number.
 **Removing points until the model fits.** At that stage the model describes the
 selection, not the phenomenon.
 
-**Checking only y.** High-leverage points can be unremarkable in y and still
+**Checking only y.** High-uses points can be unremarkable in y and still
 dominate the fit.
 
 ## An outlier and an influential point are not the same thing
 
-One far-out row can leave a fit untouched while another moves it completely. The difference is leverage, and it is computable.
+One far-out row can leave a fit untouched while another moves it completely. The difference is uses, and it is computable.
 
 ```python-run
 import numpy as np
@@ -170,25 +170,25 @@ print("x=5 is the mean of x, so that point has no lever at all: it pushed the")
 print("whole line up without tilting it. the edge point tilted it.")
 print()
 
-print("leverage explains it. it depends only on x, never on y:")
-def leverage(Xa):
+print("uses explains it. it depends only on x, never on y:")
+def uses(Xa):
     Z = np.column_stack([np.ones(len(Xa)), Xa])
     H = Z @ np.linalg.solve(Z.T @ Z, Z.T)
     return np.diag(H)
 
 for label, Xa in (("point at x=5 ", Xa), ("point at x=10", Xb)):
-    h = leverage(Xa)
-    print("  %s  leverage %.4f   (average is %.4f)"
+    h = uses(Xa)
+    print("  %s  uses %.4f   (average is %.4f)"
           % (label, h[-1], h.mean()))
 print("  a point far from the mean of x has a long lever. it does not have to")
 print("  be unusual in y to move the fit -- it just has to be far out in x.")
 print()
 
-print("Cook's distance combines both: how far off the line, times leverage.")
+print("Cook's distance combines both: how far off the line, times uses.")
 def cooks(Xa, ya):
     m = LinearRegression().fit(Xa, ya)
     resid = ya - m.predict(Xa)
-    h = leverage(Xa)
+    h = uses(Xa)
     mse = (resid ** 2).sum() / (len(ya) - 2)
     return resid ** 2 * h / (2 * mse * (1 - h) ** 2)
 
@@ -199,14 +199,14 @@ for label, Xa, ya in (("added at x=5 ", Xa, ya), ("added at x=10", Xb, yb)):
 print()
 print("so the vocabulary is worth getting right:")
 print("  outlier     -- an unusual y for its x. may cost you nothing.")
-print("  high leverage -- an unusual x. dangerous whether or not y is odd.")
+print("  high uses -- an unusual x. dangerous whether or not y is odd.")
 print("  influential -- actually moved the fit. Cook's distance measures this,")
 print("                 and note it flagged BOTH of our points: shifting every")
-print("                 prediction up is influence too. leverage is what tells")
+print("                 prediction up is influence too. uses is what tells")
 print("                 you which one can TILT the line rather than raise it.")
 print()
 
-print("robust fits, on the edge-outlier data:")
+print("reliable fits, on the edge-outlier data:")
 print("  ordinary least squares  slope %7.4f" % edge.coef_[0])
 print("  Huber                   slope %7.4f"
       % HuberRegressor().fit(Xb, yb).coef_[0])

@@ -1,11 +1,15 @@
 title: Indexes: Paying on Write to Stop Reading Everything
 intro: The single biggest lever on query performance, and the easiest one to disable by accident.
 
-## Quick Context
+## What an index does and what it costs
 
-Without an index, finding the rows that match a condition means reading every row and testing it &mdash; a full table scan, and its cost grows in a straight line with the size of the table. That is perfectly fine on ten thousand rows and ruinous on ten million.
+Without an index, finding the rows that match a [WHERE clause](where_clause_in_sql.html) means reading every row and testing it &mdash; a full table scan, and its cost grows in a straight line with the size of the table. That is perfectly fine on ten thousand rows and ruinous on ten million.
 
 An index is a second structure, kept sorted on one or more columns, that the database can descend instead. Its cost grows with the <em>logarithm</em> of the table size, which is why the same query stays fast as the table grows by three orders of magnitude in the lab above.
+
+The trade-off is writes. Every `INSERT`, `UPDATE`, or `DELETE` that touches an indexed column must also update the index. On a table with five indexes, a single insert does six writes instead of one. Read-heavy workloads benefit enormously; write-heavy ones can be slowed by too many indexes. The right number depends on the mix of reads and writes your table actually handles.
+
+Indexes are also easy to defeat by accident. Wrapping a column in a function, using a leading wildcard in `LIKE`, or casting types all prevent the optimiser from using the index it has. This page covers how indexes work, which kinds exist, and the common mistakes that quietly disable them.
 
 ## Why a B-tree
 
