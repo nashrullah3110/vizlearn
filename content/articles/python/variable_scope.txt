@@ -302,3 +302,17 @@ trap applies to lambdas exactly as it does to `def`.
 - Mutating is not assigning: `items.append(x)` needs no declaration,
   `items = [x]` creates a local.
 - A `for` loop shares the enclosing scope; a comprehension has its own.
+
+## Scope says who can see a name, not who can see it at the same time
+
+Everything above assumes one thread of execution. Add a second and every rule
+still holds &mdash; a call still gets its own local namespace, `global` still
+rebinds at module level &mdash; but a question appears that scope cannot answer.
+Two threads running the same function have separate locals, and *share* every
+global, along with every mutable object those locals happen to point at.
+
+That sharing is where the hard bugs live. `counter += 1` on a module-level
+integer is a read, an add and a write, and the other thread can be scheduled in
+either gap.
+
+<ul><li><a href="../concurrency/race_conditions_in_python.html">Race conditions, and the operations that are not atomic</a> &mdash; that exact increment, run 200,000 times by two threads, losing a countable number of updates.</li><li><a href="../concurrency/locks_and_the_ways_they_go_wrong.html">Locks, and the ways they go wrong</a> &mdash; making a read-modify-write indivisible, plus the deadlock you get free of charge when two locks are taken in two orders.</li></ul>

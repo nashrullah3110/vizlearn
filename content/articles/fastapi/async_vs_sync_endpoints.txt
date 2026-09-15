@@ -363,3 +363,11 @@ That single observation separates a capacity problem from a bug, and the two hav
 `async def` when the body awaits, `def` when it blocks, `def` by default when it does neither - because that is the only choice that stays correct when somebody adds a blocking call later.
 
 And if a service is slow and you cannot tell which ceiling you hit, hit an endpoint that does nothing: if it is fast, the pool is full; if it is slow, the loop is blocked.
+
+## Where the loop itself is explained
+
+This page decides one thing: `async def` or `def`, and what FastAPI does with each. The thing being decided *about* &mdash; a single-threaded loop that only makes progress when the coroutine on it suspends &mdash; is worth seeing on its own, away from routing and dependencies.
+
+<ul><li><a href="../async_python/event_loop_stepped_through.html">The event loop, one turn at a time</a> &mdash; what "ready", "waiting" and "one turn" mean concretely, stepped through by hand.</li><li><a href="../async_python/coroutines_tasks_and_await.html">Coroutines, tasks, and what await really does</a> &mdash; why awaiting two calls in a row costs the sum of their times and wrapping them as tasks costs the maximum. That is the same mistake as a handler which awaits its three upstream calls one after another, and it is invisible in a load test with one client.</li><li><a href="../async_python/the_blocking_call_that_freezes_the_loop.html">The blocking call that freezes the loop</a> &mdash; the mechanism behind "one slow request made every request slow", and the case the threadpool explicitly does not rescue you from.</li><li><a href="../async_python/running_work_concurrently.html">Running work concurrently, with a limit</a> &mdash; <code>gather</code>, and the semaphore you want in front of anything with a connection pool.</li></ul>
+
+The layer below is worth a look too, because the threadpool a `def` endpoint runs in is an ordinary thread pool with the ordinary constraints. <a href="../concurrency/the_gil_and_what_it_locks.html">The GIL, and what it actually locks</a> is why a `def` endpoint doing CPU work stops scaling with workers while one doing I/O keeps going, and <a href="../concurrency/choosing_threads_processes_or_async.html">choosing threads, processes, or async</a> is this page's decision one level up from the route.

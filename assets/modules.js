@@ -2137,7 +2137,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn 3Sum | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Are two strings anagrams?",
@@ -2145,7 +2145,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Are two strings anagrams? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Binary search on the answer, not the array",
@@ -2153,7 +2153,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Binary search on the answer, not the array | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Check whether a string is a palindrome",
@@ -2161,7 +2161,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Check whether a string is a palindrome | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Climbing stairs: the DP that is Fibonacci",
@@ -2169,7 +2169,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Climbing stairs: the DP that is Fibonacci | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Coin change, and why greedy is wrong",
@@ -2177,7 +2177,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Coin change, and why greedy is wrong | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Count things with a dictionary",
@@ -2185,7 +2185,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Count things with a dictionary | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Daily temperatures, and the monotonic stack",
@@ -2193,7 +2193,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Daily temperatures, and the monotonic stack | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Design a stack that reports its minimum in O(1)",
@@ -2201,7 +2201,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Design a stack that reports its minimum in O(1) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Design an LRU cache",
@@ -2209,7 +2209,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Design an LRU cache | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Does len() count characters or bytes?",
@@ -2217,7 +2217,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Does len() count characters or bytes? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Edit distance (Levenshtein)",
@@ -2225,7 +2225,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Edit distance (Levenshtein) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Evaluate reverse Polish notation",
@@ -2233,7 +2233,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Evaluate reverse Polish notation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Find the duplicate number",
@@ -2241,7 +2241,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Find the duplicate number | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Find the median of a data stream",
@@ -2249,7 +2249,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Find the median of a data stream | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "First and last position of a target",
@@ -2257,7 +2257,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn First and last position of a target | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "First non-repeating character",
@@ -2265,7 +2265,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn First non-repeating character | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Group anagrams together",
@@ -2273,7 +2273,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Group anagrams together | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Group records and invert a dictionary",
@@ -2281,7 +2281,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Group records and invert a dictionary | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "House robber: the 0-1 choice",
@@ -2289,7 +2289,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn House robber: the 0-1 choice | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "How does a Python dict work?",
@@ -2297,7 +2297,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn How does a Python dict work? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Implement a hash map from scratch",
@@ -2305,7 +2305,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Implement a hash map from scratch | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Implement a queue using two stacks",
@@ -2313,7 +2313,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Implement a queue using two stacks | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Implement substring search (strStr)",
@@ -2321,7 +2321,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Implement substring search (strStr) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Isomorphic strings",
@@ -2329,7 +2329,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Isomorphic strings | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Kth largest element",
@@ -2337,7 +2337,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Kth largest element | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Longest common prefix",
@@ -2345,7 +2345,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Longest common prefix | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Longest consecutive sequence",
@@ -2353,7 +2353,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Longest consecutive sequence | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Longest increasing subsequence, twice",
@@ -2361,7 +2361,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Longest increasing subsequence, twice | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Longest palindromic substring",
@@ -2369,7 +2369,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Longest palindromic substring | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Longest substring without repeating characters",
@@ -2377,7 +2377,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Longest substring without repeating characters | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Maximum subarray sum (Kadane)",
@@ -2385,7 +2385,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Maximum subarray sum (Kadane) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Memoisation: caching with a dictionary",
@@ -2393,7 +2393,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Memoisation: caching with a dictionary | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Merge k sorted sequences",
@@ -2401,7 +2401,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Merge k sorted sequences | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Merge overlapping intervals",
@@ -2409,7 +2409,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Merge overlapping intervals | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Minimum window substring",
@@ -2417,7 +2417,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Minimum window substring | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Product of array except self",
@@ -2425,7 +2425,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Product of array except self | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Remove duplicates from a sorted array in place",
@@ -2433,7 +2433,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Remove duplicates from a sorted array in place | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Reverse a string",
@@ -2441,7 +2441,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Reverse a string | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Rotate an array by k",
@@ -2449,7 +2449,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Rotate an array by k | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Run-length string compression",
@@ -2457,7 +2457,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Run-length string compression | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Search in a rotated sorted array",
@@ -2465,7 +2465,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Search in a rotated sorted array | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Shallow copy vs deep copy",
@@ -2473,7 +2473,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Shallow copy vs deep copy | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Sliding window maximum",
@@ -2481,7 +2481,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Sliding window maximum | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Sort an array of 0s, 1s and 2s",
@@ -2489,7 +2489,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Sort an array of 0s, 1s and 2s | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Subarray sum equals k",
@@ -2497,7 +2497,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Subarray sum equals k | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Top k frequent elements",
@@ -2505,7 +2505,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Top k frequent elements | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Trapping rain water",
@@ -2513,7 +2513,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Trapping rain water | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Two Sum",
@@ -2521,7 +2521,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Two Sum | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Valid parentheses",
@@ -2529,7 +2529,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Valid parentheses | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What does `with` guarantee when the body raises?",
@@ -2537,7 +2537,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What does `with` guarantee when the body raises? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What does `yield` actually do?",
@@ -2545,7 +2545,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What does `yield` actually do? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What does a decorator actually replace?",
@@ -2553,7 +2553,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What does a decorator actually replace? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What does slicing a string cost?",
@@ -2561,7 +2561,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What does slicing a string cost? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What happens if you modify a collection while looping over it?",
@@ -2569,7 +2569,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What happens if you modify a collection while looping over it? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What is a Python list underneath?",
@@ -2577,7 +2577,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What is a Python list underneath? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What is the complexity of this code?",
@@ -2585,7 +2585,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What is the complexity of this code? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "What is the difference between str and bytes?",
@@ -2593,7 +2593,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn What is the difference between str and bytes? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "When should you use a set instead of a list?",
@@ -2601,7 +2601,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn When should you use a set instead of a list? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why are Python strings immutable?",
@@ -2609,7 +2609,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why are Python strings immutable? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why do all these functions return the same value?",
@@ -2617,7 +2617,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why do all these functions return the same value? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why does [[0]*3]*3 break?",
@@ -2625,7 +2625,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why does [[0]*3]*3 break? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why does `is` sometimes work on strings?",
@@ -2633,7 +2633,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why does `is` sometimes work on strings? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why does this default argument remember?",
@@ -2641,7 +2641,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why does this default argument remember? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why is `in` slow on a list but fast on a set?",
@@ -2649,7 +2649,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why is `in` slow on a list but fast on a set? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why is a comprehension faster than the same loop?",
@@ -2657,7 +2657,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why is a comprehension faster than the same loop? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Why must dictionary keys be hashable?",
@@ -2665,7 +2665,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Why must dictionary keys be hashable? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Write binary search without an off-by-one",
@@ -2673,7 +2673,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn Write binary search without an off-by-one | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "`is` vs `==`, and why 257 is not 257",
@@ -2681,7 +2681,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn `is` vs `==`, and why 257 is not 257 | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "find() vs index() vs `in` — which one?",
@@ -2689,7 +2689,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn find() vs index() vs `in` — which one? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "list vs tuple vs deque vs array — which and why?",
@@ -2697,7 +2697,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": ""
+  "desc": "Learn list vs tuple vs deque vs array — which and why? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
  },
  {
   "title": "Bias vs Variance",

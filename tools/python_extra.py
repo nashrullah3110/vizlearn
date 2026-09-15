@@ -9452,3 +9452,104 @@ nothing to hold on to; a name says what the collection is.
 - One `for`, one filter: past that, the loop is easier to read, to change and
   to debug.
 """)
+
+
+# --------------------------------------------------------------------------
+# Third pass: where each feature reappears. These tracks were written after
+# the sections above, so the pages that most need to point at them - async,
+# concurrency, and the interview questions built on the same idea - had no
+# way in. One closing section each, at the end of the article.
+# --------------------------------------------------------------------------
+
+extend("generators_and_yield", """
+## The same pause, one level up
+
+A generator pauses at `yield` and hands control back to whoever called `next`.
+A coroutine pauses at `await` and hands control back to the event loop. That is
+very nearly the same machinery &mdash; a frame kept alive between resumptions
+&mdash; and the resemblance is not a coincidence: `async def` grew out of
+generators, and for a few releases you wrote coroutines *as* generators, with
+`yield from` standing where `await` now goes.
+
+<p>Two pages take it from here:</p><ul><li><a href="../async_python/coroutines_tasks_and_await.html">Coroutines, tasks, and what await really does</a> &mdash; the same suspend-and-resume, with a loop deciding who resumes next instead of a <code>for</code> statement.</li><li><a href="../async_python/queues_and_backpressure.html">Queues, producers and backpressure</a> &mdash; lazy production when the consumer sets the pace, which is what a generator does when the consumer is a loop, and what a bounded queue does when the consumer is another task.</li></ul>
+
+Laziness is also the whole point of an interview question that looks like it is
+about heaps: <a href="../interview/merge-k-sorted-sequences.html">merging k
+sorted sequences</a>. `heapq.merge` returns a generator, and if you are going to
+materialise the entire result it is *slower* than concatenating and sorting
+&mdash; but it produces the first value in a fraction of a millisecond, which is
+the reason to reach for it when the sequences are files you would rather not
+hold in memory all at once.
+""")
+
+
+extend("variable_scope", """
+## Scope says who can see a name, not who can see it at the same time
+
+Everything above assumes one thread of execution. Add a second and every rule
+still holds &mdash; a call still gets its own local namespace, `global` still
+rebinds at module level &mdash; but a question appears that scope cannot answer.
+Two threads running the same function have separate locals, and *share* every
+global, along with every mutable object those locals happen to point at.
+
+That sharing is where the hard bugs live. `counter += 1` on a module-level
+integer is a read, an add and a write, and the other thread can be scheduled in
+either gap.
+
+<ul><li><a href="../concurrency/race_conditions_in_python.html">Race conditions, and the operations that are not atomic</a> &mdash; that exact increment, run 200,000 times by two threads, losing a countable number of updates.</li><li><a href="../concurrency/locks_and_the_ways_they_go_wrong.html">Locks, and the ways they go wrong</a> &mdash; making a read-modify-write indivisible, plus the deadlock you get free of charge when two locks are taken in two orders.</li></ul>
+""")
+
+
+extend("mutability_and_aliasing", """
+## Aliasing across threads is this bug with the timing removed
+
+Two names for one list is a small surprise while you read a function top to
+bottom. Two *threads* holding the same alias is the same fact minus the ability
+to find it: you can no longer point at the line where the object changed,
+because it changed between two of your own lines.
+
+Nothing about mutability is different there. What is different is that "who
+else holds a reference to this?" stops being answerable by reading the
+enclosing function.
+
+<ul><li><a href="../concurrency/threads_or_processes.html">Threads or processes: what is and is not shared</a> &mdash; threads alias the whole heap; a process gets a copy, and that copy is exactly why a child's mutation never reaches the parent.</li><li><a href="../concurrency/race_conditions_in_python.html">Race conditions, and the operations that are not atomic</a> &mdash; what an aliased list looks like when two threads append to it.</li></ul>
+
+The defensive move is the one this page already argues for: copy at the
+boundary, or hand over something immutable. It is cheaper than a lock, and
+unlike a lock it cannot be forgotten at one call site.
+""")
+
+
+extend("sorted_with_key", """
+## When you do not need the whole thing in order
+
+`sorted(..., key=...)` puts every element in order, which is more than most
+questions ask for. If you only want the largest few, a sort does work you then
+discard &mdash; `heapq` does the smaller job, holding k items instead of n.
+
+The gap is measurable rather than asymptotic hand-waving. On a list with many
+distinct keys, a full sort took 155.9 ms where `nlargest` took 11.9 ms; on a
+list with only a handful of distinct values, the sort *won*. Which way it falls
+is a property of the data, not of the notation.
+
+<ul><li><a href="../interview/top-k-frequent-elements.html">Top k frequent elements</a> &mdash; count, then a heap of size k, with both timings printed side by side.</li><li><a href="../interview/kth-largest-element.html">Kth largest element</a> &mdash; the same idea reduced to a single value.</li><li><a href="../dsa/heaps_and_priority_queues.html">Heaps and priority queues</a> &mdash; how a heap answers "smallest" in constant time while refusing to tell you anything about the order of the rest.</li></ul>
+""")
+
+
+extend("files_and_with", """
+## with is a protocol, and files are only its most common user
+
+Nothing in `with` is about files. It calls `__enter__`, runs the block, and
+calls `__exit__` however the block ends &mdash; which makes it the right shape
+for anything with a matching pair of operations. Open and close. Begin and
+commit. Acquire and release.
+
+<ul><li><a href="../concurrency/locks_and_the_ways_they_go_wrong.html">Locks, and the ways they go wrong</a> &mdash; <code>with lock:</code> is this page's pattern with a different resource, and the reason to prefer it over <code>acquire()</code> and <code>release()</code> is one you have already met: an exception in the middle of the block still releases.</li></ul>
+
+There is one place `with` will not save you. Opening and reading a file is a
+blocking call, and inside an `async def` it stops the event loop rather than
+yielding to it &mdash; the `with` block is scoped perfectly correctly and the
+whole loop is frozen for its duration.
+
+<ul><li><a href="../async_python/the_blocking_call_that_freezes_the_loop.html">The blocking call that freezes the loop</a> &mdash; where the heartbeat stops, and where to put file and CPU work so that it does not.</li></ul>
+""")

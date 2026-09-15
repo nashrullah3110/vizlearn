@@ -349,3 +349,11 @@ Fix the top item and measure again, because the bottleneck moves.
 Keep the ceiling in view: an operation taking 5% of the runtime cannot yield more than 5%, however thoroughly it is optimised.
 
 And weigh readability honestly. A vectorised one-liner that nobody can safely modify has a maintenance cost that does not show up in a benchmark, and the version a colleague can read is often the better engineering answer even when it is slower.
+
+## The lock behind two of these timings
+
+Some of the numbers above only make sense in the presence of the interpreter lock, and it deserves a sentence rather than a hand-wave. CPython holds one lock around bytecode execution, so two Python-level threads never execute Python at the same time &mdash; but a NumPy call that spends its time in C can *release* that lock while it works, which is why a large `dot` or a big elementwise operation overlaps across threads and a Python loop over the same array does not.
+
+So the vectorised version is not merely faster. It is differently parallel, and that is a property of where the time is spent rather than of NumPy's API.
+
+<ul><li><a href="../concurrency/the_gil_and_what_it_locks.html">The GIL, and what it actually locks</a> &mdash; measured: threads overlap waiting and do not overlap computing, and what "releases the GIL" means at the C boundary.</li><li><a href="../concurrency/threads_or_processes.html">Threads or processes: what is and is not shared</a> &mdash; and the cost of moving an array across a process boundary, which for a large array can exceed the work you were trying to parallelise.</li><li><a href="../concurrency/choosing_threads_processes_or_async.html">Choosing threads, processes, or async</a> &mdash; the decision with the cases stated rather than implied.</li></ul>
