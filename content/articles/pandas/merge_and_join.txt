@@ -15,6 +15,18 @@ intro: SQL-style joins, and the duplicate key that silently multiplies your rows
 
 The default being `inner` is worth remembering. A join that was meant to add a column can quietly remove rows, and the only sign is a row count you were not checking.
 
+The key columns are specified with `on=` when both frames use the same name, or `left_on=` and `right_on=` when they differ. You can join on multiple columns by passing a list — `on=["year", "region"]` — which matches rows where every listed column agrees. An index-based join uses `left_index=True` or `right_index=True` instead of column names; `.join()` is a shorthand that defaults to joining on the left frame's index.
+
+Duplicate keys are the silent hazard. When a key appears three times on the left and twice on the right, the merge produces six rows for that key — every left row paired with every right row. Nothing warns you. The output is larger than either input, and downstream aggregations double-count without any obvious signal. Checking `len(result)` against `len(left)` after a left join is the minimum sanity check: if the result is longer, a key was duplicated on the right, and the merge multiplied rows.
+
+`validate=` catches this at merge time. `validate="one_to_one"` raises if any key is duplicated on either side. `validate="one_to_many"` allows duplicates on the right but not the left. `validate="many_to_one"` is the reverse. Using it costs nothing when the data is clean and saves hours when it is not, because the error points at the merge rather than surfacing as a wrong total three steps later.
+
+`indicator=True` adds a column called `_merge` whose values are `"left_only"`, `"right_only"`, or `"both"`. It is the quickest way to see which rows matched and which did not, and it is especially useful when debugging a join that lost rows — filtering on `_merge == "left_only"` shows exactly what was dropped.
+
+`suffixes=` controls what happens when both frames have a non-key column with the same name. The default appends `_x` and `_y`, which is informative enough to debug but ugly enough that you should rename immediately. Passing `suffixes=("_budget", "_actual")` makes the result self-documenting.
+
+The `.merge()` method on a DataFrame is identical to `pd.merge()` with that frame as the left operand. Both exist; the method form chains better, the function form reads better when neither frame is primary. Pick one per project and stay consistent.
+
 
 ## The four kinds of join
 

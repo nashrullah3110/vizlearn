@@ -22,6 +22,20 @@ Three things follow, and they are the actual argument for the style.
 
 The wrapping parentheses are what allow the line breaks. Without them the expression has to fit on one line or carry backslashes.
 
+`.assign()` is the chain-friendly way to add or replace columns. It takes keyword arguments — `df.assign(total=lambda d: d["qty"] * d["price"])` — and returns a new frame, so the chain continues. The `lambda d:` pattern is important: it refers to the frame as it exists at that point in the chain, not the original `df`, which may have been filtered or renamed by an earlier step.
+
+`.query()` replaces boolean indexing inside a chain. `df[df["year"] == 2024]` works, but it cannot be chained without assigning to a temporary first. `df.query("year == 2024")` returns a filtered frame and reads left to right. It accepts `@variable` syntax to reference Python variables outside the string, so `df.query("year == @cutoff")` works without f-strings or concatenation.
+
+`.pipe()` is the escape hatch for functions that do not return a DataFrame method. `df.pipe(my_function, arg1, arg2)` calls `my_function(df, arg1, arg2)` and returns whatever it returns. It keeps the chain going when you need a custom step — a domain-specific cleaning function, a logging call, or a validation check — without breaking the flow into a temporary variable.
+
+`.rename(columns={...})` inside a chain renames columns at the point where the rename makes sense, rather than at the top or bottom of the script. This is especially useful after a `groupby().agg()` that produces column names like `("sales", "sum")`, which need flattening before the next step can reference them.
+
+Debugging a chain is where people struggle. The simplest approach is `.pipe(print)` inserted at the step you want to inspect — it prints the frame and returns `None`, which breaks the chain, but that is intentional: you remove it once you have seen the state. A more durable version is `.pipe(lambda d: d.head().pipe(print) or d)`, which prints the first five rows and returns the frame unchanged, so the chain continues.
+
+Long chains do have a cost. A chain that spans thirty lines is harder to debug than three ten-line chains with named intermediates. The sweet spot is a chain per logical stage — clean, transform, aggregate — with a named result between stages. That gives you the benefits of immutability and readability without making a single expression do everything.
+
+One common mistake is calling `.inplace=True` methods inside a chain. Methods like `.drop(..., inplace=True)` return `None`, so the chain breaks silently. Chain-style code should never use `inplace` — every step returns a new frame, and the original is untouched.
+
 
 ## The same work, two ways
 

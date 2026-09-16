@@ -15,6 +15,16 @@ An explicit generator is passed where it is needed, and nothing else can touch i
 
 The legacy functions are not deprecated and existing code does not need rewriting, but new code should use `default_rng`.
 
+A generator holds its own internal state, and drawing from it advances that state deterministically. Given the same seed, the same sequence of calls produces the same numbers on every run, on every platform. That is what reproducibility means in practice: not that the numbers are predictable in a cryptographic sense, but that a colleague can rerun your notebook and get the same train/test split, the same bootstrap samples, and the same initialisation weights.
+
+The default algorithm behind `default_rng` is PCG-64, which is fast, has a period of 2^128, and passes every standard statistical test suite. You do not need to choose it — it is the default — but knowing the name helps when reading documentation or comparing with other libraries. SFC-64 and Philox are available as alternatives for specialised use cases like parallel streams, and you pass them as `default_rng(seed=42)` or `Generator(PCG64(42))` when you need explicit control.
+
+Seeding deserves a sentence of its own. `default_rng(42)` creates a generator seeded with `42`. `default_rng()` with no argument seeds from the operating system's entropy source, which is what you want in production — a different stream every run. The seed is an integer or an array of integers; it is not a float, and passing one raises. When you need several independent generators — one per thread, one per simulation — `SeedSequence` spawns child seeds that are statistically independent, which is safer than picking arbitrary integers and hoping they do not correlate.
+
+The methods on a generator cover the distributions you will actually use: `rng.random()` for uniform floats in [0, 1), `rng.integers(low, high)` for discrete uniform, `rng.normal(loc, scale)` for Gaussian, `rng.choice(a, size, replace)` for sampling from a population, `rng.shuffle(a)` for in-place permutation, and `rng.permutation(a)` for a shuffled copy. Each accepts a `size` parameter that returns an array rather than a scalar, so generating a million samples is one call, not a loop.
+
+Two pitfalls are common. First, creating a new generator inside a function that is called repeatedly gives a different seed each time (or the same one if you hardcode it), neither of which is what you want — create the generator once and pass it in. Second, calling `rng.shuffle` returns `None` because it shuffles in place; assigning its result to a variable and then using that variable gives you `None` and a silently shuffled original.
+
 
 ## default_rng is the current API
 

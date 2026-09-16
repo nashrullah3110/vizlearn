@@ -15,6 +15,20 @@ You can verify that, and the first editor above does &mdash; `read_modules()` ca
 
 What the app records from the signature is more than the name. It notes which parameters correspond to placeholders in the path, which have defaults, and what each is annotated as. That analysis happens once, at import, which is why routing is cheap at request time.
 
+The return value is converted to JSON automatically. A dict becomes a JSON object. A list becomes a JSON array. A Pydantic model is serialised via `.model_dump()`. A string is returned as-is, wrapped in a JSON response. If you return `None`, the response body is `null`. The content type is `application/json` by default, and the status code is `200`.
+
+Path parameters come from placeholders in the route string. `@app.get("/modules/{module_id}")` paired with `def read(module_id: int)` tells FastAPI that the `{module_id}` segment is an integer. A request to `/modules/3` calls `read(module_id=3)`. A request to `/modules/abc` returns a 422 before the function runs, because `"abc"` cannot be converted to `int`. The type annotation is doing the validation — without it, `module_id` arrives as a string, and the function must convert it manually.
+
+Query parameters are everything in the signature that is not in the path. If the route is `/modules` and the function signature is `def list_modules(skip: int = 0, limit: int = 10)`, then `/modules?skip=5&limit=20` calls `list_modules(skip=5, limit=20)`. Parameters with defaults are optional in the query string; parameters without defaults are required, and omitting them returns a 422.
+
+Route ordering matters, and it catches everyone once. Routes are matched in the order they are defined. If `/modules/latest` is defined after `/modules/{module_id}`, a request to `/modules/latest` matches the path parameter route first, and FastAPI tries to convert `"latest"` to `int`, which fails with a 422. The fix is to put the fixed route above the parameterised one. This is not a bug — it is how every path-based router works — but it is invisible until it breaks, and the error message does not mention ordering.
+
+The HTTP method matters. `@app.get` handles GET requests. `@app.post` handles POST. `@app.put`, `@app.patch`, `@app.delete` handle the rest. Defining the same path with different methods creates different endpoints — `GET /modules` for listing and `POST /modules` for creating is the standard pattern. A request with the wrong method returns 405 Method Not Allowed, which FastAPI handles without any code from you.
+
+`status_code=201` on the decorator changes the success status code. POST endpoints that create a resource should return 201 Created, not 200 OK. `status_code=204` with a `None` return is idiomatic for DELETE endpoints that return no body. The decorator is where the status code lives because it is part of the HTTP contract, not the business logic.
+
+`response_model` on the decorator controls what the response contains. It filters the return value to include only the fields defined in the model, so internal fields like `password_hash` are stripped automatically. It also generates the OpenAPI schema for the endpoint, which is what documentation tools and client generators read. Omitting it means the response shape is undocumented and unfiltered, which works for prototyping but not for production.
+
 
 ## The decorator registers a route
 

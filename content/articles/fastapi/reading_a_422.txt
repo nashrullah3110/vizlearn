@@ -9,6 +9,22 @@ The `detail` array is in effect `e.errors()` from the Pydantic track, with one a
 
 Everything the Pydantic track said about reading these applies directly. `loc` is a path. `type` is a stable machine code. `msg` is prose. `input` is what actually arrived. `ctx` carries the rule's parameters.
 
+`loc` always starts with the part of the request the value came from: `"body"`, `"query"`, `"path"`, `"header"`, or `"cookie"`. After that come the field names, and for nested models the path continues deeper — `["body", "address", "zip_code"]` points to the `zip_code` field inside an `address` model inside the request body. For list fields, the index appears as an integer: `["body", "items", 2, "price"]` means the third item's price failed.
+
+`type` is the field to branch on in client code. It is a stable string like `"string_too_short"`, `"missing"`, `"int_parsing"`, or `"value_error"`. It does not change between Pydantic releases (unlike `msg`, which is prose and gets reworded). A client that maps `type` to a user-facing message — `"missing"` to "This field is required", `"string_too_short"` to "Too short" — keeps working across upgrades. A client that displays `msg` directly couples itself to Pydantic's English wording.
+
+`ctx` carries the parameters of the constraint that failed. For `"string_too_short"`, `ctx` contains `{"min_length": 3}`. For `"greater_than"`, it contains `{"gt": 0}`. This is what lets a client build a message like "Must be at least 3 characters" without hardcoding the number — it reads the threshold from `ctx` and fills it into a template. Not every error type has a `ctx`; `"missing"` does not, because there is nothing to parameterise.
+
+`input` is the raw value that was submitted. For `"int_parsing"`, `input` might be `"abc"` — the string the client sent that could not be parsed as an integer. This is useful for debugging but potentially dangerous to echo back to the user: if the input contains HTML or JavaScript, displaying it raw in a browser is an XSS vulnerability. Sanitise it before rendering, or strip it from the response entirely by overriding the validation error handler.
+
+Multiple errors can arrive for the same field. A field with both `min_length=3` and a regex pattern that fails produces two errors, both pointing to the same `loc`. The `detail` list contains all of them, so a form can show every problem at once rather than revealing them one at a time as the user fixes each one.
+
+The response shape is consistent across every endpoint in the application. Whether the error is a missing field, a wrong type, a failed constraint, or a custom validator rejection, the response is always `{"detail": [...]}` with status 422. That consistency is what lets a client library handle validation errors generically — parse `detail`, group by `loc`, display each error next to the field it belongs to.
+
+Customising the 422 response is done by overriding the `RequestValidationError` handler. The default handler returns every field of every error. You might want to strip `input` for security, translate `msg` for localisation, or flatten `loc` from a list to a dotted string for simpler client parsing. The override receives the full `ValidationError`, so you can reshape it however your clients need.
+
+The 422 status itself is a choice. Some APIs prefer 400 Bad Request for all input errors, reserving 422 for semantic failures. FastAPI uses 422 because it maps directly to Pydantic's validation error, and the distinction between "malformed request" (400) and "well-formed but invalid" (422) is useful in practice. If your API must return 400 instead, the exception handler override is where you change it.
+
 
 ## It is a Pydantic error in an HTTP envelope
 

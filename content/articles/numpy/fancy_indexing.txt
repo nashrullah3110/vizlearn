@@ -12,6 +12,14 @@ Order is preserved as given, so this is also how you reorder. Positions may repe
 
 The result takes the shape of the **index**, not the source. Indexing a 1-D array with a `(2, 2)` index array gives a `(2, 2)` result. That is occasionally what you want and is worth knowing before it surprises you.
 
+Fancy indexing always returns a **copy**, not a view. That is the opposite of slicing, and it matters for two reasons. First, writing into the result does not change the original. Second, large fancy-indexed selections allocate new memory, so pulling a million rows by position costs a million entries of storage even when the source already holds them.
+
+You can also use fancy indexing on the left side of an assignment. `a[[0, 2, 4]] = 99` sets three elements at once. When the same position appears more than once in the index, the last write wins — `a[[0, 0]] = [1, 2]` leaves `a[0]` equal to `2`, not `1`. NumPy does not warn about this; it simply processes the assignments left to right. `np.add.at(a, idx, vals)` is the alternative when you need every duplicate to contribute, because it applies the operation without buffering.
+
+Fancy indexing extends naturally to higher dimensions. For a 2-D array, two integer arrays of the same shape select element-by-element: `a[[0, 1], [2, 3]]` picks `a[0, 2]` and `a[1, 3]`. Mixing a fancy index on one axis with a slice on another selects entire rows or columns by position — `a[[0, 2], :]` pulls two full rows, and `a[:, [1, 3]]` pulls two full columns. Broadcasting rules apply to the index arrays themselves, so a column vector of row indices combined with a row vector of column indices selects a rectangular block, which is the idiomatic way to extract a submatrix without copying the entire array first.
+
+The combination of reordering, repeating, and shape control makes fancy indexing the tool behind shuffling datasets, building batch samples for training, and constructing permutation matrices. Knowing that the result is always a copy and that the shape follows the index — not the data — prevents the two mistakes people make most often: assuming the result is a view and being surprised by an unexpected number of dimensions.
+
 
 ## Indexing with a list of positions
 

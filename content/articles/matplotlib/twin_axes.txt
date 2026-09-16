@@ -16,6 +16,28 @@ ax.tick_params(axis="y", labelcolor=c1)
 
 Without it, the reader has two scales and no way to tell which belongs to which line, and the chart is simply unreadable.
 
+Legends are the second thing that requires attention. Each axes has its own legend, and calling `ax.legend()` and `ax2.legend()` separately produces two legend boxes, one on each axes, which often overlap. The fix is to collect all handles and labels from both axes and build one legend:
+
+```python
+lines1, labels1 = ax.get_legend_handles_labels()
+lines2, labels2 = ax2.get_legend_handles_labels()
+ax.legend(lines1 + lines2, labels1 + labels2)
+```
+
+That gives a single box listing every series, which is what the reader expects.
+
+Grid lines conflict by default. Both axes draw grid lines at their own tick positions, which produces a mess of horizontal lines at different heights. Turn off the grid on one of them — usually `ax2.grid(False)` — so only one set of grid lines shows. The reader uses the grid to read values; two overlapping grids make both harder to use.
+
+Alignment of zero is sometimes necessary. When one scale goes from 0 to 100 and the other from 0 to 1,000, the two zero lines coincide. But when one goes from −10 to 100 and the other from 0 to 1,000, the zero lines are at different heights, and a reader comparing the two series against their respective baselines gets confused. Aligning zeros takes a manual calculation: set the limits on both axes so that the zero line falls at the same fraction of the axis height.
+
+The reason to think twice about twin axes is that they invite misreading. Two series on the same chart imply a relationship, and two y-axes make it easy to scale one series to visually overlap the other, suggesting a correlation that may not exist. A revenue line and a temperature line plotted on twin axes can be made to look like revenue follows temperature by adjusting the axis limits. The visual suggestion is powerful, and it is entirely an artefact of the scaling.
+
+The alternative is two separate panels stacked vertically with a shared x axis: `fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)`. Each panel has its own y axis on the left, and the shared x axis makes time alignment obvious. The reader compares the panels by looking up and down, which is harder to misread than two overlapping traces with different scales. For most uses, side-by-side panels are clearer and more honest.
+
+When twin axes are genuinely the right choice — two quantities measured on the same unit of time where the reader needs to see alignment — three rules keep the chart readable. First, colour-code everything: the y label, the tick labels, and the line itself in the same colour for each series. Second, keep one grid and remove the other. Third, align the zero lines if both series have a meaningful zero. Without all three, the chart invites the misreadings that make twin axes controversial.
+
+`secondary_xaxis` and `secondary_yaxis` are the newer API for a related but different case: showing the same data on two scales (Celsius and Fahrenheit, pixels and inches). They take a `functions=` argument that defines the forward and inverse transformation, and they stay in sync automatically. They are not interchangeable with `twinx`/`twiny`, which plot different data.
+
 ## twinx shares the x axis
 
 A second axes on top of the first, with its own y scale.

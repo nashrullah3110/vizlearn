@@ -8,6 +8,22 @@ The familiar `start:stop:step`, once per dimension.
 
 This composability is most of what makes array code compact. A block of a matrix, a channel of an image, every second sample of a signal &mdash; all are one expression.
 
+A slice of an array is a **view**, not a copy. That is the single behaviour that differs from lists in a way that matters. `b = a[1:3]` does not allocate new memory. `b` points into the same buffer as `a`, and modifying `b[0]` changes `a[1]`. This is efficient — slicing a 100-million-element array is instantaneous — but it means that holding a small slice of a large array keeps the entire large array alive in memory. `.copy()` makes an independent array when you need one.
+
+Lists do not work this way. `b = my_list[1:3]` creates a new list, and changing `b` never affects `my_list`. That difference catches people who learned slicing on lists and expect the same behaviour from arrays.
+
+Negative indices work as they do in Python: `a[-1]` is the last element, `a[-2]` the second-to-last. `a[:-1]` takes everything except the last row. Negative steps reverse: `a[::-1]` reverses the rows, and `a[:, ::-1]` reverses the columns. Because these are views, reversing a million-element array costs nothing — it just changes the stride direction.
+
+`...` (Ellipsis) fills in as many `:` as needed. For a 5-D array, `a[..., 0]` is equivalent to `a[:, :, :, :, 0]`. It is most useful in functions that work on arrays of arbitrary dimension, where you cannot write out the right number of colons.
+
+`np.newaxis` (or equivalently `None`) inserts a length-1 axis. `a[:, np.newaxis]` turns a shape `(5,)` array into `(5, 1)`, which is a column vector. This is the standard way to make two arrays broadcastable: if `a` is `(5,)` and `b` is `(3,)`, then `a[:, None] * b[None, :]` gives a `(5, 3)` outer product.
+
+Assigning to a slice writes in place. `a[1:3] = 0` sets two rows to zero. `a[:, 0] = [10, 20, 30]` replaces the first column. The right-hand side must be broadcast-compatible with the slice's shape, or NumPy raises a ValueError. Because slices are views, this modifies the original array — there is no intermediate copy.
+
+Out-of-range indices behave differently for single elements and slices. `a[100]` on a length-5 array raises `IndexError`. But `a[3:100]` silently clips to `a[3:5]`, returning the two remaining elements with no error. This is consistent with Python list slicing but occasionally hides bugs — you get an unexpectedly short result rather than an error.
+
+Combining indexing and slicing in a single expression is the idiomatic way to extract subsets from structured data. `data[0, :5, ::2]` takes the first layer, the first five columns, and every other element along the third axis. Reading expressions like this left to right, one axis at a time, is the habit that makes array code readable.
+
 
 ## One index per axis
 

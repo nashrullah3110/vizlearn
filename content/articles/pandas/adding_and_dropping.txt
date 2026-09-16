@@ -13,6 +13,22 @@ An **existing name is replaced**, silently. There is no protection against overw
 
 Column order is insertion order. `insert` is the only way to place one somewhere specific.
 
+`df.assign()` is the chain-friendly alternative to bracket assignment. It returns a new DataFrame with the added or replaced column, leaving the original unchanged. `df.assign(total=lambda d: d["qty"] * d["price"])` adds a `total` column computed from existing columns. The `lambda d:` pattern refers to the frame being assigned to, which matters in a method chain — it sees the frame as it exists at that point, not the original.
+
+`df.drop(columns=["temp"])` removes a column and returns a new frame. `df.drop(columns=["a", "b"])` removes several. The original is untouched unless you reassign: `df = df.drop(columns=["temp"])`. The older form `df.drop("temp", axis=1)` does the same thing but reads worse — `axis=1` is easy to confuse with `axis=0`, which drops rows. The `columns=` keyword is self-documenting and harder to misread.
+
+`df.rename(columns={"old": "new"})` renames columns. It accepts a dictionary mapping old names to new names, and returns a new frame. For bulk renaming — lowercasing everything, stripping whitespace — pass a function: `df.rename(columns=str.lower)` or `df.rename(columns=lambda c: c.strip())`. The function form is especially useful after reading a CSV with messy headers.
+
+`df.insert(loc, column, value)` adds a column at a specific position. `df.insert(0, "id", range(len(df)))` puts an `id` column at the far left. Unlike bracket assignment, which always appends, `insert` lets you control where the column appears — important for display order and for code that references columns by position. `insert` modifies the frame in place and returns `None`, which is the opposite of `assign` and `drop`.
+
+Alignment is the silent rule behind column assignment. When you assign a Series as a new column, pandas aligns it by index, not by position. If the Series has a different index than the DataFrame, the values are matched where indices agree and `NaN` is filled where they do not. This is powerful — you can assign the result of a `groupby` back to the original frame without worrying about row order — but it is also the source of unexpected `NaN` values when the indices do not match. Check `df.index` and `series.index` when a new column is unexpectedly full of missing values.
+
+`.pop("column")` removes a column in place and returns it. `total = df.pop("total")` takes the column out of the frame and stores it in a variable. It is the only column-removal method that modifies in place and returns the removed data, which makes it useful for reshaping — pull out a column, transform it, put it back.
+
+Conditional columns use `np.where` or `.where`. `df["flag"] = np.where(df["score"] > 90, "high", "low")` creates a column based on a condition. For multiple conditions, `np.select([cond1, cond2], [val1, val2], default=val3)` is cleaner than nested `np.where` calls. `.where` on a Series replaces values where the condition is `False`, which is the inverse of boolean indexing — confusing until you see it once, then straightforward.
+
+Type stability matters when adding columns. Assigning a column with mixed types — some integers, some strings — produces an `object` column, which is slow and memory-heavy. Ensuring that every value in the assignment has the same type, or casting immediately after with `.astype()`, prevents `object` columns from creeping into the frame.
+
 
 ## Assigning a new column
 

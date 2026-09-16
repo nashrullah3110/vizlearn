@@ -8,6 +8,24 @@ In a notebook it is worse, because the current figure is whatever the last execu
 
 `ax.plot(...)` removes the question. This is the practical reason the object-oriented API is worth the extra characters.
 
+The second common mistake is plotting data that is there but invisible. The three usual causes are: the data is outside the axis limits, the marker size is zero, and the colour matches the background.
+
+Axis limits are set automatically to fit the data, but a previous `set_xlim` or `set_ylim` call can override them, and then new data plotted outside those limits simply does not appear. `ax.autoscale()` resets the limits to fit everything currently plotted. In a notebook, the same axes object can survive across cells if the figure was not closed, so limits set three cells ago can clip data plotted now.
+
+A scatter plot with `s=0` draws invisible points. It happens when the size argument is computed from data that contains zeros — `ax.scatter(x, y, s=values)` where `values` includes `0` or `NaN`. The fix is to set a minimum: `s=np.maximum(values, 5)`. Similarly, `linewidth=0` on a line plot makes the line invisible, which is correct for a filled area but wrong for a line chart.
+
+Colour matches background when plotting white data on a white figure, or when `alpha=0` makes everything transparent. `ax.set_facecolor("lightgray")` during debugging reveals invisible white elements. Removing the facecolor afterwards restores the original appearance.
+
+The third class of mistake is a chart that appears but misrepresents the data. The most common example is a line chart on categorical data. `ax.plot(categories, values)` connects the points with lines, implying a continuous relationship between "alpha" and "beta" that does not exist. A bar chart is the correct choice for categorical comparisons. `ax.bar(categories, values)` shows each value independently.
+
+Shared axes on subplots catch people when the scales differ. `plt.subplots(1, 2, sharey=True)` forces both panels to use the same y limits, which is correct when comparing like with like but misleading when one panel's values are 10x the other's — the smaller panel looks flat. Dropping `sharey` or using `sharey=False` lets each panel scale independently, and a note in the title or caption alerts the reader to the different scales.
+
+Log scale on data that includes zero or negative values raises a warning and drops those points silently. `ax.set_yscale("log")` with a value of 0 produces `-inf`, which matplotlib clips. The data point vanishes without an error. `ax.set_yscale("symlog")` handles zero and negative values by switching to linear scale near the origin, but the transition can be visually confusing if the reader does not expect it.
+
+Legends disappear when no `label=` argument was passed to the plot call. `ax.legend()` with no labels produces an empty legend or a warning. The fix is to pass `label="series name"` to every `plot`, `scatter`, or `bar` call whose series should appear in the legend. Alternatively, `ax.legend(["a", "b"])` assigns labels by order, which works but breaks when the plotting order changes.
+
+These mistakes share a property: the code runs without error, and the chart renders without complaint. The result looks like a chart, and the reader assumes it is correct. That silence is why matplotlib mistakes are harder to catch than matplotlib errors — errors stop the program, mistakes stop the reader.
+
 
 ## Nothing appears
 

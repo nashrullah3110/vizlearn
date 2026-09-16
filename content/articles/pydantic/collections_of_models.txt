@@ -13,6 +13,18 @@ Given a list, Pydantic walks it and validates each element as a `Lesson`. A dict
 
 That last part matters more than it sounds. Validation does not abandon the collection at the first bad item. It checks all of them and reports all the failures, which for a bulk import is the difference between fixing one row per attempt and seeing the whole problem at once.
 
+Each error in a collection carries its **index** in `loc`. A failure in the third element of a list produces `loc: [2, "title"]` — the `2` tells you which item, and `"title"` tells you which field inside it. For nested collections — a list of models that themselves contain lists — the path can be several levels deep, and each level is one entry in `loc`. That specificity is what makes bulk validation usable: without it, an error saying "title is required" on a 500-item import is meaningless.
+
+`Dict[str, Model]` validates both keys and values. The keys must be strings (or whatever the key annotation says), and each value is validated as the inner model. An invalid key produces an error with the key itself in `loc`, so `{"bad key": {...}}` shows `loc: ["bad key", ...]` rather than a generic "dict error". `Set[Model]` works similarly, but enforces uniqueness — duplicate items are silently dropped after validation, and the model's `__hash__` and `__eq__` decide what counts as a duplicate.
+
+`Tuple[A, B, C]` validates by position. The first element must be an `A`, the second a `B`, the third a `C`, and the length must match. This is stricter than a list — a tuple annotation means fixed length and per-position types, while a list annotation means variable length and uniform type. Mixing them up is common and produces confusing errors: a `Tuple[int, str]` given three items fails with a length error, not a type error.
+
+Nesting collections is where the power shows. `List[Dict[str, List[Lesson]]]` is a valid annotation, and Pydantic walks every level. The error paths grow accordingly — `loc: [0, "monday", 2, "minutes"]` points to the `minutes` field of the third lesson in the `"monday"` key of the first dict in the list. The depth is unlimited, and the paths are always precise.
+
+`TypeAdapter` validates a collection without wrapping it in a model. `TypeAdapter(List[Lesson]).validate_python(data)` checks the list directly, which is useful when you receive a JSON array at the top level rather than a JSON object. It supports the same annotations, the same error reporting, and the same coercion rules as a model field.
+
+Default factories for collection fields use `default_factory`, not a mutable default. `tags: List[str] = Field(default_factory=list)` gives each instance its own empty list. Writing `tags: List[str] = []` shares the same list object across instances, which Pydantic catches and raises an error for — unlike plain Python classes, where the bug is silent.
+
 
 ## A list of models
 

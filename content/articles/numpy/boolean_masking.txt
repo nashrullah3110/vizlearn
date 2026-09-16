@@ -9,6 +9,20 @@ That is the whole idea. The mask has the same shape as the data, so it can be us
 
 It also explains an error people meet early: putting an array in an `if` raises, because Python needs one truth value and NumPy refuses to guess whether you meant `any` or `all`.
 
+Using a boolean mask as an index selects the elements where the mask is `True`. `a[a > 5]` returns a 1-D array of every element greater than 5, regardless of the original shape. That flattening is intentional — the `True` positions can be scattered anywhere, so the result cannot keep the original dimensions. If you need to preserve the shape, use `np.where(mask, a, fill_value)` instead, which returns an array of the same shape with `fill_value` wherever the mask is `False`.
+
+Masks compose with `&` (and), `|` (or), and `~` (not). Each comparison must be in parentheses because of Python's operator precedence: `(a > 3) & (a < 8)` works, but `a > 3 & a < 8` does not — `&` binds tighter than `>`, so Python tries to evaluate `3 & a` first and raises. This is the most common syntax error in NumPy code, and the fix is always more parentheses.
+
+Counting with a mask is a sum: `(a > 5).sum()` counts the `True` values, because `True` is `1` and `False` is `0`. `.any()` tells you whether at least one element is `True`. `.all()` tells you whether every element is. These three cover most of what you need to know about a mask before using it to select.
+
+Writing through a mask changes only the selected elements. `a[a < 0] = 0` clips all negative values to zero, leaving everything else untouched. This is faster and clearer than a loop, and it works in place — the original array is modified, no copy is made.
+
+`np.where(condition, x, y)` is the element-wise ternary: it returns `x` where the condition is `True` and `y` where it is `False`. Both `x` and `y` are broadcast against the condition, so `np.where(a > 0, a, 0)` is equivalent to the clipping above but returns a new array instead of modifying in place. The three-argument form is the one you want; the one-argument form, `np.where(condition)`, returns the indices where the condition is `True`, which is useful but different.
+
+Boolean masking is the foundation of filtering in NumPy. Selecting rows of a 2-D array where a column meets a condition — `data[data[:, 2] > threshold]` — is one expression, no loop, no temporary. It is also how pandas filtering works under the hood: `df[df["col"] > 5]` creates a boolean Series and indexes with it, using the same mechanism. Understanding the NumPy version makes the pandas version transparent.
+
+Performance is worth mentioning. A boolean mask evaluates every element, which means it touches every byte of the array. For a 100-million-element array, that is 100 million comparisons and 100 million bytes of mask, whether the result contains ten elements or ten million. When you know the data is sorted, `np.searchsorted` finds the boundaries in logarithmic time, which is dramatically faster — but only when the data is sorted, which it usually is not.
+
 
 ## A comparison gives an array
 

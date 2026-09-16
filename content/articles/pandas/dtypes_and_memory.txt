@@ -7,6 +7,20 @@ A frame that does not fit in memory cannot be analysed at all, and the usual rea
 
 Fixing dtypes is often the difference between a dataset that loads and one that does not, and it takes one line per column.
 
+The `object` dtype is the one that wastes the most memory. A column of strings stored as `object` holds a Python string object per cell, each with its own memory allocation and reference-counting overhead. A million-row string column stored as `object` can use 100 MB or more. Converting it to `category` stores each unique value once and uses integer codes per row — for a column with a few hundred distinct values, that can shrink memory usage by 90% or more.
+
+`category` is not just a memory optimisation. It also speeds up `groupby`, `value_counts`, and merges on that column, because the operations work on the integer codes rather than comparing strings. The tradeoff is that adding a new value that is not in the category set requires rebuilding the categories, which is slow. Use `category` for columns whose values are known and finite — status codes, country names, product types — not for free-text fields.
+
+Numeric columns have their own wasteful default. `pd.read_csv` infers `int64` for integer columns and `float64` for float columns, both of which use 8 bytes per value. If the values fit in a smaller type — `int16` for values up to 32,767, or `float32` for values that do not need double precision — the downcast saves half the memory. `pd.to_numeric(col, downcast="integer")` picks the smallest integer type that fits the data. `df.astype({"price": "float32"})` does it manually.
+
+The nullable integer types — `Int8`, `Int16`, `Int32`, `Int64` with a capital I — store integers alongside a missing-value mask, so a column can contain both integers and `NA` without being promoted to `float64`. The standard `int64` dtype cannot represent missing values, so pandas silently converts to `float64` when a single value is missing, which doubles the memory and changes the type. The nullable types avoid that promotion entirely.
+
+`df.memory_usage(deep=True)` reports the actual memory each column uses, including the string content that `object` columns point to. Without `deep=True`, it reports only the pointer array, which dramatically understates the real cost. Always use `deep=True` when investigating memory.
+
+`df.info(memory_usage="deep")` combines the dtype and memory report in one view. It shows every column's dtype, non-null count, and memory usage, plus the total. It is the first command to run on any dataset you have not seen before — before plotting, before merging, before modelling — because a wrong dtype upstream produces wrong results downstream with no error message.
+
+Datetime columns stored as `object` are another common waste. `pd.to_datetime(col)` converts them to `datetime64[ns]`, which uses 8 bytes per value regardless of the string length and enables time-based operations — resampling, time deltas, date arithmetic — that `object` strings do not support. The conversion can fail on ambiguous formats, so specifying `format=` is safer than letting pandas guess.
+
 
 ## Every column has a dtype
 

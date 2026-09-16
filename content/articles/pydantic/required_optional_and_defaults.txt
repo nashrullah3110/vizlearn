@@ -15,6 +15,20 @@ Leave out `title` and the model refuses to be built, with an error whose `type` 
 
 Everything confusing about this topic comes from one word being borrowed for two jobs.
 
+The word is `Optional`. In Python's type system, `Optional[str]` means `Union[str, None]` — the value can be a string or `None`. It says nothing about whether the field has a default. An `Optional[str]` field with no default is **required**: you must provide it, but you may provide `None`. An `Optional[str]` field with `= None` is truly optional: omit it and you get `None`. The annotation controls the allowed types; the default controls whether the field can be omitted.
+
+That distinction trips people because in everyday language "optional" means "you can leave it out." In Pydantic it does not. `Optional[str]` without a default requires a value — it just allows that value to be `None`. The mental model that survives is: "the default decides required or optional; the type decides what values are legal."
+
+`None` as a value is different from missing. Consider a PATCH endpoint where the client wants to clear a field. Sending `{"bio": null}` means "set bio to None." Not sending `bio` at all means "leave bio unchanged." A model that uses `bio: Optional[str] = None` cannot tell the difference — both cases produce `None`. Pydantic's `model_fields_set` attribute is how you distinguish them: it is a set of field names the caller actually included, so checking `"bio" in model.model_fields_set` tells you whether the field was explicitly sent.
+
+`Field(default=...)` and `Field(default_factory=...)` are the two ways to set defaults through the `Field` function. `default` takes a value directly: `Field(default=10)`. `default_factory` takes a callable that returns the value: `Field(default_factory=list)`. The factory form exists because mutable defaults — lists, dicts, sets — must not be shared across instances. Pydantic raises an error if you write `tags: List[str] = []` directly, unlike plain Python classes, where the bug is silent and shared mutations corrupt every instance.
+
+A field with `...` (Ellipsis) as its default is explicitly required: `title: str = Field(...)`. This is equivalent to having no default at all, but it lets you add other `Field` arguments like `min_length` or `description` while keeping the field required. Without `...`, adding `Field(min_length=3)` would make the field optional with a default of `None`, which is rarely what you want.
+
+Defaults interact with validation. A default value is **not validated** unless you set `validate_default=True` on the field or on the model's config. That means `x: int = "not a number"` does not raise at class definition time — it raises only when you build an instance without providing `x`, at which point the default is validated and fails. This is intentional: it lets you define a model before the default is meaningful, but it is surprising if you expect the class definition to catch the mismatch.
+
+Inheritance adds one more layer. A child model can override a parent's field, changing its default or type. A field that was required in the parent can become optional in the child, and vice versa. The child's definition wins. But removing a field entirely is not supported — you can only change it, not delete it.
+
 
 ## A field with no default is required
 

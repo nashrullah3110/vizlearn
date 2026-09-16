@@ -12,6 +12,20 @@ Two properties are worth noticing. It is an **exception**, so it unwinds &mdash;
 
 `detail` does not have to be a string. A dict or list is serialised, which is one way to return structured errors without a custom handler.
 
+The status code tells the client what happened at the HTTP level. `404` means the resource was not found. `409` means a conflict — a duplicate key, a version mismatch. `422` is what Pydantic validation failures produce by default. `400` is the catch-all for bad requests that do not fit a more specific code. `403` means the caller is authenticated but not authorised. Choosing the right code matters because clients branch on it: a 404 triggers a "not found" page, a 401 triggers a login redirect, and a 500 triggers a retry. A handler that returns 400 for everything forces every client to parse the message to decide what to do.
+
+Custom exception handlers let you change the response shape for an entire class of exceptions. `@app.exception_handler(ValueError)` registers a function that receives every unhandled `ValueError` and returns a response. The handler gets the request and the exception, and returns a `JSONResponse` (or any response) with whatever status and body you choose. This is how you enforce a consistent error shape across the entire API without putting try/except in every handler.
+
+Starlette's built-in `RequestValidationError` is what FastAPI raises when Pydantic validation fails at the request boundary. You can override its handler to reshape the 422 response — for example, to flatten the error list, to translate messages, or to strip the `input` field that echoes back what the client sent (which can be a security concern if the input contains sensitive data). `@app.exception_handler(RequestValidationError)` replaces the default handler.
+
+`HTTPException` from FastAPI extends Starlette's `HTTPException` with one addition: `detail` can be any JSON-serialisable value, not just a string. If you import from `starlette.exceptions` instead of `fastapi`, you get the narrower version, and passing a dict raises. The import source matters, and it is a common source of subtle bugs when copying code between projects.
+
+Middleware-level error handling catches exceptions that happen before or after the handler — during authentication, during response serialisation, or in middleware itself. `@app.middleware("http")` wraps the entire request cycle in a try/except, so a crash in any layer returns a controlled response rather than a bare 500. The default 500 response body is `{"detail": "Internal Server Error"}`, which is correct for production but useless for debugging. A middleware that logs the traceback and returns a request ID gives the client something to report and gives you something to search for.
+
+The order of exception handlers matters. A handler for `Exception` catches everything, including `HTTPException`, unless the `HTTPException` handler is registered first. FastAPI processes handlers in registration order and stops at the first match. If you register a broad handler before a specific one, the specific one never runs. The safe pattern is: register specific handlers first, then broader ones.
+
+Keeping HTTP out of the code that does the work is the design principle behind all of this. A service function raises `ValueError("Module not found")`. The handler, or a registered exception handler, turns that into a 404. The service function knows nothing about HTTP, status codes, or response shapes. It can be tested with a function call, reused in a CLI, or called from a background task. The moment a service function imports `HTTPException`, it is coupled to the web layer, and testing it requires a request context.
+
 
 ## HTTPException is the ordinary way
 

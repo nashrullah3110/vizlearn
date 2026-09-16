@@ -9,6 +9,18 @@ Both halves matter. The kind decides what operations mean; the width decides the
 
 `np.iinfo` and `np.finfo` report the limits, and it is worth looking at them once rather than remembering approximations. The first editor prints them.
 
+The default integer dtype on most systems is `int64`, which uses 8 bytes and covers values up to about 9.2 × 10^18. The default float is `float64` (double precision), also 8 bytes, with about 15–16 significant decimal digits. These defaults are generous, and for many datasets they waste half the memory. A column of ages fits in `int8` (1 byte, up to 127). A column of pixel values fits in `uint8` (1 byte, 0–255). A column of stock prices fits in `float32` (4 bytes, about 7 significant digits). Choosing the right width is the simplest way to halve memory usage.
+
+Overflow is silent for integers. `np.int8(127) + np.int8(1)` gives `-128`, not `128` — the value wraps around without any warning. This is the cost of fixed-width integers, and it bites hardest when accumulating sums in a narrow type. `a.sum()` on an `int8` array can overflow and produce a wrong answer. NumPy casts the accumulator to a wider type for `.sum()` and `.mean()`, but element-wise operations like `a + b` do not upcast automatically — the result has the same dtype as the inputs.
+
+Promotion rules decide the dtype of the result when two arrays with different dtypes interact. The general rule is: the result uses the type that can represent both inputs without loss. `int32 + float64` gives `float64`. `int8 + int32` gives `int32`. `float32 + float64` gives `float64`. These rules are predictable, but they occasionally produce surprises: `bool + int8` gives `int8`, and `int64 + float32` gives `float64`, not `float32`, because `float32` cannot represent all `int64` values.
+
+Structured dtypes let one array hold several named fields with different types — like a lightweight record. `dt = np.dtype([("name", "U10"), ("age", "i4"), ("score", "f8")])` defines a dtype with a 10-character string, a 32-bit integer, and a 64-bit float. An array with this dtype behaves like a table: `a["name"]` returns a string array, `a["age"]` returns an integer array. It is more memory-efficient than a list of tuples but less convenient than a pandas DataFrame, so it is mostly used in performance-sensitive code or when reading binary files with a known record layout.
+
+Byte order matters when reading data from files or the network. `>` means big-endian, `<` means little-endian, `=` means native. `np.dtype(">i4")` is a big-endian 32-bit integer. Most modern systems are little-endian, so data received from a big-endian source needs `.byteswap().newbyteorder()` or a dtype that specifies the source's byte order. Getting this wrong produces numbers that look plausible but are completely wrong — a value of 1 stored big-endian and read as little-endian becomes 16,777,216.
+
+`astype` converts between dtypes. `a.astype(np.float32)` returns a new array with the values converted. The conversion can lose precision (`float64` to `float32` rounds), lose magnitude (`int64` to `int8` wraps), or fail (`"abc"` to `int` raises). `copy=False` avoids a copy when the dtype is already correct, which is useful in pipelines where you want to ensure a dtype without paying for an unnecessary allocation.
+
 
 ## What a dtype records
 

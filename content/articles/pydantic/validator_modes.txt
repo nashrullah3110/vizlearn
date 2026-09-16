@@ -13,6 +13,20 @@ Validating one field is a sequence, and every mode is a slot in it:
 
 Almost every confusion about validators dissolves once this sequence is clear, because the question "why did my validator not run?" nearly always has the answer "it was in after mode and the value failed at step 2".
 
+**Before** mode receives the raw input — whatever the caller passed, before any type conversion. The value might be a string when the field is annotated as `int`. It might be a dict when the field is a model. The validator sees exactly what arrived, and it can transform, reject, or pass it through. This is the right mode for normalising input: stripping whitespace, converting date strings to a canonical format, or accepting multiple representations of the same value. If the before validator raises, coercion never runs.
+
+**After** mode receives the final, fully converted value. If the field is `int`, the validator sees an `int`. If the field is a model, the validator sees a validated model instance. This is the right mode for business rules: checking that a quantity is positive, that a date is in the future, or that two fields are consistent with each other. After validators do not run when coercion fails, which is the "step 2" issue from above — if `"abc"` cannot be converted to `int`, no after validator for that field executes.
+
+**Plain** mode replaces the entire pipeline. There is no coercion and no constraint check — only the validator runs. The validator receives the raw input and must return the final value. This is useful when the standard coercion is wrong for your case: you want to accept a string and produce a custom object, or you want to reject certain inputs that Pydantic would otherwise coerce silently (like truncating a float to an int).
+
+**Wrap** mode surrounds the entire pipeline. The validator receives a `handler` function that it can call to run the standard validation (before validators, coercion, constraints, after validators). The wrap validator can inspect the input before calling `handler`, modify the result after, or catch exceptions from the pipeline and recover. This is the most flexible mode and the right choice for cross-cutting concerns like logging what a field received, timing how long validation takes, or providing a fallback value when standard validation fails.
+
+The choice between modes follows a simple rule. If you need to see the raw input: before. If you need to see the converted value: after. If you need to replace the pipeline: plain. If you need to wrap it: wrap. Most validators are before or after; plain and wrap are for advanced cases.
+
+Multiple validators on the same field run in definition order within each mode, and the modes themselves run in the pipeline order: all before validators first, then coercion and constraints, then all after validators. A before validator's return value is what the next before validator (or coercion) sees, so chaining before validators composes transformations — strip whitespace, then lowercase, then check a pattern.
+
+Field validators and model validators are different. A field validator runs on one field; a model validator runs after all fields are validated and can access the entire model. Model validators are the right place for cross-field checks like "start_date must be before end_date" or "if payment_method is 'card', card_number is required." They also have before, after, and wrap modes, with the same semantics applied to the model as a whole rather than to a single field.
+
 
 ## Seeing the pipeline
 
