@@ -9,6 +9,13 @@ Data arriving from outside a program is nearly always text. A query string is te
 
 So the default &mdash; **lax mode** &mdash; is to accept any value with one unambiguous reading, and refuse the rest. The rules are worth knowing precisely, because "unambiguous" turns out to be a stricter test than most people expect.
 
+The coercion rules are per-type and asymmetric. A string `"9"` becomes the integer `9`, but the string `"9.5"` does not, because truncating it would be ambiguous &mdash; did the caller mean 9 or 10? A float `9.0` becomes the integer `9` because no information is lost, but `9.5` does not. A boolean `True` does not become `1` in strict mode, because booleans and integers mean different things even though Python treats `True` as a subclass of `int`.
+
+Strict mode turns off all coercion. `"9"` stays a string, `9.0` stays a float, and anything that is not already the annotated type is rejected. You enable it per-model with `model_config = ConfigDict(strict=True)` or per-field with `Annotated[int, Strict()]`. Strict mode is the right default for internal APIs where the caller controls the types. Lax mode is the right default for external APIs where the data arrives as text.
+
+The error messages are specific. A rejected value gets a message that names the type it arrived as, the type it was expected to be, and why the conversion was refused. That specificity makes debugging straightforward: the error tells you exactly what to fix.
+
+Understanding which conversions happen silently and which ones raise is what makes Pydantic predictable rather than magical. Each type has its own rules, and the sections below walk through the most common ones with examples.
 
 ## What becomes an int
 

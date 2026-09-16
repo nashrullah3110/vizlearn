@@ -11,6 +11,15 @@ An end date must be after a start date. A discount must not exceed the price. Ei
 
 `model_validator` is the tool built for the job.
 
+A model validator receives the entire model, not one field. It can compare any field against any other, and its logic does not depend on declaration order. There are two modes: `mode="before"` runs on the raw input data before any field validation, and `mode="after"` runs on the fully constructed model after every field has been validated and coerced.
+
+`mode="after"` is the common case. You get a model with every field already validated, typed and defaulted. You check the cross-field rule, raise `ValueError` if it fails, and return `self` if it passes. The error surfaces as a top-level validation error rather than being attached to a specific field, which correctly reflects that the problem is the combination, not any individual value.
+
+`mode="before"` is rarer. It runs on the raw dict (or whatever was passed), before field validators have touched anything. It is useful for reshaping input &mdash; renaming keys, splitting a single value into multiple fields, or providing defaults that depend on other values &mdash; but it is harder to get right because you are working with unvalidated data that may be missing keys or have wrong types.
+
+A model can have multiple model validators, and they run in declaration order. Combining a `before` validator for reshaping with an `after` validator for cross-field rules is a clean pattern that separates input normalisation from business logic.
+
+The most common mistake is using `info.data` in a `field_validator` to access another field. It works only when the other field is declared earlier, and it silently breaks when someone reorders the class. `model_validator` has no such ordering dependency.
 
 ## A rule about two fields
 

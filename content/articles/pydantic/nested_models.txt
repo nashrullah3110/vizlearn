@@ -19,6 +19,15 @@ That is it. Everything else follows from that one fact, which is worth stating p
 
 When `Module` is validated, the value for `author` is handed to `Author` for validation. If it is already an `Author`, it passes through. If it is a dict, it becomes one. If it is neither, the error says so.
 
+Error paths are what make nesting practical. If the author's email fails validation, the error message says `author -> email`, not just `email`. Every level of nesting adds a segment to the path, so a deeply nested payload produces an error like `modules -> 0 -> author -> email -> value is not a valid email address`. That path tells the caller exactly where the problem is, which is the difference between a debuggable API and one that says "validation error" and leaves the caller guessing.
+
+Nested models compose freely. A model can contain a list of models, an optional model, a dict keyed by strings with model values, or a union of models. Each of these works because Pydantic validates recursively: the outer model validates its fields, each field that is itself a model validates its own fields, and so on down the tree.
+
+The JSON Schema follows the same structure. A nested model produces a `$ref` to the inner model's schema, so a client code generator or documentation tool shows the full structure without any extra work. The schema is always in sync with the code because it is generated from the code.
+
+Circular references &mdash; model A containing model B which contains model A &mdash; are allowed. Pydantic resolves forward references at model creation time, so you annotate the field with a string (`"ModelA"`) or use `from __future__ import annotations` and the reference resolves when the class is fully defined.
+
+Default values, optional fields and validators on the inner model all work as expected. The outer model does not need to know anything about the inner model's rules; it simply declares the type and Pydantic handles the rest.
 
 ## A model can be a field type
 
