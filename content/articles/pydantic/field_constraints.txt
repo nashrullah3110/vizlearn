@@ -15,6 +15,15 @@ Now the model refuses what the domain refuses. Two things follow from that, and 
 
 The first is that bad data stops at the door. The second is that the rule is now written down in the one place a reader will look. A check buried in a service function is invisible to everyone who does not open that function; a constraint on the field is part of the model's definition, and it appears in the generated schema, the API documentation and your editor's tooltips.
 
+The numeric constraints are `gt` (greater than), `ge` (greater or equal), `lt` (less than), `le` (less or equal) and `multiple_of`. String constraints are `min_length`, `max_length` and `pattern` (a regex the value must match). Collection constraints are `min_length` and `max_length` applied to lists, sets, dicts and tuples.
+
+All of these appear in the JSON Schema output, which means clients can validate locally before sending a request. A frontend form that enforces `min_length=1` and `max_length=100` because it read those values from the schema does not need updating when you change them on the model &mdash; it picks up the new values automatically.
+
+`Field` also carries metadata: `title`, `description`, `examples` and `deprecated`. These are documentation, not constraints &mdash; they do not affect validation &mdash; but they appear in the schema and in API documentation generated from it. Putting them on the field rather than in a docstring or a separate spec file means the documentation lives next to the code and cannot drift.
+
+Constraints compose. A field can carry numeric bounds and a title and an alias and a default, all in one `Field()` call. The constraint is always checked after coercion, so `Field(gt=0)` on an `int` field rejects `"0"` after it has been converted from string to integer, not before.
+
+The `Annotated` syntax &mdash; `minutes: Annotated[int, Field(gt=0, le=180)]` &mdash; separates the type from the constraints, which is cleaner when the same constraint set applies to multiple fields or when you want to define a reusable annotated type.
 
 ## A type is a weak promise
 

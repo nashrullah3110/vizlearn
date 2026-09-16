@@ -12,6 +12,15 @@ There is a third form worth knowing: `model_dump(mode="json")` gives you a dicti
 
 In Pydantic v1 these were `.dict()` and `.json()`. They still exist in v2 and warn, and they are all over the internet.
 
+Both methods accept the same filtering arguments. `include` and `exclude` take sets of field names or nested dicts for selective output. `exclude_unset=True` omits fields the caller never provided, which is the correct behaviour for PATCH endpoints where absence means "do not change". `exclude_none=True` drops fields whose value is `None`, which reduces payload size when nulls carry no information. `exclude_defaults=True` drops fields that still hold their default value.
+
+The filtering is worth knowing well because it replaces a surprising amount of custom serialisation code. A single `model_dump(exclude_unset=True)` replaces a manual loop that checks which fields were provided, and it handles nested models recursively.
+
+`by_alias=True` uses the field's alias instead of its Python name. That matters when the API expects camelCase (`firstName`) but the Python model uses snake_case (`first_name`). Without it, the output uses the Python name and the client does not recognise the field.
+
+The `TypeError` that catches people: calling `json.dumps(model.model_dump())` when the dict contains a `date`, `Decimal`, `UUID` or any other type JSON does not support natively. `model_dump_json()` handles these conversions automatically. `model_dump(mode="json")` also handles them but returns a dict rather than a string, which is what you want when a framework or logger does the final encoding.
+
+Round-tripping works: `Model.model_validate_json(instance.model_dump_json())` reconstructs the model from its JSON output, which is useful for serialisation, caching and message queues.
 
 ## Two methods, two purposes
 
