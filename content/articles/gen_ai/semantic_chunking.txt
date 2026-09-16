@@ -7,6 +7,14 @@ Split into sentences, embed each one, and compute the similarity between each co
 
 The threshold should be relative. A fixed number like 0.7 means something different in every corpus, so implementations use a percentile of the similarities observed in <em>this</em> document &mdash; the 5th percentile of gaps, say &mdash; which adapts automatically to how varied the writing is.
 
+The result is chunks that align with topic shifts rather than arbitrary token counts. A paragraph about authentication stays in one chunk; the next paragraph about rate limiting starts a new one. This is the quality advantage over fixed-size chunking: the embedding of each chunk represents a coherent topic, not a random slice of text that starts mid-thought.
+
+Three parameters control the output. The embedding model determines how similarity is measured — a model trained on semantic similarity (like sentence-transformers) works; a general-purpose model may not distinguish topic boundaries cleanly. The percentile threshold sets how sensitive the splitting is: a lower percentile (more aggressive) produces more, smaller chunks; a higher percentile produces fewer, larger ones. The minimum chunk size prevents degenerate one-sentence chunks that carry too little context to be useful on their own.
+
+Semantic chunking pairs well with metadata enrichment. Because each chunk represents a coherent topic, it is straightforward to generate a summary or title for each chunk and store it alongside the embedding. At retrieval time, the summary can be used for hybrid search (keyword plus vector) or for reranking, improving precision without increasing the embedding cost at query time.
+
+The implementation in LangChain is `SemanticChunker`, and in LlamaIndex it is `SemanticSplitterNodeParser`. Both follow the same algorithm: split into sentences, embed, compute pairwise similarity, cut at dips. The differences are in defaults and the API surface, not in the underlying logic.
+
 ## What it costs
 
 The cost is real and worth stating plainly: <strong>one embedding call per sentence at indexing time</strong>.

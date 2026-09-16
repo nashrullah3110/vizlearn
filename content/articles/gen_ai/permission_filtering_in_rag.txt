@@ -7,6 +7,16 @@ Retrieve the top 10 by similarity, then remove what the user may not see. If eig
 
 Over-fetching &mdash; retrieve 100, filter, keep 10 &mdash; makes it less likely and never fixes it. A user with access to 0.1% of the corpus needs an enormous k, and the failure is worst exactly for the most restricted users.
 
+The core problem is that vector similarity search and access control operate on different axes. The index ranks by semantic relevance; the access layer filters by who is allowed to see what. Combining them correctly is a systems problem, not a modelling problem, and there are three approaches.
+
+Pre-filtering restricts the search space before retrieval: only documents the user is allowed to see are candidates. This guarantees the result set is clean and the right size, but it requires the vector index to support metadata filtering efficiently. Not all indexes do — a naive implementation scans the full corpus and checks permissions per document, which is as slow as brute-force search.
+
+Post-filtering retrieves by relevance first and removes forbidden documents afterwards. It is simple to implement but unreliable: the result set shrinks unpredictably, and the generator must work with whatever remains. Increasing k helps probabilistically but never guarantees enough permitted results.
+
+Hybrid approaches retrieve a large candidate set, filter it, then backfill from a wider search if too few documents survive. This is more complex but produces a consistent result size. The trade-off is latency: two retrieval rounds instead of one, and the backfill query may not be as well-targeted as the original.
+
+Whichever approach you choose, the permission model itself must be correct. A document tagged with the wrong access group will be served to unauthorised users silently and confidently. Permission metadata must be propagated from the source system at indexing time and kept in sync when access rules change.
+
 ## Pre-filtering, and why it is harder than it looks
 
 Pre-filtering restricts the candidate set before ranking, so the top k is k <em>permitted</em> results. That is the correct behaviour and it fights the index: an HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search &mdash; you traverse into a region where everything is filtered out and the walk stalls.

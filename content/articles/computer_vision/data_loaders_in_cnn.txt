@@ -5,6 +5,14 @@ intro: Why we don't load the entire dataset at once, and how dynamic augmentatio
 
 In deep learning frameworks like PyTorch or TensorFlow, a <strong>DataLoader</strong> is an utility class that handles the heavy lifting of preparing your data. Instead of writing complex loops to read images from your hard drive one by one, the DataLoader fetches the images, preprocesses them, optionally shuffles them, and groups them into perfectly sized chunks called <strong>mini-batches</strong> to feed into your CNN.
 
+The problem a data loader solves is a speed mismatch. A GPU can process thousands of images per second, but reading a JPEG from disk, decoding it, resizing it and augmenting it takes milliseconds on a single CPU core. Without prefetching, the GPU sits idle while the CPU prepares the next image. A data loader closes that gap by using multiple worker processes to prepare batches in the background, so the next batch is ready in memory before the model finishes the current one.
+
+A data loader has four responsibilities. It reads and decodes images from disk. It applies transforms — resize, crop, flip, normalise, convert to tensor — in the order you specify. It groups transformed images into a single tensor of shape (batch_size, channels, height, width). And it shuffles the order each epoch so that consecutive batches are not correlated, which helps gradient descent converge.
+
+Batch size is the main parameter you choose. Larger batches use more GPU memory but produce more stable gradient estimates. Smaller batches use less memory and add noise to the gradient, which can help escape local minima. Typical values for image classification are 16, 32, 64 or 128, depending on the image resolution and the GPU's VRAM. If training crashes with an out-of-memory error, halving the batch size is the first thing to try.
+
+Data augmentation — random flips, rotations, colour jitter, cropping — is applied inside the data loader at load time, not stored on disk. Each epoch the same image is seen with different random transforms, which effectively multiplies the dataset size without duplicating files. The original images are never modified.
+
 ## The Memory Problem (Why use batches?)
 
 Imagine you have a dataset of 1,000,000 high-resolution images. You cannot load all 1 million images into your computer's RAM (or your GPU's VRAM) at the same time—it would instantly crash with an Out-of-Memory (OOM) error.

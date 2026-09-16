@@ -5,6 +5,12 @@ intro: The retrieval step can only ever be as good as the pieces it is choosing 
 
 Every piece of <a href="rag.html" style="color: var(--accent-primary)">RAG</a> downstream of chunking — embedding, indexing, retrieval, reranking — operates on whatever the chunk boundaries produced. Cut a sentence in half and both halves lose the context that made the original sentence meaningful; the embedding of a fragment is not a fragment of the embedding.
 
+The strategies form a spectrum. Fixed-size chunking splits by token count, ignoring content entirely — simple and fast, but it regularly cuts mid-sentence. Recursive chunking tries paragraph breaks first, then sentence breaks, then word breaks, keeping units coherent when the document cooperates. Structure-aware chunking reads headings and section markers and splits at the boundaries the author provided. Semantic chunking embeds every sentence and splits where the topic shifts, at the cost of one embedding call per sentence at indexing time.
+
+Chunk size controls a direct trade-off. Small chunks (100–200 tokens) are precise — each one is about one idea, so retrieval is accurate — but they lose surrounding context. Large chunks (500–1000 tokens) carry more context but dilute the embedding: a chunk about three topics is weakly relevant to all three and strongly relevant to none. Most production systems settle between 200 and 500 tokens, with 50–100 tokens of overlap to soften boundary effects.
+
+Overlap is a patch, not a fix. It duplicates tokens across chunks so that a sentence split at a boundary still appears whole in at least one chunk. The cost is storage (every overlapped token is embedded and indexed twice) and occasional duplicate retrieval results that need deduplication downstream. The benefit is measurable: removing overlap typically drops recall by 5–15% on boundary-sensitive queries.
+
 ## Fixed-size vs semantic
 
 <strong>Fixed-size chunking</strong> counts a fixed number of words or tokens and cuts there, with no regard for what is at that position — a heading, mid-word, mid-sentence, anywhere. It is simple, predictable, and blind. <strong>Semantic chunking</strong> respects natural boundaries — sentences, paragraphs, headings — and only splits at those boundaries, accepting some variation in chunk size in exchange for every chunk being a coherent unit.
