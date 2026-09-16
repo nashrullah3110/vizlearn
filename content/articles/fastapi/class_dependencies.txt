@@ -22,6 +22,27 @@ Because the annotation and the callable are the same thing, there is a shorthand
 def list_modules(page: Pagination = Depends()):
 ```
 
+`Depends()` with no argument uses the type annotation as the callable. `page: Pagination = Depends()` is identical to `page: Pagination = Depends(Pagination)`. This is the idiomatic form when the annotation and the dependency are the same class.
+
+The instance carries state. `self.limit` and `self.offset` are attributes the handler reads — `page.limit`, `page.offset`. This is cleaner than a function dependency that returns a tuple or a dict, because the names are explicit and the IDE autocompletes them.
+
+`__init__` parameters become query (or path, or header) parameters, exactly as they would in a function dependency. `limit: int = Query(default=10, ge=1, le=100)` on `__init__` gives `limit` a constrained default with documentation — the same `Query` annotations that work on handlers work here.
+
+A class dependency can have methods. A `Pagination` class with a `.apply(query)` method that adds `.offset()` and `.limit()` to a SQLAlchemy query centralises pagination logic. The handler calls `page.apply(query)` instead of writing `.offset(page.offset).limit(page.limit)` in every endpoint.
+
+Inheritance works. A `StrictPagination(Pagination)` that overrides the default `limit` to 5 and the max to 20 is a dependency of its own. The handler declares `page: StrictPagination = Depends()` and gets the stricter version.
+
+A class with `__call__` is also a callable, which means an instance can be a dependency. `rate_limiter = RateLimiter(max_calls=100, period=60)` creates an instance with configuration, and `Depends(rate_limiter)` calls `rate_limiter.__call__()` on each request. This is how you give a dependency configuration that does not come from the request: the instance holds the config, and `__call__` receives the request parameters.
+
+The distinction between a class dependency and a `__call__` dependency is who provides the configuration. A class dependency's `__init__` parameters come from the request (query parameters, headers). A `__call__` dependency's instance attributes come from the developer (hardcoded or from settings). Both are valid patterns; the choice depends on where the configuration lives.
+
+Overriding a class dependency in tests is straightforward. `app.dependency_overrides[Pagination] = lambda: Pagination(limit=5, offset=0)` replaces the class with a lambda that returns a fixed instance. The handler receives the canned pagination without touching the query string.
+
+The documentation for a class dependency is generated from `__init__`'s signature, the same way a function dependency's documentation comes from its signature. `Query(description="...")` on an `__init__` parameter appears in the OpenAPI spec and in Swagger UI.
+
+A class dependency that opens a resource (a file, a connection) should use `yield` instead — or, if it must be a class, implement `__enter__` and `__exit__` and wrap it in a yield dependency. A class whose `__init__` opens a connection and has no `__del__` leaks the connection on every request.
+
+
 
 ## A class with __init__ is a dependency
 

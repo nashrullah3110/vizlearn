@@ -20,6 +20,22 @@ app/
 
 The test of a layout is whether somebody asked to add a field can guess which files to open. If the answer is "search for the word", the structure has stopped helping.
 
+`main.py` creates the `FastAPI()` instance, includes routers, and registers the lifespan. It imports from `routers/`, never from `services/` directly. This is the file that answers "what does this application have?" — a reader opens it and sees every router, every middleware, and every startup resource.
+
+`routers/modules.py` defines the endpoints for one resource. It imports schemas from `schemas/modules.py` and calls service functions from `services/modules.py`. The router file is thin: it validates input, calls a service, and returns a response. Business logic does not live here.
+
+`schemas/` holds the Pydantic models. `ModuleCreate`, `ModuleUpdate`, and `ModuleOut` are separate classes, because the fields for creating, updating, and reading are not the same. Keeping them in one file per resource (`schemas/modules.py`) makes imports predictable and avoids circular dependencies.
+
+`services/` holds the business logic. A service function takes validated data and returns a result. It imports nothing from FastAPI — no `Request`, no `Depends`, no `HTTPException`. This separation means the logic can be tested without an HTTP server and reused in a CLI, a migration script, or a background worker.
+
+`dependencies.py` holds the shared dependencies: `get_db`, `current_user`, `pagination`. Routers import from here rather than defining their own, which keeps the dependency graph shallow and makes overrides in tests straightforward.
+
+`settings.py` is a Pydantic `BaseSettings` model that reads configuration from environment variables. `DATABASE_URL`, `SECRET_KEY`, `DEBUG` — each is a validated field with a type and a default. The settings model is created once in the lifespan and stored on `app.state`, where dependencies and services can reach it.
+
+Tests mirror the source layout. `tests/test_modules.py` tests the modules router; `tests/conftest.py` provides fixtures for the test client, the database, and dependency overrides. Each test file imports `TestClient` from Starlette, creates the client with the app, and overrides the database dependency to use a test database.
+
+The layout scales by adding directories, not by complicating existing files. A second resource adds `routers/tracks.py`, `schemas/tracks.py`, and `services/tracks.py`. A third adds three more files in the same directories. No existing file changes, and no import paths move.
+
 
 ## A router per resource
 

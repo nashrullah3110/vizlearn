@@ -7,6 +7,22 @@ intro: A field that could be several shapes, and how to make the choice explicit
 
 For simple types the decision is usually obvious and usually right. For models it is frequently neither, and the failure mode is the worst kind: it does not raise, it just gives you the wrong object.
 
+Pydantic v2 uses "smart" union matching by default. It tries an exact type match first — `3` against `Union[int, str]` matches `int` without trying `str`. If no exact match exists, it tries each type in order and takes the first one that validates. For `Union[int, str]`, `"hello"` is an exact match for `str` and stops there. `"3"` is an exact match for `str` too, not a coercion to `int`.
+
+The problem starts with model unions. `Union[ModuleOut, LessonOut]` where both models have overlapping fields — both have `id` and `title` — means Pydantic cannot distinguish them from the data alone. It tries `ModuleOut` first (left to right), and if the data validates against it, that is what you get, even if `LessonOut` was what the sender intended.
+
+A discriminated union solves this by adding a field whose value identifies the type. `Literal["module"]` on `ModuleOut` and `Literal["lesson"]` on `LessonOut`, with `discriminator="type"` on the union field, means Pydantic reads the `type` field first, picks the right model, and validates against only that one. No ambiguity, no order dependence, no wrong-model surprises.
+
+`Discriminator` with a callable handles cases where the discriminator is not a simple field. `Discriminator(lambda v: v.get("kind", "default"))` reads the discriminator from a computed value. This is useful when the incoming data uses different field names for different sources, or when the discriminator is derived from a combination of fields.
+
+`Tagged` unions (using `Tag`) annotate each member of the union with a discriminator value directly in `Annotated`. `Annotated[ModuleOut, Tag("module")]` associates the tag `"module"` with `ModuleOut`. This keeps the discriminator definition next to the type rather than inside the type.
+
+The performance difference is real. A plain `Union[A, B, C, D]` tries up to four validations per input. A discriminated union reads one field and tries one validation. On a list of a thousand mixed items, the discriminated union is nearly four times faster.
+
+`Union[X, None]` — or equivalently `Optional[X]` or `X | None` — is the simplest union and the most common. It means the field can be the type or `null`. Pydantic handles this without a discriminator: `None` is tried first, and if the value is not `None`, the type is tried. No ambiguity is possible.
+
+The rule for choosing: if the types in the union are structurally distinguishable (different required fields, different types for the same field), a plain union works. If they overlap — same fields, same types, different semantics — a discriminated union is the only reliable approach.
+
 
 ## Smart mode: exact match first
 

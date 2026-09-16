@@ -15,6 +15,24 @@ Three things happen from those two lines. The router matches the URL and pulls o
 
 The name has to match. `{module_id}` in the path and `module_id` in the signature are connected by name, not position, and a mismatch is an error at import rather than at request time &mdash; which is the right moment to find out.
 
+The type annotation decides the conversion. `module_id: int` converts the URL segment to an integer. If the segment is `"abc"`, the conversion fails and FastAPI returns a 422 with a message naming the parameter and the expected type. The error response is automatic — no try/except in the handler.
+
+Multiple path parameters are declared the same way. `/tracks/{track_id}/modules/{module_id}` with `track_id: int` and `module_id: int` extracts both. The nesting reflects the resource hierarchy: a module belongs to a track.
+
+`Path(gt=0)` adds constraints. `module_id: int = Path(gt=0)` rejects zero and negative values. `Path(ge=1, le=1000)` accepts integers between 1 and 1000. The constraints appear in the OpenAPI schema, so generated clients and documentation reflect them.
+
+`Path(title="Module ID", description="The numeric identifier for the module")` improves the documentation. The title and description appear in the OpenAPI spec and in Swagger UI's parameter list.
+
+`Enum` restricts the accepted values. `track: TrackName` where `TrackName` is a `StrEnum` with members `MATHS`, `PYTHON`, `DSA` accepts only those values and documents them as an enum in the schema. A URL like `/tracks/physics` returns a 422 because `physics` is not in the enum.
+
+Route ordering matters. `/modules/latest` and `/modules/{module_id}` match the same URL pattern. If the parameterised route is registered first, `latest` is captured as `module_id` and fails conversion to `int` with a 422. The fix is to register `/modules/latest` before `/modules/{module_id}`. FastAPI matches routes in registration order, and the first match wins.
+
+`Path(alias="moduleId")` changes the parameter name in the documentation without changing the Python variable name. This is rarely needed for path parameters (unlike query parameters, path parameters do not have a strong naming convention) but exists for consistency with the rest of the parameter API.
+
+`{file_path:path}` captures the rest of the URL, including slashes. `/files/{file_path:path}` matches `/files/a/b/c.txt` and gives `file_path = "a/b/c.txt"`. This is the exception to the "one segment per parameter" rule, and it is how file-serving or proxy endpoints handle arbitrary paths.
+
+`UUID` as a type annotation validates and converts in one step. `module_id: UUID` accepts `123e4567-e89b-12d3-a456-426614174000` and rejects `not-a-uuid` with a 422. Any type that Pydantic can validate works as a path parameter type.
+
 
 ## A placeholder becomes an argument
 

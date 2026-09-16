@@ -7,6 +7,29 @@ Every FastAPI project starts as one file, and one file works for perhaps twenty 
 
 `APIRouter` is the answer, and the useful time to reach for it is *before* you need to.
 
+`APIRouter(prefix="/modules", tags=["modules"])` creates a router. Routes registered on it use the prefix: `@router.get("")` becomes `/modules`, `@router.get("/{id}")` becomes `/modules/{id}`. Tags group the routes in the documentation. `app.include_router(router)` registers all of them at once.
+
+Each router lives in its own file. `routers/modules.py` defines the modules router; `routers/tracks.py` defines the tracks router. `main.py` imports both and includes them. Adding a resource means adding a file and one `include_router` call — no existing file grows.
+
+Dependencies on a router apply to every route in it. `APIRouter(dependencies=[Depends(verify_token)])` protects all endpoints on that router. A new route added to the router inherits the protection without declaring it individually. This is how authentication is applied per section: the admin router requires a token, the public router does not.
+
+Router-level `responses` document error shapes for every route. `APIRouter(responses={401: {"description": "Not authenticated"}})` adds a 401 response to every endpoint's documentation. Individual routes can override or extend these with their own `responses=` argument.
+
+Nested routers are supported. `parent_router.include_router(child_router, prefix="/sub")` nests the child's routes under the parent's prefix. `/api/v1/modules/sub/...` is how versioned APIs with sub-resources are structured, though deep nesting is rarely worth the complexity.
+
+The router does not create an app. It cannot run on its own, serve requests, or hold middleware. It is a collection of routes waiting to be included in an app. This is the distinction: `FastAPI()` is the server; `APIRouter()` is an organiser.
+
+`prefix` on `include_router` overrides the router's own prefix. `app.include_router(router, prefix="/api/v2/modules")` ignores whatever prefix the router declared. This is useful for versioning: the same router, included twice with different prefixes, serves both `/api/v1/modules` and `/api/v2/modules`.
+
+`default_response_class` on a router sets the response type for every route. `APIRouter(default_response_class=ORJSONResponse)` makes every endpoint on the router use the faster ORJSON serialiser without annotating each one.
+
+The lifecycle hooks `@router.on_event("startup")` and `@router.on_event("shutdown")` are deprecated. Startup and shutdown logic belongs in the app's lifespan context manager, not on individual routers. A router that needs initialisation should expose a function the lifespan calls.
+
+Testing a router in isolation uses `TestClient(app)` where `app` includes only that router. `app = FastAPI(); app.include_router(modules_router); client = TestClient(app)` gives you a test client that exercises the modules endpoints without loading the rest of the application.
+
+The common mistake is defining the `FastAPI()` instance inside the router file. This creates a second app that is never served. The router file should export an `APIRouter()` and nothing else; `main.py` is the only file that creates the `FastAPI()` instance.
+
+
 ## A router is a mini-app
 
 Register routes on it exactly as on an app, then include it. The prefix and tags apply to everything in it.

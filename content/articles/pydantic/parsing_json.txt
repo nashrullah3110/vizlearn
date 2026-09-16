@@ -17,6 +17,22 @@ model = Module.model_validate_json(raw)
 
 It is not merely shorter. It is faster, produces better errors, and is more faithful with numbers. Three separate reasons, and they compound.
 
+The speed difference comes from skipping the intermediate Python dict. `json.loads` parses JSON into Python objects — dicts, lists, strings, floats — and then `model_validate` walks those objects and validates them. `model_validate_json` gives the raw bytes directly to Pydantic's Rust core, which parses and validates in a single pass without allocating a Python dict. On a 10 KB payload, this is 2–3x faster.
+
+The error quality improves because Pydantic sees the original JSON. With `json.loads` first, Pydantic receives Python objects and cannot tell you which byte offset in the JSON caused the error. With `model_validate_json`, the error message can point to the exact location in the raw JSON.
+
+Number fidelity is the subtle win. `json.loads` converts JSON numbers to Python `float`, which is IEEE 754 double precision. A value like `0.1` in JSON becomes `0.1000000000000000055511151231257827021181583404541015625` as a Python float. If the model field is `Decimal`, `model_validate` receives the already-lossy float and converts it to `Decimal("0.1000000000000000055511151231257827021181583404541015625")`. `model_validate_json` reads the JSON string `"0.1"` directly and produces `Decimal("0.1")` — the exact value the sender intended.
+
+`model_validate_json` accepts `bytes`, `bytearray`, and `str`. In a web framework, the request body is usually `bytes`, so there is no encoding step. `Module.model_validate_json(await request.body())` goes from raw HTTP to validated model in one call.
+
+`model_validate_json` also accepts the same `strict`, `context`, and other keyword arguments as `model_validate`. `Module.model_validate_json(raw, strict=True)` disables coercion — a JSON string `"42"` is not accepted for an `int` field.
+
+`TypeAdapter` has the same method. `TypeAdapter(List[Module]).validate_json(raw)` parses and validates a JSON array of modules in one step. This is the form for endpoints that accept bare collections rather than model wrappers.
+
+The habit worth building is to reach for `model_validate_json` whenever the input is raw JSON — which is nearly always in a web context. The two-step form (`json.loads` then `model_validate`) is for the case where you need the intermediate dict for something else (logging the raw payload, extracting one field before validating the whole thing).
+
+`model_dump_json()` is the reverse: it serialises a model instance to a JSON `bytes` object in one step, again through the Rust core. `module.model_dump_json(indent=2)` produces pretty-printed JSON. `module.model_dump_json(exclude={"internal"})` omits fields. The round trip — `model_validate_json` in, `model_dump_json` out — stays in Rust for both directions.
+
 
 ## One call instead of two
 

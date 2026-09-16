@@ -10,6 +10,22 @@ A dictionary on the app, mapping the real callable to a replacement. When FastAP
 
 That is the whole feature. It needs no test framework, no patching, and no change to the endpoints.
 
+The override replaces the callable at resolution time, not at import time. The endpoints still declare `Depends(get_db)`, and they do not know the implementation changed. The contract — "this parameter is a database session" — is the same; only the provider is different.
+
+Clearing the overrides restores the originals. `app.dependency_overrides.clear()` removes all overrides, and `del app.dependency_overrides[get_db]` removes one. In tests, clearing in a fixture teardown (or an `addfinalize`) prevents one test's overrides from leaking into another.
+
+The replacement must have a compatible signature. If `get_db` returns a `Session`, the override should return something that behaves like a `Session` — or at least like the subset the handler uses. A `dict` works if the handler only calls `.get()` and `.set()`; a full `MagicMock` works if you do not care about types.
+
+Sub-dependencies are also overridable. `app.dependency_overrides[get_token] = lambda: "test-token"` replaces the lowest-level dependency, and `current_user` — which depends on `get_token` — receives the fake token. This lets you test each layer independently without building the entire dependency tree.
+
+Overrides work on class dependencies too. `app.dependency_overrides[Pagination] = lambda: Pagination(limit=5, offset=0)` replaces the class construction. The handler receives the overridden instance, and the query parameters are ignored.
+
+The override dictionary is on the app instance, not on the router. Router-level overrides do not exist. If two routers share a dependency and you want different overrides for each, the solution is a separate test client per router or a per-test override that targets the specific dependency each router uses.
+
+This is why the whole dependency tier is practical. Without overrides, testing an endpoint that touches a database requires a running database, test data, and cleanup. With overrides, the endpoint receives a fake that returns canned data, the test runs in milliseconds, and nothing touches a real database. The dependency system pays for itself in the test suite.
+
+Overrides also work in non-test scenarios. A staging environment that reads from a cache instead of a database can override `get_db` with `get_cache`. A feature-flagged endpoint can override a dependency to switch between implementations. The mechanism is the same dictionary; the use case is broader than testing.
+
 
 ## Replacing one for a test
 

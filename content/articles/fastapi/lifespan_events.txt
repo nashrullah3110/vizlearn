@@ -8,6 +8,20 @@ Some things are not. A database connection **pool** is created once and used by 
 
 Creating those per request would be absurdly wasteful; creating them at import has its own problems. Lifespan is the third option, and the correct one.
 
+The lifespan is an `@asynccontextmanager` that receives the `app` instance. Everything before the `yield` runs once at startup; everything after runs once at shutdown. The `yield` itself is where the application serves requests — it is the entire lifetime of the server.
+
+Storing startup resources on `app.state` makes them available to every handler. `app.state.db_pool = pool` in the lifespan, then `request.app.state.db_pool` in a dependency, gives every request access to the shared pool without a global variable. `app.state` is an arbitrary namespace — anything you assign to it is available, and nothing is enforced.
+
+The `@on_event("startup")` and `@on_event("shutdown")` decorators are deprecated in favour of the lifespan context manager. They still work but cannot share state between startup and shutdown — a pool created in `@on_event("startup")` must be stored as a global to be closed in `@on_event("shutdown")`. The lifespan context manager solves this naturally: the pool is a local variable that exists for the entire block.
+
+Multiple resources are set up sequentially in the lifespan. The database pool first, then the HTTP client, then the cache. Teardown runs in reverse order — cache, client, pool — because each `yield` in a nested context manager unwinds in stack order. Using `async with` on each resource inside the lifespan is the cleanest pattern.
+
+Errors during startup prevent the server from accepting requests. If the database is unreachable and the pool creation raises, the lifespan exits before `yield`, and no request is ever served. This is the correct behaviour: a server that starts without its dependencies would return 500 on every request anyway.
+
+Errors during shutdown are logged but do not prevent the process from exiting. A pool that fails to close cleanly is a resource leak in the dying process, not a user-visible error. The lifespan should still handle cleanup errors gracefully — a `try/except` around `pool.close()` with a log message — because an unhandled exception in shutdown can mask the real reason the server is stopping.
+
+The lifespan runs once per process, not once per worker. With Uvicorn's `--workers 4`, four separate processes each run their own lifespan, creating four pools. This is correct for most resources (each process needs its own connections) and worth knowing because it means total connection count is `pool_size × workers`.
+
 
 ## The lifespan protocol, driven by hand
 

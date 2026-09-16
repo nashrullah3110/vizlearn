@@ -15,6 +15,22 @@ Otherwise it is a **query parameter**.
 
 That last rule is the default, and it is why a handler with a plain `limit: int = 10` works with no annotation ceremony at all.
 
+A default value makes the parameter optional. `limit: int = 10` means the caller can omit `?limit=` and the handler receives 10. No default means the parameter is required — omitting it returns a 422 with an error saying the field is missing.
+
+Type annotations handle conversion. `limit: int` converts the query string value (always a string in HTTP) to an integer. `price: float` converts to a float. `active: bool` accepts `true`, `false`, `1`, `0`, `yes`, `no`. If the conversion fails — `?limit=abc` — FastAPI returns a 422 with a message naming the parameter and the expected type.
+
+`Query(ge=1, le=100)` adds constraints. `limit: int = Query(default=10, ge=1, le=100)` accepts integers between 1 and 100 and defaults to 10. `Query(min_length=3, max_length=50)` constrains string length. `Query(pattern=r"^[a-z]+$")` constrains by regex. These constraints appear in the OpenAPI schema, so generated clients and documentation reflect them.
+
+`Query(alias="q")` changes the query string name. The Python parameter is `query`, but the URL uses `?q=search+term`. This is useful when the API convention uses short names (`q`, `p`, `s`) while the Python code uses descriptive ones.
+
+`Query(description="...")` and `Query(examples=["..."])` improve the documentation. The description appears in the OpenAPI spec and in Swagger UI's parameter list. Examples pre-fill the "Try it out" form.
+
+List parameters accept multiple values. `tags: list[str] = Query(default=[])` accepts `?tags=python&tags=numpy` and gives the handler `["python", "numpy"]`. The `Query()` annotation is required for list parameters — without it, FastAPI treats the parameter as a request body.
+
+`Enum` and `Literal` restrict the accepted values. `sort: Literal["date", "title", "views"] = "date"` accepts only those three strings and documents them as an enum in the schema. A value not in the list returns a 422.
+
+Optional parameters with `None` default — `search: str | None = None` — let the handler distinguish between "not provided" and "provided as empty." `?search=` gives `""` (an empty string); omitting `search` gives `None`. The handler checks `if search is not None` to know whether the caller asked to search at all.
+
 
 ## Anything not in the path is a query parameter
 

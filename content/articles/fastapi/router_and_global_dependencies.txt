@@ -12,6 +12,22 @@ APIRouter(dependencies=[Depends(fn)])               # every route in it
 
 They stack. All three run for a request that matches, outermost first, and each adds a rule rather than replacing one.
 
+Global dependencies run on every request. `FastAPI(dependencies=[Depends(log_request)])` logs every request, regardless of the router or endpoint. This is appropriate for cross-cutting concerns that apply universally: request logging, CORS headers, rate limiting.
+
+Router dependencies run on every route in the router. `APIRouter(dependencies=[Depends(verify_token)])` protects all endpoints in that router. A route added to the router next year inherits the dependency. This is how authentication is applied per section: the admin router requires a token, the public router does not.
+
+Route dependencies run on one endpoint. `@app.get("/admin/flush", dependencies=[Depends(admin_only)])` applies the check to that endpoint alone. The dependency's return value is not injected into the handler — it runs for its side effect (raising if unauthorised). For injection, declare the dependency as a handler parameter instead.
+
+The `dependencies=` argument takes a list. `dependencies=[Depends(verify_token), Depends(rate_limit)]` runs both checks. Order within the list is the execution order: `verify_token` runs first, and if it raises, `rate_limit` never runs.
+
+The stacking order is: global first, then router, then route. A request to an endpoint with all three runs the global dependency, then the router's, then the route's. If any raises, the chain stops and the error response is returned. This means a global authentication check can be overridden by a more permissive router — but in practice, you would not set global auth and then try to relax it; you would set it on the routers that need it.
+
+Dependencies declared in `dependencies=` are not injected. The handler does not receive their return value. They exist only for their side effects: raising an exception, logging, setting headers. If the handler needs the value — the current user, the database session — declare it as a handler parameter with `Depends`, not in the `dependencies=` list.
+
+Override-friendly design puts the check in a function and the policy in the `dependencies=` argument. `def require_role(role: str)` returns a dependency function. `dependencies=[Depends(require_role("admin"))]` applies the policy. Tests override `require_role` in `dependency_overrides` to skip authentication entirely. This pattern keeps the check logic testable and the policy declaration visible in the router definition.
+
+The most common mistake is declaring a dependency in `dependencies=` when the handler also needs its return value. `dependencies=[Depends(current_user)]` runs the check but throws away the user object. If the handler needs the user, declare it as a handler parameter — `user: User = Depends(current_user)` — not in the `dependencies=` list. Both forms run the dependency; only the parameter form injects the result.
+
 
 ## A dependency on the router
 

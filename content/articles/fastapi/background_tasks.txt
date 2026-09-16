@@ -13,6 +13,20 @@ Declare a `BackgroundTasks` parameter, add callables to it, and they run once th
 
 The caller is not waiting for the welcome email. That is the entire value: a request that must do something slow and inessential can answer immediately and do it afterwards.
 
+`BackgroundTasks` is a parameter, not a decorator. You declare it in the handler's signature, and FastAPI provides it. You add callables to it with `.add_task(fn, *args, **kwargs)`, and they run in order after the response is produced. Multiple tasks on the same request run sequentially, not concurrently.
+
+The tasks run in the same process as the request. A `def` task runs in the threadpool; an `async def` task runs on the event loop. The same rule as endpoints applies: if the task blocks (a synchronous HTTP call, a file write, a slow computation), use `def` so it does not stall the loop.
+
+Dependencies with `yield` clean up before background tasks run. The database session your handler used is already closed when the background task starts. If the task needs a database connection, it must open its own — it cannot reuse the handler's. This is the most common mistake with background tasks: accessing a closed session and getting a `DetachedInstanceError` or a `SessionClosedError`.
+
+Background tasks have no error reporting back to the client. If the welcome email fails, the signup response was already sent — there is no way to tell the caller. Errors in background tasks are logged to the server's stderr but are otherwise invisible. For tasks where failure matters — charging a payment, updating a record — this is the wrong tool.
+
+The ceiling is the process. Background tasks compete with request handling for CPU, memory, and database connections. Ten concurrent requests each scheduling a background task means ten tasks running alongside the next batch of requests. Under load, background tasks slow down request handling, and request handling delays background tasks.
+
+The point at which background tasks need to become a queue is when any of these is true: the task takes more than a few seconds, the task must survive a process restart, the task must be retried on failure, or the volume of tasks would overwhelm the web process. Celery, RQ, Dramatiq, and cloud task queues (SQS, Cloud Tasks) all solve this. Background tasks are for "fire this email" and "write this log entry," not for "process this video" or "run this report."
+
+A dependency can also add background tasks. A yield dependency that receives `BackgroundTasks` can schedule work in the same way a handler does. This is useful for cross-cutting concerns: an audit-logging dependency that records every request's details after the response is sent.
+
 
 ## Declare it and add to it
 
