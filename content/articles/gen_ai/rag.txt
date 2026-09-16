@@ -7,6 +7,12 @@ A language model knows what was in its training data, frozen at some cutoff date
 
 Retrieval-augmented generation is the fix that does not involve training anything. Find the passages that look relevant, paste them into the prompt, and ask the question with the evidence attached. The model stops recalling and starts reading.
 
+The pipeline has three stages: indexing, retrieval and generation. At indexing time, documents are split into chunks, each chunk is embedded into a vector, and the vectors are stored in an index. At query time, the question is embedded with the same model, the index returns the closest chunks, and those chunks are injected into the prompt alongside the question. The language model then generates an answer grounded in the retrieved evidence.
+
+Each stage has its own failure modes. Chunking too coarsely means relevant information is buried in noise; chunking too finely means the chunk lacks enough context to be useful on its own. The retrieval step can miss relevant passages if the embedding model does not capture the right notion of similarity, or if the question is phrased differently from the stored text. The generation step can ignore the retrieved evidence entirely, hallucinate beyond it, or contradict it &mdash; a failure called unfaithfulness.
+
+RAG works because it separates knowledge from reasoning. The language model handles reasoning, and the retrieval system handles knowledge. Updating the knowledge requires re-indexing the documents, not retraining the model, which makes the system far cheaper to maintain than fine-tuning. It also provides attribution: each answer can cite the chunks it was based on, giving the user a way to verify the response.
+
 ## The pipeline
 
 1. <strong>Chunk.</strong> Split the documents into passages small enough to be specific and large enough to stand alone.

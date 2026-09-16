@@ -9,6 +9,12 @@ A <strong>replica</strong> holds a complete copy of a shard. Replication handles
 
 They solve different problems and are often confused. If the index fits on one machine and you are simply serving too many queries, you need replicas and no sharding at all &mdash; which is much simpler, because there is nothing to merge.
 
+The decision to shard usually comes from corpus size. A single HNSW index with 100 million 768-dimensional vectors needs roughly 300 GB of RAM for the vectors alone, plus graph overhead. That exceeds what a single machine can hold, so the corpus must be split across machines. Each query is then scattered to every shard, each shard returns its top-k candidates, and a merge step picks the global top-k from the union.
+
+Sharding introduces two costs that a single-machine index does not have. First, network latency: the slowest shard determines response time, so an unbalanced split or a slow replica creates a tail-latency problem that did not exist before. Second, recall can drop if the sharding strategy separates documents that should have been compared together &mdash; for example, placing all science articles on one shard and all history on another means a cross-domain query may miss relevant results from the shard it does not emphasise.
+
+Choosing a sharding strategy means choosing which of these costs you accept. Random sharding distributes load evenly and preserves recall, but every shard must be queried every time. Semantic sharding groups related documents and allows routing queries to a subset of shards, reducing fan-out at the risk of missing cross-cluster matches.
+
 ## Shard randomly
 
 The instinct is to shard by topic or tenant so a query only touches one shard. For a multi-tenant system where every query is scoped to one tenant, that is right &mdash; it is really many small indexes.

@@ -7,6 +7,12 @@ Keyed on a hash of the text and the model name. Embedding is deterministic, so t
 
 Include the model identifier in the key. Vectors from different models are not comparable, and a cache that silently mixes them produces retrieval results that look plausible and are meaningless. The biggest win is at indexing time: re-indexing a corpus after a chunking tweak re-embeds only the chunks that actually changed.
 
+A RAG pipeline makes three expensive calls per query: embedding the question, searching the vector index, and generating the answer with a language model. Each call has a different cost profile and a different tolerance for stale results, which means each one benefits from a different kind of cache.
+
+The embedding cache is the safest &mdash; embeddings are deterministic and never expire unless you change models. The query cache sits between the user and the retriever: if the same question (or a semantically equivalent one) has been asked before, the cached retrieval result can be returned without touching the index. The prompt cache (or LLM response cache) stores the generated answer keyed on the combination of retrieved chunks and question. This is the highest-value cache &mdash; LLM inference is the most expensive step &mdash; and the highest-risk, because the answer depends on the model, the prompt template, the temperature, and the retrieved context. A cache hit on a stale key returns a confidently worded answer that may no longer be correct.
+
+Deciding what to cache and when to invalidate is the design problem. Corpus updates must invalidate query and prompt caches but not the embedding cache. Model changes must invalidate the embedding cache and the prompt cache. Prompt-template changes must invalidate the prompt cache only. Getting any of these wrong produces a system that serves stale answers with no indication that anything is wrong.
+
 ## Query cache: the highest saving, and the highest risk
 
 Keyed on the question, storing the final answer. A hit skips retrieval, reranking and generation &mdash; often seconds and most of the cost. Real traffic is heavily repetitive, so hit rates can be high.

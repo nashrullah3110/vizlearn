@@ -7,6 +7,10 @@ A forward RNN at position t has seen tokens 1 to t and nothing after. That is a 
 
 Take “The <strong>bank</strong> was steep and muddy.” At the word <em>bank</em> a forward-only model has seen only “The”, and must commit to a representation before <em>steep and muddy</em> arrives to settle the meaning. A backward pass has that information immediately.
 
+The fix is to run two passes &mdash; one forward, one backward &mdash; and concatenate their outputs at every position. The forward pass produces a hidden state that encodes everything to the left; the backward pass produces a hidden state that encodes everything to the right. Stacking the two gives each position a representation that sees the entire sequence.
+
+This is the idea behind the bidirectional layer. It doubles the hidden dimension, because it concatenates two independent states, and it doubles the parameter count, because the forward and backward cells learn separate weights. The accuracy gain is substantial for tasks like named-entity recognition, part-of-speech tagging, sentiment classification and question answering &mdash; any task where the label at position t depends on tokens that come after t. The cost is that the full sequence must be available before the layer can run, which rules out autoregressive generation: you cannot predict the next word with a backward pass that requires words you have not generated yet. That constraint is why GPT-style models use only a forward pass and BERT-style models use bidirectional layers.
+
 ## How the two passes combine
 
 A bidirectional layer runs two entirely separate recurrent cells with their own weights. The forward cell reads left to right; the backward cell reads the same sequence right to left. At each position their hidden states are concatenated:
