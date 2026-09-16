@@ -385,11 +385,13 @@ def cmd_lint(rel, baseline=None):
     # reports a mismatch thousands of characters away that does not exist.
     # The patterns are line-bounded for the same reason.
     nofence = FENCE.sub("\n", src)
-    for bad, why in [(r"\*\*[^*\n]*</strong>", "mismatched **/<strong>"),
-                     (r"<strong>[^<\n]*\*\*", "mismatched <strong>/**"),
-                     (r"## .*## ", "two headings welded on one line"),
-                     (r"&[a-z]+(?![a-z]*;)", "an & entity missing its ;")]:
-        m = re.search(bad, nofence)
+    nofence_noinline = re.sub(r"`[^`\n]+`", " ", nofence)
+    for bad, why, text, flags in [
+            (r"\*\*[^*\n]*</strong>", "mismatched **/<strong>", nofence_noinline, 0),
+            (r"<strong>[^<\n]*\*\*", "mismatched <strong>/**", nofence_noinline, 0),
+            (r"^## .*## ", "two headings welded on one line", nofence, re.M),
+            (r"&[a-z]+(?![a-zA-Z0-9]*;)", "an & entity missing its ;", nofence_noinline, 0)]:
+        m = re.search(bad, text, flags)
         if m:
             fail("markup", "%s: %r" % (why, m.group(0)[:60]))
     if not re.search(r"^title:", src, re.M):
