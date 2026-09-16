@@ -5,6 +5,16 @@ intro: Read this after trying the interactive once, then run it again with the s
 
 Batch Normalization (BatchNorm) was introduced by Ioffe &amp; Szegedy in 2015 and is now a standard building block in virtually every deep network. It normalizes the inputs to each layer so that training is faster and more stable. This page lets you <em>see</em> what happens with and without it.
 
+The operation itself is straightforward: for each feature in each layer, subtract the batch mean and divide by the batch standard deviation, then scale and shift by two learnable parameters &gamma; and &beta;. The subtraction and division center and normalise; &gamma; and &beta; let the network recover any scale and offset it needs, so BatchNorm does not permanently force activations to zero mean and unit variance &mdash; it just gives the optimiser a friendlier starting point.
+
+During training, the mean and variance come from the current mini-batch. During inference, they come from running averages accumulated during training. That switch is what `model.train()` and `model.eval()` control in PyTorch, and forgetting to call `model.eval()` before inference is one of the most common BatchNorm bugs.
+
+BatchNorm allows higher learning rates, because the normalisation prevents activations from growing or shrinking across layers. Without it, a high learning rate can push activations into the saturating regions of sigmoid or tanh, where gradients vanish. With it, the activations stay in the linear region of the activation function, where gradients flow.
+
+It also acts as a mild regulariser. Because each sample's normalisation depends on the other samples in the batch, the network sees slightly different inputs on each pass, which adds noise similar to dropout. That noise reduces overfitting, and in practice networks with BatchNorm often need less dropout or none at all.
+
+The batch-size dependency is BatchNorm's main limitation. Small batches give noisy estimates of the mean and variance, which destabilises training. For tasks where small batches are unavoidable &mdash; object detection, segmentation, training on a single GPU &mdash; alternatives like Layer Normalisation, Group Normalisation and Instance Normalisation compute statistics over different axes and avoid the batch dependency.
+
 ## 1) The Problem BatchNorm Solves
 
 When you feed raw features with different scales (e.g., Age 18–80 vs. Salary 20k–200k) into a network, the first-layer weights that receive the large feature grow disproportionately. During backpropagation those large weights amplify gradients in early layers (<span style="color:var(--accent-danger)">exploding</span>), while deeper layers receive progressively smaller updates (<span style="color:var(--accent-blue)">vanishing</span>). The result: unstable training or very slow convergence.

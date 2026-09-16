@@ -13,6 +13,15 @@ After any of those, `df.loc[0]` and `df.iloc[0]` can refer to different rows &md
 
 Writing `.loc` or `.iloc` explicitly, rather than bare `df[...]`, makes the choice visible. Bare brackets guess, and the guess changes with the argument type: `df["age"]` is a column, `df[0:2]` is rows by position, `df[mask]` is rows by condition. Three meanings for one syntax is a lot to hold, and the explicit accessors cost four characters.
 
+The endpoint rule is the other difference that matters. `.loc["a":"c"]` includes both endpoints: it returns rows labelled a, b and c. `.iloc[0:3]` excludes the stop, like Python slicing: it returns rows at positions 0, 1 and 2. The reason is that labels are not ordered integers &mdash; excluding the endpoint would mean the user has to know the next label after the one they want, which is often impossible.
+
+Both accept a single label or position, a list of them, a slice, or a boolean mask. `.loc` also accepts a callable that receives the frame and returns any of those, which is useful in method chains where you do not have the frame in a variable.
+
+Setting values follows the same syntax: `df.loc[mask, "score"] = 0` sets the score column to zero for rows matching the mask. The assignment goes through the accessor, so pandas knows exactly which cells are being changed. Chained indexing &mdash; `df[mask]["score"] = 0` &mdash; sometimes writes to a copy instead of the original, producing a `SettingWithCopyWarning` and silently losing the update. Using `.loc` for writes is the fix.
+
+`.at` and `.iat` are the scalar versions: `.at["row", "col"]` gets one value by label, `.iat[0, 1]` by position. They are faster than `.loc` and `.iloc` for single-cell access because they skip the overhead of handling slices and masks.
+
+The most common mistake is using `.iloc` with a label or `.loc` with a position after the index has been changed. Printing `df.index` before selecting makes the current state obvious, and resetting it with `df.reset_index(drop=True)` restores the 0-to-n alignment when label-based access is not needed.
 
 ## loc takes labels, iloc takes positions
 

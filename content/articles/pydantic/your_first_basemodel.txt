@@ -18,6 +18,15 @@ That is the entire definition. There is no `__init__`, no assignment of `self.ti
 
 The economy matters more than it first appears. Adding a field is one line. In the hand-written equivalent it is four: the parameter, the assignment, the check, and the line in `to_dict`. Those four drift apart over time, and the drift is where bugs live.
 
+Creating an instance validates the input automatically. `Module(title=42, track="dsa", minutes="30")` coerces the integer 42 to the string `"42"` and the string `"30"` to the integer 30, because Pydantic's default mode is lenient coercion. If the input cannot be coerced &mdash; `minutes="thirty"` &mdash; it raises `ValidationError` with a clear message naming the field, the input, and what was expected.
+
+Accessing fields uses dot notation: `m.title`, `m.minutes`. By default, model instances are immutable: `m.title = "New"` raises an error unless the model is configured with `model_config = ConfigDict(frozen=False)`. Immutability is the safe default because it prevents accidental mutation in code that passes models around.
+
+`model_dump()` converts the instance to a dict. `model_dump_json()` converts it to a JSON string. Both handle nested models, dates, UUIDs and other types that `json.dumps` cannot serialise on its own. `model_validate(data)` creates an instance from a dict, and `model_validate_json(json_str)` from a JSON string. These four methods &mdash; two for serialisation, two for deserialisation &mdash; are the full round-trip API.
+
+The JSON Schema is generated automatically: `Module.model_json_schema()` returns a dict describing the model's fields, types and constraints. FastAPI uses this to generate OpenAPI documentation, and frontend tools use it to generate forms. Adding a field to the model updates the schema, the documentation and the validation in one change.
+
+Default values are set with `=`: `minutes: int = 60`. Optional fields use `Optional[int]` or `int | None` with a default of `None`. Fields with no default are required; omitting them raises `ValidationError`. The order of fields in the class body determines their order in the schema and in the constructor's signature.
 
 ## Subclass, annotate, done
 

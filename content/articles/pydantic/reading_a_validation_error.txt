@@ -9,6 +9,16 @@ Pydantic checks every field and raises once, carrying the complete list. For a s
 
 `e.error_count()` tells you how many. `str(e)` gives a readable summary, which is what you saw printed in the first editor above. Both are for humans.
 
+`e.errors()` returns the machine-readable version: a list of dicts, each with `type` (the error category), `loc` (where in the input the error occurred), `msg` (a human-readable message), `input` (the value that failed), and `ctx` (extra context like the constraint that was violated). This is the data you use to build API error responses, form validation messages, or structured logs.
+
+`loc` is a tuple of field names and indices that traces the path to the broken value. For a flat model, it is `("minutes",)`. For a nested model, it might be `("address", "zip_code")`. For a list of models, `("items", 2, "price")` says the third item's price field failed. That path is what lets a frontend highlight the exact input that is wrong, even in deeply nested forms.
+
+`type` is a short string like `"int_parsing"`, `"missing"`, `"string_too_short"`, or `"value_error"`. It identifies the category of failure without reading the message. The full list is in Pydantic's documentation, and you can match on it to produce custom error messages for your API.
+
+In a FastAPI application, `ValidationError` is caught automatically and turned into a 422 response whose body is the list from `e.errors()`. You do not need to catch it yourself unless you want to transform the errors before returning them &mdash; for example, translating field names from internal Python names to the names the frontend expects.
+
+The most common mistake when reading a validation error is ignoring `loc` and reporting only the message. Without the location, a user who submitted five addresses does not know which one had the bad zip code.
+
 ## It does not stop at the first problem
 
 Every field is checked and one exception is raised carrying all of them. That is what lets a form highlight four broken inputs at once instead of revealing them one submission at a time.

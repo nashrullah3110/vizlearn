@@ -10,6 +10,15 @@ That first digit drives real behaviour in code you did not write: HTTP libraries
 
 Returning 200 with `{"error": "not found"}` throws all of that away. Every caller now has to parse your body to discover something the protocol had a field for, retries do the wrong thing, and your error rate looks like zero on every dashboard.
 
+FastAPI uses `status_code` on the decorator to set the default for a route, and the `status` module provides named constants: `status.HTTP_200_OK`, `status.HTTP_201_CREATED`, `status.HTTP_204_NO_CONTENT`, `status.HTTP_404_NOT_FOUND`. The constants are integers, but using the names makes the intent readable without memorising numbers.
+
+The common mistake on POST endpoints is returning 200 instead of 201. A `201 Created` tells the client that a new resource exists, and the `Location` header should point to it. Returning 200 says "it worked" without saying what happened, which forces the client to guess whether the resource was created or already existed.
+
+`204 No Content` is the correct response when the action succeeded but there is nothing to send back &mdash; a DELETE that removed a resource, or a PUT that updated one and the client does not need the updated version. Returning 200 with an empty body works technically but violates the contract: 200 implies a body, and some clients treat an empty 200 as an error.
+
+For validation errors, FastAPI returns 422 automatically when the request body does not match the Pydantic model. For business-logic errors &mdash; a duplicate email, an insufficient balance, a resource that does not exist &mdash; raise `HTTPException(status_code=404, detail="...")` or return a `JSONResponse` with the appropriate status code.
+
+`HTTPException` with `status_code=400` is the general-purpose client error. Use more specific codes when they fit: 401 for missing authentication, 403 for insufficient permissions, 404 for a resource that does not exist, 409 for a conflict (like a duplicate), and 429 for rate limiting. Each code triggers different behaviour in clients, proxies and monitoring.
 
 ## The route's default, and overriding it
 
