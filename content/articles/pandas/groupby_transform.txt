@@ -13,6 +13,22 @@ Three group-by operations differ only in the shape of what they return, and choo
 
 Most confusion here is someone reaching for `agg` when they wanted `transform`, then writing a merge to get back to the original shape.
 
+`transform` returns a Series (or DataFrame) with the same index as the input. Every row gets the value of its group's statistic. `df.groupby("city")["sales"].transform("mean")` gives each row the mean sales of its city — not one row per city, but one value per original row, aligned by the group key. That is what makes it directly assignable: `df["city_avg"] = df.groupby("city")["sales"].transform("mean")` adds a column without a merge.
+
+The operations `transform` supports are the same aggregation functions `agg` supports: `"mean"`, `"sum"`, `"min"`, `"max"`, `"std"`, `"count"`, `"rank"`, or a custom function. The difference is only in the output shape — one row per group (`agg`) versus one row per original row (`transform`).
+
+Normalising within groups is the classic `transform` use case. `df["z"] = df.groupby("city")["sales"].transform(lambda x: (x - x.mean()) / x.std())` gives each row its z-score within its group. Without `transform`, this requires a groupby, a merge, and a manual subtraction — three steps that `transform` replaces with one.
+
+`filter` returns a subset of the original rows. `df.groupby("city").filter(lambda g: g["sales"].sum() > 100)` keeps every row whose city has total sales above 100. The entire group is kept or dropped — there is no partial filtering. This is useful for excluding small groups (fewer than N observations), low-value groups, or groups that fail a quality check.
+
+The function passed to `filter` must return a single boolean: `True` to keep the group, `False` to drop it. A function that returns a Series (one bool per row) raises, because `filter` operates at the group level, not the row level. Row-level filtering is just boolean indexing — `df[df["sales"] > 10]` — and does not need `groupby` at all.
+
+`transform` with `"rank"` is how you rank within groups. `df["rank"] = df.groupby("city")["sales"].transform("rank")` gives each row its rank within its city. `method="dense"` makes the ranks consecutive with no gaps; `ascending=False` puts the largest value at rank 1.
+
+Combining `transform` and boolean indexing is a common pattern for keeping only each group's top values: `df[df.groupby("city")["sales"].transform("rank", ascending=False) <= 3]` keeps the top 3 rows per city. This avoids sorting and slicing inside a loop, which is both slower and harder to read.
+
+The mental model that prevents confusion: `agg` produces a summary table, `transform` annotates the original rows, and `filter` subsets them. All three start with `groupby`, and all three are followed by the column selection. The only difference is the shape of what comes back.
+
 
 ## agg reduces, transform broadcasts
 

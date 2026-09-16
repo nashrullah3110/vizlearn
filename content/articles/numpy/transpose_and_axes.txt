@@ -8,6 +8,20 @@ That is why `a.T` on a gigabyte array returns instantly. It is a view, and `np.s
 
 Everything else in this module follows from that one fact.
 
+For a 2-D array, `.T` swaps rows and columns — the matrix transpose. Row 0 becomes column 0, row 1 becomes column 1, and so on. The shape `(3, 4)` becomes `(4, 3)`. This is the most common use, and for many people it is the only one.
+
+For higher-dimensional arrays, `.T` reverses all axes. A `(2, 3, 4)` array becomes `(4, 3, 2)`. That is often not what you want — reversing three axes at once is a specific operation, and the operation you actually need is usually moving one axis to a different position. `np.transpose(a, axes=(1, 0, 2))` swaps the first two axes while leaving the third in place. `np.moveaxis(a, source, destination)` is the more readable version: `np.moveaxis(a, 0, -1)` moves axis 0 to the end.
+
+The reason these operations are free is that no data is copied. The array's shape and strides change, but the underlying buffer is the same. `a.T` on a `(1000, 1000)` float64 array — 8 MB of data — returns instantly, because it is not moving 8 MB. It is changing two numbers in the array's metadata.
+
+That efficiency has a consequence for memory layout. A C-contiguous array (the default) has consecutive elements along the last axis. After `.T`, consecutive elements are along the first axis — the array is now Fortran-contiguous. Operations that walk along the last axis (which is what most NumPy functions do) are slower on the transposed view because they are jumping through memory instead of reading sequentially. `.copy()` makes a new C-contiguous array, which restores performance at the cost of an allocation.
+
+`np.swapaxes(a, axis1, axis2)` swaps exactly two axes. For a 3-D array, `np.swapaxes(a, 0, 2)` swaps axes 0 and 2, leaving axis 1 in place. It is equivalent to `np.transpose(a, (2, 1, 0))` but reads more clearly when you are moving exactly two.
+
+`np.expand_dims(a, axis)` and `np.squeeze(a)` add and remove length-1 axes, which is related to transposing in that both reshape without copying. `expand_dims` inserts a new axis of length 1 at the specified position; `squeeze` removes all axes of length 1. These are the tools for making shapes compatible for broadcasting — adding a dimension so a 1-D array becomes a column vector or a row vector.
+
+The `.T` shorthand is only for read access. You cannot assign to `a.T` directly — `a.T = something` raises. To modify the transposed view, assign to `a.T[:]` or use the transposed view as an index target. This is a deliberate safeguard: assigning to a view is a side effect on the original, and making it explicit prevents accidental writes.
+
 ## .T reverses the axes
 
 It is a view: the strides swap and the data never moves.

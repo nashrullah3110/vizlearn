@@ -15,6 +15,22 @@ That asymmetry is deliberate. It means `df[~df.duplicated()]` keeps exactly one 
 
 `keep=False` flags **all** of them, including the first. This is the one to use when inspecting, because it shows you the complete groups rather than half of each.
 
+`drop_duplicates()` removes the flagged rows. `df.drop_duplicates()` keeps the first occurrence of each duplicate set. `df.drop_duplicates(keep="last")` keeps the last. `df.drop_duplicates(keep=False)` removes all copies, keeping none — which is useful when duplicates indicate bad data that should be investigated rather than silently resolved.
+
+`subset=` controls which columns define a duplicate. `df.drop_duplicates(subset=["email"])` treats two rows as duplicates if they share the same email, regardless of the other columns. Without `subset`, all columns must match for rows to be considered duplicates. Choosing the right subset is the difference between deduplicating correctly and either removing too much or too little.
+
+The order of rows matters when `keep="first"` or `keep="last"`. If the data is sorted by timestamp and you keep the first, you keep the oldest version of each duplicate. If you keep the last, you keep the newest. Sorting before deduplicating is how you control which copy survives: `df.sort_values("updated_at").drop_duplicates(subset=["id"], keep="last")` keeps the most recently updated version of each record.
+
+`duplicated` and `drop_duplicates` work on the index as well as on columns. `df.index.duplicated()` returns a boolean array flagging duplicate index values. `df[~df.index.duplicated()]` removes them. Duplicate index values are not an error in pandas — they are allowed and common — but they cause `loc` to return multiple rows instead of one, which breaks code that assumes a unique index.
+
+Counting duplicates before removing them is good practice. `df.duplicated().sum()` gives the total count. `df.duplicated(subset=["email"]).sum()` gives the count for a specific key. `df[df.duplicated(subset=["email"], keep=False)].sort_values("email")` shows all the duplicate groups sorted together, which is the view you need for deciding which to keep.
+
+Partial duplicates — rows that match on some columns but differ on others — are the harder case. Two orders with the same customer, product, and date but different quantities might be a real repeat or two separate transactions. `subset=` lets you check on any combination of columns, and inspecting the non-matching columns for the flagged rows usually resolves the ambiguity.
+
+For large datasets, `duplicated` is faster than `groupby().size()` for simple detection, but `groupby` is more flexible: `df.groupby(["email"]).size().reset_index(name="count").query("count > 1")` returns each duplicate key with its count, which is the report you give to someone who needs to fix the data at the source.
+
+Prevention is better than detection. Setting a unique constraint at the database level, validating uniqueness on ingest, or using `df.set_index("id", verify_integrity=True)` (which raises on duplicates) catches the problem before it enters the pipeline rather than after.
+
 
 ## duplicated flags the repeats, not the original
 

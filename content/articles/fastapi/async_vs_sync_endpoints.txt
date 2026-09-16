@@ -18,6 +18,20 @@ What differs is **where the function runs**. An `async def` endpoint is awaited 
 
 That single fact explains everything else in this module.
 
+The mistake that turns a fast framework into a slow one is writing `async def` and then calling a blocking function inside it. A `def` endpoint runs in a threadpool, so blocking is fine — the event loop continues handling other requests while the thread waits. An `async def` endpoint runs on the event loop itself, so blocking it blocks every other request. `time.sleep(5)` in a `def` endpoint delays one request. `time.sleep(5)` in an `async def` endpoint delays every concurrent request for five seconds.
+
+The rule is simple: if the function calls anything that blocks — a synchronous database driver, a file read, a CPU-heavy computation, `requests.get()` — use `def`. If the function calls only `await`-able things — `httpx.AsyncClient`, an async database driver, `asyncio.sleep` — use `async def`. If it does no I/O at all (a pure computation on the arguments), either works, but `def` is slightly safer because it runs in a thread and cannot accidentally block the loop.
+
+The threadpool that runs `def` endpoints has a default size of 40 threads. That means up to 40 synchronous endpoints can run concurrently. If all 40 are blocked on a slow database query, the 41st request waits. Increasing the pool size with `anyio.to_thread.current_default_thread_limiter().total_tokens = 100` helps, but the real fix is an async database driver that does not need a thread per query.
+
+`async def` endpoints can call `await` to yield control. While one endpoint waits for a database response, the event loop runs another endpoint's code. That interleaving is why async frameworks handle thousands of concurrent connections with a single thread — they are never waiting; they are always running whoever is ready.
+
+Dependencies follow the same rule. A `Depends(get_db)` that returns a synchronous database session runs in the threadpool. A `Depends(get_db)` that is `async def` runs on the loop. Mixing them is fine — FastAPI handles the dispatch — but a synchronous dependency inside an `async def` endpoint does not get a threadpool automatically. It blocks the loop unless you wrap it in `run_in_executor`.
+
+Background tasks — `BackgroundTasks` — run after the response is sent. They follow the same rule: a `def` background task runs in the threadpool, an `async def` background task runs on the loop. A long-running background task that blocks the loop will delay responses to other clients, which is particularly hard to debug because the background task's execution is invisible in the request logs.
+
+The performance difference between `def` and `async def` for a simple endpoint that does no I/O is negligible — microseconds. The difference shows up only under concurrent load with I/O. For a prototype or a low-traffic internal tool, the choice barely matters. For a service handling hundreds of concurrent requests, getting it wrong means the framework's concurrency advantage is cancelled by a single blocking call.
+
 
 ## Both are ordinary endpoints
 

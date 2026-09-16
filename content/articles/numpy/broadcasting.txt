@@ -7,6 +7,20 @@ intro: Two rules that decide whether shapes combine, and why a wrong guess costs
 
 That is broadcasting. The general rules extend the same idea to arrays.
 
+The two rules are short. First, if the arrays have a different number of dimensions, the shape of the smaller one is padded with 1s on the left until both shapes have the same length. Second, along each dimension, the sizes must either be equal or one of them must be 1; the size-1 dimension is stretched to match the other. If neither condition holds, the operation raises a `ValueError`.
+
+An example makes it concrete. A `(3, 4)` array plus a `(4,)` array: the `(4,)` shape is padded to `(1, 4)`, then the size-1 first dimension is stretched to 3, giving `(3, 4)`. The result is that the 1-D array is added to every row. A `(3, 1)` array plus a `(1, 4)` array: the first is stretched along columns to `(3, 4)`, the second along rows to `(3, 4)`. The result is a `(3, 4)` outer operation.
+
+No data is copied during broadcasting. NumPy uses strides of 0 along the stretched dimensions, meaning it reads the same value repeatedly as it walks. A `(1000, 1)` array broadcast against a `(1, 1000)` array performs a million operations without allocating a million-element buffer for either operand. The result does allocate, but the inputs stay small.
+
+The wrong guess costs gigabytes because broadcasting can silently create enormous results. `a[:, None] - a[None, :]` on a `(100_000,)` array produces a `(100_000, 100_000)` result — 80 GB in float64. The operation is valid, the shapes align, and NumPy attempts it. The symptom is either a `MemoryError` or the system freezing as swap fills up. The fix is to recognise when an outer operation is creating a matrix you did not intend.
+
+`np.newaxis` (or `None` in an index) is the tool for controlling which dimensions broadcast. `a[:, np.newaxis]` turns `(n,)` into `(n, 1)`, making it a column. `a[np.newaxis, :]` turns it into `(1, n)`, making it a row. The column-row outer product `a[:, None] * b[None, :]` is the canonical example, and it is the pattern behind distance matrices, correlation tables, and kernel evaluations.
+
+Broadcasting replaces loops. `a - means` where `means` is a 1-D array of column means subtracts each column's mean from every row — the same operation that a loop over columns would perform, but in one vectorised expression. Centering, normalising, and standardising data are all broadcasting operations, and they run at C speed because no Python loop is involved.
+
+The error message when shapes are incompatible — `operands could not be broadcast together with shapes (3,4) (5,)` — names both shapes and is unambiguous. The fix is always to reshape one operand so the dimensions align: add a `newaxis`, transpose, or reshape. Knowing the two rules makes the fix mechanical rather than a guessing game.
+
 
 ## The simplest case: a scalar
 

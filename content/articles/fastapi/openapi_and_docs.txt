@@ -8,6 +8,22 @@ It is assembled from things you already wrote &mdash; the path in the decorator,
 
 FastAPI serves it at `/openapi.json`, renders it at `/docs` (Swagger UI) and `/redoc` (ReDoc).
 
+The document describes every route, its parameters, request body, response shape, status codes, and descriptions. A client generated from it — in TypeScript, Kotlin, Go, or any language with an OpenAPI codegen — matches the API exactly, because it was built from the same source. There is no separate specification file to maintain and no way for the spec to drift from the code.
+
+Path parameters, query parameters, headers, and cookies each appear in the right section of the document because FastAPI infers their location from the function signature. A parameter named `module_id` in a route `/modules/{module_id}` is documented as a path parameter. A parameter with a default value that is not in the path is documented as a query parameter. `Header(...)` and `Cookie(...)` mark their respective locations explicitly.
+
+`Field(description="...")` on a model field becomes the field's description in the schema. A docstring on the model class becomes the schema's top-level description. `Field(examples=[...])` adds example values that Swagger UI pre-fills in the "Try it out" form. `Field(title="...")` overrides the display name. These annotations cost seconds to write and save every consumer of the API the time of guessing what a field means.
+
+`response_model` on the decorator defines the documented response shape. Without it, the endpoint's return type is undocumented in the spec, which means generated clients treat the response as `Any` — typeless and unusable without manual casting. `response_model=ModuleOut` generates a complete schema for the response, filters out fields not in the model, and makes the endpoint self-documenting.
+
+`responses={404: {"description": "Module not found"}}` on the decorator documents error responses. The default documentation shows only the success response; adding error responses explicitly tells consumers what to expect when something goes wrong. `responses={404: {"model": ErrorOut}}` goes further, documenting the error body's shape.
+
+Tags organise endpoints in the documentation. `@app.get("/modules", tags=["modules"])` groups the endpoint under "modules" in Swagger UI and ReDoc. `APIRouter(tags=["modules"])` applies the tag to every route on that router. Without tags, all endpoints appear in one flat list, which is unnavigable for an API with more than a dozen routes.
+
+`app = FastAPI(title="My API", version="1.0.0", description="...")` sets the top-level metadata that appears at the top of the documentation page. The title and version are required by the OpenAPI spec; the description is rendered as Markdown, so you can include links, headings, and code blocks.
+
+Disabling the docs in production — `app = FastAPI(docs_url=None, redoc_url=None)` — hides the interactive documentation. The `/openapi.json` endpoint remains unless you also set `openapi_url=None`. This is a security consideration: the spec reveals every endpoint, parameter, and model, which is useful during development and informative to an attacker in production.
+
 
 ## The document, and where it comes from
 

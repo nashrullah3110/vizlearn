@@ -6,6 +6,22 @@ The same path with different methods is the central idea of an HTTP API. `/modul
 
 FastAPI gives you a decorator per verb, and registering several against one path is normal rather than a special case.
 
+Each HTTP method carries a promise. `GET` retrieves a resource and changes nothing — calling it twice gives the same result. `POST` creates a resource — calling it twice may create two. `PUT` replaces a resource entirely — calling it twice gives the same result as calling it once. `PATCH` updates part of a resource. `DELETE` removes it. These promises are not enforced by the framework; they are conventions the API follows so that clients, caches, and proxies can behave correctly.
+
+The practical consequence of `GET` being safe (no side effects) is that browsers, CDNs, and search engines will call it freely. A `GET` endpoint that deletes data — which is a real mistake people make — means a prefetch, a crawler, or a browser's back button can destroy records.
+
+Path parameters put the resource identity in the URL. `/modules/7` names module 7. `/modules/7/lessons/3` names lesson 3 inside module 7. The nesting reflects the ownership: a lesson belongs to a module. FastAPI extracts these with `{module_id}` and `{lesson_id}` in the path, and each becomes a function parameter with the type you annotate.
+
+Query parameters carry filters, pagination, and options. `/modules?skip=0&limit=10&published=true` asks for the first 10 published modules. These are not part of the resource identity — the same resource exists regardless of how you paginate it. In FastAPI, query parameters are function parameters that are not in the path string, and defaults make them optional.
+
+Route ordering is the pitfall. Routes are matched top to bottom. A path like `/modules/{id}` matches `/modules/latest` before a literal `/modules/latest` route defined below it, because `{id}` matches any string. The fix is to define specific routes before parameterised ones. This is not a FastAPI-specific issue — every path router works this way — but FastAPI does not warn about it, so the first symptom is a 422 error when a valid path is misinterpreted as a parameter.
+
+`APIRouter` groups related routes. `router = APIRouter(prefix="/modules", tags=["modules"])` creates a router whose routes are all under `/modules` and documented under the "modules" tag. `app.include_router(router)` registers them. This is how large applications are structured: one router per resource, each in its own file, all included in the main app. The prefix avoids repeating `/modules` in every decorator, and the tag organises the documentation.
+
+`@app.api_route("/path", methods=["GET", "POST"])` registers a single handler for multiple methods, which is occasionally useful when the logic is the same regardless of the method (a webhook receiver, for example). The handler receives the request object and can check `request.method` to branch.
+
+Status codes are part of the route definition. `@app.post("/modules", status_code=201)` returns 201 Created on success. `@app.delete("/modules/{id}", status_code=204)` returns 204 No Content. The status code in the decorator is the success code; error codes come from raising `HTTPException` inside the handler.
+
 
 ## One path, several methods
 

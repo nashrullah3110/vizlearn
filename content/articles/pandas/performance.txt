@@ -13,6 +13,18 @@ Pandas performance work is unusually predictable. In descending order of payoff:
 
 Working down that list in order means the large wins come first. Working up it means spending an afternoon on step 4 while a `apply(axis=1)` sits untouched.
 
+Per-row Python — `iterrows`, `apply(axis=1)`, a `for` loop over `df.values` — is the single most common performance problem. It is also the one with the largest payoff when fixed. A vectorised column operation runs in C at the array level; a Python loop runs one interpreter step per cell. On a million-row frame with ten columns, the difference is routinely 50–100x.
+
+The usual pattern is someone who learned Python before pandas writing `for i, row in df.iterrows()` to compute a new column. The fix is almost always a vectorised expression: `df["total"] = df["qty"] * df["price"]`. When the logic is conditional, `np.where` or `np.select` replaces the `if` inside the loop. When the logic is string manipulation, `.str` accessor methods replace character-by-character processing. When the logic is truly complex, writing a NumPy ufunc or using `numba.njit` keeps the speed without simplifying the logic.
+
+Dtype choices affect both memory and speed. An `object` column of strings that should be `category` wastes memory and slows every groupby and merge that touches it. A `float64` column of integers that could be `int32` wastes half its memory. `pd.to_numeric(col, downcast="integer")` and `.astype("category")` are the two fixes, and they often halve memory usage with no change to the results.
+
+Filtering early removes rows before expensive operations touch them. `df[df["year"] == 2024].groupby("city").sum()` groups only the relevant rows. `df.groupby("city").sum()` groups everything and then the caller discards what it does not need. The second form does the same work on more data, and the difference grows with the fraction filtered.
+
+Copies accumulate silently. `df.reset_index().sort_values("date").drop(columns=["temp"])` creates three intermediate DataFrames. Each is a full copy of the data. For a frame that fits comfortably in memory, this is fine. For one that occupies half of available RAM, the intermediate copies push into swap and the operation that should take seconds takes minutes.
+
+Profiling is how you know which step to take. `%timeit` on individual operations, `df.memory_usage(deep=True).sum()` for memory, and `line_profiler` for per-line timing are the three tools. Without measurement, performance work is guessing — and the guess is almost always wrong about where the time goes.
+
 
 ## Per-row Python is the whole story
 

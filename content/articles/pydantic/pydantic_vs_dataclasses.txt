@@ -18,6 +18,20 @@ Two lines of difference, and both give you a constructor, a readable `repr`, equ
 
 It matters in exactly one place: what happens when the data is wrong.
 
+A dataclass stores whatever you pass, without checking. `Module(title=42, minutes="not a number")` builds an object with `title=42` and `minutes="not a number"`, and the type annotations are documentation only. A BaseModel refuses: it tries to coerce `42` to a string (which succeeds — you get `"42"`) and tries to parse `"not a number"` as an `int` (which fails with a `ValidationError` listing exactly what was wrong). That difference is the entire decision.
+
+If your data comes from the outside — a JSON request, a config file, a CSV, user input — validation is not optional. A wrong type four layers deep produces a `TypeError` far from the source, and the traceback names the symptom, not the cause. Pydantic catches it at the boundary, names the field and the value, and stops the bad data from entering the system.
+
+If your data comes from your own code — a return value you just computed, a named tuple you assembled — validation is overhead. A dataclass is lighter, faster to instantiate, and imposes no rules because none are needed. The code that builds the object already knows the types.
+
+Performance is the secondary difference. A dataclass constructor is a plain `__init__` — essentially free. A BaseModel constructor runs validation, coercion, and potentially custom validators on every field. For a model with five string fields, construction is roughly 5–10x slower than a dataclass. That does not matter for request handling (network latency dwarfs it), but it matters for inner loops that build millions of objects.
+
+Pydantic offers `pydantic.dataclasses.dataclass`, which is a dataclass that validates. It uses the `@dataclass` syntax but runs Pydantic validation under the hood. It is useful when you want dataclass compatibility — `asdict`, `astuple`, `fields` — with validation at construction. The tradeoff is that it does not support model methods like `.model_dump()` or `.model_json_schema()`, so it sits between the two rather than replacing either.
+
+Serialisation is the third difference. A BaseModel can produce JSON, a dict with aliased keys, and a JSON Schema. A dataclass can produce a dict with `asdict` and that is about it. If other systems need to consume your data shape — a frontend, a schema registry, an OpenAPI document — BaseModel gives you the output for free.
+
+The choice is almost always obvious once you ask the question: does this data arrive from code I control, or from somewhere I do not? Code I control: dataclass. Somewhere else: BaseModel.
+
 
 ## Side by side
 

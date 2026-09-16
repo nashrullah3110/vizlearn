@@ -13,6 +13,22 @@ intro: Split, apply, combine - the operation that is the reason to use pandas.
 
 Almost every question about aggregated data has this shape, and recognising it is most of what makes pandas worth using. The alternative in plain Python &mdash; a dict, a loop, a decision about missing keys, another loop to compute the summary &mdash; is a dozen lines that this replaces with one.
 
+The key can be one column or several. `df.groupby("city")` groups by city. `df.groupby(["city", "year"])` groups by the unique combinations of city and year. The result has one row per unique key value (or key combination), with the aggregation applied to each group independently.
+
+`as_index=False` controls whether the group key becomes the index of the result. The default is `True`, which puts the key in the index — useful for further groupby operations but inconvenient when you want a flat DataFrame for plotting or export. `as_index=False` keeps the key as a regular column, which is usually what you want.
+
+Multiple aggregations on the same column use `.agg()`. `df.groupby("city")["sales"].agg(["sum", "mean", "count"])` returns a DataFrame with three columns — the sum, mean, and count of sales for each city. Named aggregations are clearer: `df.groupby("city").agg(total=("sales", "sum"), avg=("sales", "mean"))` names each output column explicitly.
+
+Different aggregations on different columns also use `.agg()`. `df.groupby("city").agg({"sales": "sum", "profit": "mean"})` sums sales and averages profit, per city. This is the form that answers "give me total revenue and average margin by region" in one call.
+
+`NaN` values in the group key are dropped by default. A row whose city is `NaN` belongs to no group and does not appear in the result. `dropna=False` includes `NaN` as a group, which is important when missing data is itself informative — "orders with no assigned region" is a group worth seeing.
+
+Sorting the result is automatic: groups appear in sorted key order. `sort=False` disables this and returns groups in the order they first appear, which is faster on large datasets and preferable when you are going to sort by value anyway.
+
+The `GroupBy` object itself is iterable. `for name, group in df.groupby("city")` yields each group as a (key, DataFrame) pair. This is rarely the right approach for aggregation — `.agg()` is faster and clearer — but it is useful for inspection, for applying a function that cannot be expressed as a single aggregation, or for saving each group to a separate file.
+
+`.size()` counts rows per group (including `NaN` values). `.count()` counts non-null values per group. `.nunique()` counts distinct values per group. These three answer different questions: "how many rows," "how many observations," and "how many distinct values."
+
 
 ## Split, apply, combine
 

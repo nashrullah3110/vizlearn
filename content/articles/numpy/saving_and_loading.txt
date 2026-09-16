@@ -11,6 +11,18 @@ It is the right default for anything that only needs to be read by NumPy. Files 
 
 The extension is added automatically if you omit it.
 
+`.npz` bundles several arrays into one file. `np.savez("data.npz", x=x, y=y)` saves two arrays under the names `x` and `y`. `np.load("data.npz")` returns a lazy object — arrays are read from disk only when accessed by name: `f["x"]`, `f["y"]`. `np.savez_compressed` does the same with gzip compression, which typically halves the file size at a modest speed cost. The compressed format is worth using when the file will be stored or transferred; the uncompressed format is worth using when the file will be read repeatedly in a hot path.
+
+Text formats — `np.savetxt` and `np.loadtxt` — write and read human-readable CSV-like files. They are slow, they cannot store dtypes (everything comes back as `float64` by default), and they cannot store arrays with more than two dimensions. Their one advantage is interoperability: any tool that reads text can read them. Use them when the consumer is not Python; use `.npy` or `.npz` when it is.
+
+`np.genfromtxt` is the more flexible text reader. It handles missing values (`filling_values`), skips headers (`skip_header`), and infers dtypes (`dtype=None`). It is slower than `loadtxt` because of the extra parsing, but it handles messy real-world files that `loadtxt` refuses.
+
+`np.fromfile` and `ndarray.tofile` read and write raw binary with no header. They are the fastest option — no parsing, no metadata, just bytes — but they are also the most fragile. The reader must know the dtype, shape, and byte order independently, because the file contains none of that. A shape mismatch silently produces wrong data. Use them only when performance is critical and the format is controlled end to end.
+
+Memory-mapped files — `np.memmap` — access an array on disk as if it were in memory, loading pages on demand. This is how you work with arrays larger than RAM: `np.memmap("data.npy", dtype="float64", mode="r", shape=(10_000_000, 100))` opens a 7.5 GB array without loading it. Reads are fast for sequential access and slow for random access, because the operating system pages data in and out. Writes through a `memmap` modify the file directly, which is powerful and dangerous — there is no undo.
+
+Pickle (`np.save` uses it internally for object arrays) can save arbitrary Python objects inside an array, but loading a pickle executes arbitrary code. Never load a `.npy` or `.npz` file from an untrusted source with `allow_pickle=True` — it is a remote code execution vector. NumPy's default `allow_pickle=False` blocks this, and you should not override it unless you trust the file completely.
+
 
 ## .npy keeps dtype and shape exactly
 

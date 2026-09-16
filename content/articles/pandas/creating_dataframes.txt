@@ -11,6 +11,20 @@ Almost every confusion about constructing a DataFrame comes from one question: d
 
 Both produce the same frame. Knowing which one you are writing prevents a transposed result.
 
+`pd.read_csv("file.csv")` is the most common constructor in practice, and it infers column names from the first row, dtypes from the data, and the index from the row numbers. `dtype={"id": "int32", "name": "category"}` overrides the inference per column, which is worth doing on any file you will read more than once — inference is a guess, and a wrong guess wastes memory or produces the wrong type. `parse_dates=["date"]` converts date strings to datetime objects on read, which is faster than converting after.
+
+`pd.read_json`, `pd.read_excel`, `pd.read_sql`, `pd.read_parquet`, and `pd.read_html` each read a different format into the same DataFrame structure. The parquet reader is the fastest for large files and preserves dtypes exactly. The SQL reader takes a query and a connection, which is how you get a database result into pandas without writing a loop. The HTML reader is surprisingly useful — `pd.read_html(url)` returns a list of DataFrames, one per `<table>` on the page.
+
+`pd.DataFrame(np.array(...))` builds a frame from a NumPy array. Column names default to integers — `0, 1, 2` — so passing `columns=["a", "b", "c"]` is almost always necessary. The index defaults to `RangeIndex`, which is usually what you want. The dtype of each column matches the array's dtype.
+
+`pd.DataFrame.from_records(rows, columns=["a", "b"])` builds a frame from a list of tuples, which is the shape you get from `cursor.fetchall()` in a database driver. Each tuple is one row, and the `columns` argument names them.
+
+An empty DataFrame — `pd.DataFrame(columns=["a", "b", "c"])` — is the starting point for building a frame row by row, which is slow but sometimes necessary when the data arrives incrementally. `pd.concat([existing, new_row])` appends a row. For bulk construction, collecting rows in a list and calling `pd.DataFrame(rows)` once at the end is 10–100x faster than repeated `concat` calls.
+
+`index=` sets the row labels at construction time. `pd.DataFrame(data, index=["x", "y", "z"])` assigns string labels. `pd.DataFrame(data, index=pd.date_range("2024-01-01", periods=3))` assigns dates. The index is not a column — it does not appear in `df.columns` — but it controls alignment, slicing, and grouping.
+
+`columns=` controls column order. `pd.DataFrame(data, columns=["b", "a"])` puts `b` first, even if the dict had `a` first. Columns not in the list are dropped; names in the list not in the data become columns of `NaN`.
+
 
 ## From a dict of columns
 

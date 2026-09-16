@@ -9,6 +9,18 @@ One `plot` call with a million points creates one `Line2D`. A loop making two th
 
 The rule that follows is the same one as NumPy and pandas: **pass arrays, do not loop**. Where a loop is unavoidable, `LineCollection` and its relatives draw many segments as a single artist.
 
+The practical consequence is that you should batch drawing calls. Instead of looping over segments and calling `ax.plot` once per segment, build arrays of x and y coordinates separated by `NaN` (which breaks the line) and draw them in one call. One `Line2D` with gaps is far cheaper than a thousand `Line2D` objects with the same total number of points.
+
+`LineCollection`, `PathCollection`, and `PolyCollection` are the artist classes designed for this. Each draws many line segments, markers, or polygons as a single object with a single draw pass. `ax.scatter` already uses `PathCollection`, which is why a scatter plot of a million points is fast — it is one artist. Building a `LineCollection` manually takes a list of `(N, 2)` arrays, one per segment, and draws all of them with one call to `ax.add_collection`.
+
+Rendering backend matters. The default Agg backend rasterises everything to a pixel buffer, which scales with figure DPI and size but not with the number of data points (once they are drawn). The SVG and PDF backends produce one XML element or PDF path per artist, so a figure with ten thousand artists generates a file that is slow to open and huge on disk. For publication-quality vector output of dense plots, rasterising the data layer with `ax.set_rasterization_zorder(1)` while keeping the axes and labels as vectors gives the best of both worlds.
+
+Downsampling is the other lever. A million-point line on a 1000-pixel-wide figure cannot show more than about 2000 visually distinct points — two per column (the min and the max). Plotting all million is faithful but slow. The LTTB algorithm (Largest Triangle Three Buckets) reduces a time series to a fixed number of points while preserving the visual shape, and libraries like `mpl-point-clipping` or manual slicing with `a[::step]` achieve similar speedups with less sophistication.
+
+Interactive figures have tighter budgets. `%matplotlib widget` in a notebook re-renders on every pan and zoom, so a figure that takes 200 ms to draw feels sluggish. Keeping the artist count low and the data pre-downsampled makes the difference between a responsive exploration and a slideshow.
+
+Profiling is straightforward. `fig.canvas.draw()` with a timer around it measures the draw time. If it is over about 50 ms, the figure will stutter interactively, and the usual suspect is too many artists — `len(ax.get_children())` shows the count.
+
 
 ## Drawing cost grows with artists, not data
 

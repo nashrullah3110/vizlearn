@@ -14,6 +14,20 @@ def show_money(self, value: Decimal) -> str:
 
 The method takes `self` and the value, and returns whatever should appear.
 
+`@model_serializer` controls the output of the entire model rather than a single field. It receives the model instance and returns a dict (or any serialisable value) that replaces the default output. This is how you flatten nested structures, rename keys for an external API, or add computed fields that exist only in the output.
+
+`mode="wrap"` on a field serializer gives the validator a `handler` function it can call to get the default serialisation, then modify it. `mode="plain"` (the default) replaces the output entirely. Wrap mode is useful when the default is mostly right and you only need to adjust one aspect — rounding a float, appending a unit, masking part of a string.
+
+`when_used="json"` restricts the serialiser to JSON output. Without it, the serialiser also runs on `.model_dump()` (the dict output), which is not always what you want — a dict used internally might need the raw value, while the JSON sent to a client needs the formatted one. `when_used="always"` (the default) applies everywhere; `when_used="json-unless-none"` skips `None` values.
+
+The strong argument for not using custom serialisers is consistency. A model whose `.model_dump()` output does not match its field types is a model whose consumers cannot rely on the schema. If `amount` is annotated as `Decimal` but the serialiser emits a formatted string like `"£12.50"`, the JSON Schema says `number` while the actual output is a `string`. Clients written against the schema will break. The fix is to annotate the field as `str` if the output is always a string, or to use a separate response model with the correct types.
+
+`PlainSerializer` and `WrapSerializer` are the `Annotated` equivalents of the decorator form. `Annotated[Decimal, PlainSerializer(lambda v: f"£{v:.2f}")]` defines the serialiser inline with the type, which keeps the serialisation logic next to the type annotation rather than in a method elsewhere in the class. For simple transformations — rounding, formatting, casing — the inline form is often clearer.
+
+Nested models are serialised recursively by default. A model containing a list of other models calls each inner model's serialiser when dumping. A custom serialiser on the outer model can intercept the entire tree and reshape it, but doing so means the inner models' serialisers are bypassed, which can break expectations if those inner serialisers have their own formatting rules.
+
+`model_dump(exclude={"password"})` and `model_dump(include={"id", "title"})` filter fields without a custom serialiser. They are the right tool when the problem is "show fewer fields," not "change how a field looks." Combining `exclude` with a response model that omits sensitive fields is the standard pattern for API responses.
+
 ## A field serialiser
 
 <code>@field_serializer</code> replaces the output for one field. The input side is untouched.

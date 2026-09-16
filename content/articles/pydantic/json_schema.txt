@@ -9,6 +9,22 @@ You wrote none of it. It is derived entirely from the annotations, `Field` argum
 
 This is quietly the reason Pydantic became a dependency of half the modern Python ecosystem. Validation is useful; a *machine-readable description of your data that cannot drift from the code* is what other tools can build on.
 
+The schema includes everything you declared. `str` becomes `{"type": "string"}`. `int = Field(gt=0, le=180)` becomes `{"type": "integer", "exclusiveMinimum": 0, "maximum": 180}`. `Field(description="...")` adds a `"description"` key. `Field(examples=[...])` adds an `"examples"` key. A `docstring` on the class becomes the schema's top-level `"description"`. Nothing is invented; nothing is omitted.
+
+Nested models produce `$defs` (or `definitions` in older drafts). A `Module` containing a `List[Lesson]` generates a schema where `Module` references `Lesson` by `$ref`, and `Lesson` is defined in `$defs`. The nesting can go arbitrarily deep, and circular references are handled with `$ref` pointers rather than infinite expansion.
+
+`Field(alias="...")` changes the key name in the schema. `title: str = Field(alias="name")` means the JSON key is `"name"`, not `"title"`. This is how you keep Python-style snake_case in your code while exposing camelCase or other conventions in the schema. `model_config = ConfigDict(populate_by_name=True)` allows both the alias and the field name.
+
+`Literal["a", "b", "c"]` produces `{"enum": ["a", "b", "c"]}` in the schema. `Union[int, str]` produces `{"anyOf": [{"type": "integer"}, {"type": "string"}]}`. `Optional[str]` produces `{"anyOf": [{"type": "string"}, {"type": "null"}]}`. The mapping from Python types to JSON Schema types is mechanical and complete.
+
+`json_schema_extra` on `Field` or on the model config adds arbitrary keys to the schema. `Field(json_schema_extra={"x-internal": True})` adds a vendor extension. This is how you pass metadata that JSON Schema does not define — database column names, UI hints, access-control markers — without subclassing or monkey-patching.
+
+The schema's consumers are what make it valuable. FastAPI uses it to generate OpenAPI documentation. Frontend code generators use it to produce TypeScript interfaces. Form libraries use it to build input forms. Validation libraries in other languages use it to validate the same data shape. A JSON Schema document is a contract that crosses language boundaries, and Pydantic generates it from the same class that enforces it at runtime.
+
+`model_json_schema(mode="serialization")` generates the schema for the output shape rather than the input shape. These can differ when a field uses a custom serialiser — the input type might be `Decimal` while the output is `str`. The default `mode="validation"` describes what the model accepts; `mode="serialization"` describes what it produces. Knowing the difference matters when the schema is consumed by a client that reads responses rather than one that sends requests.
+
+`TypeAdapter(List[Module]).json_schema()` generates a schema for a type that is not a model — a list, a dict, a union, or any annotated type. This is useful when your API accepts or returns a bare collection rather than a model wrapper.
+
 
 ## What a model already knows
 

@@ -9,6 +9,20 @@ Everything in this module depends on the frame having a `DatetimeIndex`. `resamp
 
 Once the index is a timeline, pandas can do things that would otherwise need a lot of arithmetic: select a month by name, aggregate by period, window by duration rather than by row count.
 
+`resample` aggregates by time period. `df.resample("M").sum()` sums each month. `df.resample("W").mean()` averages each week. The period codes are standard: `"D"` for day, `"W"` for week, `"M"` for month, `"Q"` for quarter, `"Y"` for year, `"h"` for hour. `resample` is groupby for time — it splits the data into bins defined by the period, applies an aggregation to each bin, and returns one row per bin.
+
+`rolling` computes a moving window. `df["sales"].rolling(7).mean()` gives the 7-day moving average. The first 6 values are `NaN` because the window is not yet full; `min_periods=1` fills them with partial-window results. `rolling("7D")` uses a time-based window instead of a count-based one, which handles irregular timestamps correctly — a 7-day window on data with gaps includes only the days that exist, rather than exactly 7 rows.
+
+`shift` moves the data forward or backward in time. `df["prev_day"] = df["sales"].shift(1)` gives each row the previous day's sales. `df["change"] = df["sales"] - df["sales"].shift(1)` computes the daily change. `df["pct_change"] = df["sales"].pct_change()` does the same as a percentage. Shift is how you create lagged features for time series models.
+
+Slicing by date is natural with a `DatetimeIndex`. `df["2024-03"]` selects all of March 2024. `df["2024-03":"2024-06"]` selects March through June. `df.loc["2024-03-15"]` selects a single day. This partial-string indexing is one of the main reasons to put dates in the index rather than a column.
+
+`pd.to_datetime` converts strings, integers, and mixed formats to datetime objects. `pd.to_datetime(df["date"], format="%Y-%m-%d")` is explicit and fast. `pd.to_datetime(df["date"])` guesses the format, which is slower and occasionally wrong — `"01-02-2024"` could be January 2nd or February 1st depending on locale. Specifying `format=` avoids the ambiguity.
+
+`dt` accessor methods work on datetime columns (not the index). `df["date"].dt.month` extracts the month. `df["date"].dt.dayofweek` gives 0 for Monday through 6 for Sunday. `df["date"].dt.strftime("%B %Y")` formats dates as strings like "March 2024". These are the tools for creating categorical features from timestamps.
+
+Time zones are handled with `tz_localize` and `tz_convert`. `df.index = df.index.tz_localize("UTC")` stamps the index as UTC. `df.index.tz_convert("Asia/Kolkata")` converts to IST. A `DatetimeIndex` without a timezone is "naive" — it has no timezone information, and comparing it with a timezone-aware index raises. Decide on a timezone convention early and apply it consistently.
+
 
 ## A DatetimeIndex is the prerequisite
 
