@@ -5,6 +5,14 @@ intro: A language model never sees text. It sees numbers &mdash; and the transfo
 
 Tokenization splits the string into subword pieces, and each piece is looked up in the vocabulary to get an integer ID. That is the model's entire input: a list of integers. Nothing about the <em>meaning</em> of a word has entered yet &mdash; ID 4021 is no closer to ID 4022 than to ID 9. The IDs are arbitrary addresses, not measurements.
 
+The embedding layer converts each ID into a dense vector of learned real numbers. Words used in similar contexts end up with similar vectors, so meaning enters here. Position is added next — either as sinusoidal encodings or as learned position embeddings — because self-attention treats its input as a set and would otherwise be blind to word order.
+
+The transformer layers are the core of the model. Each layer applies self-attention (every token looks at every other token to decide what information to incorporate) followed by a feed-forward network (two linear layers with a nonlinearity). A typical LLM stacks 32 to 96 of these layers. At each layer the representations are refined: early layers learn syntax and local patterns, middle layers learn semantic relationships, and later layers learn task-specific features.
+
+The output layer projects the final hidden state of each position back to the vocabulary size, producing a score (logit) for every token in the vocabulary. Softmax converts those logits into a probability distribution, and the model samples or takes the argmax to produce the next token. This process repeats token by token — each generated token is appended to the input and the model runs again — which is why generation is called autoregressive and why it is slower than encoding.
+
+The entire pipeline — tokenise, embed, add position, transform through N layers, project, sample — is what happens every time the model generates a single token. Understanding it explains why context length matters (attention is quadratic in sequence length), why the first token is slow (the full input must be encoded) and why subsequent tokens are faster (the KV cache stores the attention keys and values from previous positions).
+
 ## Stage 4: Embeddings Give IDs Meaning
 
 Each ID indexes into a giant lookup table, pulling out a learned vector of <span class="mono-font">d</span> numbers. <em>These vectors are where meaning lives.</em> Words used in similar contexts end up with similar vectors, and this table is trained along with everything else.

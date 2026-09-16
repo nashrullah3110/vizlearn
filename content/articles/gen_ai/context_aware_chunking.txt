@@ -7,6 +7,14 @@ Prose is written to be read in order, so it leans on everything before it: "it",
 
 Two consequences. The generator cannot answer from the chunk because it does not know what "it" is. And retrieval never surfaces the chunk in the first place, because the embedding is of text that does not contain the words a user would search for.
 
+The fix is to add context that the prose assumes. The cheapest approach is prepending the document title and heading path to each chunk before embedding — deterministic, no model call, and usually the largest single improvement. A chunk from "Authentication > OAuth2 > Token Refresh" that opens with "This process repeats every hour" becomes far more retrievable when its heading trail is prepended.
+
+A more powerful approach is generated context: an LLM writes a sentence situating the chunk within the document, and that sentence is prepended before embedding. Anthropic's contextual retrieval paper showed this improves retrieval precision significantly. The cost is one model call per chunk at indexing time, which prompt caching over the shared document makes affordable for most corpus sizes.
+
+Neighbour context stores the previous and next chunks alongside each chunk for generation but does not embed them. The retrieval model still sees only the target chunk (keeping the embedding focused), but the generator gets a wider window. This is the idea behind the parent-document retriever: retrieve the small, precise chunk but return the larger parent to the model.
+
+The trade-off in all three approaches is dilution. Prepending 200 tokens of context to a 300-token chunk means the embedding is partly about the context, so chunks from the same section start looking alike to the retriever. The window between "too little context" and "too much" is narrow and corpus-dependent. Measuring retrieval recall on a held-out set is the only reliable way to tune it.
+
 ## What gets added
 
 <p><strong>Cheap and free:</strong> document title and heading path, prepended. Deterministic, no model call, and usually the largest single improvement.</p>

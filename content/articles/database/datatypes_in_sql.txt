@@ -5,6 +5,16 @@ intro: Choosing a type decides what values are legal, how much disk they consume
 
 A <strong>datatype</strong> declares what a column may contain. The database uses it to reject invalid data, to decide how many bytes each value occupies, and to choose how comparisons and arithmetic behave. Get it wrong and you pay in storage, in speed, or &mdash; worst &mdash; in silently incorrect numbers.
 
+The major families are integers (SMALLINT, INT, BIGINT), exact decimals (DECIMAL/NUMERIC), floating point (FLOAT, DOUBLE), strings (CHAR, VARCHAR, TEXT), dates and times (DATE, TIMESTAMP, INTERVAL), and binary (BLOB, BYTEA). Each family has trade-offs in storage size, precision and query performance.
+
+The most common mistake is storing money in FLOAT. Binary floating point cannot represent 0.1 exactly, so adding 0.10 + 0.20 does not produce 0.30 — it produces a value that fails an equality check. DECIMAL(10,2) stores the digits themselves and is exact, which is why every financial schema uses it.
+
+The second most common mistake is choosing INT for a primary key on a table that will grow. INT overflows at about 2.1 billion rows, and several well-known services have had emergency outages when a busy id column hit that ceiling. BIGINT for the primary key is cheap insurance on any table with unpredictable growth.
+
+String types differ in how they store and pad data. CHAR(n) is fixed-width and pads with spaces; VARCHAR(n) stores only the characters present plus a length byte; TEXT has no declared limit. For most columns VARCHAR is the right choice. CHAR is useful only for codes with a guaranteed fixed length (country codes, currency codes).
+
+Choosing the right type is choosing the right contract. The database enforces it on every insert and update, which means a type error surfaces as a constraint violation at write time rather than a wrong answer at query time.
+
 ## Integers: pick the smallest that fits
 
 `SMALLINT` holds &plusmn;32,767 in 2 bytes. `INT` holds about &plusmn;2.1 billion in 4. `BIGINT` holds roughly &plusmn;9.2 quintillion in 8.

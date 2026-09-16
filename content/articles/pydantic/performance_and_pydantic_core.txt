@@ -12,6 +12,11 @@ Almost everything about v2's performance follows from that split. Validation is 
 
 It also explains details you will have noticed. Error `type` codes look like machine identifiers because they come from the core. `model_validate_json` beats parsing separately because the core parses and validates in one pass. And there is a compiled wheel per platform, because there is compiled code in there.
 
+Three habits account for most of the performance difference between fast and slow pydantic usage. First, use `model_validate_json` instead of parsing JSON separately and then passing a dict — the core parses and validates in a single pass through the bytes, skipping the intermediate Python dict entirely. Second, pass data that is already the right type when possible — validating an `int` that is already an `int` costs almost nothing, while coercing a string to an int costs a parse. Third, avoid re-creating models in tight loops when a single bulk validation with `TypeAdapter` or a list field would do.
+
+The compiled core also means that custom validators written in Python are the bottleneck. A `@field_validator` that does a regex match or a database lookup runs at Python speed inside a Rust loop, and the cost of crossing the boundary adds up. Keep validators simple, and push heavy validation (network calls, file I/O) outside the model.
+
+Serialisation follows the same split. `model_dump()` produces a Python dict using Python code. `model_dump_json()` produces a JSON byte string using the core, and on models with many fields it is measurably faster than `json.dumps(model_dump())`. The difference grows with model size and nesting depth, because the core avoids creating intermediate Python objects.
 
 ## Already-correct types are nearly free
 
