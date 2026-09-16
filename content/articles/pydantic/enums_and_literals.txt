@@ -7,6 +7,22 @@ intro: Two ways to say a field may only hold one of a fixed list, and when each 
 
 There are two good ways to close it, and one common bad one.
 
+`Literal["maths", "python", "dsa", "ml"]` lists the allowed values inline. The JSON Schema says `enum: ["maths", "python", "dsa", "ml"]`, and a generated client renders a dropdown or a union type. A value not in the list raises `ValidationError` naming every permitted option. This is the right tool when the set is small, stable, and has no associated behaviour.
+
+`enum.Enum` (or `enum.StrEnum`) defines the set as a class. Each member is a named constant: `Track.MATHS`, `Track.PYTHON`. The advantage over `Literal` is that the names can differ from the values — `Track.MACHINE_LEARNING = "ml"` — and methods can be attached to the enum. The disadvantage is more code: a class definition, imports, and the question of whether to store the member or its value.
+
+`StrEnum` (Python 3.11+) is an enum whose members are strings. `class Track(StrEnum): MATHS = "maths"` means `Track.MATHS == "maths"` is `True`, which avoids the common surprise where `Track.MATHS == "maths"` is `False` with a plain `Enum`. For JSON APIs, `StrEnum` is almost always what you want, because the wire value is a string and the comparison should work without `.value`.
+
+`use_enum_values=True` in the model config stores the value (`"maths"`) instead of the member (`Track.MATHS`). Without it, `model.track` is an enum member, and `model.track == "maths"` is `False` unless the enum is a `StrEnum`. With it, `model.track` is a plain string. The trade-off: you lose the type narrowing that enum membership provides.
+
+`Literal` composes with `Union`. `Literal["active", "archived"]` is one set; `Literal["draft"]` is another; `Union[Literal["active", "archived"], Literal["draft"]]` is equivalent to `Literal["active", "archived", "draft"]`. This is useful when different modules define their own allowed values and a combined type accepts all of them.
+
+The common bad way to close the set is a validator that checks `if value not in ["a", "b", "c"]: raise ValueError(...)`. It works, but the allowed values do not appear in the JSON Schema, so no generated client or documentation tool knows what the options are. `Literal` and `Enum` both produce a schema that names the options; a validator does not.
+
+The migration path from `Literal` to `Enum` is straightforward: define the enum with the same values, replace the `Literal` annotation with the enum class, and existing data validates unchanged because the wire values are the same. The reverse (enum to `Literal`) is also clean, since `Literal` accepts the same string values the enum's members had.
+
+For sets that change at runtime — loaded from a database, a config file, or an API — neither `Literal` nor `Enum` is correct. Both are defined at class-creation time. A dynamic set needs a validator that queries the current allowed values, with the trade-off that the JSON Schema cannot list options it does not know at generation time.
+
 
 ## Literal is the smallest way to say it
 

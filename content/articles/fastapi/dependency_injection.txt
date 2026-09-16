@@ -15,6 +15,18 @@ def list_modules(page: dict = Depends(pagination)):
 
 There is no registry, no container, no configuration and no base class. A dependency is a function, and declaring one is a default value in a signature. That simplicity is why the feature is worth learning properly &mdash; it is much smaller than "dependency injection" usually implies.
 
+A dependency receives the same things a handler does: path parameters, query parameters, headers, cookies, and other dependencies. FastAPI resolves the dependency's signature just like a handler's, so `def pagination(limit: int = 10, offset: int = 0)` extracts `limit` and `offset` from the query string automatically.
+
+Dependencies can depend on other dependencies. `def current_user(token: str = Depends(get_token))` and then `def admin_only(user: User = Depends(current_user))` builds a chain that FastAPI resolves from the bottom up. The handler declares `admin_only` and gets a verified admin user; the two intermediate steps run invisibly.
+
+Shared dependencies are called once per request. If two parameters both declare `Depends(get_db)`, the database session is created once and passed to both. `use_cache=False` on `Depends` overrides this and calls the function again, which is rarely what you want — but it exists for cases where each caller needs a fresh instance.
+
+`yield` in a dependency turns it into a setup-and-teardown pair. Everything before the `yield` runs before the handler; everything after runs when the response is done. This is how database sessions are opened and closed, temporary files are created and cleaned up, and locks are acquired and released — all without the handler knowing about the lifecycle.
+
+Router-level dependencies apply to every route on a router. `APIRouter(dependencies=[Depends(verify_token)])` protects every endpoint in that router without each one declaring the dependency individually. A route added to the router next year inherits the protection automatically.
+
+The dependency system replaces what other frameworks do with middleware, decorators, base classes, and global state. Authentication, database connections, pagination, rate limiting, feature flags, and request logging are all dependencies — functions that return a value and optionally clean up after themselves. The handler's signature is a complete list of what it needs, readable without opening another file.
+
 
 ## A dependency is just a function
 

@@ -15,6 +15,35 @@ Everything before the `yield` runs before the handler. The yielded value is what
 
 It is a generator, and it behaves like a context manager &mdash; which is exactly the point, because "acquire, use, release" is what a database session, a file handle, a lock or a temporary directory all need.
 
+The `try/finally` is not optional. Without it, an exception in the handler skips the cleanup. A database session opened in the `yield` dependency and not closed in a `finally` leaks a connection. After enough leaked connections, the pool is exhausted and every request hangs.
+
+The most common pattern is a database session that commits on success and rolls back on failure:
+
+```python
+def get_session():
+    db = Session()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+```
+
+The handler receives `db`, uses it, and never calls `commit`, `rollback`, or `close`. The dependency owns the lifecycle; the handler owns the logic.
+
+`async def` yield dependencies work the same way. An async dependency that opens an async database session yields it, and the cleanup after `yield` uses `await session.close()`. The `async` version runs on the event loop; the sync version runs in the threadpool. Both are valid, and which to use depends on whether the resource's driver is async.
+
+Nesting yield dependencies works. A yield dependency can depend on another yield dependency: `get_session` depends on `get_engine`, which also yields. FastAPI resolves them in dependency order — `get_engine` first, then `get_session` — and cleans them up in reverse order after the response.
+
+The cleanup code runs after the response is produced but before it is sent to the client. This means an exception in the cleanup code produces a 500 error, not a silent failure. If the cleanup must not affect the response, catch and log the exception rather than letting it propagate.
+
+`contextmanager` from the standard library produces the same shape — a generator with `yield` inside `try/finally`. FastAPI recognises both `contextmanager`-decorated functions and bare generators, so existing context managers can be used as dependencies without modification.
+
+Yield dependencies replace middleware for request-scoped resources. Middleware runs for every request; a dependency runs only for endpoints that declare it. The dependency is also visible in the function signature, which makes the handler's requirements explicit rather than hidden in middleware registration order.
+
 
 ## yield splits it in two
 

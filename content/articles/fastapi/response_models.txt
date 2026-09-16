@@ -9,6 +9,20 @@ That is convenient and it is how data leaks. A handler that returns a database r
 
 The failure mode is quiet and it compounds. A column added to a table six months later silently starts appearing in an API response, because the endpoint was never told what it was allowed to send.
 
+`response_model=ModuleOut` on the decorator is the fix. It declares exactly which fields leave the endpoint. FastAPI filters the handler's return value through the model, drops anything not in it, and validates the output. A `password_hash` field on the database row never reaches the response, because `ModuleOut` does not include it.
+
+The response model also generates the response schema in the OpenAPI document. A generated client knows the exact shape of a successful response: `{id: number, title: string, minutes: number}`. Without a response model, the schema says `object` — which is the same as saying nothing.
+
+Separate input and output models are the standard pattern. `ModuleIn` defines what the client sends (title, minutes). `ModuleOut` defines what the server returns (id, title, minutes, created_at). They share fields but are not the same class, because the input does not have an `id` (the server assigns it) and the output does not accept writes to `created_at`.
+
+`response_model_exclude_unset=True` omits fields the handler did not set. If a model has `notes: str | None = None` and the handler did not include `notes`, the response omits the key entirely rather than sending `"notes": null`. This is useful for PATCH endpoints where the response should reflect only the fields that were actually changed.
+
+`response_model_include={"id", "title"}` and `response_model_exclude={"internal_notes"}` filter fields without a separate model class. They are quick fixes but brittle — a renamed field silently stops being filtered. A dedicated output model is more work up front and does not break on rename.
+
+`List[ModuleOut]` as a response model works for list endpoints. `@app.get("/modules", response_model=List[ModuleOut])` validates every item in the list and documents the response as an array of `ModuleOut` objects. The schema is precise enough for a generated client to return a typed array.
+
+The response model validates the output, which means a handler that returns data not matching the model gets a 500 error — a server-side validation failure. This is caught during development, not in production, because the model enforces the contract in both directions: the input model protects the server from bad client data, and the output model protects the client from bad server data.
+
 
 ## Without one, whatever you return is sent
 

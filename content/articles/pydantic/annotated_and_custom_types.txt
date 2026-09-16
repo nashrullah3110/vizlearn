@@ -7,6 +7,22 @@ You write a slug field with a pattern. Then another model needs a slug, so the p
 
 This is the most ordinary form of drift there is, and it does not need a clever solution &mdash; it needs the rule to exist once.
 
+`Annotated[str, Field(pattern=r"^[a-z0-9_]+$")]` moves the constraint into the type. Assign it to a name — `Slug = Annotated[str, Field(pattern=r"^[a-z0-9_]+$")]` — and every model that uses `slug: Slug` gets the same constraint. Changing the pattern in one place changes it everywhere.
+
+`Annotated` combines a base type with one or more metadata entries. `Annotated[int, Field(gt=0, le=180)]` is an integer between 1 and 180. `Annotated[str, Field(min_length=1, max_length=255)]` is a non-empty string under 256 characters. The base type comes first; the metadata follows.
+
+Multiple metadata entries stack. `Annotated[str, Field(min_length=1), Field(pattern=r"^[a-z]+$")]` applies both constraints. In practice, a single `Field(...)` with multiple arguments is clearer, but separate entries are useful when constraints come from different sources — a length limit from the database schema and a pattern from a business rule.
+
+Custom types go beyond what `Field` can express. `BeforeValidator(func)` runs a function before Pydantic's own validation. `AfterValidator(func)` runs one after. `PlainValidator(func)` replaces Pydantic's validation entirely. All three are metadata entries in `Annotated`, so they compose with `Field` constraints: `Annotated[str, AfterValidator(str.lower), Field(min_length=1)]` lowercases first, then checks length.
+
+`BeforeValidator` is for normalisation: stripping whitespace, lowercasing, converting a string to a number. `AfterValidator` is for validation that depends on the Pydantic-validated value: checking that a URL is reachable, that a slug does not collide with a reserved word, or that a date is in the future.
+
+A named `Annotated` type is reusable across models, function signatures, and `TypeAdapter`. `Minutes = Annotated[int, Field(gt=0, le=180)]` works in a Pydantic model, in a FastAPI query parameter, and in `TypeAdapter(Minutes).validate_python(45)`. The constraint travels with the type, not with the model.
+
+`__get_pydantic_core_schema__` on a class defines custom validation at the lowest level. A class with this method can be used as a type annotation — `class Slug(str)` with a custom schema — and Pydantic calls its validation logic. This is how libraries like `pydantic-extra-types` provide types for phone numbers, colours, and country codes: each is a class that validates on construction.
+
+The practical rule: use `Annotated` with `Field` for constraints that `Field` supports (ranges, patterns, lengths). Use `Annotated` with validators for constraints that need a function. Use a custom class only when the type needs methods or when the validation logic is complex enough to deserve its own test suite.
+
 
 ## The same rule, written twice
 

@@ -13,6 +13,22 @@ intro: The escape hatch, what it costs, and the form that usually replaces it.
 
 They look interchangeable in small examples and are not, and the differences show up in both speed and behaviour with missing values.
 
+The speed difference is the first thing worth knowing. `Series.map` with a dict is fast — it is a hash lookup, implemented in C. `Series.apply` with a Python function is slow — it calls Python on every element, one at a time, with no vectorisation. On a million-row Series, the difference is 10x or more.
+
+The alternative to both is a vectorised operation. `df["price"] * 1.1` is faster than `df["price"].apply(lambda x: x * 1.1)` because the multiplication happens in C across the whole array. The rule is: if the operation can be expressed as array arithmetic, string methods (`.str.`), or datetime methods (`.dt.`), do not use `apply`.
+
+`Series.map` with a function works like `apply` but is slightly more restrictive: it does not pass keyword arguments, it does not accept `result_type`, and it is not designed for functions that return multiple values. For simple element-wise transformations — lowercasing, rounding, formatting — `map` and `apply` produce the same result.
+
+`Series.map` with a dict replaces values by lookup. Keys not found in the dict become `NaN` (unlike Python's dict, which would raise `KeyError`). `na_action="ignore"` skips `NaN` values instead of passing them to the function, which avoids errors when the function cannot handle `NaN`.
+
+`DataFrame.apply(func, axis=0)` calls `func` once per column, passing each column as a Series. `axis=1` calls `func` once per row. The row-wise form is the slow one — it is a Python loop over every row — and it is the one people reach for when they should be using vectorised operations or `groupby.transform`.
+
+`DataFrame.map` (formerly `applymap`) calls a function on every individual cell. `df.map(lambda x: f"${x:,.2f}")` formats every number in the DataFrame as a currency string. It is the element-wise version for DataFrames, and it is as slow as any other Python-level loop.
+
+`result_type="expand"` on `DataFrame.apply` turns a function that returns a list or dict into multiple columns. Without it, the result is a Series of lists. With it, each list element becomes its own column. This is how you split a single column into several — though `str.split(expand=True)` is faster for the string case.
+
+The practical hierarchy: vectorised operations first, then `map` with a dict, then `apply` as a last resort. If `apply` is the right tool, the function should at least be pure — no side effects, no database calls, no I/O — because pandas makes no guarantees about evaluation order or caching.
+
 
 ## map replaces values from a dict
 

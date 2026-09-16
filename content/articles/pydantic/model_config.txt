@@ -15,6 +15,22 @@ In Pydantic v1 this was an inner `class Config`. That still works and is depreca
 
 There are a lot of settings. These are the ones that come up constantly.
 
+`extra="forbid"` rejects any key not declared as a field. The default, `extra="ignore"`, silently drops unknown keys — which hides typos. `extra="allow"` stores them in `model.model_extra` and includes them in the output. For request validation, `"forbid"` is usually right: a client sending `titl` instead of `title` should get an error, not a silent discard.
+
+`frozen=True` makes instances immutable. After construction, `module.title = "new"` raises `ValidationError`. This is the Pydantic equivalent of `dataclasses(frozen=True)` and serves the same purpose: preventing accidental mutation. Frozen models are also hashable, so they can be used as dict keys and set members.
+
+`str_strip_whitespace=True` strips leading and trailing whitespace from every `str` field. `str_to_lower=True` lowercases them. `str_min_length=1` rejects empty strings. These three together — strip, lower, and require at least one character — handle the most common string-cleaning tasks at the model level, before the handler sees the data.
+
+`populate_by_name=True` allows both the field name and its alias during validation. Without it, a field with `alias="publishedAt"` can only be set by `publishedAt`, not by `published_at`. With it, both work, which is useful during migrations or when the same model serves both a camelCase API and Python-internal code.
+
+`strict=True` disables type coercion. In the default lax mode, `"42"` is accepted for an `int` field and coerced to `42`. In strict mode, only an actual `int` is accepted — a string raises. Per-field strict mode is also available with `Field(strict=True)`, which is more targeted when only some fields need strictness.
+
+`validate_default=True` validates default values at model creation time. Without it, a default of `"not-a-number"` on an `int` field is accepted silently — the error appears only when someone actually passes that default through validation. With it, the error appears when the class is defined, which is when you can fix it.
+
+`use_enum_values=True` stores the enum's `.value` instead of the enum member. `status: Status = Status.ACTIVE` is stored as `"active"` (the string value) rather than `Status.ACTIVE` (the enum object). This affects serialisation and comparison: without it, `model.status == "active"` is `False` because it compares an enum member to a string.
+
+Config is inherited. A base model with `extra="forbid"` passes that to every subclass. A subclass can override any setting by redeclaring `model_config`. This is how you establish project-wide defaults: one `StrictBase` with `strict=True` and `extra="forbid"`, and every model inherits both.
+
 
 ## Unknown keys are ignored by default
 

@@ -14,6 +14,22 @@ Stated once. Every endpoint that needs a user declares one parameter, and one th
 
 A section is protected by putting it on the router, so a route added next year inherits it rather than needing somebody to remember.
 
+A bearer token is a string in the `Authorization` header: `Bearer eyJhbG...`. The dependency reads the header, strips the prefix, decodes the token, and returns a user object. If anything fails — missing header, invalid token, expired token — it raises `HTTPException(401)` and the handler never runs.
+
+JWT (JSON Web Token) is the most common token format. It carries a payload — user id, roles, expiration — signed by a secret key. The dependency verifies the signature and checks the expiration. If both pass, the payload is trusted without a database lookup. If the token is expired, the client must re-authenticate.
+
+`OAuth2PasswordBearer(tokenUrl="/token")` is FastAPI's built-in security scheme. It adds a "lock" icon to the Swagger UI documentation and tells clients where to obtain a token. The dependency it produces reads the `Authorization` header and returns the raw token string; your code decodes and verifies it.
+
+Scopes restrict what a token can do. A token with scope `"modules:read"` can list modules but not create them. `Security(get_current_user, scopes=["modules:write"])` on an endpoint requires that specific scope, and a token without it receives a 403. Scopes are declared in `OAuth2PasswordBearer(scopes={"modules:read": "Read modules", "modules:write": "Create and modify modules"})`.
+
+Password hashing uses a one-way function: `bcrypt`, `argon2`, or `scrypt`. The dependency that creates a user hashes the password before storing it. The dependency that verifies a login hashes the candidate password and compares the hashes. The raw password is never stored and never compared as a string.
+
+CORS (Cross-Origin Resource Sharing) controls which frontends can call the API. `CORSMiddleware(allow_origins=["https://vizlearn.in"])` permits requests from that domain. `allow_origins=["*"]` permits any domain, which is appropriate for a public API and wrong for one that relies on cookies for authentication — a `*` origin with `allow_credentials=True` lets any site make authenticated requests on behalf of the user.
+
+Rate limiting is not built into FastAPI. The standard approach is a middleware or dependency that counts requests per client (by IP or by token) and raises `HTTPException(429)` when the limit is exceeded. `slowapi` wraps this pattern. Without rate limiting, a single client can exhaust the server — or, worse, an attacker can brute-force tokens by trying thousands per second with no pushback.
+
+HTTPS is not a FastAPI setting — it is a deployment setting. The application runs behind a reverse proxy (nginx, Caddy, a cloud load balancer) that terminates TLS. FastAPI sees plain HTTP; the proxy sees the client's HTTPS. `--forwarded-allow-ips` on Uvicorn tells it to trust the proxy's forwarded headers, which is how `request.client.host` shows the real client IP instead of the proxy's.
+
 
 ## Reading a bearer token
 

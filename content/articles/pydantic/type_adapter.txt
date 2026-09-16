@@ -22,6 +22,22 @@ lessons = TypeAdapter(List[Lesson])
 lessons.validate_python(rows)
 ```
 
+`TypeAdapter` accepts any type Pydantic can validate: `int`, `str`, `List[Module]`, `Dict[str, float]`, `Union[int, str]`, `Annotated[int, Field(gt=0)]`, or a full model class. Whatever you pass to the constructor becomes the validation target, with the same error messages and coercion rules as a model field.
+
+`.validate_python(data)` validates Python objects — dicts, lists, primitives. `.validate_json(raw_bytes)` parses JSON and validates in one step, skipping the intermediate Python dict. On a large list this is measurably faster because Pydantic's Rust core parses the JSON directly into the validated output.
+
+`.dump_python(obj)` and `.dump_json(obj)` serialise back. They respect the same `mode`, `exclude`, `by_alias` arguments as a model's `model_dump` and `model_dump_json`. For a `TypeAdapter(List[Module])`, `.dump_json(modules)` produces a JSON array with each module serialised according to its model's rules.
+
+`.json_schema()` generates a JSON Schema for the type, which is how FastAPI documents endpoints whose response is a bare list or dict rather than a model. `TypeAdapter(List[Module]).json_schema()` produces `{"type": "array", "items": {"$ref": "#/$defs/Module"}}` with the full `Module` schema in `$defs`.
+
+The performance advantage over a wrapper model is real but not the main point. The main point is honesty: the data is a list, the type says `List[Module]`, and there is no phantom `.items` attribute that every caller must unwrap. The code reflects the actual shape.
+
+Reuse the `TypeAdapter` instance. Creating one compiles the validator — the same compilation a model does at class-creation time. Creating a new `TypeAdapter(List[Module])` on every request recompiles every time. Assign it to a module-level variable and call `.validate_python()` or `.validate_json()` on that instance.
+
+`TypeAdapter` replaces several patterns from Pydantic v1: `parse_obj_as`, `schema_of`, and wrapper models for non-model types. If you see any of those in existing code, `TypeAdapter` is the v2 equivalent.
+
+`TypeAdapter` also supports `strict=True`. `TypeAdapter(int, config=ConfigDict(strict=True))` rejects `"42"` — only an actual `int` passes. This is useful when the input comes from a trusted internal source and coercion would hide a type error rather than fix a format issue.
+
 
 ## The wrapper model you do not need
 

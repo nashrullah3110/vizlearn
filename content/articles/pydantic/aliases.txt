@@ -10,6 +10,20 @@ intro: camelCase payloads, reserved words, legacy names, and nested shapes flatt
 
 **The name changed.** You are renaming a field and both spellings must work through a deprecation window.
 
+`alias="publishedAt"` on a field means the input JSON uses `publishedAt` while the Python attribute is `published_at`. The model accepts the alias during validation, stores the value under the Python name, and can output it under either name depending on `by_alias=True` in `.model_dump()` or `.model_dump_json()`.
+
+`validation_alias` and `serialization_alias` split the alias into two directions. `validation_alias="publishedAt"` accepts `publishedAt` on input but outputs `published_at`. `serialization_alias="publishedAt"` accepts `published_at` on input but outputs `publishedAt`. Using both on the same field gives complete control over the input and output key names independently.
+
+`AliasGenerator` on the model config converts every field name by a function. `alias_generator=to_camel` converts `published_at` to `publishedAt` for every field, without annotating each one. This is the standard approach for an API that consistently uses camelCase on the wire and snake_case in Python.
+
+`populate_by_name=True` in the model config allows both the alias and the field name during validation. Without it, `published_at=...` in Python code raises because only the alias `publishedAt` is accepted. With it, both work, which is convenient when the model is used both as an API boundary (where aliases matter) and internally (where Python names matter).
+
+`AliasPath` and `AliasChoices` handle nested and ambiguous inputs. `AliasPath("data", "attributes", "title")` reads the value from a nested JSON structure: `{"data": {"attributes": {"title": "Vectors"}}}`. `AliasChoices("name", "title")` accepts either key, which is useful when ingesting data from sources that cannot agree on a field name.
+
+`by_alias=True` on `.model_dump()` outputs the alias instead of the field name. Without it, the output uses Python names. `by_alias=True` on `.model_dump_json()` does the same for JSON output. This is the switch that controls whether the output matches the wire format or the Python format.
+
+The most common mistake is forgetting `populate_by_name=True` and then being surprised that `Module(published_at="2024-01-01")` raises. The alias replaces the field name for validation purposes, so without `populate_by_name`, the Python name is not accepted — only the alias is. This is technically correct (the alias is the input name) and practically annoying, which is why `populate_by_name=True` is one of the most commonly set config options.
+
 
 ## The wire says camelCase
 

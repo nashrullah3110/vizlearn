@@ -10,6 +10,21 @@ Which axis you are joining along decides which axis does the *aligning*, and tha
 
 Stacking rows aligns the **columns** by name. Stacking columns aligns the **index** by label.
 
+`join="outer"` (the default) keeps all columns, filling missing values with `NaN`. `join="inner"` keeps only the columns that appear in every frame. The outer join is forgiving — nothing is lost — but it silently introduces `NaN` in columns that existed in one frame but not another. The inner join is strict — no `NaN`, but columns are quietly dropped.
+
+`ignore_index=True` resets the index to 0, 1, 2, ... after stacking. Without it, the result keeps the original indices, which usually means duplicates: two rows labelled 0, two labelled 1. Those duplicates are not an error — pandas allows them — but they break `.loc[0]`, which then returns two rows instead of one.
+
+`keys=["a", "b"]` adds a level to the index, labelling which frame each row came from. The result has a MultiIndex: the first level is the key, the second is the original index. This is how you stack monthly files and still know which month each row belongs to.
+
+`verify_integrity=True` raises if the result has duplicate index values. It is a safety check: if you expect the indices to be unique after stacking, this catches the case where they are not, rather than leaving it as a silent data error downstream.
+
+`pd.concat` accepts any number of DataFrames in a list. `pd.concat([jan, feb, mar, apr])` stacks four frames at once. There is no two-at-a-time limit, and passing a list of hundreds of small frames is a common pattern for reading a directory of CSV files.
+
+The difference between `concat` and `merge` is the question being answered. `concat` asks "put these frames next to each other or on top of each other." `merge` asks "match rows by a shared key." If two frames have the same columns and each row is independent, `concat`. If two frames share a key column and you want to join on it, `merge`.
+
+Column-stacking (`axis=1`) is the other direction: the result is wider, and alignment happens on the index rather than on column names. `pd.concat([names, scores], axis=1)` puts the two frames side by side, matching rows by their index values. Rows whose index appears in one frame but not the other get `NaN` in the missing columns.
+
+
 ## Stacking rows
 
 The default joins along the index, which for row-stacking means appending.

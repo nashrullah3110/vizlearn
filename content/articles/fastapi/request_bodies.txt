@@ -15,6 +15,20 @@ By the time the function runs, `module.minutes` is an integer &mdash; even if th
 
 This is also the moment where the whole Pydantic track becomes directly applicable. Field constraints, nested models, validators, aliases, enums, `Literal`, strict mode: all of it works here, unchanged, because this *is* Pydantic.
 
+Multiple model parameters embed each key under its own name. `def create(module: ModuleIn, author: AuthorIn)` expects `{"module": {...}, "author": {...}}` — FastAPI wraps both into one JSON body with the parameter names as keys. `Body(embed=True)` on a single model does the same wrapping: `{"module": {...}}` instead of the model's fields at the top level.
+
+`Field(alias="publishedAt")` works the same in a request body as it does in standalone Pydantic. The client sends camelCase, the handler receives snake_case. `model_config = ConfigDict(populate_by_name=True)` allows both spellings, which is useful during a migration.
+
+Nested models validate recursively. A `Module` containing `lessons: List[Lesson]` validates each lesson inside the list, and a failure in the third lesson's title produces an error path like `body → lessons → 2 → title` — precise enough to tell the caller exactly what to fix.
+
+`Field(examples=[...])` and `model_config = ConfigDict(json_schema_extra={"examples": [...]})` pre-fill the Swagger UI form with a working request. A developer pressing "Try it out" gets a valid payload instead of an empty box, which is the difference between a first attempt that works and three 422 errors before giving up.
+
+Optional fields with defaults — `minutes: int = 10` — are not required in the request body. The client can omit them and the handler receives the default. `None` as a default makes the field nullable: `notes: str | None = None` accepts either a string or `null`.
+
+The response to a validation failure is a 422 with a body listing every error. Each error names the field, the type of failure, and a human-readable message. FastAPI produces this automatically from the Pydantic `ValidationError`, and the structure is part of the OpenAPI spec — a generated client can type it.
+
+Raw bytes, form data, and file uploads are not model parameters. `Body(media_type="text/plain")` accepts a plain-text body. `Form(...)` reads `application/x-www-form-urlencoded` fields. `UploadFile` handles multipart file uploads. These use different annotations because they come from different content types, not because the validation machinery is different.
+
 
 ## A model parameter is the body
 

@@ -15,6 +15,22 @@ Almost nobody constructs a MultiIndex deliberately. It appears as the result of 
 
 So the practical question is rarely "should I build one" and almost always "I have one, now what".
 
+`.reset_index()` flattens it back to columns. `df.reset_index()` moves every index level into a regular column and replaces the index with 0, 1, 2, .... This is the most common operation on a MultiIndex, because many downstream operations — merging, plotting, exporting to CSV — work better with a flat index.
+
+`.xs("value", level="level_name")` selects a cross-section: all rows where one level has a specific value. `df.xs("Paris", level="city")` returns the subset for Paris with the city level removed. This is cleaner than the `.loc` form for a single-level selection, and it works on columns as well as the index.
+
+`.loc` with a tuple selects specific combinations. `df.loc[("Paris", 2024)]` selects the row where city is Paris and year is 2024. `df.loc["Paris"]` selects all rows for Paris — every year. The tuple is how you address multiple levels; a plain value addresses only the outermost one.
+
+`.get_level_values(level)` extracts one level as an array. `df.index.get_level_values("city")` returns every city label, with duplicates, in index order. This is useful for filtering, grouping, or just inspecting what is in a level without flattening the whole index.
+
+`.droplevel(level)` removes one level. `df.columns.droplevel(0)` removes the outermost column level, which is common after a multi-statistic aggregation: `df.groupby("city").agg({"sales": ["sum", "mean"]})` gives two-level columns, and dropping the outer level (`"sales"`) leaves just `"sum"` and `"mean"`.
+
+`stack()` moves a column level into the index; `unstack()` moves an index level into the columns. They are inverses, and they are how you pivot a MultiIndex between long and wide format without calling `pivot_table`. `unstack("year")` turns the year level into columns, one per year.
+
+`.sort_index()` sorts the MultiIndex, which is important because many operations — `.loc` slicing, `xs`, and any range selection — require a sorted index to work correctly. An unsorted MultiIndex raises `UnsortedIndexError` or returns wrong results on slice operations. After any operation that might reorder the index, call `.sort_index()`.
+
+The strong argument against keeping a MultiIndex is readability. Code that uses `.loc[("Paris", 2024, "Q3")]` is harder to read and harder to debug than code that uses `df[(df.city == "Paris") & (df.year == 2024) & (df.quarter == "Q3")]`. For analysis that will be read by others, flattening with `reset_index()` and using column-based filtering is usually clearer.
+
 
 ## Where it comes from
 

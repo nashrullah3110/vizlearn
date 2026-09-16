@@ -18,6 +18,22 @@ class LessonPage(BaseModel):
 
 Identical apart from one type. A third resource means a third copy, and a change to pagination means editing all of them &mdash; or, more realistically, editing most of them.
 
+`Generic[T]` lets you write the envelope once: `class Page(BaseModel, Generic[T])` with `items: List[T]`. Then `Page[Module]`, `Page[Lesson]`, `Page[Track]` each produce a concrete model with the right `items` type, full validation, and a correct JSON Schema — without copying a single line.
+
+The generic is parameterised at the type level, not at runtime. `Page[Module]` creates a distinct class whose schema says `items` is an array of `Module` objects. `Page[Lesson]` creates another whose schema says `items` is an array of `Lesson` objects. Each is a real model: you can use it as a `response_model`, validate against it, and generate a typed client from its schema. There is no `Any` anywhere.
+
+Nesting works the way you would expect. A `Page[Module]` where `Module` itself contains `List[Lesson]` produces a schema that nests `Lesson` inside `Module` inside `Page`. The generic parameter flows through the entire tree.
+
+Default values and constraints on the generic model's own fields work normally. `total: int = Field(ge=0)` on the generic model applies to every parameterisation. `items: List[T] = []` gives every parameterisation an empty default.
+
+Multiple type parameters are supported. `class Pair(BaseModel, Generic[K, V])` with `key: K` and `value: V` parameterises two fields independently. `Pair[str, int]` validates string keys and integer values; `Pair[UUID, Module]` validates UUIDs and modules.
+
+`TypeVar` bounds constrain what types can fill the parameter. `T = TypeVar("T", bound=BaseModel)` means only `BaseModel` subclasses are allowed. `Page[int]` would be rejected at type-checking time — and at runtime, Pydantic validates using the bound when no specific type is provided.
+
+The practical ceiling is that a generic model's type parameter must be known at class-creation time, not at runtime from a variable. `Page[some_type]` where `some_type` comes from a config file does not work the way you would expect. If the type is truly dynamic, a generic is the wrong tool — a discriminated union or a dict is more honest.
+
+The alternative — writing one model per resource — is not wrong for two or three resources. The generic starts earning its complexity cost at about four, where the risk of divergence between copies outweighs the indirection of a type parameter.
+
 
 ## The duplication a generic removes
 

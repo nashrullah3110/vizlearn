@@ -17,6 +17,20 @@ def admin_only(user: dict = Depends(current_user)):
 
 There is no new mechanism here. FastAPI walks the tree from the handler's signature down, calls each function in dependency order, and passes the results up.
 
+The tree can be arbitrarily deep. `admin_only` depends on `current_user`, which depends on `get_token`, which depends on the `Authorization` header. The handler declares one parameter — `admin: User = Depends(admin_only)` — and three functions run before it. Each layer adds one check or one transformation, and none of them knows about the layers above or below.
+
+Shared nodes are called once. If `current_user` appears in two branches of the tree — one endpoint parameter needs it for authorisation, another for logging — FastAPI calls `get_token` once, calls `current_user` once with the result, and passes the same user object to both. `use_cache=False` overrides this and calls the dependency again, which is useful when each consumer needs a fresh instance.
+
+The resolution order is bottom-up: leaves first, then their dependents. `get_token` runs before `current_user` because `current_user` depends on it. `current_user` runs before `admin_only` for the same reason. The handler runs last, after every dependency has returned.
+
+Yield dependencies in a sub-dependency tree clean up in reverse resolution order. The innermost dependency (the one that ran first) cleans up last. This is the same order a stack of context managers would use: the outermost manager exits first, the innermost last.
+
+Type annotations on the intermediate functions serve as documentation. `def current_user(tok: str = Depends(get_token)) -> User` says the dependency returns a `User`. A reader of the handler's signature — `user: User = Depends(current_user)` — knows the type without opening `current_user`.
+
+Error handling propagates naturally. If `get_token` raises `HTTPException(401)`, the entire chain stops — `current_user` never runs, `admin_only` never runs, the handler never runs. The 401 response reaches the client. Each dependency only needs to validate its own layer; failures at lower layers bubble up automatically.
+
+Overriding sub-dependencies in tests uses the same `app.dependency_overrides` dict. `app.dependency_overrides[get_token] = lambda: "test-token"` replaces the lowest level, and `current_user` runs with the fake token. This lets you test each layer independently: override `get_token` to test `current_user`'s logic, or override `current_user` to test `admin_only`'s logic.
+
 
 ## A dependency can declare its own
 
