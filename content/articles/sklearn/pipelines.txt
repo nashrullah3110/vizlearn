@@ -9,6 +9,13 @@ That last sentence is the important one. A pipeline has `fit`, `predict` and `sc
 
 What it does internally is straightforward. `fit` calls `fit_transform` on each step in turn, passing the output of one to the next, and `fit` on the final estimator. `predict` calls only `transform` on each step, then `predict` on the last.
 
+The reason this matters is data leakage. Without a pipeline, the most common mistake is fitting a scaler on the full training set, then splitting into folds for cross-validation. The scaler has already seen the validation fold, so every score is optimistic. A pipeline prevents this structurally: `cross_val_score` calls `fit` on the pipeline, which fits the scaler only on the training fold. The validation fold is transformed but never fitted on. You cannot leak because the API does not offer a way to.
+
+The same protection applies to any step that learns from data. An imputer that fills missing values with the column mean must learn that mean from training data only. A text vectoriser that builds a vocabulary must build it from training data only. A target encoder that maps categories to means of the target variable must compute those means from training data only. Put each of these inside a pipeline and the boundary is enforced automatically.
+
+Pipelines also make deployment cleaner. A single `joblib.dump` saves every preprocessing step and the model in one file. Loading it back gives you an object that accepts raw input and returns predictions, with no separate scaler or encoder to misplace. That is the difference between a reproducible model and a collection of parts that worked together once.
+
+When a step needs to operate on only some columns, `ColumnTransformer` nests inside a pipeline. When you need to try multiple configurations, `GridSearchCV` wraps the pipeline and searches over step parameters using the syntax `stepname__param`.
 
 ## Two ways to build one
 

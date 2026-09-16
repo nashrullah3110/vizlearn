@@ -7,6 +7,14 @@ Fixed-size splitting is one line and cuts wherever it lands &mdash; mid-sentence
 
 Recursive splitting keeps the size limit and spends it on the best boundary available. Chunks vary in length, which is fine: a chunk is a unit of meaning, not a unit of storage.
 
+The algorithm is simple. Start with the first separator in the list and split the text on it. If every resulting piece is within the size limit, stop. If any piece is still too large, split it again using the next separator in the list. Continue descending until every piece fits, or you reach the last separator &mdash; usually the empty string, which splits character by character as a last resort.
+
+The effect is that a paragraph break always wins over a line break, a line break always wins over a sentence boundary, and a sentence boundary always wins over a word boundary. The chunk prefers the largest coherent unit that fits within the limit. That preference is the difference between a chunk that starts and ends at a thought boundary and one that cuts mid-sentence.
+
+LangChain's `RecursiveCharacterTextSplitter` is the most widely used implementation. It takes `chunk_size` (the maximum number of characters per chunk), `chunk_overlap` (how many characters to repeat between adjacent chunks), and `separators` (the ordered list of split boundaries). The defaults work for English prose but not for code, structured documents, or non-English text. Customising the separator list is the single highest-leverage tuning knob in a RAG chunking pipeline.
+
+The recursive approach does not understand semantics. It does not know that two sentences are about the same idea, and it does not know that a code block should stay together. It optimises for boundary quality within a size budget, which is a good heuristic but not a guarantee of semantic coherence. For that, you need semantic chunking, which embeds sentences and cuts where the similarity drops.
+
 ## The separator list is the whole configuration
 
 The default is roughly <code>["\n\n", "\n", ". ", " ", ""]</code> &mdash; paragraph, line, sentence, word, character. It descends only when a piece still exceeds the limit, so the last entry fires only on text with no whitespace at all.

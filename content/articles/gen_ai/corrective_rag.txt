@@ -7,6 +7,14 @@ A vector search returns the k nearest chunks whether or not any of them is relev
 
 That is the most damaging RAG failure in production, because the answer is fluent, sourced-looking and wrong. The user has no signal that the retrieval missed.
 
+Corrective RAG adds a checkpoint between retrieval and generation. Before the retrieved documents reach the language model, a grading step evaluates whether they actually answer the question. If nothing is relevant, the system takes a different path instead of generating from noise.
+
+The idea comes from a 2024 paper by Yan et al. that formalised what production teams were already doing with ad-hoc relevance filters. The contribution is not the grading itself but the three-way branching: proceed, correct, or fall back. Most naive RAG pipelines treat retrieval as a black box and pass everything through. CRAG treats retrieval as a hypothesis that can be wrong, and builds the workflow around that assumption.
+
+The correction path is what gives the framework its name. When the grader says the retrieved set is irrelevant, a corrective action fires. That action might be a web search, a query to a different index, a reformulated query against the same index, or simply an honest refusal. The choice depends on your system and your tolerance for latency. What matters is that the system does not hallucinate from bad context.
+
+In practice, CRAG adds one inference call (the grader) and one branching decision to the pipeline. The latency cost is small. The accuracy gain on out-of-scope queries is large, because those are exactly the queries where vanilla RAG fails most confidently.
+
 ## The three verdicts
 
 A grader &mdash; a small model, a cross-encoder, or a similarity threshold &mdash; labels the retrieved set:

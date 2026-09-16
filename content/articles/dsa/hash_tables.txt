@@ -5,6 +5,14 @@ intro: Constant-time lookup by turning a key into an address &mdash; and what ha
 
 A <strong>hash table</strong> stores key&ndash;value pairs in an array. A <strong>hash function</strong> converts each key into an array index, so finding a key requires no searching at all &mdash; you compute where it must be and go straight there.
 
+That is the core trade-off: a hash table uses more memory than a sorted array or a tree, but it makes lookup, insertion and deletion O(1) on average. The "on average" matters. In the worst case, every key hashes to the same index, every operation degenerates to a linear scan, and the table is no faster than a list. Good hash functions and sensible load factors keep this from happening in practice.
+
+Python's `dict` and `set` are both hash tables. Every time you write `if key in my_dict` or `my_set.add(value)`, you are using a hash table. The constant-time behaviour is why dictionary lookup feels instant even on millions of keys, and why checking membership in a set is faster than scanning a list.
+
+The load factor is the ratio of stored items to available buckets. When it gets too high, collisions multiply and performance drops. Most implementations resize the table &mdash; allocate a larger array and rehash every key &mdash; when the load factor crosses a threshold. Python resizes at about two-thirds full. The resize is O(n) but happens rarely enough that the amortised cost per insertion stays O(1).
+
+Two strategies handle collisions. Chaining stores a linked list (or another container) at each bucket, so multiple keys at the same index coexist. Open addressing looks for the next empty slot in the array itself, following a probe sequence. Python uses open addressing. Both give O(1) amortised performance under reasonable load, and both degrade to O(n) if the table is too full or the hash function is too weak.
+
 ## What Makes a Good Hash Function
 
 - <strong>Deterministic</strong> &mdash; the same key must always give the same index, or you could never find anything again.

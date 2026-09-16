@@ -11,6 +11,17 @@ The obvious answer is a `@property`, and it is half right. A property computes f
 
 `@computed_field` closes the gap: the value is derived, and it appears in the output.
 
+Under the hood, a computed field is a `@property` that Pydantic knows about. You decorate a property with `@computed_field`, and Pydantic includes it in `model_dump()`, `model_dump_json()`, and the JSON Schema. The property's return type annotation becomes the field's type in the schema, which means API documentation and client code generators pick it up automatically.
+
+The value is computed on access, not stored. Every call to `model_dump()` runs the property, which means the result always reflects the current state of the model. If you change `first_name`, the `full_name` computed field returns the updated value immediately. There is no cached copy to invalidate.
+
+Computed fields cannot be set from input. They do not appear in the model's `__init__`, and passing them as keyword arguments raises a validation error. That asymmetry is the point: the value goes out but never comes in, so it cannot contradict the fields it derives from.
+
+You can combine computed fields with validators and serialisation aliases. A computed field can depend on other computed fields, though circular dependencies raise an error at class definition time rather than at runtime. The type annotation on the property controls validation of the computed value, so returning the wrong type from the property body is caught at serialisation time, not silently passed through.
+
+The alternative before Pydantic v2 was to override `dict()` or use a `root_validator` in `pre` mode to inject the field. Both were fragile and invisible to the schema. `@computed_field` replaces them with a single decorator that does the right thing by default.
+
+Computed fields work with both `BaseModel` and `@dataclass` in Pydantic v2.
 
 ## A property is invisible to serialisation
 
