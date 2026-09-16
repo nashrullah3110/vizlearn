@@ -12,6 +12,17 @@ An HTTP request has one body, and for an API there are three ways it is commonly
 
 FastAPI needs to be told which. A model parameter means JSON; `Form()` means one of the form encodings; `UploadFile` means a file part in a multipart body.
 
+`Form()` annotates a parameter to read it from form data instead of JSON. The parameter name must match the form field name. Multiple `Form()` parameters in the same function read multiple fields from the same form submission.
+
+`UploadFile` gives you a file-like object with `.filename`, `.content_type`, `.read()`, `.seek()` and `.close()`. It spools small files in memory and large files to disk automatically, so you do not need to manage temporary files yourself. `await file.read()` gets the bytes; for large files, read in chunks with a loop over `await file.read(8192)`.
+
+Mixing `Form()` and `UploadFile` in the same endpoint handles the common case of a form that submits both text fields and a file. The browser sends this as `multipart/form-data`, and FastAPI parses each part according to its annotation.
+
+You cannot mix `Form()` or `UploadFile` with a JSON body parameter in the same endpoint. The HTTP specification allows only one content type per request, and a form submission is not JSON. If you need structured metadata alongside a file, send the metadata as a `Form()` field containing a JSON string and parse it manually, or use a separate endpoint.
+
+`python-multipart` must be installed for form and file handling to work. It is not a FastAPI dependency by default, and the error message when it is missing names the package. Installing it once is the usual resolution for a first-time "form data requires python-multipart" error.
+
+For multiple file uploads, annotate the parameter as `list[UploadFile]` and use `<input type="file" multiple>` on the form. Each file arrives as a separate `UploadFile` in the list.
 
 ## Form() reads a form field
 

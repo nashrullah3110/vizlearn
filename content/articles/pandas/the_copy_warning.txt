@@ -15,6 +15,15 @@ The reason is that there are **two** operations here, not one.
 
 Historically pandas noticed this pattern and raised `SettingWithCopyWarning`. The warning is famous for being confusing: it appears where the code looks fine, it sometimes appears when nothing is wrong, and it sometimes fails to appear when something is. In current versions the assignment may simply do nothing, silently.
 
+The fix is `.loc`, which does both steps in one operation: `df.loc[df["age"] < 30, "age"] = 99`. There is no intermediate object, so the write always lands on the original frame. This is not a workaround; it is the intended API for conditional assignment.
+
+The warning disappeared in pandas 2.0 with copy-on-write (CoW), which is enabled by default in pandas 3.0. Under CoW, every indexing operation returns a new object that shares memory with the original until one of them is modified, at which point the modified one gets its own copy. That makes chained assignment impossible rather than silently broken: writing to a chained result modifies a copy, and the original is guaranteed to be untouched.
+
+Understanding the copy warning requires understanding views and copies. A slice like `df[0:5]` may return a view (same memory) or a copy (new memory), depending on the dtypes, the version of pandas, and whether the frame was itself a view. That unpredictability is the root cause: the user cannot tell which they got, so they cannot tell whether writing through it will reach the original.
+
+The `.copy()` method makes a deliberate copy, so `sub = df[df["age"] < 30].copy()` gives you an independent frame you can modify freely. Use it when you want a subset to work on without affecting the original. Use `.loc` when you want to modify the original through a condition.
+
+The pattern to avoid is any assignment where `df` appears more than once on the left side: `df[mask]["col"] = val` or `df.iloc[i]["col"] = val`. Both involve two lookups, and the second lookup may not reach the original. The safe patterns are `df.loc[mask, "col"] = val` and `df.iloc[i, df.columns.get_loc("col")] = val`.
 
 ## The assignment that does nothing
 

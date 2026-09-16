@@ -19,6 +19,17 @@ df.loc[adult & local & recent]
 
 Each name documents a condition, and each can be counted separately when the result is unexpectedly empty &mdash; which is how you find out which clause is doing the damage.
 
+The parenthesis rule catches everyone once. `df[(df["age"] >= 18) & (df["city"] == "pune")]` needs parentheses around each comparison because `&` has higher precedence than `>=` and `==` in Python. Without them, `df["age"] >= 18 & df["city"]` evaluates `18 & df["city"]` first, which is either an error or nonsense. The error message is unhelpful, which is why this rule is worth memorising.
+
+`&` is "and", `|` is "or", `~` is "not". These are bitwise operators repurposed for boolean Series. Python's `and`, `or` and `not` do not work on Series because pandas cannot reduce an entire column to a single boolean &mdash; hence the `ValueError: The truth value of a Series is ambiguous`.
+
+`.isin(values)` tests membership: `df[df["city"].isin(["pune", "delhi"])]` keeps rows where the city is in the list. It is cleaner than chaining `|` comparisons and handles long lists without clutter.
+
+`.between(low, high)` tests a range: `df[df["age"].between(18, 30)]` keeps rows where age is between 18 and 30, inclusive. It is equivalent to `(df["age"] >= 18) & (df["age"] <= 30)` but shorter and harder to get wrong.
+
+`.query("age >= 18 and city == 'pune'")` writes the filter as a string expression. It avoids the parenthesis problem because it parses the expression itself, and it reads more naturally for complex conditions. Variables from the surrounding scope are referenced with `@`: `.query("age >= @min_age")`.
+
+`.loc[mask]` is the explicit way to filter, and it allows assignment: `df.loc[mask, "status"] = "approved"` sets a column on the filtered rows. Bare `df[mask]` works for reading but not reliably for writing, which is the copy-warning pattern.
 
 ## A comparison gives a boolean Series
 

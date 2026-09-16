@@ -12,6 +12,17 @@ So the most useful thing here may simply be the ability to date a page.
 
 If a page uses the first set, treat everything in it as historical &mdash; not only the names, but the behaviour it describes.
 
+The method renames are the most visible change: `.dict()` became `.model_dump()`, `.json()` became `.model_dump_json()`, `.parse_obj()` became `.model_validate()`, `.schema()` became `.model_json_schema()`. The `model_` prefix avoids collisions with user-defined fields named `dict` or `json`, which was a real problem in v1.
+
+The configuration change is the most common source of silent breakage. `class Config: orm_mode = True` became `model_config = ConfigDict(from_attributes=True)`. The old `Config` inner class still works but is deprecated, and some settings changed names: `orm_mode` is now `from_attributes`, `allow_population_by_field_name` is `populate_by_name`, `anystr_strip_whitespace` is gone (use a validator).
+
+Validators changed syntax. `@validator("field")` became `@field_validator("field")`, and the function signature changed: v1 validators received `cls` and `v` plus keyword arguments for other fields; v2 validators receive `cls` and `v`, and access to other fields requires `@model_validator` instead. The `pre=True` argument became `mode="before"`.
+
+The strict mode behaviour changed. v1 was lenient by default and had no strict mode. v2 is lenient by default but supports `strict=True` on individual fields or on the whole model, which rejects coercion entirely: `"42"` is not accepted for an `int` field in strict mode.
+
+Error handling changed too. `ValidationError` in v2 carries richer structured data: each error has a `type` string for programmatic matching, an `input` field showing what was received, and a `ctx` dict with constraint details. Code that parsed the error message as a string to extract information should switch to `e.errors()` and read the structured fields instead.
+
+The `bump-pydantic` tool automates most renames. Run it on your codebase and it rewrites the obvious cases. The ones it cannot catch are behaviour changes that use the same syntax but do different things &mdash; particularly around `Optional` fields, which v2 no longer treats as having an implicit default of `None`.
 
 ## The method renames
 

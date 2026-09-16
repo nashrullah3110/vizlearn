@@ -6,6 +6,15 @@ Most people meet Pydantic through FastAPI, and often without realising they are 
 
 FastAPI has no validation layer of its own. It reads your annotations, hands the request body to a Pydantic model, converts the resulting `ValidationError` into a 422, and turns the generated JSON Schema into your documentation. That is the whole of it, and knowing where the line falls makes both easier to reason about.
 
+A route parameter annotated with a Pydantic model tells FastAPI to parse the request body as JSON, validate it against the model, and pass the validated instance to the function. If validation fails, FastAPI returns a 422 with the full list of errors &mdash; every broken field, not just the first one.
+
+The response model works in the other direction. `@app.get("/items/{id}", response_model=ItemOut)` tells FastAPI to validate and filter the return value through `ItemOut` before sending it. Fields not in `ItemOut` are stripped, which prevents accidentally leaking internal data like hashed passwords or database IDs.
+
+Separate input and output models are the standard pattern. `ItemIn` defines what the client sends (no `id`, no `created_at`). `ItemOut` defines what the client receives (with `id` and `created_at`). `ItemDB` defines what the database stores. Each model carries only the fields appropriate to its role, and Pydantic handles the conversion between them.
+
+The JSON Schema generated from the models appears at `/docs` (Swagger UI) and `/redoc` (ReDoc). Adding `Field(description="...", examples=[...])` to a model field puts that text directly into the API documentation. The documentation updates automatically when the model changes, which eliminates the drift between code and docs.
+
+Query parameters, path parameters, headers and cookies are validated the same way, using Python type annotations and optional `Query()`, `Path()`, `Header()` or `Cookie()` wrappers with constraints. The validation runs before your function body, so by the time your code executes, every input is the type and shape you declared.
 
 ## A model is the request body
 

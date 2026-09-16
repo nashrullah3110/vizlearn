@@ -9,6 +9,17 @@ If you do not supply one, pandas creates a `RangeIndex` of `0, 1, 2, ...`. That 
 
 It is not row numbers. It is a labelled axis that takes part in selection, alignment, joining, grouping and reshaping. Nearly every pandas behaviour that surprises people is the index doing something they did not ask for.
 
+Alignment is the most important behaviour. When you add two Series, pandas matches them by index label, not by position. If one Series has labels `["a", "b", "c"]` and the other has `["b", "c", "d"]`, the result has labels `["a", "b", "c", "d"]`, with `NaN` for `a` (missing in the second) and `d` (missing in the first). That alignment is automatic and silent, and it is responsible for most "where did the NaN come from" questions.
+
+`set_index("col")` moves a column into the index. `reset_index()` moves the index back into a column. These two operations control which column acts as the label axis. After a `groupby`, the grouped column becomes the index by default, which is why the result sometimes looks like it lost a column &mdash; it moved.
+
+A `MultiIndex` has more than one level: `df.set_index(["city", "year"])` creates a two-level index. Selection uses tuples: `df.loc[("pune", 2024)]`. `xs("pune", level="city")` selects across a level without specifying the others.
+
+`merge` and `join` use the index differently. `merge` joins on columns by default and ignores the index. `join` joins on the index by default and requires the join key to be in the index. Knowing which operation uses which is the difference between a correct join and one that produces unexpected `NaN` values or duplicate rows.
+
+The index is hashable and supports set operations: `idx1.intersection(idx2)`, `idx1.union(idx2)`, `idx1.difference(idx2)`. These are useful for comparing two frames' row labels without merging them.
+
+Duplicate index labels are allowed and cause silent problems: `.loc["x"]` on a duplicated index returns multiple rows instead of one, which breaks code that expects a scalar. `df.index.is_unique` checks for duplicates, and `df.index.duplicated()` returns a boolean mask marking which entries are repeats.
 
 ## Every Series and DataFrame has one
 

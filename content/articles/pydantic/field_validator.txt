@@ -9,6 +9,15 @@ They cannot check membership of a set that lives in a database. They cannot norm
 
 `field_validator` is where those live. It is a classmethod that receives one field's value, and either returns a value or raises.
 
+The decorator takes the field name as a string: `@field_validator("track")`. It can take multiple names to apply the same rule to several fields: `@field_validator("start", "end")`. The function receives `cls` (the class) and `v` (the value), and must return the value, possibly transformed. Raising `ValueError` rejects the input with the message you provide.
+
+The `mode` argument controls when the validator runs. `mode="before"` runs before Pydantic's type coercion, so the value is whatever the caller passed &mdash; possibly a string, a dict, or anything else. `mode="after"` (the default) runs after coercion, so the value is already the declared type. Use "before" when you want to accept alternative input formats; use "after" when you want to check constraints on the typed value.
+
+A validator can normalise as well as validate. Stripping whitespace, lowering case, converting a legacy format &mdash; these are transformations that belong in the validator because they happen at the boundary, before the rest of the application sees the data. Return the cleaned value and it becomes the field's value.
+
+`model_validator` validates across fields rather than one at a time. Use it when a constraint involves two or more fields: "end must be after start", "exactly one of email or phone must be provided". It receives the entire model (or the raw data in "before" mode) and can check any combination of fields.
+
+Validators run in field order for field validators and after all fields for model validators. If a field fails type coercion, its validator does not run. If you need to validate a field that might be missing, annotate it as `Optional` with a default and check for `None` in the validator.
 
 ## A rule the annotation cannot hold
 

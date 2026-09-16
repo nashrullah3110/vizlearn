@@ -13,6 +13,15 @@ intro: read_csv's arguments, and the ones that prevent a class of bug.
 
 All three are fixed at read time by saying what you know.
 
+`dtype={"id": str}` keeps the id column as strings, preserving leading zeros. `parse_dates=["joined"]` parses the joined column as datetimes. `dtype={"amount": "Int64"}` (capital I) uses pandas' nullable integer type, which holds `NaN` without promoting to float. These three arguments fix the three most common inference problems.
+
+`read_csv` also takes `usecols` to read only the columns you need, which saves memory and time on wide files. `nrows` reads only the first n rows, which is useful for inspecting a file before committing to the full read. `chunksize` returns an iterator of DataFrames rather than one large one, which is how you process files that do not fit in memory.
+
+For writing, `to_csv("out.csv", index=False)` is the usual call. `index=False` prevents pandas from writing the row index as a column, which is almost always what you want unless the index carries meaningful labels. `to_parquet` writes a binary format that is faster to read, smaller on disk, and preserves dtypes exactly &mdash; no inference on the way back in.
+
+The encoding default for `read_csv` is UTF-8, which is correct for most files. Files from Excel or older Windows systems may use `latin-1` or `cp1252`, and the symptom is a `UnicodeDecodeError` or garbled characters. `encoding="latin-1"` reads anything without error, but characters may be wrong; `chardet` or `charset-normalizer` can detect the correct encoding.
+
+`read_excel`, `read_json`, `read_sql` and `read_parquet` follow the same pattern: a function that returns a DataFrame, with arguments that control how the source is interpreted. The API is consistent enough that learning `read_csv` well transfers directly to the others.
 
 ## read_csv infers, and inference is where bugs start
 

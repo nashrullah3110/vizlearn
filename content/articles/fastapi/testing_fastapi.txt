@@ -10,6 +10,17 @@ It is also why the editors on these pages work at all &mdash; they use the same 
 
 In real code the import is `from fastapi.testclient import TestClient`, and it wraps httpx. It needs `httpx` installed, which is the usual reason a first test fails on a fresh environment.
 
+A test creates a `TestClient(app)`, calls methods like `.get("/path")`, `.post("/path", json={...})`, and asserts on the response. `.status_code` checks the HTTP status. `.json()` returns the parsed body. `.headers` gives the response headers. These are the same attributes httpx and requests expose, so the syntax is familiar.
+
+Testing a POST with a JSON body passes the data as `json={"title": "Test", "minutes": 30}`. Testing a POST with form data passes it as `data={"username": "ada"}`. Testing a file upload passes it as `files={"file": ("name.txt", b"content", "text/plain")}`. Each mirrors what the real client would send.
+
+Dependency overrides are how you swap a real database or external service for a test double. `app.dependency_overrides[get_db] = lambda: test_db` replaces the `get_db` dependency with one that returns a test database. The override applies to all routes that depend on `get_db`, and you clear it after the test with `app.dependency_overrides.clear()`.
+
+A good test suite asserts on status codes, response shapes, and error messages. It tests the happy path (valid input returns the right data), validation errors (invalid input returns 422 with a useful message), not-found cases (missing resources return 404), and authentication (unauthenticated requests return 401 or 403).
+
+For async endpoints, use `AsyncClient` from httpx with `pytest-asyncio`. The pattern is the same: create the client, call methods, assert on the response. The difference is that the test function is `async def` and the client uses `async with AsyncClient(transport=ASGITransport(app=app))`.
+
+Fixtures manage shared state. A pytest fixture that creates a `TestClient` and seeds the database runs once per test function (or once per session with `scope="session"`), keeping tests isolated without duplicating setup code.
 
 ## The client calls the app, not a server
 

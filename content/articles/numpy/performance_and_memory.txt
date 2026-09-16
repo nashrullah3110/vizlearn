@@ -12,6 +12,13 @@ Most NumPy performance work comes down to four questions, roughly in order of pa
 
 The first is covered in the introductory module and dwarfs the rest. This module is about the other three, which matter once the obvious loop is gone.
 
+The dtype determines how many bytes each element occupies. `float64` uses 8 bytes per element; `float32` uses 4. Halving the dtype width halves memory, improves cache utilisation, and often speeds up computation because less data travels between RAM and CPU. For many machine-learning workloads, `float32` is sufficient, and `float16` or `bfloat16` are used for training on GPUs.
+
+Temporary arrays are the hidden cost in expressions like `a * b + c`. NumPy evaluates `a * b` first, allocates a temporary array for the result, then adds `c` and allocates another temporary for that result. Two temporaries, each the size of the input. The `out` parameter avoids one: `np.multiply(a, b, out=result); np.add(result, c, out=result)` reuses one buffer. For large arrays in hot loops, this matters.
+
+Memory layout affects speed through cache behaviour. NumPy defaults to C order (row-major): the last axis varies fastest in memory. Iterating along the last axis reads consecutive bytes, which fills cache lines efficiently. Iterating along the first axis jumps by the row length, missing the cache on every access. On a large matrix, that difference can be 2&ndash;5x.
+
+`np.shares_memory(a, b)` tells you whether two arrays overlap in memory. Views share memory; copies do not. Operations that return views (slicing, reshaping, transposing) are free; operations that return copies (fancy indexing, `np.copy()`) cost time and memory proportional to the array size. Knowing which is which avoids both accidental data sharing and unnecessary copies.
 
 ## dtype is the cheapest saving there is
 
