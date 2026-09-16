@@ -5,11 +5,27 @@ intro: Unlock what relational data by mastering how to combine tables. This guid
 
 In a relational database, data is split into multiple tables to avoid redundancy (a practice called normalization). <strong>SQL JOINs</strong> are the mechanism to bring that related data back together for querying. They combine rows from two or more tables based on a related column between them.
 
+A join works by comparing a column in one table against a column in another. When the values match, the two rows are combined into a single wider row in the result. The column used for matching is almost always a foreign key pointing to the other table's primary key.
+
+The four standard joins differ only in what happens to unmatched rows. An INNER JOIN discards them — only matching pairs survive. A LEFT JOIN keeps every row from the left table, filling in NULLs where the right table has no match. A RIGHT JOIN does the reverse. A FULL OUTER JOIN keeps everything from both sides.
+
+LEFT JOIN is the most common in practice, because you typically want all records from a primary table (orders, users, events) and whatever related data exists, without losing rows that have no match. INNER JOIN is the default when you write just `JOIN`, and it is the right choice when unmatched rows are meaningless — an order with no customer should not appear at all.
+
+A CROSS JOIN produces the Cartesian product: every combination of rows from both tables. It is rarely intentional, but it is what you get when you forget the ON clause, which makes it the source of most "why does my query return a million rows?" surprises. Understanding the join types is understanding which rows survive and which disappear — everything else is syntax.
+
 ## The Core Idea: Finding Pairs
 
 At its heart, a JOIN operation is like a matching game. The database engine takes a row from the first table (the "left" table) and compares its "join key" (e.g., <code>DeptID</code>) to the join key of every row in the second table (the "right" table). When it finds a match, it combines the two rows into a single, wider row in the result set.
 
 The different types of JOINs (<code>INNER</code>, <code>LEFT</code>, <code>RIGHT</code>, <code>FULL</code>) simply change the rules for what happens when a row in one table doesn't have a matching partner in the other.
+
+An INNER JOIN returns only the rows that match in both tables — unmatched rows on either side disappear. A LEFT JOIN keeps every row from the left table and fills in NULLs where the right table has no match. A RIGHT JOIN does the reverse, and a FULL OUTER JOIN keeps everything from both sides, with NULLs wherever a match is missing.
+
+The join condition is almost always an equality on a foreign key: `ON orders.customer_id = customers.id`. The database compares that column in every row of the left table against every row of the right table and combines the matches. Under the hood it uses hash joins or merge joins rather than the naive nested loop, so performance scales with the size of the tables, not their product.
+
+Two mistakes account for most join bugs. The first is joining on the wrong column, which produces a silent cross-product — every row matches every row — and the result set is orders of magnitude larger than expected. The second is forgetting that a LEFT JOIN followed by a WHERE clause on the right table's column converts it back into an INNER JOIN, because the NULLs are filtered out. To keep the LEFT JOIN's effect, put the right-table condition in the ON clause, not in WHERE.
+
+CROSS JOIN is the fifth type: it produces every combination of rows from the two tables, with no condition at all. It is rarely used intentionally, but it is what you get when you list two tables in FROM without a join condition — which is why accidental cross joins are one of the most common causes of unexpectedly slow queries.
 
 ## The four joins on one small example
 

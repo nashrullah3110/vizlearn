@@ -7,6 +7,14 @@ people[0]["langs"][1]
 
 Left to right: index the list, look up the key, index that list. Each step returns something, and the next step operates on it. If you are unsure what a line does, evaluate it one piece at a time &mdash; `people[0]`, then `people[0]["langs"]` &mdash; which is exactly what an editor's debugger shows you.
 
+The most common shape is a list of dictionaries, where each dictionary is a record with named fields. JSON from an API, rows from a database query and CSV parsed with `DictReader` all arrive in this form. The outer list gives you iteration; the inner dicts give you named access. Processing it is always two nested loops or a nested comprehension.
+
+Modification at depth requires understanding references. `people[0]["langs"].append("Rust")` changes the original list inside the original dict — there is no implicit copy. A shallow copy (`list(people)`) duplicates the outer list but shares the inner dicts, so mutating a nested field still changes the original. Use `copy.deepcopy` when you need a fully independent copy.
+
+Missing keys are the main source of runtime errors. `person["address"]["city"]` raises `KeyError` if either level is absent, and the traceback names only the key that failed, not the path. The safe patterns are `.get()` with a default, `try/except KeyError`, or a helper that walks the path and returns a fallback. For deeply nested JSON, these patterns appear on almost every access.
+
+Converting between a list of dicts and a dict of lists is a routine operation. `{k: [row[k] for row in records] for k in records[0]}` produces columnar data from row-oriented records, which is what pandas does when you construct a DataFrame from a list of dicts. The reverse — building records from columns — is `[dict(zip(cols, vals)) for vals in zip(*col_data.values())]`.
+
 ## Walking it
 
 
@@ -21,6 +29,12 @@ The outer loop takes records, the inner takes the list inside each one. That is 
 [lang for person in people for lang in person["langs"]]
 
 Same clause order as the loops, and worth using only when it fits on one line.
+
+Modification requires care because of how references work. `people[0]["langs"].append("Rust")` modifies the original list inside the original dictionary. There is no copy unless you make one. This is the expected behaviour when you want to update in place, and a bug when you thought you were working on a separate copy. Shallow copies (`list(people)` or `people[:]`) duplicate the outer list but share the inner dictionaries, so mutating a nested dict still affects the original. Deep copies (`copy.deepcopy(people)`) duplicate everything recursively, which is the safe choice when you need a truly independent copy.
+
+The most common operations on nested structures are lookups with a chain of indices and keys, iteration with nested loops, and flattening into simpler structures for analysis. A list of dicts is the natural representation for JSON records, database rows and API responses. A dict of lists is common for columnar data. Converting between the two is a frequent task: `{k: [row[k] for row in records] for k in records[0]}` turns a list of dicts into a dict of lists, which is what pandas does when you pass a list of dicts to `DataFrame()`.
+
+Missing keys and indices are the main source of errors. `person["address"]["city"]` raises `KeyError` if either key is absent. Chaining `.get()` calls (`person.get("address", {}).get("city", "unknown")`) avoids the exception but is verbose. For deeply nested lookups, a helper function or a try/except block is usually cleaner than a chain of `.get()` calls.
 
 ## The missing-key problem
 

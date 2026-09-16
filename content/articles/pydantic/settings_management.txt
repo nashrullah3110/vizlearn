@@ -19,6 +19,13 @@ Field names map to environment variables case-insensitively, so `app_port` reads
 
 Note `app_debug: bool`. The boolean vocabulary from the coercion module means `APP_DEBUG=yes`, `=1`, `=true` and `=on` all work, and `=maybe` raises. That is a much better outcome than `bool(os.environ.get("APP_DEBUG"))`, where the string `"false"` is `True`.
 
+`pydantic-settings` also reads from `.env` files. Adding `model_config = SettingsConfigDict(env_file=".env")` makes the model load variables from that file, with environment variables taking priority. This means you can keep defaults in `.env` for local development and override them in production through the real environment, without changing code.
+
+Nested settings work through field prefixes. A field `database_url` reads `DATABASE_URL`; a nested model `class Database(BaseModel): url: str; pool_size: int = 5` under `database: Database` reads `DATABASE_URL` and `DATABASE_POOL_SIZE` when you set `env_nested_delimiter='_'`. This lets you group related configuration logically in your code while keeping the flat `KEY=value` convention in the environment.
+
+Validation runs at construction time. If a required variable is missing or a value cannot be coerced to the annotated type, the model raises `ValidationError` with a message naming the field and the problem. The application fails immediately at startup rather than minutes later when the misconfigured value is first used. This is the core benefit: every configuration error surfaces in one place, at the earliest possible moment.
+
+Secret values (`SecretStr`, `SecretBytes`) are also supported. They are read normally but redact themselves in repr and logs, so a password that leaks into a stack trace is shown as `'**********'` rather than the actual value.
 
 ## Configuration is a boundary too
 

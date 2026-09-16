@@ -7,6 +7,14 @@ A flat index stores the vectors and compares the query with every one. It is exa
 
 It is also the ground truth. To measure any approximate index's recall you need the true neighbours, and a flat search over a sample is how you get them.
 
+An index trades exact answers for speed. It organises vectors into a structure — clusters, graphs, trees or compressed codes — so that most vectors can be skipped without being compared. The result is approximate nearest-neighbour (ANN) search: faster by orders of magnitude, but with a small probability of missing a genuine neighbour.
+
+The three main families are IVF (inverted file), HNSW (hierarchical navigable small-world graph) and product quantisation. IVF clusters the vectors and searches only the nearest clusters, trading recall at cluster boundaries for speed. HNSW builds a layered graph and walks it greedily toward the query — best recall-for-latency, highest memory. Product quantisation compresses each vector into a short code, cutting memory dramatically at some recall cost, and is usually combined with IVF.
+
+The metric that matters is recall@k: of the k true nearest neighbours, how many did the index actually return? For RAG, 0.95 is usually fine because a reranker will re-score the top results anyway. For deduplication or exact matching, anything less than 1.0 is a data quality problem.
+
+Choosing an index means choosing where on the recall-latency-memory triangle you want to sit. HNSW gives the best recall for a given latency but uses the most memory. IVF-PQ uses the least memory but has lower recall. IVF-flat sits in the middle. The right choice depends on your corpus size, your hardware budget and how much recall loss your application can tolerate.
+
 ## What an index buys and what it costs
 
 Every approximate index prunes: it organises vectors so that most can be skipped without being compared. That turns a linear scan into something closer to logarithmic, and introduces the possibility of missing a genuine neighbour because the structure routed the search elsewhere.

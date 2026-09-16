@@ -11,6 +11,13 @@ It is exactly wrong three layers in. If a function inside your own system passes
 
 Same behaviour, opposite value, depending on which side of the boundary you are standing on. Which is why the setting exists.
 
+Lax mode converts anything unambiguous: the string `"42"` becomes `int` 42, `"true"` becomes `bool` True, and `"3.14"` becomes `float` 3.14. It refuses ambiguous conversions &mdash; `"maybe"` does not become a bool, and a list does not become an int &mdash; so it is not permissive without limits. It is the right default at system boundaries where data arrives as text.
+
+Strict mode requires the value to already be the annotated type. An `int` field accepts only `int`, not `str` or `float`. A `bool` field accepts only `bool`, not `int` (even though `bool` is a subclass of `int` in Python). This catches bugs inside your own code: if an internal function passes a string where an int was expected, strict mode surfaces that mistake as a `ValidationError` at the model boundary rather than silently converting and hiding the type confusion.
+
+The practical answer is per-field configuration. External-facing fields (API parameters, environment variables, CSV columns) stay lax because their input is always text. Internal fields (database ids, computed values, inter-service contracts) use `Field(strict=True)` or a strict type alias like `StrictInt`. This way the boundary does the conversion exactly once, and everything downstream is guaranteed to be the right type.
+
+You can also set the mode model-wide with `model_config = ConfigDict(strict=True)` and then relax individual fields with `Field(strict=False)`. The model-level setting is the default; the field-level setting overrides it. This is cleaner than annotating every field when most of your model is internal.
 
 ## The same model, two answers
 

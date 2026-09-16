@@ -7,6 +7,14 @@ A network's final layer produces one raw number per class. These are called <str
 
 Softmax converts them into a probability distribution. Cross-entropy then measures how wrong that distribution is. The two are almost always used together, and the reason is more interesting than convention.
 
+Softmax exponentiates each logit and divides by the sum of all the exponentiated logits. The result is a vector of positive numbers that sum to 1 — a valid probability distribution. The largest logit always gets the largest probability, so softmax never changes which class wins; it only tells you how confident the model is.
+
+Cross-entropy measures the gap between two probability distributions: the model's prediction and the true label. For a single correct class (the usual case), the loss simplifies to the negative log of the probability assigned to the correct class. If the model is confident and right, that probability is near 1 and the loss is near 0. If the model is confident and wrong, the probability is near 0 and the loss explodes toward infinity.
+
+The gradient of the combined softmax-cross-entropy loss has a remarkably clean form: for each class, the gradient is simply the predicted probability minus the target (1 for the correct class, 0 for everything else). This means the update pushes the correct class's probability up and every other class's probability down, by an amount proportional to the current error. No second derivatives, no complicated chain rule — which is one reason this combination became the universal default for classification.
+
+In practice, frameworks compute softmax and cross-entropy together in a single fused operation (PyTorch's `CrossEntropyLoss` takes raw logits, not probabilities) because the fused version is numerically stable. Computing softmax separately and then taking the log can produce NaN or Inf when logits are large; the fused version subtracts the maximum logit first, which cancels out mathematically but prevents overflow.
+
 ## What softmax does
 
 p<sub>i</sub> = e<sup>z<sub>i</sub></sup> / &Sigma;<sub>j</sub> e<sup>z<sub>j</sub></sup>

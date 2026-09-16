@@ -7,6 +7,12 @@ intro: Batch size decides how many examples the model looks at before it changes
 - <strong>Full batch.</strong> The whole dataset per update. The gradient is exact, but you get one update per epoch and it is slow.
 - <strong>Mini-batch (32&ndash;256).</strong> What in effect everyone uses. Enough samples for a usable gradient estimate, enough updates to make progress, and it fits on a GPU.
 
+The batch size controls a three-way trade-off between gradient accuracy, update frequency and hardware utilisation. A batch of 1 gives the noisiest gradient and the most updates per epoch. A full-batch gradient is exact but gives only one update per epoch. Mini-batches of 32 to 256 sit at the sweet spot: the gradient estimate is close enough to the true gradient for stable convergence, updates are frequent enough for fast progress, and the batch is large enough to saturate the GPU's parallel cores.
+
+Gradient noise is not purely harmful. The stochastic noise from small batches helps the optimiser escape sharp local minima and find flatter minima that generalise better. This is why increasing batch size often requires increasing the learning rate proportionally (linear scaling rule) to maintain the same training dynamics, and why very large batch sizes sometimes produce models that generalise worse even though the training loss is lower.
+
+The practical upper bound on batch size is GPU memory. A batch of images must fit in VRAM along with the model parameters, activations and gradients. When the batch does not fit, the usual fixes are to reduce the batch size, use gradient accumulation (run several smaller forward passes and sum the gradients before updating), use mixed-precision training (float16 halves the memory per activation), or distribute across multiple GPUs. Gradient accumulation is the simplest — it simulates a large batch without needing more memory.
+
 ## How the numbers work out
 
 With 1,024 training samples:
