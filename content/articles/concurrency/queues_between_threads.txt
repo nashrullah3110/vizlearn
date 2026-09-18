@@ -4,8 +4,8 @@ intro: A queue is a lock, a condition and a deque already assembled correctly - 
 ## Why a queue rather than a lock
 
 The previous pages built up a set of primitives and a set of ways to misuse
-them: a [lock](locks_and_the_ways_they_go_wrong.html) you must take on every
-access, a <code>Condition</code> whose wait must sit in a
+them. There is a [lock](locks_and_the_ways_they_go_wrong.html) you must take on
+every access, a <code>Condition</code> whose wait must sit in a
 <code>while</code> loop, a [race](race_conditions_in_python.html) waiting in
 any check-then-act. A <code>queue.Queue</code> is those three things already
 put together by someone who got the details right.
@@ -14,7 +14,7 @@ It is internally locked, so <code>put</code> and <code>get</code> are safe from
 any number of threads with no locking of your own. It blocks when it has
 nothing to give and &mdash; if you bound it &mdash; when it has nowhere to put
 something. And it turns shared mutable state into **message passing**, which is
-the design that removes races rather than guarding them: an item is owned by
+the design that removes races rather than guarding them. An item is owned by
 the producer, then by the queue, then by exactly one consumer, and never by two
 things at once.
 
@@ -89,9 +89,9 @@ a queue you know is finished.
 <code>task_done</code>/<code>join</code> is a counter, not a queue length.
 <code>unfinished_tasks</code> went up on each <code>put</code> and down on each
 <code>task_done</code>, and <code>join</code> returns when it reaches zero.
-That is a different question from "is the queue empty": an item that has been
-taken but not yet finished is out of the queue and still unfinished, which is
-exactly the state you need to wait for at shutdown.
+That is a different question from whether the queue is empty. An item that has
+been taken but not yet finished is out of the queue and still unfinished, which
+is exactly the state you need to wait for at shutdown.
 
 ## A worker pool that stops cleanly
 
@@ -150,12 +150,12 @@ with items still queued.
 
 There is **one sentinel per worker**, because each <code>None</code> is
 consumed by exactly one <code>get</code>. Putting a single sentinel stops one
-worker and leaves the other two blocked forever &mdash; a classic, and the
-reason many people prefer a <code>threading.Event</code> flag that every worker
-can see, or simply daemon threads and no shutdown at all.
+worker and leaves the other two blocked forever. That is a classic mistake, and
+the reason many people prefer a <code>threading.Event</code> flag that every
+worker can see, or simply daemon threads and no shutdown at all.
 
 <code>daemon=True</code> means the interpreter will not wait for these threads
-at exit. It is a safety net rather than the plan; a daemon thread killed at
+at exit. It is a safety net rather than the plan. A daemon thread killed at
 interpreter exit does not run <code>finally</code> blocks, so anything holding
 a file or a transaction should be shut down properly, not abandoned.
 
@@ -171,13 +171,13 @@ is a missing bound.
 
 Bounded, a full <code>put</code> blocks until a consumer takes something out,
 so the producer is automatically slowed to the rate the consumers can sustain.
-That is **backpressure**, it costs one argument, and the explorer above this
+That is **backpressure**, and it costs one argument. The explorer above this
 article is the depth of a bounded queue over time under producer and consumer
 rates you choose &mdash; including the flat stretch where the producer is
 waiting.
 
 The value to pick is a statement about how far ahead you are willing to let the
-producer run, in items. It is a contract rather than a tuning number: a bound
+producer run, in items. It is a contract rather than a tuning number. A bound
 of 100 means "up to 100 items may be buffered", and the right figure follows
 from how large an item is and how stale a buffered one may become.
 
@@ -186,9 +186,9 @@ from how large an item is and how stale a buffered one may become.
 <code>queue.LifoQueue</code> returns the most recent item first, which turns a
 breadth-first crawl into a depth-first one with no other change.
 <code>queue.PriorityQueue</code> returns the smallest first and expects
-comparable items, so the shape is <code>q.put((priority, payload))</code>
-&mdash; and a tuple whose second element is not comparable will raise when two
-priorities tie, which is why a monotonic counter is usually wedged in between.
+comparable items, so the shape is <code>q.put((priority, payload))</code>.
+A tuple whose second element is not comparable will raise when two priorities
+tie, which is why a monotonic counter is usually wedged in between.
 
 <code>queue.SimpleQueue</code> is worth knowing for one property: it is
 unbounded, has no <code>task_done</code>, and is reentrant, so it is the only
@@ -196,11 +196,10 @@ one safe to use from a signal handler or a <code>__del__</code>.
 
 And the deliberate near-duplicate: <code>asyncio.Queue</code> has almost the
 same interface and is **not** thread-safe, while <code>queue.Queue</code> is
-thread-safe and blocks the thread rather than awaiting. Using the wrong one is
-a real bug in both directions &mdash; a <code>queue.Queue.get()</code> inside a
-coroutine freezes the event loop, which is
-[the blocking call problem](../async_python/the_blocking_call_that_freezes_the_loop.html),
-and an <code>asyncio.Queue</code> touched from two threads corrupts quietly. To
+thread-safe and blocks the thread rather than awaiting. Using the wrong one is a real bug in both directions. A
+<code>queue.Queue.get()</code> inside a coroutine freezes the event loop, which
+is [the blocking call problem](../async_python/the_blocking_call_that_freezes_the_loop.html).
+An <code>asyncio.Queue</code> touched from two threads corrupts quietly. To
 bridge the two, use <code>loop.call_soon_threadsafe</code>,
 <code>asyncio.run_coroutine_threadsafe</code>, or the
 <code>janus</code> library, which exists precisely for this.
@@ -266,7 +265,7 @@ the thread, so it stops the event loop. Use <code>asyncio.Queue</code> there.
 
 <strong>Is <code>get</code> fair between workers?</strong> Roughly, and it is not guaranteed. Items go to whichever worker the OS wakes, so a run where one worker takes more than its share is normal and not a bug.
 
-<strong>Can I put anything in it?</strong> Any object &mdash; it is the same process, so nothing is pickled and nothing is copied. That is a real advantage over a [process pool](threads_or_processes.html), and it is also why the item is still shared mutable state: two threads holding the same object still need a lock if they both mutate it.
+<strong>Can I put anything in it?</strong> Any object &mdash; it is the same process, so nothing is pickled and nothing is copied. That is a real advantage over a [process pool](threads_or_processes.html), and it is also why the item is still shared mutable state. Two threads holding the same object still need a lock if they both mutate it.
 
 <strong>What if a worker dies?</strong> The item is lost and <code>unfinished_tasks</code> never decrements, so <code>join</code> hangs. Wrapping the body in <code>try/finally</code> with <code>task_done</code> in the <code>finally</code> is what keeps a crashing worker from hanging the shutdown.
 

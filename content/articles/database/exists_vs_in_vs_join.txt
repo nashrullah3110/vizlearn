@@ -8,7 +8,7 @@ or as a `JOIN`. Run the first three variants above and all three return Ada and
 Grace &mdash; except that the JOIN returns Ada twice.
 
 That difference is the first thing to understand, and the NULL behaviour of the
-fourth is the second. `EXISTS` tests for the presence of at least one matching row and stops as soon as it finds one, so it never produces duplicates and can short-circuit. `IN` collects a set of values from a subquery and tests membership, but a single NULL in that set poisons the entire check &mdash; `NOT IN` returns no rows at all, silently, which is one of SQL's most common silent-failure bugs. A `JOIN` pairs every matching row on both sides, so a customer with three orders appears three times &mdash; correct when you want the orders, a bug when you want the customers. This page shows all three side by side, demonstrates the NULL trap with a concrete example, and covers the performance differences in the query plan.
+fourth is the second. `EXISTS` tests for the presence of at least one matching row and stops as soon as it finds one, so it never produces duplicates and can short-circuit. `IN` collects a set of values from a subquery and tests membership, but a single NULL in that set poisons the entire check. `NOT IN` returns no rows at all, silently, which is one of SQL's most common silent-failure bugs. A `JOIN` pairs every matching row on both sides, so a customer with three orders appears three times &mdash; correct when you want the orders, a bug when you want the customers. This page shows all three side by side, demonstrates the NULL trap with a concrete example, and covers the performance differences in the query plan.
 
 ## JOIN multiplies rows
 
@@ -75,8 +75,8 @@ that away.
 
 Twenty years ago these three had genuinely different costs and the advice was
 elaborate. Modern planners in PostgreSQL, SQL Server and Oracle recognise all
-three shapes and frequently compile them to the same physical plan &mdash;
-usually a semi-join, which is precisely "find whether a match exists, do not
+three shapes and frequently compile them to the same physical plan. The result
+is usually a semi-join &mdash; precisely "find whether a match exists, do not
 duplicate rows".
 
 So performance is rarely the reason to choose. The reasons that survive are:
@@ -96,27 +96,27 @@ in ten seconds what a rule of thumb argues about indefinitely.
 The `NOT IN` trap is worth seeing execute rather than reasoning about, because it
 produces no error &mdash; only a wrong answer. Three customers, an orders table
 where one order is anonymous (a NULL `customer_id`), asked which customers never
-ordered:
+ordered.
 
 |query|result|
 |---|---|
 |`... WHERE id NOT IN (SELECT customer_id FROM orders)`|**zero rows**|
 |`... WHERE NOT EXISTS (SELECT 1 ...)`|**customer 3** (correct)|
 
-The single NULL in the subquery poisons the whole `NOT IN`: `3 <> NULL` is
+The single NULL in the subquery poisons the whole `NOT IN`. `3 <> NULL` is
 unknown, `AND` with unknown is unknown, and `WHERE` keeps only rows that are
 definitely true, so every customer is filtered out. `NOT EXISTS` never compares
 anything to NULL &mdash; it asks whether a matching row was found &mdash; so it
-returns the right answer on the same data. This is not a corner case to file away;
-a nullable column is the normal situation, which is why `NOT EXISTS` is the safe
-default and `NOT IN` earns its place only on a column that is provably `NOT NULL`.
+returns the right answer on the same data. This is not a corner case to file away. A nullable column is the normal
+situation, which is why `NOT EXISTS` is the safe default and `NOT IN` earns its
+place only on a column that is provably `NOT NULL`.
 
 ## EXISTS stops at the first match
 
 The early exit is the other reason to prefer `EXISTS`, and it is a real difference
 in work done. `EXISTS` is true the moment one matching row is found, so for a
 customer with ten thousand orders it examines one; `COUNT(*) > 0`, the common
-alternative, counts all ten thousand before comparing:
+alternative, counts all ten thousand before comparing.
 
 |test|rows the subquery examines|
 |---|---|

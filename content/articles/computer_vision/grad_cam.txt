@@ -7,7 +7,7 @@ A network says "cat". Which part of the image made it say that?
 
 Grad-CAM answers with a heatmap, and it does so using quantities the network
 produces anyway during backpropagation, which is why it works on any
-convolutional architecture without retraining or modification. The recipe is three steps: take the feature maps from the last convolutional layer, compute the gradient of the target class score with respect to each map, global-average-pool those gradients into per-channel weights, and sum the weighted maps through a ReLU. The result is a coarse heatmap at the resolution of the feature maps (typically 7&#215;7 or 14&#215;14), upsampled onto the image to show which spatial regions drove the classification. Grad-CAM is class-specific &mdash; asking about "cat" and "dog" on the same image produces different heatmaps &mdash; and it can be applied to any differentiable output, including intermediate layers. This page shows the heatmap live on an image classifier, lets you switch classes and layers, and covers Grad-CAM++ and Score-CAM as refinements that reduce gradient noise.
+convolutional architecture without retraining or modification. The recipe has three steps. Take the feature maps from the last convolutional layer and compute the gradient of the target class score with respect to each map. Global-average-pool those gradients into per-channel weights, then sum the weighted maps through a ReLU. The result is a coarse heatmap at the resolution of the feature maps (typically 7&#215;7 or 14&#215;14), upsampled onto the image to show which spatial regions drove the classification. Grad-CAM is class-specific &mdash; asking about "cat" and "dog" on the same image produces different heatmaps &mdash; and it can be applied to any differentiable output, including intermediate layers. This page shows the heatmap live on an image classifier, lets you switch classes and layers, and covers Grad-CAM++ and Score-CAM as refinements that reduce gradient noise.
 
 ## The recipe
 
@@ -65,8 +65,8 @@ different things, and the choice of layer changes the answer.
 
 **Plausibility is not correctness.** A heatmap over the animal's face looks
 convincing whether or not the model used the face. Grad-CAM shows what the
-gradients say, and there is published work on saliency methods that produce
-sensible-looking maps for randomly initialised networks &mdash; so a
+gradients say. There is published work on saliency methods that produce
+sensible-looking maps for randomly initialised networks, so a
 reasonable-looking heatmap is not evidence the model is reasoning well.
 
 **It does not survive every architecture unchanged.** Transformers have no final
@@ -88,7 +88,7 @@ gradient saturation.
 
 Grad-CAM's heatmap is a weighted sum of feature maps followed by a ReLU, and doing
 one cell by hand removes the mystery. Three maps, with weights that are the
-spatial-average gradients of the class score, combined at a single location:
+spatial-average gradients of the class score, combined at a single location.
 
 |contribution|value|
 |---|---|
@@ -99,25 +99,25 @@ spatial-average gradients of the class score, combined at a single location:
 
 At a cell where the negatively-weighted map dominates the sum comes out negative
 &mdash; say &minus;0.65 &mdash; and the ReLU clips it to 0. That clip is the step
-people skip and then misread: Grad-CAM deliberately discards evidence *against* the
-class, because the question is what supported this prediction, and a map mixing
+people skip and then misread. Grad-CAM deliberately discards evidence *against* the
+class, because the question is what supported this prediction. A map mixing
 support and opposition on one colour scale is easy to misread. The consequence is
-that a Grad-CAM heatmap can never show you what argued against a class &mdash; drag
-every weight negative and it goes empty, not inverted &mdash; and to see the
+that a Grad-CAM heatmap can never show you what argued against a class. Drag
+every weight negative and it goes empty, not inverted. To see the
 opposing evidence you run it on the competing class instead. The map is also only
 7&times;7 before upsampling, so the smooth blob over the animal's face is
 interpolation, not pixel-level proof.
 
 Grad-CAM's real caution is that plausibility is not correctness. A heatmap over an
-animal's face looks convincing whether or not the model used the face, and published
-work has produced sensible-looking saliency maps for *randomly initialised* networks
-&mdash; so a reasonable heatmap is a hypothesis about the model, not a verification
-of it. It also explains exactly one layer, usually the last convolutional one, and
-the choice of layer changes the answer, so a Grad-CAM result is really "what the
+animal's face looks convincing whether or not the model used the face. Published
+work has produced sensible-looking saliency maps for *randomly initialised* networks,
+so a reasonable heatmap is a hypothesis about the model, not a verification
+of it. It also explains exactly one layer, usually the last convolutional one. The
+choice of layer changes the answer, so a Grad-CAM result is really "what the
 gradients at this layer say", not "what the model used". Its ancestor CAM required
 the network to end in global average pooling and read the weights straight from that
-layer; Grad-CAM's contribution was getting the same weights from gradients, which
-removed the architectural requirement and is why it works on almost any CNN.
+layer. Grad-CAM's contribution was getting the same weights from gradients, which
+removed the architectural requirement.
 
 ## Where it goes wrong
 
@@ -135,7 +135,7 @@ depends on it.
 
 ## Asking the gradient which pixels mattered
 
-Grad-CAM produces a heatmap over the image for a chosen class, and every step of it is arithmetic you can follow. This builds one end to end on a small network, then checks the two things people forget to check -- whether the map changes with the class, and whether it can be trusted when the prediction is wrong.
+Grad-CAM produces a heatmap over the image for a chosen class, and every step of it is arithmetic you can follow. This builds one end to end on a small network, then checks the two things people forget to check. First, whether the map changes with the class. Second, whether it can be trusted when the prediction is wrong.
 
 ```python-run
 import numpy as np

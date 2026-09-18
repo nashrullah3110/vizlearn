@@ -20,8 +20,8 @@ anything. A write does not overwrite a row; it creates a *new version* of it, an
 the old version stays until nobody can still need it.
 
 Every transaction is given a **snapshot** &mdash; effectively a rule saying which
-versions count as visible &mdash; fixed at the moment it starts, or at the moment
-each statement starts, depending on the
+versions count as visible. The snapshot is fixed at the moment the transaction
+starts, or at the moment each statement starts, depending on the
 [isolation level](isolation_levels.html).
 
 A reader that began before a write simply continues to see the older version.
@@ -49,7 +49,7 @@ comparison of transaction ids rather than a queue.
 This is the part that gets missed. MVCC eliminates reader/writer conflicts. It
 does **not** eliminate writer/writer conflicts.
 
-Two transactions updating the same row still contend: the second must wait for
+Two transactions updating the same row still contend. The second must wait for
 the first to commit or roll back, because they would otherwise both produce a new
 version from the same old one and one update would vanish. That is the
 [lost update](isolation_levels.html) problem, and MVCC's answer to it is either a
@@ -64,7 +64,7 @@ seen by any live snapshot and reclaim the space.
 
 In PostgreSQL that job is `VACUUM`, usually run by autovacuum. When it cannot
 keep up &mdash; typically because a very old transaction is still open and
-pinning every version created since &mdash; tables **bloat**: the row count is
+pinning every version created since &mdash; tables **bloat**. The row count is
 unchanged while the file grows, and every scan reads more pages for the same
 data.
 
@@ -88,7 +88,7 @@ version superseded *after* that transaction began has to be kept.
 Picture a table taking a steady 1,000 updates a second. Each update leaves a dead
 version behind. A reporting transaction that opens and then sits idle &mdash; a
 connection returned to a pool without a commit, a debugger stopped at a
-breakpoint &mdash; pins cleanup for as long as it stays open:
+breakpoint &mdash; pins cleanup for as long as it stays open.
 
 |idle for|dead versions pinned|
 |---|---|
@@ -108,7 +108,7 @@ The claim that visibility becomes arithmetic rather than a queue is worth making
 literal, because it is why reads never wait. A version is visible to a snapshot
 `S` exactly when `created_by <= S AND (deleted_by IS NULL OR deleted_by > S)`.
 Take the two versions from earlier &mdash; v1 created by 100 and deleted by 142,
-v2 created by 142 and still live:
+v2 created by 142 and still live.
 
 |snapshot|v1 (100&ndash;142)|v2 (142&ndash;)|sees|
 |---|---|---|---|
@@ -118,7 +118,7 @@ v2 created by 142 and still live:
 No lock is consulted and nothing blocks; each reader compares transaction ids and
 picks its version. A snapshot of 120 keeps seeing 1000 no matter how many times
 142 commits, because the numbers do not change once fixed. That is the entire
-mechanism by which a long report runs undisturbed beside a stream of writes. It is also why the visible version is found without a scan of the history: the
+mechanism by which a long report runs undisturbed beside a stream of writes. It is also why the visible version is found without a scan of the history. The
 engine keeps versions chained newest-first and walks until the comparison first
 succeeds, which for a recently-read row is usually the very first link.
 

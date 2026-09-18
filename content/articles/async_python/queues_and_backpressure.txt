@@ -57,7 +57,7 @@ produced 4  (queue holds 2)
     consumed 4
 ```
 
-Read the queue-size column. It climbs to 2 and then stops: the producer put items
+Read the queue-size column. It climbs to 2 and then stops. The producer put items
 0 and 1 immediately, and when it tried to put item 2 the queue was full, so
 <code>await q.put(2)</code> **suspended the producer** until the consumer took one
 out. From then on the producer only advances when the consumer makes room, which
@@ -69,16 +69,16 @@ That pacing is the whole point, and it came from one argument.
 ## Backpressure is the maxsize
 
 <code>maxsize=2</code> made the queue **bounded**, and a bounded queue is what
-creates **backpressure**: when it is full, <code>put</code> waits, so a fast
+creates **backpressure**. When it is full, <code>put</code> waits, so a fast
 producer is automatically slowed to the rate the consumer can keep up with. The
 producer never runs more than two items ahead.
 
 Remove the bound &mdash; <code>asyncio.Queue()</code> with no maxsize &mdash; and
-the behaviour changes completely: the producer dumps all five items in instantly,
+the behaviour changes completely. The producer dumps all five items in instantly,
 the queue holds all of them, and only then does the consumer start draining. With
 five items that is harmless. With a producer reading a million-line file into an
 unbounded queue faster than the consumer can process it, the queue grows without
-limit and the program runs out of memory &mdash; a failure that looks like a leak
+limit and the program runs out of memory. The failure looks like a leak
 and is really a missing bound.
 
 So the size of the queue is not a tuning detail; it is the contract between the
@@ -106,8 +106,8 @@ of coroutines at once. A queue is for the other case: an *open-ended stream* of
 work whose size you do not know in advance, arriving over time, to be processed
 by a bounded number of workers. Crawlers, pipelines, and anything that consumes a
 feed have that shape, and the queue is what decouples "how fast work arrives"
-from "how fast we handle it" &mdash; with the bound as the safety valve between
-them.
+from "how fast we handle it". The bound is the safety valve between
+the two.
 
 ## A worker pool that shuts down cleanly
 
@@ -184,16 +184,16 @@ retrieved" noise on shutdown.
 come out in. <code>LifoQueue</code> returns the most recent first, which turns a
 crawler's frontier from breadth-first into depth-first with no other change.
 <code>PriorityQueue</code> returns the smallest first and expects comparable
-items, so the usual shape is <code>await q.put((priority, payload))</code>
-&mdash; and a tuple whose second element is not comparable will raise when two
-priorities tie, which is why an incrementing counter is often wedged in between.
+items, so the usual shape is <code>await q.put((priority, payload))</code>.
+A tuple whose second element is not comparable will raise when two
+priorities tie, so an incrementing counter is often wedged in between.
 
 Both <code>put</code> and <code>get</code> also have non-waiting forms.
 <code>put_nowait</code> raises <code>asyncio.QueueFull</code> rather than
 suspending, and <code>get_nowait</code> raises <code>asyncio.QueueEmpty</code>.
-They exist for the case where waiting is the wrong behaviour &mdash; a metrics
-pipeline that would rather drop a sample than slow the thing producing it, for
-instance:
+They exist for the case where waiting is the wrong behaviour. A metrics
+pipeline would rather drop a sample than slow the thing producing it, for
+instance.
 
 ```python
 try:
@@ -228,7 +228,7 @@ and <code>get</code> do the waiting; the count is for observing, not for control
 
 ## Questions people ask
 
-<strong>What should maxsize be?</strong> However far ahead of the consumer you are willing to let the producer run, expressed in items. It is a contract rather than a tuning number: a queue of 100 means "up to 100 items of work may be buffered", and the right value follows from how big an item is and how stale a buffered one may be.
+<strong>What should maxsize be?</strong> However far ahead of the consumer you are willing to let the producer run, expressed in items. It is a contract, not a tuning number. A queue of 100 means "up to 100 items of work may be buffered", and the right value follows from how big an item is and how stale a buffered one may be.
 
 <strong>Is an unbounded queue ever right?</strong> When the producer is naturally slower than the consumer, or the total volume is small and known. Otherwise it converts backpressure into memory growth, and the failure looks like a leak rather than a missing bound.
 

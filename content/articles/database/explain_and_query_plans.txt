@@ -10,7 +10,7 @@ statistics it holds about your data.
 
 Which means that two queries returning identical results can differ by orders of
 magnitude in cost, and nothing about the SQL text tells you which is which.
-`EXPLAIN` is how you find out, and it takes about ten seconds. It prints the plan the optimiser chose &mdash; which indexes it will use, which join strategy, whether it will sort or hash &mdash; and `EXPLAIN ANALYZE` runs the query and adds the actual row counts and timings so you can see where the estimate was wrong.
+`EXPLAIN` is how you find out, and it takes about ten seconds. It prints the plan the optimiser chose &mdash; which indexes it will use, which join strategy, whether it will sort or hash. `EXPLAIN ANALYZE` runs the query and adds the actual row counts and timings, so you can see where the estimate was wrong.
 
 ## SCAN against SEARCH
 
@@ -70,8 +70,8 @@ ignore an index on a small table.
 
 The same applies to selectivity. A query matching 60% of the rows is usually
 better served by a scan, because an index gives a list of row locations that
-then have to be fetched individually &mdash; and fetching most of the table one
-row at a time costs more than reading it in order.
+then have to be fetched individually. Fetching most of the table one row at a
+time costs more than reading it in order.
 
 This is why plans change as tables grow, and why a query that was fast in staging
 can be slow in production with the same schema and different statistics.
@@ -97,7 +97,7 @@ The `SCAN` / `SEARCH` distinction is easy to nod at and worth turning into
 numbers, because that is what makes it urgent on a growing table. `SCAN` reads
 every row and tests it; `SEARCH` through a B-tree index descends a sorted
 structure, so it does on the order of `log2(rows)` steps to reach the block it
-wants:
+wants.
 
 |table size|`SCAN` reads|`SEARCH` (index steps)|
 |---|---|---|
@@ -105,11 +105,11 @@ wants:
 |5,000,000 rows|5,000,000|~23|
 
 Two things follow. The gap is not constant &mdash; it widens as the table grows,
-because the scan is linear and the search is logarithmic, so the query that was
+because the scan is linear and the search is logarithmic. The query that was
 "fine in staging" on 5,000 rows is a thousandfold worse in production on five
-million while the indexed version barely moved from 13 steps to 23. And it is why
-`SCAN` on a large table where you expected a lookup is the single most valuable
-thing to spot in a plan: it is the difference between reading a handful of pages
+million, while the indexed version barely moved from 13 steps to 23. And that is
+why `SCAN` on a large table where you expected a lookup is the single most valuable
+thing to spot in a plan. It is the difference between reading a handful of pages
 and reading the whole table.
 
 ## Why a scan can beat the index
@@ -118,7 +118,7 @@ and reading the whole table.
 optimiser sometimes ignores an index you built for it. An index gives a list of
 row locations, which then have to be fetched one at a time &mdash; random access.
 A scan reads the table in order &mdash; sequential access, which is far cheaper per
-row. So there is a crossover in selectivity:
+row. So there is a crossover in selectivity.
 
 |query matches|index path|better plan|
 |---|---|---|
@@ -128,7 +128,7 @@ row. So there is a crossover in selectivity:
 Fetching 60% of a table one row at a time through an index costs more than reading
 the whole table sequentially and discarding 40%, because random reads dominate the
 bill. This is why the optimiser's choice depends on the *statistics*, not just the
-SQL &mdash; and why a query that used the index in staging, against a few hundred
+SQL. It is also why a query that used the index in staging, against a few hundred
 rows, can correctly switch to a scan in production, against millions with a
 different distribution. The plan changing under you is the optimiser doing its
 job, not misbehaving.

@@ -5,11 +5,14 @@ intro: The one construct in SQL that can follow a chain of unknown length.
 
 A self-join resolves one level of a hierarchy. Two joins resolve two. To resolve
 five you write five, and to resolve "however many there are" you cannot write
-anything at all, because the number of joins would have to depend on data the
-query has not read yet.
+anything at all. The number of joins would have to depend on data the query has
+not read yet.
 
 A **recursive CTE** removes that limit. It runs a query, feeds the result back
-into itself, and keeps going until a round produces nothing new. The structure is always the same: an **anchor member** that returns the starting rows (the root of the tree, the first node of the graph), a `UNION ALL`, and a **recursive member** that joins the CTE to itself to produce the next level. The database executes the anchor once, then runs the recursive member repeatedly, feeding each round's output as the next round's input, until a round returns zero rows. This page walks through an employee-manager hierarchy, a bill-of-materials tree, and a graph path search, each one with the recursive CTE printed step by step so you can see which rows each round adds.
+into itself, and keeps going until a round produces nothing new. The structure is always the same. An **anchor member** returns the starting rows
+&mdash; the root of the tree, the first node of the graph. Then a `UNION ALL`
+connects to a **recursive member** that joins the CTE to itself to produce the
+next level. The database executes the anchor once, then runs the recursive member repeatedly, feeding each round's output as the next round's input, until a round returns zero rows. This page walks through an employee-manager hierarchy, a bill-of-materials tree, and a graph path search, each one with the recursive CTE printed step by step so you can see which rows each round adds.
 
 ## The two halves
 
@@ -67,9 +70,9 @@ problem with the arrow reversed.
 The fourth variant has no table in it. The anchor is `SELECT 1` and the step
 adds one until it reaches ten.
 
-This is how you produce a sequence without a helper table: a row per day across
-a date range so a report shows zeros for days with no sales, a row per bucket
-for a histogram, a numbers table for splitting strings. It is one of the most
+This is how you produce a sequence without a helper table. Common uses are a row
+per day across a date range so a report shows zeros for days with no sales, a
+row per bucket for a histogram, and a numbers table for splitting strings. It is one of the most
 useful applications and the one people find last.
 
 ## Cycles
@@ -92,11 +95,11 @@ answer, which is far easier to notice.
 ## Filling gaps: the row-per-day spine
 
 The sequence trick earns its own worked case, because it solves a problem every
-reporting query hits: a `GROUP BY day` over a table with no sales on some days
-simply has no row for those days, so the chart skips them and a week with a
+reporting query hits. A `GROUP BY day` over a table with no sales on some days
+simply has no row for those days. The chart skips them, and a week with a
 zero-sales Tuesday looks like a six-day week.
 
-The fix is to generate every day in the range and `LEFT JOIN` the data onto it:
+The fix is to generate every day in the range and `LEFT JOIN` the data onto it.
 
 ```
 WITH RECURSIVE days(d) AS (
@@ -119,7 +122,7 @@ that lies by omission and one that does not.
 
 "Runs forever" understates it. With `UNION ALL` and a cycle, each round feeds the
 next, and if the cycle doubles the frontier the row count explodes geometrically
-before the server kills it:
+before the server kills it.
 
 |round|rows produced|
 |---|---|
@@ -136,9 +139,8 @@ which is far easier to notice than a connection that simply never comes back.
 compares each new row against everything found so far, every round, so on
 acyclic data it makes a correct query needlessly quadratic. The depth cap costs
 one integer comparison per row; reach for it first. A path-based guard &mdash; refusing to revisit a name already on the accumulated
-path &mdash; is stricter and costs a substring check per row, and it is the right
-choice when the data is a graph rather than a tree and genuine repeats are
-expected.
+path &mdash; is stricter and costs a substring check per row. It is the right choice when the data is a graph
+rather than a tree and genuine repeats are expected.
 
 ## Where it goes wrong
 

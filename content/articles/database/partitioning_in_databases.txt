@@ -13,7 +13,11 @@ machines and is a much larger commitment.
 
 The query above builds three range partitions and a view that unions them, which
 is the shape a partitioned table has underneath. Run the variants to see what
-each strategy costs. The two main strategies &mdash; range and hash &mdash; serve different access patterns: range partitioning groups rows by a continuous value like date, so queries on a date range touch only the relevant partition, while hash partitioning distributes rows evenly and prevents hot partitions when the access pattern is unpredictable.
+each strategy costs. The two main strategies &mdash; range and hash &mdash; serve different access
+patterns. Range partitioning groups rows by a continuous value like date, so
+queries on a date range touch only the relevant partition. Hash partitioning
+distributes rows evenly and prevents hot partitions when the access pattern is
+unpredictable.
 
 ## Range partitioning
 
@@ -78,7 +82,7 @@ trying not to read.
 The payoff scales with how much the query skips, and that is just arithmetic.
 Take 120 million orders over five years, partitioned by month &mdash; 60
 partitions of two million rows each. A report over a single month, filtering on
-the partition key, prunes to one partition:
+the partition key, prunes to one partition.
 
 |query| rows the engine must touch |fraction of the table|
 |---|---|---|
@@ -96,7 +100,7 @@ quarter of the rows again.
 So why not partition into thousands of tiny pieces? Because pruning saves scan
 work and the planner spends it back. The planner evaluates every partition when it
 builds the plan, so planning cost grows roughly linearly with the partition count
-&mdash; a fixed overhead paid on every query whether or not pruning helps it:
+&mdash; a fixed overhead paid on every query whether or not pruning helps it.
 
 |partitions|rough planning overhead|
 |---|---|
@@ -119,11 +123,11 @@ customer within each month &mdash; when both access patterns matter.
 Pruning is the benefit everyone knows. The other one shows up when two tables are
 partitioned on the *same* key &mdash; orders and order-items both by `customer_id`,
 say. A row in bucket `i` of one table can only match rows in bucket `i` of the
-other, so the engine performs a **partition-wise join**: 60 small joins of
-aligned buckets, rather than one join over the whole product.
+other, so the engine performs a **partition-wise join**. It runs 60 small joins
+of aligned buckets rather than one join over the whole product.
 
 The arithmetic is the same shape as pruning. With 60 buckets a side, matched
-partitioning means 60 aligned partition-joins; unmatched, any bucket of one table
+partitioning means 60 aligned partition-joins. Without matching, any bucket of one table
 could hold a match for any bucket of the other, which is 60 &times; 60 = 3,600
 partition-pairs to consider. And each aligned join is small enough that its hash
 table &mdash; two million rows, not 120 million &mdash; fits in memory instead of
