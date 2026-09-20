@@ -23,11 +23,8 @@ class HashMap:
     def __init__(self, buckets=8):
         self.buckets = [[] for _ in range(buckets)]
         self.count = 0
-        self.resizes = 0
-
     def _index(self, key):
         return hash(key) % len(self.buckets)      # hash picks the bucket
-
     def put(self, key, value):
         bucket = self.buckets[self._index(key)]
         for i, (k, _) in enumerate(bucket):
@@ -36,39 +33,59 @@ class HashMap:
                 return
         bucket.append((key, value))
         self.count += 1
-        if self.count / len(self.buckets) > 0.75:
-            self._resize()
-
     def get(self, key, default=None):
         for k, v in self.buckets[self._index(key)]:
             if k == key:
                 return v
         return default
 
+m = HashMap()
+for i, w in enumerate("a b c d".split()): m.put(w, i)
+print("HashMap  ->", m.get("c"), "| missing:", m.get("z"))
+```
+Adding `remove`, `_resize` and a bucket-spread helper completes the chaining implementation.
+
+```python-run
+class HashMap:
+    def __init__(self, buckets=4):
+        self.buckets = [[] for _ in range(buckets)]
+        self.count = 0
+    def _index(self, key):
+        return hash(key) % len(self.buckets)
+    def put(self, key, value):
+        bucket = self.buckets[self._index(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:
+                bucket[i] = (key, value)
+                return
+        bucket.append((key, value))
+        self.count += 1
+        if self.count / len(self.buckets) > 0.75:
+            self._resize()
+    def get(self, key, default=None):
+        for k, v in self.buckets[self._index(key)]:
+            if k == key:
+                return v
+        return default
     def remove(self, key):
         bucket = self.buckets[self._index(key)]
         for i, (k, _) in enumerate(bucket):
             if k == key:
-                bucket.pop(i)                     # trivial with chaining
+                bucket.pop(i)
                 self.count -= 1
                 return True
         return False
-
     def _resize(self):
         old = self.buckets
         self.buckets = [[] for _ in range(len(old) * 2)]
         for bucket in old:
             for k, v in bucket:                   # every key moves
                 self.buckets[self._index(k)].append((k, v))
-        self.resizes += 1
-
     def spread(self):
-        sizes = [len(b) for b in self.buckets]
-        return f"{len(self.buckets)} buckets, longest chain {max(sizes)}, empty {sizes.count(0)}"
-
-m = HashMap()
-for i, w in enumerate("a b c d".split()): m.put(w, i)
-print("HashMap  ->", m.get("c"), "| missing:", m.get("z"))
+        return f"{len(self.buckets)} buckets, longest {max(len(b) for b in self.buckets)}, empty {sum(1 for b in self.buckets if not b)}"
+m = HashMap(buckets=4)
+for i, w in enumerate("vectors norms basis".split()): m.put(w, i)
+print("spread:", m.spread(), "| remove:", m.remove("norms"), "| get:", m.get("norms"))
 ```
 
 ```python-run
@@ -127,16 +144,13 @@ class MyHashMap:
         self.cap = capacity
         self.size = 0
         self.buckets = [[] for _ in range(capacity)]
-
     def _index(self, key):
         return hash(key) % self.cap
-
     def get(self, key):
         for k, v in self.buckets[self._index(key)]:
             if k == key:
                 return v
         return None
-
     def put(self, key, value):
         bucket = self.buckets[self._index(key)]
         for i, (k, _) in enumerate(bucket):
@@ -147,7 +161,6 @@ class MyHashMap:
         self.size += 1
         if self.size / self.cap > 0.75:
             self._resize()
-
     def remove(self, key):
         bucket = self.buckets[self._index(key)]
         for i, (k, _) in enumerate(bucket):
@@ -156,7 +169,6 @@ class MyHashMap:
                 self.size -= 1
                 return True
         return False
-
     def _resize(self):
         old = self.buckets
         self.cap *= 2
@@ -165,14 +177,85 @@ class MyHashMap:
         for bucket in old:
             for k, v in bucket:
                 self.put(k, v)                 # rehash everything
+print("MyHashMap class defined with put, get, remove, and auto-resize")
+```
+Exercising get, put and remove on a fixed-size map.
 
+```python-run
+class MyHashMap:
+    def __init__(self, capacity=16):
+        self.cap = capacity
+        self.size = 0
+        self.buckets = [[] for _ in range(capacity)]
+    def _index(self, key):
+        return hash(key) % self.cap
+    def get(self, key):
+        for k, v in self.buckets[self._index(key)]:
+            if k == key:
+                return v
+        return None
+    def put(self, key, value):
+        bucket = self.buckets[self._index(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:
+                bucket[i] = (key, value)
+                return
+        bucket.append((key, value))
+        self.size += 1
+    def remove(self, key):
+        bucket = self.buckets[self._index(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:
+                bucket.pop(i)
+                self.size -= 1
+                return True
+        return False
+m = MyHashMap(capacity=4)
+m.put("basis", 2)
+m.put("rank", 3)
+print("get basis :", m.get("basis"))
+print("get missing:", m.get("nope"))
+print("remove    :", m.remove("basis"), "| now:", m.get("basis"))
+```
+
+Adding automatic resizing keeps the load factor below 0.75. Insert six keys into a four-bucket map and watch the capacity double.
+
+```python-run
+class MyHashMap:
+    def __init__(self, capacity=16):
+        self.cap = capacity
+        self.size = 0
+        self.buckets = [[] for _ in range(capacity)]
+    def _index(self, key):
+        return hash(key) % self.cap
+    def get(self, key):
+        for k, v in self.buckets[self._index(key)]:
+            if k == key:
+                return v
+        return None
+    def put(self, key, value):
+        bucket = self.buckets[self._index(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:
+                bucket[i] = (key, value)
+                return
+        bucket.append((key, value))
+        self.size += 1
+        if self.size / self.cap > 0.75:
+            self._resize()
+    def _resize(self):
+        old = self.buckets
+        self.cap *= 2
+        self.buckets = [[] for _ in range(self.cap)]
+        self.size = 0
+        for bucket in old:
+            for k, v in bucket:
+                self.put(k, v)
 m = MyHashMap(capacity=4)
 for i, word in enumerate("vectors norms basis rank trace det".split()):
     m.put(word, i)
-print("size      :", m.size, "buckets:", m.cap, "<- it resized")
-print("get basis :", m.get("basis"))
-print("get missing:", m.get("nope"))
-print("remove    :", m.remove("norms"), "| now:", m.get("norms"))
+print("size:", m.size, "buckets:", m.cap, "<- resized from 4")
+print("get basis:", m.get("basis"))
 ```
 O(1) average for all three operations, O(n) worst case when every key collides.
 

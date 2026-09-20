@@ -47,28 +47,22 @@ print("heap sizes:", len(m.low), len(m.high))
 Against re-sorting the stream on every query.
 
 ```python-run
-import heapq, random, statistics, time
-
+import heapq, random
 class RunningMedian:
     def __init__(self):
         self.low = []      # max-heap, stored negated
         self.high = []     # min-heap
-
     def add(self, x):
         heapq.heappush(self.low, -x)
         heapq.heappush(self.high, -heapq.heappop(self.low))
         if len(self.high) > len(self.low):
             heapq.heappush(self.low, -heapq.heappop(self.high))
-
     def median(self):
         if len(self.low) > len(self.high):
             return float(-self.low[0])
         return (-self.low[0] + self.high[0]) / 2
-
 random.seed(11)
 stream = [random.randint(0, 1000) for _ in range(2_000)]
-
-# Against re-sorting on every query.
 def by_sorting(stream):
     out, data = [], []
     for x in stream:
@@ -77,16 +71,46 @@ def by_sorting(stream):
         out.append(float(data[n // 2]) if n % 2
                    else (data[n // 2 - 1] + data[n // 2]) / 2)
     return out
+heap_out, mm = [], RunningMedian()
+for x in stream:
+    mm.add(x); heap_out.append(mm.median())
+sort_out = by_sorting(stream)
+print("same medians throughout:", heap_out == sort_out)
+```
 
+The heap approach is also substantially faster at scale.
+
+```python-run
+import heapq, random, time
+class RunningMedian:
+    def __init__(self):
+        self.low = []      # max-heap, stored negated
+        self.high = []     # min-heap
+    def add(self, x):
+        heapq.heappush(self.low, -x)
+        heapq.heappush(self.high, -heapq.heappop(self.low))
+        if len(self.high) > len(self.low):
+            heapq.heappush(self.low, -heapq.heappop(self.high))
+    def median(self):
+        if len(self.low) > len(self.high):
+            return float(-self.low[0])
+        return (-self.low[0] + self.high[0]) / 2
+random.seed(11)
+stream = [random.randint(0, 1000) for _ in range(2_000)]
+def by_sorting(stream):
+    out, data = [], []
+    for x in stream:
+        data.append(x); data.sort()
+        n = len(data)
+        out.append(float(data[n // 2]) if n % 2
+                   else (data[n // 2 - 1] + data[n // 2]) / 2)
+    return out
 t0 = time.perf_counter()
 heap_out, mm = [], RunningMedian()
 for x in stream:
     mm.add(x); heap_out.append(mm.median())
 a = time.perf_counter() - t0
-
 t0 = time.perf_counter(); sort_out = by_sorting(stream); b = time.perf_counter() - t0
-print()
-print("same medians throughout:", heap_out == sort_out)
 print(f"  two heaps          {a*1000:7.1f} ms   O(log n) per insert")
 print(f"  re-sort each time  {b*1000:7.1f} ms   ({b/a:.0f}x slower)")
 ```
