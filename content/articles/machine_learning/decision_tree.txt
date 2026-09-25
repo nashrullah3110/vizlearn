@@ -79,7 +79,7 @@ A depth-3 tree printed as the rules it learned, with the impurity drop at every 
 import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.tree import DecisionTreeClassifier, export_text
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split
 
 X, y = make_classification(n_samples=2000, n_features=6, n_informative=3,
                            n_redundant=0, flip_y=0.06, class_sep=1.3,
@@ -90,9 +90,22 @@ Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
 tree = DecisionTreeClassifier(max_depth=3, random_state=0).fit(Xtr, ytr)
 print(export_text(tree, feature_names=names))
 print("test accuracy %.4f" % tree.score(Xte, yte))
-print()
+```
 
-print("how it chose the first split -- gini impurity before and after:")
+Next we verify how the root split was chosen by computing Gini impurity by hand and comparing it to what scikit-learn picked.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split
+
+X, y = make_classification(n_samples=2000, n_features=6, n_informative=3,
+                           n_redundant=0, flip_y=0.06, class_sep=1.3,
+                           random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
+tree = DecisionTreeClassifier(max_depth=3, random_state=0).fit(Xtr, ytr)
+
 def gini(labels):
     if len(labels) == 0:
         return 0.0
@@ -100,6 +113,7 @@ def gini(labels):
     return 1 - (p ** 2).sum()
 
 before = gini(ytr)
+print("how it chose the first split -- gini impurity before and after:")
 print("  impurity of the root: %.4f" % before)
 best = None
 for col in range(6):
@@ -116,22 +130,21 @@ print("  same feature. the thresholds differ because this loop tried five")
 print("  candidate cut points and scikit-learn tries the midpoint between")
 print("  every adjacent pair of values -- the idea is identical, the search")
 print("  is just finer.")
-print()
+```
 
-print("if two sibling leaves show the SAME class, that is not a mistake. a")
-print("split is chosen because it lowers impurity -- it makes one side purer")
-print("-- and that can happen without either side's majority label flipping.")
-print("export_text prints the label, not the mix behind it:")
-for leaf in np.where(tree.tree_.children_left == -1)[0]:
-    counts = tree.tree_.value[leaf][0] * tree.tree_.n_node_samples[leaf]
-    print("   leaf %2d: %5d rows, %s -> class %d"
-          % (leaf, tree.tree_.n_node_samples[leaf],
-             np.round(counts).astype(int), counts.argmax()))
-print()
-print("a tree is a set of boxes, so it can only cut along the axes:")
-print("  it will never draw a diagonal line, no matter how much data you give it.")
-print("  it models x > 3 in one split and x + y > 3 only by stacking many.")
-print()
+Increasing depth trades test accuracy for memorisation, and feature importance is just each feature's total impurity drop across all splits.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split
+
+X, y = make_classification(n_samples=2000, n_features=6, n_informative=3,
+                           n_redundant=0, flip_y=0.06, class_sep=1.3,
+                           random_state=0)
+names = ["f%d" % i for i in range(6)]
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
 
 print("depth is the whole trade-off:")
 print("%8s %10s %10s %10s" % ("depth", "leaves", "train", "test"))
@@ -140,6 +153,8 @@ for d in (1, 2, 3, 5, 10, None):
     print("%8s %10d %10.4f %10.4f"
           % (d, t.get_n_leaves(), t.score(Xtr, ytr), t.score(Xte, yte)))
 print()
+
+tree = DecisionTreeClassifier(max_depth=3, random_state=0).fit(Xtr, ytr)
 print("feature importances are impurity drops added up, weighted by how many")
 print("rows passed through each split:")
 for n, imp in sorted(zip(names, tree.feature_importances_),

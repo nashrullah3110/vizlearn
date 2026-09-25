@@ -132,7 +132,6 @@ import numpy as np
 rng = np.random.default_rng(0)
 
 def run(depth, scale, act, name, n=256, width=64):
-    # forward a batch, then propagate a gradient back and log its size
     x = rng.normal(size=(n, width))
     Ws = [rng.normal(0, scale, (width, width)) for _ in range(depth)]
     acts, zs = [x], []
@@ -168,18 +167,12 @@ for args in (
 ):
     name, sizes, out = run(*args)
     print("%-34s %12.3e %12.3e %12.3e" % (name, sizes[-1], sizes[9], sizes[0]))
-print()
+```
 
-name, sizes, _ = run(DEPTH, 0.10, sigmoid, "x")
-print("the sigmoid + small weights row, layer by layer:")
-for i in range(0, DEPTH, 4):
-    print("   layer %2d: %.3e" % (DEPTH - i, sizes[DEPTH - 1 - i]))
-print("   layer  1: %.3e" % sizes[0])
-print("  it shrinks by a roughly constant factor per layer, which makes the")
-print("  total an exponential. after %d layers it is %.1e of what it started"
-      % (DEPTH, sizes[0] / sizes[-1]))
-print("  as -- the first layer receives no usable signal and never learns.")
-print()
+The gradient shrinks by a constant factor at each layer, which makes the total loss exponential in depth. One multiplication per layer is all it takes.
+
+```python-run
+import numpy as np
 
 print("why it is exponential, in one line. each backward step multiplies by")
 print("W.T and by the activation's derivative:")
@@ -197,10 +190,12 @@ for width in (64, 256, 1024):
     print("   width %4d: He std = sqrt(2/%d) = %.4f" % (width, width, np.sqrt(2 / width)))
 print()
 print("2. activations with gradient 1 -- relu, not sigmoid (see the table).")
-print()
-print("3. residual connections -- measured, not asserted. same 20 layers and")
-print("   the same undersized weights (sd 0.06), with and without a skip")
-print("   path around each block:")
+```
+
+Residual connections give the gradient a shortcut that bypasses the shrinking chain entirely, which is what let networks grow beyond 20 layers.
+
+```python-run
+import numpy as np
 
 def stack(residual, depth=20, width=64, n=128):
     r2 = np.random.default_rng(1)
@@ -215,12 +210,13 @@ def stack(residual, depth=20, width=64, n=128):
         xs.append(a)
     g = r2.normal(size=a.shape) / np.sqrt(n)
     for i in range(depth - 1, -1, -1):
-        gz = g * (zs[i] > 0)          # through the relu branch
-        skip = g if residual else 0.0  # and straight through the skip
+        gz = g * (zs[i] > 0)
+        skip = g if residual else 0.0
         g = gz @ Ws[i].T + skip
     return np.abs(g).mean()
 
 plain, res = stack(False), stack(True)
+print("3. residual connections -- same 20 layers, same small weights:")
 print("   plain stack    : gradient at layer 1 = %.3e" % plain)
 print("   residual stack : gradient at layer 1 = %.3e" % res)
 print("   %.0e times more signal reaches layer 1, from the same weights."

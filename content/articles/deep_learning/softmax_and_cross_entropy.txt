@@ -113,7 +113,16 @@ stable = np.exp(big - big.max()) / np.exp(big - big.max()).sum()
 print("  subtract the max first = %s" % np.round(stable, 6))
 print("  every library does that subtraction. it changes nothing")
 print("  mathematically and everything numerically.")
-print()
+```
+
+Cross-entropy measures how far the predicted distribution lands from the true label, and the combined loss has the same overflow trap that softmax does on its own.
+
+```python-run
+import numpy as np
+
+logits = np.array([2.0, 1.0, 0.1, -1.0])
+e = np.exp(logits - logits.max())
+p = e / e.sum()
 
 print("cross-entropy over that distribution, per possible answer:")
 for c in range(4):
@@ -132,10 +141,17 @@ print("  log_softmax(z)[1] = z[1] - logsumexp(z) = %.4f"
       % (z[1] - (z.max() + np.log(np.exp(z - z.max()).sum()))))
 print("  that is why frameworks give you cross_entropy(LOGITS, target) and")
 print("  warn you not to apply softmax yourself first.")
-print()
+```
 
-print("and now the reason it is elegant rather than merely stable.")
-print("the gradient of (softmax + cross-entropy) with respect to the logits:")
+The gradient of the combined softmax-plus-cross-entropy simplifies to a single subtraction, which a numerical check confirms.
+
+```python-run
+import numpy as np
+
+logits = np.array([2.0, 1.0, 0.1, -1.0])
+e = np.exp(logits - logits.max())
+p = e / e.sum()
+
 true_class = 0
 onehot = np.zeros(4); onehot[true_class] = 1
 analytic = p - onehot
@@ -149,9 +165,9 @@ h = 1e-6
 numeric = np.array([(loss_of(logits + h * np.eye(4)[i])
                      - loss_of(logits - h * np.eye(4)[i])) / (2 * h)
                     for i in range(4)])
-print("  analytic  (p - onehot):", np.round(analytic, 8))
-print("  numeric               :", np.round(numeric, 8))
-print("  max difference: %.2e" % np.abs(analytic - numeric).max())
+print("analytic  (p - onehot):", np.round(analytic, 8))
+print("numeric               :", np.round(numeric, 8))
+print("max difference: %.2e" % np.abs(analytic - numeric).max())
 print()
 print("the whole derivative is 'predicted minus actual'. no softmax")
 print("derivative, no chain rule term, no jacobian -- they cancel exactly.")
