@@ -99,73 +99,103 @@ hs, out, loss = forward(Wx, Wh, Wy, b)
 print("a %d-step RNN, one prediction from the final state." % T)
 print("   output %.6f, target %.1f, loss %.6f" % (out, target, loss))
 print()
-
 print("UNROLLED, this is a %d-layer network where every layer uses the SAME"
       % T)
-print("Wh. so the gradient for Wh gets a contribution from every step, and")
-print("those contributions ADD:")
-print()
+print("Wh. the gradient for Wh gets a contribution from every step.")
+```
 
-dWy = hs[-1].reshape(-1, 1) * 2 * (out - target)
+Now backpropagate through all T steps and watch how each step's contribution to the gradient shrinks the further back it is.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+X, H, T = 2, 3, 14
+Wx, Wh = rng.normal(0, 0.5, (X, H)), rng.normal(0, 0.5, (H, H))
+Wy, b = rng.normal(0, 0.5, (H, 1)), np.zeros(H)
+seq, target = rng.normal(0, 1.0, (T, X)), 0.7
+H0 = rng.normal(0, 0.4, H)
+
+def forward(Wx, Wh, Wy, b):
+    h = H0.copy()
+    hs = [h.copy()]
+    for x in seq:
+        h = np.tanh(x @ Wx + h @ Wh + b)
+        hs.append(h.copy())
+    return hs, hs[-1] @ Wy, float((hs[-1] @ Wy - target) ** 2)
+
+hs, out, _ = forward(Wx, Wh, Wy, b)
 dh = (2 * (out - target) * Wy).ravel()
-dWx = np.zeros_like(Wx)
-dWh = np.zeros_like(Wh)
-db = np.zeros_like(b)
-contributions = []
+contribs = []
 for t in range(T - 1, -1, -1):
-    dpre = dh * (1 - hs[t + 1] ** 2)          # through the tanh
-    step_dWh = np.outer(hs[t], dpre)
-    dWh += step_dWh
-    dWx += np.outer(seq[t], dpre)
-    db += dpre
-    contributions.append((t, np.abs(step_dWh).max()))
-    dh = dpre @ Wh.T                          # one step further back
+    dpre = dh * (1 - hs[t + 1] ** 2)
+    contribs.append((t, np.abs(np.outer(hs[t], dpre)).max()))
+    dh = dpre @ Wh.T
 print("%10s %26s" % ("step", "its contribution to dWh"))
-biggest = max(m for _, m in contributions)
-for t, mag in contributions:
+biggest = max(m for _, m in contribs)
+for t, mag in contribs:
     if t in (T - 1, T - 2, T - 4, T - 7, T // 2, 2, 1, 0):
         print("%10d %26.8f  %s"
               % (t, mag, "#" * max(0, int(40 * mag / biggest))))
-print("   total dWh magnitude: %.8f" % np.abs(dWh).max())
 print()
-late = np.mean([m for t, m in contributions if t >= T - 3])
-early = np.mean([m for t, m in contributions if t <= 2])
-print("   the last three steps contribute %.6f on average; the first three"
-      % late)
-print("   contribute %.6f -- a factor of %.0f. that decay is the vanishing"
-      % (early, late / max(early, 1e-30)))
-print("   gradient, seen from the other direction: the early steps barely")
-print("   influence the update at all, so whatever happened there cannot")
-print("   be learned.")
-print()
+late = np.mean([m for t, m in contribs if t >= T - 3])
+early = np.mean([m for t, m in contribs if t <= 2])
+print("   last 3 steps avg %.6f; first 3 avg %.6f -- factor of %.0f."
+      % (late, early, late / max(early, 1e-30)))
+print("   that decay is the vanishing gradient: early steps barely influence")
+print("   the update, so long-range dependencies cannot be learned.")
+```
 
+We can verify those analytic gradients by nudging each weight and measuring the loss change directly.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+X, H, T = 2, 3, 14
+Wx, Wh = rng.normal(0, 0.5, (X, H)), rng.normal(0, 0.5, (H, H))
+Wy, b, seq, target = rng.normal(0, 0.5, (H, 1)), np.zeros(H), rng.normal(0, 1.0, (T, X)), 0.7
+H0 = rng.normal(0, 0.4, H)
+def forward(Wx, Wh, Wy, b):
+    h = H0.copy(); hs = [h.copy()]
+    for x in seq:
+        h = np.tanh(x @ Wx + h @ Wh + b); hs.append(h.copy())
+    return hs, hs[-1] @ Wy, float((hs[-1] @ Wy - target) ** 2)
+hs, out, _ = forward(Wx, Wh, Wy, b)
+dWy = hs[-1].reshape(-1, 1) * 2 * (out - target)
+dh = (2 * (out - target) * Wy).ravel()
+dWx, dWh, db = np.zeros_like(Wx), np.zeros_like(Wh), np.zeros_like(b)
+for t in range(T - 1, -1, -1):
+    dpre = dh * (1 - hs[t + 1] ** 2)
+    dWh += np.outer(hs[t], dpre); dWx += np.outer(seq[t], dpre); db += dpre
+    dh = dpre @ Wh.T
 def numeric(param, i, j, h=1e-6):
     up = [Wx.copy(), Wh.copy(), Wy.copy(), b.copy()]
     dn = [Wx.copy(), Wh.copy(), Wy.copy(), b.copy()]
-    up[param][i, j] += h
-    dn[param][i, j] -= h
+    up[param][i, j] += h; dn[param][i, j] -= h
     return (forward(*up)[2] - forward(*dn)[2]) / (2 * h)
-
-print("CHECK IT. nudge each weight and measure the loss directly:")
+print("CHECK. nudge each weight and measure the loss directly:")
 print("%10s %8s %18s %18s %12s"
       % ("param", "index", "analytic", "numeric", "difference"))
 worst = 0.0
-for name, p, grad, (i, j) in (("Wx", 0, dWx, (0, 0)), ("Wx", 0, dWx, (1, 2)),
-                              ("Wh", 1, dWh, (0, 0)), ("Wh", 1, dWh, (2, 1)),
-                              ("Wy", 2, dWy, (1, 0))):
+for name, p, grad, (i, j) in (("Wx", 0, dWx, (0, 0)), ("Wh", 1, dWh, (0, 0)),
+                              ("Wh", 1, dWh, (2, 1)), ("Wy", 2, dWy, (1, 0))):
     a, n = grad[i, j], numeric(p, i, j)
     worst = max(worst, abs(a - n))
     print("%10s %8s %18.10f %18.10f %12.2e"
           % (name, "[%d,%d]" % (i, j), a, n, abs(a - n)))
 print("   worst disagreement: %.2e -- floating point noise." % worst)
-print()
+```
 
+In practice, running the full backward pass over thousands of steps is too expensive, so training uses truncated BPTT.
+
+```python-run
+T = 14
 print("WHY SUM AND NOT AVERAGE. Wh is one matrix used %d times. the" % T)
 print("derivative of the loss with respect to it is the sum over every use:")
 print("    dL/dWh = sum over t of (dL/dWh at step t)")
 print("   averaging would silently divide your learning rate by the sequence")
-print("   length, and it would make gradients from a 10-token sequence and a")
-print("   1000-token one incomparable.")
+print("   length, and it would make gradients from a 10-token and a")
+print("   1000-token sequence incomparable.")
 print()
 
 print("TRUNCATED BPTT, because the full version is impractical:")
@@ -175,21 +205,19 @@ for k in (1, 5, 25, "full"):
     print("%14s %16s %20s %s"
           % (k, "%d states" % min(kk, T), "%d steps back" % min(kk, T),
              "<- exact" if k == "full" else ""))
-print("   a 10,000-step sequence would need 10,000 stored states before the")
-print("   backward pass can begin. truncation caps that at k, and accepts")
-print("   that dependencies longer than k are invisible to training.")
+print("   truncation caps memory at k states, and accepts that dependencies")
+print("   longer than k are invisible to training.")
 print()
-print("   the usual arrangement is to carry the STATE forward across chunks")
-print("   while cutting the GRADIENT at the boundary:")
+print("   the usual arrangement carries STATE forward across chunks while")
+print("   cutting the GRADIENT at the boundary:")
 print("      forward:  state flows through the whole sequence")
 print("      backward: stops after k steps")
-print("   so the model can still USE long context at inference; it just")
-print("   cannot LEARN dependencies longer than k.")
+print("   the model can still USE long context at inference; it just cannot")
+print("   LEARN dependencies longer than k.")
 print()
-print("and that is the honest limit of the architecture. an LSTM extends how")
-print("far the gradient survives; truncation caps how far it is allowed to")
-print("travel at all. attention removes the question by giving every pair of")
-print("positions a direct path.")
+print("and that is the honest limit. an LSTM extends how far the gradient")
+print("survives; truncation caps how far it is allowed to travel. attention")
+print("removes the question by giving every pair of positions a direct path.")
 ```
 
 ## Worth remembering

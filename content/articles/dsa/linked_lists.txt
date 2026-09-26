@@ -107,14 +107,10 @@ The sentinel or dummy-head trick is worth knowing: allocate one node before the 
 Linked lists are taught as the alternative to arrays and then almost never used. Both halves of that are justified, and the reasons are opposite: the linked list wins the operation it is famous for and loses everything else, including some things by a much larger margin than the complexity table suggests.
 
 ```python-run
-import time
-
-
 class Node:
     def __init__(self, val):
         self.val = val
         self.next = None
-
 
 class LinkedList:
     def __init__(self, values=()):
@@ -122,94 +118,76 @@ class LinkedList:
         tail = None
         for v in values:
             n = Node(v)
-            if tail:
-                tail.next = n
-            else:
-                self.head = n
+            if tail: tail.next = n
+            else:    self.head = n
             tail = n
-
     def get(self, i):
-        # O(i): there is no arithmetic that finds the i-th node
         n, steps = self.head, 0
         while n and steps < i:
-            n = n.next
-            steps += 1
+            n = n.next; steps += 1
         return n, steps + 1
 
-    def insert_after(self, node, val):
-        # O(1): two pointer writes, no matter how long the list is
-        new = Node(val)
-        new.next = node.next
-        node.next = new
-        return 2
-
-
 n = 5000
-lst = list(range(n))
 ll = LinkedList(range(n))
-
 print("INDEXING, %d elements" % n)
 for i in (0, n // 2, n - 1):
     _, steps = ll.get(i)
-    print("  index %5d: list = 1 step (address arithmetic), linked = %d steps"
-          % (i, steps))
+    print("  index %5d: list = 1 step, linked = %d steps" % (i, steps))
+# no fifth-element formula for a linked list -- every access walks from head
+```
 
-# There is no fifth-element formula for a linked list. Every access walks
-# from the head, which is why the O(1) indexing of an array is not a small
-# advantage but a categorical one.
+Now compare front-insertion, where linked lists are genuinely faster, and mid-insertion, where the search cost erases the advantage.
 
-print()
-print("INSERTING AT THE FRONT, %d times" % 10000)
+```python-run
+import time
+
+class Node:
+    def __init__(self, val):
+        self.val = val
+        self.next = None
+
+class LinkedList:
+    def __init__(self):
+        self.head = None
+
+print("INSERTING AT THE FRONT, 10000 times")
 t0 = time.time()
 a = []
 for i in range(10000):
-    a.insert(0, i)             # shifts every element right
+    a.insert(0, i)
 t1 = time.time()
-ll2 = LinkedList()
+ll = LinkedList()
 for i in range(10000):
-    node = Node(i)             # two writes, wherever the list is
-    node.next = ll2.head
-    ll2.head = node
+    node = Node(i)
+    node.next = ll.head
+    ll.head = node
 t2 = time.time()
 print("  list.insert(0, x): %7.1f ms" % ((t1 - t0) * 1000))
 print("  linked prepend:    %7.1f ms" % ((t2 - t1) * 1000))
+# this is the operation linked lists exist for, and the gap is real
+# but O(1) insertion only applies once you HAVE the node -- finding it is O(n)
+```
 
-# This is the operation linked lists exist for, and the gap is real.
-#
-# But now the part the complexity table hides. Insertion is O(1) only
-# once you HAVE the node. Finding it is O(n), and in real code you almost
-# always have to find it first:
+Finally, the memory comparison that shows why arrays win in practice: contiguous layout versus scattered pointer-chasing.
 
-print()
-print("insert after the value 4000, including the search:")
-node, steps = ll.get(4000)
-writes = ll.insert_after(node, "new")
-print("  linked: %d steps to find + %d pointer writes = %d operations"
-      % (steps, writes, steps + writes))
-print("  list:   1 step to find + %d shifts = %d operations"
-      % (n - 4000, n - 4000 + 1))
-
-# The linked list did MORE total work here, because walking 4001 nodes
-# cost more than shifting 1000 array slots -- and shifting an array is a
-# single memmove over contiguous memory, while walking a list is 4001
-# dependent pointer dereferences, each one a potential cache miss.
-#
-# That last point is the one that decides it in practice. An array of
-# 5000 ints occupies one contiguous block the CPU prefetches perfectly.
-# The same 5000 as linked nodes are scattered objects, each holding a
-# value and a pointer:
-
+```python-run
 import sys
-print()
-print("memory for 5000 ints:")
-print("  list:        %8d bytes (plus the ints)" % sys.getsizeof(lst))
-print("  linked nodes: %8d bytes (5000 objects, ~%d bytes each)" % (
-    5000 * (sys.getsizeof(Node(0)) + 16), sys.getsizeof(Node(0)) + 16))
 
-# Which is why the honest summary is: use a linked list when you are
-# splicing at a position you already hold -- an LRU cache moving a node to
-# the front, a free list, an allocator -- and use an array for almost
-# everything else.
+class Node:
+    def __init__(self, val):
+        self.val = val
+        self.next = None
+
+n = 5000
+lst = list(range(n))
+print("memory for %d ints:" % n)
+print("  list:        %8d bytes (plus the ints)" % sys.getsizeof(lst))
+node_size = sys.getsizeof(Node(0)) + 16
+print("  linked nodes: %8d bytes (~%d bytes each)" % (n * node_size, node_size))
+# an array is one contiguous block the CPU prefetches perfectly;
+# linked nodes are scattered objects, each a potential cache miss.
+# use a linked list when you splice at a position you already hold
+# (LRU cache, free list, allocator) and an array for almost everything else.
 ```
 
 ## Try it yourself

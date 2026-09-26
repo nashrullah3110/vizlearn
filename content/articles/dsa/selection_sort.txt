@@ -114,83 +114,57 @@ def selection(a):
     comps = swaps = 0
     for i in range(len(a)):
         m = i
-        for j in range(i + 1, len(a)):
+        for j in range(i+1, len(a)):
             comps += 1
-            if a[j] < a[m]:
-                m = j
+            if a[j] < a[m]: m = j
         if m != i:
-            a[i], a[m] = a[m], a[i]
-            swaps += 1
+            a[i], a[m] = a[m], a[i]; swaps += 1
     return a, comps, swaps
-
 
 def bubble(a):
     a = a[:]
     comps = swaps = 0
-    for i in range(len(a) - 1):
-        for j in range(len(a) - 1 - i):
+    for i in range(len(a)-1):
+        for j in range(len(a)-1-i):
             comps += 1
-            if a[j] > a[j + 1]:
-                a[j], a[j + 1] = a[j + 1], a[j]
-                swaps += 1
+            if a[j] > a[j+1]:
+                a[j], a[j+1] = a[j+1], a[j]; swaps += 1
     return a, comps, swaps
 
-
-import random
-random.seed(3)
+import random; random.seed(3)
 data = random.sample(range(30), 30)
-
 _, sc, ss = selection(data)
 _, bc, bs = bubble(data)
 print("30 random elements")
 print("  selection: %3d comparisons, %3d writes" % (sc, ss))
 print("  bubble:    %3d comparisons, %3d writes" % (bc, bs))
+# same comparison count, wildly different write count
 
-# Same comparison count, wildly different write count. Selection sort
-# never makes more than n-1 swaps, because each pass puts one element in
-# its final position and leaves it there.
-
-print()
-print("%6s  %10s  %8s" % ("n", "swaps", "n-1"))
+print("\n%6s  %10s  %8s" % ("n", "swaps", "n-1"))
 for n in (10, 50, 100, 500):
     d = random.sample(range(n), n)
     _, _, s = selection(d)
-    print("%6d  %10d  %8d" % (n, s, n - 1))
+    print("%6d  %10d  %8d" % (n, s, n-1))
+# at most n-1 swaps, every time -- the property that matters on flash memory
+```
 
-# At most n-1, every time, for any input. That is the property worth
-# knowing: when a WRITE is far more expensive than a comparison --
-# flash memory with limited erase cycles, or records that are large to
-# move -- minimising writes is the thing that matters, and this is the
-# simple sort that does it.
-#
-# Now the flaw. Selection sort is NOT stable, and unlike bubble sort's
-# case this is not a one-character fix: the long-distance swap is the
-# algorithm.
+The flaw: selection sort is NOT stable. The long-distance swap that makes it write-efficient also scrambles equal keys.
 
-items = [("Ada", 2), ("Bala", 1), ("Chen", 2), ("Dara", 1)]
-
-
+```python-run
 def selection_pairs(x):
     x = x[:]
     for i in range(len(x)):
         m = i
-        for j in range(i + 1, len(x)):
-            if x[j][1] < x[m][1]:
-                m = j
+        for j in range(i+1, len(x)):
+            if x[j][1] < x[m][1]: m = j
         x[i], x[m] = x[m], x[i]
     return x
 
-
-print()
+items = [("Ada", 2), ("Bala", 1), ("Chen", 2), ("Dara", 1)]
 print("input:  ", [p[0] for p in items])
 print("sorted: ", [p[0] for p in selection_pairs(items)])
-
-# Bala and Dara both have key 1, and Ada and Chen both have key 2. Read
-# the output: the two 2s come out as Chen then Ada -- reversed from the
-# input. The second pass swapped Ada to the end to bring Dara forward,
-# throwing it past Chen, and nothing
-# afterwards can put it back. Sorting twice to break ties -- by one key,
-# then another -- silently fails on a sort that does this.
+# the two 2s come out as Chen then Ada -- reversed from input.
+# sorting twice to break ties silently fails with selection sort.
 ```
 
 ## Things to try

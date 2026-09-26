@@ -104,156 +104,126 @@ The sections above describe how IVF partitions the space and why exact search st
 import numpy as np
 
 rng = np.random.default_rng(11)
-N, D, NLIST = 4000, 32, 64
-
-# clustered data, because real embeddings are clustered and uniform
-# random vectors would make IVF look better than it is
+N, D = 4000, 32
 CENTRES = rng.normal(0, 1, (12, D))
-labels = rng.integers(0, 12, N)
-X = CENTRES[labels] + rng.normal(0, 0.55, (N, D))
+X = CENTRES[rng.integers(0, 12, N)] + rng.normal(0, 0.55, (N, D))
 X = X / np.linalg.norm(X, axis=1, keepdims=True)
-
-Q = 200
-qlab = rng.integers(0, 12, Q)
-QY = CENTRES[qlab] + rng.normal(0, 0.55, (Q, D))
+Q, K = 200, 10
+QY = CENTRES[rng.integers(0, 12, Q)] + rng.normal(0, 0.55, (Q, D))
 QY = QY / np.linalg.norm(QY, axis=1, keepdims=True)
 
-print("%s vectors of %d dimensions, in %d natural clusters."
-      % ("{:,}".format(N), D, len(CENTRES)))
+print("%s vectors of %d dims, %d clusters" % ("{:,}".format(N), D, 12))
 print()
-print("EXACT SEARCH first, so there is a truth to compare against:")
-K = 10
-sims = QY @ X.T
-truth = np.argsort(-sims, axis=1)[:, :K]
-print("   every query compared against every vector: %s dot products"
-      % "{:,}".format(Q * N))
-print("   this is the thing that does not scale. at %s vectors and 1000"
-      % "{:,}".format(10 ** 8))
-print("   queries a second it is %s dot products a second, which is not"
-      % "{:,}".format(10 ** 11))
-print("   an engineering problem you can optimise your way out of.")
-print()
+print("EXACT SEARCH -- the ground truth:")
+truth = np.argsort(-(QY @ X.T), axis=1)[:, :K]
+print("  %s queries x %s vectors = %s dot products"
+      % ("{:,}".format(Q), "{:,}".format(N), "{:,}".format(Q * N)))
+print("  at 100M vectors this becomes 100 billion/s -- does not scale.")
+```
 
-print("BUILD THE IVF INDEX. step 1: cluster the vectors, %d centroids."
-      % NLIST)
+Exact search checks every vector. An IVF index partitions vectors into clusters so that a query scans only a few of them.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(11)
+N, D, NLIST = 4000, 32, 64
+CENTRES = rng.normal(0, 1, (12, D))
+X = CENTRES[rng.integers(0, 12, N)] + rng.normal(0, 0.55, (N, D))
+X = X / np.linalg.norm(X, axis=1, keepdims=True)
+Q, K = 200, 10
+QY = CENTRES[rng.integers(0, 12, Q)] + rng.normal(0, 0.55, (Q, D))
+QY = QY / np.linalg.norm(QY, axis=1, keepdims=True)
+truth = np.argsort(-(QY @ X.T), axis=1)[:, :K]
+
 cent = X[rng.choice(N, NLIST, replace=False)].copy()
-for _ in range(12):                       # plain k-means
-    assign = np.argmax(X @ cent.T, axis=1)
+for _ in range(12):
+    a = np.argmax(X @ cent.T, axis=1)
     for c in range(NLIST):
-        m = assign == c
-        if m.any():
-            v = X[m].mean(axis=0)
-            cent[c] = v / np.linalg.norm(v)
-sizes = np.bincount(assign, minlength=NLIST)
-print("   cluster sizes: min %d, median %d, max %d, mean %.1f"
-      % (sizes.min(), int(np.median(sizes)), sizes.max(), sizes.mean()))
-print("   step 2: store each vector in its nearest centroid's list. that")
-print("   is the whole index -- %d lists, %s vectors, no graph and no"
-      % (NLIST, "{:,}".format(N)))
-print("   tree.")
-print()
+        m = a == c
+        if m.any(): v = X[m].mean(0); cent[c] = v / np.linalg.norm(v)
+assign = np.argmax(X @ cent.T, axis=1)
 
-print("SEARCHING. compare the query to the %d centroids, pick the nprobe" % NLIST)
-print("closest, and scan only those lists:")
-print("%-10s %14s %16s %14s %16s"
-      % ("nprobe", "recall@10", "vectors scanned", "% of index", "speedup"))
-sweep = {}
+print("IVF: %d centroids over %s vectors" % (NLIST, "{:,}".format(N)))
+print()
+print("%-8s %10s %14s %10s" % ("nprobe", "recall@10", "vecs scanned", "speedup"))
 for nprobe in (1, 2, 4, 8, 16, 32, 64):
-    hits = 0
-    scanned = 0
+    hits = scanned = 0
     for i in range(Q):
         cs = np.argsort(-(QY[i] @ cent.T))[:nprobe]
-        mask = np.isin(assign, cs)
-        idx = np.where(mask)[0]
-        scanned += len(idx)
-        if len(idx):
-            local = idx[np.argsort(-(QY[i] @ X[idx].T))[:K]]
-        else:
-            local = np.array([], int)
-        hits += len(set(local.tolist()) & set(truth[i].tolist()))
-    rec = hits / float(Q * K)
-    avg = scanned / float(Q)
-    sweep[nprobe] = (rec, avg)
-    print("%-10d %14.4f %16.0f %13.1f%% %15.1fx"
-          % (nprobe, rec, avg, 100 * avg / N, N / max(avg, 1)))
-print("   read the first row honestly: probing ONE cluster scans %.1f%% of"
-      % (100 * sweep[1][1] / N))
-print("   the index and recovers %.0f%% of the true neighbours. that is not"
-      % (100 * sweep[1][0]))
-print("   'nearly all' -- more than half the right answers are gone.")
-print("   the interesting row is nprobe = 4: %.0f%% recall for %.1f%% of the"
-      % (100 * sweep[4][0], 100 * sweep[4][1] / N))
-print("   work, a %.0fx speedup. the curve is steep early and flat late,"
-      % (N / sweep[4][1]))
-print("   which is the shape that makes ANN worth using at all -- most of")
-print("   the accuracy is available for a small fraction of the cost, and")
-print("   the last few percent of recall costs almost everything.")
-print("   it works because true neighbours mostly share a cluster with the")
-print("   query, which is an assumption about the DATA: on uniformly")
-print("   random points there are no clusters and IVF would buy nothing.")
-print("   and read the last row: at nprobe = nlist you are scanning")
-print("   everything, recall is 1.0, and you have reinvented exact search")
-print("   with extra steps. every row between is the actual product.")
-print()
+        idx = np.where(np.isin(assign, cs))[0]; scanned += len(idx)
+        loc = idx[np.argsort(-(QY[i] @ X[idx].T))[:K]] if len(idx) else []
+        hits += len(set(np.asarray(loc).tolist()) & set(truth[i].tolist()))
+    rec = hits / (Q * K); avg = scanned / Q
+    print("%-8d %10.4f %14.0f %9.1fx" % (nprobe, rec, avg, N / max(avg, 1)))
 
-print("WHERE THE MISSES COME FROM. a true neighbour is lost when it sits")
-print("in a cluster the query did not probe -- which happens when the")
-print("query lands near a boundary:")
-d1 = []
-for i in range(Q):
-    s = np.sort(-(QY[i] @ cent.T))
-    d1.append(-s[0] + s[1])              # gap between best and 2nd centroid
-d1 = np.array(d1)
-close = d1 < np.median(d1)
-def recall_at(nprobe, subset):
+# nprobe=4 gives most of the recall for a fraction of the work.
+# nprobe=nlist scans everything -- exact search with extra steps.
+```
+
+Recall is not spread evenly. Queries near a cluster boundary lose neighbours sitting in the un-probed cluster next door.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(11)
+N, D, NLIST = 4000, 32, 64
+CENTRES = rng.normal(0, 1, (12, D))
+X = CENTRES[rng.integers(0, 12, N)] + rng.normal(0, 0.55, (N, D))
+X = X / np.linalg.norm(X, axis=1, keepdims=True)
+Q, K = 200, 10
+QY = CENTRES[rng.integers(0, 12, Q)] + rng.normal(0, 0.55, (Q, D))
+QY = QY / np.linalg.norm(QY, axis=1, keepdims=True)
+truth = np.argsort(-(QY @ X.T), axis=1)[:, :K]
+cent = X[rng.choice(N, NLIST, replace=False)].copy()
+for _ in range(12):
+    a = np.argmax(X @ cent.T, axis=1)
+    for c in range(NLIST):
+        m = a == c
+        if m.any(): v = X[m].mean(0); cent[c] = v / np.linalg.norm(v)
+assign = np.argmax(X @ cent.T, axis=1)
+
+gaps = [np.sort(QY[i] @ cent.T)[-1] - np.sort(QY[i] @ cent.T)[-2]
+        for i in range(Q)]
+close = np.array(gaps) < np.median(gaps)
+def recall_for(np_, mask):
     h = t = 0
-    for i in np.where(subset)[0]:
-        cs = np.argsort(-(QY[i] @ cent.T))[:nprobe]
+    for i in np.where(mask)[0]:
+        cs = np.argsort(-(QY[i] @ cent.T))[:np_]
         idx = np.where(np.isin(assign, cs))[0]
-        local = idx[np.argsort(-(QY[i] @ X[idx].T))[:K]] if len(idx) else []
-        h += len(set(np.asarray(local).tolist()) & set(truth[i].tolist()))
+        loc = idx[np.argsort(-(QY[i] @ X[idx].T))[:K]] if len(idx) else []
+        h += len(set(np.asarray(loc).tolist()) & set(truth[i].tolist()))
         t += K
-    return h / float(t)
-print("%-34s %16s %16s" % ("", "recall@10, np=1", "recall@10, np=4"))
-print("%-34s %16.4f %16.4f"
-      % ("queries near a cluster boundary", recall_at(1, close),
-         recall_at(4, close)))
-print("%-34s %16.4f %16.4f"
-      % ("queries deep inside a cluster", recall_at(1, ~close),
-         recall_at(4, ~close)))
-print("   the loss is not spread evenly. queries that fall between")
-print("   centroids lose far more, and raising nprobe helps them far more.")
-print("   that is worth knowing because it means your average recall hides")
-print("   a population of queries that fail much harder than the mean --")
-print("   and those are the ones users complain about.")
-print()
+    return h / t
 
-print("THE MEMORY SIDE, which is a different constraint entirely:")
-print("%-30s %16s %16s" % ("", "bytes/vector", "%s vectors" % "{:,}".format(10 ** 8)))
+print("%-30s %12s %12s" % ("", "np=1", "np=4"))
+print("%-30s %12.4f %12.4f" % ("near boundary", recall_for(1, close), recall_for(4, close)))
+print("%-30s %12.4f %12.4f" % ("deep in cluster", recall_for(1, ~close), recall_for(4, ~close)))
+print()
+print("Boundary queries lose far more; raising nprobe helps them most.")
+```
+
+Memory is a separate constraint. Product quantisation compresses each vector to a short code, trading accuracy for a smaller footprint.
+
+```python-run
+D = 32
+print("%-28s %14s %14s" % ("", "bytes/vec", "100M vectors"))
 for label, b in (("float32, %d dims" % D, D * 4),
                  ("float32, 768 dims", 768 * 4),
                  ("PQ, 96 subquantisers", 96),
                  ("PQ, 48 subquantisers", 48)):
-    print("%-30s %16d %14.1f GB" % (label, b, 10 ** 8 * b / 1e9))
-print("   product quantisation replaces each vector with a short code, so")
-print("   %s 768-dimensional vectors go from %.0f GB -- which does not fit"
-      % ("{:,}".format(10 ** 8), 10 ** 8 * 768 * 4 / 1e9))
-print("   in any single machine's RAM -- to %.1f GB, which does. it costs"
-      % (10 ** 8 * 96 / 1e9))
-print("   accuracy, and it is usually combined with IVF rather than")
-print("   chosen instead of it: IVF decides WHERE to look, PQ decides how")
-print("   cheaply each comparison is done.")
+    print("%-28s %14d %12.1f GB" % (label, b, 1e8 * b / 1e9))
+
 print()
-print("WHICH TO REACH FOR, by what is actually scarce:")
-print("%-26s %s" % ("under ~10k vectors", "exact search -- IVF adds only risk"))
+print("WHICH TO REACH FOR:")
+print("%-26s %s" % ("under ~10k vectors", "exact search"))
 print("%-26s %s" % ("recall matters most", "HNSW, high ef_search"))
 print("%-26s %s" % ("memory is the limit", "IVF + PQ"))
-print("%-26s %s" % ("build time matters", "IVF -- HNSW is slow to build"))
-print("%-26s %s" % ("frequent deletions", "IVF -- HNSW handles them poorly"))
-print("   and whichever you pick, measure recall against exact search on")
-print("   your own vectors, exactly as done above. it is the one number")
-print("   that an ANN index cannot report about itself, and the default")
-print("   parameters of every library were chosen on somebody else's data.")
+print("%-26s %s" % ("build time matters", "IVF (HNSW is slow to build)"))
+print("%-26s %s" % ("frequent deletions", "IVF (HNSW handles them poorly)"))
+print()
+print("Measure recall against exact search on your own vectors.")
+print("Default parameters were chosen on somebody else's data.")
 ```
 
 ## Things to try

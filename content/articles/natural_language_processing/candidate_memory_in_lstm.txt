@@ -109,28 +109,30 @@ for t, z in enumerate(pre):
         print("   step %2d: sigmoid candidate -> c = %8.4f   tanh -> c = %8.4f"
               % (t, c_sig, c_tanh))
 print("   the sigmoid version only ever climbs -- every contribution is")
-print("   positive, so the state drifts up until the forget gate balances")
-print("   it. the tanh version can push the state in either direction, so")
-print("   it can also CORRECT a memory rather than only reinforcing it.")
-print()
+print("   positive, so the state drifts up. the tanh version can push in")
+print("   either direction, so it can also CORRECT a memory.")
+```
 
-print("and the range bounds how fast the state can move. with |g| <= 1 and")
-print("the input gate in [0, 1], one step can change c by at most 1:")
+The tanh bound also prevents the cell state from exploding. Here is how the candidate interacts with the input gate.
+
+```python-run
+import numpy as np
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-np.clip(z, -30, 30)))
+
 c = 0.0
-print("   fastest possible accumulation, i=1 and g=1 at every step,")
-print("   with the forget gate wide open at 0.99:")
+print("fastest possible accumulation, i=1 and g=1 every step, f=0.99:")
 for t in range(1, 2001):
     c = 0.99 * c + 1.0
     if t in (1, 5, 50, 200, 1000, 2000):
-        print("      step %4d: c = %8.4f" % (t, c))
-print("   it levels off at 1/(1-f) = %.1f instead of growing without bound."
+        print("   step %4d: c = %8.4f" % (t, c))
+print("   levels off at 1/(1-f) = %.1f -- tanh saturating at +/-1 prevents"
       % (1 / (1 - 0.99)))
-print("   an unbounded candidate would let the state explode, and tanh")
-print("   saturating at +/-1 is what prevents that.")
+print("   unbounded growth.")
 print()
 
-print("the candidate is computed from the same inputs as the gates, with")
-print("its own weights -- it is a full layer, not a transformation of them:")
+print("the candidate is a full layer with its own weights:")
 H, X = 4, 3
 rng = np.random.default_rng(1)
 Wc = rng.normal(0, 0.5, (X + H, H)); bc = np.zeros(H)
@@ -138,20 +140,14 @@ Wi = rng.normal(0, 0.5, (X + H, H)); bi = np.zeros(H)
 x, h = rng.normal(size=X), rng.normal(size=H)
 z = np.concatenate([x, h])
 g, i = np.tanh(z @ Wc + bc), sigmoid(z @ Wi + bi)
-print("   input x = %s, hidden h = %s" % (np.round(x, 3), np.round(h, 3)))
 print("   candidate g = %s" % np.round(g, 4))
 print("   input gate i = %s" % np.round(i, 4))
-print("   what actually reaches memory, i * g = %s" % np.round(i * g, 4))
+print("   what reaches memory, i * g = %s" % np.round(i * g, 4))
 print()
-print("   read the last row against the one above it. unit by unit, the gate")
-print("   scales the content down -- and where the gate is small, a large")
-print("   candidate contributes almost nothing. the cell can compute a")
-print("   strong opinion and then decline to store it.")
-print()
-print("that separation is the design. one network decides what the new")
-print("information IS, a second decides whether it is worth keeping, and")
-print("they are trained independently. a plain RNN has only the first, which")
-print("is why it cannot choose to ignore an input.")
+print("   where the gate is small, a large candidate contributes almost")
+print("   nothing. the cell can compute a strong opinion and decline to")
+print("   store it. one network decides what the new information IS, a")
+print("   second decides whether it is worth keeping.")
 ```
 
 ## Guided tour
