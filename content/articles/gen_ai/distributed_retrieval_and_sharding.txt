@@ -139,8 +139,12 @@ print("   response from somewhere.")
 print("   this is why adding shards to make each one faster can make the")
 print("   SERVICE slower, and why it is the p99 of a shard that matters")
 print("   rather than its mean.")
-print()
-print("   the standard mitigations, and what each gives up:")
+```
+
+The standard mitigations for that tail each trade away something else, which the next block spells out.
+
+```python-run
+print("the standard mitigations for the tail, and what each gives up:")
 print("%-30s %s" % ("hedged requests", "duplicate work for a shorter tail"))
 print("%-30s %s" % ("a deadline, partial results", "recall, silently"))
 print("%-30s %s" % ("fewer, larger shards", "per-shard latency"))
@@ -148,11 +152,15 @@ print("   the middle one deserves care. returning results from 62 of 64")
 print("   shards looks like a success and is a %.1f%% loss of the corpus"
       % (100 * 2 / 64.0))
 print("   on that query, with nothing in the response to say so.")
-print()
+```
+
+Latency is not the only cross-shard problem. The next block shows why BM25 scores, unlike cosine distance, do not merge safely across shards.
+
+```python-run
+import numpy as np
 
 print("PROBLEM 2 -- THE MERGE. distance scores merge fine, because a")
 print("cosine similarity means the same thing everywhere. these do not:")
-print()
 print("   BM25 scores depend on CORPUS STATISTICS -- specifically idf,")
 print("   which is computed from the documents a shard happens to hold:")
 SHARDS = {
@@ -176,12 +184,23 @@ print("   not because it is a better match, but because of who its")
 print("   neighbours are.")
 print("   merge those scores and the ranking is decided by shard")
 print("   assignment. that is why the article says to shard RANDOMLY: it")
-print("   does not fix the problem, it makes the per-shard statistics")
-print("   converge to the global ones, so the error is small and unbiased")
-print("   instead of large and systematic.")
+print("   makes the per-shard statistics converge to the global ones, so")
+print("   the error is small and unbiased instead of large and systematic.")
 print("   sharding by date or by customer -- the two most natural choices")
 print("   -- is exactly what you must not do.")
-print()
+```
+
+To see how large that distortion actually is, the next block scores one identical document on both shards.
+
+```python-run
+import numpy as np
+
+SHARDS = {
+    "shard A (10,000 docs)": (10000, 40),
+    "shard B (10,000 docs)": (10000, 3000),
+}
+gn = sum(n for n, _ in SHARDS.values())
+gdf = sum(df for _, df in SHARDS.values())
 
 print("HOW WRONG DOES IT GET? one document, scored on both shards:")
 TF = 3.0
@@ -199,7 +218,12 @@ print("   the fixes are to distribute global statistics to every shard, or")
 print("   to re-score the merged candidates centrally. both cost a round")
 print("   trip, which is why many systems simply accept the error and")
 print("   shard randomly so that it stays small.")
-print()
+```
+
+Shards are not the only axis of a cluster; the last block separates them from replicas and sizes a cluster from both.
+
+```python-run
+import numpy as np
 
 print("REPLICAS ARE A DIFFERENT AXIS, and conflating them is common:")
 print("%-19s %-30s %s" % ("", "shards", "replicas"))

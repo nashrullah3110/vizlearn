@@ -119,8 +119,29 @@ print("the condition number is the ratio of the steepest curvature to the")
 print("shallowest. gradient descent needs roughly that many steps to")
 print("converge, so a condition number of 1e9 means it will not converge in")
 print("any budget you have.")
-print()
+```
 
+Now run gradient descent on each variant, each at its own best learning rate, and compare convergence.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+n = 400
+raw = np.column_stack([rng.normal(0.5, 0.02, n),
+                       rng.normal(60_000, 15_000, n)])
+w_true = np.array([3.0, 0.00004])
+y = raw @ w_true + rng.normal(0, 0.05, n)
+def design(a):
+    return np.column_stack([a, np.ones(len(a))])
+def cond(a):
+    M = design(a)
+    ev = np.linalg.eigvalsh(M.T @ M / len(M))
+    return ev.max() / max(ev.min(), 1e-30), ev.max()
+def standardize(a): return (a - a.mean(axis=0)) / a.std(axis=0)
+def minmax(a):      return (a - a.min(axis=0)) / (a.max(axis=0) - a.min(axis=0))
+def center(a):      return a - a.mean(axis=0)
+variants = [("raw", raw), ("centred only", center(raw)),
+            ("min-max to [0,1]", minmax(raw)), ("standardised", standardize(raw))]
 print("run it and see. the same %d steps on each version:" % 400)
 for name, A in variants:
     c, L = cond(A)
@@ -142,7 +163,18 @@ print("every version uses the largest learning rate that is stable FOR IT,")
 print("so this is not a handicap -- it is the best each one can do in 400")
 print("steps. the two scaled versions reach the exact optimum; the other two")
 print("do not get close.")
-print()
+```
+
+Centring alone came out worse than raw because it changes where the surface sits without changing how elongated it is. The gradient magnitudes show why one learning rate cannot serve both features.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+n = 400
+raw = np.column_stack([rng.normal(0.5, 0.02, n),
+                       rng.normal(60_000, 15_000, n)])
+w_true = np.array([3.0, 0.00004])
+y = raw @ w_true + rng.normal(0, 0.05, n)
 print("note that 'centred only' came out WORSE than raw. subtracting the mean")
 print("changes where the surface sits without changing how elongated it is,")
 print("so the condition number stays astronomical -- and it happened to")
@@ -150,7 +182,6 @@ print("remove the one large gradient that was letting the raw version make")
 print("any progress at all. centring is not scaling, and on its own it is")
 print("not reliably an improvement.")
 print()
-
 print("why it happens, geometrically. a step moves each weight by")
 print("lr x gradient, and the gradient for a weight is scaled by its input:")
 g = 2 * raw.T @ (raw @ np.zeros(2) - y) / n
@@ -160,8 +191,11 @@ print("    feature 1: %14.4f" % g[1])
 print("  a factor of %.0f apart. one learning rate has to serve both, so it"
       % abs(g[1] / g[0]))
 print("  is set by the larger one and the smaller weight barely moves.")
-print()
+```
 
+These are the practical rules for choosing a scaler and avoiding the common mistakes.
+
+```python-run
 print("which scaler to use:")
 print("  StandardScaler (mean 0, sd 1) -- the default. works with any")
 print("     distribution and is what most initialisation schemes assume.")

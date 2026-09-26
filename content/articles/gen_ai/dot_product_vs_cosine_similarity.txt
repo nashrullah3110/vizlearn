@@ -112,8 +112,11 @@ print("scores it %.4f against the short exact match's %.4f. by dot"
 print("product the WRONG DOCUMENT WINS. by cosine, %.4f against %.4f,"
       % (cos(q, docs["45 deg off, long"]), cos(q, docs["same direction, short"])))
 print("and the right one wins.")
-print()
+```
 
+That is not a coincidence — it falls straight out of the algebra relating the two, which the next block states directly.
+
+```python-run
 print("THE ALGEBRA, so this is not a coincidence:")
 print("      dot(a, b)    = |a| |b| cos(theta)")
 print("      cosine(a, b) = dot(a, b) / (|a| |b|) = cos(theta)")
@@ -121,7 +124,23 @@ print("   cosine is the dot product with the magnitudes cancelled, so it")
 print("   depends on DIRECTION ONLY. the dot product mixes direction and")
 print("   magnitude into one number, and once mixed you cannot tell which")
 print("   contributed what.")
-print()
+```
+
+That algebra has a practical consequence: once every vector is normalised to unit length, dot product and cosine become the same number.
+
+```python-run
+import numpy as np
+
+q = np.array([1.0, 1.0, 0.0])
+docs = {
+    "same direction, short": np.array([1.0, 1.0, 0.0]),
+    "same direction, LONG":  np.array([5.0, 5.0, 0.0]),
+    "45 deg off, long":      np.array([4.0, 0.0, 0.0]),
+    "orthogonal":            np.array([0.0, 0.0, 3.0]),
+    "opposite":              np.array([-1.0, -1.0, 0.0]),
+}
+def cos(a, b):
+    return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
 
 print("SO IF EVERYTHING IS NORMALISED, THEY ARE THE SAME OPERATION:")
 qn = q / np.linalg.norm(q)
@@ -135,8 +154,11 @@ print("   identical to floating-point precision. that is why so much")
 print("   retrieval code normalises once at index time and then uses the")
 print("   dot product: same answer as cosine, no division per comparison,")
 print("   and a dot product is a single fused matrix multiply on a GPU.")
-print()
+```
 
+Given that equivalence once normalised, the choice comes down to what a vector's length is meant to encode.
+
+```python-run
 print("WHICH TO CHOOSE, and the honest answer is that it depends on what")
 print("your vector's LENGTH means:")
 print("%-34s %s" % ("if length means...", "then use"))
@@ -145,7 +167,15 @@ for k, v in (("nothing (a direction only)", "either -- normalise and dot"),
              ("document length", "cosine, or you rank by length"),
              ("you have no idea", "cosine -- the safe default")):
     print("%-34s %s" % (k, v))
-print()
+```
+
+Getting that choice wrong produces a real bug: the next block shows an embedding model whose vector length grows with text length.
+
+```python-run
+import numpy as np
+
+def cos(a, b):
+    return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
 
 print("A CONCRETE FAILURE, because this one appears in real systems. some")
 print("embedding models produce longer vectors for longer text:")
@@ -173,7 +203,17 @@ for name, v in (("query", query), ("short", short), ("long", long_off)):
     n = np.linalg.norm(v)
     print("      |%s| = %.4f  %s"
           % (name, n, "unit" if abs(n - 1) < 1e-6 else "NOT UNIT"))
-print()
+```
+
+Finally, it is worth separating cosine similarity from cosine distance, and checking how both relate to euclidean distance on unit vectors.
+
+```python-run
+import numpy as np
+
+q = np.array([1.0, 1.0, 0.0])
+qn = q / np.linalg.norm(q)
+def cos(a, b):
+    return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
 
 print("ONE LAST DISTINCTION people conflate: cosine SIMILARITY versus")
 print("cosine DISTANCE, and versus euclidean distance on unit vectors.")

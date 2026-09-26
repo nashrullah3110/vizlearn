@@ -83,13 +83,9 @@ Ordinal, label and one-hot encoding do similar-looking things for different purp
 
 ```python-run
 import numpy as np
-from sklearn.preprocessing import LabelEncoder, OrdinalEncoder, OneHotEncoder
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import cross_val_score
+from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
 
 sizes = np.array(["small", "medium", "large", "x-large"])
-colours = np.array(["red", "green", "blue"])
 
 print("LabelEncoder is for the TARGET, and takes a 1-D array:")
 le = LabelEncoder().fit(["cat", "dog", "bird", "dog"])
@@ -112,9 +108,21 @@ for c, n in zip(told.categories_[0], range(4)):
     print("     %-8s -> %.0f" % (c, n))
 print("  alphabetically, x-large sorts last and large sorts second. the model")
 print("  is told large < medium < small < x-large, which is nonsense.")
-print()
+```
 
+Now the same data through three encodings, showing how the choice affects a linear model versus a tree.
+
+```python-run
+import numpy as np
+from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import cross_val_score
+
+sizes = np.array(["small", "medium", "large", "x-large"])
+colours = np.array(["red", "green", "blue"])
 rng = np.random.default_rng(0)
+
 idx = rng.integers(0, 4, 1500)
 size_col = sizes[idx]
 price = np.array([10.0, 20.0, 30.0, 40.0])[idx] + rng.normal(0, 2, 1500)
@@ -130,11 +138,6 @@ for name, Xe in (("ordinal, alphabetical", Xa), ("ordinal, correct order", Xt),
              cross_val_score(RandomForestRegressor(n_estimators=100, random_state=0),
                              Xe, price, cv=5).mean()))
 print()
-print("the correct ordinal encoding wins for the linear model, because the")
-print("order is real and one number captures it. the alphabetical one loses")
-print("badly. the forest does not care -- it can split its way to the right")
-print("answer from any encoding, it just needs more depth to do it.")
-print()
 
 print("now a column with NO order -- colour:")
 col = colours[rng.integers(0, 3, 1500)]
@@ -145,12 +148,6 @@ Xoh = OneHotEncoder(sparse_output=False).fit_transform(col.reshape(-1, 1))
 print("  ordinal  linear R2 %.4f" % cross_val_score(LinearRegression(), Xo, value, cv=5).mean())
 print("  one-hot  linear R2 %.4f" % cross_val_score(LinearRegression(), Xoh, value, cv=5).mean())
 print("  there is no order to find, so forcing one costs you most of the signal.")
-print()
-print("the rule, in one line each:")
-print("  ordered categories, linear model   -> OrdinalEncoder, categories= set")
-print("  unordered categories, linear model -> OneHotEncoder")
-print("  any categories, tree model         -> ordinal is fine and much cheaper")
-print("  the target column                  -> LabelEncoder")
 ```
 
 ## Things to try

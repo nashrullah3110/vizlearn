@@ -145,54 +145,54 @@ def propagate(scale_fn, act, name):
     return name, stds
 
 relu = lambda z: np.maximum(0, z)
-tanh = np.tanh
 
-print("activation standard deviation after each of %d layers." % DEPTH)
-print("healthy means it stays roughly constant. it should not trend.")
-print()
-print("%-32s %9s %9s %9s %9s"
-      % ("scheme", "layer 1", "layer 4", "layer 7", "layer 10"))
+print("activation std after each of %d layers (should stay constant):\n" % DEPTH)
+print("%-32s %9s %9s %9s %9s" % ("scheme", "layer 1", "layer 4", "layer 7", "layer 10"))
 for fn, act, name in (
     (lambda w: rng.normal(0, 0.01, (w, w)), relu, "gaussian sd 0.01 (too small)"),
     (lambda w: rng.normal(0, 1.00, (w, w)), relu, "gaussian sd 1.00 (too big)"),
-    (lambda w: rng.normal(0, np.sqrt(1 / w), (w, w)), tanh, "Xavier/Glorot, tanh"),
+    (lambda w: rng.normal(0, np.sqrt(1 / w), (w, w)), np.tanh, "Xavier/Glorot, tanh"),
     (lambda w: rng.normal(0, np.sqrt(2 / w), (w, w)), relu, "He, relu"),
 ):
     name, stds = propagate(fn, act, name)
-    print("%-32s %9.3e %9.3e %9.3e %9.3e"
-          % (name, stds[0], stds[3], stds[6], stds[9]))
+    print("%-32s %9.3e %9.3e %9.3e %9.3e" % (name, stds[0], stds[3], stds[6], stds[9]))
 print()
-print("sd 0.01 collapses toward zero -- by layer 10 every activation is")
-print("effectively 0, so no information reaches the output and no gradient")
-print("comes back. sd 1.00 does the opposite and saturates.")
-print()
-print("the two that work stay on the same order of magnitude. He is flat.")
-print("Xavier drifts down gently, because tanh compresses whatever it is")
-print("given -- but compare a drift from 0.63 to 0.22 against a collapse to")
-print("1e-11. that is the difference between a network that trains slowly")
-print("and one that does not train at all.")
-print()
-print("the rules themselves:")
-print("  Xavier: variance 1/n_in, for tanh and sigmoid.")
-print("  He:     variance 2/n_in, for relu -- the 2 compensates for relu")
-print("          discarding half its inputs.")
-print()
+print("sd 0.01 collapses to zero -- no signal reaches the output.")
+print("sd 1.00 does the opposite and saturates.")
+print("He stays flat. Xavier drifts gently (tanh compresses), but compare")
+print("a drift from 0.63 to 0.22 against a collapse to 1e-11.")
+print("\nthe rules: Xavier variance 1/n_in (tanh/sigmoid),")
+print("He variance 2/n_in (relu -- the 2 compensates for relu halving).")
+```
 
-print("here is where the 2 comes from. relu zeroes the negative half, and the")
-print("quantity that propagates through a layer is the mean SQUARE:")
+The next block shows where the factor of 2 in He initialisation comes from.
+
+```python-run
+import numpy as np
+
+relu = lambda z: np.maximum(0, z)
+rng = np.random.default_rng(0)
+
+print("where the 2 comes from: relu zeroes the negative half.\n")
 z = rng.normal(0, 1.0, 400_000)
 print("  E[z^2]        for the input      %.4f" % (z ** 2).mean())
-print("  E[relu(z)^2]  after the relu     %.4f  <- exactly half"
-      % (relu(z) ** 2).mean())
-print("  half the values became 0 and the other half were untouched, so the")
-print("  mean of the squares halves. every layer would halve it again.")
+print("  E[relu(z)^2]  after relu         %.4f  <- exactly half" % (relu(z) ** 2).mean())
+print("  half the values became 0, so the mean of squares halves.")
+print("  every layer would halve it again.\n")
 z2 = rng.normal(0, np.sqrt(2.0), 400_000)
 print("  with weights scaled by sqrt(2): E[relu(z)^2] = %.4f  <- restored"
       % (relu(z2) ** 2).mean())
 print("  that is the whole derivation of He initialisation.")
-print()
+```
 
-print("and the failure that is not about scale at all -- all zeros:")
+Finally, the failure that is not about scale at all: all-zero weights and the symmetry problem.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+print("the failure that is not about scale -- all zeros:\n")
 W1 = np.zeros((4, 3)); W2 = np.zeros((3, 1))
 x = rng.normal(size=(8, 4)); y = rng.normal(size=(8, 1))
 for step in range(50):
@@ -204,16 +204,13 @@ for step in range(50):
     W1 -= 0.1 * dW1; W2 -= 0.1 * dW2
 print("  after 50 steps, the hidden layer's weights:")
 print(np.round(W1, 6))
-print("  every column is identical. all three hidden units computed the same")
-print("  thing, received the same gradient, and updated identically.")
-print("  a layer of n units with the same values is a layer of 1 unit.")
-print()
-print("that is why initialisation must be RANDOM, not merely small. the")
-print("randomness is what breaks the symmetry between units, and no amount")
-print("of training will break it later.")
-print()
-print("biases are the exception -- zero is the standard choice for them,")
-print("because the weights have already broken the symmetry.")
+print("  every column is identical. all three hidden units computed the")
+print("  same thing, received the same gradient, and updated identically.")
+print("  a layer of n units with the same values is a layer of 1 unit.\n")
+print("initialisation must be RANDOM, not merely small. randomness breaks")
+print("the symmetry between units, and no amount of training breaks it later.\n")
+print("biases are the exception -- zero is fine because the weights already")
+print("broke the symmetry.")
 ```
 
 ## Questions people ask

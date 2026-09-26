@@ -113,7 +113,27 @@ print("A 5-DIMENSIONAL SPACE, small enough to read every coordinate:")
 print("%-10s %s" % ("word", "  ".join("%8s" % d for d in DIMS)))
 for w, v in VOCAB.items():
     print("%-10s %s" % (w, "  ".join("%8.2f" % x for x in v)))
-print()
+```
+
+Directions in that space can be added and subtracted, and the next block tries the classic king - man + woman analogy on it.
+
+```python-run
+import numpy as np
+
+VOCAB = {
+    "king":    [0.90, 0.85, 0.05, 0.05, 0.60],
+    "queen":   [0.90, 0.05, 0.85, 0.05, 0.55],
+    "man":     [0.05, 0.90, 0.05, 0.10, 0.55],
+    "woman":   [0.05, 0.05, 0.90, 0.10, 0.50],
+    "prince":  [0.85, 0.80, 0.05, 0.05, 0.35],
+    "dog":     [0.02, 0.30, 0.30, 0.95, 0.35],
+    "puppy":   [0.02, 0.30, 0.30, 0.95, 0.10],
+}
+def unit(v):
+    v = np.asarray(v, float)
+    return v / np.linalg.norm(v)
+def cos(a, b):
+    return float(unit(a) @ unit(b))
 
 print("THE COORDINATES ARE DIRECTIONS, so differences between words are")
 print("directions too. king - man is whatever is left of 'king' once")
@@ -129,10 +149,14 @@ for w in sorted(VOCAB, key=lambda x: -cos(result, VOCAB[x]))[:4]:
     print("%-14s %10.4f" % (w, cos(result, VOCAB[w])))
 print("   'queen' comes out on top, which is the famous result -- and it")
 print("   works here because the dimensions were BUILT to be 'royal' and")
-print("   'male'. in a real embedding nobody chose those axes, they are")
-print("   whatever the training objective produced, and the arithmetic")
-print("   works far less reliably than the demonstration suggests.")
-print()
+print("   'male'. in a real embedding nobody chose those axes, and the")
+print("   arithmetic works far less reliably than this demo suggests.")
+```
+
+The property that actually decides whether retrieval works is not the similarity number itself but its spread, which the next block measures on a realistic embedding shape.
+
+```python-run
+import numpy as np
 
 print("NOW THE PROPERTY THAT DECIDES WHETHER RETRIEVAL WORKS, and it is")
 print("not similarity -- it is the SPREAD of similarities. compare a")
@@ -161,12 +185,20 @@ print("   scores about %.2f. that is the FLOOR, not the signal -- two"
       % pair_sims(real).mean())
 print("   documents about nothing in common look %.0f%% similar before"
       % (100 * pair_sims(real).mean()))
-print("   any relatedness is measured.")
-print("   the consequence is practical: an absolute similarity threshold")
-print("   ('accept anything above 0.7') is meaningless without knowing")
-print("   your space's floor, and the floor differs per model. always")
-print("   calibrate the threshold against your own unrelated pairs.")
-print()
+print("   any relatedness is measured, so an absolute threshold is")
+print("   meaningless without knowing your own space's floor.")
+```
+
+Spread aside, cosine similarity also has a conceptual blind spot: it measures relatedness, not agreement, so opposites end up as near neighbours.
+
+```python-run
+import numpy as np
+
+def unit(v):
+    v = np.asarray(v, float)
+    return v / np.linalg.norm(v)
+def cos(a, b):
+    return float(unit(a) @ unit(b))
 
 print("AND THE LIMIT THAT SURPRISES PEOPLE MOST: cosine similarity")
 print("measures RELATEDNESS, not agreement. opposites are neighbours,")
@@ -192,10 +224,11 @@ print("   them. an unrelated word scores %.4f."
 print("   so a search for 'did sales increase' happily returns a document")
 print("   saying sales decreased. the retrieval is doing its job -- that")
 print("   document IS about the topic -- and the answer is still wrong.")
-print("   negation has the same problem, which is why 'find documents that")
-print("   do NOT mention X' cannot be expressed as a vector search at all.")
-print()
+```
 
+Taken together, those limits show up as a single table of what a pure vector search is good at and what it needs help with.
+
+```python-run
 print("WHAT THIS MEANS FOR A RETRIEVER, in one table:")
 print("%-38s %s" % ("vector search is good at", "and bad at"))
 for a, b in (("paraphrase and synonyms", "exact identifiers"),

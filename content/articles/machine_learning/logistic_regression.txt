@@ -121,7 +121,6 @@ import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, log_loss
 
 X, y = make_classification(n_samples=3000, n_features=4, n_informative=3,
                            n_redundant=0, n_clusters_per_class=1,
@@ -147,13 +146,27 @@ print("the sigmoid, at a few points:")
 for zz in (-6, -2, -0.5, 0, 0.5, 2, 6):
     print("   z=%5.1f -> %.6f" % (zz, sigmoid(zz)))
 print("  z=0 is the decision boundary, where the model is exactly undecided.")
-print()
+```
+
+Coefficients act on the log-odds scale, so one unit of a feature multiplies the odds rather than adding to the probability.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, log_loss
+
+X, y = make_classification(n_samples=3000, n_features=4, n_informative=3,
+                           n_redundant=0, n_clusters_per_class=1,
+                           flip_y=0.05, class_sep=1.4, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
+model = LogisticRegression().fit(Xtr, ytr)
 
 print("what the coefficients mean -- multiply the ODDS, not the probability:")
 for i, c in enumerate(model.coef_[0]):
     print("   feature %d: +1 unit multiplies the odds by %.4f" % (i, np.exp(c)))
 print()
-p = model.predict_proba(Xte)[:, 1]
 big = int(np.argmax(np.abs(model.coef_[0])))
 print("   take feature %d, the strongest one (odds x %.4f):"
       % (big, np.exp(model.coef_[0][big])))
@@ -162,11 +175,10 @@ for base in (0.10, 0.50, 0.90):
     new = odds * np.exp(model.coef_[0][big])
     print("     a row at p=%.2f moves to p=%.4f, a change of %+.4f"
           % (base, new / (1 + new), new / (1 + new) - base))
-print("   one coefficient, three different-sized changes. that is why you")
-print("   cannot read a logistic coefficient as 'adds N% to the chance' --")
-print("   it adds a constant amount to the LOG ODDS, not to the probability.")
+print("   one coefficient, three different-sized changes.")
 print()
 
+p = model.predict_proba(Xte)[:, 1]
 print("it is trained on log loss, not accuracy:")
 print("  accuracy %.4f, log loss %.4f" % (accuracy_score(yte, model.predict(Xte)),
                                           log_loss(yte, p)))

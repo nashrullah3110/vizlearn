@@ -88,25 +88,6 @@ for houses in ([2, 1, 1, 2], [2, 7, 9, 3, 1]):
 The tuple assignment that is load-bearing, and the circular variant.
 
 ```python-run
-def brute(houses):
-    best = 0
-    for mask in range(1 << len(houses)):
-        if mask & (mask >> 1):
-            continue
-        best = max(best, sum(h for i, h in enumerate(houses) if mask >> i & 1))
-    return best
-
-
-def table(houses):
-    if not houses:
-        return 0
-    best = [0] * (len(houses) + 1)
-    best[1] = houses[0]
-    for i in range(2, len(houses) + 1):
-        best[i] = max(best[i - 1], best[i - 2] + houses[i - 1])
-    return best[-1]
-
-
 def rolling(houses):
     skip = take = 0
     for h in houses:
@@ -121,10 +102,18 @@ def rolling_broken(houses):
         take = skip + h                   # adds h to a value including its neighbour
     return max(skip, take)
 
-print()
 print("updating skip before take, instead of simultaneously:")
 for houses in ([2, 7, 9, 3, 1], [2, 1, 1, 2]):
     print(f"  {houses}  correct {rolling(houses)}  broken {rolling_broken(houses)}")
+```
+The circular variant handles the wraparound by running the linear solution twice, once excluding each end house.
+
+```python-run
+def rolling(houses):
+    skip = take = 0
+    for h in houses:
+        skip, take = max(skip, take), skip + h
+    return max(skip, take)
 
 # The circular variant: run it twice, and mind the single house.
 def circular(houses):
@@ -132,7 +121,6 @@ def circular(houses):
         return houses[0]                  # both slices would be empty
     return max(rolling(houses[1:]), rolling(houses[:-1]))
 
-print()
 print("houses in a circle (first and last are adjacent):")
 for houses in ([2, 3, 2], [1, 2, 3, 1], [5], [2, 7, 9, 3, 1]):
     print(f"  {str(houses):<16} linear {rolling(houses):>3}   circular {circular(houses):>3}")

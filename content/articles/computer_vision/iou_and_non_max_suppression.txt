@@ -105,8 +105,18 @@ print("   the max/min pair is the whole trick: the intersection's left edge")
 print("   is the RIGHTMOST of the two left edges, and its right edge is the")
 print("   LEFTMOST of the two right edges. if that gives a negative width,")
 print("   the boxes do not overlap and the clamp to 0 handles it.")
-print()
+```
 
+Next, slide two boxes of equal size apart to see how much overlap the 0.5 threshold actually requires.
+
+```python-run
+import numpy as np
+
+def iou(a, b):
+    ix = max(0., min(a[2],b[2])-max(a[0],b[0])) * max(0., min(a[3],b[3])-max(a[1],b[1]))
+    return ix / ((a[2]-a[0])*(a[3]-a[1]) + (b[2]-b[0])*(b[3]-b[1]) - ix)
+
+A = (10.0, 10.0, 50.0, 50.0)
 print("WHAT 0.5 ACTUALLY LOOKS LIKE. two boxes of equal size, slid apart:")
 print("%14s %10s %s" % ("offset", "IoU", ""))
 for off in (0, 5, 10, 13, 20, 30, 40):
@@ -117,7 +127,12 @@ print("   a 40-pixel box shifted 13 pixels -- a third of its width -- still")
 print("   scores about 0.5. the standard threshold is more forgiving than")
 print("   it sounds, which is why COCO reports mAP averaged over 0.5 to")
 print("   0.95 rather than at 0.5 alone.")
-print()
+```
+
+With IoU defined, set up a cluster of seven overlapping proposals to test non-max suppression.
+
+```python-run
+import numpy as np
 
 boxes = np.array([
     [12, 12, 52, 52], [14, 15, 54, 55], [11, 9, 49, 47],   # three on object 1
@@ -133,8 +148,22 @@ print("separated; a fourth object G genuinely overlaps object 1:")
 print("%6s %28s %8s" % ("box", "coords", "score"))
 for n, b, s in zip(names, boxes, scores):
     print("%6s %28s %8.2f" % (n, str(tuple(int(x) for x in b)), s))
-print()
+```
 
+Now apply the NMS algorithm at threshold 0.5 and trace which boxes survive.
+
+```python-run
+import numpy as np
+
+def iou(a, b):
+    ix = max(0., min(a[2],b[2])-max(a[0],b[0])) * max(0., min(a[3],b[3])-max(a[1],b[1]))
+    return ix / ((a[2]-a[0])*(a[3]-a[1]) + (b[2]-b[0])*(b[3]-b[1]) - ix)
+
+boxes = np.array([[12,12,52,52],[14,15,54,55],[11,9,49,47],
+                  [80,80,130,130],[82,78,128,132],
+                  [200,40,240,80],[36,20,76,60]], float)
+scores = np.array([0.92, 0.88, 0.75, 0.95, 0.71, 0.66, 0.80])
+names = ["A", "B", "C", "D", "E", "F", "G"]
 def nms(boxes, scores, thresh):
     order = list(np.argsort(-scores))
     keep, log = [], []
@@ -164,17 +193,59 @@ print("   kept: %s" % ", ".join(names[i] for i in keep))
 print("   IoU between A (object 1) and G (object 4): %.4f" % iou(boxes[0], boxes[6]))
 print("   they are different objects that happen to overlap, and whether")
 print("   NMS keeps both depends entirely on where the threshold sits.")
-print()
+```
+
+Sweeping the threshold shows how strongly it controls the outcome.
+
+```python-run
+import numpy as np
+
+def iou(a, b):
+    ix = max(0., min(a[2],b[2])-max(a[0],b[0])) * max(0., min(a[3],b[3])-max(a[1],b[1]))
+    return ix / ((a[2]-a[0])*(a[3]-a[1]) + (b[2]-b[0])*(b[3]-b[1]) - ix)
+
+boxes = np.array([[12,12,52,52],[14,15,54,55],[11,9,49,47],
+                  [80,80,130,130],[82,78,128,132],
+                  [200,40,240,80],[36,20,76,60]], float)
+scores = np.array([0.92, 0.88, 0.75, 0.95, 0.71, 0.66, 0.80])
+names = ["A", "B", "C", "D", "E", "F", "G"]
+
+def nms(boxes, scores, thresh):
+    order = list(np.argsort(-scores))
+    keep = []
+    while order:
+        i = order.pop(0)
+        keep.append(i)
+        order = [j for j in order if iou(boxes[i], boxes[j]) <= thresh]
+    return keep
 
 print("THE THRESHOLD IS A REAL DIAL:")
 print("%14s %30s %10s" % ("IoU threshold", "kept", "count"))
 for t in (0.05, 0.2, 0.3, 0.5, 0.7, 0.95):
-    k, _ = nms(boxes, scores, t)
+    k = nms(boxes, scores, t)
     print("%14.2f %30s %10d" % (t, ", ".join(names[i] for i in k), len(k)))
 print("   at a low threshold G is deleted -- a real object lost because it")
 print("   overlapped a more confident one. at a high threshold the")
 print("   duplicates B, C and E survive. no single value is right for both.")
-print()
+```
+
+NMS breaks down when objects genuinely overlap, and Soft-NMS offers a workaround.
+
+```python-run
+import numpy as np
+
+def iou(a, b):
+    ix = max(0., min(a[2],b[2])-max(a[0],b[0])) * max(0., min(a[3],b[3])-max(a[1],b[1]))
+    return ix / ((a[2]-a[0])*(a[3]-a[1]) + (b[2]-b[0])*(b[3]-b[1]) - ix)
+
+def nms(boxes, scores, thresh):
+    order = sorted(range(len(scores)), key=lambda i: -scores[i])
+    keep = []
+    while order:
+        i = order.pop(0)
+        keep.append(i)
+        order = [j for j in order if iou(boxes[i], boxes[j]) <= thresh]
+    return keep
 
 print("WHERE IT FAILS. two people standing close together:")
 crowd = np.array([[10, 10, 40, 70], [18, 10, 48, 70]], float)
@@ -182,7 +253,7 @@ crowd_scores = np.array([0.9, 0.85])
 v = iou(crowd[0], crowd[1])
 print("   two genuinely separate objects, IoU %.4f" % v)
 for t in (0.3, 0.5, 0.7):
-    k, _ = nms(crowd, crowd_scores, t)
+    k = nms(crowd, crowd_scores, t)
     print("      threshold %.1f -> keeps %d box(es)%s"
           % (t, len(k), "  <- a real person deleted" if len(k) < 2 else ""))
 print("   NMS cannot tell 'a duplicate of one object' from 'two objects")

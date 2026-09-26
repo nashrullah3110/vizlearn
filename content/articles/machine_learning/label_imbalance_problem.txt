@@ -71,7 +71,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (accuracy_score, balanced_accuracy_score, f1_score,
                              roc_auc_score, average_precision_score,
-                             confusion_matrix, matthews_corrcoef)
+                             matthews_corrcoef)
 
 X, y = make_classification(n_samples=20000, n_features=15, n_informative=6,
                            weights=[0.99], flip_y=0.01, random_state=0)
@@ -102,24 +102,33 @@ print()
 print("the do-nothing model scores %.4f on accuracy and 0.0000 on every metric"
       % accuracy_score(yte, np.zeros_like(yte)))
 print("that asks whether it found anything. that is the whole problem, in one row.")
-print()
+```
 
-tn, fp, fn, tp = confusion_matrix(yte, models["logistic regression"].predict(Xte)).ravel()
+Even the real model misses most positives at the default threshold, and PR AUC degrades much faster than ROC AUC as imbalance deepens.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (accuracy_score, confusion_matrix,
+                             roc_auc_score, average_precision_score)
+
+X, y = make_classification(n_samples=20000, n_features=15, n_informative=6,
+                           weights=[0.99], flip_y=0.01, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0,
+                                      stratify=y)
+model = LogisticRegression(max_iter=3000).fit(Xtr, ytr)
+
+tn, fp, fn, tp = confusion_matrix(yte, model.predict(Xte)).ravel()
 print("even the real model, at the default threshold:")
 print("  caught %d of the %d positives, missed %d" % (tp, tp + fn, fn))
-print("  it is not broken -- it is optimising log loss over %d negatives and"
-      % (tn + fp))
-print("  %d positives, so the negatives win every argument it has." % (tp + fn))
 print()
 
-print("the baseline you must beat is the base rate, not 0.5:")
-print("  a random scorer gets ROC AUC 0.5000 and PR AUC ~%.4f (the base rate)"
-      % yte.mean())
-print("  so the logistic model's PR AUC of %.4f is %.0fx the base rate and a"
-      % (average_precision_score(yte, models["logistic regression"].predict_proba(Xte)[:, 1]),
-         average_precision_score(yte, models["logistic regression"].predict_proba(Xte)[:, 1]) / yte.mean()))
-print("  genuine result, while its accuracy of %.4f says nothing at all."
-      % accuracy_score(yte, models["logistic regression"].predict(Xte)))
+pr_auc = average_precision_score(yte, model.predict_proba(Xte)[:, 1])
+print("baseline: a random scorer gets PR AUC ~%.4f (the base rate)" % yte.mean())
+print("logistic model's PR AUC: %.4f (%.0fx the base rate)"
+      % (pr_auc, pr_auc / yte.mean()))
 print()
 
 print("how the metrics behave as the imbalance deepens:")
@@ -134,15 +143,8 @@ for w in (0.50, 0.90, 0.99, 0.999):
              average_precision_score(d, p)))
 print()
 print("PR AUC falls off a cliff while ROC AUC is still reporting good news.")
-print("at 1.5 percent positives ROC AUC reads 0.83, which sounds like a")
-print("working model -- and PR AUC says 0.27, closer to the truth. ROC AUC")
-print("is slower to notice because the false positive rate has an enormous")
-print("denominator, so even thousands of false alarms barely move it.")
-print()
-print("so: report balanced accuracy or PR AUC, always quote the base rate")
-print("next to any score, and check the confusion matrix before believing")
-print("anything. the fixes -- class weights, resampling, thresholds -- come")
-print("after you can see the problem.")
+print("so: report balanced accuracy or PR AUC, always quote the base rate,")
+print("and check the confusion matrix before believing anything.")
 ```
 
 ## Guided tour

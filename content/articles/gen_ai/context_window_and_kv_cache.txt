@@ -71,8 +71,6 @@ That is why input tokens are priced well below output tokens, why a long prompt 
 The sections above explain what the cache holds and why prefill and decode behave differently. Here is the arithmetic -- how much memory the cache costs at each sequence length, why it and not the weights decides your batch size, and exactly how much work caching saves.
 
 ```python-run
-import numpy as np
-
 # a 7B-class model
 LAYERS, HEADS, HEAD_DIM, VOCAB = 32, 32, 128, 32000
 D_MODEL = HEADS * HEAD_DIM
@@ -95,7 +93,14 @@ print("   to produce %d tokens without a cache you compute %s key-value"
 print("   pairs, of which %d are new. that is %.0f%% waste, and it grows"
       % (100, 100 * (1 - 100.0 / sum(range(1, 101)))))
 print("   with the square of the length.")
-print()
+```
+
+Keeping those key-value pairs is the obvious fix; the next block works out what the cache costs per token, and per sequence.
+
+```python-run
+LAYERS, HEADS, HEAD_DIM = 32, 32, 128
+D_MODEL = HEADS * HEAD_DIM
+BYTES = 2                               # fp16
 
 print("THE CACHE IS THE OBVIOUS FIX: keep them. what it costs, per token:")
 per_token = 2 * LAYERS * D_MODEL * BYTES
@@ -117,7 +122,16 @@ print("   model weights are about %.0f GB. at long context the cache is"
       % (7e9 * BYTES / 1e9))
 print("   the larger allocation, and it is the thing that actually limits")
 print("   how many users you can serve at once.")
-print()
+```
+
+That cache size sets a hard limit on concurrency: the next block works out how many sequences actually fit on an 80 GB card.
+
+```python-run
+LAYERS, HEADS, HEAD_DIM = 32, 32, 128
+D_MODEL = HEADS * HEAD_DIM
+BYTES = 2
+per_token = 2 * LAYERS * D_MODEL * BYTES
+
 print("   work out the batch size a 80 GB card allows, weights first:")
 FREE = 80 - 7e9 * BYTES / 1e9 - 4      # minus weights and activations
 print("%-18s %18s %18s" % ("context length", "cache per seq", "max batch"))
@@ -135,7 +149,12 @@ print("   a 128k context is not a setting you switch on -- without GQA or")
 print("   a quantised cache it does not fit at all, and with them it still")
 print("   costs most of your throughput. long context is a capacity")
 print("   decision wearing a feature's clothes.")
-print()
+```
+
+Beyond memory, prefill and decode also differ in what limits their speed, compute in one case and memory bandwidth in the other.
+
+```python-run
+BYTES = 2
 
 print("PREFILL AND DECODE, in the numbers. prefill processes the whole")
 print("prompt at once; decode produces one token at a time:")
@@ -159,7 +178,15 @@ print("   arithmetic is done.")
 print("   that is why batching helps decode so much: %d sequences read the"
       % 32)
 print("   same weights once and produce %d tokens from that read." % 32)
-print()
+```
+
+Given how large the cache gets, production systems attack the per-token formula directly, and grouped-query attention is the compromise that won.
+
+```python-run
+LAYERS, HEADS, HEAD_DIM = 32, 32, 128
+D_MODEL = HEADS * HEAD_DIM
+BYTES = 2
+per_token = 2 * LAYERS * D_MODEL * BYTES
 
 print("MAKING THE CACHE SMALLER. every production trick attacks one factor")
 print("of that per-token formula:")
@@ -187,7 +214,16 @@ print("   sharing factor while the query side -- which is not cached at all")
 print("   -- keeps its full width. almost every model released since 2023")
 print("   uses it, and the choice of 8 groups rather than 1 is a quality")
 print("   decision, not a memory one.")
-print()
+```
+
+One more trick is not about shrinking the cache at all, but about not reserving space for tokens that were never generated.
+
+```python-run
+LAYERS, HEADS, HEAD_DIM = 32, 32, 128
+D_MODEL = HEADS * HEAD_DIM
+BYTES = 2
+per_token = 2 * LAYERS * D_MODEL * BYTES
+
 print("AND THE ONE THAT IS NOT ABOUT SIZE: PagedAttention. the cache for a")
 print("sequence grows as it generates, so a contiguous allocation must")
 print("reserve the MAXIMUM length up front:")

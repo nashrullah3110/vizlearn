@@ -94,21 +94,16 @@ That last one is worth watching for, because it is invisible in the answer: the 
 Completeness is the only dimension that scores what is ABSENT, which is why the others cannot see it. This measures it by decomposing the question, then shows the trap: the metric can be gamed by saying more, and the way out is not a better completeness score.
 
 ```python-run
-import numpy as np
-
-QUESTION = ("What is your refund policy and how do I start a return?")
-# the sub-questions a complete answer has to cover
+QUESTION = "What is your refund policy and how do I start a return?"
 REQUIRED = [
     "the time window",
     "the condition the item must be in",
     "how to start the return",
     "how long the refund takes",
 ]
-
 ANSWERS = {
     "A: one line": ["the time window"],
-    "B: policy only": ["the time window",
-                       "the condition the item must be in"],
+    "B: policy only": ["the time window", "the condition the item must be in"],
     "C: complete": REQUIRED,
     "D: complete, plus padding": REQUIRED,
     "E: padding, little else": ["the time window"],
@@ -124,20 +119,20 @@ for r in REQUIRED:
 print()
 
 print("COMPLETENESS = covered sub-questions / required sub-questions:")
-print("%-30s %14s %16s %12s"
-      % ("answer", "covered", "completeness", "words"))
+print("%-30s %14s %16s %12s" % ("answer", "covered", "completeness", "words"))
 for name, covered in ANSWERS.items():
     print("%-30s %14s %16.4f %12d"
           % (name, "%d of %d" % (len(covered), len(REQUIRED)),
              len(covered) / float(len(REQUIRED)), LENGTH[name]))
 print()
-print("   the decomposition is the whole method, and it is also the whole")
-print("   difficulty: someone has to decide what the question REQUIRES.")
-print("   that list is a judgement call, it is where the disagreement")
-print("   between two evaluators lives, and no amount of scoring")
-print("   machinery downstream can repair a wrong one.")
-print()
+print("   the decomposition is the whole method: someone has to decide what")
+print("   the question REQUIRES, and that judgement call is where two")
+print("   evaluators disagree -- no scoring machinery downstream fixes it.")
+```
 
+Once the required points are listed, the next step is checking how the other three dimensions score an answer that only covers half of them.
+
+```python-run
 print("WHY NOTHING ELSE IN THE SUITE SEES THIS. score answer B, which is")
 print("missing half the question:")
 print("%-26s %14s %s" % ("dimension", "B scores", "why"))
@@ -152,10 +147,28 @@ print("   there; completeness is the only one that looks for what is not.")
 print("   that is also why it is the only one that needs the question")
 print("   decomposed in advance -- the others can work from the answer")
 print("   and the context alone.")
-print()
+```
 
-print("NOW THE TRAP. completeness rewards saying more, and saying more is")
-print("cheap:")
+That gap is also a trap: completeness alone rewards a model for simply saying more, whether or not the extra words are useful.
+
+```python-run
+REQUIRED = [
+    "the time window",
+    "the condition the item must be in",
+    "how to start the return",
+    "how long the refund takes",
+]
+ANSWERS = {
+    "A: one line": ["the time window"],
+    "B: policy only": ["the time window", "the condition the item must be in"],
+    "C: complete": REQUIRED,
+    "D: complete, plus padding": REQUIRED,
+    "E: padding, little else": ["the time window"],
+}
+LENGTH = {"A: one line": 12, "B: policy only": 34, "C: complete": 71,
+          "D: complete, plus padding": 240, "E: padding, little else": 210}
+
+print("THE TRAP: completeness rewards saying more, and saying more is cheap:")
 print("%-30s %14s %14s %16s"
       % ("answer", "completeness", "words", "useful words"))
 for name, covered in ANSWERS.items():
@@ -167,18 +180,34 @@ print("   compare C and D. identical completeness, and D is %.1fx longer."
       % (LENGTH["D: complete, plus padding"] / float(LENGTH["C: complete"])))
 print("   and compare D with E: E is nearly as long and covers %d of %d."
       % (len(ANSWERS["E: padding, little else"]), len(REQUIRED)))
-print("   so length is not a proxy for completeness either -- but")
-print("   optimising completeness alone will push a model toward D and")
-print("   then toward E, because the cheapest way to raise the chance of")
-print("   covering a sub-question is to say more things.")
-print()
+print("   so length is not a proxy for completeness either -- optimising")
+print("   completeness alone pushes a model toward D and then toward E,")
+print("   because the cheapest way to cover a sub-question is to say more.")
+```
+
+The fix is not a better completeness score on its own, but requiring completeness and relevance to clear a floor together.
+
+```python-run
+REQUIRED = [
+    "the time window",
+    "the condition the item must be in",
+    "how to start the return",
+    "how long the refund takes",
+]
+ANSWERS = {
+    "A: one line": ["the time window"],
+    "B: policy only": ["the time window", "the condition the item must be in"],
+    "C: complete": REQUIRED,
+    "D: complete, plus padding": REQUIRED,
+    "E: padding, little else": ["the time window"],
+}
+REL = {"A: one line": 1.0, "B: policy only": 1.0, "C: complete": 0.95,
+       "D: complete, plus padding": 0.55, "E: padding, little else": 0.30}
 
 print("THE RESOLUTION IS NOT A BETTER COMPLETENESS SCORE. it is to score")
 print("relevance at the same time and require both:")
 print("%-30s %14s %14s %s"
       % ("answer", "completeness", "relevance", "passes a floor of 0.8?"))
-REL = {"A: one line": 1.0, "B: policy only": 1.0, "C: complete": 0.95,
-       "D: complete, plus padding": 0.55, "E: padding, little else": 0.30}
 for name, covered in ANSWERS.items():
     comp = len(covered) / float(len(REQUIRED))
     ok = comp >= 0.8 and REL[name] >= 0.8
@@ -188,13 +217,16 @@ print("   only C passes both. D is complete and padded; A and B are")
 print("   focused and incomplete. neither failure is visible in a single")
 print("   blended score, and a blended score is exactly what lets a model")
 print("   trade one against the other.")
-print()
+```
 
+Finally, completeness also surfaces a failure that has nothing to do with generation at all: a multi-hop question whose answer needs facts from two separate documents.
+
+```python-run
+HOPS = [("which plan the customer is on", "doc A"),
+        ("what that plan's refund window is", "doc B")]
 print("AND THE CASE WHERE INCOMPLETENESS IS A RETRIEVAL PROBLEM, not a")
 print("generation one. a multi-hop question needs facts from separate")
 print("documents:")
-HOPS = [("which plan the customer is on", "doc A"),
-        ("what that plan's refund window is", "doc B")]
 print("%-42s %s" % ("the answer needs", "which is in"))
 for h, d in HOPS:
     print("%-42s %s" % (h, d))

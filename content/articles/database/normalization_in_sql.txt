@@ -102,7 +102,23 @@ SELECT DISTINCT customer_name, customer_city FROM flat WHERE customer_name = 'Ad
 
 -- Two cities for one person. Nothing in the schema forbids it, because
 -- the schema does not know those rows describe the same customer.
---
+```
+
+The next block demonstrates the delete and insert anomalies, and contrasts the flat layout with a normalised one where each fact is stored once.
+
+```sql-run
+CREATE TABLE flat (
+    order_id INTEGER, customer_name TEXT, customer_city TEXT,
+    product_name TEXT, product_price REAL, qty INTEGER
+);
+INSERT INTO flat VALUES
+    (101, 'Ada', 'London', 'Keyboard',  45.0, 1),
+    (101, 'Ada', 'London', 'Mouse',     25.0, 2),
+    (102, 'Ada', 'London', 'Monitor',  180.0, 1),
+    (104, 'Chen', 'Singapore', 'Keyboard', 45.0, 2);
+CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT, city TEXT);
+INSERT INTO customers VALUES (1, 'Ada', 'London');
+
 -- ANOMALY 2, DELETE. Remove order 102 and something unrelated goes
 -- with it.
 
@@ -116,9 +132,9 @@ SELECT count(*) AS monitor_rows_left FROM flat WHERE product_name = 'Monitor';
 -- ANOMALY 3, INSERT. A new product that nobody has ordered cannot be
 -- recorded at all without inventing an order to hang it on.
 --
--- The normalised schema this article's database uses has none of these:
--- the city lives once in customers, the price lives once in products,
--- and order_items holds only the link.
+-- A normalised schema has none of these: the city lives once in
+-- customers, the price lives once in products, and order_items
+-- holds only the link.
 
 SELECT 'flat: rows mentioning Ada city' AS where_a_fact_lives, count(*) AS copies
 FROM flat WHERE customer_name = 'Ada'

@@ -149,7 +149,19 @@ print("validation loss bottoms out at epoch %d (%.4f) and ends at %.4f."
       % (best, val[best], val[-1]))
 print("training to the end costs you %.4f of validation loss for nothing."
       % (val[-1] - val[best]))
-print()
+```
+
+The patience parameter controls how many epochs of non-improvement to tolerate before stopping.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+EPOCHS = 60
+epochs = np.arange(EPOCHS)
+val = 1.2 * np.exp(-epochs / 12) + 0.05 + 0.010 * np.maximum(0, epochs - 18)
+val = val + rng.normal(0, 0.012, EPOCHS)
+best = int(np.argmin(val))
 
 def run(patience, min_delta=0.0):
     best_val, best_epoch, wait = np.inf, 0, 0
@@ -174,8 +186,28 @@ print("patience=1 stops at epoch %d -- the curve is noisy, so a single bad"
 print("epoch looks like the end. the true minimum is at %d." % best)
 print("patience=10 finds it and still saves %d epochs of compute."
       % (EPOCHS - 1 - run(10)[0]))
-print()
+```
 
+The min_delta parameter sets the threshold for what counts as real improvement, and restoring the best weights is what makes the whole technique work.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+EPOCHS = 60
+epochs = np.arange(EPOCHS)
+val = 1.2 * np.exp(-epochs / 12) + 0.05 + 0.010 * np.maximum(0, epochs - 18)
+val = val + rng.normal(0, 0.012, EPOCHS)
+best = int(np.argmin(val))
+def run(patience, min_delta=0.0):
+    best_val, best_epoch, wait = np.inf, 0, 0
+    for e in range(EPOCHS):
+        if val[e] < best_val - min_delta:
+            best_val, best_epoch, wait = val[e], e, 0
+        else:
+            wait += 1
+            if wait >= patience:
+                return e, best_epoch, best_val
+    return EPOCHS - 1, best_epoch, best_val
 print("the second parameter is min_delta -- how much counts as improvement:")
 for md in (0.0, 0.005, 0.02):
     stop, be, bv = run(10, md)
@@ -184,7 +216,6 @@ for md in (0.0, 0.005, 0.02):
 print("  a min_delta larger than the noise stops you chasing it. a min_delta")
 print("  larger than the real improvements stops you too early.")
 print()
-
 print("and the part that is easy to get wrong -- RESTORING the weights:")
 print("  stopping at epoch %d without restoring leaves you the weights from"
       % run(10)[0])
@@ -194,16 +225,19 @@ print("  the difference is %.4f, which is the entire benefit. an early"
       % (val[run(10)[0]] - val[best]))
 print("  stopping callback that does not restore is just a compute saver.")
 print()
-
 print("what it is really doing: early stopping is a regulariser. it limits")
 print("how far the weights can travel from their initialisation, which is")
 print("the same thing weight decay does by a different route. that is why")
 print("stacking both often helps less than you would expect.")
-print()
-print("two practical notes. stop on the metric you care about, not always on")
-print("loss -- a model can improve F1 while its loss worsens. and never stop")
-print("on the TEST set: the epoch you choose is a fitted parameter, so a test")
-print("set used to choose it is no longer a test set.")
+```
+
+Stop on the metric you care about, not always on loss. And never stop on the test set — the epoch you choose is a fitted parameter, so a test set used to choose it is no longer a test set.
+
+```python-run
+print("stop on the metric you care about, not always on loss -- a model can")
+print("improve F1 while its loss worsens. and never stop on the TEST set: the")
+print("epoch you choose is a fitted parameter, so a test set used to choose")
+print("it is no longer a test set.")
 ```
 
 ## Questions people ask

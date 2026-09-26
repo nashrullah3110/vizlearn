@@ -110,8 +110,6 @@ Measuring both is therefore not redundant. Groundedness tells you whether the sy
 Correctness needs a reference answer, and comparing free text to a reference is harder than it sounds. This scores the same answers three ways -- exact match, token overlap, and a judge -- and shows exactly which kinds of answer each one gets wrong.
 
 ```python-run
-import numpy as np
-
 REFERENCE = "Refunds are available within 30 days of purchase."
 
 ANSWERS = [
@@ -148,7 +146,22 @@ print("%-58s %8s %8s %8s" % ("candidate answer", "truth", "exact", "F1"))
 for a, truth in ANSWERS:
     print("%-58s %8s %8.2f %8.4f"
           % (a[:56], "right" if truth else "WRONG", exact(a), f1(a)))
-print()
+```
+
+With scores on the table, the next block checks how many answers exact match gets right — and why paraphrase defeats it.
+
+```python-run
+REFERENCE = "Refunds are available within 30 days of purchase."
+ANSWERS = [
+    ("You have 30 days from purchase to request a refund.", True),
+    ("Refunds are available within 30 days of purchase.", True),
+    ("Within 30 days.", True),
+    ("Refunds are available within 60 days of purchase.", False),
+    ("The refund policy is described in section 4.", False),
+]
+
+def exact(a):
+    return 1.0 if a.strip().lower() == REFERENCE.strip().lower() else 0.0
 
 print("EXACT MATCH scores %d of %d correctly."
       % (sum(1 for a, t in ANSWERS if (exact(a) >= 0.5) == t), len(ANSWERS)))
@@ -157,7 +170,31 @@ print("   is marked wrong, which means the metric is measuring whether")
 print("   the model reproduced your wording, not whether it answered.")
 print("   for anything but a single-token answer -- a date, a name, a")
 print("   yes/no -- exact match is not an option.")
-print()
+```
+
+Token overlap relaxes that, but it introduces a failure mode of its own: it cannot tell which shared word actually carries the answer.
+
+```python-run
+def toks(s):
+    return set(w.strip(".,").lower() for w in s.split())
+REF = toks("Refunds are available within 30 days of purchase.")
+def f1(a):
+    t = toks(a)
+    if not t or not REF:
+        return 0.0
+    inter = len(t & REF)
+    if not inter:
+        return 0.0
+    p, r = inter / float(len(t)), inter / float(len(REF))
+    return 2 * p * r / (p + r)
+ANSWERS = [
+    ("You have 30 days from purchase to request a refund.", True),
+    ("Refunds are available within 30 days of purchase.", True),
+    ("Within 30 days.", True),
+    ("Refunds are available within 60 days of purchase.", False),
+    ("Refunds are available within 30 days of purchase, and shipping is free.", True),
+    ("The refund policy is described in section 4.", False),
+]
 
 THR = 0.5
 print("TOKEN F1 at a threshold of %.1f scores %d of %d correctly."
@@ -167,19 +204,18 @@ print("   are both visible above:")
 wrong_high = [(a, f1(a)) for a, t in ANSWERS if not t and f1(a) >= THR]
 right_low = [(a, f1(a)) for a, t in ANSWERS if t and f1(a) < THR]
 for a, s in wrong_high:
-    print("      SCORES HIGH AND IS WRONG (%.4f):" % s)
-    print("         %s" % a[:60])
+    print("      SCORES HIGH AND IS WRONG (%.4f): %s" % (s, a[:55]))
 for a, s in right_low:
-    print("      SCORES LOW AND IS RIGHT (%.4f):" % s)
-    print("         %s" % a[:60])
+    print("      SCORES LOW AND IS RIGHT (%.4f): %s" % (s, a[:55]))
 print("   the first is the serious one. '60 days' shares every word with")
 print("   the reference except the one that carries the answer, so overlap")
 print("   scores it %.4f -- higher than several correct answers."
       % f1("Refunds are available within 60 days of purchase."))
-print("   token overlap cannot weight the token that matters, because it")
-print("   does not know which token that is.")
-print()
+```
 
+Since no snippet can run an actual model call, the next block lists what a model-as-judge fixes and the practical problems it introduces instead.
+
+```python-run
 print("A MODEL-AS-JUDGE reads both and decides. this snippet cannot run")
 print("one -- which is precisely the point, because a judge needs a model")
 print("call per example and the two metrics above need none.")
@@ -197,9 +233,12 @@ print("   the length bias is worth measuring on your own judge before")
 print("   trusting it. score the same correct answer padded to different")
 print("   lengths and see whether the number moves; if it does, your")
 print("   'correctness' metric is partly a verbosity metric.")
-print()
+```
 
-print("AND THE DISTINCTION THAT MATTERS MOST -- CORRECTNESS IS NOT")
+None of that, however, tells correctness apart from groundedness — the final block lays out the four cases where they diverge.
+
+```python-run
+print("THE DISTINCTION THAT MATTERS MOST -- CORRECTNESS IS NOT")
 print("GROUNDEDNESS:")
 CASES = [
     ("the context is right, the answer follows it", "grounded", "correct"),

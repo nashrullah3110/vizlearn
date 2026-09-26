@@ -93,8 +93,6 @@ The <strong>KV cache</strong> is what keeps decode linear: previous tokens' keys
 The stages are described above. Following the SHAPES through them is what makes the pipeline concrete -- where the parameters actually are, why prefill and decode cost such different amounts, and what the model does not have that you might assume it does.
 
 ```python-run
-import numpy as np
-
 VOCAB, D, LAYERS, HEADS, T = 32000, 4096, 32, 32, 6
 TOKENS = ["The", "cat", "sat", "on", "the", "mat"]
 
@@ -121,7 +119,12 @@ print("   (%d, %d) throughout. every layer is a function from that shape"
       % (T, D))
 print("   to itself, which is why you can stack as many as you like and")
 print("   why they can share a residual stream.")
-print()
+```
+
+That constant shape hides where the parameters actually live. The next block totals them up by component.
+
+```python-run
+VOCAB, D, LAYERS, HEADS, T = 32000, 4096, 32, 32, 6
 
 print("WHERE THE PARAMETERS ARE. this is the table that explains the")
 print("model's size:")
@@ -149,7 +152,17 @@ print("   weights are in the boring per-token part.")
 print("   note also that the embedding table and the output head are the")
 print("   same size, and in many models they are the SAME MATRIX -- tied")
 print("   weights, saving %s parameters." % "{:,}".format(emb))
-print()
+```
+
+Those same weights are read very differently depending on how many rows pass through them at once. The next block compares prefill against decode.
+
+```python-run
+VOCAB, D, LAYERS, HEADS, T = 32000, 4096, 32, 32, 6
+emb = VOCAB * D
+attn_per_layer = 4 * D * D
+ff_per_layer = 3 * D * (4 * D)
+per_layer = attn_per_layer + ff_per_layer
+total = emb + LAYERS * per_layer + emb
 
 print("PREFILL AND DECODE ARE THE SAME ARITHMETIC AT DIFFERENT SHAPES:")
 print("%-12s %-14s %-26s %s"
@@ -172,7 +185,12 @@ print("   the same read, amortised over %d tokens instead of 1. that ratio"
       % T)
 print("   is why a long prompt is cheap per token and generation is not,")
 print("   and why batching helps decode enormously and prefill barely.")
-print()
+```
+
+The shapes also make it obvious what the model does not have -- including any real handle on digits. The next block shows how a BPE vocabulary splits numbers.
+
+```python-run
+D, T = 4096, 6
 
 print("AND WHAT THE MODEL DOES NOT HAVE, which the shapes make obvious:")
 print("%-38s %s" % ("no memory between calls", "the (%d, %d) is rebuilt each time" % (T, D)))
