@@ -131,114 +131,89 @@ Kruskal and Prim look nothing alike -- one sorts all the edges globally, the oth
 
 ```python-run
 import heapq
-
-EDGES = [
-    ("A", "B", 4), ("A", "C", 8), ("B", "C", 11), ("B", "D", 8),
-    ("C", "E", 7), ("C", "F", 1), ("D", "E", 2), ("D", "G", 7),
-    ("E", "F", 6), ("F", "G", 2), ("G", "H", 9), ("D", "H", 4),
-]
+EDGES = [("A","B",4),("A","C",8),("B","C",11),("B","D",8),("C","E",7),
+         ("C","F",1),("D","E",2),("D","G",7),("E","F",6),("F","G",2),
+         ("G","H",9),("D","H",4)]
 NODES = sorted({n for a, b, _ in EDGES for n in (a, b)})
-
-
 def kruskal(edges):
     parent = {n: n for n in NODES}
-
     def find(x):
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
+        while parent[x] != x: parent[x] = parent[parent[x]]; x = parent[x]
         return x
-
     chosen, total = [], 0
     for w, a, b in sorted((w, a, b) for a, b, w in edges):
         ra, rb = find(a), find(b)
         if ra != rb:
-            parent[rb] = ra
-            chosen.append((a, b, w))
-            total += w
+            parent[rb] = ra; chosen.append((a, b, w)); total += w
     return chosen, total
-
-
 def prim(edges, start):
     adj = {n: [] for n in NODES}
-    for a, b, w in edges:
-        adj[a].append((w, b))
-        adj[b].append((w, a))
-    seen = {start}
-    pq = [(w, start, to) for w, to in adj[start]]
+    for a, b, w in edges: adj[a].append((w, b)); adj[b].append((w, a))
+    seen, pq = {start}, [(w, start, to) for w, to in adj[start]]
     heapq.heapify(pq)
     chosen, total = [], 0
     while pq and len(seen) < len(NODES):
         w, frm, to = heapq.heappop(pq)
-        if to in seen:
-            continue
-        seen.add(to)
-        chosen.append((frm, to, w))
-        total += w
+        if to in seen: continue
+        seen.add(to); chosen.append((frm, to, w)); total += w
         for w2, nxt in adj[to]:
-            if nxt not in seen:
-                heapq.heappush(pq, (w2, to, nxt))
+            if nxt not in seen: heapq.heappush(pq, (w2, to, nxt))
     return chosen, total
-
 
 k_edges, k_total = kruskal(EDGES)
 print("Kruskal picks, in order:")
-for a, b, w in k_edges:
-    print("   %s-%s  weight %d" % (a, b, w))
-print("   total %d" % k_total)
-
-print()
-print("Prim from A picks, in order:")
+for a, b, w in k_edges: print("   %s-%s  weight %d" % (a, b, w))
+print("   total", k_total)
 p_edges, p_total = prim(EDGES, "A")
-for a, b, w in p_edges:
-    print("   %s-%s  weight %d" % (a, b, w))
-print("   total %d" % p_total)
+print("\nPrim from A picks, in order:")
+for a, b, w in p_edges: print("   %s-%s  weight %d" % (a, b, w))
+print("   total", p_total)
+print("\nsame total:", k_total == p_total)
+```
 
-print()
-print("same total:", k_total == p_total)
-print("same edge set:", sorted(tuple(sorted((a, b))) for a, b, _ in k_edges)
-      == sorted(tuple(sorted((a, b))) for a, b, _ in p_edges))
+Both algorithms produce the same total weight because of the cut property: the cheapest edge crossing any partition of the vertices must appear in some minimum spanning tree. Verify this directly on several random cuts.
 
-# The orders are completely different -- Kruskal takes the globally
-# cheapest edge anywhere, Prim only ever takes an edge touching the tree
-# it has built. They still agree.
-#
-# The CUT PROPERTY is why. Split the nodes into any two groups; the
-# cheapest edge crossing that split must be in some minimum spanning
-# tree. If it were not, adding it would create a cycle, and removing any
-# other crossing edge of that cycle would give a tree that weighs less --
-# a contradiction.
-#
-# Both algorithms are just different ways of choosing which cut to apply
-# it to. Check the property directly:
+```python-run
+import heapq, random
+EDGES = [("A","B",4),("A","C",8),("B","C",11),("B","D",8),("C","E",7),
+         ("C","F",1),("D","E",2),("D","G",7),("E","F",6),("F","G",2),
+         ("G","H",9),("D","H",4)]
+NODES = sorted({n for a, b, _ in EDGES for n in (a, b)})
+def kruskal(edges):
+    parent = {n: n for n in NODES}
+    def find(x):
+        while parent[x] != x: parent[x] = parent[parent[x]]; x = parent[x]
+        return x
+    chosen, total = [], 0
+    for w, a, b in sorted((w, a, b) for a, b, w in edges):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra; chosen.append((a, b, w)); total += w
+    return chosen, total
+def prim(edges, start):
+    adj = {n: [] for n in NODES}
+    for a, b, w in edges: adj[a].append((w, b)); adj[b].append((w, a))
+    seen, pq = {start}, [(w, start, to) for w, to in adj[start]]
+    heapq.heapify(pq)
+    chosen, total = [], 0
+    while pq and len(seen) < len(NODES):
+        w, frm, to = heapq.heappop(pq)
+        if to in seen: continue
+        seen.add(to); chosen.append((frm, to, w)); total += w
+        for w2, nxt in adj[to]:
+            if nxt not in seen: heapq.heappush(pq, (w2, to, nxt))
+    return chosen, total
 
-print()
-print("cheapest edge across a few random cuts, and whether the MST has it:")
-import random
-rng = random.Random(4)
+k_edges, _ = kruskal(EDGES)
 in_mst = {tuple(sorted((a, b))) for a, b, _ in k_edges}
+rng = random.Random(4)
 for _ in range(5):
     group = set(rng.sample(NODES, rng.randrange(1, len(NODES))))
-    crossing = [(w, a, b) for a, b, w in EDGES
-                if (a in group) != (b in group)]
-    if not crossing:
-        continue
-    w, a, b = min(crossing)
-    ties = sum(1 for cw, _, _ in crossing if cw == w)
-    mark = "yes" if tuple(sorted((a, b))) in in_mst else "no"
-    print("   |group| = %d: cheapest crossing %s-%s (%d), tied with %d other"
-          " -> in MST: %s" % (len(group), a, b, w, ties - 1, mark))
-
-# Every one of them is in the tree, which is the cut property holding on
-# five arbitrary splits of the graph.
-#
-# The tie column is the fine print. The property forces the cheapest
-# crossing edge into EVERY minimum spanning tree only when it is uniquely
-# cheapest; where another edge of equal weight crosses the same cut,
-# either may be chosen and there is more than one minimum spanning tree,
-# all of the same total weight. Re-run the cuts with a different seed and
-# a tied edge will eventually come up "no" for that reason -- the tree is
-# still minimum, it is just not the only one.
+    crossing = [(w,a,b) for a,b,w in EDGES if (a in group)!=(b in group)]
+    if crossing:
+        w,a,b = min(crossing)
+        print("cut %s: cheapest %s-%s(%d), in MST: %s" % (
+            sorted(group), a, b, w, tuple(sorted((a,b))) in in_mst))
 ```
 
 ## Things to try

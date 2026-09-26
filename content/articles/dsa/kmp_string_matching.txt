@@ -122,93 +122,81 @@ def naive(text, pat):
         j = 0
         while j < len(pat):
             comps += 1
-            if text[i + j] != pat[j]:
-                break
+            if text[i + j] != pat[j]: break
             j += 1
-        if j == len(pat):
-            hits.append(i)
+        if j == len(pat): hits.append(i)
     return hits, comps
-
-
 def build_lps(pat):
     lps = [0] * len(pat)
     length, i = 0, 1
     while i < len(pat):
         if pat[i] == pat[length]:
-            length += 1
-            lps[i] = length
-            i += 1
-        elif length:
-            length = lps[length - 1]
-        else:
-            lps[i] = 0
-            i += 1
+            length += 1; lps[i] = length; i += 1
+        elif length: length = lps[length - 1]
+        else: lps[i] = 0; i += 1
     return lps
-
-
 def kmp(text, pat):
     lps = build_lps(pat)
-    comps, hits = 0, []
-    i = j = 0
+    comps, hits, i, j = 0, [], 0, 0
     while i < len(text):
         comps += 1
         if text[i] == pat[j]:
-            i += 1
-            j += 1
+            i += 1; j += 1
             if j == len(pat):
-                hits.append(i - j)
-                j = lps[j - 1]
-        elif j:
-            j = lps[j - 1]          # fall back in the PATTERN only
-        else:
-            i += 1
+                hits.append(i - j); j = lps[j - 1]
+        elif j: j = lps[j - 1]
+        else: i += 1
     return hits, comps
 
+text = "AAAAAAAAAAAAAAAAAAAB" * 20; pat = "AAAAAB"
+nh, nc = naive(text, pat); kh, kc = kmp(text, pat)
+print("text: %d chars, pattern: %r" % (len(text), pat))
+print("  naive: %d matches, %d comparisons" % (len(nh), nc))
+print("  KMP:   %d matches, %d comparisons" % (len(kh), kc))
+print("  same matches:", nh == kh)
+```
 
-text = "AAAAAAAAAAAAAAAAAAAB" * 20
-pat = "AAAAAB"
-n_hits, n_comps = naive(text, pat)
-k_hits, k_comps = kmp(text, pat)
-print("text: 'AAAA...AAAB' repeated, %d characters" % len(text))
-print("pattern: %r" % pat)
-print("  naive: %d matches, %d comparisons" % (len(n_hits), n_comps))
-print("  KMP:   %d matches, %d comparisons" % (len(k_hits), k_comps))
-print("  same matches:", n_hits == k_hits)
+KMP never moves its text pointer backwards. When a mismatch happens, the LPS table tells it how far to slide the pattern forward without re-reading text characters. Patterns with more internal repetition produce larger table values and save more work. A pattern with no repeating structure at all (like "ABCDE") gets all zeros and KMP does the same work as naive.
 
-# The naive version re-reads the same run of As for every starting
-# position. KMP reads each character of the text once and never moves i
-# backwards -- when a mismatch happens it slides the PATTERN instead.
-#
-# What the table stores: for each prefix of the pattern, the length of the
-# longest proper prefix that is also a suffix of it. That is the amount
-# already matched that can be reused after a mismatch.
+```python-run
+def naive(text, pat):
+    comps, hits = 0, []
+    for i in range(len(text) - len(pat) + 1):
+        j = 0
+        while j < len(pat):
+            comps += 1
+            if text[i + j] != pat[j]: break
+            j += 1
+        if j == len(pat): hits.append(i)
+    return hits, comps
+def build_lps(pat):
+    lps = [0] * len(pat)
+    length, i = 0, 1
+    while i < len(pat):
+        if pat[i] == pat[length]:
+            length += 1; lps[i] = length; i += 1
+        elif length: length = lps[length - 1]
+        else: lps[i] = 0; i += 1
+    return lps
+def kmp(text, pat):
+    lps = build_lps(pat)
+    comps, hits, i, j = 0, [], 0, 0
+    while i < len(text):
+        comps += 1
+        if text[i] == pat[j]:
+            i += 1; j += 1
+            if j == len(pat):
+                hits.append(i - j); j = lps[j - 1]
+        elif j: j = lps[j - 1]
+        else: i += 1
+    return hits, comps
 
 for p in ("AAAAAB", "ABABACA", "ABCDE", "AABAACAABAA"):
-    lps = build_lps(p)
-    print()
-    print("  pattern %-12s %s" % (p, " ".join(p)))
-    print("  lps     %-12s %s" % ("", " ".join(str(x) for x in lps)))
-
-# Read 'ABABACA'. At index 3 the value is 2, because "ABAB" ends with
-# "AB", which is also how it starts -- so after failing at index 4 we can
-# resume as if two characters already matched, without re-reading them.
-#
-# 'ABCDE' is all zeros: nothing repeats, so a mismatch always restarts the
-# pattern from the beginning. On that kind of pattern KMP does the same
-# work as the naive version, and the table has bought nothing.
-
+    print("%-12s LPS = %s" % (p, build_lps(p)))
 print()
-print("%-14s %10s %10s" % ("pattern", "naive", "KMP"))
+text = "AAAAAAAAAAAAAAAAAAAB" * 20
 for p in ("AAAAAB", "ABCDE"):
-    _, nc = naive(text, p)
-    _, kc = kmp(text, p)
-    print("%-14s %10d %10d" % (p, nc, kc))
-
-# So the guarantee is the point rather than the average: KMP is O(n + m)
-# on EVERY input, where naive is O(n*m) on the bad ones. If your patterns
-# and texts have little internal repetition, the naive scan is competitive
-# and much simpler -- which is why real implementations often use it, with
-# a fallback for the pathological cases.
+    print("%-8s naive %5d   KMP %5d" % (p, naive(text, p)[1], kmp(text, p)[1]))
 ```
 
 ## Things to try
