@@ -96,88 +96,43 @@ Interpolation search estimates where a value should be instead of always looking
 
 ```python-run
 def binary(a, target):
-    lo, hi, probes = 0, len(a) - 1, 0
+    lo, hi, probes = 0, len(a)-1, 0
     while lo <= hi:
-        probes += 1
-        mid = (lo + hi) // 2
-        if a[mid] == target:
-            return probes
-        if a[mid] < target:
-            lo = mid + 1
-        else:
-            hi = mid - 1
+        probes += 1; mid = (lo + hi) // 2
+        if a[mid] == target: return probes
+        if a[mid] < target: lo = mid + 1
+        else: hi = mid - 1
     return probes
 
-
-def interpolation(a, target, cap=10 ** 6):
-    lo, hi, probes = 0, len(a) - 1, 0
+def interpolation(a, target, cap=10**6):
+    lo, hi, probes = 0, len(a)-1, 0
     while lo <= hi and a[lo] <= target <= a[hi] and probes < cap:
         probes += 1
-        if a[hi] == a[lo]:
-            pos = lo
-        else:
-            # where the value SHOULD be if the data were evenly spread
-            pos = lo + (target - a[lo]) * (hi - lo) // (a[hi] - a[lo])
-        if a[pos] == target:
-            return probes
-        if a[pos] < target:
-            lo = pos + 1
-        else:
-            hi = pos - 1
+        if a[hi] == a[lo]: pos = lo
+        else: pos = lo + (target - a[lo]) * (hi - lo) // (a[hi] - a[lo])
+        if a[pos] == target: return probes
+        if a[pos] < target: lo = pos + 1
+        else: hi = pos - 1
     return probes
 
-
-import math
-import random
-
-n = 100000
-uniform = list(range(n))                       # perfectly evenly spaced
-rng = random.Random(9)
-# uniformly distributed but NOT perfectly spaced -- the realistic case
-spread = sorted(rng.sample(range(10 * n), n))
-clustered = sorted(int(rng.random() ** 8 * n) for _ in range(n))
-exponential = sorted(2 ** (i // 3) for i in range(n))
-
-print("%-16s %14s %14s %12s" % ("data", "binary probes", "interp probes",
-                                "log2(log2 n)"))
-for name, data in (("evenly spaced", uniform), ("random uniform", spread),
-                   ("clustered", clustered), ("exponential", exponential)):
+import math, random
+n = 100000; rng = random.Random(9)
+datasets = [
+    ("evenly spaced", list(range(n))),
+    ("random uniform", sorted(rng.sample(range(10*n), n))),
+    ("clustered", sorted(int(rng.random()**8 * n) for _ in range(n))),
+    ("exponential", sorted(2**(i//3) for i in range(n))),
+]
+print("%-16s %12s %12s %10s" % ("data", "binary", "interp", "log2log2n"))
+for name, data in datasets:
     targets = [data[rng.randrange(n)] for _ in range(50)]
     b = sum(binary(data, t) for t in targets) / 50
-    i = sum(interpolation(data, t) for t in targets) / 50
-    print("%-16s %14.1f %14.1f %12.1f" % (
-        name, b, i, math.log2(math.log2(n))))
-
-# The first row is the ideal: values exactly one apart, so the formula
-# computes the position rather than estimating it and lands on the target
-# in a single probe. Real data is never that tidy, which is what the
-# second row is for -- uniformly distributed but randomly spaced, where
-# the count settles near log2(log2(n)), about 4. Binary search needs
-# sixteen or seventeen on the same data.
-#
-# On the clustered data the guess is systematically wrong: most values sit
-# near the bottom of the range, so the formula points near the bottom
-# every time and the window shrinks by a little instead of by half.
-#
-# The exponential data is the worst case in a clean form. Each value is
-# roughly double the last, so a linear interpolation between the endpoints
-# is off by orders of magnitude on every probe.
-#
-# Binary search does not care -- its column barely moves, because halving
-# is a fact about the INDEX range and makes no assumption about the
-# values. That is the trade: interpolation search buys speed by assuming a
-# distribution, and pays for the assumption when it is wrong.
-
-print()
-print("worst case if the guess is always off by one position:")
-print("  interpolation: O(n) -- %d probes on %d items" % (n, n))
-print("  binary:        O(log n) -- %d probes on %d items" % (
-    int(math.log2(n)) + 1, n))
-
-# In practice the safe version is a hybrid: interpolate, but if the window
-# is not shrinking fast enough, fall back to bisection. That is exactly
-# what numerical root-finders do with Brent's method, for the same reason
-# -- keep the fast guess, keep the guaranteed bound.
+    ip = sum(interpolation(data, t) for t in targets) / 50
+    print("%-16s %12.1f %12.1f %10.1f" % (name, b, ip, math.log2(math.log2(n))))
+# uniform data: interpolation wins big. clustered/exponential: it loses,
+# because the linear guess is systematically wrong. binary search does not
+# care -- halving the INDEX range assumes nothing about the values.
+print("\nworst case: interp O(n)=%d, binary O(log n)=%d" % (n, int(math.log2(n))+1))
 ```
 
 ## Things to try

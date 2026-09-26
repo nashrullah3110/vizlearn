@@ -98,126 +98,112 @@ A bowl, a ravine, a saddle and a plateau. Each one defeats a different optimiser
 
 ```python-run
 import numpy as np
+def bowl(w): return 0.5*(w**2).sum(), w
+def ravine(w):
+    c = np.array([400.,1.]); return 0.5*(c*w**2).sum(), c*w
+def saddle(w): return w[0]**2-w[1]**2, np.array([2*w[0],-2*w[1]])
+def plateau(w):
+    s = np.tanh(w); return (s**2).sum(), 2*s*(1-s**2)
+def sgd(fn,w,n,lr):
+    for _ in range(n): w = w - lr*fn(w)[1]
+    return w
+def momentum(fn,w,n,lr,beta=0.9):
+    v = np.zeros_like(w)
+    for _ in range(n): v = beta*v+fn(w)[1]; w = w-lr*v
+    return w
+def rmsprop(fn,w,n,lr,beta=0.9):
+    s = np.zeros_like(w)
+    for _ in range(n):
+        g = fn(w)[1]; s = beta*s+(1-beta)*g**2; w = w-lr*g/(np.sqrt(s)+1e-8)
+    return w
+def adam(fn,w,n,lr,b1=0.9,b2=0.999):
+    m = np.zeros_like(w); v = np.zeros_like(w)
+    for t in range(1,n+1):
+        g = fn(w)[1]; m = b1*m+(1-b1)*g; v = b2*v+(1-b2)*g**2
+        w = w-lr*(m/(1-b1**t))/(np.sqrt(v/(1-b2**t))+1e-8)
+    return w
+SURFS = [("bowl",bowl,[3.,3.]), ("ravine 400:1",ravine,[-2.,-2.]),
+         ("saddle",saddle,[.001,.001]), ("plateau",plateau,[3.,3.])]
+OPTS = [("SGD",sgd,.004),("momentum",momentum,.002),
+        ("RMSProp",rmsprop,.02),("Adam",adam,.02)]
+print("Four surfaces, four optimisers, 500 steps each (loss reached):")
+print("%-16s %12s %12s %12s %12s" % ("surface",*[n for n,_,_ in OPTS]))
+for sn,fn,s0 in SURFS:
+    vals = []
+    for _,opt,lr in OPTS:
+        loss = fn(opt(fn, np.array(s0), 500, lr))[0]
+        vals.append("%.3e" % loss if np.isfinite(loss) else "diverged")
+    print("%-16s %12s %12s %12s %12s" % (sn, *vals))
+```
 
-def bowl(w):
-    return 0.5 * (w ** 2).sum(), w
+Now read the table surface by surface to see what each one reveals about optimiser design.
+
+```python-run
+import numpy as np
 
 def ravine(w):
-    c = np.array([400.0, 1.0])       # 400x steeper across than along
-    return 0.5 * (c * w ** 2).sum(), c * w
+    c = np.array([400.0, 1.0])
+    return 0.5 * (c * w**2).sum(), c * w
 
-def saddle(w):
-    # up in one direction, down in the other, flat at the origin
-    return w[0] ** 2 - w[1] ** 2, np.array([2 * w[0], -2 * w[1]])
-
-def plateau(w):
-    # tanh saturates: enormous region with almost no gradient
-    s = np.tanh(w)
-    return (s ** 2).sum(), 2 * s * (1 - s ** 2)
-
-SURFACES = [("bowl", bowl, np.array([3.0, 3.0])),
-            ("ravine (400:1)", ravine, np.array([-2.0, -2.0])),
-            ("saddle", saddle, np.array([0.001, 0.001])),
-            ("plateau (tanh)", plateau, np.array([3.0, 3.0]))]
-
-def sgd(grad_fn, w, steps, lr):
-    for _ in range(steps):
-        w = w - lr * grad_fn(w)[1]
+def sgd(fn, w, n, lr):
+    for _ in range(n): w = w - lr * fn(w)[1]
     return w
 
-def momentum(grad_fn, w, steps, lr, beta=0.9):
-    v = np.zeros_like(w)
-    for _ in range(steps):
-        v = beta * v + grad_fn(w)[1]
-        w = w - lr * v
-    return w
-
-def rmsprop(grad_fn, w, steps, lr, beta=0.9):
-    s = np.zeros_like(w)
-    for _ in range(steps):
-        g = grad_fn(w)[1]
-        s = beta * s + (1 - beta) * g ** 2
-        w = w - lr * g / (np.sqrt(s) + 1e-8)
-    return w
-
-def adam(grad_fn, w, steps, lr, b1=0.9, b2=0.999):
-    m = np.zeros_like(w); v = np.zeros_like(w)
-    for t in range(1, steps + 1):
-        g = grad_fn(w)[1]
-        m = b1 * m + (1 - b1) * g
-        v = b2 * v + (1 - b2) * g ** 2
-        w = w - lr * (m / (1 - b1 ** t)) / (np.sqrt(v / (1 - b2 ** t)) + 1e-8)
-    return w
-
-OPTS = [("SGD", sgd, 0.004), ("momentum", momentum, 0.002),
-        ("RMSProp", rmsprop, 0.02), ("Adam", adam, 0.02)]
-
-print("four surfaces, four optimisers, 500 steps each.")
-print("the number is the loss reached -- lower is better, except on the")
-print("saddle where the interesting question is whether it ESCAPED.")
+print("BOWL -- everything works. it tells you nothing about an optimiser.")
 print()
-print("%-18s %14s %14s %14s %14s"
-      % ("surface", *[n for n, _, _ in OPTS]))
-for sname, fn, start in SURFACES:
-    row = []
-    for oname, opt, lr in OPTS:
-        w = opt(fn, start.copy(), 500, lr)
-        loss = fn(w)[0]
-        row.append("%.3e" % loss if np.isfinite(loss) else "diverged")
-    print("%-18s %14s %14s %14s %14s" % (sname, *row))
-print()
-
-print("read it surface by surface.")
-print()
-print("BOWL -- everything works. this is the surface people picture, and it")
-print("is the one that tells you nothing about an optimiser.")
-print()
-
-print("RAVINE -- 400x steeper across than along. SGD's step is capped by the")
-print("steep direction (anything above 2/400 = %.4f diverges), so the"
-      % (2 / 400))
-print("shallow one crawls at that same tiny rate:")
+print("RAVINE -- 400x steeper across than along. SGD's step is capped by")
+print("the steep direction (above 2/400 = %.4f it diverges), so the" % (2/400))
+print("shallow direction crawls at that same tiny rate:")
 for step in (0, 100, 300, 500):
     ww = sgd(ravine, np.array([-2.0, -2.0]), step, 0.004)
     print("   SGD after %3d steps: %s" % (step, np.round(ww, 5)))
-print("   the first coordinate is solved almost immediately; the second is")
-print("   still travelling at step 500. RMSProp and Adam rescale per")
-print("   coordinate, which is exactly the fix.")
-print()
+print("   the first coordinate is solved fast; the second is still")
+print("   travelling at step 500. RMSProp and Adam rescale per coordinate.")
+```
 
-print("SADDLE -- the gradient at the origin is EXACTLY zero, and it is not a")
-print("minimum. starting at (0.001, 0.001):")
-for oname, opt, lr in OPTS:
-    w = opt(saddle, np.array([0.001, 0.001]), 500, lr)
-    print("   %-10s ended at %s (loss %.3e) -- %s"
-          % (oname, np.round(w, 4), saddle(w)[0],
-             "escaped" if abs(w[1]) > 0.5 else "still stuck near the origin"))
-print("   escaping means running away DOWN the second coordinate. an")
-print("   optimiser that normalises its step size gets out fastest, because")
-print("   even a tiny gradient produces a full-sized step.")
-print()
+The saddle and plateau are the surfaces that separate adaptive methods from plain SGD.
 
-print("PLATEAU -- tanh saturates, so far from the origin the gradient is")
-print("almost zero even though the loss is high:")
-for r in (1.0, 2.0, 3.0, 4.0):
-    g = plateau(np.array([r, r]))[1]
-    print("   at distance %.0f: loss %.4f, gradient magnitude %.3e"
-          % (r, plateau(np.array([r, r]))[0], np.linalg.norm(g)))
-print("   SGD's step is proportional to that gradient, so it barely moves.")
-print("   this is the same problem as a vanishing gradient, and it is why")
-print("   saturating activations were abandoned in hidden layers.")
-print()
+```python-run
+import numpy as np
+def saddle(w): return w[0]**2-w[1]**2, np.array([2*w[0],-2*w[1]])
+def plateau(w):
+    s = np.tanh(w); return (s**2).sum(), 2*s*(1-s**2)
+def sgd(fn,w,n,lr):
+    for _ in range(n): w = w-lr*fn(w)[1]
+    return w
+def momentum(fn,w,n,lr,beta=0.9):
+    v = np.zeros_like(w)
+    for _ in range(n): v = beta*v+fn(w)[1]; w = w-lr*v
+    return w
+def rmsprop(fn,w,n,lr,beta=0.9):
+    s = np.zeros_like(w)
+    for _ in range(n):
+        g = fn(w)[1]; s = beta*s+(1-beta)*g**2; w = w-lr*g/(np.sqrt(s)+1e-8)
+    return w
+def adam(fn,w,n,lr,b1=0.9,b2=0.999):
+    m = np.zeros_like(w); v = np.zeros_like(w)
+    for t in range(1,n+1):
+        g = fn(w)[1]; m = b1*m+(1-b1)*g; v = b2*v+(1-b2)*g**2
+        w = w-lr*(m/(1-b1**t))/(np.sqrt(v/(1-b2**t))+1e-8)
+    return w
+OPTS = [("SGD",sgd,.004),("momentum",momentum,.002),
+        ("RMSProp",rmsprop,.02),("Adam",adam,.02)]
 
-print("the summary that actually transfers:")
-print("  a real loss surface is all four of these in different directions at")
-print("  once, and which one dominates changes during training.")
-print("  adaptive methods (Adam, RMSProp) handle ravines and plateaus well")
-print("  because they rescale by the gradient's own recent magnitude.")
-print("  momentum handles ravines by accumulating the consistent direction")
-print("  and cancelling the oscillating one.")
-print("  plain SGD handles none of them, and still generalises slightly")
-print("  better than Adam on many vision problems -- which is why it has")
-print("  not gone away.")
+print("SADDLE -- gradient is zero at the origin, yet it is not a minimum:")
+for on, opt, lr in OPTS:
+    w = opt(saddle, np.array([.001,.001]), 500, lr)
+    print("   %-10s -> %s  %s" % (on, np.round(w,4), "escaped" if abs(w[1])>.5 else "stuck"))
+print("   normalising step size lets a tiny gradient produce a full step.")
+print()
+print("PLATEAU -- tanh saturates, gradient vanishes far from origin:")
+for r in (1., 2., 3., 4.):
+    g = plateau(np.array([r,r]))[1]
+    print("   dist %.0f: loss %.4f, |grad| %.3e" % (r, plateau(np.array([r,r]))[0], np.linalg.norm(g)))
+print("   SGD barely moves. same problem as vanishing gradients.")
+print()
+print("SUMMARY: a real surface is all four at once. adaptive methods rescale")
+print("by gradient magnitude; momentum accumulates the consistent direction.")
+print("plain SGD handles none, yet generalises better on many vision tasks.")
 ```
 
 ## Questions people ask
