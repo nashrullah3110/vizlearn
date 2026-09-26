@@ -148,53 +148,70 @@ def kahn(deps, tie_break=sorted):
         ready = tie_break(ready)
     return order, len(order) == len(deps)
 
-
 order, ok = kahn(DEPS)
 print("one valid order:")
 for i, step in enumerate(order, 1):
     print("  %d. %s" % (i, step))
 
-# Now the same graph with the ready-list drained in the opposite order.
-
 order2, _ = kahn(DEPS, lambda x: sorted(x, reverse=True))
 print()
 print("another valid order:", " | ".join(order2))
 print("same graph, both correct:", order != order2)
+```
 
-# Three tasks have no prerequisites at all, so nothing in the problem
-# says which comes first. A topological sort returns SOME order consistent
-# with the constraints, not the order -- and code that depends on getting
-# a particular one is depending on a tie-break that is not specified.
-#
-# What IS guaranteed is the constraint itself. Check it directly:
+A topological sort returns some valid order, not the only one. The guarantee is that every dependency comes before the task needing it. Check it directly.
 
+```python-run
+DEPS = {
+    "boil water": [], "grind beans": [],
+    "brew": ["boil water", "grind beans"], "warm cup": [],
+    "pour": ["brew", "warm cup"], "drink": ["pour"],
+}
+order = ["boil water", "grind beans", "warm cup", "brew", "pour", "drink"]
 pos = {n: i for i, n in enumerate(order)}
 violations = [(d, n) for n, ds in DEPS.items() for d in ds if pos[d] > pos[n]]
-print()
 print("dependencies that came after the task needing them:", violations)
+```
 
-# Empty, in both orders. That is the entire specification.
-#
-# And the case with no answer. Add one edge that makes a cycle:
+Both orderings are valid because neither violates a dependency. Now see what happens when a cycle makes a valid ordering impossible.
 
-CYCLIC = dict(DEPS)
-CYCLIC["boil water"] = ["drink"]      # you must drink before you boil
+```python-run
+from collections import deque
 
-order3, ok3 = kahn(CYCLIC)
-print()
+DEPS = {
+    "boil water":   ["drink"],       # you must drink before you boil
+    "grind beans":  [],
+    "brew":         ["boil water", "grind beans"],
+    "warm cup":     [],
+    "pour":         ["brew", "warm cup"],
+    "drink":        ["pour"],
+}
+
+
+def kahn(deps):
+    indeg = {n: len(d) for n, d in deps.items()}
+    out_edges = {n: [] for n in deps}
+    for node, ds in deps.items():
+        for d in ds:
+            out_edges[d].append(node)
+    ready = sorted([n for n, k in indeg.items() if k == 0])
+    order = []
+    while ready:
+        node = ready.pop(0)
+        order.append(node)
+        for nxt in out_edges[node]:
+            indeg[nxt] -= 1
+            if indeg[nxt] == 0:
+                ready.append(nxt)
+        ready = sorted(ready)
+    return order, len(order) == len(deps)
+
+
+order, ok = kahn(DEPS)
 print("with a cycle, Kahn's algorithm produced %d of %d tasks" % (
-    len(order3), len(CYCLIC)))
-print("complete?", ok3)
-print("stuck on:", sorted(set(CYCLIC) - set(order3)))
-
-# It did not loop forever and it did not raise: it simply ran out of
-# tasks with an in-degree of zero, and the count came up short. That
-# comparison -- did I emit every node? -- IS the cycle detection, and it
-# comes free with the algorithm.
-#
-# Which is why this is the check behind "circular dependency detected" in
-# build systems, package managers and spreadsheet engines: they are all
-# running a topological sort, and the error is the sort failing to finish.
+    len(order), len(DEPS)))
+print("complete?", ok)
+print("stuck on:", sorted(set(DEPS) - set(order)))
 ```
 
 ## Things to try
