@@ -130,88 +130,108 @@ class DSU:
         self.rank = [0] * n
         self.by_rank, self.compress = by_rank, compress
         self.hops = 0
+    def find(self, x):
+        root = x
+        while self.parent[root] != root:
+            root = self.parent[root]; self.hops += 1
+        if self.compress:
+            while self.parent[x] != root:
+                self.parent[x], x = root, self.parent[x]
+        return root
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra == rb: return False
+        if self.by_rank:
+            if self.rank[ra] < self.rank[rb]: ra, rb = rb, ra
+            self.parent[rb] = ra
+            if self.rank[ra] == self.rank[rb]: self.rank[ra] += 1
+        else:
+            self.parent[ra] = rb
+        return True
 
+n = 2000
+print("%d elements, worst-order unions, then every find" % n)
+print("%-26s %12s" % ("variant", "pointer hops"))
+for by_rank in (False, True):
+    for compress in (False, True):
+        d = DSU(n, by_rank, compress)
+        for i in range(n - 1): d.union(i, i + 1)
+        d.hops = 0
+        for i in range(n): d.find(i)
+        label = "%s + %s" % ("rank" if by_rank else "no rank",
+                             "compress" if compress else "no compress")
+        print("%-26s %12d" % (label, d.hops))
+```
+
+Without rank or compression, chained unions produce O(n) depth. Either optimisation alone fixes it; together the depth collapses to 1.
+
+```python-run
+class DSU:
+    def __init__(self, n):
+        self.parent = list(range(n))
+        self.rank = [0] * n
+        self.hops = 0
     def find(self, x):
         root = x
         while self.parent[root] != root:
             root = self.parent[root]
             self.hops += 1
-        if self.compress:
-            while self.parent[x] != root:      # second pass: re-point
-                self.parent[x], x = root, self.parent[x]
+        while self.parent[x] != root:
+            self.parent[x], x = root, self.parent[x]
         return root
-
     def union(self, a, b):
         ra, rb = self.find(a), self.find(b)
         if ra == rb:
             return False
-        if self.by_rank:
-            if self.rank[ra] < self.rank[rb]:
-                ra, rb = rb, ra
-            self.parent[rb] = ra
-            if self.rank[ra] == self.rank[rb]:
-                self.rank[ra] += 1
-        else:
-            self.parent[ra] = rb               # arbitrary: builds a chain
+        if self.rank[ra] < self.rank[rb]:
+            ra, rb = rb, ra
+        self.parent[rb] = ra
+        if self.rank[ra] == self.rank[rb]:
+            self.rank[ra] += 1
         return True
 
-
 n = 2000
-print("%d elements, unioned in the worst order, then every element queried"
-      % n)
-print("%-26s %14s %14s" % ("variant", "pointer hops", "tree depth"))
-for by_rank in (False, True):
-    for compress in (False, True):
-        d = DSU(n, by_rank, compress)
-        for i in range(n - 1):
-            d.union(i, i + 1)          # a chain, if nothing prevents it
-        d.hops = 0
-        for i in range(n):
-            d.find(i)
-        depth = 0
-        for i in range(n):
-            k, c = i, 0
-            while d.parent[k] != k:
-                k = d.parent[k]; c += 1
-            depth = max(depth, c)
-        name = "%s + %s" % ("rank" if by_rank else "no rank",
-                            "compress" if compress else "no compress")
-        print("%-26s %14d %14d" % (name, d.hops, depth))
-
-# The first row is the degenerate case: unioning 0-1, 1-2, 2-3 in order
-# with no rank builds one long chain, and every find walks it. That is
-# O(n) per query -- a linked list wearing a tree's name.
-#
-# Either optimisation alone fixes it, and they fix it differently. Union
-# by rank PREVENTS the deep tree from forming; path compression allows it
-# to form and then flattens it on the way back out. Together the depth
-# collapses to 1 and a find is a single lookup.
-#
-# The famous complexity is O(alpha(n)) amortised, where alpha is the
-# inverse Ackermann function. It is not a constant, but:
-
-best = DSU(n, True, True)
+best = DSU(n)
 for i in range(n - 1):
     best.union(i, i + 1)
 best.hops = 0
 for i in range(n):
     best.find(i)
-print()
-print("alpha(n) stays below 5 for any n that fits in the observable universe.")
+print("alpha(n) stays below 5 for any n in the observable universe.")
 print("with both optimisations, %d finds cost %d hops -- %.2f each."
       % (n, best.hops, best.hops / n))
+```
 
-# Now what it is FOR. Union-Find answers "are these two in the same
-# group" under merges, which is exactly Kruskal's cycle test:
+Union-Find answers "are these two in the same group?" under merges, which is exactly the cycle test Kruskal's algorithm needs.
+
+```python-run
+class DSU:
+    def __init__(self, n):
+        self.parent = list(range(n))
+        self.rank = [0] * n
+    def find(self, x):
+        root = x
+        while self.parent[root] != root:
+            root = self.parent[root]
+        while self.parent[x] != root:
+            self.parent[x], x = root, self.parent[x]
+        return root
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra == rb:
+            return False
+        if self.rank[ra] < self.rank[rb]:
+            ra, rb = rb, ra
+        self.parent[rb] = ra
+        if self.rank[ra] == self.rank[rb]:
+            self.rank[ra] += 1
+        return True
 
 edges = [(1, "a", "b"), (2, "b", "c"), (2, "a", "c"), (3, "c", "d")]
 names = {}
-d = DSU(4)
 for w, u, v in edges:
     for x in (u, v):
         names.setdefault(x, len(names))
-
-print()
 d = DSU(len(names))
 total = 0
 for w, u, v in sorted(edges):
@@ -219,14 +239,8 @@ for w, u, v in sorted(edges):
         total += w
         print("  take %s-%s (weight %d)" % (u, v, w))
     else:
-        print("  skip %s-%s (weight %d) -- would close a cycle" % (u, v, w))
+        print("  skip %s-%s (weight %d) -- cycle" % (u, v, w))
 print("  spanning tree weight:", total)
-
-# The b-c edge was rejected without any search of the tree built so far:
-# b and c were already connected through a, and one find on each end
-# said so.
-# That is the whole contribution: a cycle test that costs almost nothing,
-# which is what makes Kruskal's algorithm practical.
 ```
 
 ## Guided tour

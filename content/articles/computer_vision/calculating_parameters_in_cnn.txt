@@ -160,118 +160,128 @@ for n in (32, 224, 1024):
           % (n, n, "{:,}".format(conv_params(3, 3, 64, 128))))
 print("   identical. the kernel is reused at every position, so image size")
 print("   changes the COMPUTE and never the parameter count.")
-print()
+```
 
-# a VGG-ish network on 224x224x3
+Now apply those formulas to a full VGG-style network and see where the parameters actually sit.
+
+```python-run
+import numpy as np
+
+def conv_params(kh, kw, cin, cout):
+    return (kh * kw * cin + 1) * cout
+
+def dense_params(fin, fout):
+    return (fin + 1) * fout
+
+# (name, type, params_args, output_hw)
 layers = [
-    ("conv3-64",   "conv", (3, 3, 3, 64),      224),
-    ("conv3-64",   "conv", (3, 3, 64, 64),     224),
-    ("maxpool",    "pool", None,               112),
-    ("conv3-128",  "conv", (3, 3, 64, 128),    112),
-    ("conv3-128",  "conv", (3, 3, 128, 128),   112),
-    ("maxpool",    "pool", None,                56),
-    ("conv3-256",  "conv", (3, 3, 128, 256),    56),
-    ("conv3-256",  "conv", (3, 3, 256, 256),    56),
-    ("maxpool",    "pool", None,                28),
-    ("conv3-512",  "conv", (3, 3, 256, 512),    28),
-    ("conv3-512",  "conv", (3, 3, 512, 512),    28),
-    ("maxpool",    "pool", None,                14),
-    ("flatten",    "flat", None,                14),
-    ("dense-4096", "dense", (14 * 14 * 512, 4096), 1),
-    ("dense-4096", "dense", (4096, 4096),        1),
-    ("dense-1000", "dense", (4096, 1000),        1),
+    ("conv3-64",  "c", (3,3,3,64),    224), ("conv3-64",  "c", (3,3,64,64),   224),
+    ("maxpool",   "-", None,           112), ("conv3-128", "c", (3,3,64,128),  112),
+    ("conv3-128", "c", (3,3,128,128),  112), ("maxpool",   "-", None,           56),
+    ("conv3-256", "c", (3,3,128,256),   56), ("conv3-256", "c", (3,3,256,256),  56),
+    ("maxpool",   "-", None,            28), ("conv3-512", "c", (3,3,256,512),  28),
+    ("conv3-512", "c", (3,3,512,512),   28), ("maxpool",   "-", None,           14),
+    ("flatten",   "-", None,            14),
+    ("dense-4096","d", (14*14*512,4096), 1), ("dense-4096","d", (4096,4096), 1),
+    ("dense-1000","d", (4096,1000),      1),
 ]
 
 print("A VGG-STYLE NETWORK on 224x224x3:")
-print("%14s %20s %16s %18s"
-      % ("layer", "output shape", "parameters", "multiply-adds"))
+print("%14s %20s %16s %18s" % ("layer", "output", "parameters", "multiply-adds"))
 total_p, total_m = 0, 0
-rows = []
-for name, kind, spec, out_hw in layers:
-    if kind == "conv":
-        kh, kw, cin, cout = spec
-        p = conv_params(kh, kw, cin, cout)
-        m = out_hw * out_hw * kh * kw * cin * cout
-        shape = "%dx%dx%d" % (out_hw, out_hw, cout)
-    elif kind == "dense":
-        fin, fout = spec
-        p = dense_params(fin, fout)
-        m = fin * fout
-        shape = "%d" % fout
-    elif kind == "flat":
-        p, m = 0, 0
-        shape = "%d" % (14 * 14 * 512)
+for name, kind, spec, hw in layers:
+    if kind == "c":
+        kh, kw, ci, co = spec
+        p, m = conv_params(kh,kw,ci,co), hw*hw*kh*kw*ci*co
+        shape = "%dx%dx%d" % (hw, hw, co)
+    elif kind == "d":
+        p, m = dense_params(spec[0],spec[1]), spec[0]*spec[1]
+        shape = "%d" % spec[1]
     else:
-        p, m = 0, 0
-        shape = "%dx%dx%s" % (out_hw, out_hw, "-")
-    total_p += p
-    total_m += m
-    rows.append((name, kind, p, m))
-    print("%14s %20s %16s %18s"
-          % (name, shape, "{:,}".format(p), "{:,}".format(m)))
-print("%14s %20s %16s %18s"
-      % ("TOTAL", "", "{:,}".format(total_p), "{:,}".format(total_m)))
-print()
+        p, m, shape = 0, 0, str(hw)
+    total_p += p; total_m += m
+    print("%14s %20s %16s %18s" % (name, shape, "{:,}".format(p), "{:,}".format(m)))
+print("%14s %20s %16s %18s" % ("TOTAL", "", "{:,}".format(total_p), "{:,}".format(total_m)))
+```
 
-conv_p = sum(p for _, k, p, _ in rows if k == "conv")
-dense_p = sum(p for _, k, p, _ in rows if k == "dense")
-conv_m = sum(m for _, k, _, m in rows if k == "conv")
-dense_m = sum(m for _, k, _, m in rows if k == "dense")
+The table reveals the key insight: where parameters sit versus where compute sits.
+
+```python-run
+import numpy as np
+
+def conv_params(kh, kw, cin, cout):
+    return (kh * kw * cin + 1) * cout
+
+def dense_params(fin, fout):
+    return (fin + 1) * fout
+
+conv_specs = [(3,3,3,64,224),(3,3,64,64,224),(3,3,64,128,112),(3,3,128,128,112),
+              (3,3,128,256,56),(3,3,256,256,56),(3,3,256,512,28),(3,3,512,512,28)]
+dense_specs = [(14*14*512,4096),(4096,4096),(4096,1000)]
+
+conv_p = sum(conv_params(kh,kw,ci,co) for kh,kw,ci,co,_ in conv_specs)
+conv_m = sum(hw*hw*kh*kw*ci*co for kh,kw,ci,co,hw in conv_specs)
+dense_p = sum(dense_params(fi,fo) for fi,fo in dense_specs)
+dense_m = sum(fi*fo for fi,fo in dense_specs)
+total_p = conv_p + dense_p
+total_m = conv_m + dense_m
+
 print("AND HERE IS THE POINT:")
-print("%22s %18s %10s %18s %10s"
-      % ("", "parameters", "share", "multiply-adds", "share"))
+print("%22s %18s %10s %18s %10s" % ("", "parameters", "share", "multiply-adds", "share"))
 print("%22s %18s %9.1f%% %18s %9.1f%%"
-      % ("convolutions", "{:,}".format(conv_p), 100 * conv_p / total_p,
-         "{:,}".format(conv_m), 100 * conv_m / total_m))
+      % ("convolutions", "{:,}".format(conv_p), 100*conv_p/total_p,
+         "{:,}".format(conv_m), 100*conv_m/total_m))
 print("%22s %18s %9.1f%% %18s %9.1f%%"
-      % ("dense layers", "{:,}".format(dense_p), 100 * dense_p / total_p,
-         "{:,}".format(dense_m), 100 * dense_m / total_m))
+      % ("dense layers", "{:,}".format(dense_p), 100*dense_p/total_p,
+         "{:,}".format(dense_m), 100*dense_m/total_m))
 print()
-print("   the dense layers hold %.0f%% of the parameters and do %.1f%% of the"
-      % (100 * dense_p / total_p, 100 * dense_m / total_m))
-print("   arithmetic. the convolutions are the opposite.")
+print("   dense layers hold %.0f%% of parameters, do %.1f%% of the arithmetic."
+      % (100*dense_p/total_p, 100*dense_m/total_m))
+print("   convolutions are the opposite.")
 print()
-first_dense = [p for n, k, p, _ in rows if k == "dense"][0]
-print("   and ONE layer dominates. the first dense layer alone:")
+first_dense = dense_params(14*14*512, 4096)
+print("   ONE layer dominates: the first dense layer alone:")
 print("      %s parameters -- %.0f%% of the entire network"
-      % ("{:,}".format(first_dense), 100 * first_dense / total_p))
-print("      because flattening 14x14x512 gives %s inputs, and every one of"
-      % "{:,}".format(14 * 14 * 512))
-print("      them connects to all 4096 outputs.")
+      % ("{:,}".format(first_dense), 100*first_dense/total_p))
+print("      because flattening 14x14x512 = %s inputs, all connecting to 4096 outputs."
+      % "{:,}".format(14*14*512))
+```
+
+Global average pooling solves that bottleneck. BatchNorm and bias removal also affect the count.
+
+```python-run
+import numpy as np
+
+def conv_params(kh, kw, cin, cout, bias=True):
+    return (kh * kw * cin + (1 if bias else 0)) * cout
+
+def dense_params(fin, fout):
+    return (fin + 1) * fout
+
+dense_p = dense_params(14*14*512, 4096) + dense_params(4096, 4096) + dense_params(4096, 1000)
+gap_dense = dense_params(512, 1000)
+
+print("GLOBAL AVERAGE POOLING replaces flattening:")
+print("   flatten + 3 dense layers : %s parameters" % "{:,}".format(dense_p))
+print("   global avg pool + dense  : %s parameters" % "{:,}".format(gap_dense))
+print("   a %.0fx reduction, and the network generalises BETTER." % (dense_p / gap_dense))
 print()
 
-print("WHICH IS WHY GLOBAL AVERAGE POOLING REPLACED IT. average each")
-print("channel down to a single number instead of flattening:")
-gap_in = 512
-gap_dense = dense_params(gap_in, 1000)
-print("      flatten + dense-4096 + dense-4096 + dense-1000 : %s"
-      % "{:,}".format(dense_p))
-print("      global average pool + dense-1000               : %s"
-      % "{:,}".format(gap_dense))
-print("      a %.0fx reduction, and the network gets BETTER at generalising"
-      % (dense_p / gap_dense))
-print("      because there is far less capacity available to memorise.")
-print()
-
-print("TWO THINGS THAT CHANGE THE COUNT and are easy to forget:")
-print("   BatchNorm adds 2 learnable parameters per channel (plus 2 running")
-print("   statistics that are saved but not trained):")
+print("BATCHNORM adds 2 learnable parameters per channel:")
 for c in (64, 256, 512):
-    print("      %3d channels -> %d trainable, %d buffers" % (c, 2 * c, 2 * c))
-bn_total = sum(2 * spec[3] for _, k, spec, _ in layers if k == "conv")
-print("      across this network: %s trainable BatchNorm parameters --"
-      % "{:,}".format(bn_total))
-print("      about 1 in every %s of the total. negligible in count,"
-      % "{:,}".format(int(total_p / bn_total)))
-print("      and important in effect.")
+    print("   %3d channels -> %d trainable, %d buffers" % (c, 2*c, 2*c))
+conv_channels = [64, 64, 128, 128, 256, 256, 512, 512]
+bn_total = sum(2*c for c in conv_channels)
+total_p = sum(conv_params(3,3,ci,co) for ci,co in
+              [(3,64),(64,64),(64,128),(128,128),(128,256),(256,256),(256,512),(512,512)]) + dense_p
+print("   across this network: %s -- about 1 in %s. negligible count, important effect."
+      % ("{:,}".format(bn_total), "{:,}".format(int(total_p / bn_total))))
 print()
-print("   BIAS is often disabled before a BatchNorm, because BatchNorm's")
-print("   shift parameter does the same job:")
-with_bias = conv_params(3, 3, 512, 512, True)
-without = conv_params(3, 3, 512, 512, False)
-print("      3x3, 512->512 with bias %s, without %s -- a difference of %d"
-      % ("{:,}".format(with_bias), "{:,}".format(without), with_bias - without))
-print("      small, but it is free and it removes a redundant parameter.")
+print("BIAS is often disabled before BatchNorm (its shift parameter does the same job):")
+print("   3x3 512->512 with bias: %s, without: %s -- saves %d parameters."
+      % ("{:,}".format(conv_params(3,3,512,512,True)),
+         "{:,}".format(conv_params(3,3,512,512,False)),
+         conv_params(3,3,512,512,True) - conv_params(3,3,512,512,False)))
 ```
 
 ## Questions people ask

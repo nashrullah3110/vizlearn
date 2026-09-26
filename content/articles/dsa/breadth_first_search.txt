@@ -199,9 +199,8 @@ Three implementation details that matter:
 BFS and DFS are the same seven lines with one substitution: take the next node from the front of the collection or from the back. That single change is what makes one of them find shortest paths and the other not, and the clearest way to see it is to run both from the same code.
 
 ```python-run
-# Two routes from A to G: a short one through C, and a long one through
-# B. They are listed so that a stack reaches the long one first -- which
-# is the case that separates the two searches.
+from collections import deque
+
 GRAPH = {
     "A": ["C", "B"],
     "C": ["G"],            # A -> C -> G, two edges
@@ -210,8 +209,6 @@ GRAPH = {
     "E": ["G"],            # A -> B -> D -> E -> G, four edges
     "G": [],
 }
-from collections import deque
-
 
 def search(graph, start, goal, breadth_first):
     frontier = deque([(start, [start])])
@@ -228,19 +225,23 @@ def search(graph, start, goal, breadth_first):
                 frontier.append((nxt, path + [nxt]))
     return order, None
 
-
 for label, bf in (("BFS (popleft)", True), ("DFS (pop)", False)):
     order, path = search(GRAPH, "A", "G", bf)
     print("%-15s visits %s" % (label, " ".join(order)))
-    print("%-15s path to G: %s  (%d edges)" % ("", " -> ".join(path), len(path) - 1))
+    print("%-15s path:  %s  (%d edges)" % ("", " -> ".join(path), len(path)-1))
+# BFS found G in 2 edges, DFS in 4 -- BFS finishes everything at distance 1
+# before starting distance 2, so the first arrival is always the shortest.
+```
 
-# Both find G. BFS found it in two edges and DFS in four, on the same
-# graph with the same code -- and that is not luck: BFS reaches every node
-# by the fewest edges possible, because it finishes everything at distance
-# 1 before it starts on distance 2. DFS committed to the first branch it
-# entered and took the route that branch happened to offer.
-#
-# Watch the frontier to see why. BFS explores in complete rings:
+Now watch BFS settle nodes in non-decreasing distance order, then see why DFS has no such guarantee.
+
+```python-run
+from collections import deque
+
+GRAPH = {
+    "A": ["C", "B"], "C": ["G"], "B": ["D"],
+    "D": ["E"], "E": ["G"], "G": [],
+}
 
 def levels(graph, start):
     frontier, seen, d = deque([start]), {start}, {start: 0}
@@ -254,31 +255,27 @@ def levels(graph, start):
                 d[nxt] = d[node] + 1
                 frontier.append(nxt)
     return order
-
-
-print()
-print("distance from A, in the order BFS settles them:")
+print("distance from A, in BFS settlement order:")
 for node, dist in levels(GRAPH, "A"):
     print("  %s at distance %d" % (node, dist))
+# distances come out non-decreasing: 0, 1, 1, 2, 2, 3
 
-# The distances come out non-decreasing: 0, 1, 1, 2, 2, 3. A node is
-# never settled before anything closer to the start, which is exactly the
-# invariant that makes the first time you reach a node also the best time.
-#
-# DFS has no such property. It commits to one branch and can arrive at a
-# node the long way round:
+def search(graph, start, goal, bf):
+    frontier = deque([(start, [start])])
+    seen = {start}
+    while frontier:
+        node, path = frontier.popleft() if bf else frontier.pop()
+        if node == goal: return path
+        for nxt in graph[node]:
+            if nxt not in seen:
+                seen.add(nxt); frontier.append((nxt, path + [nxt]))
+    return None
 
-order, path = search(GRAPH, "A", "G", False)
-print()
-bfs_order, bfs_path = search(GRAPH, "A", "G", True)
-print("DFS reached G via %s -- %d edges, when %d were available."
-      % (" -> ".join(path), len(path) - 1, len(bfs_path) - 1))
-
-# The catch: this only holds when every edge costs the same. BFS counts
-# EDGES, not distance. Give the edges different weights and the fewest-hop
-# route stops being the cheapest one, which is the gap Dijkstra's
-# algorithm exists to fill -- it is BFS with a priority queue instead of
-# a plain one, so it settles nodes by total cost rather than hop count.
+dfs_path = search(GRAPH, "A", "G", False)
+bfs_path = search(GRAPH, "A", "G", True)
+print("\nDFS took %s (%d edges), BFS took %d."
+      % (" -> ".join(dfs_path), len(dfs_path)-1, len(bfs_path)-1))
+# BFS counts EDGES, not weights -- for weighted graphs, use Dijkstra.
 ```
 
 ## Questions people ask
