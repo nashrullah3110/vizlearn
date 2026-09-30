@@ -11,7 +11,7 @@ The design has three parts, and stating them upfront is the expected opening:
 <strong>A hash function</strong> mapping keys to bucket indices.
 <strong>A collision strategy</strong> for when two keys land in the same bucket.
 
-The simplest approach uses chaining: each bucket holds a linked list (or Python list) of key-value pairs. `put` hashes the key, walks the bucket's list to check for an existing entry, and either updates it or appends a new pair. `get` walks the same list and returns the value or &minus;1. `remove` walks and deletes the matching pair. Average-case O(1) holds as long as the load factor (entries / buckets) stays low. With too few buckets, the chains grow long and performance degrades toward O(n). The other is open addressing: on collision, probe the next slot (linear probing). Or the next slot at a quadratic offset, until an empty one is found. Open addressing has better cache behaviour but is harder to implement correctly, especially for deletion (which requires tombstone markers). The hash function for integer keys is often just `key % num_buckets`. Using a prime number of buckets reduces clustering. Interviewers care about three things: choosing the collision strategy and explaining the tradeoff, knowing the load-factor threshold for resizing (usually 0.7), and handling deletion correctly. This page implements both chaining and open addressing, prints the bucket state after each operation, and shows the chain lengths growing as the load factor increases.
+The simplest approach uses chaining: each bucket holds a linked list (or Python list) of key-value pairs. `put` hashes the key, walks the bucket's list to check for an existing entry, and either updates it or appends a new pair. `get` walks the same list and returns the value or &minus;1. `remove` walks and deletes the matching pair. Average-case O(1) holds as long as the load factor (entries / buckets) stays low. With too few buckets, the chains grow long and speed degrades toward O(n). The other is open addressing: on collision, probe the next slot (linear probing). Or the next slot at a quadratic offset, until an empty one is found. Open addressing has better cache behaviour but is harder to implement correctly, especially for deletion (which requires tombstone markers). The hash function for integer keys is often just `key % num_buckets`. Using a prime number of buckets reduces clustering. Interviewers care about three things: choosing the collision strategy and explaining the tradeoff, knowing the load-factor threshold for resizing (usually 0.7), and handling deletion correctly. This page implements both chaining and open addressing, prints the bucket state after each operation, and shows the chain lengths growing as the load factor increases.
 
 
 ## Run it
@@ -278,7 +278,7 @@ The <strong>load factor</strong> is entries divided by buckets. As it rises, buc
 
 Resizing at 0.75 is the common choice (Java's `HashMap` uses exactly this; CPython uses about 2/3). Doubling the capacity is O(n), and amortised across the insertions that fit in the new space it is O(1) per operation. The same argument as list `append`.
 
-Choosing a <strong>power-of-two capacity</strong> allows `hash & (cap - 1)` instead of a modulo, which is faster. It also means only the low bits of the hash are used. So a hash function that varies mainly in its high bits clusters badly &mdash; which is why Java's `HashMap` mixes the high bits down before masking.
+Choosing a <strong>power-of-two capacity</strong> allows `hash & (cap - 1)` instead of a modulo, which is faster. It also means only the low bits of the hash are used. So a hash function that varies mainly in its high bits clusters badly &mdash;. This is why Java's `HashMap` mixes the high bits down before masking.
 
 ## Chaining versus open addressing
 
@@ -312,7 +312,7 @@ Instead of a list per bucket, store entries right in the array and probe for ano
 
 <strong>Deletion is the awkward part.</strong> Removing an entry outright breaks probe sequences that passed through that slot. A later lookup would stop at the gap and report the key missing. So deleted slots hold a <strong>tombstone</strong> marker meaning "empty, but keep probing".
 
-Tombstones build up and degrade performance until a resize clears them. This is why open-addressed tables need periodic rehashing even without growth.
+Tombstones build up and degrade speed until a resize clears them. This is why open-addressed tables need periodic rehashing even without growth.
 
 CPython uses open addressing with a scattering probe sequence; Java uses chaining. This converts long chains into trees above a threshold to bound the worst case.
 
@@ -346,11 +346,11 @@ Worth mentioning: Python randomises string hashes per process to prevent deliber
 
 <strong>"What if keys are integers 0 to 1,000,000?"</strong> Use direct addressing. An array indexed by the key. No hashing, no collisions, O(1) sure. Only viable when the key space is small and dense.
 
-<strong>"How would you make it thread-safe?"</strong> A single lock serialises all of it; striped locking &mdash; one lock per group of buckets &mdash; allows concurrency. Java's `ConcurrentHashMap` does this.
+<strong>"How would you make it thread-safe?"</strong> A single lock serialises all of it; striped locking. One lock per group of buckets. Allows concurrency. Java's `ConcurrentHashMap` does this.
 
 <strong>"What is the worst case?"</strong> O(n) when all keys collide. Java mitigates it by treeifying long chains, giving O(log n).
 
-<strong>"How do you iterate in insertion order?"</strong> Maintain a doubly linked list of entries alongside the table &mdash; which is exactly `OrderedDict` and CPython's compact dict layout.
+<strong>"How do you iterate in insertion order?"</strong> Maintain a doubly linked list of entries alongside the table &mdash;. This is exactly `OrderedDict` and CPython's compact dict layout.
 
 <strong>"What about memory?"</strong> Chaining costs a pointer per entry plus list overhead; open addressing wastes empty slots. Both trade memory for speed.
 
@@ -360,7 +360,7 @@ Worth mentioning: Python randomises string hashes per process to prevent deliber
 
 <strong>Do you handle collisions by name?</strong> A design without a collision answer is incomplete.
 
-<strong>Do you resize?</strong> Without it, performance degrades to O(n) as the table fills.
+<strong>Do you resize?</strong> Without it, speed degrades to O(n) as the table fills.
 
 <strong>Do you rehash on resize?</strong> Copying buckets without recomputing indices is the classic bug.
 

@@ -11,7 +11,7 @@ The fix is to add context that the prose assumes. The cheapest approach is prepe
 
 A more powerful approach is made context: an LLM writes a sentence situating the chunk within the document. And that sentence is prepended before embedding. Anthropic's contextual retrieval paper showed this improves retrieval precision much. The cost is one model call per chunk at indexing time. This prompt caching over the shared document makes affordable for most corpus sizes.
 
-Neighbour context stores the previous and next chunks alongside each chunk for generation but does not embed them. The retrieval model still sees only the target chunk (keeping the embedding focused). But the generator gets a wider window. This is the idea behind the parent-document retriever: retrieve the small, precise chunk but return the larger parent to the model.
+Neighbour context stores the previous and next chunks alongside each chunk for generation but does not embed them. The retrieval model still sees only the target chunk (keeping the embedding focused). But the generator gets a wider window. This is the idea behind the parent-document retriever. Retrieve the small, precise chunk but return the larger parent to the model.
 
 The trade-off in all three approaches is dilution. Prepending 200 tokens of context to a 300-token chunk means the embedding is partly about the context. So chunks from the same section start looking alike to the retriever. The window between "too little context" and "too much" is narrow and corpus-dependent. Measuring retrieval recall on a held-out set is the only reliable way to tune it.
 
@@ -31,9 +31,9 @@ Keep the enrichment short relative to the chunk, and measure on a retrieval eval
 
 ## Contextual retrieval, and what it costs
 
-The strongest published form of this is to have an LLM write a short sentence situating each chunk inside its document &mdash; what it is about, what it follows &mdash; and prepend that before embedding. Reported reductions in retrieval failure are large. And the technique is simple enough to implement in an afternoon.
+The strongest published form of this is to have an LLM write a short sentence situating each chunk inside its document. What it is about, what it follows. And prepend that before embedding. Reported reductions in retrieval failure are large. And the technique is simple enough to implement in an afternoon.
 
-The cost is one model call per chunk at index time. This sounds prohibitive on a large corpus and mostly is not: the document is the same for every chunk in it. So <a href="caching_in_rag_pipelines.html">prompt caching</a> over that shared prefix makes the marginal call cheap. It is the clearest practical example of two of these techniques composing.
+The cost is one model call per chunk at index time. This sounds prohibitive on a large corpus and mostly is not. The document is the same for every chunk in it. So <a href="caching_in_rag_pipelines.html">prompt caching</a> over that shared prefix makes the marginal call cheap. It is the clearest practical example of two of these techniques composing.
 
 It is still an index-time cost paid on every re-index, so it belongs in your pipeline design. Rather than being bolted on: changing the chunker means regenerating every context sentence.
 
@@ -101,7 +101,7 @@ so it can be understood on its own. Reply with the context only.
 
 The made context is prepended to the chunk text, and the combined text is embedded and stored.
 
-<blockquote><strong>Made:</strong> "This passage is from the parental leave section of the employee handbook, describing the application process for eligible employees."</blockquote>
+<blockquote><strong>Made:</strong> "This passage is from the parental leave section of the employee handbook, describing the use process for eligible employees."</blockquote>
 <blockquote><strong>Chunk:</strong> "This must be requested at least 8 weeks in advance..."</blockquote>
 
 Now the chunk is retrievable by a query about applying for parental leave, and interpretable when retrieved.
@@ -266,7 +266,7 @@ print("If you return the enriched text, the model treats your generated")
 print("context as source material. Keep enrichment on the INDEX side.")
 ```
 
-A quick heuristic tests whether a chunk can stand alone: does it open with a pronoun or bare article?
+A quick heuristic tests whether a chunk can stand alone. Does it open with a pronoun or bare article?
 
 ```python-run
 DOC = [
@@ -357,7 +357,7 @@ Following it up quantitatively: measure recall@k with and without the context ad
 
 ## Recap in one screen
 
-- Chunks routinely reference material outside themselves, and retrieval delivers them out of order.
+- Chunks routinely reference material outside themselves, and retrieval gives them out of order.
 - Prepend the heading path always &mdash; free, and it fixes the most common case.
 - Overlap handles boundary loss; parent-child retrieval handles intra-section references.
 - Contextual retrieval makes a situating sentence per chunk at indexing time, and measurably reduces retrieval failures.

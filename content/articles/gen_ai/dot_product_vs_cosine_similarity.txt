@@ -3,13 +3,13 @@ intro: The same two vectors, two different questions asked of them.
 
 ## What this is
 
-<a href="../machine_learning/cosine_similarity.html" style="color: var(--accent-primary)">Cosine similarity</a> asks "what angle apart are these two vectors" and ignores length fully. Dot product asks "how much do these two vectors agree, weighted by how long they both are" — length is part of the answer, not discarded. Most embedding search defaults to cosine, but a growing number of models (some recommendation embeddings, some matryoshka and MIPS-optimised models) are trained. That way, <em>dot product</em> is the correct similarity, and using cosine on them silently under-uses the model. In [embedding](../deep_learning/how_are_embeddings_generated.html) spaces, cosine similarity is the standard retrieval metric because documents of different lengths produce vectors of different magnitudes. And you want a long document about cats to match a short query about cats. The dot product would rank the long document higher simply because its vector is longer, not because it is more relevant. But in attention mechanisms inside [transformers](how_llms_predict_next_word.html), the dot product is used on purpose. The magnitude of a key vector encodes how strongly that token wants to be attended to, and normalising it away would lose that signal. Scaled dot-product attention divides by the square root of the dimension to keep the values in a range where softmax produces useful gradients. But it does not normalise the vectors themselves. The two measures agree on direction and disagree on scale. If both vectors are unit-length, cosine similarity and the dot product return exactly the same number. This page computes both measures on pairs of vectors, shows how magnitude affects each one, and covers when to use which in practice.
+<a href="../machine_learning/cosine_similarity.html" style="color: var(--accent-primary)">Cosine similarity</a> asks "what angle apart are these two vectors" and ignores length fully. Dot product asks "how much do these two vectors agree, weighted by how long they both are" — length is part of the answer, not discarded. Most embedding search defaults to cosine, but a growing number of models (some recommendation embeddings, some matryoshka and MIPS-optimised models) are trained. That way, <em>dot product</em> is the correct similarity, and using cosine on them silently under-uses the model. In [embedding](../deep_learning/how_are_embeddings_generated.html) spaces, cosine similarity is the standard retrieval metric because documents of different lengths produce vectors of different magnitudes. And you want a long document about cats to match a short query about cats. The dot product would rank the long document higher simply because its vector is longer, not because it is more relevant. But in attention methods inside [transformers](how_llms_predict_next_word.html), the dot product is used on purpose. The magnitude of a key vector encodes how strongly that token wants to be attended to, and normalising it away would lose that signal. Scaled dot-product attention divides by the square root of the dimension to keep the values in a range where softmax produces useful gradients. But it does not normalise the vectors themselves. The two measures agree on direction and disagree on scale. If both vectors are unit-length, cosine similarity and the dot product return exactly the same number. This page computes both measures on pairs of vectors, shows how magnitude affects each one, and covers when to use which in practice.
 
 ## The formulas
 
 dot(a,b) = &Sigma; a&#7522;b&#7522; &nbsp;&nbsp;&nbsp; cos(a,b) = dot(a,b) / (&#8214;a&#8214; &#8214;b&#8214;)
 
-Cosine is the dot product after dividing out both vectors' lengths — which is exactly why stretching one vector along its own direction changes its dot product with anything but never changes its cosine with anything.
+Cosine is the dot product after dividing out both vectors' lengths —. This is exactly why stretching one vector along its own direction changes its dot product with anything but never changes its cosine with anything.
 
 ## The same formula, one difference
 
@@ -271,7 +271,7 @@ Cosine similarity has a fixed range, which makes it thresholdable:
 |0.0|Orthogonal &mdash; nothing in common|
 |Negative|Opposed directions|
 
-The dot product has no fixed range at all, which is a practical disadvantage. A score of 42 means nothing without knowing the typical magnitudes in that space.
+The dot product has no fixed range at all, which is a practical downside. A score of 42 means nothing without knowing the typical magnitudes in that space.
 
 Two cautions about cosine thresholds:
 
@@ -283,7 +283,7 @@ Two cautions about cosine thresholds:
 
 Cosine similarity divides by the vector lengths, so a zero-length vector produces a division by zero.
 
-That is not hypothetical. An empty document, a chunk that contained only whitespace or markup, a user with no interactions. All produce zero vectors, and the result is a `nan` that propagates silently through averages and rankings.
+That is not hypothetical. An empty document, a chunk that contained only whitespace or markup, a user with no links. All produce zero vectors, and the result is a `nan` that propagates silently through averages and rankings.
 
 ```python
 def cosine(a, b):
@@ -303,7 +303,7 @@ The dot product has no such problem, which is a minor point in its favour. The r
 |Manhattan|Yes|Sparse or high-dimensional data|
 |Mahalanobis|Yes, and accounts for correlation|Outlier detection|
 
-Euclidean distance is the one people reach for by habit from geometry. And it is usually the wrong choice for unnormalised embeddings: a long vector is far from all of it. So document length dominates the ranking. Normalise, and it becomes the same to cosine.
+Euclidean distance is the one people reach for by habit from geometry. And it is usually the wrong choice for unnormalised embeddings. A long vector is far from all of it. So document length dominates the ranking. Normalise, and it becomes the same to cosine.
 
 ## Questions people ask
 

@@ -3,7 +3,7 @@ intro: Spend the expensive model only on the candidates that survived the cheap 
 
 ## The idea in brief
 
-A <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">bi-encoder</a> embeds the query and every document <em>apart</em>, ahead of time — that is what makes the embeddings precomputable and search fast. But it also means the model never looks at a query and a document together. A <strong>cross-encoder</strong> takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable. The accuracy gap between these two approaches is real and well-measured. On MS MARCO and similar benchmarks, a cross-encoder always and much outperforms a bi-encoder by 5-15 points of nDCG,. This is because joint attention can model fine-grained query-document interactions (negation, qualification, partial match) that free embeddings compress away. The standard pattern is a **two-stage pipeline**: the bi-encoder (or BM25) retrieves a shortlist of 20-100 candidates cheaply. And the cross-encoder rescores only that shortlist to find the final ranking. This page shows both models scoring the same query-document pairs side by side, shows where the bi-encoder's ranking disagrees with the cross-encoder's, and covers the latency-accuracy tradeoff as the shortlist size changes.
+A <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">bi-encoder</a> embeds the query and every document <em>apart</em>, ahead of time — that is what makes the embeddings precomputable and search fast. But it also means the model never looks at a query and a document together. A <strong>cross-encoder</strong> takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable. The accuracy gap between these two approaches is real and well-measured. On MS MARCO and similar benchmarks, a cross-encoder always and much outperforms a bi-encoder by 5-15 points of nDCG,. This is because joint attention can model fine-grained query-document links (negation, qualification, partial match) that free embeddings compress away. The standard pattern is a **two-stage pipeline**: the bi-encoder (or BM25) retrieves a shortlist of 20-100 candidates cheaply. And the cross-encoder rescores only that shortlist to find the final ranking. This page shows both models scoring the same query-document pairs side by side, shows where the bi-encoder's ranking disagrees with the cross-encoder's, and covers the latency-accuracy tradeoff as the shortlist size changes.
 
 ## The two-stage pattern
 
@@ -176,7 +176,7 @@ print("worded chunks punch above their weight in a vector index, and")
 print("reranking is what puts them back in their place.")
 ```
 
-That accuracy is exactly why cross-encoders are not used alone: the next block shows what running one over a whole corpus would cost, and why the two-stage split exists.
+That accuracy is exactly why cross-encoders are not used alone. The next block shows what running one over a whole corpus would cost, and why the two-stage split exists.
 
 ```python-run
 N = 1_000_000
@@ -223,7 +223,7 @@ print("reranker is. Tune k by watching recall@k of stage one.")
 
 ## Worth remembering
 
-A bi-encoder scores query and document on its own, which is what makes it fast enough to search a whole corpus but blind to interactions between them — a lexical coincidence can outrank a genuine match. A cross-encoder reads both together and catches that, at a cost that only scales with the shortlist, not the corpus. Two-stage retrieval — cheap and broad, then expensive and narrow — is how production search gets both speed and accuracy instead of choosing one.
+A bi-encoder scores query and document on its own, which is what makes it fast enough to search a whole corpus but blind to links between them — a lexical coincidence can outrank a genuine match. A cross-encoder reads both together and catches that, at a cost that only scales with the shortlist, not the corpus. Two-stage retrieval — cheap and broad, then expensive and narrow — is how production search gets both speed and accuracy instead of choosing one.
 
 ## Choosing a reranker
 
@@ -235,7 +235,7 @@ A bi-encoder scores query and document on its own, which is what makes it fast e
 |ColBERT (late interaction)|Between the two &mdash; token-level vectors, precomputable|
 |LLM-as-reranker|Prompt a model to score relevance; flexible, expensive|
 
-<strong>ColBERT</strong> deserves a mention as the genuine middle ground. It stores a vector per <em>token</em> rather than per document, and scores by matching query tokens against document tokens at query time. That gives much of a cross-encoder's fine-grained interaction while keeping the document side precomputable. At the cost of a far larger index.
+<strong>ColBERT</strong> deserves a mention as the genuine middle ground. It stores a vector per <em>token</em> rather than per document, and scores by matching query tokens against document tokens at query time. That gives much of a cross-encoder's fine-grained link while keeping the document side precomputable. At the cost of a far larger index.
 
 <strong>LLM reranking</strong> &mdash; asking a language model to rate each candidate's relevance, or to order a list &mdash; is flexible and adapts to instructions. And it is slow and expensive enough that it is usually reserved for small candidate sets or offline evaluation.
 

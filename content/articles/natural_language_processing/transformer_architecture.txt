@@ -7,7 +7,7 @@ The previous modules built the parts: <a href="query_key_value.html" style="colo
 
 The surprise, when you finally see the block written out, is how little there is. Two sublayers, each wrapped in the same two-line pattern, repeated N times.
 
-The first sublayer is multi-head self-attention, which lets each position in the sequence attend to every other position and collect data weighted by relevance. The second sublayer is a feed-forward network &mdash; two linear layers with a ReLU (or GELU) in between &mdash; applied on its own to each position. The attention sublayer mixes data across positions. The feed-forward sublayer processes each position in isolation. Stacking the two is what gives the transformer both global context and per-position work.
+The first sublayer is multi-head self-attention, which lets each position in the sequence attend to every other position and collect data weighted by relevance. The second sublayer is a feed-forward network. Two linear layers with a ReLU (or GELU) in between. Applied on its own to each position. The attention sublayer mixes data across positions. The feed-forward sublayer processes each position in isolation. Stacking the two is what gives the transformer both global context and per-position work.
 
 Each sublayer is wrapped in a residual connection and a layer normalisation. The residual connection adds the sublayer's input back to its output. This keeps gradients flowing through deep stacks. The layer normalisation rescales the result so that each layer receives inputs in a stable range. Without these two wrappers, a transformer with more than a few blocks becomes difficult to train.
 
@@ -32,7 +32,7 @@ That is the entire thing. Two sublayers, and each is wrapped identically: run th
 - <strong>The residual connection</strong> gives the gradient a path that skips the sublayer fully.
 - <strong>Layer normalisation</strong> keeps the activations at a stable scale as depth grows.
 
-The division of labour between the first two is worth holding on to: attention mixes across tokens, the FFN thinks about each token. A transformer alternates between the two, over and over.
+The division of labour between the first two is worth holding on to. Attention mixes across tokens, the FFN thinks about each token. A transformer alternates between the two, over and over.
 
 ## The block, repeated
 
@@ -43,7 +43,7 @@ A transformer is one block stacked many times. The block has two sublayers, each
 
 <strong>Attention moves data between positions.</strong> Each token gathers a content-weighted mix of the others.
 
-<strong>The feed-forward network processes each position on its own.</strong> It expands to four times the model dimension, applies a non-linearity, and projects back. This is where most of the parameters live &mdash; roughly two thirds of them in a typical model &mdash; and it is a common misconception that attention does all the work.
+<strong>The feed-forward network processes each position on its own.</strong> It expands to four times the model dimension, applies a non-linearity, and projects back. This is where most of the parameters live. Roughly two thirds of them in a typical model. And it is a common misconception that attention does all the work.
 
 <strong>Residual connections</strong> give gradients a path back through dozens of blocks. <strong>LayerNorm</strong> keeps activations stable, and placing it <em>before</em> each sublayer rather than after is what makes 80-layer stacks trainable.
 
@@ -269,7 +269,7 @@ The reason is practical: with post-norm the residual path itself gets normalised
 
 ## In one line
 
-A transformer block is two sublayers, each wrapped in the same add-and-normalise pattern: attention moves data between positions. And a position-wise feed-forward network processes each token on its own. The residual connection is what makes depth possible. This gives the gradient a path that skips each sublayer &mdash; remove it and a deep stack stops training fully &mdash; while layer normalisation holds the activation scale steady as layers build up. About two thirds of the parameters live in the feed-forward network. Rather than in attention, and parameters grow with the square of the model dimension but only linearly with depth.
+A transformer block is two sublayers, each wrapped in the same add-and-normalise pattern: attention moves data between positions. And a position-wise feed-forward network processes each token on its own. The residual connection is what makes depth possible. This gives the gradient a path that skips each sublayer. Remove it and a deep stack stops training fully. While layer normalisation holds the activation scale steady as layers build up. About two thirds of the parameters live in the feed-forward network. Rather than in attention, and parameters grow with the square of the model dimension but only linearly with depth.
 
 ## Why it replaced recurrent networks
 
@@ -277,7 +277,7 @@ Two properties, both structural.
 
 <strong>Parallelism.</strong> An RNN must compute position t before t+1. A transformer computes all positions at once as one matrix multiplication. This is what a GPU is built for. That alone made training on far more data feasible.
 
-<strong>Constant path length.</strong> Any two positions are one attention step apart. In an RNN the path grows with the distance, and gradients decay along it &mdash; which is why long-range dependencies were the central difficulty.
+<strong>Constant path length.</strong> Any two positions are one attention step apart. In an RNN the path grows with the distance, and gradients decay along it &mdash;. This is why long-range dependencies were the central difficulty.
 
 The cost of those wins is quadratic attention: doubling the sequence length quadruples the work. That is the trade the architecture makes. And it is why long context required years of engineering (FlashAttention, sparse patterns, KV caching) rather than being free.
 
@@ -296,7 +296,7 @@ The same block, repeated more times and made wider:
 
 Nothing about the block changes. What changes is depth, width, vocabulary, context length and the amount of data.
 
-The scaling laws that emerged from studying this &mdash; performance improving predictably with compute, parameters and data together &mdash; are why the field spent several years mostly making the same architecture bigger. The Chinchilla result refined it: for a given compute budget, most early large models were under-trained on too little data relative to their size.
+The scaling laws that emerged from studying this. Speed improving predictably with compute, parameters and data together. Are why the field spent several years mostly making the same architecture bigger. The Chinchilla result refined it: for a given compute budget, most early large models were under-trained on too little data relative to their size.
 
 Practical results of size: Adam's optimiser state is twice the model. So large-scale training needs sharding (ZeRO, FSDP). Inference needs KV caching and quantisation; and fine-tuning uses parameter-efficient methods such as LoRA rather than updating every weight.
 
@@ -306,7 +306,7 @@ Practical results of size: Adam's optimiser state is twice the model. So large-s
 
 <strong>What is the difference between BERT and GPT?</strong> Bidirectional encoder trained on masked tokens, versus causal decoder trained on next-token prediction. Understanding versus generation.
 
-<strong>Do transformers understand language?</strong> They model statistical structure in text extremely well. Whether that constitutes understanding is a genuine open question, not a settled one in either direction.
+<strong>Do transformers understand language?</strong> They model statistical structure in text very well. Whether that constitutes understanding is a genuine open question, not a settled one in either direction.
 
 <strong>Why pre-norm rather than post-norm?</strong> It leaves the residual path clean. So gradients flow back unimpeded. Post-norm needs careful warm-up beyond about 12 layers.
 

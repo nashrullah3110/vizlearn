@@ -11,7 +11,7 @@ Correctness is only defined relative to a reference, and choosing that reference
 
 <p><strong>Verifiable work.</strong> Where the answer is code, a number or a query, correctness can be executed rather than judged. This is the gold standard when it is available and it almost never is for open-ended questions.</p>
 
-The cost is the reason this dimension needs separate treatment. Writing a gold answer takes domain expertise, verifying a model's answer against it takes judgement, and scaling either one takes money or an LLM-as-judge &mdash; which adds its own biases. Exact string match fails at once on natural language. This is because paraphrase is the norm, and n-gram metrics (BLEU, ROUGE) reward surface overlap rather than factual accuracy. Claim-level judging &mdash; decomposing both the answer and the reference into atomic facts and comparing them &mdash; is the approach that handles paraphrase, gives partial credit, and identifies which specific fact was wrong. This page walks through each reference format, shows claim-level scoring on a worked example, and covers the failure mode this dimension exists to catch: the grounded-but-wrong answer. Where the model faithfully reports what a retrieved document says and that document is out of date.
+The cost is the reason this dimension needs separate treatment. Writing a gold answer takes domain expertise, verifying a model's answer against it takes judgement, and scaling either one takes money or an LLM-as-judge. Which adds its own biases. Exact string match fails at once on natural language. This is because paraphrase is the norm, and n-gram metrics (BLEU, ROUGE) reward surface overlap rather than factual accuracy. Claim-level judging. Decomposing both the answer and the reference into atomic facts and comparing them &mdash; is the approach that handles paraphrase, gives partial credit, and identifies. This specific fact was wrong. This page walks through each reference format, shows claim-level scoring on a worked example, and covers the failure mode this dimension exists to catch: the grounded-but-wrong answer. Where the model faithfully reports what a retrieved document says and that document is out of date.
 
 ## Why exact match fails, and what replaces it
 
@@ -33,7 +33,7 @@ That makes correctness the dimension that audits your <em>data</em> rather than 
 
 <p><strong>Show the judge the reference.</strong> A model asked "is this answer correct?" with no ground truth is being asked to recall the fact itself, and will confidently score wrong answers as right in exactly the domains where you needed evaluation most.</p>
 
-<p><strong>Ask for partial credit.</strong> Binary correct/incorrect throws away the difference between an answer with one wrong detail and one that is fully wrong. Per-claim scoring gives a proportion.</p>
+<p><strong>Ask for partial credit.</strong> Binary correct/incorrect throws away the difference between an answer with one wrong detail and one that is fully wrong. Per-claim scoring gives a share.</p>
 
 <p><strong>Calibrate against humans.</strong> Have annotators label a sample and measure agreement with your judge. If the judge agrees 70% of the time, a 3-point movement in your correctness score is noise.</p>
 
@@ -107,7 +107,7 @@ Measuring both is so not redundant. Groundedness tells you whether the system is
 
 ## Why string matching fails, and what the judge costs
 
-Correctness needs a reference answer, and comparing free text to a reference is harder than it sounds. This scores the same answers three ways -- exact match, token overlap. And a judge -- and shows exactly which kinds of answer each one gets wrong.
+Correctness needs a reference answer, and comparing free text to a reference is harder than it sounds. This scores the same answers three ways. Exact match, token overlap. And a judge -- and shows exactly which kinds of answer each one gets wrong.
 
 ```python-run
 REFERENCE = "Refunds are available within 30 days of purchase."
@@ -172,7 +172,7 @@ print("   for anything but a single-token answer -- a date, a name, a")
 print("   yes/no -- exact match is not an option.")
 ```
 
-Token overlap relaxes that, but it adds a failure mode of its own: it cannot tell which shared word actually carries the answer.
+Token overlap relaxes that, but it adds a failure mode of its own. It cannot tell which shared word actually carries the answer.
 
 ```python-run
 def toks(s):
@@ -271,7 +271,7 @@ print("   row 3, which is why both get reported.")
 
 Correctness compares the answer against a reference or verifiable fact, which makes it the only one of the four dimensions that requires ground truth someone has to write. Exact match and n-gram overlap fail on paraphrase; claim-level judging against a key-facts reference is what works. Its distinctive value is catching the grounded-but-wrong answer. Where the model faithfully reports a document that is itself out of date. A defect in your corpus that every other dimension scores as a success.
 
-These four are usually measured with an <strong>LLM as judge</strong>: a strong model is shown the question, the retrieved context, the answer and sometimes a reference, and asked to score one dimension at a time. Judging one dimension per call is not a stylistic choice. A single prompt asking for all four produces correlated, mushy scores, because the model settles on a general impression and applies it everywhere.
+These four are usually measured with an <strong>LLM as judge</strong>. A strong model is shown the question, the retrieved context, the answer and sometimes a reference, and asked to score one dimension at a time. Judging one dimension per call is not a stylistic choice. A single prompt asking for all four produces correlated, mushy scores, because the model settles on a general impression and applies it everywhere.
 
 Two habits make judge scores trustworthy. Ask for a decision and a justification, so a human can audit disagreements. And calibrate against a small human-labelled set before believing any of it. A judge that agrees with your annotators 70% of the time is not measuring what you think it is measuring.
 

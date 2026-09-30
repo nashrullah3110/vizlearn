@@ -5,21 +5,21 @@ intro: Not a bug in the model. A property of asking a distribution for a fact.
 
 Ask a model something it has barely seen and it does not go quiet. <a href="how_llms_predict_next_word.html" style="color: var(--accent-primary)">Next-token prediction</a> produces a distribution over the whole vocabulary, that distribution sums to one, and decoding picks from it. There is no branch in the architecture where "insufficient evidence" lives.
 
-So the mass lands on any is most plausible: a real researcher who works in the area, a plausible-looking citation, an API method that ought to exist. The output is fluent because fluency is what was trained, and being wrong does not make it any less fluent. **Grounding** is the family of techniques that ties a model's output back to verifiable sources: retrieved documents, tool calls, citations, structured data. Retrieval-augmented generation (RAG) is the most common approach. Fetch relevant passages and include them in the prompt so the model can copy rather than guess. But grounding does not remove hallucination; it redirects it. A grounded model can still misquote a passage, combine facts from two documents into a claim neither supports, or ignore the retrieved context fully when the training distribution pulls harder. This page shows grounded and ungrounded answers side by side, shows the failure modes that survive grounding, and covers the detection techniques &mdash; self-consistency, citation verification, and NLI-based fact checking &mdash; that catch what grounding misses.
+So the mass lands on any is most plausible. A real researcher who works in the area, a plausible-looking citation, an API method that ought to exist. The output is fluent because fluency is what was trained, and being wrong does not make it any less fluent. **Grounding** is the family of techniques that ties a model's output back to verifiable sources. Retrieved documents, tool calls, citations, structured data. Retrieval-augmented generation (RAG) is the most common approach. Fetch relevant passages and include them in the prompt so the model can copy rather than guess. But grounding does not remove hallucination; it redirects it. A grounded model can still misquote a passage, combine facts from two documents into a claim neither supports, or ignore the retrieved context fully when the training distribution pulls harder. This page shows grounded and ungrounded answers side by side, shows the failure modes that survive grounding, and covers the detection techniques. Self-consistency, citation verification, and NLI-based fact checking. That catch what grounding misses.
 
 ## Where hallucinations come from
 
 - <strong>Thin evidence.</strong> A fact that appeared once in pretraining is a weak signal competing with strong, generic patterns.
 - <strong>Sampling.</strong> Temperature exists to make text less repetitive. And it spends probability mass on the tail to do so.
 - <strong>The training objective.</strong> Nothing in pretraining rewards abstaining, and preference tuning often rewards a confident, complete answer over a hedge.
-- <strong>Prompts that presuppose.</strong> Ask about a paper that does not exist and the likeliest continuation is a description of it, not a correction.
+- <strong>Prompts that presuppose.</strong> Ask about a paper that does not exist and the likeliest follow-up is a description of it, not a correction.
 - <strong>Stale or absent knowledge.</strong> Anything after the cutoff, or behind a login, was never there to be recalled.
 
 ## Why a model invents things
 
-A language model is trained to produce text that looks like its training data. It is not trained to be true, and it has no mechanism for checking.
+A language model is trained to produce text that looks like its training data. It is not trained to be true, and it has no method for checking.
 
-So when it does not know something, it does not stop. It produces the most plausible continuation. A fabricated citation looks exactly like a real one,. This is because "author, year, journal" is a pattern the model has seen tens of thousands of times.
+So when it does not know something, it does not stop. It produces the most plausible follow-up. A fabricated citation looks exactly like a real one,. This is because "author, year, journal" is a pattern the model has seen tens of thousands of times.
 
 That is the whole reason, and it has an important result: <strong>fluency and accuracy are unrelated</strong>. The confident tone is a property of the text distribution, not evidence about the content.
 
@@ -212,7 +212,7 @@ print("   groundedness check catches and a document-level one does not.")
 ## Guided tour
 
 1. <strong>Start on thin ice.</strong> With evidence at 2.0 the correct name holds about half the mass and three plausible wrong ones hold the other half. So the hallucination rate reads 49.6%. Nothing here is broken; this is what a weak memory looks like written as a distribution.
-2. <strong>Turn the temperature up.</strong> At 2.0 the distribution flattens: the correct answer falls from 50.4% to 36.9% and the hallucination rate climbs past 63%. Temperature is a fluency control that doubles as a hallucination control.
+2. <strong>Turn the temperature up.</strong> At 2.0 the distribution flattens. The correct answer falls from 50.4% to 36.9% and the hallucination rate climbs past 63%. Temperature is a fluency control that doubles as a hallucination control.
 3. <strong>Ground it.</strong> Tick <strong>Ground It With Retrieval</strong>. The supporting passage is in the prompt, the correct answer takes almost all the mass. And the hallucination rate collapses. This is why <a href="rag.html" style="color: var(--accent-primary)">RAG</a> is the first thing anyone reaches for.
 4. <strong>Let it decline.</strong> Turn retrieval off again and tick <strong>Allow &ldquo;I Don&rsquo;t Know&rdquo;</strong>. The top candidate is 50.4%, under the 0.60 threshold, so the system declines outright. The hallucination rate goes to zero, and so does the chance of getting an answer at all.
 5. <strong>Now lower the bar.</strong> Drag <strong>Confidence Threshold</strong> down to 0.45. It answers again, and the hallucination rate comes straight back. A system that never answers is safe and useless; a system that always answers is neither. The threshold is where you choose between them.
@@ -230,7 +230,7 @@ What does <em>not</em> help: asking the model whether it is sure. Self-reported 
 
 ## What to remember
 
-A model hallucinates because it answers by sampling a distribution that has no state for "I do not know". The mass has to go somewhere, and when the true fact is thinly represented it goes onto any is most plausible instead. That makes hallucination a property of the setup. Rather than a defect to be patched out: thin evidence, high temperature and prompts that presuppose all raise it. While putting the fact in the context. This allows an explicit abstention, constraining the output and verifying claims afterwards all lower it. Every mitigation trades coverage for precision, so the honest question is not "has it stopped hallucinating" but "how often does it answer, and how often is it right when it does".
+A model hallucinates because it answers by sampling a distribution that has no state for "I do not know". The mass has to go somewhere, and when the true fact is thinly represented it goes onto any is most plausible instead. That makes hallucination a property of the setup. Rather than a defect to be patched out. Thin evidence, high temperature and prompts that presuppose all raise it. While putting the fact in the context. This allows an explicit abstention, constraining the output and verifying claims afterwards all lower it. Every mitigation trades coverage for precision, so the honest question is not "has it stopped hallucinating" but "how often does it answer, and how often is it right when it does".
 
 ## What reduces it, ranked by effect
 
