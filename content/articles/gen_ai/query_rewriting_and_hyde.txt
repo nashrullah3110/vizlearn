@@ -3,11 +3,11 @@ intro: Sometimes the query is the part that needs fixing, not the index.
 
 ## Before the details
 
-A user's question and the passage that answers it are much written in else registers. Short and colloquial versus long-form and technical. Each likeness metric in this batch — <a href="dot_product_vs_cosine_similarity.html" style="color. Var(--accent-primary)">cosine</a>, <a href="bm25_and_sparse_retrieval.html" style="color. Var(--accent-primary)">BM25</a> — depends on shared vocabulary between what is embedded and what is stored. If the question and the answer do not share words, no likeness metric can bridge that gap on its own; the fix has to happen before retrieval, to the query it. Query rewriting uses an LLM to rephrase the user's question into the vocabulary of the indexed documents. Expanding acronyms, adding synonyms, and making the intent explicit. HyDE (Made-up Document Embeddings) takes a more radical approach. Instead of rewriting the query, it asks the LLM to generate a made-up answer, embeds that answer, and uses the embedding as the search vector. The made-up answer does not need to be correct; it just needs to be written in the same register as the real documents. So its embedding lands in the right neighbourhood of the vector space. Both methods add one LLM call before retrieval, which raises latency by 200-500ms but can sharply improve recall when the vocabulary gap is wide. Query rewriting is simpler and more predictable; HyDE works better when the query is quite short or ambiguous. A [multi-query](multi_query_retriever.html) variant makes a few rewrites and merges the fetched results. This trades more LLM calls for broader coverage. This page rewrites a sample query, makes a made-up document, embeds both, and shows which real passages each fetches.
+A user's question and the passage that answers it are much written in else registers. Short and colloquial versus long-form and technical. Each likeness metric in this batch — <a href="dot_product_vs_cosine_similarity.html" style="color. Var(--accent-primary)">cosine</a>, <a href="bm25_and_sparse_retrieval.html" style="color. Var(--accent-primary)">BM25</a> — depends on shared vocabulary between what is embedded and what is stored. If the question and the answer do not share words, no likeness metric can bridge that gap on its own. The fix has to happen before retrieval, to the query it. Query rewriting uses an LLM to rephrase the user's question into the vocabulary of the indexed documents. Expanding acronyms, adding synonyms, and making the intent explicit. HyDE (Made-up Document Embeddings) takes a more radical approach. Instead of rewriting the query, it asks the LLM to generate a made-up answer, embeds that answer, and uses the embedding as the search vector. The made-up answer does not need to be correct; it just needs to be written in the same register as the real documents. So its embedding lands in the right neighbourhood of the vector space. Both ways add one LLM call before retrieval, which raises latency by 200-500ms but can sharply improve recall when the vocabulary gap is wide. Query rewriting is simpler and more predictable; HyDE works better when the query is quite short or ambiguous. A [multi-query](multi_query_retriever.html) variant makes a few rewrites and merges the fetched yields. This trades more LLM calls for broader coverage. This page rewrites a sample query, makes a made-up document, embeds both, and shows which real passages each fetches.
 
 ## Two ways to close the gap
 
-<strong>Query expansion</strong> adds tied terms to the first query — synonyms, likely technical vocabulary — widening what it can match against. <strong>HyDE (Made-up Document Embeddings)</strong> goes more: ask a language model to draft a plausible answer to the question, without ever checking whether that answer is true, and embed <em>that made-up answer</em> instead of the question. A fabricated but stylistically realistic answer sits much closer in embedding space to a real answer than a terse question ever does — the retrieval step never sees or uses the made-up text's truth, just its vocabulary and register.
+<strong>Query expansion</strong> adds tied terms to the first query — synonyms, likely technical vocabulary — widening what it can match against. <strong>HyDE (Made-up Document Embeddings)</strong> goes more: ask a language net to draft a plausible answer to the question, without ever checking whether that answer is true, and embed <em>that made-up answer</em> instead of the question. A fabricated but stylistically realistic answer sits much closer in embedding space to a real answer than a terse question ever does — the retrieval step never sees or uses the made-up text's truth, just its vocabulary and register.
 
 ## The vocabulary gap
 
@@ -22,7 +22,7 @@ That mismatch has a name, the vocabulary gap. And it is one of the largest sourc
 
 ## Query rewriting
 
-Use a model to reformulate the question before searching. A few distinct steps hide under the same name:
+Use a net to reformulate the question before searching. A few distinct steps hide under the same name:
 
 <strong>Expansion.</strong> Add synonyms and tied terms. "car" turns "car automobile vehicle".
 
@@ -32,7 +32,7 @@ Use a model to reformulate the question before searching. A few distinct steps h
 
 <strong>Contextualisation.</strong> Resolve guides against conversation history. "What about for premium users?" turns "What is the refund policy for premium users?". And this one is key in any chat interface, since a follow-up question is meaningless as a standalone search.
 
-<strong>Multi-query.</strong> Generate a few rewrites, search with each, and fuse the results. Broader recall at the cost of a few searches.
+<strong>Multi-query.</strong> Generate a few rewrites, search with each, and fuse the yields. Broader recall at the cost of a few searches.
 
 ```python
 prompt = """Rewrite this question as 3 different search queries that would
@@ -50,14 +50,14 @@ Contextualisation deserves emphasis since it is the one that is always needed an
 
 HyDE &mdash; made-up document embeddings &mdash; takes an unintuitive approach that works surprisingly well.
 
-Instead of embedding the question, ask a model to <strong>write a plausible answer</strong>. Then embed <em>that</em> and search with it.
+Instead of embedding the question, ask a net to <strong>write a plausible answer</strong>. Then embed <em>that</em> and search with it.
 
 <blockquote>Question: "why is my thing not working"</blockquote>
 <blockquote>Made-up answer: "Connection failures in the client library are much caused by an expired API token, an incorrect end URL. Or a firewall blocking outbound requests on port 443. Check the token expiry first..."</blockquote>
 
 That fabricated passage is written in the same register as the documents you are searching. Technical, declarative, with the vocabulary answers use. Its embedding sits much closer to real answer passages than the question's embedding did.
 
-The made answer may be factually wrong, and that does not matter. It is never shown to the user; it is used just as a search key, and what makes it useful is its <em>style and vocabulary</em>, not its precision.
+The made answer may be factually wrong, and that does not matter. It is never shown to the user. It is used just as a search key, and what makes it useful is its <em>style and vocabulary</em>, not its precision.
 
 |&nbsp;|Question embedding|Hypothetical answer embedding|
 |---|---|---|
@@ -65,7 +65,7 @@ The made answer may be factually wrong, and that does not matter. It is never sh
 |Length|Short|Paragraph|
 |Match against documents|Weak|Strong|
 
-Two real variants: generate a few made-up answers and average their embeddings. This is more reliable; and combine the made-up embedding with the first question's rather than replacing it.
+Two real variants: generate a few made-up answers and average their embeddings. This is more reliable. And combine the made-up embedding with the first question's rather than replacing it.
 
 ## Gauging the vocabulary gap, and closing it
 
@@ -306,22 +306,22 @@ print("   exists.")
 
 ## Tests to try
 
-1. <strong>Read the raw query's ranking.</strong> A passage about data drift in live beats the overfitting passage — it happens to share more surface words ("model", "worse", "new", "data") with the terse question, still though the overfitting passage is the intended answer.
+1. <strong>Read the raw query's ranking.</strong> A passage about data drift in live beats the overfitting passage — it happens to share more surface words ("net", "worse", "new", "data") with the terse question, still though the overfitting passage is the intended answer.
 2. <strong>Switch to the expanded query.</strong> A handful of added technical terms — "overfitting", "extension" — appear in the target passage but not the drift one. And that is enough to move the target back to the top.
 3. <strong>Switch to HyDE.</strong> The made-up answer is written in the same register as the target passage — full sentences, technical vocabulary, no question words — and it pulls ahead by the widest margin of the three, just. This is since it does not resemble the drift passage's phrasing at all.
-4. <strong>Compare all three likeness counts.</strong> Same underlying question, same target document, three quite else embedded-text choices — and three else outcomes for whether the right document is still reachable.
+4. <strong>Check all three likeness counts.</strong> Same underlying question, same target document, three quite else embedded-text choices — and three else outcomes for whether the right document is still reachable.
 
 ## What can go wrong
 
-HyDE embeds a fabrication. If the made-up answer is confidently wrong about the topic. Rather than just stylistically answer-shaped, it can retrieve confidently wrong documents just as easily as right ones — it improves vocabulary match, not correctness. It too costs an extra model call before retrieval still starts. This query expansion much does not.
+HyDE embeds a fabrication. If the made-up answer is confidently wrong about the topic. Rather than just stylistically answer-shaped, it can retrieve confidently wrong documents just as easily as right ones — it improves vocabulary match, not correctness. It too costs an extra net call before retrieval still starts. This query expansion much does not.
 
 ## The short of it
 
-Retrieval grade is not just a property of the index and the likeness metric — it depends on how close the embedded query text sits to the embedded document text in vocabulary and register. Query expansion narrows that gap cheaply by adding terms; HyDE narrows it more by replacing the question with a fabricated answer written in the target register, at the cost of an extra generation step and the risk of chasing a plausible-sounding but wrong hypothesis.
+Retrieval grade is not just a property of the index and the likeness metric — it depends on how close the embedded query text sits to the embedded document text in vocabulary and register. Query expansion narrows that gap cheaply by adding terms. HyDE narrows it more by replacing the question with a fabricated answer written in the target register, at the cost of an extra generation step and the risk of chasing a plausible-sounding but wrong hypothesis.
 
 ## What each costs
 
-Each one of these methods adds a model call before retrieval starts.
+Each one of these ways adds a net call before retrieval starts.
 
 |Technique|Extra calls|Extra latency|
 |---|---|---|
@@ -330,13 +330,13 @@ Each one of these methods adds a model call before retrieval starts.
 |Multi-query (3 rewrites)|1, then 3 searches|300&ndash;700ms|
 |HyDE|1 generation|500&ndash;1500ms &mdash; it generates a paragraph|
 
-HyDE is the most costly since it makes much more text. A small fast model is much adequate for the generation. This brings the cost down much.
+HyDE is the most costly since it makes much more text. A small fast net is much adequate for the generation. This brings the cost down much.
 
 Three mitigations worth having:
 
 <strong>Cache by query text.</strong> Repeated and close questions are common. And the rewrite is deterministic at temperature 0.
 
-<strong>Run rewrites in parallel</strong> with the first query's search, so the latency is the max rather than the sum.
+<strong>Run rewrites in parallel</strong> with the first query's search. So the latency is the max rather than the sum.
 
 <strong>Apply selectively.</strong> Short vague queries gain; long set ones much do not. A length or specificity heuristic avoids paying the cost when there is nothing to gain.
 
@@ -344,11 +344,11 @@ Three mitigations worth having:
 
 <strong>They help most with:</strong> short vague queries, conversational follow-ups, domain jargon the user does not know, and multi-part questions.
 
-<strong>They hurt when:</strong> the query now holds exact identifiers. Rewriting "error E4471" can lose the code. This was the most useful part. Guard by keeping the first query in the fused search alongside any rewrites.
+<strong>They hurt when:</strong> the query now holds right identifiers. Rewriting "error E4471" can lose the code. This was the most useful part. Guard by keeping the first query in the fused search alongside any rewrites.
 
-<strong>HyDE in detail hurts</strong> when the model has no knowledge of the domain and makes a made-up answer that is not merely wrong but off-topic. This pulls retrieval in an unhelpful way.
+<strong>HyDE in detail hurts</strong> when the net has no knowledge of the domain and makes a made-up answer that is not merely wrong but off-topic. This pulls retrieval in an unhelpful way.
 
-The safe general pattern is <strong>additive rather than substitutive</strong>. Search with the first query <em>and</em> the rewrites, and fuse. That way a bad rewrite dilutes the results slightly rather than replacing them.
+The safe general pattern is <strong>additive rather than substitutive</strong>. Search with the first query <em>and</em> the rewrites, and fuse. That way a bad rewrite dilutes the yields slightly rather than replacing them.
 
 ## Where they sit in a pipeline
 
@@ -366,21 +366,21 @@ Measure each addition on a question set with known answers. In most systems hybr
 
 ## Questions people ask
 
-<strong>Does HyDE need a large model?</strong> No &mdash; the made-up answer just needs the right register and vocabulary. A small fast model works well.
+<strong>Does HyDE need a large net?</strong> No &mdash; the made-up answer just needs the right register and vocabulary. A small fast net works well.
 
 <strong>Does it matter that the made-up answer is wrong?</strong> Not for retrieval. Since it is used just as a search key. It would matter if you showed it to the user, which you should not.
 
-<strong>Should I replace the first query?</strong> No &mdash; search with both and fuse. That way a poor rewrite cannot destroy the results.
+<strong>Should I replace the first query?</strong> No &mdash; search with both and fuse. That way a poor rewrite cannot destroy the yields.
 
 <strong>How many rewrites for multi-query?</strong> Three to five. Beyond that, returns flatten and latency grows.
 
-<strong>Is query rewriting better than a better embedding model?</strong> A better embedding model helps each query; rewriting helps the badly-phrased ones. Try the model first.
+<strong>Is query rewriting better than a better embedding net?</strong> A better embedding net helps each query. Rewriting helps the badly-phrased ones. Try the net first.
 
 <strong>Can I cache these?</strong> Yes, and you should &mdash; keyed on the query text, at temperature 0.
 
 ## Recap in one screen
 
-- Users phrase questions else from how documents phrase answers, and that gap causes retrieval failures.
+- Users phrase questions else from how documents phrase answers. And that gap causes retrieval failures.
 - Query rewriting expands, clarifies, decomposes or contextualises the question before searching.
 - Contextualising against conversation history is key in chat, and much forgotten.
 - HyDE makes a plausible answer and searches with its embedding. This matches the documents' register.
