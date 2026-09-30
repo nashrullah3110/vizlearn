@@ -3,7 +3,7 @@ intro: Spend the expensive model only on the candidates that survived the cheap 
 
 ## The idea in brief
 
-A <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">bi-encoder</a> embeds the query and each document <em>apart</em>, ahead of time — that is what makes the embeddings precomputable and search fast. But it also means the model never looks at a query and a document together. A <strong>cross-encoder</strong> takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable. The precision gap between these two approaches is real and well-measured. On MS MARCO and close benchmarks, a cross-encoder always and much beats a bi-encoder by 5-15 points of nDCG,. This is since joint attention can model fine-grained query-document links (negation, qualification, partial match) that free embeddings compress away. The standard pattern is a **two-stage pipeline**: the bi-encoder (or BM25) fetches a shortlist of 20-100 candidates cheaply. And the cross-encoder rescores just that shortlist to find the final ranking. This page shows both models scoring the same query-document pairs side by side, shows where the bi-encoder's ranking disagrees with the cross-encoder's, and covers the latency-precision tradeoff as the shortlist size changes.
+A <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">bi-encoder</a> embeds the query and each document <em>apart</em>, ahead of time — that is what makes the embeddings precomputable and search fast. But it too means the model never looks at a query and a document together. A <strong>cross-encoder</strong> takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable. The precision gap between these two approaches is real and well-measured. On MS MARCO and close benchmarks, a cross-encoder always and much beats a bi-encoder by 5-15 points of nDCG,. This is since joint attention can model fine-grained query-document links (negation, qualification, partial match) that free embeddings compress away. The standard pattern is a **two-stage pipeline**: the bi-encoder (or BM25) fetches a shortlist of 20-100 candidates cheaply. And the cross-encoder rescores just that shortlist to find the final ranking. This page shows both models scoring the same query-document pairs side by side, shows where the bi-encoder's ranking disagrees with the cross-encoder's, and covers the latency-precision tradeoff as the shortlist size changes.
 
 ## The two-stage pattern
 
@@ -37,12 +37,12 @@ A bi-encoder over a million documents is one embedding plus an indexed vector se
 So the standard arrangement uses each for what it is good at:
 
 1. <strong>Retrieve</strong> 50&ndash;100 candidates with the bi-encoder (and BM25, fused). Fast, broad, some noise.
-2. <strong>Rerank</strong> those candidates with the cross-encoder. Costly per item, affordable on 50.
+2. <strong>Rerank</strong> those candidates with the cross-encoder. Costly per thing, affordable on 50.
 3. <strong>Pass</strong> the top 3&ndash;10 to the model.
 
 The insight is that recall and precision can be separated. Stage one needs high recall &mdash; the right document must be <em>somewhere</em> in the 50. Stage two gives precision, sorting them well.
 
-Measured on standard benchmarks, adding a cross-encoder reranker often improves nDCG by 10&ndash;20% over dense retrieval alone. It is one of the highest-value additions to a RAG pipeline. And it is often skipped.
+Measured on standard benchmarks, adding a cross-encoder reranker much improves nDCG by 10&ndash;20% over dense retrieval alone. It is one of the highest-value additions to a RAG pipeline. And it is much skipped.
 
 ## In code
 
@@ -137,7 +137,7 @@ print("vector to normalise -- it read the query, picked the dimensions")
 print("asked about, and read the document there.")
 ```
 
-Put both scorers over both queries and the disagreement shows up right at the top of the ranking, not just further down.
+Put both scorers over both queries and the disagreement shows up right at the top of the ranking, not just more down.
 
 ```python-run
 import numpy as np
@@ -216,10 +216,10 @@ print("reranker is. Tune k by watching recall@k of stage one.")
 
 ## Try it yourself
 
-1. <strong>Read Stage 1.</strong> Pure cosine likeness over word overlap. One candidate about python <em>the snake</em> ranks deceptively high — it shares the words "python" and "memory" with the query. And a bi-encoder scoring query and document on its own has no way to notice they mean a thing other in context.
+1. <strong>Read Stage 1.</strong> Pure cosine likeness over word overlap. One candidate about python <em>the snake</em> ranks deceptively high — it shares the words "python" and "memory" with the query. And a bi-encoder scoring query and document on its own has no way to notice they mean a thing else in context.
 2. <strong>Turn on the reranker.</strong> The final order changes: the snake document drops sharply. And a truly on-topic document that Stage 1 under-ranked moves up. This is what "reading query and document together" catches that comparing two free vectors cannot.
 3. <strong>Turn it back off.</strong> The order reverts to pure Stage 1 — the reranker did not change what was fetched, just the order the survivors are returned in.
-4. <strong>Read the cost panel.</strong> The bi-encoder cost is now paid, before the query ever arrived. The cross-encoder cost is just the number of candidates it re-scores — six forward passes, not a million.
+4. <strong>Read the cost panel.</strong> The bi-encoder cost is now paid, before the query ever arrived. The cross-encoder cost is just the count of candidates it re-scores — six forward passes, not a million.
 
 ## Worth recalling
 
@@ -235,9 +235,9 @@ A bi-encoder scores query and document on its own, which is what makes it fast e
 |ColBERT (late interaction)|Between the two &mdash; token-level vectors, precomputable|
 |LLM-as-reranker|Prompt a model to score relevance; flexible, expensive|
 
-<strong>ColBERT</strong> deserves a mention as the genuine middle ground. It stores a vector per <em>token</em> rather than per document, and scores by matching query tokens against document tokens at query time. That gives much of a cross-encoder's fine-grained link while keeping the document side precomputable. At the cost of a far larger index.
+<strong>ColBERT</strong> deserves a mention as the genuine middle ground. It stores a vector per <em>token</em> rather than per document, and scores by matching query tokens against document tokens at query time. That gives much of a cross-encoder's fine-grained link while keeping the document side precomputable. At the cost of a far more index.
 
-<strong>LLM reranking</strong> &mdash; asking a language model to rate each candidate's fit, or to order a list &mdash; is flexible and adapts to cues. And it is slow and costly enough that it is often reserved for small candidate sets or offline evaluation.
+<strong>LLM reranking</strong> &mdash; asking a language model to rate each candidate's fit, or to order a list &mdash; is flexible and adapts to cues. And it is slow and costly enough that it is much reserved for small candidate sets or offline evaluation.
 
 ## How many candidates to rerank
 
@@ -249,7 +249,7 @@ The parameter to tune, and it is a straight latency-versus-grade trade.
 |50|The usual choice &mdash; enough room to rescue a mid-ranked document|
 |100&ndash;200|Better recall, noticeably slower|
 
-The number to measure is stage one's <strong>recall@n</strong>: if recall@50 is 0.95 and recall@100 is 0.96, reranking 100 buys almost nothing. If recall@50 is 0.7, the bottleneck is retrieval, not ranking, and fixing chunking or adding hybrid search matters more than a bigger reranker.
+The count to measure is stage one's <strong>recall@n</strong>: if recall@50 is 0.95 and recall@100 is 0.96, reranking 100 buys almost nothing. If recall@50 is 0.7, the bottleneck is retrieval, not ranking, and fixing chunking or adding hybrid search matters more than a bigger reranker.
 
 That diagnostic sorting is worth stating plainly: <strong>reranking cannot recover a document that was never fetched.</strong>
 
@@ -257,7 +257,7 @@ That diagnostic sorting is worth stating plainly: <strong>reranking cannot recov
 
 <strong>Do I need a reranker?</strong> If retrieval grade limits your system and latency allows 20&ndash;50ms, it is one of the best available improvements.
 
-<strong>Can a cross-encoder replace the bi-encoder?</strong> Just on a very small corpus. It cannot be indexed.
+<strong>Can a cross-encoder replace the bi-encoder?</strong> Just on a quite small corpus. It cannot be indexed.
 
 <strong>How many candidates should I rerank?</strong> 50 is the standard starting point; tune from measured recall.
 
@@ -265,7 +265,7 @@ That diagnostic sorting is worth stating plainly: <strong>reranking cannot recov
 
 <strong>Does reranking help with the "lost in the middle" problem?</strong> Yes. It puts the most apt chunk first, where the model attends to it most.
 
-<strong>Can I fine-tune a reranker?</strong> Yes, on (query, apt, irrelevant) triples from your own data. It often beats a general model by a wide margin on a set domain.
+<strong>Can I fine-tune a reranker?</strong> Yes, on (query, apt, irrelevant) triples from your own data. It much beats a general model by a wide margin on a set domain.
 
 ## Recap in one screen
 
