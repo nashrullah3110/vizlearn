@@ -7,7 +7,7 @@ Retrieve the top 10 by likeness, then remove what the user may not see. If eight
 
 Over-fetching &mdash; retrieve 100, filter, keep 10 &mdash; makes it less likely and never fixes it. A user with access to 0.1% of the corpus needs an enormous k. And the failure is worst just for the most restricted users.
 
-The core problem is that vector likeness search and access control run on different axes. The index ranks by semantic fit; the access layer filters by who is allowed to see what. Combining them correctly is a systems problem, not a modelling problem, and there are three approaches.
+The core problem is that vector likeness search and access control run on other axes. The index ranks by semantic fit; the access layer filters by who is allowed to see what. Combining them correctly is a systems problem, not a modelling problem, and there are three approaches.
 
 Pre-sifting restricts the search space before retrieval: only documents the user is allowed to see are candidates. This guarantees the result set is clean and the right size. But it needs the vector index to support metadata sifting fast. Not all indexes do — a naive implementation scans the full corpus and checks permissions per document. This is as slow as brute-force search.
 
@@ -21,7 +21,7 @@ Whichever approach you choose, the permission model itself must be correct. A do
 
 Pre-sifting restricts the candidate set before ranking, so the top k is k <em>permitted</em> results. That is the correct behaviour and it fights the index. An HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search. You traverse into a region where all of it is sifted out and the walk stalls.
 
-Vector stores handle this differently, which is one of the real gaps between them. Options include sifted graph traversal, per-tenant sub-indexes (clean, and costly at many tenants), and falling back to a flat scan when the filter is very selective &mdash;. This is often truly fastest,. This is because the permitted set is small.
+Vector stores handle this else, which is one of the real gaps between them. Options include sifted graph traversal, per-tenant sub-indexes (clean, and costly at many tenants), and falling back to a flat scan when the filter is very selective &mdash;. This is often truly fastest,. This is because the permitted set is small.
 
 ## Where the permissions live
 
@@ -37,7 +37,7 @@ Pre-sifting is the correct behaviour and it is truly hard to implement,. This is
 
 Walking an HNSW graph while skipping most nodes can <strong>disconnect the traversal</strong>. The search reaches a region where each neighbour is sifted out and stalls. This returns far fewer results than asked for even though plenty of permitted documents exist elsewhere in the graph.
 
-The plans stores use, all with trade-offs: sifted traversal that keeps searching past excluded nodes; per-tenant sub-indexes. This are clean and costly once tenants number in the thousands; and falling back to a flat scan when the filter is selective &mdash;. This is often truly fastest. Since a user with access to 0.1% of a million documents is a thousand-vector brute force.
+The plans stores use, all with trade-offs: sifted traversal that keeps searching past left out nodes; per-tenant sub-indexes. This are clean and costly once tenants number in the thousands; and falling back to a flat scan when the filter is selective &mdash;. This is often truly fastest. Since a user with access to 0.1% of a million documents is a thousand-vector brute force.
 
 ## Getting the model right, and failing closed
 
@@ -47,7 +47,7 @@ Two design rules cover most of the damage.
 
 <p><strong>Index groups, resolve membership per query.</strong> Baking a user list into each chunk means a departure leaves the index granting access until the next re-index. And stale permissions fail <em>open</em>, which is the wrong way. Indexing a stable group id and resolving the user's groups per request makes revocation immediate.</p>
 
-Also: sifting is not deletion. A document removed for legal or privacy reasons must leave the index and any cached answers derived from it. Or it remains recoverable by anyone who can still see it &mdash; which is a different and worse problem than a missing result.
+Also: sifting is not deletion. A document removed for legal or privacy reasons must leave the index and any cached answers derived from it. Or it remains recoverable by anyone who can still see it &mdash; which is a other and worse problem than a missing result.
 
 ## The failure mode that matters most
 
@@ -95,7 +95,7 @@ Two hard parts:
 
 <strong>Inherited permissions.</strong> A document in a restricted folder inherits its restriction. The indexing pipeline must resolve inheritance and write the effective ACL, not the document's own.
 
-<strong>Permission changes.</strong> When someone leaves a group, or a document is reclassified, the index is stale and will over-share until it is updated. Permissions change far more often than document content, so they need their own refresh path. Ideally event-driven, and at minimum on a short schedule.
+<strong>Permission changes.</strong> When someone leaves a group, or a document is reclassified, the index is stale and will over-share until it is updated. Permissions change far more often than document content, so they need their own refresh path. Ideally event-driven, and at min on a short schedule.
 
 ## Post-sifting, measured, and why it fails quietly
 
