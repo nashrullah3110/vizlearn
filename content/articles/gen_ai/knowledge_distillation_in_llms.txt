@@ -11,7 +11,7 @@ Those small numbers are not noise &mdash; they encode <strong>likeness structure
 
 There is a catch: a confident teacher's non-target chances are so tiny that they add almost nothing to the gradient. At <span class="mono-font">T = 1</span> the distribution is nearly one-hot. So the student learns roughly what the plain label now told it.
 
-Raising the temperature in the softmax flattens the distribution and <em>amplifies the ratios between the small values</em>:
+Raising the temperature in the softmax flattens the distribution and <em>amplifies the ratios between the small vals</em>:
 
 p&#7522; = exp(z&#7522; / T) / &Sigma;&#11002; exp(z&#11002; / T)
 
@@ -25,11 +25,11 @@ L = (1 &minus; &alpha;) &middot; CE(student, true label) &nbsp; + &nbsp; &alpha;
 
 - The <strong>cross-entropy</strong> term keeps the student anchored to ground truth. So it cannot inherit the teacher's mistakes wholesale.
 - The <strong>KL divergence</strong> term pulls the student's whole distribution toward the teacher's, transferring the likeness structure.
-- <strong>&alpha;</strong> balances them. Typical values lean toward the teacher, since the soft targets carry strictly more data per case.
+- <strong>&alpha;</strong> balances them. Typical vals lean toward the teacher, since the soft targets carry strictly more data per case.
 
 ## Why It Matters for LLMs
 
-Distillation is how most small production models are made. DistilBERT keeps roughly 97% of BERT's speed at 40% of the size and 60% faster inference. The same recipe gave the compact members of most modern model families.
+Distillation is how most small live models are made. DistilBERT keeps roughly 97% of BERT's speed at 40% of the size and 60% faster inference. The same recipe gave the compact members of most modern model families.
 
 For generative models the idea extends naturally: the teacher's full next-token distribution at each spot is a far richer target than the single token that happened to appear in the text. A tied variant, <em>sequence-level</em> distillation, simply trains the student on text the teacher made.
 
@@ -74,7 +74,7 @@ For generative models, three approaches are used, and they differ in what the st
 
 <strong>Logit distillation.</strong> Match the teacher's full next-token distribution at each spot. The most informative, and it needs access to the teacher's logits and a shared tokeniser.
 
-<strong>Sequence-level distillation.</strong> Have the teacher generate outputs, then train the student on them as ordinary text. Works with any teacher &mdash; including one behind an API &mdash; and discards the distribution data.
+<strong>Sequence-level distillation.</strong> Have the teacher generate outputs, then train the student on them as ordinary text. Works with any teacher &mdash; with one behind an API &mdash; and discards the distribution data.
 
 <strong>Rationale distillation.</strong> Have the teacher give reasoning chains and answers, and train the student on both. This transfers some multi-step reasoning that plain answer-matching does not. And it is what "step-by-step distillation" means.
 
@@ -222,9 +222,9 @@ print("   compression.")
 
 1. <strong>Look at T = 1.</strong> The teacher is nearly one-hot and looks almost the same to the hard label. Barely any extra sign.
 2. <strong>Raise T to 5.</strong> The runner-ups emerge. Note <em>which</em> ones rise: semantically tied classes, never random ones. That sorting is the knowledge being transferred.
-3. <strong>Press "Train student" repeatedly</strong> and watch KL divergence fall as the student's bars converge on the teacher's shape. Including the small ones.
-4. <strong>Set &alpha; = 0 and retrain from reset.</strong> The student matches only the one-hot label; its non-target chances collapse and the likeness structure is lost.
-5. <strong>Try the sentiment case.</strong> "not bad at all" is truly ambiguous. So the teacher stays unclear even at T = 1. And that calibrated doubt is itself worth teaching.
+3. <strong>Press "Train student" repeatedly</strong> and watch KL divergence fall as the student's bars converge on the teacher's shape. With the small ones.
+4. <strong>Set &alpha; = 0 and retrain from reset.</strong> The student matches just the one-hot label; its non-target chances collapse and the likeness structure is lost.
+5. <strong>Try the sentiment case.</strong> "not bad at all" is truly ambiguous. So the teacher stays unclear even at T = 1. And that calibrated doubt is it worth teaching.
 
 ## In one line
 
@@ -239,21 +239,21 @@ A hard label answers one question. A teacher's full distribution answers each qu
 |Pruning|Removes weights or heads|Small to moderate|
 |Architecture search|Finds an efficient design|Varies|
 
-These combine, and the usual production sequence is <strong>distil. Then quantise</strong>: reduce the parameter count first. Then reduce the bits per parameter. A distilled 1B model quantised to 4-bit runs comfortably on a phone.
+These combine, and the usual live sequence is <strong>distil. Then quantise</strong>: reduce the parameter count first. Then reduce the bits per parameter. A distilled 1B model quantised to 4-bit runs comfortably on a phone.
 
-The check worth internalising: quantisation is nearly free and gives you a fixed factor of memory. Distillation costs a training run and can give you a model an order of size smaller. But only for the behaviour you distilled.
+The check worth internalising: quantisation is nearly free and gives you a fixed factor of memory. Distillation costs a training run and can give you a model an order of size smaller. But just for the behaviour you distilled.
 
-That caveat matters. A student distilled on customer-support conversations will handle customer support well and may be markedly worse at a thing else. Distillation narrows as it shrinks, which is often just what a production task wants.
+That caveat matters. A student distilled on customer-support conversations will handle customer support well and may be markedly worse at a thing else. Distillation narrows as it shrinks, which is often just what a live task wants.
 
 ## Real notes
 
-<strong>Generate teacher outputs once, offline.</strong> Running the teacher during each training step is costly; precompute and cache its outputs or logits.
+<strong>Generate teacher outputs once, offline.</strong> Running the teacher in each training step is costly; precompute and cache its outputs or logits.
 
 <strong>Match the tokeniser</strong> for logit distillation. Other vocabularies mean the distributions are over other things and cannot be compared spot by spot.
 
 <strong>Initialise the student from the teacher</strong> where design allows. Taking each other layer, for instance. It converges much faster than random initialisation.
 
-<strong>Distil on the distribution you will serve.</strong> The student learns the teacher's behaviour on the prompts you show it. So those prompts should resemble production traffic.
+<strong>Distil on the distribution you will serve.</strong> The student learns the teacher's behaviour on the prompts you show it. So those prompts should resemble live traffic.
 
 <strong>Watch the licence.</strong> Using a commercial model's outputs to train a competing model is prohibited by a few providers' terms. This is a legal constraint rather than a technical one. And it is a real one.
 
@@ -277,7 +277,7 @@ The honest sorting for most teams: try quantisation first, since it is far cheap
 
 <strong>Is this the same as fine-tuning?</strong> Fine-tuning adapts a model to a task using ground-truth labels. Distillation trains one model to imitate one more. They are often combined.
 
-<strong>How much data do I need?</strong> More than for fine-tuning, because the student is learning behaviour rather than tuning it. Tens of thousands of cases is typical, and they can be made by the teacher.
+<strong>How much data do I need?</strong> More than for fine-tuning, since the student is learning behaviour rather than tuning it. Tens of thousands of cases is typical, and they can be made by the teacher.
 
 ## Recap in one screen
 

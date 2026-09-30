@@ -3,15 +3,15 @@ intro: Half the sentence is a subject. Half of it is a WHERE clause.
 
 ## The idea in brief
 
-Likeness search compares meaning, and that is all it does. Ask it for "papers about attention published after 2020" and the words <em>published after 2020</em> are treated as more subject matter to match, not as a rule to enforce. A 2017 paper that is squarely about attention will score well and be returned,. This is because nothing in a cosine score knows what a year is. A self-query retriever fixes this by using a language model to split the user's question into two parts before any search runs. A semantic query (the subject to embed and compare) and a structured filter (the metadata constraint to enforce just). The LLM receives a schema describing the metadata fields each document carries. Year, author, document type, department. And returns a JSON object with the semantic query string and a set of check operators over those fields. The vector store applies the filter first as a hard WHERE clause. Then ranks only the surviving documents by cosine likeness to the semantic query. The constraint turns a guarantee rather than a sign that the embedding may or may not capture. LangChain's `SelfQueryRetriever` wraps this pattern: you define an `AttributeInfo` list describing each metadata field, pass it alongside a natural-language description of the document collection. And the retriever handles the LLM call, filter construction, and sifted search in one step. This page walks through the split on a few case queries, shows the made filter, and covers the metadata schema definition.
+Likeness search compares meaning, and that is all it does. Ask it for "papers about attention published after 2020" and the words <em>published after 2020</em> are treated as more subject matter to match, not as a rule to enforce. A 2017 paper that is squarely about attention will score well and be returned,. This is since nothing in a cosine score knows what a year is. A self-query retriever fixes this by using a language model to split the user's question into two parts before any search runs. A semantic query (the subject to embed and compare) and a structured filter (the metadata constraint to enforce just). The LLM receives a schema describing the metadata fields each document carries. Year, author, document type, department. And returns a JSON object with the semantic query string and a set of check operators over those fields. The vector store applies the filter first as a hard WHERE clause. Then ranks just the surviving documents by cosine likeness to the semantic query. The constraint turns a guarantee rather than a sign that the embedding may or may not capture. LangChain's `SelfQueryRetriever` wraps this pattern: you define an `AttributeInfo` list describing each metadata field, pass it alongside a natural-language description of the document collection. And the retriever handles the LLM call, filter construction, and sifted search in one step. This page walks through the split on a few case queries, shows the made filter, and covers the metadata schema definition.
 
 ## Two questions in one sentence
 
-A self-query retriever hands the sentence to an LLM along with a description of the metadata each document carries, and asks it to return two things. The <strong>semantic query</strong> &mdash; the part that should be embedded and compared &mdash; and a <strong>structured filter</strong> over the metadata, in the form of real checks like <code>year &gt; 2020</code>. The filter runs first as an ordinary store-style predicate; likeness then ranks only the documents that survived it. The constraint turns a guarantee rather than a hint.
+A self-query retriever hands the sentence to an LLM along with a description of the metadata each document carries, and asks it to return two things. The <strong>semantic query</strong> &mdash; the part that should be embedded and compared &mdash; and a <strong>structured filter</strong> over the metadata, in the form of real checks like <code>year &gt; 2020</code>. The filter runs first as an ordinary store-style predicate; likeness then ranks just the documents that survived it. The constraint turns a guarantee rather than a hint.
 
 ## Turning a question into a filter plus a search
 
-Many questions hold two other kinds of requirement. And a plain vector search can only handle one of them.
+Many questions hold two other kinds of requirement. And a plain vector search can just handle one of them.
 
 <blockquote>"What did the 2023 security reports say about phishing?"</blockquote>
 
@@ -30,9 +30,9 @@ Then it runs a sifted vector search: the filter constrains the candidate set. An
 
 Two things, and the first is the part that is easy to under-invest in.
 
-<strong>Metadata on each document, populated at indexing time.</strong> The filter can only guide fields that exist. Adding a date field later means re-indexing.
+<strong>Metadata on each document, populated at indexing time.</strong> The filter can just guide fields that exist. Adding a date field later means re-indexing.
 
-<strong>A schema description given to the model,</strong> so it knows which fields exist and what values they take:
+<strong>A schema description given to the model,</strong> so it knows which fields exist and what vals they take:
 
 ```python
 metadata_fields = [
@@ -52,11 +52,11 @@ This is a language model giving a filter, so it fails in language-model ways. An
 
 <strong>Invented field names.</strong> The model filters on `publication_date` when the schema says `year`. Validate the filter against the schema and drop or repair unknown fields.
 
-<strong>Invented values.</strong> A filter for `doc_type = "reports"` when the actual value is `"report"`. Enumerate allowed values in the schema, and fuzzy-match or reject.
+<strong>Invented vals.</strong> A filter for `doc_type = "reports"` when the actual value is `"report"`. Enumerate allowed vals in the schema, and fuzzy-match or reject.
 
 <strong>Over-sifting.</strong> The model adds a constraint the user did not intend. And the result set is empty. The standard remedy is to <strong>fall back to an unfiltered search</strong> when the sifted one returns nothing. And to say so in the response.
 
-<strong>Under-sifting.</strong> The model ignores a constraint the user did state, and irrelevant results come back. Harder to detect by itself; it shows up in evaluation.
+<strong>Under-sifting.</strong> The model ignores a constraint the user did state, and irrelevant results come back. Harder to detect by it; it shows up in evaluation.
 
 <strong>Latency.</strong> An extra model call before retrieval begins, adding a few hundred milliseconds. Cache the parse for repeated queries.
 
@@ -73,7 +73,7 @@ if not results:
 
 ## Exploration guide
 
-1. <strong>Read the parse for the first query.</strong> Note what was removed from the semantic half. Only <em>attention</em> is left to match on,. This is because the date has turn a filter instead.
+1. <strong>Read the parse for the first query.</strong> Note what was removed from the semantic half. Just <em>attention</em> is left to match on,. This is since the date has turn a filter instead.
 2. <strong>Turn the filter off.</strong> This is plain likeness search over all of it. A 2017 paper takes the top spot &mdash; it is truly the best match for "attention". And it breaks the constraint the reader stated.
 3. <strong>Turn it back on.</strong> The 2017 paper is struck out with the reason it failed. And the top result is now both about attention and inside the requested date range.
 4. <strong>Try "short surveys on retrieval".</strong> Two constraints this time, on other fields and other types. A number and a category. Combined with AND.
@@ -394,7 +394,7 @@ print("Same data, same filter, different answers.")
 
 ## Recap in one screen
 
-- Questions often mix a semantic requirement with structured constraints; embeddings handle only the first.
+- Questions often mix a semantic requirement with structured constraints; embeddings handle just the first.
 - A model parses the question into a query string plus a metadata filter. This is then applied at search time.
 - It needs metadata populated at indexing time and a schema description in the prompt.
 - Validate the made filter against the schema, and fall back to unfiltered search when it returns nothing.

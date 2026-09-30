@@ -3,7 +3,7 @@ intro: <strong>Causal Language Modeling (CLM)</strong> is the fundamental princi
 
 ## How GPT-style models learn to write
 
-<strong>Causal Language Modeling (CLM)</strong> is the basic principle behind how generative AI models like GPT work. At its core, it's a simple yet powerful task: <strong>predicting the next word (or "token") in a sequence given the words that came before it.</strong> This interactive lab explains that process. This allows you to train your own mini-model and see just how it makes decisions. The "causal" in the name means the model can only look left. When predicting token t, it sees tokens 1 through t-1 but never t+1 or beyond. This is enforced by a causal mask in the [attention](../natural_language_processing/multi_head_attention.html) layer that sets future spots to negative infinity before the [softmax](how_llms_predict_next_word.html). Contrast this with [masked language modelling](masked_language_modeling.html), where the model sees both sides of a blank and fills it in &mdash; that is the pretraining objective behind BERT and is better for grasp. But it cannot generate text because it has no notion of left-to-right sorting. CLM training is self-supervised: the training data is raw text with no labels. And each token's label is simply the next token in the sequence. The loss is cross-entropy averaged over all spots. And the model learns a chance distribution over the full vocabulary at each step. At generation time, a sampling plan ([temperature, top-k, top-p](how_llms_predict_next_word.html)) picks from that distribution to give the next token. And the process repeats autoregressively.
+<strong>Causal Language Modeling (CLM)</strong> is the basic principle behind how generative AI models like GPT work. At its core, it's a simple yet powerful task: <strong>predicting the next word (or "token") in a sequence given the words that came before it.</strong> This interactive lab explains that process. This allows you to train your own mini-model and see just how it makes decisions. The "causal" in the name means the model can just look left. When predicting token t, it sees tokens 1 through t-1 but never t+1 or beyond. This is enforced by a causal mask in the [attention](../natural_language_processing/multi_head_attention.html) layer that sets future spots to negative infinity before the [softmax](how_llms_predict_next_word.html). Contrast this with [masked language modelling](masked_language_modeling.html), where the model sees both sides of a blank and fills it in &mdash; that is the pretraining objective behind BERT and is better for grasp. But it cannot generate text since it has no notion of left-to-right sorting. CLM training is self-supervised: the training data is raw text with no labels. And each token's label is simply the next token in the sequence. The loss is cross-entropy averaged over all spots. And the model learns a chance distribution over the full vocabulary at each step. At generation time, a sampling plan ([temperature, top-k, top-p](how_llms_predict_next_word.html)) picks from that distribution to give the next token. And the process repeats autoregressively.
 
 ## Quick Context: Learning from Data
 
@@ -12,7 +12,7 @@ A language model learns by studying vast amounts of text. It doesn't understand 
 - <strong>Tokenization:</strong> The input text is broken down into smaller units called tokens (often words or sub-words).
 - <strong>Building a Chance Distribution:</strong> The model studies which tokens tend to follow other tokens. For any given sequence of tokens (the "context"), it builds a list of all doable next tokens and assigns a chance to each one. For case, after the context "The sky is", the token "blue" will have a very high chance.
 
-When you click the "Update Learned Chances" button, you are running this training process on the text you've provided. The model builds its numeric grasp based only on that data.
+When you click the "Update Learned Chances" button, you are running this training process on the text you've provided. The model builds its numeric grasp based just on that data.
 
 ## Core Idea: Probabilistic Prediction
 
@@ -24,13 +24,13 @@ The simplest method is to always choose the token with the highest chance. This 
 
 To add creativity, we add randomness via a "temperature" setting. A low temperature makes the model's choices more conservative (closer to greedy). While a high temperature raises randomness. This allows it to pick less likely tokens and give more surprising (but perhaps less coherent) text.
 
-## Predicting forward, and only forward
+## Predicting forward, and just forward
 
 Causal language modelling is the training objective behind each generative model. Predict the next token from the tokens before it, and never look ahead.
 
 <p class="mono-font">P(w&#8321;, w&#8322;, &hellip;, w&#8345;) = &prod;&#7511; P(w&#7511; | w&#8321; &hellip; w&#7511;&#8331;&#8321;)</p>
 
-The word "causal" means that one-one-way flow: token t may depend on its past and never on its future. (It is often written "casual" by accident, including in some published code.)
+The word "causal" means that one-one-way flow: token t may depend on its past and never on its future. (It is often written "casual" by accident, with in some published code.)
 
 The method enforcing it is a <strong>mask</strong>. Attention scores for future spots are set to negative infinity before the softmax. So their weights turn just zero:
 
@@ -42,13 +42,13 @@ sat      .     .     .     -inf
 on       .     .     .     .
 ```
 
-Without that mask, predicting "cat" from a context including "cat" would be trivial at training time and not doable at inference. Where the future does not exist.
+Without that mask, predicting "cat" from a context with "cat" would be trivial at training time and not doable at inference. Where the future does not exist.
 
 ## Why one pass trains each spot
 
 The masking has an speed result that is easy to miss and is central to why this objective scales.
 
-For a sequence of 1,000 tokens, a single forward pass gives predictions at <em>all</em> 1,000 spots at once, each correctly conditioned only on its own past. The loss is averaged over all of them.
+For a sequence of 1,000 tokens, a single forward pass gives predictions at <em>all</em> 1,000 spots at once, each correctly conditioned just on its own past. The loss is averaged over all of them.
 
 So one pass over a document yields as many training signs as the document has tokens. No labelling, no annotation &mdash; any text at all is training data. And the supervision is free.
 
@@ -72,7 +72,7 @@ To predict text well a model must track syntax, resolve pronouns, hold facts, ma
 
 <strong>In-context learning</strong> is the most striking. Show three worked cases in the prompt and the model goes on the pattern with no weight updates at all. That is pattern follow-up, which is just what the objective rewards. And research on "induction heads" traces the ability to identifiable attention circuits that copy and complete earlier patterns.
 
-Two things it does not give, and both follow from the objective. <strong>Truthfulness</strong>, because likelihood is not truth: a plausible falsehood scores well. And <strong>calibrated doubt</strong>, because the model outputs a distribution over tokens rather than a belief about the world.
+Two things it does not give, and both follow from the objective. <strong>Truthfulness</strong>, since likelihood is not truth: a plausible falsehood scores well. And <strong>calibrated doubt</strong>, since the model outputs a distribution over tokens rather than a belief about the world.
 
 ## One pass, each spot, and the mask that makes it work
 
@@ -236,7 +236,7 @@ Use the controls to build intuition for how these models behave.
 
 ## From base model to assistant
 
-A causal language model trained only on this objective is a <strong>base model</strong>. It goes on text. Ask it a question and it may give more questions, because that is what a list of questions looks like in the training data.
+A causal language model trained just on this objective is a <strong>base model</strong>. It goes on text. Ask it a question and it may give more questions, since that is what a list of questions looks like in the training data.
 
 Two further stages make it an assistant:
 
@@ -264,22 +264,22 @@ Two facts worth carrying. <strong>Greedy decoding is not best</strong> &mdash; p
 
 ## Questions people ask
 
-<strong>Why "causal"?</strong> Because data flows in one way only, past to future. The same sense as in causal systems. It is often misspelled "casual".
+<strong>Why "causal"?</strong> Since data flows in one way just, past to future. The same sense as in causal systems. It is often misspelled "casual".
 
 <strong>Is this the same as autoregressive?</strong> In effect yes. "Causal" describes the masking; "autoregressive" describes feeding outputs back as inputs.
 
-<strong>Why not train bidirectionally and generate anyway?</strong> A bidirectional model has no notion of "next". And its training task assumes the nearby context exists. Tries to generate by iterative filling work poorly.
+<strong>Why not train bidirectionally and generate anyway?</strong> A bidirectional model has no notion of "next". And its training task assumes the close context exists. Tries to generate by iterative filling work poorly.
 
 <strong>Does the model plan the whole sentence?</strong> Architecturally it emits one token at a time, and there is evidence internal states encode data about upcoming tokens. Whether that is planning is an open question.
 
-<strong>Why does it repeat itself?</strong> Low temperature and greedy decoding favour high-chance continuations, and repetition is high-chance. Raise temperature, use top-p, or apply a repetition cost.
+<strong>Why does it repeat it?</strong> Low temperature and greedy decoding favour high-chance continuations, and repetition is high-chance. Raise temperature, use top-p, or apply a repetition cost.
 
 <strong>Can a causal model do classification?</strong> Yes &mdash; by prompting, or by reading the final hidden state. At scale it matches encoders on most grasp benchmarks despite the one-one-way constraint.
 
 ## Recap in one screen
 
-- Predict the next token from the past only; a causal mask sets future attention scores to negative infinity.
+- Predict the next token from the past just; a causal mask sets future attention scores to negative infinity.
 - One forward pass trains each spot at once. And any text is training data &mdash; which is why the objective scales.
 - Generation is the same model applied repeatedly, appending its own output.
-- Powers including in-context learning emerge from the objective rather than being specified.
+- Powers with in-context learning emerge from the objective rather than being specified.
 - A base model goes on text; cue tuning and choice optimisation make it an assistant.
