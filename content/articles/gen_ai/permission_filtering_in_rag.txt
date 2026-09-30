@@ -9,7 +9,7 @@ Over-fetching &mdash; retrieve 100, filter, keep 10 &mdash; makes it less likely
 
 The core problem is that vector similarity search and access control operate on different axes. The index ranks by semantic relevance; the access layer filters by who is allowed to see what. Combining them correctly is a systems problem, not a modelling problem, and there are three approaches.
 
-Pre-filtering restricts the search space before retrieval: only documents the user is allowed to see are candidates. This guarantees the result set is clean and the right size, but it requires the vector index to support metadata filtering efficiently. Not all indexes do — a naive implementation scans the full corpus and checks permissions per document, which is as slow as brute-force search.
+Pre-filtering restricts the search space before retrieval: only documents the user is allowed to see are candidates. This guarantees the result set is clean and the right size, but it requires the vector index to support metadata filtering efficiently. Not all indexes do — a naive implementation scans the full corpus and checks permissions per document. This is as slow as brute-force search.
 
 Post-filtering retrieves by relevance first and removes forbidden documents afterwards. It is simple to implement but unreliable: the result set shrinks unpredictably, and the generator must work with whatever remains. Increasing k helps probabilistically but never guarantees enough permitted results.
 
@@ -19,17 +19,17 @@ Whichever approach you choose, the permission model itself must be correct. A do
 
 ## Pre-filtering, and why it is harder than it looks
 
-Pre-filtering restricts the candidate set before ranking, so the top k is k <em>permitted</em> results. That is the correct behaviour and it fights the index: an HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search &mdash; you traverse into a region where everything is filtered out and the walk stalls.
+Pre-filtering restricts the candidate set before ranking, so the top k is k <em>permitted</em> results. That is the correct behaviour and it fights the index: an HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search. You traverse into a region where everything is filtered out and the walk stalls.
 
 Vector databases handle this differently, which is one of the real differences between them. Options include filtered graph traversal, per-tenant sub-indexes (clean, and costly at many tenants), and falling back to a flat scan when the filter is very selective &mdash; which is often genuinely fastest, because the permitted set is small.
 
 ## Where the permissions live
 
-Baking an access list into each chunk's metadata at index time is fast and goes stale the moment someone leaves a group &mdash; and stale permissions fail open, which is the wrong direction.
+Baking an access list into each chunk's metadata at index time is fast and goes stale the moment someone leaves a group. And stale permissions fail open, which is the wrong direction.
 
-The usual compromise: index a stable <em>group</em> identifier with each chunk, resolve the user's groups per request from the identity system, and filter on the intersection. Group membership changes are then reflected immediately without re-indexing anything.
+The usual compromise: index a stable <em>group</em> identifier with each chunk, resolve the user's groups per request from the identity system, and filter on the intersection. Group membership changes are then reflected at once without re-indexing anything.
 
-Two more things to say. Deleted documents must leave the index, not just be filtered out. And the filter belongs on the server, derived from the authenticated session &mdash; never from a client-supplied user id, which is trivially forged.
+Two more things to say. Deleted documents must leave the index, not just be filtered out. And the filter belongs on the server, derived from the authenticated session. Never from a client-supplied user id, which is trivially forged.
 
 ## Why pre-filtering fights the index
 
@@ -37,7 +37,7 @@ Pre-filtering is the correct behaviour and it is genuinely hard to implement, be
 
 Walking an HNSW graph while skipping most nodes can <strong>disconnect the traversal</strong>: the search reaches a region where every neighbour is filtered out and stalls, returning far fewer results than asked for even though plenty of permitted documents exist elsewhere in the graph.
 
-The strategies databases use, all with trade-offs: filtered traversal that keeps searching past excluded nodes; per-tenant sub-indexes, which are clean and expensive once tenants number in the thousands; and falling back to a flat scan when the filter is selective &mdash; which is often genuinely fastest, since a user with access to 0.1% of a million documents is a thousand-vector brute force.
+The strategies databases use, all with trade-offs: filtered traversal that keeps searching past excluded nodes; per-tenant sub-indexes. This are clean and expensive once tenants number in the thousands; and falling back to a flat scan when the filter is selective &mdash; which is often genuinely fastest, since a user with access to 0.1% of a million documents is a thousand-vector brute force.
 
 ## Getting the model right, and failing closed
 
@@ -45,13 +45,13 @@ Two design rules cover most of the damage.
 
 <p><strong>Derive the filter from the session, never the request.</strong> A client-supplied user or group id is trivially forged. The filter must be built server-side from the authenticated identity.</p>
 
-<p><strong>Index groups, resolve membership per query.</strong> Baking a user list into each chunk means a departure leaves the index granting access until the next re-index &mdash; and stale permissions fail <em>open</em>, which is the wrong direction. Indexing a stable group id and resolving the user's groups per request makes revocation immediate.</p>
+<p><strong>Index groups, resolve membership per query.</strong> Baking a user list into each chunk means a departure leaves the index granting access until the next re-index. And stale permissions fail <em>open</em>, which is the wrong direction. Indexing a stable group id and resolving the user's groups per request makes revocation immediate.</p>
 
 Also: filtering is not deletion. A document removed for legal or privacy reasons must leave the index and any cached answers derived from it, or it remains recoverable by anyone who can still see it &mdash; which is a different and worse problem than a missing result.
 
 ## The failure mode that matters most
 
-A RAG system retrieves documents and puts them in a prompt. If the retrieval does not respect who is asking, the model will faithfully summarise a document the user was never allowed to see &mdash; and it will do so fluently, with a citation.
+A RAG system retrieves documents and puts them in a prompt. If the retrieval does not respect who is asking, the model will faithfully summarise a document the user was never allowed to see. And it will do so fluently, with a citation.
 
 That is a data breach with a helpful tone, and it is the most consequential thing that can go wrong in an enterprise retrieval system. Unlike a hallucination, it is not a quality problem; it is a security one.
 
@@ -95,7 +95,7 @@ Two hard parts:
 
 <strong>Inherited permissions.</strong> A document in a restricted folder inherits its restriction. The indexing pipeline must resolve inheritance and write the effective ACL, not the document's own.
 
-<strong>Permission changes.</strong> When someone leaves a group, or a document is reclassified, the index is stale and will over-share until it is updated. Permissions change far more often than document content, so they need their own refresh path &mdash; ideally event-driven, and at minimum on a short schedule.
+<strong>Permission changes.</strong> When someone leaves a group, or a document is reclassified, the index is stale and will over-share until it is updated. Permissions change far more often than document content, so they need their own refresh path. Ideally event-driven, and at minimum on a short schedule.
 
 ## Post-filtering, measured, and why it fails quietly
 

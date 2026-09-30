@@ -7,7 +7,7 @@ A shallow copy builds a <strong>new container holding the same objects</strong>.
 
 <p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
 
-The distinction matters whenever a data structure contains mutable objects &mdash; lists of lists, dicts of dicts, objects holding references to other objects. A shallow copy of `[[1, 2], [3, 4]]` creates a new outer list but both inner lists are shared, so `copy[0].append(5)` changes the original too. `copy.deepcopy` rebuilds every nested object recursively, handles circular references by tracking `id`s, and respects `__deepcopy__` for custom classes. The cost is proportional to the total number of objects in the graph, which is why deep-copying a large nested structure (a parsed JSON tree, a graph of ORM objects) can be surprisingly slow. This page demonstrates the divergence at each nesting level, shows where `deepcopy` handles cycles that a manual recursion would not, and covers the common interview follow-up: what does `dict(d)` copy?
+The distinction matters whenever a data structure contains mutable objects &mdash; lists of lists, dicts of dicts, objects holding references to other objects. A shallow copy of `[[1, 2], [3, 4]]` creates a new outer list but both inner lists are shared. So `copy[0].append(5)` changes the original too. `copy.deepcopy` rebuilds every nested object recursively, handles circular references by tracking `id`s, and respects `__deepcopy__` for custom classes. The cost is proportional to the total number of objects in the graph, which is why deep-copying a large nested structure (a parsed JSON tree, a graph of ORM objects) can be surprisingly slow. This page shows the divergence at each nesting level, shows where `deepcopy` handles cycles that a manual recursion would not, and covers the common interview follow-up: what does `dict(d)` copy?
 
 ## Run it
 
@@ -89,7 +89,7 @@ print("a tuple is only as immutable as its contents:", t)
 
 ## Everything is shallow unless you asked
 
-<p>These are all the same operation: <code>b = a[:]</code>, <code>b = list(a)</code>, <code>b = a.copy()</code>, <code>b = copy.copy(a)</code>, <code>b = [*a]</code>, and <code>dict(d)</code> for dictionaries. One level.</p><p><code>copy.deepcopy</code> is the only one in that list that recurses. It also handles the two things a naive recursion would get wrong: <strong>cycles</strong>, via a memo of objects already copied, so a list containing itself does not hang; and <strong>identity sharing</strong>, so if the same object appears twice in the source it appears twice as the same object in the result rather than being duplicated.</p>
+<p>These are all the same operation: <code>b = a[:]</code>, <code>b = list(a)</code>, <code>b = a.copy()</code>, <code>b = copy.copy(a)</code>, <code>b = [*a]</code>, and <code>dict(d)</code> for dictionaries. One level.</p><p><code>copy.deepcopy</code> is the only one in that list that recurses. It also handles the two things a naive recursion would get wrong: <strong>cycles</strong>, via a memo of objects already copied. So a list containing itself does not hang; and <strong>identity sharing</strong>. So if the same object appears twice in the source it appears twice as the same object in the result rather than being duplicated.</p>
 
 ## What deepcopy costs, and when to avoid it
 
@@ -97,7 +97,7 @@ print("a tuple is only as immutable as its contents:", t)
 
 ## The follow-up: the nested-list multiplication bug
 
-<p>"What does <code>[[0] * 3] * 3</code> give you?" A list of three references to <em>one</em> inner list, so setting <code>grid[0][0]</code> sets the first cell of every row. It is the same fact as this page &mdash; the outer sequence was copied and the inner one was shared &mdash; arriving through multiplication rather than through a copy call. The fix is a comprehension, which evaluates <code>[0] * 3</code> once per row.</p>
+<p>"What does <code>[[0] * 3] * 3</code> give you?" A list of three references to <em>one</em> inner list. So setting <code>grid[0][0]</code> sets the first cell of every row. It is the same fact as this page &mdash; the outer sequence was copied and the inner one was shared &mdash; arriving through multiplication rather than through a copy call. The fix is a comprehension, which evaluates <code>[0] * 3</code> once per row.</p>
 
 ## What to say out loud
 
@@ -117,7 +117,7 @@ print("a tuple is only as immutable as its contents:", t)
 
 <p>Volunteering these is most of what separates a correct answer from a good one.</p>
 
-<p><strong>Tuples are only as immutable as their contents.</strong> <code>([1, 2], 3)</code> cannot be reassigned and its inner list can still be appended to, so a tuple is not a defence against the problem on this page.</p>
+<p><strong>Tuples are only as immutable as their contents.</strong> <code>([1, 2], 3)</code> cannot be reassigned and its inner list can still be appended to. So a tuple is not a defence against the problem on this page.</p>
 
 <p><strong>A dict comprehension over a dict is shallow too</strong>, as is <code>{**d}</code>. Every spelling of "make me a new dict from this one" shares the values.</p>
 

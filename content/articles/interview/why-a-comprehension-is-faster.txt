@@ -7,7 +7,7 @@ Yes, by a little, and for a specific reason: the loop looks up <code>out.append<
 
 <p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
 
-The difference is visible in the bytecode. The loop body contains `LOAD_ATTR` to look up `.append`, `CALL_FUNCTION` to invoke it, and `POP_TOP` to discard the return value &mdash; three extra instructions per iteration. The comprehension replaces all of that with a single `LIST_APPEND` opcode that writes directly to the list being built, with no attribute lookup and no Python-level function call overhead. The speedup is roughly 10&ndash;30% in CPython, depending on what the loop body does &mdash; the simpler the per-element work, the more the overhead dominates. Generator expressions and `dict`/`set` comprehensions have their own dedicated opcodes and follow the same pattern.
+The difference is visible in the bytecode. The loop body contains `LOAD_ATTR` to look up `.append`, `CALL_FUNCTION` to invoke it, and `POP_TOP` to discard the return value. Three extra instructions per iteration. The comprehension replaces all of that with a single `LIST_APPEND` opcode that writes directly to the list being built, with no attribute lookup and no Python-level function call overhead. The speedup is roughly 10&ndash;30% in CPython, depending on what the loop body does. The simpler the per-element work, the more the overhead dominates. Generator expressions and `dict`/`set` comprehensions have their own dedicated opcodes and follow the same pattern.
 
 This page times both forms across several input sizes, prints the relevant bytecodes side by side with `dis.dis`, and covers the follow-up questions: whether a comprehension changes the complexity (it does not), where the speed gap disappears (when the per-element work is expensive enough to dwarf the call overhead), and when a loop is the right choice regardless (when you need early exit, exception handling, or side effects).
 
@@ -92,11 +92,11 @@ print(f"  the generator  {sys.getsizeof(i * i for i in range(N)):,} bytes")
 
 ## The difference, in bytecode
 
-<p><code>out.append(x)</code> is three separate things: find the attribute <code>append</code> on the list, build a call, and make it. That happens once per item. The comprehension compiles the append into <code>LIST_APPEND</code>, a single instruction that pushes the value onto the list being built &mdash; no name to resolve and no call to make.</p><p>The explorer above is those two instruction sequences, taken from <code>dis</code> rather than described, so you can count the difference. It is a handful of opcodes per item.</p>
+<p><code>out.append(x)</code> is three separate things: find the attribute <code>append</code> on the list, build a call, and make it. That happens once per item. The comprehension compiles the append into <code>LIST_APPEND</code>, a single instruction that pushes the value onto the list being built &mdash; no name to resolve and no call to make.</p><p>The explorer above is those two instruction sequences, taken from <code>dis</code> rather than described. So you can count the difference. It is a handful of opcodes per item.</p>
 
 ## Why the number is smaller than people expect
 
-<p>Folklore puts comprehensions at two or three times faster, and that has not been true for a while. Two things narrowed it.</p><p>The <strong>specialising interpreter</strong> added in 3.11 rewrites hot instruction sequences in place, and a repeated attribute-lookup-then-call on the same type is exactly the pattern it specialises, so the loop's overhead shrank.</p><p>And in 3.12 comprehensions were <strong>inlined</strong> (PEP 709). Before that, a list comprehension created and called a hidden function object on every evaluation &mdash; real overhead that partly cancelled the LIST_APPEND saving. Removing it made comprehensions faster in a way that has nothing to do with the append path.</p><p>So the answer to give is "a bit faster, because of a per-iteration lookup and call", not a multiplier. The editor below measures it on whichever interpreter you are running.</p>
+<p>Folklore puts comprehensions at two or three times faster, and that has not been true for a while. Two things narrowed it.</p><p>The <strong>specialising interpreter</strong> added in 3.11 rewrites hot instruction sequences in place, and a repeated attribute-lookup-then-call on the same type is exactly the pattern it specialises. So the loop's overhead shrank.</p><p>And in 3.12 comprehensions were <strong>inlined</strong> (PEP 709). Before that, a list comprehension created and called a hidden function object on every evaluation. Real overhead that partly cancelled the LIST_APPEND saving. Removing it made comprehensions faster in a way that has nothing to do with the append path.</p><p>So the answer to give is "a bit faster, because of a per-iteration lookup and call", not a multiplier. The editor below measures it on whichever interpreter you are running.</p>
 
 ## When the loop is the right answer anyway
 
@@ -104,7 +104,7 @@ print(f"  the generator  {sys.getsizeof(i * i for i in range(N)):,} bytes")
 
 ## The follow-up: what about map and filter
 
-<p><code>map(f, xs)</code> can beat a comprehension when <code>f</code> is already a function, because it avoids a Python-level call per item by doing the loop in C &mdash; but <code>map(lambda x: x * x, xs)</code> is usually slower than the comprehension, because the lambda reintroduces exactly the per-item Python call you were trying to avoid. So <code>map(str, xs)</code> is a reasonable choice and <code>map</code> with a lambda rarely is.</p>
+<p><code>map(f, xs)</code> can beat a comprehension when <code>f</code> is already a function, because it avoids a Python-level call per item by doing the loop in C. But <code>map(lambda x: x * x, xs)</code> is usually slower than the comprehension, because the lambda reintroduces exactly the per-item Python call you were trying to avoid. So <code>map(str, xs)</code> is a reasonable choice and <code>map</code> with a lambda rarely is.</p>
 
 ## What to say out loud
 
@@ -115,7 +115,7 @@ print(f"  the generator  {sys.getsizeof(i * i for i in range(N)):,} bytes")
 ## What to notice while it runs
 
 <ul>
-<li>The loop's per-iteration bytecode contains <code>LOAD_ATTR</code> and <code>CALL</code>; the comprehension's does not.</li>
+<li>The loop's per-iteration bytecode contains <code>LOAD_ATTR</code> and <code>CALL</code>. The comprehension's does not.</li>
 <li>Both forms are O(n) &mdash; the difference is per-item overhead.</li>
 <li>The measured gap is modest, which is the honest answer to the question.</li>
 </ul>
@@ -134,9 +134,9 @@ print(f"  the generator  {sys.getsizeof(i * i for i in range(N)):,} bytes")
 
 <p><strong>"Do dict and set comprehensions work the same way?"</strong> Yes, with <code>MAP_ADD</code> and <code>SET_ADD</code> in place of <code>LIST_APPEND</code>. Same saving, same reasoning.</p>
 
-<p><strong>"In a nested comprehension, what order do the <code>for</code> clauses run in?"</strong> Left to right, outermost first - the same order you would write the nested loops. <code>[x for row in grid for x in row]</code> flattens; swapping the clauses is a <code>NameError</code>, which is a quick way to check yourself.</p>
+<p><strong>"In a nested comprehension, what order do the <code>for</code> clauses run in?"</strong> Left to right, outermost first - the same order you would write the nested loops. <code>[x for row in grid for x in row]</code> flattens; swapping the clauses is a <code>NameError</code>. This is a quick way to check yourself.</p>
 
-<p><strong>"Does a comprehension leak its loop variable?"</strong> Not in Python 3 - it has its own scope, so <code>i</code> does not survive. It did leak in Python 2, and the fix is worth knowing because PEP 709 in 3.12 inlined comprehensions again <em>without</em> reintroducing the leak.</p>
+<p><strong>"Does a comprehension leak its loop variable?"</strong> Not in Python 3 - it has its own scope. So <code>i</code> does not survive. It did leak in Python 2, and the fix is worth knowing because PEP 709 in 3.12 inlined comprehensions again <em>without</em> reintroducing the leak.</p>
 
 ## Common wrong answers
 

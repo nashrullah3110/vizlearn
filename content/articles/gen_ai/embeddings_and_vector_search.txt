@@ -13,9 +13,9 @@ Searching a million vectors by brute force &mdash; computing the distance from t
 
 ## Cosine, and why it is the default
 
-Retrieval almost always ranks by <a href="../machine_learning/cosine_similarity.html" style="color: var(--accent-primary)">cosine similarity</a>: the angle between the query vector and the document vector, ignoring how long either one is. Length in an embedding tends to carry things like document length or token count rather than meaning, so ignoring it is the point.
+Retrieval almost always ranks by <a href="../machine_learning/cosine_similarity.html" style="color: var(--accent-primary)">cosine similarity</a>: the angle between the query vector and the document vector, ignoring how long either one is. Length in an embedding tends to carry things like document length or token count rather than meaning. So ignoring it is the point.
 
-On vectors normalised to unit length, ranking by cosine and ranking by Euclidean distance give identical orders, which is why many systems normalise once at index time and then use whichever their hardware does faster. Switch the metric here and watch how little changes &mdash; and, on the points that are not near the unit circle, exactly where it does.
+On vectors normalised to unit length, ranking by cosine and ranking by Euclidean distance give identical orders. This is why many systems normalise once at index time and then use whichever their hardware does faster. Switch the metric here and watch how little changes &mdash; and, on the points that are not near the unit circle, exactly where it does.
 
 ## Exact search does not scale
 
@@ -48,13 +48,13 @@ The standard comparison is the angle between vectors:
 
 Length in an embedding tends to reflect frequency or confidence rather than meaning, so ignoring it is deliberate: a long document and a short one about the same subject should be close.
 
-On vectors normalised to length 1, cosine similarity and the dot product are identical, and Euclidean distance ranks the same way. That is why libraries normalise on the way in and then use fast dot products &mdash; a matrix multiply is far cheaper than computing norms per comparison.
+On vectors normalised to length 1, cosine similarity and the dot product are identical, and Euclidean distance ranks the same way. That is why libraries normalise on the way in and then use fast dot products. A matrix multiply is far cheaper than computing norms per comparison.
 
 Calibrate the threshold rather than assuming one. Many sentence-embedding models score unrelated text at 0.2&ndash;0.4, so a threshold of 0.5 admits considerable noise. Score a few hundred known-related and known-unrelated pairs and put the cut where the distributions separate.
 
 ## Approximate search, and why exact does not scale
 
-Comparing a query against every stored vector is exact and linear. With a million 768-dimensional vectors that is 768 million multiply-adds per query &mdash; tolerable in a batch job, too slow for an interactive request at any real volume.
+Comparing a query against every stored vector is exact and linear. With a million 768-dimensional vectors that is 768 million multiply-adds per query. Tolerable in a batch job, too slow for an interactive request at any real volume.
 
 <strong>Approximate nearest neighbour</strong> indexes trade a small amount of recall for orders of magnitude of speed.
 
@@ -153,7 +153,7 @@ print("   'male'. in a real embedding nobody chose those axes, and the")
 print("   arithmetic works far less reliably than this demo suggests.")
 ```
 
-The property that actually decides whether retrieval works is not the similarity number itself but its spread, which the next block measures on a realistic embedding shape.
+The property that actually decides whether retrieval works is not the similarity number itself but its spread. This the next block measures on a realistic embedding shape.
 
 ```python-run
 import numpy as np
@@ -247,27 +247,27 @@ print("   why the interesting engineering is in the combination.")
 
 1. <strong>Look at the space.</strong> Four topics, four visible clumps. Nothing arranged them by keyword; they are grouped because their meanings are.
 2. <strong>Search exactly.</strong> The default compares all 18 documents and returns the true nearest three. Recall is 100% by definition &mdash; this <em>is</em> the answer everything else is measured against.
-3. <strong>Partition it.</strong> Switch <strong>Search Mode</strong> to partitioned with one cell probed. Comparisons drop to the cell's contents plus the four centroids, and recall usually stays at 100% &mdash; the neighbours were in the obvious cell.
+3. <strong>Partition it.</strong> Switch <strong>Search Mode</strong> to partitioned with one cell probed. Comparisons drop to the cell's contents plus the four centroids, and recall usually stays at 100%. The neighbours were in the obvious cell.
 4. <strong>Now find the failure.</strong> Raise <strong>k</strong> to 5 or 6 with one cell probed. The cell runs out of documents, so the search returns whatever it has and recall drops below 100%: real neighbours were sitting in a cell nobody looked at.
 5. <strong>Buy the recall back.</strong> Raise <strong>Cells Probed</strong>. Recall climbs back to 100% and the comparison count climbs with it. That trade is the entire tuning surface of a vector database.
-6. <strong>Probe everything.</strong> At 4 cells the search does 22 comparisons for an index of 18 documents &mdash; worse than the exact scan, because you pay for the centroids too. Partitioning only pays when you skip most of the index.
+6. <strong>Probe everything.</strong> At 4 cells the search does 22 comparisons for an index of 18 documents. Worse than the exact scan, because you pay for the centroids too. Partitioning only pays when you skip most of the index.
 7. <strong>Change the metric.</strong> On the mango query, cosine calls "a summer fruit salad" and "peeling a ripe mango" a tie at 1.000, because they sit at almost the same angle from the origin. Euclidean puts "peeling a ripe mango" clearly first, because it is genuinely nearer. Same points, same query, different question being asked.
 
 ## Where this goes wrong
 
 - <strong>Mixing embedding models.</strong> Vectors from two different models are not comparable, even at the same dimension. Re-embed everything when you change model, or the index quietly returns nonsense.
-- <strong>Expecting exact matches.</strong> Embeddings are poor at part numbers, error codes and rare proper nouns, which is why serious systems run hybrid retrieval &mdash; keyword search alongside vectors.
+- <strong>Expecting exact matches.</strong> Embeddings are poor at part numbers, error codes and rare proper nouns. This is why serious systems run hybrid retrieval &mdash; keyword search alongside vectors.
 - <strong>Ignoring recall.</strong> An approximate index that has drifted to 70% recall looks perfectly healthy from the outside; every query returns results. Measure against exact search on a sample.
 - <strong>Chunk size chosen by accident.</strong> A vector represents its whole chunk, so a chunk covering three topics has an embedding that means none of them.
 - <strong>No filtering plan.</strong> "Nearest neighbours, but only from this tenant, in the last 30 days" is a much harder query than pure similarity, and the index has to be built for it.
 
 ## The short of it
 
-An embedding puts meaning somewhere in space, so similarity becomes geometry and retrieval becomes nearest-neighbour search, ranked by cosine because vector length carries length rather than meaning. Exact search costs one comparison per document and does not survive scale, so production indexes partition the space and probe only the nearest few cells &mdash; buying a large drop in work for a small, measurable chance of missing a true neighbour. That chance is recall@k, and it moves with how many cells you probe, which makes vector search a tuning problem rather than a solved one.
+An embedding puts meaning somewhere in space, so similarity becomes geometry and retrieval becomes nearest-neighbour search, ranked by cosine because vector length carries length rather than meaning. Exact search costs one comparison per document and does not survive scale, so production indexes partition the space and probe only the nearest few cells. Buying a large drop in work for a small, measurable chance of missing a true neighbour. That chance is recall@k, and it moves with how many cells you probe, which makes vector search a tuning problem rather than a solved one.
 
 ## Why hybrid search wins
 
-Embeddings are strong at paraphrase and weak at exact tokens. They will happily return a document about "annual leave" for a query about "holiday allowance" &mdash; and will blur "invoice INV-2024-8871" into every other invoice number.
+Embeddings are strong at paraphrase and weak at exact tokens. They will happily return a document about "annual leave" for a query about "holiday allowance". And will blur "invoice INV-2024-8871" into every other invoice number.
 
 Keyword retrieval (BM25) is the opposite: precise on names, codes, numbers and rare terms, and blind to paraphrase.
 

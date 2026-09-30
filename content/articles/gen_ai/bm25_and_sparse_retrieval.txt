@@ -3,13 +3,13 @@ intro: Keyword search, done properly.
 
 ## What this is
 
-Before <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">dense vector search</a>, and still running alongside it in most real systems, is sparse lexical search: score a document by which query terms it contains, weighted by how informative each term is. BM25 is the version of this idea that actually works well, and it needs no training, no GPU, and no embedding model. BM25 scores a document by summing a term-weight for each query word that appears in it. The term weight combines two ideas: IDF (inverse document frequency) gives rare words more weight than common ones, and TF saturation ensures that a word appearing 10 times scores only slightly higher than one appearing 5 times &mdash; preventing keyword-stuffed documents from dominating. The saturation is controlled by the parameter k1 (typically 1.2-2.0): higher values let term frequency matter more, lower values flatten the curve earlier. The parameter b (typically 0.75) controls length normalisation: b=1 fully penalises long documents, b=0 ignores length. The "sparse" in sparse retrieval refers to the document representation: each document is a vector with one dimension per vocabulary term, and most entries are zero because any given document uses only a tiny fraction of the vocabulary. An inverted index stores only the non-zero entries, making retrieval fast even over millions of documents. [Hybrid search](hybrid_search_reciprocal_rank_fusion.html) combines BM25's lexical precision with [dense vector search](embeddings_and_vector_search.html)'s semantic understanding. This page scores a set of documents against a query, shows the IDF and TF-saturation components, and covers the k1/b parameter tradeoff.
+Before <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">dense vector search</a>, and still running alongside it in most real systems, is sparse lexical search: score a document by which query terms it contains, weighted by how informative each term is. BM25 is the version of this idea that actually works well, and it needs no training, no GPU, and no embedding model. BM25 scores a document by summing a term-weight for each query word that appears in it. The term weight combines two ideas: IDF (inverse document frequency) gives rare words more weight than common ones, and TF saturation ensures that a word appearing 10 times scores only slightly higher than one appearing 5 times. Preventing keyword-stuffed documents from dominating. The saturation is controlled by the parameter k1 (typically 1.2-2.0): higher values let term frequency matter more, lower values flatten the curve earlier. The parameter b (typically 0.75) controls length normalisation: b=1 fully penalises long documents, b=0 ignores length. The "sparse" in sparse retrieval refers to the document representation: each document is a vector with one dimension per vocabulary term, and most entries are zero because any given document uses only a tiny fraction of the vocabulary. An inverted index stores only the non-zero entries, making retrieval fast even over millions of documents. [Hybrid search](hybrid_search_reciprocal_rank_fusion.html) combines BM25's lexical precision with [dense vector search](embeddings_and_vector_search.html)'s semantic understanding. This page scores a set of documents against a query, shows the IDF and TF-saturation components, and covers the k1/b parameter tradeoff.
 
 ## The formula
 
 score(D,Q) = &Sigma;<sub>t&isin;Q</sub> IDF(t) &middot; f(t,D)(k1+1) / (f(t,D) + k1(1 &minus; b + b&middot;|D|/avgdl))
 
-Three ideas, one formula. <strong>IDF(t)</strong> — a term that appears in fewer documents is more informative, so it is weighted higher. <strong>f(t,D)</strong> — more occurrences of a query term help, but with diminishing returns, controlled by <strong>k1</strong>. <strong>|D|/avgdl</strong> — a document's raw term count is normalised against its own length, controlled by <strong>b</strong>, so a long document does not win purely by containing more words.
+Three ideas, one formula. <strong>IDF(t)</strong> — a term that appears in fewer documents is more informative, so it is weighted higher. <strong>f(t,D)</strong> — more occurrences of a query term help, but with diminishing returns, controlled by <strong>k1</strong>. <strong>|D|/avgdl</strong> — a document's raw term count is normalised against its own length, controlled by <strong>b</strong>. So a long document does not win purely by containing more words.
 
 ## Scoring by term overlap, carefully
 
@@ -39,7 +39,7 @@ Sparse retrieval matches tokens, which is exactly what embeddings are bad at:
 |"holiday allowance"|Misses "annual leave"|Finds it|
 |"cheapest shipping"|Misses "lowest-cost delivery"|Finds it|
 
-The pattern: <strong>identifiers, names, codes and rare technical terms belong to BM25; paraphrase belongs to embeddings.</strong> Their failures do not overlap, which is the argument for using both.
+The pattern: <strong>identifiers, names, codes and rare technical terms belong to BM25; paraphrase belongs to embeddings.</strong> Their failures do not overlap. This is the argument for using both.
 
 Three further advantages that matter operationally. BM25 needs no model, no GPU and no embedding step, so indexing is fast and cheap. It handles a brand-new term the moment it is indexed, where an embedding model has never seen it. And it is transparent &mdash; you can explain exactly why a document scored highly, which matters for debugging and for audit.
 
@@ -393,7 +393,7 @@ Parameter guidance: `k₁` between 1.2 and 2.0, `b` around 0.75. Neither is sens
 
 A newer family keeps the inverted-index machinery and learns the weights.
 
-<strong>SPLADE</strong> uses a transformer to predict, for each document, a sparse weight over the whole vocabulary &mdash; including terms that do not literally appear. A document about "annual leave" can be given weight on "holiday", so the sparse index gains some semantic matching.
+<strong>SPLADE</strong> uses a transformer to predict, for each document, a sparse weight over the whole vocabulary. Including terms that do not literally appear. A document about "annual leave" can be given weight on "holiday", so the sparse index gains some semantic matching.
 
 The result sits between the two worlds: it retains the exact-match strength and index efficiency of sparse retrieval while handling some paraphrase. The cost is a model pass per document at indexing time, and larger posting lists.
 
@@ -401,7 +401,7 @@ Whether it beats BM25-plus-dense-hybrid depends on the corpus, and it is worth e
 
 ## Questions people ask
 
-<strong>Is BM25 outdated?</strong> No. It remains a strong baseline that dense retrieval alone often fails to beat, particularly on technical corpora.
+<strong>Is BM25 outdated?</strong> No. It remains a strong baseline that dense retrieval alone often fails to beat, especially on technical corpora.
 
 <strong>Do I need both BM25 and embeddings?</strong> For most real corpora, yes &mdash; hybrid retrieval is the standard recommendation and usually the largest single quality gain.
 

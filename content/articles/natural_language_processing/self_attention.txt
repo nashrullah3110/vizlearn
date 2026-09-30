@@ -23,7 +23,7 @@ The output for that word is the weighted blend of all the values. So after one s
 
 ## The example worth staring at
 
-<p>"The animal didn't cross the street because it was too tired." What does "it" refer to?</p><p>Change one word &mdash; "because it was too <em>wide</em>" &mdash; and the answer flips from the animal to the street. Nothing about the grammar changed. The only way to resolve it is to notice which noun makes sense with the adjective, which means "it" has to be able to look at both nouns <em>and</em> at the adjective, all at once.</p><p>An RNN reading left to right has to carry that decision in its hidden state across six words. Self-attention just looks &mdash; but not, it turns out, in one go.</p><strong>One layer cannot do it.</strong> In layer 1 each word's query is a fixed function of that word alone, so the query "it" sends out is identical in both sentences. It scores the same against "animal" and against "street" whichever adjective the sentence ends on, and the panel confirms this: at layer 1 the answer is "animal" both times, to three decimal places.<p>Layer 2 is where it resolves. By then "it" has absorbed a little of everything it attended to in layer 1, including the adjective, so the query it sends the second time is no longer generic &mdash; and that is enough to separate the two nouns. Switch to layer 2 and the reference follows the adjective: "tired" keeps it on the animal, "wide" moves it to the street.</p><p>This is the real reason transformers are deep. A single attention layer mixes information; it takes another to <em>use</em> what was mixed.</p>
+<p>"The animal didn't cross the street because it was too tired." What does "it" refer to?</p><p>Change one word &mdash; "because it was too <em>wide</em>" &mdash; and the answer flips from the animal to the street. Nothing about the grammar changed. The only way to resolve it is to notice which noun makes sense with the adjective. This means "it" has to be able to look at both nouns <em>and</em> at the adjective, all at once.</p><p>An RNN reading left to right has to carry that decision in its hidden state across six words. Self-attention just looks &mdash; but not, it turns out, in one go.</p><strong>One layer cannot do it.</strong> In layer 1 each word's query is a fixed function of that word alone. So the query "it" sends out is identical in both sentences. It scores the same against "animal" and against "street" whichever adjective the sentence ends on, and the panel confirms this: at layer 1 the answer is "animal" both times, to three decimal places.<p>Layer 2 is where it resolves. By then "it" has absorbed a little of everything it attended to in layer 1, including the adjective. So the query it sends the second time is no longer generic. And that is enough to separate the two nouns. Switch to layer 2 and the reference follows the adjective: "tired" keeps it on the animal, "wide" moves it to the street.</p><p>This is the real reason transformers are deep. A single attention layer mixes information; it takes another to <em>use</em> what was mixed.</p>
 
 ## A sequence relating itself
 
@@ -38,11 +38,11 @@ The mechanics for one token:
 3. Dot the query with each key, scale by `√dₖ`, softmax to get weights.
 4. Output the weighted sum of the values.
 
-Every token does this simultaneously, which is one matrix multiplication rather than a loop.
+Every token does this at once, which is one matrix multiplication rather than a loop.
 
 ## Why it needs positional information
 
-Self-attention has no notion of order. Shuffle the input tokens and the set of outputs is the same set, just permuted &mdash; the mechanism sees a bag, not a sequence.
+Self-attention has no notion of order. Shuffle the input tokens and the set of outputs is the same set, just permuted. The mechanism sees a bag, not a sequence.
 
 For language that is fatal: "the dog bit the man" and "the man bit the dog" would be indistinguishable.
 
@@ -54,7 +54,7 @@ This is worth remembering as a design fact rather than a detail: attention suppl
 
 One set of attention weights can only express one kind of relationship at a time. Multi-head attention runs several attention computations in parallel, each with its own learned projections, and concatenates the results.
 
-With 8 heads and a model dimension of 512, each head works in 64 dimensions &mdash; the total cost is roughly unchanged, and the model gains several independent views of the sequence.
+With 8 heads and a model dimension of 512, each head works in 64 dimensions. The total cost is roughly unchanged, and the model gains several independent views of the sequence.
 
 What the heads specialise in, when inspected, is genuinely varied: some track syntactic dependencies such as subject to verb, some attend to the previous token, some to matching brackets or quotation marks, some appear to do little at all. Studies that prune heads find many can be removed with little loss, which suggests a good deal of redundancy.
 
@@ -191,7 +191,7 @@ print("   paper is an attempt to avoid building that matrix in full.")
 
 <table> <tr><th></th><th>RNN / LSTM</th><th>Self-attention</th></tr> <tr><td>Steps between two words</td><td>their distance</td><td>1, always</td></tr> <tr><td>Training</td><td>sequential</td><td>fully parallel</td></tr> <tr><td>Work per layer</td><td>grows with n</td><td>grows with n&sup2;</td></tr> <tr><td>Knows word order</td><td>inherently</td><td>only if told</td></tr> </table>
 
-The first two rows are why transformers took over. A <a href="rnn.html" style="color: var(--accent-primary)">recurrent network</a> cannot start step 50 until step 49 is done, so training time scales with sentence length and gradients have to survive fifty multiplications. Self-attention computes every position simultaneously, which is what let models grow to the size they are now.
+The first two rows are why transformers took over. A <a href="rnn.html" style="color: var(--accent-primary)">recurrent network</a> cannot start step 50 until step 49 is done. So training time scales with sentence length and gradients have to survive fifty multiplications. Self-attention computes every position at once, which is what let models grow to the size they are now.
 
 The last two rows are the bill. The quadratic cost is why context windows were small for years, and the order-blindness is a genuine hole that has to be patched.
 
@@ -204,7 +204,7 @@ The last two rows are the bill. The quadratic cost is why context windows were s
 
 ## Where that leaves you
 
-Self-attention is attention with queries, keys and values all drawn from the same sequence, so every word is rewritten as a blend of the words it finds relevant &mdash; which is how a pronoun can resolve to a noun six words away in a single step. Because every position is computed independently, training parallelises completely and the path between any two words is length 1 regardless of distance, and those two properties are what displaced recurrence. One layer only mixes information, though &mdash; resolving a pronoun against a distant adjective takes a second layer to use what the first collected, which is why the architecture is stacked. The costs are real and specific: the number of scores grows with the square of the sequence length, and the mechanism is entirely blind to word order until positional information is added.
+Self-attention is attention with queries, keys and values all drawn from the same sequence, so every word is rewritten as a blend of the words it finds relevant &mdash; which is how a pronoun can resolve to a noun six words away in a single step. Because every position is computed independently, training parallelises completely and the path between any two words is length 1 regardless of distance, and those two properties are what displaced recurrence. One layer only mixes information, though &mdash; resolving a pronoun against a distant adjective takes a second layer to use what the first collected. This is why the architecture is stacked. The costs are real and specific: the number of scores grows with the square of the sequence length, and the mechanism is entirely blind to word order until positional information is added.
 
 ## Where it sits in a transformer block
 

@@ -5,7 +5,7 @@ intro: A large model is accurate but expensive. A small model is cheap but weake
 
 A training label says "this is a dog" and nothing else. But a trained teacher, shown that same photo, might output <span class="mono-font">dog 0.90, wolf 0.07, cat 0.02, car 0.001</span>.
 
-Those small numbers are not noise &mdash; they encode <strong>similarity structure</strong> the label cannot express: a dog resembles a wolf far more than a car. Geoffrey Hinton named this <em>dark knowledge</em>. It is the teacher's entire learned view of how the classes relate, and it is free supervision on every single example. The student trains on two losses simultaneously: one against the hard labels (the standard cross-entropy) and one against the teacher's soft predictions (the KL divergence between the student's and teacher's output distributions). The total loss is a weighted combination: `L = alpha * L_hard + (1 - alpha) * T^2 * L_soft`, where T is the temperature and alpha controls the balance. Temperature softens the teacher's output distribution: at T=1 the distribution is peaked (the top class dominates), at T=5 the small probabilities are amplified and the dark knowledge becomes visible. The T-squared scaling compensates for the fact that higher temperature reduces the magnitude of the gradients. In practice, T between 2 and 20 and alpha between 0.1 and 0.5 are common. For LLMs, distillation often happens at the sequence level: the student learns to match the teacher's token-level probabilities across a full generation, not just a single classification. DistilBERT (66M parameters) distilled from BERT-base (110M) retains 97% of BERT's performance at 60% of the size and 2x the speed. This page trains a student from a teacher, shows the soft label distribution at different temperatures, and covers the alpha/T tradeoff.
+Those small numbers are not noise &mdash; they encode <strong>similarity structure</strong> the label cannot express: a dog resembles a wolf far more than a car. Geoffrey Hinton named this <em>dark knowledge</em>. It is the teacher's entire learned view of how the classes relate, and it is free supervision on every single example. The student trains on two losses at once: one against the hard labels (the standard cross-entropy) and one against the teacher's soft predictions (the KL divergence between the student's and teacher's output distributions). The total loss is a weighted combination: `L = alpha * L_hard + (1 - alpha) * T^2 * L_soft`, where T is the temperature and alpha controls the balance. Temperature softens the teacher's output distribution: at T=1 the distribution is peaked (the top class dominates), at T=5 the small probabilities are amplified and the dark knowledge becomes visible. The T-squared scaling compensates for the fact that higher temperature reduces the magnitude of the gradients. In practice, T between 2 and 20 and alpha between 0.1 and 0.5 are common. For LLMs, distillation often happens at the sequence level: the student learns to match the teacher's token-level probabilities across a full generation, not just a single classification. DistilBERT (66M parameters) distilled from BERT-base (110M) retains 97% of BERT's performance at 60% of the size and 2x the speed. This page trains a student from a teacher, shows the soft label distribution at different temperatures, and covers the alpha/T tradeoff.
 
 ## Why Temperature Is Important
 
@@ -37,7 +37,7 @@ For generative models the idea extends naturally: the teacher's full next-token 
 
 Distillation trains a small <strong>student</strong> model to reproduce the behaviour of a large <strong>teacher</strong>. The result is a model with a fraction of the parameters that retains much of the teacher's quality on the tasks it was distilled for.
 
-The insight is about what the teacher provides. A hard label says "this is a cat". A teacher's full output distribution says "90% cat, 7% dog, 2% fox, 1% everything else" &mdash; and that shape carries information about how the classes relate, which a one-hot label does not.
+The insight is about what the teacher provides. A hard label says "this is a cat". A teacher's full output distribution says "90% cat, 7% dog, 2% fox, 1% everything else". And that shape carries information about how the classes relate, which a one-hot label does not.
 
 Those richer targets are called <strong>soft labels</strong>, and they are why a distilled student often outperforms the same architecture trained from scratch on the same data. Each example teaches more.
 
@@ -224,7 +224,7 @@ print("   compression.")
 2. <strong>Raise T to 5.</strong> The runner-ups emerge. Note <em>which</em> ones rise: semantically related classes, never random ones. That ordering is the knowledge being transferred.
 3. <strong>Press "Train student" repeatedly</strong> and watch KL divergence fall as the student's bars converge on the teacher's shape &mdash; including the small ones.
 4. <strong>Set &alpha; = 0 and retrain from reset.</strong> The student matches only the one-hot label; its non-target probabilities collapse and the similarity structure is lost.
-5. <strong>Try the sentiment example.</strong> "not bad at all" is genuinely ambiguous, so the teacher stays uncertain even at T = 1 &mdash; and that calibrated uncertainty is itself worth teaching.
+5. <strong>Try the sentiment example.</strong> "not bad at all" is genuinely ambiguous, so the teacher stays uncertain even at T = 1. And that calibrated uncertainty is itself worth teaching.
 
 ## In one line
 
@@ -241,7 +241,7 @@ A hard label answers one question. A teacher's full distribution answers every q
 
 These combine, and the usual production sequence is <strong>distil, then quantise</strong>: reduce the parameter count first, then reduce the bits per parameter. A distilled 1B model quantised to 4-bit runs comfortably on a phone.
 
-The comparison worth internalising: quantisation is nearly free and gives you a fixed factor of memory. Distillation costs a training run and can give you a model an order of magnitude smaller &mdash; but only for the behaviour you distilled.
+The comparison worth internalising: quantisation is nearly free and gives you a fixed factor of memory. Distillation costs a training run and can give you a model an order of magnitude smaller. But only for the behaviour you distilled.
 
 That caveat matters. A student distilled on customer-support conversations will handle customer support well and may be markedly worse at anything else. Distillation narrows as it shrinks, which is often exactly what a production task wants.
 
@@ -253,7 +253,7 @@ That caveat matters. A student distilled on customer-support conversations will 
 
 <strong>Initialise the student from the teacher</strong> where architecture allows &mdash; taking every other layer, for instance. It converges considerably faster than random initialisation.
 
-<strong>Distil on the distribution you will serve.</strong> The student learns the teacher's behaviour on the prompts you show it, so those prompts should resemble production traffic.
+<strong>Distil on the distribution you will serve.</strong> The student learns the teacher's behaviour on the prompts you show it. So those prompts should resemble production traffic.
 
 <strong>Watch the licence.</strong> Using a commercial model's outputs to train a competing model is prohibited by several providers' terms. This is a legal constraint rather than a technical one, and it is a real one.
 
@@ -277,7 +277,7 @@ The honest ordering for most teams: try quantisation first, since it is far chea
 
 <strong>Is this the same as fine-tuning?</strong> Fine-tuning adapts a model to a task using ground-truth labels. Distillation trains one model to imitate another. They are often combined.
 
-<strong>How much data do I need?</strong> More than for fine-tuning, because the student is learning behaviour rather than adjusting it &mdash; tens of thousands of examples is typical, and they can be generated by the teacher.
+<strong>How much data do I need?</strong> More than for fine-tuning, because the student is learning behaviour rather than adjusting it. Tens of thousands of examples is typical, and they can be generated by the teacher.
 
 ## Recap in one screen
 

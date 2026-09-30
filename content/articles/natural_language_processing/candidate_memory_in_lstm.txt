@@ -7,7 +7,7 @@ The candidate layer &mdash; written $\tilde{C}_t$ and read "C-tilde" &mdash; tak
 
 $$\tilde{C}_t = \tanh(W_C \cdot [H_{t-1}, X_t] + b_C)$$
 
-It has no authority. It cannot write to memory on its own; the Input Gate decides how much of it survives. Think of it as an <strong>employee drafting a proposal</strong> and the input gate as the manager approving some, all, or none of it. The use of tanh rather than sigmoid is deliberate: tanh outputs values between -1 and +1, which lets the candidate subtract from the cell state as well as add to it. A sigmoid candidate could only push the memory upward. The candidate layer has its own weight matrix and bias, sized identically to those of the [forget](forget_gate_in_lstm.html), input, and [output](output_gate_in_lstm.html) gates. During backpropagation, the gradient flows through both the candidate and the input gate, so training adjusts what content is proposed and how much is accepted simultaneously. In a typical LSTM with a hidden size of 256, the candidate layer contributes roughly a quarter of the total parameters. This page shows the candidate vector at each timestep, compares it to what the input gate actually lets through, and covers the tanh-vs-sigmoid tradeoff with a worked example.
+It has no authority. It cannot write to memory on its own; the Input Gate decides how much of it survives. Think of it as an <strong>employee drafting a proposal</strong> and the input gate as the manager approving some, all, or none of it. The use of tanh rather than sigmoid is deliberate: tanh outputs values between -1 and +1. This lets the candidate subtract from the cell state as well as add to it. A sigmoid candidate could only push the memory upward. The candidate layer has its own weight matrix and bias, sized identically to those of the [forget](forget_gate_in_lstm.html), input, and [output](output_gate_in_lstm.html) gates. During backpropagation, the gradient flows through both the candidate and the input gate, so training adjusts what content is proposed and how much is accepted at once. In a typical LSTM with a hidden size of 256, the candidate layer contributes roughly a quarter of the total parameters. This page shows the candidate vector at each timestep, compares it to what the input gate actually lets through, and covers the tanh-vs-sigmoid tradeoff with a worked example.
 
 ## Why $\tanh$ and Not a Sigmoid?
 
@@ -24,7 +24,7 @@ Because the cell state is repeatedly <em>added</em> to, an unbounded proposal wo
 
 ## The Cost of Bounding: Saturation
 
-The same squashing that keeps things stable creates a trap. The derivative of $\tanh$ is $1 - \tanh^2(z)$: it peaks at <strong>1.0</strong> when $z = 0$ and collapses toward <strong>0</strong> as $|z|$ grows. Once a unit is driven to $z = \pm 4$, its output is stuck near $\pm 1$ and almost no gradient flows back &mdash; the unit has effectively stopped learning.
+The same squashing that keeps things stable creates a trap. The derivative of $\tanh$ is $1 - \tanh^2(z)$: it peaks at <strong>1.0</strong> when $z = 0$ and collapses toward <strong>0</strong> as $|z|$ grows. Once a unit is driven to $z = \pm 4$, its output is stuck near $\pm 1$ and almost no gradient flows back. The unit has effectively stopped learning.
 
 This is why weight initialisation and normalisation matter so much. They keep pre-activations near the middle of the curve, where the layer is still responsive.
 
@@ -53,7 +53,7 @@ So the candidate proposes and the input gate decides. Sometimes described as the
 
 ## Why the tanh bound matters
 
-The cell state accumulates across time steps. If the candidate were unbounded &mdash; a linear or ReLU output &mdash; then repeated additions could grow the state without limit.
+The cell state builds up across time steps. If the candidate were unbounded &mdash; a linear or ReLU output &mdash; then repeated additions could grow the state without limit.
 
 That growth has two consequences. The output path `tanh(cₜ)` saturates, so its gradient approaches zero and the output gate stops learning. And the numbers themselves can overflow into `inf` over a long sequence.
 
@@ -152,7 +152,7 @@ print("   second decides whether it is worth keeping.")
 
 ## Guided tour
 
-1. <strong>Run the simulation.</strong> Watch the highlighted red route: the candidate is computed alongside the gates, then immediately meets the Input Gate at a $\times$ before it is ever allowed near the conveyor belt.
+1. <strong>Run the simulation.</strong> Watch the highlighted red route: the candidate is computed alongside the gates, then at once meets the Input Gate at a $\times$ before it is ever allowed near the conveyor belt.
 2. <strong>Slide $z$ to 0.</strong> The proposal is zero, but the gradient bar is at its maximum. Nothing is being written, yet this is the state in which the layer learns fastest.
 3. <strong>Push $z$ past $\pm 3$.</strong> The output bar pins to full while the gradient bar empties &mdash; watch both at once. That is saturation, visible in a single glance.
 4. <strong>Go negative.</strong> The output bar turns red, showing a proposal that <em>subtracts</em> from memory. No sigmoid gate in this cell can do that; only the candidate carries a sign.
@@ -182,11 +182,11 @@ The candidate's weight matrix is the same size as each gate's: `(input + hidden)
 
 ## Failure modes
 
-<strong>Candidate saturated at &plusmn;1.</strong> If the pre-activation is consistently large, tanh is flat and its derivative is near zero, so the candidate's weights stop learning. Scaled inputs and sensible initialisation prevent it; layer normalisation inside the cell fixes it directly.
+<strong>Candidate saturated at &plusmn;1.</strong> If the pre-activation is consistently large, tanh is flat and its derivative is near zero. So the candidate's weights stop learning. Scaled inputs and sensible initialisation prevent it; layer normalisation inside the cell fixes it directly.
 
 <strong>Candidate near zero everywhere.</strong> Nothing is ever proposed for storage, so memory never updates usefully. Usually a dead-weights or learning-rate problem.
 
-<strong>Cell state growing without bound.</strong> Forget gate near 1 and input gate near 1 for many steps means candidates accumulate. Check `|c|`: values above about 5 mean the output tanh is saturated.
+<strong>Cell state growing without bound.</strong> Forget gate near 1 and input gate near 1 for many steps means candidates build up. Check `|c|`: values above about 5 mean the output tanh is saturated.
 
 Monitoring is straightforward with a manual cell:
 
@@ -216,5 +216,5 @@ A candidate whose absolute maximum is pinned at 1.0 across all dimensions is sat
 - The candidate is what the cell could write to memory: content, not a decision.
 - It uses tanh, so it ranges from &minus;1 to 1 and can be negative &mdash; unlike the sigmoid gates.
 - The input gate scales it before it is added to the retained cell state.
-- The bound keeps the accumulating cell state growing linearly rather than explosively, which is why ReLU is not used here.
+- The bound keeps the building up cell state growing linearly rather than explosively, which is why ReLU is not used here.
 - All four transformations are computed as one fused matrix multiplication and split.

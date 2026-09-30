@@ -3,7 +3,7 @@ intro: Sometimes the query is the part that needs fixing, not the index.
 
 ## Before the details
 
-A user's question and the passage that answers it are usually written in different registers: short and colloquial versus long-form and technical. Every similarity metric in this batch — <a href="dot_product_vs_cosine_similarity.html" style="color: var(--accent-primary)">cosine</a>, <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> — depends on shared vocabulary between what is embedded and what is stored. If the question and the answer do not share words, no similarity metric can bridge that gap on its own; the fix has to happen before retrieval, to the query itself. Query rewriting uses an LLM to rephrase the user's question into the vocabulary of the indexed documents &mdash; expanding acronyms, adding synonyms, and making the intent explicit. HyDE (Hypothetical Document Embeddings) takes a more radical approach: instead of rewriting the query, it asks the LLM to generate a hypothetical answer, embeds that answer, and uses the embedding as the search vector. The hypothetical answer does not need to be correct; it just needs to be written in the same register as the real documents, so its embedding lands in the right neighbourhood of the vector space. Both techniques add one LLM call before retrieval, which increases latency by 200-500ms but can dramatically improve recall when the vocabulary gap is wide. Query rewriting is simpler and more predictable; HyDE works better when the query is very short or ambiguous. A [multi-query](multi_query_retriever.html) variant generates several rewrites and merges the retrieved results, trading more LLM calls for broader coverage. This page rewrites a sample query, generates a hypothetical document, embeds both, and shows which real passages each retrieves.
+A user's question and the passage that answers it are usually written in different registers: short and colloquial versus long-form and technical. Every similarity metric in this batch — <a href="dot_product_vs_cosine_similarity.html" style="color: var(--accent-primary)">cosine</a>, <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> — depends on shared vocabulary between what is embedded and what is stored. If the question and the answer do not share words, no similarity metric can bridge that gap on its own; the fix has to happen before retrieval, to the query itself. Query rewriting uses an LLM to rephrase the user's question into the vocabulary of the indexed documents. Expanding acronyms, adding synonyms, and making the intent explicit. HyDE (Hypothetical Document Embeddings) takes a more radical approach: instead of rewriting the query, it asks the LLM to generate a hypothetical answer, embeds that answer, and uses the embedding as the search vector. The hypothetical answer does not need to be correct; it just needs to be written in the same register as the real documents. So its embedding lands in the right neighbourhood of the vector space. Both techniques add one LLM call before retrieval, which increases latency by 200-500ms but can dramatically improve recall when the vocabulary gap is wide. Query rewriting is simpler and more predictable; HyDE works better when the query is very short or ambiguous. A [multi-query](multi_query_retriever.html) variant generates several rewrites and merges the retrieved results, trading more LLM calls for broader coverage. This page rewrites a sample query, generates a hypothetical document, embeds both, and shows which real passages each retrieves.
 
 ## Two ways to close the gap
 
@@ -30,7 +30,7 @@ Use a model to reformulate the question before searching. Several distinct opera
 
 <strong>Decomposition.</strong> Split a multi-part question into parts, retrieve for each, and combine. "How do refunds and exchanges differ?" becomes two searches.
 
-<strong>Contextualisation.</strong> Resolve references against conversation history. "What about for premium users?" becomes "What is the refund policy for premium users?" &mdash; and this one is important in any chat interface, because a follow-up question is meaningless as a standalone search.
+<strong>Contextualisation.</strong> Resolve references against conversation history. "What about for premium users?" becomes "What is the refund policy for premium users?". And this one is important in any chat interface, because a follow-up question is meaningless as a standalone search.
 
 <strong>Multi-query.</strong> Generate several rewrites, search with each, and fuse the results. Broader recall at the cost of several searches.
 
@@ -55,7 +55,7 @@ Instead of embedding the question, ask a model to <strong>write a plausible answ
 <blockquote>Question: "why is my thing not working"</blockquote>
 <blockquote>Hypothetical answer: "Connection failures in the client library are usually caused by an expired API token, an incorrect endpoint URL, or a firewall blocking outbound requests on port 443. Check the token expiry first..."</blockquote>
 
-That fabricated passage is written in the same register as the documents you are searching &mdash; technical, declarative, using the vocabulary answers use. Its embedding sits much closer to real answer passages than the question's embedding did.
+That fabricated passage is written in the same register as the documents you are searching. Technical, declarative, using the vocabulary answers use. Its embedding sits much closer to real answer passages than the question's embedding did.
 
 The generated answer may be factually wrong, and that does not matter. It is never shown to the user; it is used only as a search key, and what makes it useful is its <em>style and vocabulary</em>, not its accuracy.
 
@@ -344,7 +344,7 @@ Three mitigations worth having:
 
 <strong>They help most with:</strong> short vague queries, conversational follow-ups, domain jargon the user does not know, and multi-part questions.
 
-<strong>They hurt when:</strong> the query already contains exact identifiers &mdash; rewriting "error E4471" can lose the code, which was the most useful part. Guard by keeping the original query in the fused search alongside any rewrites.
+<strong>They hurt when:</strong> the query already contains exact identifiers &mdash; rewriting "error E4471" can lose the code. This was the most useful part. Guard by keeping the original query in the fused search alongside any rewrites.
 
 <strong>HyDE specifically hurts</strong> when the model has no knowledge of the domain and generates a hypothetical answer that is not merely wrong but off-topic, pulling retrieval in an unhelpful direction.
 

@@ -3,13 +3,13 @@ intro: Fine-tuning a 7B model the traditional way means updating all 7 billion w
 
 ## The Insight: Updates Are Low-Rank
 
-Fine-tuning changes a weight matrix from <span class="mono-font">W</span> to <span class="mono-font">W + &Delta;W</span>. The observation behind LoRA is that although <span class="mono-font">W</span> is enormously expressive, the <em>change</em> needed to specialise a model for one task has very low intrinsic rank &mdash; it does not need the full space.
+Fine-tuning changes a weight matrix from <span class="mono-font">W</span> to <span class="mono-font">W + &Delta;W</span>. The observation behind LoRA is that although <span class="mono-font">W</span> is enormously expressive, the <em>change</em> needed to specialise a model for one task has very low intrinsic rank. It does not need the full space.
 
 So instead of learning a full <span class="mono-font">d &times; k</span> matrix, LoRA factorises the update into two thin matrices:
 
 &Delta;W = B &middot; A &nbsp;&nbsp; where B is d&times;r and A is r&times;k, with r &lll; min(d, k)
 
-The original weights are <strong>frozen</strong>. Only A and B are trained. If the frozen matrix W is d-by-d and the rank r is 16, A is d-by-16 and B is 16-by-d, so the trainable parameter count drops from d-squared to 2dr &mdash; a reduction of roughly 10,000x for a 7B model's attention weights. At inference time the product BA is added directly to W, producing a single merged matrix with zero extra latency. Multiple LoRA adapters can coexist: each task gets its own A and B, and switching tasks means swapping two small matrices while the base model stays in memory once. This is how services like Hugging Face PEFT serve hundreds of fine-tuned variants from one base checkpoint. The rank r is the main hyperparameter: too low and the adapter cannot represent the task's deviation from the base model; too high and it overfits or loses the efficiency advantage. In practice, r between 4 and 64 covers most tasks. A is initialised with a random Gaussian and B with zeros, so the adapter starts as a no-op and learns the delta. This page freezes a weight matrix, trains a low-rank adapter beside it, and shows how the merged output matches the full fine-tune within a controlled tolerance.
+The original weights are <strong>frozen</strong>. Only A and B are trained. If the frozen matrix W is d-by-d and the rank r is 16, A is d-by-16 and B is 16-by-d. So the trainable parameter count drops from d-squared to 2dr. A reduction of roughly 10,000x for a 7B model's attention weights. At inference time the product BA is added directly to W, producing a single merged matrix with zero extra latency. Multiple LoRA adapters can coexist: each task gets its own A and B, and switching tasks means swapping two small matrices while the base model stays in memory once. This is how services like Hugging Face PEFT serve hundreds of fine-tuned variants from one base checkpoint. The rank r is the main hyperparameter: too low and the adapter cannot represent the task's deviation from the base model; too high and it overfits or loses the efficiency advantage. In practice, r between 4 and 64 covers most tasks. A is initialised with a random Gaussian and B with zeros, so the adapter starts as a no-op and learns the delta. This page freezes a weight matrix, trains a low-rank adapter beside it, and shows how the merged output matches the full fine-tune within a controlled tolerance.
 
 ## Why the Savings Are So Extreme
 
@@ -35,7 +35,7 @@ Combine LoRA with a 4-bit quantized base and you get <strong>QLoRA</strong>, the
 
 ## Training a small update instead of the whole model
 
-Fine-tuning a 7-billion-parameter model conventionally means updating all 7 billion weights. With Adam, that requires the weights, their gradients, and two optimiser moments &mdash; roughly 4&times; the model in memory, so about 112GB in 32-bit. Beyond most hardware.
+Fine-tuning a 7-billion-parameter model conventionally means updating all 7 billion weights. With Adam, that requires the weights, their gradients, and two optimiser moments. Roughly 4&times; the model in memory, so about 112GB in 32-bit. Beyond most hardware.
 
 LoRA changes what is trained. The pretrained weights are <strong>frozen</strong>, and for each target matrix a small pair of matrices is trained alongside it:
 
@@ -63,7 +63,7 @@ Two details make it practical:
 
 <strong>A is initialised randomly and B to zero</strong>, so `BA = 0` at the start and the model begins exactly as the pretrained one. Training then moves it gradually rather than disrupting it on the first step.
 
-<strong>The adapter can be merged.</strong> After training, `W₀ + BA` can be computed once and stored as a single matrix, so inference has <em>no</em> extra cost. Or the adapter can be kept separate and swapped &mdash; which is what allows one base model to serve many tasks.
+<strong>The adapter can be merged.</strong> After training, `W₀ + BA` can be computed once and stored as a single matrix. So inference has <em>no</em> extra cost. Or the adapter can be kept separate and swapped &mdash; which is what allows one base model to serve many tasks.
 
 ## The parameters that matter
 
@@ -314,7 +314,7 @@ The trade: an unmerged adapter adds a small amount of inference latency, since `
 
 <strong>You need new knowledge, not new behaviour.</strong> Fine-tuning of any kind is a poor way to add facts. Use retrieval.
 
-<strong>The domain is very far from pretraining.</strong> Adapting an English model to a low-resource language or to a genuinely novel modality may need more capacity than a low-rank update provides &mdash; consider full fine-tuning or continued pretraining.
+<strong>The domain is very far from pretraining.</strong> Adapting an English model to a low-resource language or to a genuinely novel modality may need more capacity than a low-rank update provides. Consider full fine-tuning or continued pretraining.
 
 <strong>You have very little data.</strong> Below a few hundred examples, few-shot prompting is often better than any fine-tuning, and much cheaper to iterate.
 

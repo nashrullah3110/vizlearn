@@ -15,7 +15,7 @@ print(len(b))     # 5    bytes -- é needs two in UTF-8
 print(s[0])       # 'c'  a one-character str
 print(b[0])       # 99   an INTEGER, not b'c'
 ```
-Two details catch people out immediately. Indexing `bytes` yields an `int`, not a one-byte `bytes` object &mdash; slicing does give `bytes`, so `b[0:1]` is `b'c'` while `b[0]` is `99`. And `len` differs between the two representations of the same text, which is the source of most truncation bugs.
+Two details catch people out at once. Indexing `bytes` yields an `int`, not a one-byte `bytes` object &mdash; slicing does give `bytes`. So `b[0:1]` is `b'c'` while `b[0]` is `99`. And `len` differs between the two representations of the same text, which is the source of most truncation bugs.
 
 This page covers when to use each type, what `encode` and `decode` actually do, why UTF-8 is the right default, and the common errors that appear at system boundaries &mdash; reading a file, calling a subprocess, or sending data over a socket &mdash; where the wrong type produces either a `TypeError` or silent corruption. The code blocks below encode and decode the same text in UTF-8 and Latin-1 so you can see the byte-level differences, then trigger the common errors on purpose &mdash; `TypeError` when you mix types, and `UnicodeDecodeError` when you guess the encoding wrong.
 
@@ -135,13 +135,13 @@ Both mean the same thing: the data does not fit the codec. The `errors` paramete
 |`"surrogateescape"`|Round-trip undecodable bytes|Filenames, lossless pass-through|
 |`"backslashreplace"`|Escape as `\xNN`|Debugging and logs|
 
-<strong>`surrogateescape` is the one worth knowing about.</strong> It maps undecodable bytes into a reserved surrogate range so that decoding then re-encoding reproduces the original bytes exactly. That is how Python handles filenames on systems where the name is not valid UTF-8 &mdash; it can still be opened, even though it cannot be meaningfully displayed.
+<strong>`surrogateescape` is the one worth knowing about.</strong> It maps undecodable bytes into a reserved surrogate range so that decoding then re-encoding reproduces the original bytes exactly. That is how Python handles filenames on systems where the name is not valid UTF-8. It can still be opened, even though it cannot be meaningfully displayed.
 
 Reaching for `errors="ignore"` to make an exception go away is almost always the wrong fix; it converts a loud failure into corrupted data.
 
 ## Two different things that both print nicely
 
-<p><code>"hi"</code> and <code>b"hi"</code> look almost identical and are not comparable: <code>"hi" == b"hi"</code> is <code>False</code>, and in Python 3 that is deliberate. A str has no encoding &mdash; asking for the bytes of a str is meaningless until you say <em>which</em> bytes, which is why <code>encode</code> takes an argument.</p>
+<p><code>"hi"</code> and <code>b"hi"</code> look almost identical and are not comparable: <code>"hi" == b"hi"</code> is <code>False</code>, and in Python 3 that is deliberate. A str has no encoding &mdash; asking for the bytes of a str is meaningless until you say <em>which</em> bytes. This is why <code>encode</code> takes an argument.</p>
 
 Indexing differs too. <code>s[0]</code> on a str gives a one-character str; <code>b[0]</code> on bytes gives an <code>int</code>. That catches people constantly.
 
@@ -182,7 +182,7 @@ print("binary mode:", data, type(data).__name__)
 # .decode() on the way back.
 print("to send    :", "hello".encode())
 ```
-<strong>Always pass `encoding=` explicitly when opening text files.</strong> Without it, Python uses the platform default, which is UTF-8 on Linux and macOS and historically a legacy code page on Windows &mdash; so the same code reads different characters on different machines. Python 3.15 makes UTF-8 the default everywhere, and being explicit remains the habit that survives version differences.
+<strong>Always pass `encoding=` explicitly when opening text files.</strong> Without it, Python uses the platform default, which is UTF-8 on Linux and macOS and historically a legacy code page on Windows. So the same code reads different characters on different machines. Python 3.15 makes UTF-8 the default everywhere, and being explicit remains the habit that survives version differences.
 
 Three things must stay in `bytes`:
 
@@ -201,7 +201,7 @@ print(bytes(ba))                     # b'Hello world'
 mv = memoryview(ba)
 chunk = mv[0:5]               # zero-copy view
 ```
-`bytearray` is the mutable counterpart, useful for building a buffer incrementally without repeated concatenation. `memoryview` slices without copying, which is what makes parsing large binary payloads efficient &mdash; and it has no `str` equivalent, because a character offset in a variable-width representation is not a fixed byte offset.
+`bytearray` is the mutable counterpart, useful for building a buffer incrementally without repeated concatenation. `memoryview` slices without copying, which is what makes parsing large binary payloads efficient. And it has no `str` equivalent, because a character offset in a variable-width representation is not a fixed byte offset.
 
 ## Questions people ask
 

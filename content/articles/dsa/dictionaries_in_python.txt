@@ -5,7 +5,7 @@ intro: Python's dict is a hash table with O(1) average lookup and, since 3.7, a 
 
 A dictionary maps keys to values. Internally it is a <strong>hash table</strong>: Python calls <span class="mono-font">hash(key)</span>, reduces the result to an index into an array of slots, and stores the entry there. Looking a key up repeats the computation and goes straight to the slot &mdash; no scanning.
 
-That is why lookup is O(1) on average rather than O(n): the cost does not depend on how many items the dict holds. A dict with ten entries and a dict with ten million take about the same time to answer <span class="mono-font">d[k]</span>. Keys must be hashable, which in practice means immutable: strings, numbers, tuples of hashables. Lists and dicts cannot be keys because mutating them after insertion would change the hash, stranding the entry in the wrong slot. When two keys hash to the same slot (a collision), CPython uses open addressing with a probing sequence to find the next free slot. Since Python 3.7 the insertion order is guaranteed, so iterating a dict yields keys in the order they were first added. `collections.OrderedDict` still exists but is only needed when move-to-end or equality-by-order semantics matter. Deletion is O(1) amortised, but frequent add-delete cycles can leave the internal table sparse; Python periodically resizes and compacts it. A `defaultdict` from the `collections` module is a dict that calls a factory function for missing keys rather than raising `KeyError`, which simplifies counting and grouping patterns. This page runs timing experiments on lookup, insertion, and deletion across dict sizes, and covers the collision-resolution mechanism with a worked example.
+That is why lookup is O(1) on average rather than O(n): the cost does not depend on how many items the dict holds. A dict with ten entries and a dict with ten million take about the same time to answer <span class="mono-font">d[k]</span>. Keys must be hashable, which in practice means immutable: strings, numbers, tuples of hashables. Lists and dicts cannot be keys because mutating them after insertion would change the hash, stranding the entry in the wrong slot. When two keys hash to the same slot (a collision), CPython uses open addressing with a probing sequence to find the next free slot. Since Python 3.7 the insertion order is guaranteed, so iterating a dict yields keys in the order they were first added. `collections.OrderedDict` still exists but is only needed when move-to-end or equality-by-order semantics matter. Deletion is O(1) amortised, but frequent add-delete cycles can leave the internal table sparse; Python periodically resizes and compacts it. A `defaultdict` from the `collections` module is a dict that calls a factory function for missing keys rather than raising `KeyError`. This simplifies counting and grouping patterns. This page runs timing experiments on lookup, insertion, and deletion across dict sizes, and covers the collision-resolution mechanism with a worked example.
 
 ## The operations, and what they cost
 
@@ -38,7 +38,7 @@ A Python dictionary maps keys to values with roughly constant-time lookup. Since
 |`len(d)`|O(1)|
 |Iteration|O(n), in insertion order|
 
-"Average" is doing work in those rows: the worst case is O(n) when every key collides, which requires a pathological hash function or adversarially chosen keys. Python randomises string hashes per process specifically to prevent the latter as a denial-of-service vector.
+"Average" is doing work in those rows: the worst case is O(n) when every key collides. This requires a pathological hash function or adversarially chosen keys. Python randomises string hashes per process specifically to prevent the latter as a denial-of-service vector.
 
 ## Accessing keys that might not exist
 
@@ -81,7 +81,7 @@ d[[1, 2]] = "error"      # TypeError: unhashable type: 'list'
 d[frozenset({1,2})] = "ok"
 ```
 
-If a list could be a key, mutating it after insertion would change its hash and the entry would become unreachable &mdash; stored in a slot the new hash does not point to.
+If a list could be a key, mutating it after insertion would change its hash and the entry would become unreachable. Stored in a slot the new hash does not point to.
 
 For a custom class, `__eq__` and `__hash__` must agree:
 
@@ -99,7 +99,7 @@ Defining `__eq__` without `__hash__` makes the class unhashable in Python 3 &mda
 
 ## What the hash table gives you, and the order it now keeps
 
-A dict is a hash table with one extra promise since Python 3.7: it remembers insertion order. Both halves matter, and both are easy to check -- along with what can be a key, which is a rule about hashing rather than about types.
+A dict is a hash table with one extra promise since Python 3.7: it remembers insertion order. Both halves matter, and both are easy to check -- along with what can be a key. This is a rule about hashing rather than about types.
 
 ```python-run
 import time
@@ -209,15 +209,15 @@ print("  stock is now:              ", stock)
 ## Try it yourself
 
 1. <strong>Compare get with direct indexing.</strong> Choose <strong>Method</strong> for a lookup on a missing key and press <strong>Execute</strong>. Direct indexing raises KeyError; <span class="mono-font">get</span> returns None instead. That difference decides which one belongs in your code.
-2. <strong>Overwrite an existing key.</strong> Run an insert with a key that is already present. The dict does not grow &mdash; assignment on an existing key replaces the value in place, which is why dicts cannot hold duplicate keys.
-3. <strong>Watch insertion order hold.</strong> Insert several keys in a deliberate order and then iterate. They come back in the order added, not sorted and not hashed &mdash; a language guarantee since Python 3.7.
+2. <strong>Overwrite an existing key.</strong> Run an insert with a key that is already present. The dict does not grow &mdash; assignment on an existing key replaces the value in place. This is why dicts cannot hold duplicate keys.
+3. <strong>Watch insertion order hold.</strong> Insert several keys in a deliberate order and then iterate. They come back in the order added, not sorted and not hashed. A language guarantee since Python 3.7.
 4. <strong>Delete and re-add.</strong> Remove a key with <strong>Method</strong> set to a pop or delete, then add it back. It reappears at the <em>end</em> of the iteration order, because insertion order means the order of the most recent insertion.
 
 ## Why keys must be hashable
 
 A key must be hashable, which in practice means immutable. Strings, numbers and tuples work; lists, dicts and sets do not, and <span class="mono-font">d[[1,2]] = x</span> raises <span class="mono-font">TypeError: unhashable type: 'list'</span>.
 
-The reason is that the hash determines the storage slot. If a key could change after insertion, its hash would change, and the entry would be sitting in a slot the lookup no longer computes &mdash; the value would become unreachable while still occupying memory. Forbidding mutable keys makes that impossible.
+The reason is that the hash determines the storage slot. If a key could change after insertion, its hash would change, and the entry would be sitting in a slot the lookup no longer computes. The value would become unreachable while still occupying memory. Forbidding mutable keys makes that impossible.
 
 A tuple is hashable only if everything inside it is, so <span class="mono-font">(1, 2)</span> works as a key and <span class="mono-font">(1, [2])</span> does not.
 
@@ -249,7 +249,7 @@ for order in orders:
     c = by_id[order.customer_id]
 ```
 
-With 10,000 orders and 10,000 customers that is 100 million comparisons against 20,000 operations &mdash; and the second version is shorter.
+With 10,000 orders and 10,000 customers that is 100 million comparisons against 20,000 operations. And the second version is shorter.
 
 The pattern generalises: whenever a loop contains a search, a dictionary built beforehand usually eliminates it. Recognising it is worth more than most algorithmic knowledge in everyday work.
 
@@ -299,7 +299,7 @@ The `dataclass` row is worth emphasising. A dictionary with fixed keys &mdash; `
 
 <strong>Why can a list not be a key?</strong> Mutating it would change its hash and orphan the entry. Use a tuple.
 
-<strong>How much memory does a dictionary use?</strong> More than a list of the same values &mdash; it stores hashes and spare capacity. Lookup speed is what you are buying.
+<strong>How much memory does a dictionary use?</strong> More than a list of the same values. It stores hashes and spare capacity. Lookup speed is what you are buying.
 
 <strong>Is `dict.get()` slower than `d[key]`?</strong> Marginally, because it is a method call. Both are O(1).
 

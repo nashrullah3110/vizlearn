@@ -5,7 +5,7 @@ intro: Three techniques that all get called "training", doing three different jo
 
 A pretrained model is a text predictor. Ask it a question and it produces something a document containing that question might plausibly continue with &mdash; which is not the same as an answer, and certainly not a helpful one.
 
-Two more stages turn that into an assistant. <strong>Supervised fine-tuning</strong> shows it thousands of written demonstrations of the behaviour you want. <strong>Preference optimisation</strong> then shows it pairs of answers with a human verdict on which is better, for all the cases where nobody could write the ideal answer but anyone can pick the better of two. The division of labour matters: SFT teaches format and basic instruction following, while preference optimisation teaches the subtler qualities &mdash; helpfulness, safety, tone &mdash; that humans can recognise easily but cannot demonstrate perfectly in a single gold-standard example. RLHF was the original preference method: train a reward model on human comparisons, then optimise the language model against that reward with PPO while penalising drift from the SFT checkpoint. DPO simplified the pipeline by showing that the same optimum can be reached with a supervised loss directly on the preference pairs, skipping the reward model and the reinforcement learning loop entirely. Both methods solve the same constrained optimisation problem &mdash; maximise reward subject to a KL penalty that keeps the model close to its reference &mdash; and the temperature parameter beta controls how tight the leash is. This page computes the reward, the KL divergence, and the policy shift for a toy vocabulary so you can see exactly what the penalty does.
+Two more stages turn that into an assistant. <strong>Supervised fine-tuning</strong> shows it thousands of written demonstrations of the behaviour you want. <strong>Preference optimisation</strong> then shows it pairs of answers with a human verdict on which is better, for all the cases where nobody could write the ideal answer but anyone can pick the better of two. The division of labour matters: SFT teaches format and basic instruction following, while preference optimisation teaches the subtler qualities &mdash; helpfulness, safety, tone &mdash; that humans can recognise easily but cannot show perfectly in a single gold-standard example. RLHF was the original preference method: train a reward model on human comparisons, then optimise the language model against that reward with PPO while penalising drift from the SFT checkpoint. DPO simplified the pipeline by showing that the same optimum can be reached with a supervised loss directly on the preference pairs, skipping the reward model and the reinforcement learning loop entirely. Both methods solve the same constrained optimisation problem &mdash; maximise reward subject to a KL penalty that keeps the model close to its reference &mdash; and the temperature parameter beta controls how tight the leash is. This page computes the reward, the KL divergence, and the policy shift for a toy vocabulary so you can see exactly what the penalty does.
 
 ## The maths both preference methods share
 
@@ -19,7 +19,7 @@ A usable assistant is not produced in one training run. Three stages follow one 
 
 <strong>2. Supervised fine-tuning (SFT)</strong> &mdash; training on curated examples of instructions and good responses. This teaches the <em>format</em>: that a question should be answered, that output should be structured a particular way, that a conversation has turns.
 
-<strong>3. Preference optimisation</strong> &mdash; RLHF, DPO or similar. Humans compare pairs of responses and the model is tuned towards the preferred one. This teaches the qualities that are easy to <em>recognise</em> and hard to <em>demonstrate</em>: helpfulness, appropriate caution, tone, refusing what should be refused.
+<strong>3. Preference optimisation</strong> &mdash; RLHF, DPO or similar. Humans compare pairs of responses and the model is tuned towards the preferred one. This teaches the qualities that are easy to <em>recognise</em> and hard to <em>show</em>: helpfulness, appropriate caution, tone, refusing what should be refused.
 
 |Stage|Data needed|Teaches|
 |---|---|---|
@@ -49,7 +49,7 @@ The KL penalty is not optional. Without it the policy drifts into degenerate tex
 
 Practically, RLHF is complicated: two models in memory, an RL loop that is sensitive to hyperparameters, and a reward model that can be gamed.
 
-<strong>DPO (direct preference optimisation)</strong> removes the reward model and the RL loop. It shows that the same objective can be optimised directly on the preference pairs with a simple classification-style loss &mdash; increase the likelihood of the preferred response, decrease the likelihood of the rejected one, relative to a frozen reference model.
+<strong>DPO (direct preference optimisation)</strong> removes the reward model and the RL loop. It shows that the same objective can be optimised directly on the preference pairs with a simple classification-style loss. Increase the likelihood of the preferred response, decrease the likelihood of the rejected one, relative to a frozen reference model.
 
 |&nbsp;|RLHF (PPO)|DPO|
 |---|---|---|
@@ -237,7 +237,7 @@ print("   the answer to that problem is retrieval rather than training.")
 3. <strong>Add RLHF with a tight leash.</strong> Set the method to RLHF with beta at 3. The good answer gains a little, the drift stays small, and human ratings go up.
 4. <strong>Loosen the leash.</strong> Drag <strong>beta</strong> down towards 0.1. The model collapses onto the long, hedging, flattering answer &mdash; because the reward model scores it highest. Reward goes up, the human rating goes <em>down</em>, and the drift readout goes through the roof. That is reward hacking, and it is why the KL penalty is not optional.
 5. <strong>Fix the reward model instead.</strong> Uncheck <strong>Reward Model Likes Long Answers</strong> and the collapse stops happening, at the same beta. The KL penalty was never the real fix; it was a guard rail against a proxy that was wrong.
-6. <strong>Compare DPO.</strong> Switch the method to DPO. It moves probability towards the preferred answer and away from the rejected one, and it has no reward model to hack &mdash; but it also has no opinion at all about answers nobody compared.
+6. <strong>Compare DPO.</strong> Switch the method to DPO. It moves probability towards the preferred answer and away from the rejected one, and it has no reward model to hack. But it also has no opinion at all about answers nobody compared.
 
 ## Choosing between them
 

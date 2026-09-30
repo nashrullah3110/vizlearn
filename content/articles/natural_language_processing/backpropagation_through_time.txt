@@ -3,11 +3,11 @@ intro: How gradient descent trains a network that contains a loop.
 
 ## The Problem With a Loop
 
-Backpropagation works on feed-forward graphs — signals flow one way, gradients flow back the same way. An RNN's feedback loop breaks that picture. The fix, <strong>Backpropagation Through Time (BPTT)</strong>, is beautifully blunt: <em>unroll</em> the loop into T copies of the cell, one per timestep, and the loop becomes an ordinary (deep) feed-forward chain that standard backprop can handle. Each unrolled copy shares the same weight matrices W and U, so the gradients from all timesteps are summed into a single weight update. The chain rule applied across T copies produces a product of T Jacobians &mdash; and that product is why RNNs struggle with long sequences. If the largest singular value of the recurrent Jacobian is below 1 the gradients shrink exponentially ([vanishing gradients](../deep_learning/exploding_and_vanishing_gradient.html)); above 1 they grow exponentially (exploding gradients, handled by [gradient clipping](../deep_learning/gradient_clipping.html)). Truncated BPTT limits the unrolling to a fixed window of k steps, which caps the memory cost and the gradient path length at the expense of long-range learning. LSTMs and GRUs address the same problem architecturally, by adding gates that let gradients flow through an additive path rather than a multiplicative one. This page unrolls a small RNN, shows the gradient flowing backward through each timestep, and plots the gradient magnitude decaying or exploding as the sequence grows.
+Backpropagation works on feed-forward graphs — signals flow one way, gradients flow back the same way. An RNN's feedback loop breaks that picture. The fix, <strong>Backpropagation Through Time (BPTT)</strong>, is beautifully blunt: <em>unroll</em> the loop into T copies of the cell, one per timestep, and the loop becomes an ordinary (deep) feed-forward chain that standard backprop can handle. Each unrolled copy shares the same weight matrices W and U, so the gradients from all timesteps are summed into a single weight update. The chain rule applied across T copies produces a product of T Jacobians. And that product is why RNNs struggle with long sequences. If the largest singular value of the recurrent Jacobian is below 1 the gradients shrink exponentially ([vanishing gradients](../deep_learning/exploding_and_vanishing_gradient.html)). Above 1 they grow exponentially (exploding gradients, handled by [gradient clipping](../deep_learning/gradient_clipping.html)). Truncated BPTT limits the unrolling to a fixed window of k steps, which caps the memory cost and the gradient path length at the expense of long-range learning. LSTMs and GRUs address the same problem architecturally, by adding gates that let gradients flow through an additive path rather than a multiplicative one. This page unrolls a small RNN, shows the gradient flowing backward through each timestep, and plots the gradient magnitude decaying or exploding as the sequence grows.
 
 ## Forward, Then Backward
 
-- <strong>Forward pass:</strong> tokens enter left to right; each cell computes h&#8348; from x&#8348; and h&#8348;&#8331;&#8321;; the loss L is measured at the end.
+- <strong>Forward pass:</strong> tokens enter left to right; each cell computes h&#8348; from x&#8348; and h&#8348;&#8331;&#8321;. The loss L is measured at the end.
 - <strong>Backward pass:</strong> the gradient &part;L/&part;h starts at the loss and travels right to left. Crossing each cell multiplies it by the local derivative &part;h&#8348;/&part;h&#8348;&#8331;&#8321; — the chain rule, applied once per timestep.
 - <strong>Weight update:</strong> because every unrolled copy shares the same W and U, their gradient contributions from all timesteps are <em>summed</em> before the single weight update.
 
@@ -57,7 +57,7 @@ Forgetting to detach is a real bug: the graph grows without bound, memory climbs
 |Activation memory|Linear in sequence length|
 |Parallelism across steps|None &mdash; strictly sequential|
 
-The last row is the one that mattered historically. Because step t needs `hₜ₋₁`, the steps cannot be computed simultaneously, so a GPU's thousands of cores sit mostly idle and training time scales with length.
+The last row is the one that mattered historically. Because step t needs `hₜ₋₁`, the steps cannot be computed at once, so a GPU's thousands of cores sit mostly idle and training time scales with length.
 
 That is a hardware-utilisation limitation rather than a quality one, and gating cannot fix it. It is the main reason transformers &mdash; where every position is computed in parallel &mdash; displaced recurrent networks for large-scale work, independent of any argument about long-range dependencies.
 
@@ -230,7 +230,7 @@ BPTT = unroll the loop, backpropagate through the chain, sum the shared-weight g
 
 <strong>Pack variable-length sequences.</strong> `pack_padded_sequence` stops the recurrence at each sequence's real end. Without it, gradients flow through padding steps and the final hidden state summarises the padding rather than the sentence.
 
-<strong>Watch memory with sequence length.</strong> Doubling the sequence doubles the stored activations. If training fits at 200 steps and fails at 400, this is why &mdash; truncate, or reduce the batch size.
+<strong>Watch memory with sequence length.</strong> Doubling the sequence doubles the stored activations. If training fits at 200 steps and fails at 400, this is why. Truncate, or reduce the batch size.
 
 <strong>Detach the carried state</strong> between chunks in stateful training, or the graph never gets freed.
 
@@ -246,7 +246,7 @@ BPTT = unroll the loop, backpropagate through the chain, sum the shared-weight g
 |Memory|Fixed|Grows with sequence length|
 |Parallelism|Across the batch|Across the batch only|
 
-The shared weights are what create both the summation and the long product. A network with distinct weights per step would have neither problem &mdash; and would need a separate parameter set for every possible sequence length, which is exactly what parameter sharing exists to avoid.
+The shared weights are what create both the summation and the long product. A network with distinct weights per step would have neither problem &mdash; and would need a separate parameter set for every possible sequence length. This is exactly what parameter sharing exists to avoid.
 
 ## Questions people ask
 
@@ -258,7 +258,7 @@ The shared weights are what create both the summation and the long product. A ne
 
 <strong>Do transformers need BPTT?</strong> No &mdash; there is no recurrence, so ordinary backpropagation applies and all positions are computed in parallel.
 
-<strong>Why does my memory grow every batch?</strong> A carried hidden state that was never detached, so the graph accumulates.
+<strong>Why does my memory grow every batch?</strong> A carried hidden state that was never detached, so the graph builds up.
 
 <strong>Is gradient clipping always needed?</strong> For recurrent models, effectively yes.
 

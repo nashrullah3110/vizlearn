@@ -11,13 +11,13 @@ They solve different problems and are often confused. If the index fits on one m
 
 The decision to shard usually comes from corpus size. A single HNSW index with 100 million 768-dimensional vectors needs roughly 300 GB of RAM for the vectors alone, plus graph overhead. That exceeds what a single machine can hold, so the corpus must be split across machines. Each query is then scattered to every shard, each shard returns its top-k candidates, and a merge step picks the global top-k from the union.
 
-Sharding introduces two costs that a single-machine index does not have. First, network latency: the slowest shard determines response time, so an unbalanced split or a slow replica creates a tail-latency problem that did not exist before. Second, recall can drop if the sharding strategy separates documents that should have been compared together &mdash; for example, placing all science articles on one shard and all history on another means a cross-domain query may miss relevant results from the shard it does not emphasise.
+Sharding introduces two costs that a single-machine index does not have. First, network latency: the slowest shard determines response time, so an unbalanced split or a slow replica creates a tail-latency problem that did not exist before. Second, recall can drop if the sharding strategy separates documents that should have been compared together. For example, placing all science articles on one shard and all history on another means a cross-domain query may miss relevant results from the shard it does not emphasise.
 
 Choosing a sharding strategy means choosing which of these costs you accept. Random sharding distributes load evenly and preserves recall, but every shard must be queried every time. Semantic sharding groups related documents and allows routing queries to a subset of shards, reducing fan-out at the risk of missing cross-cluster matches.
 
 ## Shard randomly
 
-The instinct is to shard by topic or tenant so a query only touches one shard. For a multi-tenant system where every query is scoped to one tenant, that is right &mdash; it is really many small indexes.
+The instinct is to shard by topic or tenant so a query only touches one shard. For a multi-tenant system where every query is scoped to one tenant, that is right. It is really many small indexes.
 
 For a general corpus it is a mistake. If all the finance documents live on shard 2, a finance query's true top 50 are all there, and taking only the local top 5 discards forty-five of them. Random sharding spreads relevant documents evenly so a modest per-shard k captures nearly all of them.
 
@@ -35,15 +35,15 @@ The merge itself needs care. Scores must be comparable across shards &mdash; fin
 
 Merging local top-k lists assumes the scores are comparable across shards, and that assumption quietly fails for lexical retrieval.
 
-BM25's idf term depends on corpus statistics &mdash; document frequency and average document length &mdash; which differ per shard. A term that is rare on shard 1 and common on shard 3 gets different weights, so a merged ranking is comparing numbers computed on different scales. The fix is global statistics: compute df and avgdl across the whole corpus and distribute them, which is an extra coordination step people discover only after the rankings look wrong.
+BM25's idf term depends on corpus statistics &mdash; document frequency and average document length &mdash; which differ per shard. A term that is rare on shard 1 and common on shard 3 gets different weights. So a merged ranking is comparing numbers computed on different scales. The fix is global statistics: compute df and avgdl across the whole corpus and distribute them. This is an extra coordination step people discover only after the rankings look wrong.
 
-Dense retrieval escapes this. Cosine similarity between a query and a document vector involves no corpus statistics at all, so shard-local scores are directly comparable. It is one of the underrated operational advantages of vector search.
+Dense retrieval escapes this. Cosine similarity between a query and a document vector involves no corpus statistics at all. So shard-local scores are directly comparable. It is one of the underrated operational advantages of vector search.
 
 ## Replication, failure and the degraded answer
 
 Sharding splits data; replication copies it. They solve different problems, and conflating them is the most common design error here: if the index fits on one machine and you are simply serving too many queries, you want replicas and no sharding at all, and there is then nothing to merge.
 
-Once shards exist, so does partial failure. Scatter-gather waits for everyone, so a single slow or dead shard degrades every query. The practical answers are a <strong>deadline</strong> &mdash; serve what returned in time and mark the result degraded &mdash; and <strong>hedged requests</strong>, asking two replicas and taking whichever answers first, which trades a few percent extra load for a much better tail.
+Once shards exist, so does partial failure. Scatter-gather waits for everyone, so a single slow or dead shard degrades every query. The practical answers are a <strong>deadline</strong> &mdash; serve what returned in time and mark the result degraded &mdash; and <strong>hedged requests</strong>, asking two replicas and taking whichever answers first. This trades a few percent extra load for a much better tail.
 
 Decide explicitly whether a degraded answer is acceptable. For search it usually is. For a RAG answer that will be presented as authoritative, silently dropping a shard means silently dropping evidence, and the user has no way to know.
 
@@ -92,7 +92,7 @@ With random or semantic sharding, a query fans out and the results are merged:
 
 The correctness condition is easy to get wrong: <strong>each shard must return its own top k, not top k/n</strong>. If the global top 10 all happen to live in one shard, asking each of five shards for 2 results loses 8 of them.
 
-The latency condition is different and equally important: the query takes as long as the <strong>slowest</strong> shard. With ten shards, the chance that at least one is having a slow moment is ten times higher than with one &mdash; so tail latency degrades as shard count grows. This is the standard fan-out problem, and the standard mitigations are hedged requests (send to a replica after a short delay and take whichever answers first) and a timeout with partial results.
+The latency condition is different and equally important: the query takes as long as the <strong>slowest</strong> shard. With ten shards, the chance that at least one is having a slow moment is ten times higher than with one. So tail latency degrades as shard count grows. This is the standard fan-out problem, and the standard mitigations are hedged requests (send to a replica after a short delay and take whichever answers first) and a timeout with partial results.
 
 ## Tail latency, and the scores that do not survive the merge
 
@@ -272,7 +272,7 @@ Copying each shard serves more queries and survives failures.
 |Write cost|Every write goes to every replica|
 |Consistency|Replicas can lag behind|
 
-That last row matters for retrieval specifically. A document indexed a moment ago may be present on one replica and not another, so two identical queries can return different results. For most retrieval that is acceptable; where it is not &mdash; a user searching for something they just uploaded &mdash; the usual fix is to route that user's reads to the replica that accepted the write, or to accept the lag and say so in the interface.
+That last row matters for retrieval specifically. A document indexed a moment ago may be present on one replica and not another. So two identical queries can return different results. For most retrieval that is acceptable; where it is not &mdash; a user searching for something they just uploaded &mdash; the usual fix is to route that user's reads to the replica that accepted the write, or to accept the lag and say so in the interface.
 
 The routing choice is between <strong>load balancing</strong> (any replica, best throughput) and <strong>consistent routing</strong> (the same replica for a session, better cache behaviour and freshness). Consistent routing also improves cache hit rates, which is a meaningful secondary benefit.
 
@@ -296,7 +296,7 @@ That last point is a real and under-discussed source of ranking inconsistency in
 
 <strong>Monitoring per shard.</strong> Aggregate latency hides a single slow shard. Track per-shard latency, size and error rate.
 
-<strong>Deletions.</strong> Tombstones accumulate per shard, so schedule compactions.
+<strong>Deletions.</strong> Tombstones build up per shard, so schedule compactions.
 
 <strong>Cost.</strong> Memory-resident indexes are the expensive part. Reducing dimensions &mdash; 1,536 to 384 &mdash; is a fourfold saving and often a small accuracy cost, and it is usually a better first move than adding machines.
 

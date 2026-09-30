@@ -7,7 +7,7 @@ intro: What does the @ syntax do, and why do decorated functions need functools.
 
 <p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
 
-The three things interviewers want to hear: first, `@decorator` is syntactic sugar for reassignment, not magic &mdash; it calls the decorator with the function and binds the name to the result. Second, that reassignment replaces `__name__`, `__doc__`, and `__module__`, which breaks introspection and logging unless `functools.wraps` copies them onto the wrapper. Third, a decorator **with arguments** like `@repeat(3)` is a function that returns a decorator, adding a third nesting level &mdash; the outermost takes the argument, the middle takes the function, and the innermost is the wrapper that runs. This page shows the metadata before and after wrapping, demonstrates the `wraps` fix, and builds a parameterised decorator step by step so the three layers are visible.
+The three things interviewers want to hear: first, `@decorator` is syntactic sugar for reassignment, not magic. It calls the decorator with the function and binds the name to the result. Second, that reassignment replaces `__name__`, `__doc__`, and `__module__`, which breaks introspection and logging unless `functools.wraps` copies them onto the wrapper. Third, a decorator **with arguments** like `@repeat(3)` is a function that returns a decorator, adding a third nesting level. The outermost takes the argument, the middle takes the function, and the innermost is the wrapper that runs. This page shows the metadata before and after wrapping, shows the `wraps` fix, and builds a parameterised decorator step by step so the three layers are visible.
 
 ## Run it
 
@@ -95,7 +95,7 @@ def greet(name): ...
 
 # is exactly
 def greet(name): ...
-greet = shout(greet)</code></pre><p>Which tells you three things immediately. It runs once, when the <code>def</code> is executed, not on every call. The decorator receives the function object and can return literally anything &mdash; a different function, a class instance, or a string, though the last one will confuse everybody. And stacked decorators apply bottom-up: the one nearest the <code>def</code> wraps first.</p>
+greet = shout(greet)</code></pre><p>Which tells you three things at once. It runs once, when the <code>def</code> is executed, not on every call. The decorator receives the function object and can return literally anything &mdash; a different function, a class instance, or a string, though the last one will confuse everybody. And stacked decorators apply bottom-up: the one nearest the <code>def</code> wraps first.</p>
 
 ## Why wraps exists
 
@@ -103,7 +103,7 @@ greet = shout(greet)</code></pre><p>Which tells you three things immediately. It
 
 ## Decorators that take arguments
 
-<p><code>@repeat(3)</code> needs one more layer, and the reason follows from the assignment rule. <code>@X</code> calls <code>X(fn)</code>; so if <code>X</code> is written as <code>repeat(3)</code>, then <code>repeat(3)</code> must itself <em>return</em> a decorator:</p><pre><code>def repeat(times):            # takes the argument
+<p><code>@repeat(3)</code> needs one more layer, and the reason follows from the assignment rule. <code>@X</code> calls <code>X(fn)</code>. So if <code>X</code> is written as <code>repeat(3)</code>, then <code>repeat(3)</code> must itself <em>return</em> a decorator:</p><pre><code>def repeat(times):            # takes the argument
     def decorator(fn):        # takes the function
         @functools.wraps(fn)
         def wrapper(*a, **k): # takes the call
@@ -137,13 +137,13 @@ greet = shout(greet)</code></pre><p>Which tells you three things immediately. It
 
 <p><strong>A decorator can return anything.</strong> <code>property</code> returns a descriptor and <code>dataclass</code> returns the same class with methods added - so "a decorator wraps a function" is the common case, not the rule.</p>
 
-<p><strong>Decorating a method needs care about <code>self</code>.</strong> The wrapper receives it as the first positional argument, so <code>*args</code> handles it - but the ordering with <code>staticmethod</code> and <code>classmethod</code> matters, and those two go closest to the <code>def</code>.</p>
+<p><strong>Decorating a method needs care about <code>self</code>.</strong> The wrapper receives it as the first positional argument. So <code>*args</code> handles it - but the ordering with <code>staticmethod</code> and <code>classmethod</code> matters, and those two go closest to the <code>def</code>.</p>
 
 <p><strong>Exceptions from the wrapper appear in the traceback.</strong> Every decorator adds a frame, which is why a heavily decorated call site produces tracebacks with more wrapper lines than application lines.</p>
 
 ## The follow-ups interviewers ask
 
-<p><strong>"How do you write one that works with and without arguments?"</strong> Inspect the first argument: if it is callable and it is the only one, you were used bare and should decorate it immediately; otherwise return a decorator. It is fiddly, which is why most libraries simply require the parentheses.</p>
+<p><strong>"How do you write one that works with and without arguments?"</strong> Inspect the first argument: if it is callable and it is the only one, you were used bare and should decorate it at once; otherwise return a decorator. It is fiddly, which is why most libraries simply require the parentheses.</p>
 
 <p><strong>"What should you know about <code>functools.lru_cache</code>?"</strong> It stores results on the function, keyed by the arguments - so the arguments must be hashable, and the cache keeps them alive. Decorating a method caches <code>self</code>, which keeps every instance alive for the life of the process: a real and common memory leak. <code>maxsize=None</code> makes it unbounded.</p>
 

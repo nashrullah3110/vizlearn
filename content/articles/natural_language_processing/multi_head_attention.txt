@@ -5,7 +5,7 @@ intro: Why one attention pattern is not enough, and why more heads cost nothing.
 
 A single <a href="self_attention.html" style="color: var(--accent-primary)">self-attention</a> layer produces one set of weights per word, and those weights must sum to 1. That is a hard constraint: attention spent on one word is attention taken from another.
 
-But a word usually relates to several others in different ways at once. In "the tired cat drank the cold milk", the verb "drank" has a subject, an object, and a tense &mdash; three relationships, three different words. One distribution has to compromise between them, and a compromise between three answers is not a good answer to any of them. Multi-head attention solves this by running h independent attention operations in parallel, each with its own learned Q, K, V projections. Each head's projection maps the full d-dimensional embedding into a d/h-dimensional subspace, so the total parameter count and computation stay the same as a single head operating on the full dimension &mdash; splitting costs nothing. The outputs are concatenated and projected back to d dimensions by a final linear layer. In BERT-base, d=768 and h=12, so each head works in a 64-dimensional space. Different heads learn to attend to different syntactic and semantic relationships: one head may track subject-verb agreement, another may track coreference, a third may attend to the previous token. This page shows the attention pattern of each head independently, highlights which heads specialise in which relationship, and covers why the number of heads is usually 8 or 12 rather than 1 or 64.
+But a word usually relates to several others in different ways at once. In "the tired cat drank the cold milk", the verb "drank" has a subject, an object, and a tense. Three relationships, three different words. One distribution has to compromise between them, and a compromise between three answers is not a good answer to any of them. Multi-head attention solves this by running h independent attention operations in parallel, each with its own learned Q, K, V projections. Each head's projection maps the full d-dimensional embedding into a d/h-dimensional subspace, so the total parameter count and computation stay the same as a single head operating on the full dimension &mdash; splitting costs nothing. The outputs are concatenated and projected back to d dimensions by a final linear layer. In BERT-base, d=768 and h=12, so each head works in a 64-dimensional space. Different heads learn to attend to different syntactic and semantic relationships: one head may track subject-verb agreement, another may track coreference, a third may attend to the previous token. This page shows the attention pattern of each head independently, highlights which heads specialise in which relationship, and covers why the number of heads is usually 8 or 12 rather than 1 or 64.
 
 ## The idea
 
@@ -21,7 +21,7 @@ Heads are not stacked on top of the model dimension &mdash; the model dimension 
 
 So going from 1 head to 8 does not multiply the cost by eight. The projection matrices are the same total size either way, and the parameter count is unchanged. What changes is the shape of the computation: eight narrow attention patterns instead of one wide one.
 
-This is close to a free lunch, and it is why every transformer uses many heads. The cost is that each head is individually less expressive, which is why very high head counts eventually stop helping &mdash; at some point d<sub>k</sub> gets too small to represent anything useful.
+This is close to a free lunch, and it is why every transformer uses many heads. The cost is that each head is individually less expressive, which is why very high head counts eventually stop helping. At some point d<sub>k</sub> gets too small to represent anything useful.
 
 ## Several attention computations at once
 
@@ -223,16 +223,16 @@ print("   heads' dimensions instead of stacking them, and the bug is silent.")
 ## Try it yourself
 
 1. <strong>Collapse to one head.</strong> Set the <strong>Number of Heads</strong> slider to 1 and pick "drank" as the <strong>Focus Word</strong>. A single distribution has to cover subject, object and everything else at once, and Coverage drops.
-2. <strong>Open them up.</strong> Set the <strong>Number of Heads</strong> slider to 4. The heads separate: one tracks the subject, another the object, another the neighbouring determiner. Distinct Targets rises &mdash; the same layer is now representing several relationships simultaneously.
+2. <strong>Open them up.</strong> Set the <strong>Number of Heads</strong> slider to 4. The heads separate: one tracks the subject, another the object, another the neighbouring determiner. Distinct Targets rises &mdash; the same layer is now representing several relationships at once.
 3. <strong>Prove the diversity is the point.</strong> Tick <strong>Make Heads Identical</strong>. Every head now shares one projection, so all four rows become the same row, Head Disagreement falls to zero and Distinct Targets drops to 1. Four copies of one opinion are worth exactly one opinion.
 4. <strong>Watch the width shrink.</strong> With <strong>Model Dimension</strong> at 64, step the <strong>Number of Heads</strong> slider from 1 to 4 and watch Dimension per Head fall from 64 to 16 while Total Parameters does not move at all. The heads are splitting the budget, not adding to it.
-5. <strong>Make the heads too narrow.</strong> Set the <strong>Model Dimension</strong> slider to 16 with 4 heads. Each head now has 4 dimensions to work with &mdash; barely enough to express a relationship, which is the practical limit on how many heads are worth having.
+5. <strong>Make the heads too narrow.</strong> Set the <strong>Model Dimension</strong> slider to 16 with 4 heads. Each head now has 4 dimensions to work with &mdash; barely enough to express a relationship. This is the practical limit on how many heads are worth having.
 
 ## What heads actually learn
 
 Analyses of trained models have found heads that track syntactic dependencies, heads that attend to the previous token, heads that follow coreference. That is the encouraging half.
 
-The other half is that many heads learn nothing legible. A large fraction attend overwhelmingly to the first token or to punctuation &mdash; behaviour usually read as a "no-op", somewhere to park attention when a head has nothing to contribute for this input. Several papers have shown that a majority of heads can be pruned after training with little loss, which suggests the redundancy is real and that heads matter more during training than at inference.
+The other half is that many heads learn nothing legible. A large fraction attend overwhelmingly to the first token or to punctuation. Behaviour usually read as a "no-op", somewhere to park attention when a head has nothing to contribute for this input. Several papers have shown that a majority of heads can be pruned after training with little loss. This suggests the redundancy is real and that heads matter more during training than at inference.
 
 So treat clean per-head interpretations with care. The tidy examples in papers are selected; most heads are not that tidy.
 
@@ -245,7 +245,7 @@ So treat clean per-head interpretations with care. The tidy examples in papers a
 
 ## In one line
 
-Multi-head attention runs several attention operations in parallel, each with its own projections, so a layer can represent several relationships at once instead of compromising between them in a single distribution that must sum to 1. Crucially the model dimension is split across heads rather than multiplied by them, so more heads cost no extra parameters &mdash; they buy diversity at the price of making each head narrower, which is why the count cannot be raised indefinitely. The concatenated outputs are mixed by a final projection, and in trained models many heads turn out to be redundant or parked on punctuation, so individual head patterns should be read with caution.
+Multi-head attention runs several attention operations in parallel, each with its own projections, so a layer can represent several relationships at once instead of compromising between them in a single distribution that must sum to 1. Crucially the model dimension is split across heads rather than multiplied by them, so more heads cost no extra parameters. They buy diversity at the price of making each head narrower, which is why the count cannot be raised indefinitely. The concatenated outputs are mixed by a final projection, and in trained models many heads turn out to be redundant or parked on punctuation. So individual head patterns should be read with caution.
 
 ## Variants that shrink the KV cache
 
@@ -275,7 +275,7 @@ For fine-tuning and use, this is not a parameter you choose &mdash; it is fixed 
 
 ## Questions people ask
 
-<strong>Why not one big attention head?</strong> It can only express one weighting pattern per position. Several heads represent several relationships simultaneously.
+<strong>Why not one big attention head?</strong> It can only express one weighting pattern per position. Several heads represent several relationships at once.
 
 <strong>How many heads is best?</strong> 8&ndash;32 for typical sizes, with per-head dimension 64&ndash;128. Rarely worth tuning.
 

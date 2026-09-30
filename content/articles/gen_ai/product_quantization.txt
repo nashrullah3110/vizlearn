@@ -190,17 +190,17 @@ it is almost always paired with IVF or a graph.
 
 ## Questions people ask
 
-<strong>Why does splitting help so much?</strong> Because representable positions *multiply* while stored centroids only add. m codebooks of k centroids describe `kᵐ` positions from `m·k` stored centroids &mdash; at m = 96 and k = 256, that is 256⁹⁶ positions from 24,576 centroids. Plain quantization has to store every position it can represent.
+<strong>Why does splitting help so much?</strong> Because representable positions *multiply* while stored centroids only add. m codebooks of k centroids describe `kᵐ` positions from `m·k` stored centroids. At m = 96 and k = 256, that is 256⁹⁶ positions from 24,576 centroids. Plain quantization has to store every position it can represent.
 
 <strong>Should nbits ever be anything but 8?</strong> Rarely. A byte is what hardware likes, 256 centroids per subspace is a good operating point, and the SIMD lookup implementations that make PQ fast assume it. Lower values exist for extreme compression and lose recall quickly.
 
-<strong>Should I use OPQ?</strong> Usually yes. PQ splits dimensions in their original order, which implicitly assumes neighbouring dimensions belong together &mdash; arbitrary for a learned embedding. OPQ learns a rotation that balances variance across the subspaces first, costs one matrix multiply per query, and typically buys a few points of recall.
+<strong>Should I use OPQ?</strong> Usually yes. PQ splits dimensions in their original order, which implicitly assumes neighbouring dimensions belong together. Arbitrary for a learned embedding. OPQ learns a rotation that balances variance across the subspaces first, costs one matrix multiply per query, and typically buys a few points of recall.
 
-<strong>Why asymmetric distance instead of decoding the code?</strong> Because it leaves the query exact. Quantising the query too would let you precompute a symmetric table between codebook entries, which is marginally faster and measurably less accurate &mdash; you would be adding the query's own quantisation error to every comparison for no benefit.
+<strong>Why asymmetric distance instead of decoding the code?</strong> Because it leaves the query exact. Quantising the query too would let you precompute a symmetric table between codebook entries, which is marginally faster and measurably less accurate. You would be adding the query's own quantisation error to every comparison for no benefit.
 
-<strong>FAISS rejected my m. Why?</strong> Because m must divide d. 768 divides by 96, 64, 48, 32 and 16, and so does 1536 &mdash; one small reason those embedding dimensions are popular. This is what catches people who change embedding model without revisiting the index recipe.
+<strong>FAISS rejected my m. Why?</strong> Because m must divide d. 768 divides by 96, 64, 48, 32 and 16, and so does 1536. One small reason those embedding dimensions are popular. This is what catches people who change embedding model without revisiting the index recipe.
 
-<strong>Is PQ an index?</strong> No, it is a compression scheme. A pure PQ index still computes a distance for every vector in the corpus &mdash; a flat scan over short codes, perhaps 20&ndash;30&times; faster than scanning float32, and still `O(n)`. It is almost always wrapped in something that prunes.
+<strong>Is PQ an index?</strong> No, it is a compression scheme. A pure PQ index still computes a distance for every vector in the corpus. A flat scan over short codes, perhaps 20&ndash;30&times; faster than scanning float32, and still `O(n)`. It is almost always wrapped in something that prunes.
 
 ## Recap in one screen
 
@@ -209,4 +209,4 @@ it is almost always paired with IVF or a graph.
 - A query builds an `m × 256` distance table once, then each candidate costs m lookups and m additions: no multiplications, no decoding, and a cost independent of d.
 - Asymmetric is the default because only the stored side is quantised, so the query contributes no error of its own.
 - Quantisation error is PQ's only failure mode. It shows up as recall and as nothing else.
-- It compresses without pruning, so pair it with IVF, a graph, or a rescoring stage &mdash; pure PQ on its own is unusual.
+- It compresses without pruning, so pair it with IVF, a graph, or a rescoring stage. Pure PQ on its own is unusual.

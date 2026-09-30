@@ -9,14 +9,14 @@ grid[0][0] = 1
 
 print(grid)        # [[1, 0, 0], [1, 0, 0], [1, 0, 0]]
 ```
-One assignment changed all three rows. The reason is that `* 3` on a list <strong>copies references, not objects</strong> &mdash; so `grid` holds three pointers to the <em>same</em> inner list.
+One assignment changed all three rows. The reason is that `* 3` on a list <strong>copies references, not objects</strong>. So `grid` holds three pointers to the <em>same</em> inner list.
 
 ```python-run
 grid = [[0] * 3] * 3
 print(grid[0] is grid[1])        # True -- the same object
 print(id(grid[0]) == id(grid[1]))  # True
 ```
-The inner `[0] * 3` is fine, because integers are immutable &mdash; there is nothing to share dangerously. The outer `* 3` is the problem, because a list is mutable and now has three names. The fix is a list comprehension: `[[0] * 3 for _ in range(3)]` creates a **new** inner list on each iteration, so each row has its own identity. The same aliasing trap appears in default arguments &mdash; `def f(items=[])` shares one list across every call that omits the argument &mdash; and in any place where `*` is used to repeat a container of mutable objects. The general rule: `*` on a sequence copies references, never objects, so it is safe only when the elements are immutable (ints, strings, tuples of immutables). This page shows the broken and correct grids side by side with `id()` printed for each row, demonstrates the mutable-default variant, and covers `copy.deepcopy` as the fallback for deeper nesting.
+The inner `[0] * 3` is fine, because integers are immutable &mdash; there is nothing to share dangerously. The outer `* 3` is the problem, because a list is mutable and now has three names. The fix is a list comprehension: `[[0] * 3 for _ in range(3)]` creates a **new** inner list on each iteration. So each row has its own identity. The same aliasing trap appears in default arguments &mdash; `def f(items=[])` shares one list across every call that omits the argument &mdash; and in any place where `*` is used to repeat a container of mutable objects. The general rule: `*` on a sequence copies references, never objects, so it is safe only when the elements are immutable (ints, strings, tuples of immutables). This page shows the broken and correct grids side by side with `id()` printed for each row, shows the mutable-default variant, and covers `copy.deepcopy` as the fallback for deeper nesting.
 
 ## Run it
 
@@ -153,7 +153,7 @@ The tell is that the bug only appears on <em>write</em>. Building and printing t
 
 This is one instance of a general rule: assignment and shallow copies duplicate references, never the objects behind them.
 
-<p><code>b = a</code> &mdash; another name for the same list. <code>b = a[:]</code> or <code>list(a)</code> or <code>copy.copy(a)</code> &mdash; a new outer list holding the same inner references, so nested contents are still shared. <code>copy.deepcopy(a)</code> &mdash; new objects all the way down, at the cost of walking the whole structure.</p>
+<p><code>b = a</code> &mdash; another name for the same list. <code>b = a[:]</code> or <code>list(a)</code> or <code>copy.copy(a)</code> &mdash; a new outer list holding the same inner references. So nested contents are still shared. <code>copy.deepcopy(a)</code> &mdash; new objects all the way down, at the cost of walking the whole structure.</p>
 
 ## How to spot it in review
 
@@ -212,7 +212,7 @@ print("rows share one list:", grid[0] is grid[1])
 
 <strong>Why does `[0] * 3` work fine?</strong> Integers are immutable, so sharing them is unobservable.
 
-<strong>Is `*` ever right for nested lists?</strong> Only if you never mutate the inner lists &mdash; and then a tuple of tuples states the intent better.
+<strong>Is `*` ever right for nested lists?</strong> Only if you never mutate the inner lists. And then a tuple of tuples states the intent better.
 
 <strong>Why does the comprehension fix it?</strong> The expression is re-evaluated per iteration, creating a new object each time.
 

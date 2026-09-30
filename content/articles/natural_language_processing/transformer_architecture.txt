@@ -11,7 +11,7 @@ The first sublayer is multi-head self-attention, which lets each position in the
 
 Each sublayer is wrapped in a residual connection and a layer normalisation. The residual connection adds the sublayer's input back to its output, which keeps gradients flowing through deep stacks. The layer normalisation rescales the result so that each layer receives inputs in a stable range. Without these two wrappers, a transformer with more than a few blocks becomes difficult to train.
 
-The original 2017 paper ("Attention Is All You Need") described an encoder-decoder architecture with six blocks on each side. Modern models are often encoder-only (BERT, for classification and embeddings) or decoder-only (GPT, for generation). The decoder-only variant uses masked self-attention, where each position can attend only to earlier positions, which is what makes left-to-right generation possible. The architectural difference between BERT and GPT is whether the attention mask allows the model to look forward.
+The original 2017 paper ("Attention Is All You Need") described an encoder-decoder architecture with six blocks on each side. Modern models are often encoder-only (BERT, for classification and embeddings) or decoder-only (GPT, for generation). The decoder-only variant uses masked self-attention, where each position can attend only to earlier positions. This is what makes left-to-right generation possible. The architectural difference between BERT and GPT is whether the attention mask allows the model to look forward.
 
 The transformer replaced recurrent networks because it processes all positions in parallel during training, rather than sequentially. That parallelism is why transformers train faster on modern hardware, and why they have scaled to billions of parameters where RNNs could not.
 
@@ -250,7 +250,7 @@ print("   arrangement that makes 100-layer models trainable.")
 
 ## Why residuals matter so much
 
-Without a residual connection, the gradient reaching layer 1 has to pass back through every layer above it, being multiplied at each step. Multiply twenty-four numbers smaller than one and you get approximately zero &mdash; the <a href="vanishing_gradient_problem_in_rnn.html" style="color: var(--accent-primary)">vanishing gradient problem</a>, arriving from a different direction.
+Without a residual connection, the gradient reaching layer 1 has to pass back through every layer above it, being multiplied at each step. Multiply twenty-four numbers smaller than one and you get about zero &mdash; the <a href="vanishing_gradient_problem_in_rnn.html" style="color: var(--accent-primary)">vanishing gradient problem</a>, arriving from a different direction.
 
 The residual gives the gradient a route that skips the sublayer, so it reaches the early layers in effect intact. That is why the same trick appears in ResNets, and why almost every deep architecture built since 2015 has some version of it. It is not an optimisation detail; without it, "deep" is not available.
 
@@ -269,13 +269,13 @@ The reason is practical: with post-norm the residual path itself gets normalised
 
 ## In one line
 
-A transformer block is two sublayers, each wrapped in the same add-and-normalise pattern: attention moves information between positions, and a position-wise feed-forward network processes each token on its own. The residual connection is what makes depth possible, giving the gradient a path that skips each sublayer &mdash; remove it and a deep stack stops training entirely &mdash; while layer normalisation holds the activation scale steady as layers accumulate. About two thirds of the parameters live in the feed-forward network rather than in attention, and parameters grow with the square of the model dimension but only linearly with depth.
+A transformer block is two sublayers, each wrapped in the same add-and-normalise pattern: attention moves information between positions, and a position-wise feed-forward network processes each token on its own. The residual connection is what makes depth possible, giving the gradient a path that skips each sublayer &mdash; remove it and a deep stack stops training entirely &mdash; while layer normalisation holds the activation scale steady as layers build up. About two thirds of the parameters live in the feed-forward network rather than in attention, and parameters grow with the square of the model dimension but only linearly with depth.
 
 ## Why it replaced recurrent networks
 
 Two properties, both structural.
 
-<strong>Parallelism.</strong> An RNN must compute position t before t+1. A transformer computes all positions simultaneously as one matrix multiplication, which is what a GPU is built for. That alone made training on far more data feasible.
+<strong>Parallelism.</strong> An RNN must compute position t before t+1. A transformer computes all positions at once as one matrix multiplication, which is what a GPU is built for. That alone made training on far more data feasible.
 
 <strong>Constant path length.</strong> Any two positions are one attention step apart. In an RNN the path grows with the distance, and gradients decay along it &mdash; which is why long-range dependencies were the central difficulty.
 
@@ -298,7 +298,7 @@ Nothing about the block changes. What changes is depth, width, vocabulary, conte
 
 The scaling laws that emerged from studying this &mdash; performance improving predictably with compute, parameters and data together &mdash; are why the field spent several years mostly making the same architecture bigger. The Chinchilla result refined it: for a given compute budget, most early large models were under-trained on too little data relative to their size.
 
-Practical consequences of size: Adam's optimiser state is twice the model, so large-scale training needs sharding (ZeRO, FSDP); inference needs KV caching and quantisation; and fine-tuning uses parameter-efficient methods such as LoRA rather than updating every weight.
+Practical consequences of size: Adam's optimiser state is twice the model, so large-scale training needs sharding (ZeRO, FSDP). Inference needs KV caching and quantisation; and fine-tuning uses parameter-efficient methods such as LoRA rather than updating every weight.
 
 ## Questions people ask
 

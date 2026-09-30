@@ -7,7 +7,7 @@ Define a function with <code>async def</code> and calling it does not run it. It
 hands you back a **coroutine object** &mdash; a description of work that has not
 started.
 
-These editors run inside a browser event loop that is already going, so the examples finish with <code>await main()</code>. In a standalone <code>.py</code> script &mdash; run with <code>python file.py</code> &mdash; you write <code>asyncio.run(main())</code> instead, which starts a loop, runs the coroutine, and closes it. The two are the same program with different entry points.
+These editors run inside a browser event loop that is already going, so the examples finish with <code>await main()</code>. In a standalone <code>.py</code> script &mdash; run with <code>python file.py</code> &mdash; you write <code>asyncio.run(main())</code> instead. This starts a loop, runs the coroutine, and closes it. The two are the same program with different entry points.
 
 ```python-run
 import asyncio
@@ -56,7 +56,7 @@ from <code>await</code> alone.
 
 To make two coroutines make progress at the same time, you wrap each in a
 **task**. <code>asyncio.create_task</code> schedules a coroutine on the loop
-immediately and returns a handle; the coroutine starts running at the next await,
+at once and returns a handle; the coroutine starts running at the next await,
 whether or not you have awaited the handle yet.
 
 ```python-run
@@ -92,7 +92,7 @@ proposition of async, and it is visible in this one four-hundredth-versus-two-
 hundredth difference.
 
 The reason is scheduling order. <code>await fetch(...)</code> creates the
-coroutine and immediately blocks on it, so the second one is not created until
+coroutine and at once blocks on it, so the second one is not created until
 the first returns. <code>create_task</code> puts both on the loop *before* either
 is awaited, so by the time you <code>await a</code>, task <code>b</code> is
 already running and its timer is already ticking.
@@ -146,7 +146,7 @@ returned: hi
 ```
 
 <code>send(None)</code> starts the coroutine and runs it until it either
-suspends or finishes. This one never awaits, so it finishes immediately, and a
+suspends or finishes. This one never awaits, so it finishes at once, and a
 finished coroutine signals its result by raising
 <code>StopIteration</code> with the return value attached &mdash; which is the
 same protocol a generator uses, because that is what coroutines were built on.
@@ -233,7 +233,7 @@ never awaited" &mdash; a warning worth treating as an error.
 
 **Awaiting create_task too early.** <code>await asyncio.create_task(f())</code>
 on one line is just a slower <code>await f()</code> &mdash; you scheduled it and
-immediately blocked on it, gaining nothing.
+at once blocked on it, gaining nothing.
 
 **An orphaned task.** A task nobody holds a reference to can be garbage-collected
 mid-flight, and an unhandled exception inside it may never surface. Keep the
@@ -243,9 +243,9 @@ handle, and await it.
 
 <strong>When do I need <code>create_task</code> rather than <code>await</code>?</strong> Await when you need the result before you can do anything else. Use a task when you want the work happening *while* you carry on. Two awaits in a row are two things in sequence; two tasks are two things at once.
 
-<strong>Does <code>create_task</code> start the coroutine immediately?</strong> It schedules it immediately, which is not quite the same. It begins running at the next opportunity the loop gets &mdash; the next time the current coroutine awaits &mdash; so the work starts before you await the handle, which is the entire reason the timings differ above.
+<strong>Does <code>create_task</code> start the coroutine at once?</strong> It schedules it at once, which is not quite the same. It begins running at the next opportunity the loop gets &mdash; the next time the current coroutine awaits &mdash; so the work starts before you await the handle. This is the entire reason the timings differ above.
 
-<strong>Is <code>gather</code> just a nicer <code>create_task</code>?</strong> Close. It wraps each argument in a task, so it gives you the same overlap plus results in call order and one place to handle failure. It is covered in [running work concurrently](running_work_concurrently.html), along with TaskGroup, which additionally cancels siblings when one fails.
+<strong>Is <code>gather</code> just a nicer <code>create_task</code>?</strong> Close. It wraps each argument in a task, so it gives you the same overlap plus results in call order and one place to handle failure. It is covered in [running work concurrently](running_work_concurrently.html), along with TaskGroup, which also cancels siblings when one fails.
 
 <strong>What happens to a task nobody keeps a reference to?</strong> It can be garbage-collected mid-flight, and an exception inside it may never be reported. Keep the handle &mdash; or better, create it inside a TaskGroup, which holds it for you and makes the lifetime visible.
 
@@ -257,7 +257,7 @@ handle, and await it.
 
 - <code>async def</code> is a factory for coroutine objects. Calling one runs nothing; it hands back a resumable object.
 - That object is driven by <code>send(None)</code>, and a finished coroutine returns its value by raising <code>StopIteration</code>. The loop is that pattern in a queue.
-- <code>await</code> both starts a coroutine and waits for it, so a row of awaits is strictly sequential &mdash; overlap never comes from <code>await</code> alone.
+- <code>await</code> both starts a coroutine and waits for it, so a row of awaits is strictly sequential. Overlap never comes from <code>await</code> alone.
 - <code>create_task</code> schedules work on the loop now and returns a handle, which is where concurrency actually comes from: two 0.2 s waits take 0.40 s awaited in turn and 0.20 s as tasks.
 - <code>cancel()</code> requests cancellation by raising <code>CancelledError</code> at the task's current await; catch it to clean up, then always re-raise.
 - <code>wait_for</code> (or <code>asyncio.timeout</code>) is that same mechanism with a deadline, so a timeout is cancellation rather than a separate feature.

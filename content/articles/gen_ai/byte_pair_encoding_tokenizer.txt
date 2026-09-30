@@ -3,7 +3,7 @@ intro: Before a language model sees a single word, a <strong>tokenizer</strong> 
 
 ## The Two Failure Modes It Avoids
 
-- <strong>Word-level:</strong> every distinct word needs its own entry. The vocabulary explodes into the millions, and any word missing from it becomes a useless <span class="mono-font">[UNK]</span> &mdash; every typo, name and new term is lost.
+- <strong>Word-level:</strong> every distinct word needs its own entry. The vocabulary explodes into the millions, and any word missing from it becomes a useless <span class="mono-font">[UNK]</span>. Every typo, name and new term is lost.
 - <strong>Character-level:</strong> a tiny vocabulary that can spell anything, but sequences become enormously long and the model must relearn that <span class="mono-font">c-a-t</span> means something.
 
 BPE lands in between: frequent words become single tokens, rare words split into meaningful pieces, and <em>nothing</em> is ever out-of-vocabulary. The algorithm starts with the character-level vocabulary (plus a special end-of-word marker) and iteratively merges the most frequent adjacent pair into a new token. Each merge reduces the total sequence length by the number of occurrences of that pair. After a fixed number of merges (the vocabulary size minus the initial character set), the vocabulary is complete. GPT-2 uses 50,257 tokens; GPT-4 uses around 100,000. A larger vocabulary means shorter sequences (fewer tokens per sentence, so faster inference and a longer effective context window) but a larger embedding table. The merge order is the tokenizer &mdash; at inference time, it applies the same merges in the same priority to any new text, greedily splitting unknown words into the longest known pieces. This page runs BPE step by step on a sample corpus, shows the merge table growing after each iteration, and covers the vocabulary-size tradeoff that determines how many merges to perform.
@@ -19,7 +19,7 @@ That is the entire method. Vocabulary size is simply base characters plus the nu
 
 ## Merge Order Is the Model
 
-The merge list is <strong>ordered</strong>, and that order matters at encoding time: to tokenize a new word you replay the merges from rank 1 downward, applying each wherever it fits. The "How it got there" panel shows this replay step by step &mdash; the word starts as loose characters and progressively fuses.
+The merge list is <strong>ordered</strong>, and that order matters at encoding time: to tokenize a new word you replay the merges from rank 1 downward, applying each wherever it fits. The "How it got there" panel shows this replay step by step. The word starts as loose characters and progressively fuses.
 
 Notice that the earliest merges are almost always extremely common fragments (<span class="mono-font">e</span>+<span class="mono-font">s</span>, <span class="mono-font">t</span>+<span class="mono-font">h</span>), while later merges assemble whole frequent words. The vocabulary discovers morphology &mdash; prefixes, suffixes, stems &mdash; without ever being told that such things exist.
 
@@ -56,9 +56,9 @@ tok.tokenize(" hello")              # ['Ġhello']  -- Ġ marks a leading space
 
 Three observations from those lines.
 
-<strong>Common words are single tokens</strong>; long or rare ones fragment into pieces that were frequent in the training corpus.
+<strong>Common words are single tokens</strong>. Long or rare ones fragment into pieces that were frequent in the training corpus.
 
-<strong>Leading spaces are part of the token.</strong> GPT-style tokenisers treat " hello" and "hello" as different tokens, which is why a prompt ending in a space can change the output noticeably.
+<strong>Leading spaces are part of the token.</strong> GPT-style tokenisers treat " hello" and "hello" as different tokens. This is why a prompt ending in a space can change the output noticeably.
 
 <strong>Case matters.</strong> "Token" and "token" are different entries, so capitalisation consumes vocabulary and affects tokenisation.
 
@@ -275,13 +275,13 @@ print("error.")
 
 1. <strong>Set merges to 0.</strong> Every word shatters into individual characters &mdash; the tokens-per-word figure is at its worst.
 2. <strong>Drag the slider up slowly</strong> and watch "Tokens / Word" fall. Each merge buys compression, with the earliest merges buying the most.
-3. <strong>Tokenize <span class="mono-font">lowest</span> after training on the repetitive sample.</strong> It typically splits into a stem plus <span class="mono-font">est</span> &mdash; a suffix the algorithm found purely from frequency.
+3. <strong>Tokenize <span class="mono-font">lowest</span> after training on the repetitive sample.</strong> It typically splits into a stem plus <span class="mono-font">est</span>. A suffix the algorithm found purely from frequency.
 4. <strong>Now type a word the corpus has never seen</strong>, such as <span class="mono-font">zyxwv</span>. It falls back to characters instead of failing &mdash; this graceful degradation is BPE's most important property.
 5. <strong>Switch to the code-like sample.</strong> Different merges appear entirely, because the vocabulary is a direct fingerprint of the training data &mdash; which is exactly why a model tokenizes unfamiliar domains inefficiently.
 
 ## Where that leaves you
 
-BPE is a compression algorithm repurposed as a vocabulary builder: merge what is frequent, leave the rest in pieces. This lab runs the genuine training loop on whatever corpus you paste in &mdash; the merge table you see is the actual product of counting pairs, not a stored example. Real tokenizers add byte-level fallbacks and pre-tokenization rules, but the core loop is exactly this.
+BPE is a compression algorithm repurposed as a vocabulary builder: merge what is frequent, leave the rest in pieces. This lab runs the genuine training loop on whatever corpus you paste in. The merge table you see is the actual product of counting pairs, not a stored example. Real tokenizers add byte-level fallbacks and pre-tokenization rules, but the core loop is exactly this.
 
 ## The variants
 
@@ -304,7 +304,7 @@ Several well-known model behaviours trace directly back to this step.
 
 <strong>Poor spelling and character counting.</strong> "strawberry" may be two or three tokens, none of which is a letter. Asking how many r's it contains asks the model to reason about something it cannot see.
 
-<strong>Inconsistent arithmetic.</strong> "1234" might be one token or several depending on the tokeniser and the surrounding text, so digits are not consistently represented. Some newer models tokenise digits individually to improve this.
+<strong>Inconsistent arithmetic.</strong> "1234" might be one token or several depending on the tokeniser and the surrounding text. So digits are not consistently represented. Some newer models tokenise digits individually to improve this.
 
 <strong>Context limits in tokens, not words.</strong> A 128,000-token window is roughly 96,000 English words, and far fewer for code or other scripts.
 

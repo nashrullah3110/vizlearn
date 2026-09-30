@@ -11,7 +11,7 @@ But notice what it is multiplied against. It never touches the old memory. It sc
 
 $$C_t = \underbrace{f_t \odot C_{t-1}}_{\text{what survives}} + \underbrace{i_t \odot \tilde{C}_t}_{\text{what gets written}}$$
 
-The input gate and the [candidate layer](candidate_memory_in_lstm.html) form a division of labour: the candidate proposes what to write, and the input gate decides how much of it to accept. A gate value near 0 blocks a memory slot entirely; near 1, it writes the candidate's full proposal. This element-wise scaling means different slots can be updated by different amounts on the same timestep &mdash; the LSTM can simultaneously write strongly to one slot and barely touch another. During backpropagation, the gradient to the candidate flows through the input gate, and the gradient to the input gate flows through the candidate, so training adjusts both what content is proposed and how aggressively it is written. The [forget gate](forget_gate_in_lstm.html) and input gate together control the memory's evolution: the forget gate erases selectively, and the input gate writes selectively. When the forget gate is near 1 and the input gate is near 0, the memory is copied forward unchanged &mdash; the LSTM is coasting. When both are active, the memory is being rewritten. This page animates the input gate and candidate at each timestep, shows which memory slots receive new content, and covers the forget-input interplay.
+The input gate and the [candidate layer](candidate_memory_in_lstm.html) form a division of labour: the candidate proposes what to write, and the input gate decides how much of it to accept. A gate value near 0 blocks a memory slot entirely; near 1, it writes the candidate's full proposal. This element-wise scaling means different slots can be updated by different amounts on the same timestep. The LSTM can at once write strongly to one slot and barely touch another. During backpropagation, the gradient to the candidate flows through the input gate, and the gradient to the input gate flows through the candidate. So training adjusts both what content is proposed and how aggressively it is written. The [forget gate](forget_gate_in_lstm.html) and input gate together control the memory's evolution: the forget gate erases selectively, and the input gate writes selectively. When the forget gate is near 1 and the input gate is near 0, the memory is copied forward unchanged &mdash; the LSTM is coasting. When both are active, the memory is being rewritten. This page animates the input gate and candidate at each timestep, shows which memory slots receive new content, and covers the forget-input interplay.
 
 ## Two Layers, Two Different Jobs
 
@@ -24,7 +24,7 @@ Splitting the decision this way is what lets the cell be selective per dimension
 
 ## Why Addition, Not Replacement
 
-The written term is <em>added</em> to what the Forget Gate let through. This matters enormously. Replacement would destroy old memory every time something new arrived; addition lets the cell <strong>accumulate</strong> &mdash; keeping the subject of a sentence while layering on new adjectives.
+The written term is <em>added</em> to what the Forget Gate let through. This matters enormously. Replacement would destroy old memory every time something new arrived; addition lets the cell <strong>build up</strong>. Keeping the subject of a sentence while layering on new adjectives.
 
 It also protects the gradient. Addition passes gradients backwards unchanged, which is precisely why the cell state acts as a highway through time rather than a lossy relay.
 
@@ -78,7 +78,7 @@ The cell update has two terms, and the two gates control one each. That independ
 
 The third row is what a GRU cannot do. Its update gate uses `z` and `1 − z`, so keeping the old state at full strength forces the new contribution to zero. An LSTM can do both, and that is the expressiveness it buys with its extra gate.
 
-The `1 → 1` case matters in practice: it is how a cell accumulates evidence over several steps, such as building up a sentiment reading across a sentence rather than replacing it word by word.
+The `1 → 1` case matters in practice: it is how a cell builds up evidence over several steps, such as building up a sentiment reading across a sentence rather than replacing it word by word.
 
 ## The gate that decides what is worth storing
 
@@ -197,9 +197,9 @@ print("   flood the memory before the model has learned what matters.")
 ## Things to try
 
 1. <strong>Run the simulation.</strong> The highlighted route shows $i_t$ leaving the glowing gate, meeting the candidate at the $\times$ operator, and only then rising to the $+$ on the conveyor belt.
-2. <strong>Set the gate to 0 but leave the candidate at 0.80.</strong> The written amount drops to zero. The network did all the work of computing a rich candidate and then threw it away &mdash; the cell state simply passes through untouched.
+2. <strong>Set the gate to 0 but leave the candidate at 0.80.</strong> The written amount drops to zero. The network did all the work of computing a rich candidate and then threw it away. The cell state simply passes through untouched.
 3. <strong>Open the gate to 1.00 and sweep the candidate.</strong> Now the written amount tracks the candidate exactly, including negative values that pull the memory slot down.
-4. <strong>Try gate 1.00 with candidate 0.00.</strong> Nothing is written even though the gate is wide open &mdash; proof that the gate controls volume, not content.
+4. <strong>Try gate 1.00 with candidate 0.00.</strong> Nothing is written even though the gate is wide open. Proof that the gate controls volume, not content.
 
 ## In one line
 
@@ -209,7 +209,7 @@ The Input Gate is the LSTM's write-enable line. It converts a proposal into an a
 
 <strong>The gate stays closed.</strong> If `i` is consistently near 0, nothing new ever enters memory and the cell state is frozen. The model behaves as if it had no memory at all beyond the current input. Usually a symptom of a learning rate or initialisation problem, or a task where the model has found no use for memory.
 
-<strong>The gate stays open.</strong> If `i` is consistently near 1 while the forget gate is also near 1, the cell state grows without bound as contributions accumulate. Values in the hundreds appear, tanh in the output path saturates, and gradients vanish through the output gate. Layer normalisation inside the cell is one remedy.
+<strong>The gate stays open.</strong> If `i` is consistently near 1 while the forget gate is also near 1, the cell state grows without bound as contributions build up. Values in the hundreds appear, tanh in the output path saturates, and gradients vanish through the output gate. Layer normalisation inside the cell is one remedy.
 
 <strong>Saturated sigmoids.</strong> A gate pinned at 0 or 1 has a derivative near zero, so it stops learning when to open and close. Keeping pre-activations in a reasonable range &mdash; scaled inputs, sensible initialisation &mdash; prevents it.
 

@@ -5,7 +5,7 @@ intro: <strong>Masked Language Modeling (MLM)</strong> is the pretraining object
 
 A causal model reads left to right and predicts what comes next, so it can never look ahead. MLM has no such restriction: the blank sits in the <em>middle</em>, and the model is free to use every token on both sides at once.
 
-Mask <span class="mono-font">soft</span> in "the cat sat on the ___ mat" and the left context narrows it to a modifier while the right context (<span class="mono-font">mat</span>) rules out most adjectives. Neither side alone is enough. That is why MLM produces such strong <em>understanding</em> representations &mdash; and why it cannot be used to generate text. BERT masks 15% of tokens in each training example, but not all of them become `[MASK]`: 80% are replaced with the mask token, 10% are replaced with a random word, and 10% are left unchanged. The random replacement prevents the model from learning that `[MASK]` is always present, and the unchanged tokens force it to build good representations even for visible words. The training objective is cross-entropy on only the masked positions &mdash; the model predicts over the full vocabulary at each masked slot, and the loss ignores the unmasked positions entirely. After pretraining, the MLM head is discarded and the encoder is fine-tuned for downstream tasks (classification, NER, question answering) by attaching a task-specific head. MLM cannot generate text because it has no notion of producing tokens left to right &mdash; it fills blanks, it does not continue sequences. GPT-style [causal language modelling](how_llms_predict_next_word.html) is the pretraining objective for generation. This page masks tokens in a sample sentence, shows the model's top predictions at each position, and covers the 80/10/10 split and why it matters.
+Mask <span class="mono-font">soft</span> in "the cat sat on the ___ mat" and the left context narrows it to a modifier while the right context (<span class="mono-font">mat</span>) rules out most adjectives. Neither side alone is enough. That is why MLM produces such strong <em>understanding</em> representations &mdash; and why it cannot be used to generate text. BERT masks 15% of tokens in each training example, but not all of them become `[MASK]`: 80% are replaced with the mask token, 10% are replaced with a random word, and 10% are left unchanged. The random replacement prevents the model from learning that `[MASK]` is always present, and the unchanged tokens force it to build good representations even for visible words. The training objective is cross-entropy on only the masked positions &mdash; the model predicts over the full vocabulary at each masked slot, and the loss ignores the unmasked positions entirely. After pretraining, the MLM head is discarded and the encoder is fine-tuned for downstream tasks (classification, NER, question answering) by attaching a task-specific head. MLM cannot generate text because it has no notion of producing tokens left to right. It fills blanks, it does not continue sequences. GPT-style [causal language modelling](how_llms_predict_next_word.html) is the pretraining objective for generation. This page masks tokens in a sample sentence, shows the model's top predictions at each position, and covers the 80/10/10 split and why it matters.
 
 ## The Curious 80 / 10 / 10 Split
 
@@ -27,7 +27,7 @@ Masked language modelling hides some tokens and trains the model to recover them
 
 <p class="mono-font">"The cat sat on the [MASK]" &rarr; predict "mat"</p>
 
-The difference from causal modelling is the direction of information flow. Here the model sees everything except the masked positions, so a token can be predicted from the words after it as well as before. That bidirectional context is what makes the resulting representations strong for understanding tasks &mdash; and it is exactly why the model cannot generate, since there is no notion of "next".
+The difference from causal modelling is the direction of information flow. Here the model sees everything except the masked positions, so a token can be predicted from the words after it as well as before. That bidirectional context is what makes the resulting representations strong for understanding tasks. And it is exactly why the model cannot generate, since there is no notion of "next".
 
 BERT's specific recipe masks 15% of tokens, and the composition is deliberate:
 
@@ -43,7 +43,7 @@ The last two look odd and solve a real problem. `[MASK]` never appears at fine-t
 
 Too little masking and each pass teaches almost nothing. Too much and there is not enough context left to make prediction possible.
 
-15% became the convention, and later work suggests the optimum is task- and scale-dependent &mdash; some studies find 40% works better for larger models.
+15% became the convention, and later work suggests the optimum is task- and scale-dependent. Some studies find 40% works better for larger models.
 
 There is a real efficiency consequence either way:
 
@@ -63,7 +63,7 @@ The output of masked pretraining is a model whose hidden states are excellent <s
 
 Those representations are what get used:
 
-- <strong>Embeddings</strong> for search, similarity and clustering &mdash; particularly after contrastive fine-tuning, as in Sentence-BERT.
+- <strong>Embeddings</strong> for search, similarity and clustering &mdash; especially after contrastive fine-tuning, as in Sentence-BERT.
 - <strong>Token classification</strong> &mdash; named entities, part of speech, where bidirectional context genuinely helps.
 - <strong>Sentence classification</strong> &mdash; sentiment, intent, topic, via the `[CLS]` position or pooled states.
 - <strong>Span extraction</strong> &mdash; extractive question answering, predicting start and end positions.
@@ -75,15 +75,15 @@ For all of these, an encoder fine-tuned on a few thousand labelled examples is o
 1. <strong>Mask a single strongly-constrained token</strong> such as <span class="mono-font">mat</span>. The top candidate should dominate &mdash; the surrounding words leave little freedom.
 2. <strong>Now mask an adjective</strong> like <span class="mono-font">soft</span>. Confidence spreads across several plausible words: the context permits a whole family of answers.
 3. <strong>Load the "bank / river" preset</strong> and mask <span class="mono-font">bank</span>. The words after it are what disambiguate the sense &mdash; exactly the information a left-to-right model would not yet have.
-4. <strong>Mask two adjacent tokens.</strong> Accuracy drops sharply, because MLM predicts each blank <em>independently</em> and cannot coordinate between them &mdash; a genuine known limitation of the objective.
+4. <strong>Mask two adjacent tokens.</strong> Accuracy drops sharply, because MLM predicts each blank <em>independently</em> and cannot coordinate between them. A genuine known limitation of the objective.
 
 ## About the model in this lab
 
-Predictions come from a small context-scoring model built live in your browser from the demo corpus shown in the vocabulary count &mdash; it ranks candidate words by how often they co-occur with the surviving context. It is a genuine calculation, not a canned list, but it is far simpler than a transformer: treat the <em>shape</em> of the results as the lesson, not the exact percentages.
+Predictions come from a small context-scoring model built live in your browser from the demo corpus shown in the vocabulary count. It ranks candidate words by how often they co-occur with the surviving context. It is a genuine calculation, not a canned list, but it is far simpler than a transformer: treat the <em>shape</em> of the results as the lesson, not the exact percentages.
 
 ## In one line
 
-MLM turns any raw text into supervised training data by deleting parts of it. Because the blank is surrounded rather than trailing, the model learns deep bidirectional understanding &mdash; ideal for classification, retrieval and question answering, and unsuitable for generation. That generative job belongs to causal models, which predict strictly forward.
+MLM turns any raw text into supervised training data by deleting parts of it. Because the blank is surrounded rather than trailing, the model learns deep bidirectional understanding. Ideal for classification, retrieval and question answering, and unsuitable for generation. That generative job belongs to causal models, which predict strictly forward.
 
 ## The variants that improved on BERT
 
@@ -95,7 +95,7 @@ MLM turns any raw text into supervised training data by deleting parts of it. Be
 |ELECTRA|Replaced-token detection instead of masking|
 |DistilBERT|Distilled from BERT: 40% smaller, 60% faster, ~97% of the quality|
 
-<strong>RoBERTa</strong> is the instructive one. Same architecture, same objective, and substantially better results &mdash; from training longer on more data with larger batches, masking dynamically (a different mask each epoch rather than one fixed at preprocessing), and dropping BERT's next-sentence-prediction objective, which turned out to be unhelpful.
+<strong>RoBERTa</strong> is the instructive one. Same architecture, same objective, and substantially better results &mdash; from training longer on more data with larger batches, masking dynamically (a different mask each epoch rather than one fixed at preprocessing), and dropping BERT's next-sentence-prediction objective. This turned out to be unhelpful.
 
 That is a useful general lesson: BERT's original recipe was not optimal, and a large part of the subsequent improvement came from training procedure rather than architecture.
 
@@ -140,7 +140,7 @@ Three things worth knowing when fine-tuning one:
 
 <strong>Continued pretraining helps on specialised domains.</strong> Running the masked objective on your own unlabelled corpus before supervised fine-tuning often gives a measurable gain, and needs no labels.
 
-<strong>The `[CLS]` representation is not a good sentence embedding</strong> out of the box &mdash; it was not trained for similarity. Use a model fine-tuned contrastively, or masked mean pooling.
+<strong>The `[CLS]` representation is not a good sentence embedding</strong> out of the box. It was not trained for similarity. Use a model fine-tuned contrastively, or masked mean pooling.
 
 <strong>512 tokens is the usual limit.</strong> Longer documents need chunking, or a long-context variant such as Longformer.
 
@@ -297,7 +297,7 @@ print("   the two middle rows.")
 
 <strong>Why the 80/10/10 split?</strong> Because `[MASK]` does not exist at fine-tuning time; the random and unchanged cases prevent the model relying on the token's presence.
 
-<strong>Should I continue pretraining on my domain?</strong> If you have a substantial unlabelled domain corpus, usually yes &mdash; it is cheap and often helps.
+<strong>Should I continue pretraining on my domain?</strong> If you have a substantial unlabelled domain corpus, usually yes. It is cheap and often helps.
 
 <strong>What is `[CLS]` for?</strong> A position whose final representation is used as a sequence summary for classification.
 

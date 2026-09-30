@@ -5,7 +5,7 @@ intro: Group a list of records by a field. Then invert a dictionary so the value
 
 <strong>Grouping</strong> turns a flat sequence into a dictionary of lists, keyed on some property. <strong>Inverting</strong> swaps keys and values. Both are one-liners once the right tool is known, and both have a trap.
 
-Grouping's trap is forgetting that the key function can collide &mdash; two records produce the same key, so the value must be a list, not a single item. `defaultdict(list)` handles this; a plain dict comprehension silently drops duplicates. Inverting's trap is that values may not be unique, so the reversed dictionary can lose entries. This page shows `defaultdict`, `setdefault`, and `itertools.groupby` for grouping, safe and unsafe inversion patterns, and the performance difference between them at scale. The code blocks below build all three grouping variants and both inversion approaches on the same data so you can compare their output and timing directly.
+Grouping's trap is forgetting that the key function can collide &mdash; two records produce the same key. So the value must be a list, not a single item. `defaultdict(list)` handles this; a plain dict comprehension silently drops duplicates. Inverting's trap is that values may not be unique, so the reversed dictionary can lose entries. This page shows `defaultdict`, `setdefault`, and `itertools.groupby` for grouping, safe and unsafe inversion patterns, and the performance difference between them at scale. The code blocks below build all three grouping variants and both inversion approaches on the same data so you can compare their output and timing directly.
 
 ```python-run
 words = ["apple", "avocado", "banana", "blueberry", "cherry"]
@@ -172,7 +172,7 @@ The other requirement: <strong>values must be hashable</strong> to become keys. 
 
 ## Where this shows up
 
-Grouping is the shape behind most "organise this data" questions: anagram groups keyed on sorted letters, files keyed on their hash, log lines keyed on their level. Recognising it saves you from writing a nested loop that scans for an existing group &mdash; the accidental O(n&sup2;) this idiom exists to avoid. The one-pass `defaultdict` build is O(n); the nested-loop version that
+Grouping is the shape behind most "organise this data" questions: anagram groups keyed on sorted letters, files keyed on their hash, log lines keyed on their level. Recognising it saves you from writing a nested loop that scans for an existing group. The accidental O(n&sup2;) this idiom exists to avoid. The one-pass `defaultdict` build is O(n). The nested-loop version that
 re-scans the groups already built is O(n&sup2;), which on a hundred thousand
 records is the difference between ten thousand operations and ten billion &mdash;
 the same idiom, and the reason it is worth reaching for on sight.
@@ -208,7 +208,7 @@ for key, group in groupby(sorted(words, key=lambda w: w[0]), key=lambda w: w[0])
 for key, group in groupby(sorted(words, key=lambda w: w[0]), key=lambda w: w[0]):
     print(key, "->", list(group))
 ```
-Which costs O(n log n), while the `defaultdict` version is O(n). <strong>Prefer `defaultdict`</strong> unless the data is already sorted or the runs themselves are what you want &mdash; compressing repeated values, detecting consecutive duplicates, run-length encoding.
+Which costs O(n log n), while the `defaultdict` version is O(n). <strong>Prefer `defaultdict`</strong> unless the data is already sorted or the runs themselves are what you want. Compressing repeated values, detecting consecutive duplicates, run-length encoding.
 
 The other sharp edge: the group is an <em>iterator sharing the underlying stream</em>. It is exhausted as soon as you advance to the next group, so `list(group)` must happen before moving on. `groups = [(k, g) for k, g in groupby(x)]` yields empty groups for exactly this reason.
 
