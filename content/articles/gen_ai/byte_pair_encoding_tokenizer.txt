@@ -3,10 +3,10 @@ intro: Before a language model sees a single word, a <strong>tokenizer</strong> 
 
 ## The Two Failure Modes It Avoids
 
-- <strong>Word-level:</strong> each distinct word needs its own entry. The vocabulary explodes into the millions, and any word missing from it becomes a useless <span class="mono-font">[UNK]</span>. Each typo, name and new term is lost.
-- <strong>Character-level:</strong> a tiny vocabulary that can spell anything, but sequences become enormously long and the model must relearn that <span class="mono-font">c-a-t</span> means something.
+- <strong>Word-level:</strong> each distinct word needs its own entry. The vocabulary explodes into the millions, and any word missing from it turns a useless <span class="mono-font">[UNK]</span>. Each typo, name and new term is lost.
+- <strong>Character-level:</strong> a tiny vocabulary that can spell a thing, but sequences turn enormously long and the model must relearn that <span class="mono-font">c-a-t</span> means a thing.
 
-BPE lands in between: frequent words become single tokens, rare words split into meaningful pieces, and <em>nothing</em> is ever out-of-vocabulary. The algorithm starts with the character-level vocabulary (plus a special end-of-word marker) and iteratively merges the most frequent adjacent pair into a new token. Each merge reduces the total sequence length by the number of instances of that pair. After a fixed number of merges (the vocabulary size minus the initial character set), the vocabulary is complete. GPT-2 uses 50,257 tokens; GPT-4 uses around 100,000. A larger vocabulary means shorter sequences (fewer tokens per sentence, so faster inference and a longer effective context window) but a larger embedding table. The merge order is the tokenizer &mdash; at inference time, it applies the same merges in the same priority to any new text, greedily splitting unknown words into the longest known pieces. This page runs BPE step by step on a sample corpus, shows the merge table growing after each iteration, and covers the vocabulary-size tradeoff that decides how many merges to perform.
+BPE lands in between: frequent words turn single tokens, rare words split into meaningful pieces, and <em>nothing</em> is ever out-of-vocabulary. The algorithm starts with the character-level vocabulary (plus a special end-of-word marker) and iteratively merges the most frequent adjacent pair into a new token. Each merge reduces the total sequence length by the number of instances of that pair. After a fixed number of merges (the vocabulary size minus the initial character set), the vocabulary is complete. GPT-2 uses 50,257 tokens; GPT-4 uses around 100,000. A larger vocabulary means shorter sequences (fewer tokens per sentence, so faster inference and a longer effective context window) but a larger embedding table. The merge order is the tokenizer &mdash; at inference time, it applies the same merges in the same priority to any new text, greedily splitting unknown words into the longest known pieces. This page runs BPE step by step on a sample corpus, shows the merge table growing after each iteration, and covers the vocabulary-size tradeoff that decides how many merges to perform.
 
 ## The Algorithm, in Four Lines
 
@@ -15,7 +15,7 @@ BPE lands in between: frequent words become single tokens, rare words split into
 3. Merge the <strong>single most frequent pair</strong> all over it occurs, and record that merge.
 4. Repeat until you have the number of merges you asked for.
 
-That is the entire method. Vocabulary size is simply base characters plus the number of merges &mdash; which is why it is an exact dial. Rather than something you discover after the fact.
+That is the entire method. Vocabulary size is simply base characters plus the number of merges &mdash; which is why it is an exact dial. Rather than a thing you discover after the fact.
 
 ## Merge Order Is the Model
 
@@ -37,7 +37,7 @@ Worked through on a tiny corpus &mdash; the words "low", "lower", "newest", "wid
 
 Continue until the vocabulary reaches the target size &mdash; 30,000 or 100,000 entries in practice. The merges are recorded in order, and applying them in that same order is how new text is tokenised.
 
-The outcome is a vocabulary that spends its budget where the text really is. Frequent words become single tokens; rare words remain as fragments; and. This is because the single characters (or bytes) are always in the vocabulary, <strong>nothing is ever unrepresentable</strong>.
+The outcome is a vocabulary that spends its budget where the text really is. Frequent words turn single tokens; rare words remain as fragments; and. This is because the single characters (or bytes) are always in the vocabulary, <strong>nothing is ever unrepresentable</strong>.
 
 That last property is why the `<UNK>` token has in effect disappeared from modern models.
 
@@ -66,7 +66,7 @@ Three observations from those lines.
 
 Plain BPE over characters has a gap: a character never seen in training cannot be shown. With Unicode's 149,000+ code points, that gap is real.
 
-<strong>Byte-level BPE</strong> operates on UTF-8 <em>bytes</em> rather than characters. There are only 256 doable bytes, all of which are in the base vocabulary. So <em>any</em> text in any script &mdash; plus emoji, plus binary noise &mdash; is representable.
+<strong>Byte-level BPE</strong> runs on UTF-8 <em>bytes</em> rather than characters. There are only 256 doable bytes, all of which are in the base vocabulary. So <em>any</em> text in any script &mdash; plus emoji, plus binary noise &mdash; is representable.
 
 The cost is speed for non-Latin scripts. A Chinese character is three UTF-8 bytes, so it costs at least one token and often more; the same sentence in Chinese and in English can differ severalfold in token count.
 
@@ -302,7 +302,7 @@ BPE is a compression algorithm repurposed as a vocabulary builder. Merge what is
 
 A few well-known model behaviours trace right back to this step.
 
-<strong>Poor spelling and character counting.</strong> "strawberry" may be two or three tokens, none of which is a letter. Asking how many r's it holds asks the model to reason about something it cannot see.
+<strong>Poor spelling and character counting.</strong> "strawberry" may be two or three tokens, none of which is a letter. Asking how many r's it holds asks the model to reason about a thing it cannot see.
 
 <strong>Inconsistent arithmetic.</strong> "1234" might be one token or a few depending on the tokeniser and the nearby text. So digits are not always shown. Some newer models tokenise digits one by one to improve this.
 
@@ -310,7 +310,7 @@ A few well-known model behaviours trace right back to this step.
 
 <strong>Response to trailing spaces.</strong> Because the space is part of the token, a prompt ending with a space tokenises differently from one that does not.
 
-<strong>The tokeniser must ship with the model.</strong> Token id 1,547 means one thing in one vocabulary and something else in another. A mismatch gives fluent nonsense rather than an error.
+<strong>The tokeniser must ship with the model.</strong> Token id 1,547 means one thing in one vocabulary and a thing else in one more. A mismatch gives fluent nonsense rather than an error.
 
 ## Questions people ask
 
@@ -329,7 +329,7 @@ A few well-known model behaviours trace right back to this step.
 ## Recap in one screen
 
 - BPE starts from characters and repeatedly merges the most frequent adjacent pair until the vocabulary is full.
-- Frequent words become single tokens; rare ones fragment; characters remain as a fallback. So nothing is unknown.
+- Frequent words turn single tokens; rare ones fragment; characters remain as a fallback. So nothing is unknown.
 - Byte-level BPE works on UTF-8 bytes, so any text is representable. At more tokens for non-Latin scripts.
 - WordPiece, Unigram and SentencePiece are changes on the same idea with different merge or pruning rules.
 - Tokenisation explains poor spelling, inconsistent arithmetic, token-based context limits and trailing-space response.

@@ -3,7 +3,7 @@ intro: How would you speed up a recursive function that recomputes the same valu
 
 ## The technique
 
-Cache a function's results keyed on its arguments. On a repeat call, return the stored value instead of recomputing.
+Cache a function's results keyed on its inputs. On a repeat call, return the stored value instead of recomputing.
 
 The canonical case is Fibonacci:
 
@@ -32,11 +32,11 @@ O(n), and `fib(40)` returns instantly. One decorator.
 |20|21,891|21|
 |40|331,160,281|41|
 
-The pattern extends far beyond Fibonacci. Any pure function (same inputs always give the same output) with overlapping subproblems gains: [edit distance](edit-distance.html), [coin change](coin-change.html), [climbing stairs](climbing-stairs.html). And most dynamic programming problems. The manual approach uses a dictionary keyed on the function's arguments; `functools.lru_cache` automates it with a decorator and adds a bounded cache with LRU eviction. `@cache` (Python 3.9+) is the unbounded variant. The tradeoff is memory: each distinct argument tuple stores a result. So a function called with millions of distinct inputs builds a million-entry dictionary. For iterative DP (bottom-up), a table or two variables replace the dictionary fully, using O(1) or O(n) space without recursion depth limits. Python's default recursion limit is 1000, so memoised recursion on large inputs needs `sys.setrecursionlimit` or an iterative rewrite. This page runs both the naive and memoised versions, prints the call count at each step, and shows the cache hit rate.
+The pattern extends far beyond Fibonacci. Any pure function (same inputs always give the same output) with overlapping subproblems gains: [edit distance](edit-distance.html), [coin change](coin-change.html), [climbing stairs](climbing-stairs.html). And most dynamic programming problems. The manual approach uses a dictionary keyed on the function's inputs; `functools.lru_cache` automates it with a decorator and adds a bounded cache with LRU eviction. `@cache` (Python 3.9+) is the unbounded variant. The tradeoff is memory: each distinct input tuple stores a result. So a function called with millions of distinct inputs builds a million-entry dictionary. For iterative DP (bottom-up), a table or two variables replace the dictionary fully, using O(1) or O(n) space without recursion depth limits. Python's default recursion limit is 1000, so memoised recursion on large inputs needs `sys.setrecursionlimit` or an iterative rewrite. This page runs both the naive and memoised versions, prints the call count at each step, and shows the cache hit rate.
 
 ## Run it
 
-The same recurrence three ways with call counts, then <code>cache_info()</code> showing the hit rate. Then the two conditions broken on purpose. An impure function and an unhashable argument.
+The same recurrence three ways with call counts, then <code>cache_info()</code> showing the hit rate. Then the two conditions broken on purpose. An impure function and an unhashable input.
 
 ```python-run
 from functools import lru_cache
@@ -135,7 +135,7 @@ def fib_manual(n, memo=None):
 
 print(fib_manual(30))
 ```
-Note `memo=None` rather than `memo={}`. A mutable default argument is created <strong>once, at function definition</strong>, and shared by each call that does not supply one. So results leak between unrelated invocations. It happens to work for a pure function like Fibonacci and is a genuine bug broadly, and interviewers watch for it.
+Note `memo=None` rather than `memo={}`. A mutable default input is created <strong>once, at function definition</strong>, and shared by each call that does not supply one. So results leak between unrelated invocations. It happens to work for a pure function like Fibonacci and is a genuine bug broadly, and interviewers watch for it.
 
 The manual version is worth knowing because it is what you write when the cache needs to be inspected, bounded by a custom rule, or shared by name between calls.
 
@@ -143,11 +143,11 @@ The manual version is worth knowing because it is what you write when the cache 
 
 Three conditions, and all three are needed:
 
-<strong>The function is pure</strong> &mdash; same arguments always give the same result, with no side effects. Memoising a function that reads a database or the clock returns stale answers.
+<strong>The function is pure</strong> &mdash; same inputs always give the same result, with no side effects. Memoising a function that reads a store or the clock returns stale answers.
 
-<strong>Arguments are hashable.</strong> Lists and dictionaries cannot be cache keys; convert to tuples or frozensets.
+<strong>Inputs are hashable.</strong> Lists and dictionaries cannot be cache keys; convert to tuples or frozensets.
 
-<strong>Subproblems repeat.</strong> Caching a function called once per distinct argument adds cost for nothing.
+<strong>Subproblems repeat.</strong> Caching a function called once per distinct input adds cost for nothing.
 
 That third point is the one that separates memoisation from a general speed-up. It is just the "overlapping subproblems" condition of dynamic programming. Memoisation <em>is</em> top-down dynamic programming.
 
@@ -163,13 +163,13 @@ That third point is the one that separates memoisation from a general speed-up. 
 
 Naive recursion on overlapping subproblems recomputes the same values an rapid number of times. Memoisation does not make each call faster; it makes the repeated ones disappear. So the work drops to the number of <em>distinct</em> subproblems.
 
-This is dynamic programming from the top down. The bottom-up table computes the same values in a loop with no call stack. Same cost, and see <a href="../dsa/dynamic_programming.html">dynamic programming</a> for both directions side by side.
+This is dynamic programming from the top down. The bottom-up table computes the same values in a loop with no call stack. Same cost, and see <a href="../dsa/dynamic_programming.html">dynamic programming</a> for both ways side by side.
 
 ## The two conditions
 
-<p><strong>The function must be pure.</strong> Same arguments, same answer, no side effects. Caching a function that reads a file or the clock returns a stale answer forever. And the bug looks like the data being wrong rather than the cache being wrong.</p>
+<p><strong>The function must be pure.</strong> Same inputs, same answer, no side effects. Caching a function that reads a file or the clock returns a stale answer for good. And the bug looks like the data being wrong rather than the cache being wrong.</p>
 
-<p><strong>The arguments must be hashable.</strong> They become dictionary keys, so a list argument raises. That is why cached functions take tuples where you might expect lists. The constraint comes from the cache, not the algorithm.</p>
+<p><strong>The inputs must be hashable.</strong> They turn dictionary keys, so a list input raises. That is why cached functions take tuples where you might expect lists. The constraint comes from the cache, not the algorithm.</p>
 
 ## What lru_cache adds
 
@@ -191,13 +191,13 @@ def expensive(x): ...
 print(expensive.cache_info())            # hits, misses, maxsize, currsize
 print(expensive.cache_clear())
 ```
-`cache_info()` is the practically useful part: it tells you whether the cache is earning its place. A hit rate near zero means the arguments rarely repeat and the decorator is pure cost.
+`cache_info()` is the nearly useful part: it tells you whether the cache is earning its place. A hit rate near zero means the inputs rarely repeat and the decorator is pure cost.
 
 Four constraints worth knowing:
 
-<strong>Arguments must be hashable.</strong> `lru_cache` keys on the argument tuple, so a list argument raises `TypeError`.
+<strong>Inputs must be hashable.</strong> `lru_cache` keys on the input tuple, so a list input raises `TypeError`.
 
-<strong>Keyword and positional arguments key differently.</strong> `f(1)` and `f(x=1)` are separate cache entries. This doubles memory and halves the hit rate if callers are inconsistent.
+<strong>Keyword and positional inputs key differently.</strong> `f(1)` and `f(x=1)` are separate cache entries. This doubles memory and halves the hit rate if callers are inconsistent.
 
 <strong>`maxsize=None` never evicts.</strong> On unbounded input that is a memory leak; a bounded size is safer in long-running processes.
 
@@ -222,12 +222,12 @@ Write memoisation first, because the recurrence is the part you have to think ab
 ## Where it is used beyond interviews
 
 - <strong>Web response caching.</strong> Keyed on the request, with a TTL.
-- <strong>Database query caching.</strong> Same query, same result, until the data changes.
-- <strong>Costly pure steps</strong> &mdash; parsing, compiling regular expressions (`re.compile` is itself cached), rendering templates.
+- <strong>Store query caching.</strong> Same query, same result, until the data changes.
+- <strong>Costly pure steps</strong> &mdash; parsing, compiling regular terms (`re.compile` is itself cached), rendering templates.
 - <strong>Property caching</strong> &mdash; `functools.cached_property` computes once per instance.
 - <strong>API clients</strong> caching immutable lookups such as currency codes or country lists.
 
-And the counterpart: <strong>invalidation is the hard part</strong>. A cache with no invalidation plan in time serves stale data, and "when does this become wrong?" is the question to ask before adding one. For pure functions the answer is never, which is why memoisation is the easy case.
+And the counterpart: <strong>invalidation is the hard part</strong>. A cache with no invalidation plan in time serves stale data, and "when does this turn wrong?" is the question to ask before adding one. For pure functions the answer is never, which is why memoisation is the easy case.
 
 ## Questions people ask
 
@@ -235,7 +235,7 @@ And the counterpart: <strong>invalidation is the hard part</strong>. A cache wit
 
 <strong>Is `lru_cache` thread-safe?</strong> Yes, its bookkeeping is &mdash; and the wrapped function may still be called twice concurrently for the same key.
 
-<strong>What if arguments are unhashable?</strong> Convert to tuples or frozensets, or hash a canonical serialisation.
+<strong>What if inputs are unhashable?</strong> Convert to tuples or frozensets, or hash a canonical serialisation.
 
 <strong>How large should `maxsize` be?</strong> Large enough for the working set, small enough to bound memory. Use `cache_info()` to check the hit rate.
 
@@ -245,8 +245,8 @@ And the counterpart: <strong>invalidation is the hard part</strong>. A cache wit
 
 ## Recap in one screen
 
-- Store results keyed on arguments; return the stored value on a repeat call.
+- Store results keyed on inputs; return the stored value on a repeat call.
 - `@lru_cache` or `@cache` turns rapid recursion into linear in one line.
-- Needs a pure function, hashable arguments, and truly repeating subproblems.
-- Never use a mutable default argument as the cache. It is shared across all calls.
+- Needs a pure function, hashable inputs, and truly repeating subproblems.
+- Never use a mutable default input as the cache. It is shared across all calls.
 - Memoisation is top-down dynamic programming; tabulation is the iterative form without a recursion limit.

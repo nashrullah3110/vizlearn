@@ -1,43 +1,43 @@
 title: Permission filtering in RAG retrieval: A Practical Guide
 intro: How do you stop a RAG system retrieving documents the user is not allowed to see?
 
-## Why post-filtering quietly fails
+## Why post-sifting quietly fails
 
 Retrieve the top 10 by likeness, then remove what the user may not see. If eight were restricted you return two, and nothing reports that the result set collapsed. The generator answers from thin evidence and sounds no less confident.
 
 Over-fetching &mdash; retrieve 100, filter, keep 10 &mdash; makes it less likely and never fixes it. A user with access to 0.1% of the corpus needs an enormous k. And the failure is worst just for the most restricted users.
 
-The core problem is that vector likeness search and access control operate on different axes. The index ranks by semantic relevance; the access layer filters by who is allowed to see what. Combining them correctly is a systems problem, not a modelling problem, and there are three approaches.
+The core problem is that vector likeness search and access control run on different axes. The index ranks by semantic fit; the access layer filters by who is allowed to see what. Combining them correctly is a systems problem, not a modelling problem, and there are three approaches.
 
-Pre-filtering restricts the search space before retrieval: only documents the user is allowed to see are candidates. This guarantees the result set is clean and the right size. But it needs the vector index to support metadata filtering fast. Not all indexes do — a naive implementation scans the full corpus and checks permissions per document. This is as slow as brute-force search.
+Pre-sifting restricts the search space before retrieval: only documents the user is allowed to see are candidates. This guarantees the result set is clean and the right size. But it needs the vector index to support metadata sifting fast. Not all indexes do — a naive implementation scans the full corpus and checks permissions per document. This is as slow as brute-force search.
 
-Post-filtering fetches by relevance first and removes forbidden documents afterwards. It is simple to implement but unreliable: the result set shrinks unpredictably. And the generator must work with any remains. Raising k helps probabilistically but never guarantees enough permitted results.
+Post-sifting fetches by fit first and removes forbidden documents afterwards. It is simple to implement but unreliable: the result set shrinks unpredictably. And the generator must work with any remains. Raising k helps probabilistically but never guarantees enough permitted results.
 
 Hybrid approaches retrieve a large candidate set, filter it. Then backfill from a wider search if too few documents survive. This is more complex but gives a steady result size. The trade-off is latency: two retrieval rounds instead of one. And the backfill query may not be as well-targeted as the first.
 
 Whichever approach you choose, the permission model itself must be correct. A document tagged with the wrong access group will be served to unauthorised users silently and confidently. Permission metadata must be propagated from the source system at indexing time and kept in sync when access rules change.
 
-## Pre-filtering, and why it is harder than it looks
+## Pre-sifting, and why it is harder than it looks
 
-Pre-filtering restricts the candidate set before ranking, so the top k is k <em>permitted</em> results. That is the correct behaviour and it fights the index. An HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search. You traverse into a region where all of it is filtered out and the walk stalls.
+Pre-sifting restricts the candidate set before ranking, so the top k is k <em>permitted</em> results. That is the correct behaviour and it fights the index. An HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search. You traverse into a region where all of it is sifted out and the walk stalls.
 
-Vector databases handle this differently, which is one of the real gaps between them. Options include filtered graph traversal, per-tenant sub-indexes (clean, and costly at many tenants), and falling back to a flat scan when the filter is very selective &mdash;. This is often truly fastest,. This is because the permitted set is small.
+Vector stores handle this differently, which is one of the real gaps between them. Options include sifted graph traversal, per-tenant sub-indexes (clean, and costly at many tenants), and falling back to a flat scan when the filter is very selective &mdash;. This is often truly fastest,. This is because the permitted set is small.
 
 ## Where the permissions live
 
-Baking an access list into each chunk's metadata at index time is fast and goes stale the moment someone leaves a group. And stale permissions fail open, which is the wrong direction.
+Baking an access list into each chunk's metadata at index time is fast and goes stale the moment someone leaves a group. And stale permissions fail open, which is the wrong way.
 
-The usual compromise: index a stable <em>group</em> identifier with each chunk, resolve the user's groups per request from the identity system, and filter on the intersection. Group membership changes are then reflected at once without re-indexing anything.
+The usual compromise: index a stable <em>group</em> identifier with each chunk, resolve the user's groups per request from the identity system, and filter on the intersection. Group membership changes are then reflected at once without re-indexing a thing.
 
-Two more things to say. Deleted documents must leave the index, not just be filtered out. And the filter belongs on the server, derived from the authenticated session. Never from a client-supplied user id, which is trivially forged.
+Two more things to say. Deleted documents must leave the index, not just be sifted out. And the filter belongs on the server, derived from the authenticated session. Never from a client-supplied user id, which is trivially forged.
 
-## Why pre-filtering fights the index
+## Why pre-sifting fights the index
 
-Pre-filtering is the correct behaviour and it is truly hard to implement,. This is because an ANN index was built over the whole corpus and does not know about your predicate.
+Pre-sifting is the correct behaviour and it is truly hard to implement,. This is because an ANN index was built over the whole corpus and does not know about your predicate.
 
-Walking an HNSW graph while skipping most nodes can <strong>disconnect the traversal</strong>. The search reaches a region where each neighbour is filtered out and stalls. This returns far fewer results than asked for even though plenty of permitted documents exist elsewhere in the graph.
+Walking an HNSW graph while skipping most nodes can <strong>disconnect the traversal</strong>. The search reaches a region where each neighbour is sifted out and stalls. This returns far fewer results than asked for even though plenty of permitted documents exist elsewhere in the graph.
 
-The plans databases use, all with trade-offs: filtered traversal that keeps searching past excluded nodes; per-tenant sub-indexes. This are clean and costly once tenants number in the thousands; and falling back to a flat scan when the filter is selective &mdash;. This is often truly fastest. Since a user with access to 0.1% of a million documents is a thousand-vector brute force.
+The plans stores use, all with trade-offs: sifted traversal that keeps searching past excluded nodes; per-tenant sub-indexes. This are clean and costly once tenants number in the thousands; and falling back to a flat scan when the filter is selective &mdash;. This is often truly fastest. Since a user with access to 0.1% of a million documents is a thousand-vector brute force.
 
 ## Getting the model right, and failing closed
 
@@ -45,15 +45,15 @@ Two design rules cover most of the damage.
 
 <p><strong>Derive the filter from the session, never the request.</strong> A client-supplied user or group id is trivially forged. The filter must be built server-side from the authenticated identity.</p>
 
-<p><strong>Index groups, resolve membership per query.</strong> Baking a user list into each chunk means a departure leaves the index granting access until the next re-index. And stale permissions fail <em>open</em>, which is the wrong direction. Indexing a stable group id and resolving the user's groups per request makes revocation immediate.</p>
+<p><strong>Index groups, resolve membership per query.</strong> Baking a user list into each chunk means a departure leaves the index granting access until the next re-index. And stale permissions fail <em>open</em>, which is the wrong way. Indexing a stable group id and resolving the user's groups per request makes revocation immediate.</p>
 
-Also: filtering is not deletion. A document removed for legal or privacy reasons must leave the index and any cached answers derived from it. Or it remains recoverable by anyone who can still see it &mdash; which is a different and worse problem than a missing result.
+Also: sifting is not deletion. A document removed for legal or privacy reasons must leave the index and any cached answers derived from it. Or it remains recoverable by anyone who can still see it &mdash; which is a different and worse problem than a missing result.
 
 ## The failure mode that matters most
 
 A RAG system fetches documents and puts them in a prompt. If the retrieval does not respect who is asking, the model will faithfully summarise a document the user was never allowed to see. And it will do so fluently, with a citation.
 
-That is a data breach with a helpful tone. And it is the most consequential thing that can go wrong in an enterprise retrieval system. Unlike a hallucination, it is not a quality problem; it is a security one.
+That is a data breach with a helpful tone. And it is the most consequential thing that can go wrong in an enterprise retrieval system. Unlike a hallucination, it is not a grade problem; it is a security one.
 
 The requirement is straightforward to state and easy to implement incorrectly: <strong>the set of documents thought of must be just the set this user may read</strong>.
 
@@ -61,11 +61,11 @@ The requirement is straightforward to state and easy to implement incorrectly: <
 
 There are three places it could go, and only one is correct.
 
-<strong>After generation</strong> &mdash; check the answer for leaked content. Hopeless: the content is already in the output, and paraphrase makes detection unreliable.
+<strong>After generation</strong> &mdash; check the answer for leaked content. Hopeless: the content is now in the output, and paraphrase makes detection unreliable.
 
-<strong>After retrieval, before the prompt</strong> &mdash; retrieve k documents, discard the ones the user cannot see, pass the rest. Better, and still wrong in two ways: the unauthorised documents taken slots. So fewer authorised ones were thought of; and their content has already been loaded into the use's memory.
+<strong>After retrieval, before the prompt</strong> &mdash; retrieve k documents, discard the ones the user cannot see, pass the rest. Better, and still wrong in two ways: the unauthorised documents taken slots. So fewer authorised ones were thought of; and their content has now been loaded into the use's memory.
 
-<strong>Inside the search</strong> &mdash; the index only ever thinks of documents matching the user's permissions. This is the correct answer, and it needs the store to support filtered search.
+<strong>Inside the search</strong> &mdash; the index only ever thinks of documents matching the user's permissions. This is the correct answer, and it needs the store to support sifted search.
 
 ```python
 results = store.search(
@@ -75,7 +75,7 @@ results = store.search(
 )
 ```
 
-The gap between the second and third options is not theoretical. With post-filtering, a user in a small group querying a corpus ruled by other groups' documents may get zero results while apt authorised documents exist &mdash;. This is because all ten fetched slots went to documents they cannot see.
+The gap between the second and third options is not theoretical. With post-sifting, a user in a small group querying a corpus ruled by other groups' documents may get zero results while apt authorised documents exist &mdash;. This is because all ten fetched slots went to documents they cannot see.
 
 ## Modelling permissions in metadata
 
@@ -89,7 +89,7 @@ The filter can only express what the metadata records, so the model has to be de
 |Attribute-based|`region`, `department`, `classification`|several predicates combined|
 |Row-level via source|Reference to the source system|Resolve at query time|
 
-<strong>Group-based ACLs</strong> cover most cases and are what most source systems already provide. Store the list of group ids permitted to read each document, and filter on intersection with the requesting user's groups.
+<strong>Group-based ACLs</strong> cover most cases and are what most source systems now provide. Store the list of group ids permitted to read each document, and filter on intersection with the requesting user's groups.
 
 Two hard parts:
 
@@ -97,9 +97,9 @@ Two hard parts:
 
 <strong>Permission changes.</strong> When someone leaves a group, or a document is reclassified, the index is stale and will over-share until it is updated. Permissions change far more often than document content, so they need their own refresh path. Ideally event-driven, and at minimum on a short schedule.
 
-## Post-filtering, measured, and why it fails quietly
+## Post-sifting, measured, and why it fails quietly
 
-The article says post-filtering quietly fails. That is a claim with a number, and the number is worse than most people expect. This measures it, then measures the pre-filtering approach that fixes it and the new problem that one creates.
+The article says post-sifting quietly fails. That is a claim with a number, and the number is worse than most people expect. This measures it, then measures the pre-sifting approach that fixes it and the new problem that one creates.
 
 ```python-run
 import numpy as np
@@ -165,7 +165,7 @@ print("   the user can see, so the least privileged users pay the most --")
 print("   and k has to be chosen before you know f.")
 ```
 
-Filtering before ranking instead of after removes that whole failure mode. The search only ever sees documents the user is allowed to have.
+Sifting before ranking instead of after removes that whole failure mode. The search only ever sees documents the user is allowed to have.
 
 ```python-run
 import numpy as np
@@ -189,7 +189,7 @@ for frac in (0.90, 0.50, 0.20, 0.05, 0.01):
 print("   correct at every privilege level, which is the whole argument.")
 ```
 
-Pre-filtering is correct, so the question is why anyone still post-filters. And the answer is that an approximate index does not tolerate having nodes yanked out from below its search.
+Pre-sifting is correct, so the question is why anyone still post-filters. And the answer is that an approximate index does not tolerate having nodes yanked out from below its search.
 
 ```python-run
 NPROBE_SCAN = 400
@@ -212,7 +212,7 @@ print("%-30s %s" % ("a partitioned index per group", "duplicated storage"))
 print("%-30s %s" % ("filter inside the index walk", "needs store support"))
 ```
 
-None of this is about ranking at all once permissions themselves go stale. And an index that was correct when it was built can become wrong the moment an access grant changes.
+None of this is about ranking at all once permissions themselves go stale. And an index that was correct when it was built can turn wrong the moment an access grant changes.
 
 ```python-run
 print("AND THE PART THAT IS NOT ABOUT RANKING AT ALL. permissions change,")
@@ -239,13 +239,13 @@ print("   that a user CANNOT retrieve a document, run on every deploy.")
 
 ## Things to try
 
-1. Drop <strong>corpus visible</strong> to 5%. Post-filtering returns almost nothing while pre-filtering still returns k. The control fails worst for the most restricted user.
+1. Drop <strong>corpus visible</strong> to 5%. Post-sifting returns almost nothing while pre-sifting still returns k. The control fails worst for the most restricted user.
 2. Raise <strong>over-fetch</strong> to 500. The shortfall shrinks and never disappears, which is why over-fetching is a mitigation rather than a fix.
 3. Set visibility to 100%. All three plans agree, which is just why this bug survives testing on an admin account.
 
 ## What to recall
 
-Permission filtering has to happen inside the search, not around it. Post-filtering ranks first and drops afterwards, so it silently returns fewer results than requested and degrades worst for the most restricted users. Filtering after generation is not a control at all. The model has already read the text. Index a group id and resolve membership per request, because stale permissions fail open.
+Permission sifting has to happen inside the search, not around it. Post-sifting ranks first and drops afterwards, so it silently returns fewer results than requested and degrades worst for the most restricted users. Sifting after generation is not a control at all. The model has now read the text. Index a group id and resolve membership per request, because stale permissions fail open.
 
 ## Late-binding permissions
 
@@ -260,9 +260,9 @@ An other to storing ACLs in the index is to resolve them at query time against t
 |Correctness during changes|Window of over-sharing|Correct immediately|
 |Filtering inside the search|Yes|No &mdash; post-filter only|
 
-The trade is sharp: resolving at query time is always correct and forces post-filtering. This brings back the slot-wastage problem.
+The trade is sharp: resolving at query time is always correct and forces post-sifting. This brings back the slot-wastage problem.
 
-The pragmatic combination used in practice is <strong>both</strong>: filter inside the search using indexed ACLs to get a correct-enough candidate set fast. Then verify the final choice against the source system before showing anything. The index filter does the heavy lifting; the verification catches the staleness window.
+The pragmatic combination used in practice is <strong>both</strong>: filter inside the search using indexed ACLs to get a correct-enough candidate set fast. Then verify the final choice against the source system before showing a thing. The index filter does the heavy lifting; the verification catches the staleness window.
 
 ## Failure modes to test for by name
 
@@ -273,7 +273,7 @@ Permission bugs do not announce themselves, so they have to be tested on purpose
 - <strong>Inherited restrictions</strong> on documents in restricted containers.
 - <strong>Deleted users and revoked groups.</strong>
 - <strong>Documents with no ACL recorded</strong> &mdash; decide whether the default is deny (correct) or allow (dangerous), and make it explicit.
-- <strong>Cached results.</strong> A cache keyed only on the query text will serve one user's authorised results to another. Cache keys must include the permission context.
+- <strong>Cached results.</strong> A cache keyed only on the query text will serve one user's authorised results to one more. Cache keys must include the permission context.
 
 That last one is worth stating plainly because caching is added later, as a speed improvement, by someone who is not thinking about permissions.
 
@@ -293,7 +293,7 @@ Retrieval is the main channel and not the only one.
 
 <strong>Can I filter after retrieval?</strong> It is not secure enough and it wastes retrieval slots. Filter inside the search.
 
-<strong>What if my vector store does not support filtered search?</strong> Over-retrieve heavily and post-filter as an interim measure, and treat it as a reason to change store.
+<strong>What if my vector store does not support sifted search?</strong> Over-retrieve heavily and post-filter as an interim measure, and treat it as a reason to change store.
 
 <strong>How do I keep permissions fresh?</strong> Event-driven updates from the source system, with a scheduled reconciliation as a backstop. Permissions change more often than content.
 
@@ -306,7 +306,7 @@ Retrieval is the main channel and not the only one.
 ## Recap in one screen
 
 - An unfiltered retrieval will faithfully summarise documents the user may not read.
-- Apply the filter <em>inside</em> the search; post-filtering both leaks and wastes retrieval slots.
+- Apply the filter <em>inside</em> the search; post-sifting both leaks and wastes retrieval slots.
 - Store effective ACLs at indexing time, resolving inheritance, and refresh them on its own of content.
 - Default to deny for documents with no recorded permissions, and test the no-groups case by name.
 - Caches, logs, conversation history and the vectors themselves are all extra leak channels.

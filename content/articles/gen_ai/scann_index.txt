@@ -5,10 +5,10 @@ intro: What is anisotropic vector quantization, and why does it beat plain quant
 
 Each quantiser on the last pages cuts squared reconstruction error:
 put the centroids where they make `‖q(x) − x‖²` as small as doable, summed
-over the corpus. That objective treats each direction of error as equally
+over the corpus. That objective treats each way of error as equally
 harmful.
 
-For **maximum inner product search** it is not. Here is the argument, and it
+For **maximum inner product search** it is not. Here is the input, and it
 is short enough to hold in your head.
 
 Take a stored vector `x` and its quantised version `q(x)`. Split the residual
@@ -26,7 +26,7 @@ is returned at all — are the ones roughly *aligned* with `x`. That is what
 For a query aligned with `x`, the parallel part `r∥` adds or subtracts
 almost right from the score. The perpendicular part `r⊥` projects onto
 that query only weakly, and across the set of such queries it points in
-in effect arbitrary directions and averages toward zero.
+in effect arbitrary ways and averages toward zero.
 
 So the two parts have very different effects on the thing you care about,
 and an objective that weights them equally is optimising the wrong quantity.
@@ -46,7 +46,7 @@ so you can see that the machinery does nothing until you ask it to.
 
 Raise η and vectors start choosing different centroids: the blue ones. They
 are accepting a larger *total* error in exchange for a smaller error along
-their own direction — a bad trade under the usual objective and a good one
+their own way — a bad trade under the usual objective and a good one
 under this one.
 
 The paper derives η from a target: if you care about vectors whose inner
@@ -64,7 +64,7 @@ That is not noise in the case; it is the nature of the claim.
 Anisotropic quantisation does not promise a better answer for a *given* query.
 It promises a better expected answer over the distribution of queries for
 which a vector would be a top result. A case that showed one query
-and declared victory would be gauging something the method never claimed.
+and declared victory would be gauging a thing the method never claimed.
 
 So the bars here are MIPS recall@k averaged over 48 fixed queries, computed by
 running both assignments against an exact inner-product answer. The
@@ -91,13 +91,13 @@ purpose.
 the full vectors.
 
 That last stage is why the middle one can afford to be so lossy. And it is the
-same argument as [IVF-PQ](ivf_pq_index.html)'s rerank: a cheap stage only has
+same input as [IVF-PQ](ivf_pq_index.html)'s rerank: a cheap stage only has
 to give a good candidate *set*, and an exact stage over a few hundred
-vectors fixes the ordering. Set the rescoring slider to zero here and both
+vectors fixes the sorting. Set the rescoring slider to zero here and both
 recall figures fall together — which tells you that a good part of ScaNN's
 benchmark spot is the rescoring, not the quantiser.
 
-## When the argument applies, and when it evaporates
+## When the input applies, and when it evaporates
 
 ScaNN leads the ann-benchmarks glove-100-angular leaderboard and is the right
 choice when the workload really is maximum inner product search:
@@ -105,16 +105,16 @@ recommendation scoring, two-tower retrieval, dot product against unnormalised
 embeddings.
 
 There is an key caveat. **If your vectors are L2-normalised, the
-anisotropy argument mostly evaporates.** With each vector the same length,
+anisotropy input mostly evaporates.** With each vector the same length,
 inner product, cosine and Euclidean ranking all coincide, and the parallel
-direction stops being special in the way the derivation needs. Many embedding
+way stops being special in the way the derivation needs. Many embedding
 models normalise by default — `sentence-transformers` does, OpenAI's
 embeddings arrive normalised — so this is worth checking before choosing an
 index on the strength of this result.
 
-The practical drawbacks are ecosystem rather than coded: ScaNN is a
-library rather than a database, tied to TensorFlow, with fewer integrations
-than HNSW. That is why it appears less often in vector database backends than
+The real drawbacks are ecosystem rather than coded: ScaNN is a
+library rather than a store, tied to TensorFlow, with fewer integrations
+than HNSW. That is why it appears less often in vector store backends than
 its benchmark spot suggests it should.
 
 ```python
@@ -133,10 +133,10 @@ neighbors, distances = searcher.search_batched(queries)
 ```
 
 Three lines, three stages. `num_leaves_to_search` is IVF's nprobe under
-another name; `anisotropic_quantization_threshold` is the parameter this whole
+one more name; `anisotropic_quantization_threshold` is the parameter this whole
 page is about; `reorder(100)` is the rescoring shortlist. Removing the
 `.reorder` call is the single change that most degrades the result, which is
-the same lesson as the IVF-PQ page from a different direction.
+the same lesson as the IVF-PQ page from a different way.
 
 ## What to check before choosing it
 
@@ -147,7 +147,7 @@ take minutes.
 the spread. If they are all 1.0 &mdash; which they are if you used
 `sentence-transformers` with its default, or OpenAI's embedding end
 &mdash; the anisotropy derivation has nothing to work with, because the
-parallel direction is only special when size carries data. Inner
+parallel way is only special when size carries data. Inner
 product, cosine and Euclidean rankings all coincide there, and a plain
 quantiser is doing the same job for less trouble.
 
@@ -167,11 +167,11 @@ And if both answers are no, the idea is still worth having. Decomposing
 quantisation error into a part that moves the score and one that mostly
 does not is the transferable part, and the question it poses &mdash; which
 errors is my ranking really sensitive to? &mdash; recurs wherever a cheap
-estimate feeds an ordering.
+estimate feeds an sorting.
 
 ## In one line
 
-ScaNN quantises with a loss that weights error along a vector's own direction
+ScaNN quantises with a loss that weights error along a vector's own way
 more heavily than error across it, because that is the part that distorts
 inner products for the queries that would have ranked the vector highly. Same
 code length, better MIPS recall — measured over a workload, not a query. The
@@ -180,23 +180,23 @@ last stage is what lets the middle one be so lossy.
 
 ## Questions people ask
 
-<strong>What does η really change?</strong> Which centroid each vector is assigned to, and nothing else. At η = 1 the assignment is the same to plain k-means; raise it and vectors begin accepting a larger *total* error in exchange for a smaller error along their own direction. The useful range is narrow &mdash; the gain peaks around 2 to 3 and shrinks by 6,. This is because weighting the parallel error too heavily starts ignoring perpendicular error that does still matter.
+<strong>What does η really change?</strong> Which centroid each vector is assigned to, and nothing else. At η = 1 the assignment is the same to plain k-means; raise it and vectors begin accepting a larger *total* error in exchange for a smaller error along their own way. The useful range is narrow &mdash; the gain peaks around 2 to 3 and shrinks by 6,. This is because weighting the parallel error too heavily starts ignoring perpendicular error that does still matter.
 
-<strong>Why does a single query sometimes get worse?</strong> Because the claim is about an hope, not a query. Anisotropic quantisation promises a better expected answer over the distribution of queries for which a vector would be a top result. A case that showed one query and declared victory would be gauging something the method never claimed.
+<strong>Why does a single query sometimes get worse?</strong> Because the claim is about an hope, not a query. Anisotropic quantisation promises a better expected answer over the distribution of queries for which a vector would be a top result. A case that showed one query and declared victory would be gauging a thing the method never claimed.
 
-<strong>Does it help if my embeddings are normalised?</strong> Mostly no. And it is the first thing to check. With each vector the same length, inner product, cosine and Euclidean ranking coincide and the parallel direction stops being special in the way the derivation needs.
+<strong>Does it help if my embeddings are normalised?</strong> Mostly no. And it is the first thing to check. With each vector the same length, inner product, cosine and Euclidean ranking coincide and the parallel way stops being special in the way the derivation needs.
 
 <strong>How much of the benchmark result is the quantiser?</strong> Not all of it. And not most of it. ScaNN as shipped is partition, quantised scoring, then exact rescoring of a few hundred candidates. And removing `.reorder()` degrades the result more than any η setting does.
 
 <strong>What is the fair baseline?</strong> IVF-PQ with refinement, because it is the same three-stage shape. Benchmarking a rescoring pipeline against a non-rescoring one attributes the rescoring to the quantiser.
 
-<strong>Why is it less common in vector databases than its benchmark spot suggests?</strong> Ecosystem. Rather than algorithm: it is a library. Rather than a database, tied to TensorFlow, with fewer integrations than HNSW. The algorithm is not what is holding it back.
+<strong>Why is it less common in vector stores than its benchmark spot suggests?</strong> Ecosystem. Rather than algorithm: it is a library. Rather than a store, tied to TensorFlow, with fewer integrations than HNSW. The algorithm is not what is holding it back.
 
 ## Recap in one screen
 
-- Squared reconstruction error treats each direction of error as equally harmful. For maximum inner product search it is not.
+- Squared reconstruction error treats each way of error as equally harmful. For maximum inner product search it is not.
 - Split the residual into parts parallel and perpendicular to the stored vector. For the queries that would rank that vector highly. Those roughly aligned with it. The parallel part moves the score almost right while the perpendicular part averages toward zero.
 - The loss weights them `η : 1` with η > 1. At η = 1 it is just k-means, which is the control condition worth setting first.
 - The payoff is a few points of MIPS recall at the same code length, measured over a workload rather than a query.
 - The shipped system is three stages: learned partition, anisotropic quantised scoring with in-register SIMD lookups, then exact rescoring. The last is what lets the middle one be so lossy.
-- If your vectors are L2-normalised the argument mostly evaporates. Check the norms before choosing an index on the strength of this result.
+- If your vectors are L2-normalised the input mostly evaporates. Check the norms before choosing an index on the strength of this result.

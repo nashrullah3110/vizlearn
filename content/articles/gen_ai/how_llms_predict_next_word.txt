@@ -7,21 +7,21 @@ Logits are unbounded and can be negative, so they are pushed through <strong>sof
 
 p&#7522; = exp(z&#7522; / T) / &Sigma;&#11002; exp(z&#11002; / T)
 
-Because of the rapid, small gaps in logits become large gaps in chance. A token scoring 2 points higher is not slightly more likely. It is roughly seven times more likely. The temperature T controls how peaked the distribution is: T=1 is the model's native confidence, T&lt;1 sharpens the distribution toward the top token (more deterministic), and T&gt;1 flattens it (more random). After softmax gives chances, a sampling plan picks the next token. Greedy decoding always takes the highest-chance token, which is fast but repetitive. Top-k sampling restricts the choice to the k most likely tokens and samples among them. Top-p (nucleus) sampling keeps the smallest set of tokens whose cumulative chance exceeds p. This adapts the candidate set size to the model's confidence. All three plans can be combined with temperature. The model then appends the chosen token to the input and runs the entire sequence through the transformer again to give the next token's logit distribution. This autoregressive loop goes on until a stop token is made or a length limit is reached. This page shows the logit-to-chance conversion, shows temperature scaling, and compares greedy, top-k, and top-p sampling on the same prompt.
+Because of the rapid, small gaps in logits turn large gaps in chance. A token scoring 2 points higher is not slightly more likely. It is roughly seven times more likely. The temperature T controls how peaked the distribution is: T=1 is the model's native confidence, T&lt;1 sharpens the distribution toward the top token (more deterministic), and T&gt;1 flattens it (more random). After softmax gives chances, a sampling plan picks the next token. Greedy decoding always takes the highest-chance token, which is fast but repetitive. Top-k sampling restricts the choice to the k most likely tokens and samples among them. Top-p (nucleus) sampling keeps the smallest set of tokens whose cumulative chance exceeds p. This adapts the candidate set size to the model's confidence. All three plans can be combined with temperature. The model then appends the chosen token to the input and runs the entire sequence through the transformer again to give the next token's logit distribution. This autoregressive loop goes on until a stop token is made or a length limit is reached. This page shows the logit-to-chance conversion, shows temperature scaling, and compares greedy, top-k, and top-p sampling on the same prompt.
 
 ## Step 2: Temperature Reshapes Confidence
 
 That <span class="mono-font">T</span> in the formula divides each logit before the rapid. This stretches or compresses the gaps between them:
 
-- <strong>T &lt; 1</strong> &mdash; gaps widen, the leader runs away with it. Output becomes focused and repetitive. As T approaches 0 this is the same to always taking the argmax.
+- <strong>T &lt; 1</strong> &mdash; gaps widen, the leader runs away with it. Output turns focused and repetitive. As T approaches 0 this is the same to always taking the argmax.
 - <strong>T = 1</strong> &mdash; the model's own distribution, untouched.
-- <strong>T &gt; 1</strong> &mdash; gaps compress toward uniform. Unlikely tokens become truly reachable, which reads as creativity right up until it reads as nonsense.
+- <strong>T &gt; 1</strong> &mdash; gaps compress toward uniform. Unlikely tokens turn truly reachable, which reads as creativity right up until it reads as nonsense.
 
 Temperature never changes the <em>ranking</em>, only the confidence spread. Watch the entropy readout as you drag it &mdash; that number is the distribution's doubt in bits.
 
 ## Step 3: Truncation — Top-k and Top-p
 
-Even after temperature, the long tail of thousands of near-zero tokens still holds meaningful total chance. Sample from it often enough and you in time draw something absurd. Two filters prevent this:
+Even after temperature, the long tail of thousands of near-zero tokens still holds meaningful total chance. Sample from it often enough and you in time draw a thing absurd. Two filters prevent this:
 
 - <strong>Top-k</strong> keeps the k highest-scoring tokens and discards the rest. Simple, but rigid: k=5 is far too narrow when the model is truly unclear and far too wide when only one answer is correct.
 - <strong>Top-p (nucleus)</strong> keeps the smallest set whose chances sum to p. The cutoff <em>adapts</em>: for "The capital of France is" the nucleus may hold one token. While for an open-ended prompt it may hold forty.
@@ -36,11 +36,11 @@ A language model does just one thing: given a sequence of tokens, give a chance 
 
 Concretely, the final layer gives one <strong>logit</strong> per token in the vocabulary. An unbounded score, perhaps 100,000 of them. Softmax converts those into chances summing to 1. Then one token is chosen, appended to the sequence, and the whole process repeats.
 
-That loop is called <strong>autoregressive generation</strong>, and it has a direct result: the model cannot revise. Once a token is emitted it becomes part of the input. And a poor early choice constrains all of it after it.
+That loop is called <strong>autoregressive generation</strong>, and it has a direct result: the model cannot revise. Once a token is emitted it turns part of the input. And a poor early choice constrains all of it after it.
 
 ## How the token is chosen
 
-The distribution is not the answer &mdash; something must pick from it. And the choice of how is what the sampling parameters control.
+The distribution is not the answer &mdash; a thing must pick from it. And the choice of how is what the sampling parameters control.
 
 |Method|Behaviour|
 |---|---|
@@ -67,7 +67,7 @@ The distribution is not the answer &mdash; something must pick from it. And the 
 
 Each new token attends to each last token. Naively, making token 1,000 means recomputing keys and values for all 999 before it. So generation is quadratic in output length.
 
-The <strong>KV cache</strong> removes that. The keys and values for last tokens do not change. So they are computed once and stored. Each new token computes only its own, appends them, and attends against the cache. Generation becomes linear.
+The <strong>KV cache</strong> removes that. The keys and values for last tokens do not change. So they are computed once and stored. Each new token computes only its own, appends them, and attends against the cache. Generation turns linear.
 
 The cost is memory: two tensors per layer per token. For a long context and a large model that runs to many gigabytes. And it is why <strong>grouped-query attention</strong> exists. Sharing key and value projections across heads shrinks the cache a few-fold.
 
@@ -95,7 +95,7 @@ print("   a real vocabulary has 50,000 to 200,000 of these, and the model")
 print("   produces the whole list on every single step.")
 ```
 
-Those raw logits are not a distribution yet. The next block runs them through softmax to see why a small gap in logits becomes a large gap in chance.
+Those raw logits are not a distribution yet. The next block runs them through softmax to see why a small gap in logits turns a large gap in chance.
 
 ```python-run
 import numpy as np
@@ -296,7 +296,7 @@ print("   someone made, not the model 'thinking differently' this time.")
 
 1. <strong>Keep the France prompt and press Sample repeatedly at T = 1.</strong> The correct answer rules. So you nearly always get it &mdash; but not quite always.
 2. <strong>Push temperature to 2.0 and sample again.</strong> The distribution flattens and the model starts confidently naming the wrong city. This is just how hallucination looks at the token level.
-3. <strong>Drop temperature to 0.05.</strong> One bar takes in effect all the chance mass; sampling and greedy become the same thing.
+3. <strong>Drop temperature to 0.05.</strong> One bar takes in effect all the chance mass; sampling and greedy turn the same thing.
 4. <strong>Set top-p to 0.9 and switch prompts.</strong> Note how many candidates survive on the factual prompt versus the open-ended one. Same setting, fully different cutoff. That adaptivity is why nucleus sampling largely replaced top-k.
 5. <strong>Set top-k to 1.</strong> Each filter collapses to greedy decoding no matter temperature. Proof that truncation, not temperature, is what removes randomness fully.
 
@@ -316,7 +316,7 @@ Two things it does <em>not</em> buy, and both follow from the objective:
 
 <strong>Calibrated doubt.</strong> The model gives a distribution over tokens, not a belief about truth. High chance means "this is what such text looks like". This is why confident falsehoods are the trait failure.
 
-<strong>Arithmetic and character-level reasoning.</strong> Tokenisation fragments numbers inconsistently, and letters are not visible as separate units. Counting the r's in "strawberry" asks the model to reason about something it cannot see.
+<strong>Arithmetic and character-level reasoning.</strong> Tokenisation fragments numbers inconsistently, and letters are not visible as separate units. Counting the r's in "strawberry" asks the model to reason about a thing it cannot see.
 
 ## From base model to assistant
 
@@ -334,7 +334,7 @@ Neither changes the underlying method. The model is still predicting the next to
 
 <strong>Why does it repeat itself?</strong> Low temperature and greedy decoding favour high-chance continuations, and repetition is high-chance. Raise the temperature, use top-p, or apply a repetition cost.
 
-<strong>What temperature should I use?</strong> 0 for anything needing a determinate answer; 0.7 for general use; higher for creative work.
+<strong>What temperature should I use?</strong> 0 for a thing needing a determinate answer; 0.7 for general use; higher for creative work.
 
 <strong>Why is output slower than input?</strong> The prompt is handled in one parallel pass; output is one sequential step per token.
 
