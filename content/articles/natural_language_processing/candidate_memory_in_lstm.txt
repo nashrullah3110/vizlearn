@@ -7,14 +7,14 @@ The candidate layer &mdash; written $\tilde{C}_t$ and read "C-tilde" &mdash; tak
 
 $$\tilde{C}_t = \tanh(W_C \cdot [H_{t-1}, X_t] + b_C)$$
 
-It has no authority. It cannot write to memory on its own; the Input Gate decides how much of it survives. Think of it as an <strong>employee drafting a proposal</strong> and the input gate as the manager approving some, all, or none of it. The use of tanh rather than sigmoid is deliberate: tanh outputs values between -1 and +1. This lets the candidate subtract from the cell state as well as add to it. A sigmoid candidate could only push the memory upward. The candidate layer has its own weight matrix and bias, sized identically to those of the [forget](forget_gate_in_lstm.html), input, and [output](output_gate_in_lstm.html) gates. During backpropagation, the gradient flows through both the candidate and the input gate, so training adjusts what content is proposed and how much is accepted at once. In a typical LSTM with a hidden size of 256, the candidate layer contributes roughly a quarter of the total parameters. This page shows the candidate vector at each timestep, compares it to what the input gate actually lets through, and covers the tanh-vs-sigmoid tradeoff with a worked example.
+It has no authority. It cannot write to memory on its own; the Input Gate decides how much of it survives. Think of it as an <strong>employee drafting a proposal</strong> and the input gate as the manager approving some, all, or none of it. The use of tanh rather than sigmoid is deliberate: tanh outputs values between -1 and +1. This lets the candidate subtract from the cell state as well as add to it. A sigmoid candidate could only push the memory upward. The candidate layer has its own weight matrix and bias, sized identically to those of the [forget](forget_gate_in_lstm.html), input, and [output](output_gate_in_lstm.html) gates. During backpropagation, the gradient flows through both the candidate and the input gate. So training adjusts what content is proposed and how much is accepted at once. In a typical LSTM with a hidden size of 256, the candidate layer contributes roughly a quarter of the total parameters. This page shows the candidate vector at each timestep, compares it to what the input gate actually lets through, and covers the tanh-vs-sigmoid tradeoff with a worked example.
 
 ## Why $\tanh$ and Not a Sigmoid?
 
 This is the question that separates people who have memorised the diagram from people who understand it. The answer is <strong>sign</strong>.
 
 - A sigmoid outputs $[0, 1]$. Every update it proposed would <em>increase</em> the memory value. The cell state could only ever drift upward.
-- $\tanh$ outputs $[-1, 1]$. The candidate can push a memory slot <strong>up or down</strong>, which is what real information requires &mdash; "this sentence is negative" needs to be representable, not just "more of something".
+- $\tanh$ outputs $[-1, 1]$. The candidate can push a memory slot <strong>up or down</strong>. This is what real information requires &mdash; "this sentence is negative" needs to be representable, not just "more of something".
 
 Being zero-centred also helps optimisation: the updates do not carry a systematic positive bias that the rest of the network has to cancel out.
 
@@ -49,7 +49,7 @@ The candidate is then scaled by the input gate before being added:
 
 <p class="mono-font">c&#7511; = f&#7511; &#8857; c&#7511;&#8331;&#8321; + i&#7511; &#8857; g&#7511;</p>
 
-So the candidate proposes and the input gate decides. Sometimes described as the pair being a writer and a valve, which is a fair reading.
+So the candidate proposes and the input gate decides. Sometimes described as the pair being a writer and a valve. This is a fair reading.
 
 ## Why the tanh bound matters
 
@@ -57,7 +57,7 @@ The cell state builds up across time steps. If the candidate were unbounded &mda
 
 That growth has two consequences. The output path `tanh(cₜ)` saturates, so its gradient approaches zero and the output gate stops learning. And the numbers themselves can overflow into `inf` over a long sequence.
 
-Bounding the candidate to &plusmn;1 means each step adds at most 1 to any dimension, and the forget gate can subtract. The state can still grow over many steps &mdash; which is why cell values in the tens are possible and worth monitoring &mdash; and it grows linearly rather than explosively.
+Bounding the candidate to &plusmn;1 means each step adds at most 1 to any dimension. And the forget gate can subtract. The state can still grow over many steps &mdash; which is why cell values in the tens are possible and worth monitoring &mdash; and it grows linearly rather than explosively.
 
 This is also why <strong>ReLU is not used inside recurrent cells</strong>. It is the default in feed-forward networks and the wrong choice here: an unbounded activation applied repeatedly through a recurrence produces instability that gating cannot contain.
 
@@ -65,7 +65,7 @@ This is also why <strong>ReLU is not used inside recurrent cells</strong>. It is
 
 Take a cell tracking sentiment while reading "the film was not very good".
 
-At "good", the candidate for the sentiment dimension is strongly positive &mdash; that is what the word contributes in isolation. At "not", earlier, a different dimension carried a negation signal, and the state now reflects it.
+At "good", the candidate for the sentiment dimension is strongly positive &mdash; that is what the word contributes in isolation. At "not", earlier, a different dimension carried a negation signal. And the state now reflects it.
 
 What the trained cell learns is to use the gates to combine these correctly rather than letting the last strong candidate win. The candidate at "good" may be +0.9 while the input gate for that dimension is low, because the context makes a naive positive reading wrong.
 
@@ -159,11 +159,11 @@ print("   second decides whether it is worth keeping.")
 
 ## In one line
 
-The candidate layer is the LSTM's content generator: bounded, signed, and completely powerless on its own. Content and control are on purpose separated &mdash; $\tanh$ proposes, sigmoid disposes. The last piece of the cell decides what the outside world gets to see: the <strong>Output Gate</strong>.
+The candidate layer is the LSTM's content generator: bounded, signed, and fully powerless on its own. Content and control are on purpose separated &mdash; $\tanh$ proposes, sigmoid disposes. The last piece of the cell decides what the outside world gets to see: the <strong>Output Gate</strong>.
 
 ## Where it sits in the computation
 
-All four of an LSTM's transformations take the same input &mdash; the concatenation of the previous hidden state and the current input &mdash; and produce vectors of the same width. So implementations compute them as one matrix multiplication and split the result:
+All four of an LSTM's transformations take the same input &mdash; the joining of the previous hidden state and the current input &mdash; and produce vectors of the same width. So implementations compute them as one matrix multiplication and split the result:
 
 ```python
 gates = x @ W_ih.T + h @ W_hh.T + b        # one multiply, 4x hidden wide
@@ -176,7 +176,7 @@ c = f * c + i * g
 h = o * c.tanh()
 ```
 
-That fusion is why `nn.LSTM` is dramatically faster than a hand-written Python loop: one large matrix multiplication per step rather than four small ones, with cuDNN kernels underneath.
+That fusion is why `nn.LSTM` is sharply faster than a hand-written Python loop: one large matrix multiplication per step rather than four small ones, with cuDNN kernels underneath.
 
 The candidate's weight matrix is the same size as each gate's: `(input + hidden) × hidden`. With 300-dimensional input and 256 hidden units, about 143,000 parameters &mdash; a quarter of the cell's total.
 
@@ -216,5 +216,5 @@ A candidate whose absolute maximum is pinned at 1.0 across all dimensions is sat
 - The candidate is what the cell could write to memory: content, not a decision.
 - It uses tanh, so it ranges from &minus;1 to 1 and can be negative &mdash; unlike the sigmoid gates.
 - The input gate scales it before it is added to the retained cell state.
-- The bound keeps the building up cell state growing linearly rather than explosively, which is why ReLU is not used here.
+- The bound keeps the building up cell state growing linearly rather than explosively. This is why ReLU is not used here.
 - All four transformations are computed as one fused matrix multiplication and split.

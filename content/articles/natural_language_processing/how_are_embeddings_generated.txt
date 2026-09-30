@@ -5,20 +5,20 @@ intro: Nobody hand-labels an embedding space. It falls out of a simple predictio
 
 The whole field rests on one claim: a word is characterised by the company it keeps. Words appearing in similar contexts tend to mean similar things.
 
-It is easy to check. <em>Cat</em> and <em>dog</em> both appear near <em>pet</em>, <em>feed</em>, <em>vet</em> and <em>fur</em>. <em>Bulldozer</em> does not. So if you build vectors that predict a word’s context well, words with similar contexts must end up with similar vectors. The semantic structure is a by-product of the prediction task, never an objective in itself. Word2Vec offers two architectures: Skip-gram (predict context words from a centre word) and CBOW (predict the centre word from its context). Skip-gram works better on small datasets and rare words; CBOW is faster and works better on frequent words. Both produce a weight matrix whose rows are the word embeddings. GloVe takes a different approach: it factorises the global word co-occurrence matrix, which captures the same distributional information but in a single matrix factorisation rather than iterative gradient updates. FastText extends Word2Vec by embedding character n-grams, so it can produce vectors for words never seen in training by combining their subword pieces. All three produce static embeddings (one vector per word regardless of context). Contextual embeddings from transformers supersede them for most downstream tasks but are much more expensive to compute. This page trains a small Skip-gram model on a sample corpus, shows the embedding vectors converging during training, and shows the vector-arithmetic property.
+It is easy to check. <em>Cat</em> and <em>dog</em> both appear near <em>pet</em>, <em>feed</em>, <em>vet</em> and <em>fur</em>. <em>Bulldozer</em> does not. So if you build vectors that predict a word’s context well, words with similar contexts must end up with similar vectors. The semantic structure is a by-product of the prediction task, never an objective in itself. Word2Vec offers two architectures: Skip-gram (predict context words from a centre word) and CBOW (predict the centre word from its context). Skip-gram works better on small datasets and rare words; CBOW is faster and works better on frequent words. Both produce a weight matrix whose rows are the word embeddings. GloVe takes a different approach: it factorises the global word co-occurrence matrix. This captures the same distributional information but in a single matrix factorisation rather than iterative gradient updates. FastText extends Word2Vec by embedding character n-grams, so it can produce vectors for words never seen in training by combining their subword pieces. All three produce static embeddings (one vector per word regardless of context). Contextual embeddings from transformers supersede them for most downstream tasks but are much more expensive to compute. This page trains a small Skip-gram model on a sample corpus, shows the embedding vectors converging during training, and shows the vector-arithmetic property.
 
 ## Skip-gram and CBOW
 
 Word2Vec offers two ways to set up the prediction:
 
-- <strong>Skip-gram</strong> &mdash; given the centre word, predict the surrounding words. From “the cat sat on the mat”, given <em>sat</em>, predict <em>the</em>, <em>cat</em>, <em>on</em>, <em>the</em>. Slower, and better on rare words because each occurrence generates several training examples.
+- <strong>Skip-gram</strong> &mdash; given the centre word, predict the surrounding words. From “the cat sat on the mat”, given <em>sat</em>, predict <em>the</em>, <em>cat</em>, <em>on</em>, <em>the</em>. Slower, and better on rare words because each occurrence makes several training examples.
 - <strong>CBOW</strong> &mdash; given the surrounding words, predict the centre. Faster, and better on frequent words.
 
-The architecture is on purpose trivial: an input embedding layer, no hidden layer, and an output projection. The embedding matrix is the only thing anybody wants; the output layer is discarded after training. The vectors are a side effect of a task nobody cares about the answers to.
+The architecture is on purpose trivial: an input embedding layer, no hidden layer. And an output projection. The embedding matrix is the only thing anybody wants; the output layer is discarded after training. The vectors are a side effect of a task nobody cares about the answers to.
 
 ## Negative sampling
 
-<p>The naive setup predicts a probability distribution over the whole vocabulary, which means a softmax over 50,000 words for every training example. That is prohibitively expensive.</p><strong>Negative sampling</strong> replaces it with a much cheaper question. Instead of “which of 50,000 words is the context?”, ask “is this pair a real (word, context) pair or a fabricated one?” &mdash; a binary classification. For each true pair, draw perhaps 5 to 20 random words as negatives and train the model to score the real pair high and the fakes low.<p>Cost drops from 50,000 output computations to about 20, and quality is comparable. This is what made training on billions of words practical.</p>
+<p>The naive setup predicts a probability distribution over the whole vocabulary. This means a softmax over 50,000 words for every training example. That is prohibitively expensive.</p><strong>Negative sampling</strong> replaces it with a much cheaper question. Instead of “which of 50,000 words is the context?”, ask “is this pair a real (word, context) pair or a fabricated one?” &mdash; a binary classification. For each true pair, draw perhaps 5 to 20 random words as negatives and train the model to score the real pair high and the fakes low.<p>Cost drops from 50,000 output computations to about 20, and quality is comparable. This is what made training on billions of words practical.</p>
 
 ## Learned from context, not assigned
 
@@ -41,7 +41,7 @@ Turn that into a training objective and the vectors fall out.
 
 The model is a shallow network: an embedding lookup, then a projection to vocabulary size. After training, the projection layer is discarded and <strong>the embedding table is the product</strong>. The prediction task was only ever a means to shape those vectors.
 
-The practical problem is the output layer. A softmax over 100,000 words for every training pair is prohibitively expensive, so Word2Vec uses <strong>negative sampling</strong>: instead of scoring all words, score the true context word and a handful (5&ndash;20) of random ones, and train the model to tell them apart. That turns a 100,000-way softmax into a few binary classifications and is the trick that made the method practical.
+The practical problem is the output layer. A softmax over 100,000 words for every training pair is prohibitively expensive. So Word2Vec uses <strong>negative sampling</strong>: instead of scoring all words, score the true context word and a handful (5&ndash;20) of random ones, and train the model to tell them apart. That turns a 100,000-way softmax into a few binary classifications and is the trick that made the method practical.
 
 <strong>CBOW</strong> is the mirror image &mdash; predict the centre word from the average of its context. It trains faster and does slightly worse on rare words, since averaging washes them out.
 
@@ -61,7 +61,7 @@ Other parameters that matter: dimension (100&ndash;300 for word vectors), minimu
 
 ## Trained by prediction, not by design
 
-Nobody writes an embedding table. It falls out of training a model on a prediction task, and this trains one with skip-gram negative sampling -- the word2vec objective -- so you can watch the geometry appear.
+Nobody writes an embedding table. It falls out of training a model on a prediction task. And this trains one with skip-gram negative sampling -- the word2vec objective -- so you can watch the geometry appear.
 
 ```python-run
 import numpy as np
@@ -214,7 +214,7 @@ print("identical; only the amount of evidence differs.)")
 1. <strong>Start from noise.</strong> Press <strong>Re-randomize</strong> and look at the layout. Vectors are random, so the arrangement is meaningless &mdash; no structure exists before training.
 2. <strong>Train one epoch.</strong> Press <strong>Train 1 Epoch</strong> and watch points shift slightly. Each step nudges words that co-occur closer together and pushes unrelated ones apart.
 3. <strong>Let clusters form.</strong> Press <strong>Train 20 Epochs</strong>. Related words gather into groups. Nothing told the model these words were related &mdash; it only ever tried to predict context.
-4. <strong>Re-randomize and train again.</strong> The clusters re-form, but in different positions and orientations. The absolute coordinates are arbitrary; only the relative geometry carries meaning, which is why you cannot compare vectors from two separately trained models.
+4. <strong>Re-randomize and train again.</strong> The clusters re-form, but in different positions and orientations. The absolute coordinates are arbitrary; only the relative geometry carries meaning. This is why you cannot compare vectors from two separately trained models.
 
 ## Common mistakes
 
@@ -225,7 +225,7 @@ print("identical; only the amount of evidence differs.)")
 
 ## What to remember
 
-Embeddings are learned by training a on purpose simple model on a proxy task &mdash; predict a word from its context, or the context from the word &mdash; and keeping the embedding matrix while discarding everything else. Semantic structure emerges because words in similar contexts need similar vectors to make the prediction work. Negative sampling replaces the vocabulary-wide softmax with a cheap binary decision, which is what made the whole approach scale.
+Embeddings are learned by training a on purpose simple model on a proxy task &mdash; predict a word from its context, or the context from the word &mdash; and keeping the embedding matrix while discarding everything else. Semantic structure emerges because words in similar contexts need similar vectors to make the prediction work. Negative sampling replaces the vocabulary-wide softmax with a cheap binary decision. This is what made the whole approach scale.
 
 ## Contextual embeddings, and why they superseded fixed ones
 
@@ -233,7 +233,7 @@ Word2Vec gives "bank" one vector, averaging the river and the financial senses i
 
 A transformer produces a different vector for each occurrence, computed from the surrounding words. In "the river bank" the vector has absorbed "river". In "the savings bank" it has absorbed "savings". Polysemy is resolved by construction.
 
-The training objective is what generates them:
+The training objective is what makes them:
 
 - <strong>Masked language modelling</strong> (BERT) hides 15% of tokens and predicts them from both directions.
 - <strong>Next-token prediction</strong> (GPT) predicts each token from those before it.
@@ -265,7 +265,7 @@ Training word vectors from scratch on a small corpus is almost always worse than
 
 <strong>What is negative sampling?</strong> Replacing a full softmax over the vocabulary with a few binary comparisons against random words. It is what made Word2Vec tractable.
 
-<strong>Why do I get different vectors on each run?</strong> Random initialisation and sampling. The <em>geometry</em> is stable even though the coordinates are not, so similarities are reproducible and individual dimensions are not.
+<strong>Why do I get different vectors on each run?</strong> Random initialisation and sampling. The <em>geometry</em> is stable even though the coordinates are not. So similarities are reproducible and individual dimensions are not.
 
 <strong>Can embeddings handle words not in the vocabulary?</strong> Word2Vec cannot. FastText can, by composing character n-grams. Subword tokenisers sidestep the problem entirely.
 

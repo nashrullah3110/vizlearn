@@ -3,7 +3,7 @@ intro: Neither method alone, combined by their agreement.
 
 ## The idea in brief
 
-<a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">Dense retrieval</a> and <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously. Hybrid search runs both and combines the results, so a failure in one is not by itself a failure of the whole system. The combination method matters: averaging raw scores is meaningless because the two scoring functions live on incomparable scales. Reciprocal Rank Fusion (RRF) solves this by discarding the scores entirely and using only each document's position in each ranked list. The formula `RRF(d) = sum(1 / (k + rank(d)))` across all lists gives each document a score that rewards being ranked highly by multiple methods. The constant k (typically 60) dampens the difference between adjacent ranks so that a document at rank 1 does not overwhelm one at rank 3. A document that both methods agree on builds up contributions from both lists and rises to the top; a document that only one method likes gets a single contribution and ranks lower. RRF requires no tuning, no normalisation, and no learned weights, which is why it became the default fusion method in systems like Elasticsearch and Weaviate. This page runs dense and sparse retrieval on the same query, prints both ranked lists side by side, and shows the RRF scores and the fused ranking.
+<a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">Dense retrieval</a> and <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously. Hybrid search runs both and combines the results, so a failure in one is not by itself a failure of the whole system. The combination method matters: averaging raw scores is meaningless because the two scoring functions live on incomparable scales. Reciprocal Rank Fusion (RRF) solves this by discarding the scores entirely and using only each document's position in each ranked list. The formula `RRF(d) = sum(1 / (k + rank(d)))` across all lists gives each document a score that rewards being ranked highly by multiple methods. The constant k (typically 60) dampens the difference between adjacent ranks so that a document at rank 1 does not overwhelm one at rank 3. A document that both methods agree on builds up contributions from both lists and rises to the top; a document that only one method likes gets a single contribution and ranks lower. RRF requires no tuning, no normalisation, and no learned weights. This is why it became the default fusion method in systems like Elasticsearch and Weaviate. This page runs dense and sparse retrieval on the same query, prints both ranked lists side by side, and shows the RRF scores and the fused ranking.
 
 ## Why fuse ranks, not raw scores
 
@@ -28,7 +28,7 @@ Neither covers the other's ground:
 |"cheapest way to ship"|Finds "lowest-cost delivery"|Misses it|
 |"section 4.2.1"|Approximate|Exact|
 
-The pattern is consistent enough that combining them is the standard recommendation, and it is usually the single largest quality improvement available to a retrieval system.
+The pattern is consistent enough that combining them is the standard recommendation. And it is usually the single largest quality improvement available to a retrieval system.
 
 ## Why scores cannot simply be added
 
@@ -57,7 +57,7 @@ Query: "annual leave policy for new starters".
 |C: Holiday booking process|2|8|1/62 + 1/68 = 0.0308|
 |D: Annual report 2024|9|2|1/69 + 1/62 = 0.0306|
 
-The final ordering is A, B, C, D. Note what happened: document A was top for dense and third for sparse, and its agreement across both lists put it first. Document D, second on keyword match alone, ranked last &mdash; "annual" matched a document about annual reports. And the dense retriever correctly disagreed.
+The final ordering is A, B, C, D. Note what happened: document A was top for dense and third for sparse. And its agreement across both lists put it first. Document D, second on keyword match alone, ranked last &mdash; "annual" matched a document about annual reports. And the dense retriever correctly disagreed.
 
 That is the mechanism in one table: <strong>agreement between different retrievers is evidence, and RRF rewards it</strong>.
 
@@ -336,7 +336,7 @@ for name, bl, vl, rel in QUERIES:
     print("%-24s %10.4f %10.4f %10.4f" % (name, row[0], row[1], row[2]))
 ```
 
-Averaging across those four queries is only half the story. The next block looks at the mean and the worst query for each method, which is where fusion earns its keep.
+Averaging across those four queries is only half the story. The next block looks at the mean and the worst query for each method. This is where fusion earns its keep.
 
 ```python-run
 import numpy as np
@@ -397,7 +397,7 @@ print("   retrievals and two indexes on every query instead of one.")
 1. <strong>Compare the two lists.</strong> They do not agree on the #1 result — dense and sparse are weighting the same five documents by genuinely different criteria.
 2. <strong>Read the fused ranking.</strong> The winner is not necessarily #1 in either individual list — it is the document both methods placed respectably. This is exactly what "fused by rank" is built to surface.
 3. <strong>Push k up toward 60.</strong> The gaps between fused scores shrink and consensus dominates even more strongly — this is the standard default, chosen to be forgiving of exactly how far down a list something sits.
-4. <strong>Pull k down to 1.</strong> Rank 1 in either list is now worth dramatically more than rank 2 — a document has to actually top one of the lists to compete.
+4. <strong>Pull k down to 1.</strong> Rank 1 in either list is now worth sharply more than rank 2 — a document has to actually top one of the lists to compete.
 
 ## Summing up
 
@@ -417,7 +417,7 @@ def rrf(rankings, k=60, top_n=10):
 results = rrf([dense_ids, bm25_ids])
 ```
 
-Twelve lines, no tuning, no normalisation. That simplicity is a large part of why RRF is used so widely in practice despite more sophisticated alternatives existing.
+Twelve lines, no tuning, no normalisation. That ease is a large part of why RRF is used so widely in practice despite more sophisticated alternatives existing.
 
 Two practical details:
 
@@ -434,7 +434,7 @@ Two practical details:
 |Cross-encoder rerank|Rescore candidates with a model|No, but costs inference|
 |Learned fusion|Train a model on click data|Yes, needs labels|
 
-<strong>Weighted score fusion</strong> can beat RRF when carefully tuned on a specific corpus, and it is brittle: the normalisation depends on the result set and the weights need retuning as the corpus changes.
+<strong>Weighted score fusion</strong> can beat RRF when carefully tuned on a specific corpus. And it is brittle: the normalisation depends on the result set and the weights need retuning as the corpus changes.
 
 <strong>Cross-encoder reranking</strong> is not an alternative so much as the next stage. The standard production shape is: hybrid retrieval with RRF to get 50 good candidates cheaply, then a cross-encoder to order them accurately, then the top 5 into the prompt.
 
@@ -452,7 +452,7 @@ Where it matters least: short, clean, natural-language corpora with no identifie
 
 ## Questions people ask
 
-<strong>Is hybrid search always better?</strong> Almost always at least as good, and the gain is largest where exact tokens matter. The cost is running two retrievers.
+<strong>Is hybrid search always better?</strong> Almost always at least as good. And the gain is largest where exact tokens matter. The cost is running two retrievers.
 
 <strong>What value of k?</strong> 60, from the original paper. It is not sensitive &mdash; anything from 20 to 100 behaves similarly.
 

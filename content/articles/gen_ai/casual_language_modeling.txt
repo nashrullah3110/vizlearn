@@ -3,7 +3,7 @@ intro: <strong>Causal Language Modeling (CLM)</strong> is the fundamental princi
 
 ## How GPT-style models learn to write
 
-<strong>Causal Language Modeling (CLM)</strong> is the fundamental principle behind how generative AI models like GPT work. At its core, it's a simple yet powerful task: <strong>predicting the next word (or "token") in a sequence given the words that came before it.</strong> This interactive lab explains that process, allowing you to train your own mini-model and see exactly how it makes decisions. The "causal" in the name means the model can only look left: when predicting token t, it sees tokens 1 through t-1 but never t+1 or beyond. This is enforced by a causal mask in the [attention](../natural_language_processing/multi_head_attention.html) layer that sets future positions to negative infinity before the [softmax](how_llms_predict_next_word.html). Contrast this with [masked language modelling](masked_language_modeling.html), where the model sees both sides of a blank and fills it in &mdash; that is the pretraining objective behind BERT and is better for understanding. But it cannot generate text because it has no notion of left-to-right ordering. CLM training is self-supervised: the training data is raw text with no labels, and each token's label is simply the next token in the sequence. The loss is cross-entropy averaged over all positions, and the model learns a probability distribution over the full vocabulary at each step. At generation time, a sampling strategy ([temperature, top-k, top-p](how_llms_predict_next_word.html)) picks from that distribution to produce the next token. And the process repeats autoregressively.
+<strong>Causal Language Modeling (CLM)</strong> is the fundamental principle behind how generative AI models like GPT work. At its core, it's a simple yet powerful task: <strong>predicting the next word (or "token") in a sequence given the words that came before it.</strong> This interactive lab explains that process, allowing you to train your own mini-model and see exactly how it makes decisions. The "causal" in the name means the model can only look left: when predicting token t, it sees tokens 1 through t-1 but never t+1 or beyond. This is enforced by a causal mask in the [attention](../natural_language_processing/multi_head_attention.html) layer that sets future positions to negative infinity before the [softmax](how_llms_predict_next_word.html). Contrast this with [masked language modelling](masked_language_modeling.html), where the model sees both sides of a blank and fills it in &mdash; that is the pretraining objective behind BERT and is better for understanding. But it cannot generate text because it has no notion of left-to-right ordering. CLM training is self-supervised: the training data is raw text with no labels. And each token's label is simply the next token in the sequence. The loss is cross-entropy averaged over all positions, and the model learns a probability distribution over the full vocabulary at each step. At generation time, a sampling strategy ([temperature, top-k, top-p](how_llms_predict_next_word.html)) picks from that distribution to produce the next token. And the process repeats autoregressively.
 
 ## Quick Context: Learning from Data
 
@@ -16,7 +16,7 @@ When you click the "Update Learned Probabilities" button, you are running this t
 
 ## Core Idea: Probabilistic Prediction
 
-Once trained, the model generates text one token at a time. Given your input prompt, it looks at the sequence and calculates the probability distribution for the very next token. This is what you see in the "Next Token Predictions" list. Each bar represents the model's "confidence" that a particular token should come next.
+Once trained, the model makes text one token at a time. Given your input prompt, it looks at the sequence and calculates the probability distribution for the very next token. This is what you see in the "Next Token Predictions" list. Each bar represents the model's "confidence" that a particular token should come next.
 
 <h4 class="font-bold" style="color: var(--text-main);">Greedy Decoding</h4>
 
@@ -32,7 +32,7 @@ Causal language modelling is the training objective behind every generative mode
 
 The word "causal" refers to that one-directional flow: token t may depend on its past and never on its future. (It is often written "casual" by accident, including in some published code.)
 
-The mechanism enforcing it is a <strong>mask</strong>. Attention scores for future positions are set to negative infinity before the softmax, so their weights become exactly zero:
+The mechanism enforcing it is a <strong>mask</strong>. Attention scores for future positions are set to negative infinity before the softmax. So their weights become exactly zero:
 
 ```
         the   cat   sat   on
@@ -50,9 +50,9 @@ The masking has an efficiency consequence that is easy to miss and is central to
 
 For a sequence of 1,000 tokens, a single forward pass produces predictions at <em>all</em> 1,000 positions at once, each correctly conditioned only on its own past. The loss is averaged over all of them.
 
-So one pass over a document yields as many training signals as the document has tokens. No labelling, no annotation &mdash; any text at all is training data, and the supervision is free.
+So one pass over a document yields as many training signals as the document has tokens. No labelling, no annotation &mdash; any text at all is training data. And the supervision is free.
 
-That property is the reason next-token prediction won. The available training set is the written output of humanity, and every token in it is a labelled example.
+That property is the reason next-token prediction won. The available training set is the written output of humanity. And every token in it is a labelled example.
 
 |&nbsp;|Causal LM|Masked LM|
 |---|---|---|
@@ -223,15 +223,15 @@ print("   from a training signal.")
 
 Use the controls to build intuition for how these models behave.
 
-1. <strong>Train on Different Data:</strong> Clear the training data and use one of the samples. Train on the "Nature Description" text. Now, give it the prompt "The ocean is". The predictions will likely be words like "vast", "blue", or "deep". Now, load and train on the "Tech Support Logs" and use the same prompt. The predictions will be completely different, showing that the model's knowledge is entirely dependent on its training data.
+1. <strong>Train on Different Data:</strong> Clear the training data and use one of the samples. Train on the "Nature Description" text. Now, give it the prompt "The ocean is". The predictions will likely be words like "vast", "blue", or "deep". Now, load and train on the "Tech Support Logs" and use the same prompt. The predictions will be fully different, showing that the model's knowledge is entirely dependent on its training data.
 2. <strong>Experiment with Temperature:</strong> Set the temperature to its lowest value (0.1). Generate a few tokens. The output will be very predictable. Now, slide the temperature to a high value (like 1.2) and generate again. Notice how the model starts making more creative and sometimes nonsensical choices. This is the trade-off between coherence and creativity.
 3. <strong>The "Stuck in a Loop" Problem:</strong> With a simple model and low temperature, you might see the model get stuck in a repetitive loop (e.g., "is a is a is a..."). This is a classic problem in language generation that more advanced techniques (like top-k or nucleus sampling) help solve.
 
 ## Worth remembering
 
 - <strong>Models are Statistical Parrots:</strong> They learn patterns, not meaning. Their output is based on the probability of what token should come next based on the data they were trained on.
-- <strong>Generation is One Token at a Time:</strong> Text is generated sequentially. The model predicts the next token, adds it to the sequence, and then uses that new, longer sequence to predict the token after that.
-- <strong>Temperature Controls Creativity:</strong> Temperature is a key parameter for controlling the randomness and "creativity" of the generated output.
+- <strong>Generation is One Token at a Time:</strong> Text is made sequentially. The model predicts the next token, adds it to the sequence, and then uses that new, longer sequence to predict the token after that.
+- <strong>Temperature Controls Creativity:</strong> Temperature is a key parameter for controlling the randomness and "creativity" of the made output.
 - <strong>Context is King:</strong> The model's predictions are entirely dependent on the preceding tokens (the context). Changing even one word in the prompt can drastically alter the probability distribution for the next token.
 
 ## From base model to assistant
@@ -264,11 +264,11 @@ Two facts worth carrying. <strong>Greedy decoding is not optimal</strong> &mdash
 
 ## Questions people ask
 
-<strong>Why "causal"?</strong> Because information flows in one direction only, past to future &mdash; the same sense as in causal systems. It is frequently misspelled "casual".
+<strong>Why "causal"?</strong> Because information flows in one direction only, past to future &mdash; the same sense as in causal systems. It is often misspelled "casual".
 
 <strong>Is this the same as autoregressive?</strong> Effectively yes. "Causal" describes the masking; "autoregressive" describes feeding outputs back as inputs.
 
-<strong>Why not train bidirectionally and generate anyway?</strong> A bidirectional model has no notion of "next", and its training task assumes the surrounding context exists. Attempts to generate by iterative filling work poorly.
+<strong>Why not train bidirectionally and generate anyway?</strong> A bidirectional model has no notion of "next". And its training task assumes the surrounding context exists. Attempts to generate by iterative filling work poorly.
 
 <strong>Does the model plan the whole sentence?</strong> Architecturally it emits one token at a time, and there is evidence internal states encode information about upcoming tokens. Whether that is planning is an open question.
 

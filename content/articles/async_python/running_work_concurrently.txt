@@ -13,7 +13,7 @@ schedules them all as [tasks](coroutines_tasks_and_await.html), waits for every
 one, and returns their results in the order you passed them &mdash; not the order
 they finished.
 
-These editors run inside a browser event loop that is already going, so the examples finish with <code>await main()</code>. In a standalone <code>.py</code> script &mdash; run with <code>python file.py</code> &mdash; you write <code>asyncio.run(main())</code> instead. This starts a loop, runs the coroutine, and closes it. The two are the same program with different entry points.
+These editors run inside a browser event loop that is already going. So the examples finish with <code>await main()</code>. In a standalone <code>.py</code> script &mdash; run with <code>python file.py</code> &mdash; you write <code>asyncio.run(main())</code> instead. This starts a loop, runs the coroutine, and closes it. The two are the same program with different entry points.
 
 ```python-run
 import asyncio, time
@@ -169,7 +169,7 @@ task failing together.
 | Results as they finish, not in order | <code>as_completed</code> |
 
 For new code on Python 3.11 or later, TaskGroup is the sensible default, and
-<code>gather</code> is for the cases where you specifically want the siblings to
+<code>gather</code> is for the cases where you in detail want the siblings to
 survive a failure.
 
 ## Results as they finish
@@ -248,7 +248,7 @@ cancelled the rest: 1
 
 This is the **hedged request** pattern: ask two replicas the same question,
 take whichever answers first, and cancel the other so it stops consuming a
-connection. It cuts tail latency at the cost of extra load, and it is only
+connection. It cuts tail latency at the cost of extra load. And it is only
 expressible with <code>wait</code>, because <code>gather</code> insists on
 waiting for both and <code>as_completed</code> gives you no handle on the ones
 still running.
@@ -331,13 +331,13 @@ non-coroutine in the list is an error, not a constant that passes through.
 
 ## Questions people ask
 
-<strong>gather or TaskGroup?</strong> TaskGroup for new code on 3.11 or later: it cancels the siblings when one task fails. So a failure never leaves work running unsupervised. Reach for <code>gather</code> when you specifically want the siblings to survive a failure, or when you need the results lined up with the arguments.
+<strong>gather or TaskGroup?</strong> TaskGroup for new code on 3.11 or later: it cancels the siblings when one task fails. So a failure never leaves work running unsupervised. Reach for <code>gather</code> when you in detail want the siblings to survive a failure, or when you need the results lined up with the arguments.
 
 <strong>Does <code>gather</code> cancel the others when one raises?</strong> No, and this is the single most common wrong assumption about it. The first exception propagates and the other coroutines carry on running with nobody watching them. That gap is exactly what TaskGroup was added to close.
 
 <strong>When is <code>return_exceptions=True</code> right?</strong> When a failure is data you intend to inspect. Nine of ten shards answered, report the tenth. It is wrong when a failure should abort the batch, because it converts errors into list entries that code can silently treat as results.
 
-<strong>How many is too many to gather?</strong> Whatever the other end can take, which is a property of the remote service and not of asyncio. Once the list is long enough that you are asking the question, bound it with a semaphore rather than guessing.
+<strong>How many is too many to gather?</strong> Whatever the other end can take. This is a property of the remote service and not of asyncio. Once the list is long enough that you are asking the question, bound it with a semaphore rather than guessing.
 
 <strong>Can I mix <code>await</code> and tasks in one function?</strong> Yes, and it is normal: start the slow independent work as tasks, do other things, then await the handles when you finally need the results. What you cannot do is expect a row of plain awaits to overlap.
 
@@ -348,6 +348,6 @@ non-coroutine in the list is an error, not a constant that passes through.
 - The win is collapsing many independent waits from their sum to their maximum: 0.3, 0.2 and 0.1&nbsp;s together take 0.30, not 0.60.
 - <code>gather</code> returns results in **call** order however they finished, and by default raises the first exception while leaving the siblings running.
 - <code>TaskGroup</code> scopes the work to an <code>async with</code> block and cancels every sibling if one fails. Structured concurrency, and the sensible default on 3.11+.
-- Several tasks can fail at once, so a TaskGroup raises an <code>ExceptionGroup</code>, which <code>except*</code> exists to unpack.
+- Several tasks can fail at once, so a TaskGroup raises an <code>ExceptionGroup</code>. This <code>except*</code> exists to unpack.
 - <code>as_completed</code> trades the input ordering for the first result arriving as soon as it is ready.
-- Async removed the accidental concurrency ceiling threads used to impose, so bound it on purpose. A <code>Semaphore</code> inside the coroutine, around the part being limited.
+- Async removed the accidental concurrency ceiling threads used to impose. So bound it on purpose. A <code>Semaphore</code> inside the coroutine, around the part being limited.

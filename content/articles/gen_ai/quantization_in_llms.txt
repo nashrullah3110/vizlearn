@@ -33,7 +33,7 @@ A model's weights are numbers, and how precisely each is stored is a choice. Qua
 |INT8|8|7GB|
 |INT4|4|3.5GB|
 
-The arithmetic is what makes this matter: a 70B model in 16-bit needs 140GB and does not fit on a single GPU. At 4-bit it is 35GB and fits on one. Quantisation is frequently the difference between a model being deployable and not.
+The arithmetic is what makes this matter: a 70B model in 16-bit needs 140GB and does not fit on a single GPU. At 4-bit it is 35GB and fits on one. Quantisation is often the difference between a model being deployable and not.
 
 Speed also improves, and for a reason worth understanding: generation is <strong>memory-bandwidth-bound</strong>, not compute-bound. Every token requires reading all the weights, so halving their size roughly halves the time spent waiting for memory.
 
@@ -58,7 +58,7 @@ The basic operation maps a range of floats onto a small set of integers:
 
 <p class="mono-font">q = round((w &minus; zero_point) / scale)</p>
 
-Applied per tensor, this fails on transformers for a specific reason: their weight and activation distributions contain <strong>outliers</strong>, values far larger than the rest. One outlier in a tensor forces the scale to cover its range, and every other value collapses into a handful of levels.
+Applied per tensor, this fails on transformers for a specific reason: their weight and activation distributions contain <strong>outliers</strong>, values far larger than the rest. One outlier in a tensor forces the scale to cover its range. And every other value collapses into a handful of levels.
 
 The methods that work all address this:
 
@@ -70,7 +70,7 @@ The methods that work all address this:
 
 <strong>LLM.int8()</strong> keeps outlier dimensions in 16-bit and quantises the rest to 8-bit.
 
-<strong>NF4</strong> (used by QLoRA) uses quantisation levels spaced according to a normal distribution, which fits weight distributions better than uniform spacing.
+<strong>NF4</strong> (used by QLoRA) uses quantisation levels spaced according to a normal distribution. This fits weight distributions better than uniform spacing.
 
 ## Measuring the outlier collapse
 
@@ -245,7 +245,7 @@ print("same weights, at a cost of half a bit each.")
 
 ## Summing up
 
-Quantization buys memory and speed with precision. The surprise is how cheap the trade is: 8-bit is usually indistinguishable from full precision, and modern 4-bit methods come remarkably close. The size numbers here count weights only &mdash; real deployments also need memory for activations and the KV cache, which grows with context length.
+Quantization buys memory and speed with precision. The surprise is how cheap the trade is: 8-bit is usually indistinguishable from full precision, and modern 4-bit methods come remarkably close. The size numbers here count weights only &mdash; real deployments also need memory for activations and the KV cache. This grows with context length.
 
 ## Post-training versus quantisation-aware
 
@@ -279,13 +279,13 @@ Note `compute_dtype`: weights are <em>stored</em> in 4-bit and de-quantised to b
 
 ## What else can be quantised
 
-<strong>Weights</strong> are the usual target &mdash; they dominate memory and are static, so quantising them is straightforward.
+<strong>Weights</strong> are the usual target &mdash; they dominate memory and are static. So quantising them is straightforward.
 
 <strong>Activations</strong> are harder, because they vary per input and contain worse outliers. Weight-only quantisation is much more common so.
 
 <strong>The KV cache</strong> is increasingly quantised, and for long contexts it can exceed the weights in size. 8-bit cache quantisation is a meaningful saving with a small quality cost.
 
-<strong>Gradients and optimiser state</strong> during training &mdash; 8-bit optimisers reduce Adam's memory, which is twice the model size in 32-bit.
+<strong>Gradients and optimiser state</strong> during training &mdash; 8-bit optimisers reduce Adam's memory. This is twice the model size in 32-bit.
 
 ## Questions people ask
 

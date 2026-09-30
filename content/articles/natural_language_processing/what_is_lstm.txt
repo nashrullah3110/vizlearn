@@ -3,16 +3,16 @@ intro: An LSTM adds a separate memory channel that information can travel along 
 
 ## Two states, not one
 
-A simple recurrent cell has one hidden state, and it is completely rewritten at every timestep. An LSTM has two:
+A simple recurrent cell has one hidden state, and it is fully rewritten at every timestep. An LSTM has two:
 
 - <strong>Cell state</strong> <span class="mono-font">C<sub>t</sub></span> &mdash; the long-term memory. It is modified only by addition and elementwise multiplication by a gate, never by a full matrix multiply.
 - <strong>Hidden state</strong> <span class="mono-font">h<sub>t</sub></span> &mdash; the working output, a filtered view of the cell state, passed to the next layer and the next timestep.
 
-The cell state is the important one. Because it is updated additively, information placed there at timestep 1 can reach timestep 500 in effect untouched. There is no repeated matrix multiplication to shrink it. Three **gates** control what flows through this channel. The **forget gate** decides how much of the old cell state to keep (a sigmoid output multiplied elementwise). The **input gate** decides how much of a candidate update to write. The **output gate** decides how much of the cell state to expose as the hidden state. Each gate is a learned sigmoid layer, so the network learns *when* to remember and *when* to forget, rather than having memory decay forced by architecture. The GRU simplifies this to two gates and merges the cell and hidden states, trading some capacity for fewer parameters and faster training. This page shows each gate's activation as the LSTM reads a sentence, lets you trace how a specific piece of information survives across timesteps, and compares the LSTM and GRU architectures side by side.
+The cell state is the important one. Because it is updated additively, information placed there at timestep 1 can reach timestep 500 in effect untouched. There is no repeated matrix multiplication to shrink it. Three **gates** control what flows through this channel. The **forget gate** decides how much of the old cell state to keep (a sigmoid output times elementwise). The **input gate** decides how much of a candidate update to write. The **output gate** decides how much of the cell state to expose as the hidden state. Each gate is a learned sigmoid layer, so the network learns *when* to remember and *when* to forget, rather than having memory decay forced by architecture. The GRU simplifies this to two gates and merges the cell and hidden states, trading some capacity for fewer parameters and faster training. This page shows each gate's activation as the LSTM reads a sentence, lets you trace how a specific piece of information survives across timesteps, and compares the LSTM and GRU architectures side by side.
 
 ## The three gates
 
-Each gate is a small sigmoid layer producing values in [0, 1], which then multiply a vector elementwise &mdash; 0 blocks completely, 1 passes completely, and everything between is a partial pass.
+Each gate is a small sigmoid layer producing values in [0, 1]. This then multiply a vector elementwise &mdash; 0 blocks fully, 1 passes fully, and everything between is a partial pass.
 
 f<sub>t</sub> = &sigma;(W<sub>f</sub>&middot;[h<sub>t&minus;1</sub>, x<sub>t</sub>] + b<sub>f</sub>)&nbsp;&nbsp;&nbsp;forget
 
@@ -32,7 +32,7 @@ In a language model the forget gate might drop the previous subject’s gender w
 
 The whole design rests on the additive update. Differentiating <span class="mono-font">C<sub>t</sub></span> about <span class="mono-font">C<sub>t&minus;1</sub></span> gives <span class="mono-font">f<sub>t</sub></span> &mdash; the forget gate itself, not a weight matrix.
 
-So the gradient flowing back through the cell state is multiplied by the forget gate at each step. When the network learns to keep something, the forget gate sits near 1, and multiplying by roughly 1 many times preserves the gradient. Compare that with a simple RNN, where the same path is multiplied by <span class="mono-font">W<sub>h</sub></span> and a tanh derivative every step and decays geometrically.
+So the gradient flowing back through the cell state is times by the forget gate at each step. When the network learns to keep something, the forget gate sits near 1, and multiplying by roughly 1 many times preserves the gradient. Compare that with a simple RNN, where the same path is times by <span class="mono-font">W<sub>h</sub></span> and a tanh derivative every step and decays geometrically.
 
 This is the same principle as a residual connection: give the gradient an uninterrupted additive route, and depth stops destroying it.
 
@@ -40,14 +40,14 @@ This is the same principle as a residual connection: give the gradient an uninte
 
 A plain recurrent network overwrites its hidden state at every step. Whatever it knew about word one is repeatedly transformed, and after fifty steps almost nothing survives. Gradients decay along the same path, so it cannot learn long-range dependencies either.
 
-An LSTM adds a second, separately protected state: the <strong>cell state</strong>, which travels along the sequence with only additive updates and multiplicative gates deciding what enters and leaves.
+An LSTM adds a second, separately protected state: the <strong>cell state</strong>. This travels along the sequence with only additive updates and multiplicative gates deciding what enters and leaves.
 
 Two states, two jobs:
 
 - <strong>Cell state `c`</strong> &mdash; long-term memory. Modified by addition, not by rewriting.
 - <strong>Hidden state `h`</strong> &mdash; the working output at each step, derived from the cell state.
 
-Three gates control the flow, each a small neural network with a sigmoid output between 0 and 1 &mdash; 0 meaning "block completely", 1 meaning "let everything through":
+Three gates control the flow, each a small neural network with a sigmoid output between 0 and 1 &mdash; 0 meaning "block fully", 1 meaning "let everything through":
 
 |Gate|Question it answers|
 |---|---|
@@ -76,7 +76,7 @@ The LSTM's cell state has a path where the derivative of `cₜ` about `cₜ₋�
 
 That is the same structural idea as a residual connection: an additive path with a derivative near 1, protecting the gradient from the multiplicative decay. It is why LSTMs handled sequences of hundreds of steps where plain RNNs managed ten.
 
-It reduces the problem rather than removing it. Very long dependencies remain hard, and exploding gradients still occur, which is why gradient clipping is standard when training recurrent models.
+It reduces the problem rather than removing it. Very long dependencies remain hard, and exploding gradients still occur. This is why gradient clipping is standard when training recurrent models.
 
 ## The whole cell, one timestep at a time
 
@@ -228,7 +228,7 @@ print("   scratch space. nobody assigns those roles; the gradient does.")
 ## Experiments to try
 
 1. <strong>Count the cost of gating.</strong> Press <strong>Parameters</strong> and compare with a plain RNN of the same size. An LSTM has four weight matrices instead of one &mdash; three gates plus the candidate &mdash; so it needs roughly <strong>four times</strong> the parameters.
-2. <strong>Grow the state.</strong> Raise <strong>State Size</strong> and watch the count climb. Each of the four blocks is (d + h) &times; h, so the total is 4[(d + h)h + h].
+2. <strong>Grow the state.</strong> Raise <strong>State Size</strong> and watch the count climb. Each of the four blocks is (d + h) &times; h. So the total is 4[(d + h)h + h].
 3. <strong>Follow one timestep.</strong> Press <strong>Simulate Cell Operation</strong> and trace the cell state along the top. It passes straight through, touched only by a multiply and an add &mdash; that unbroken line is the long-term memory path.
 4. <strong>Watch the gates open and close.</strong> During the simulation note that gate values are between 0 and 1 rather than binary. Gating is continuous, which is what makes it differentiable and therefore learnable.
 
@@ -241,7 +241,7 @@ print("   scratch space. nobody assigns those roles; the gradient does.")
 
 ## In one line
 
-An LSTM separates long-term memory (the cell state) from working output (the hidden state) and controls the flow between them with three learned sigmoid gates. Because the cell state is updated by addition and gated multiplication rather than a matrix multiply, the gradient travels back through it multiplied only by the forget gate. So when the model chooses to remember, it genuinely can, for hundreds of steps. The cost is four times the parameters of a simple cell, and a GRU usually gets most of the benefit for less.
+An LSTM separates long-term memory (the cell state) from working output (the hidden state) and controls the flow between them with three learned sigmoid gates. Because the cell state is updated by addition and gated multiplication rather than a matrix multiply, the gradient travels back through it times only by the forget gate. So when the model chooses to remember, it genuinely can, for hundreds of steps. The cost is four times the parameters of a simple cell. And a GRU usually gets most of the benefit for less.
 
 ## Using one, and the shapes involved
 
@@ -289,7 +289,7 @@ For variable-length batches, use `pack_padded_sequence` so the LSTM does not pro
 
 <strong>How many layers?</strong> One or two for most tasks. Deep stacks of LSTMs are hard to train and rarely pay off.
 
-<strong>Why tanh and sigmoid rather than ReLU?</strong> Sigmoid bounds gates to 0&ndash;1, which is what a gate requires. Tanh bounds content to &minus;1&ndash;1, which keeps the repeatedly-applied recurrence stable.
+<strong>Why tanh and sigmoid rather than ReLU?</strong> Sigmoid bounds gates to 0&ndash;1. This is what a gate requires. Tanh bounds content to &minus;1&ndash;1, which keeps the repeatedly-applied recurrence stable.
 
 <strong>Do I need gradient clipping?</strong> Yes &mdash; recurrent models are the classic case for it.
 
@@ -300,5 +300,5 @@ For variable-length batches, use `pack_padded_sequence` so the LSTM does not pro
 - Two states: a protected cell state for long-term memory, a hidden state for the working output.
 - Three sigmoid gates decide what to forget, what to store and what to expose.
 - The cell updates additively, so `∂cₜ/∂cₜ₋₁` is the forget gate &mdash; near 1 means the gradient survives.
-- That additive path is the same idea as a residual connection, and it is what fixed vanishing gradients.
+- That additive path is the same idea as a residual connection. And it is what fixed vanishing gradients.
 - Superseded by transformers at scale; still the right tool for streaming, small data and on-device work.

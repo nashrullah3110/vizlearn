@@ -9,7 +9,7 @@ The surprise, when you finally see the block written out, is how little there is
 
 The first sublayer is multi-head self-attention, which lets each position in the sequence attend to every other position and collect information weighted by relevance. The second sublayer is a feed-forward network &mdash; two linear layers with a ReLU (or GELU) in between &mdash; applied independently to each position. The attention sublayer mixes information across positions. The feed-forward sublayer processes each position in isolation. Stacking the two is what gives the transformer both global context and per-position computation.
 
-Each sublayer is wrapped in a residual connection and a layer normalisation. The residual connection adds the sublayer's input back to its output, which keeps gradients flowing through deep stacks. The layer normalisation rescales the result so that each layer receives inputs in a stable range. Without these two wrappers, a transformer with more than a few blocks becomes difficult to train.
+Each sublayer is wrapped in a residual connection and a layer normalisation. The residual connection adds the sublayer's input back to its output. This keeps gradients flowing through deep stacks. The layer normalisation rescales the result so that each layer receives inputs in a stable range. Without these two wrappers, a transformer with more than a few blocks becomes difficult to train.
 
 The original 2017 paper ("Attention Is All You Need") described an encoder-decoder architecture with six blocks on each side. Modern models are often encoder-only (BERT, for classification and embeddings) or decoder-only (GPT, for generation). The decoder-only variant uses masked self-attention, where each position can attend only to earlier positions. This is what makes left-to-right generation possible. The architectural difference between BERT and GPT is whether the attention mask allows the model to look forward.
 
@@ -57,7 +57,7 @@ Everything else about a transformer is the arrangement of these blocks and what 
 |Decoder-only (GPT)|Decoder stack|Causal|Generation, chat, anything open-ended|
 |Encoder-decoder (T5, original)|Both, with cross-attention|Both|Translation, summarisation|
 
-<strong>Encoder-only</strong> models see the whole input at once, so every token's representation is informed by both directions. That makes them excellent at understanding and useless at generating &mdash; there is no notion of "next".
+<strong>Encoder-only</strong> models see the whole input at once, so every token's representation is informed by both directions. That makes them excellent at understanding and useless at making &mdash; there is no notion of "next".
 
 <strong>Decoder-only</strong> models mask future positions, so each token depends only on what precedes it. That constraint is what makes generation possible, and it turned out to scale so well that most current large models are decoder-only.
 
@@ -246,19 +246,19 @@ print("   arrangement that makes 100-layer models trainable.")
 3. <strong>Take normalisation away instead.</strong> Untick <strong>Layer Normalisation</strong> with residuals on and depth at 24. Now the opposite failure: with nothing rescaling between layers the gradient compounds instead of decaying. And a deep stack becomes unstable rather than dead.
 4. <strong>Find where the parameters are.</strong> With <strong>Feed-Forward Width</strong> at 4, read FFN Share. Roughly two thirds of every block sits in the feed-forward network, not in attention &mdash; which surprises most people, since attention is the part that gets all the attention.
 5. <strong>Change the width.</strong> Set the <strong>Feed-Forward Width</strong> slider to 1 and watch FFN Share collapse, then to 8 and watch it dominate. The 4× default is a convention, not a law.
-6. <strong>Scale it up.</strong> Set the <strong>Model Dimension</strong> slider to its maximum and watch the total. Parameters grow with the <em>square</em> of the dimension but only linearly with depth, which is why widening is so much more expensive than deepening.
+6. <strong>Scale it up.</strong> Set the <strong>Model Dimension</strong> slider to its maximum and watch the total. Parameters grow with the <em>square</em> of the dimension but only linearly with depth. This is why widening is so much more expensive than deepening.
 
 ## Why residuals matter so much
 
-Without a residual connection, the gradient reaching layer 1 has to pass back through every layer above it, being multiplied at each step. Multiply twenty-four numbers smaller than one and you get about zero &mdash; the <a href="vanishing_gradient_problem_in_rnn.html" style="color: var(--accent-primary)">vanishing gradient problem</a>, arriving from a different direction.
+Without a residual connection, the gradient reaching layer 1 has to pass back through every layer above it, being times at each step. Multiply twenty-four numbers smaller than one and you get about zero &mdash; the <a href="vanishing_gradient_problem_in_rnn.html" style="color: var(--accent-primary)">vanishing gradient problem</a>, arriving from a different direction.
 
-The residual gives the gradient a route that skips the sublayer, so it reaches the early layers in effect intact. That is why the same trick appears in ResNets, and why almost every deep architecture built since 2015 has some version of it. It is not an optimisation detail; without it, "deep" is not available.
+The residual gives the gradient a route that skips the sublayer. So it reaches the early layers in effect intact. That is why the same trick appears in ResNets, and why almost every deep architecture built since 2015 has some version of it. It is not an optimisation detail; without it, "deep" is not available.
 
 ## Pre-norm and post-norm
 
-The original paper put normalisation <em>after</em> the addition &mdash; <span class="mono-font">LayerNorm(x + Sublayer(x))</span>, which is what the diagram above shows. Almost every model since does the opposite, <span class="mono-font">x + Sublayer(LayerNorm(x))</span>, called pre-norm.
+The original paper put normalisation <em>after</em> the addition &mdash; <span class="mono-font">LayerNorm(x + Sublayer(x))</span>. This is what the diagram above shows. Almost every model since does the opposite, <span class="mono-font">x + Sublayer(LayerNorm(x))</span>, called pre-norm.
 
-The reason is practical: with post-norm the residual path itself gets normalised at every layer, which weakens it, and deep post-norm models need a careful learning-rate warmup to train at all. Pre-norm leaves the residual path clean from input to output and trains far more forgivingly. If you read the 2017 paper and then read a modern implementation, this is the difference you will notice first.
+The reason is practical: with post-norm the residual path itself gets normalised at every layer. This weakens it, and deep post-norm models need a careful learning-rate warmup to train at all. Pre-norm leaves the residual path clean from input to output and trains far more forgivingly. If you read the 2017 paper and then read a modern implementation, this is the difference you will notice first.
 
 ## Where this goes wrong
 
@@ -275,7 +275,7 @@ A transformer block is two sublayers, each wrapped in the same add-and-normalise
 
 Two properties, both structural.
 
-<strong>Parallelism.</strong> An RNN must compute position t before t+1. A transformer computes all positions at once as one matrix multiplication, which is what a GPU is built for. That alone made training on far more data feasible.
+<strong>Parallelism.</strong> An RNN must compute position t before t+1. A transformer computes all positions at once as one matrix multiplication. This is what a GPU is built for. That alone made training on far more data feasible.
 
 <strong>Constant path length.</strong> Any two positions are one attention step apart. In an RNN the path grows with the distance, and gradients decay along it &mdash; which is why long-range dependencies were the central difficulty.
 
@@ -298,7 +298,7 @@ Nothing about the block changes. What changes is depth, width, vocabulary, conte
 
 The scaling laws that emerged from studying this &mdash; performance improving predictably with compute, parameters and data together &mdash; are why the field spent several years mostly making the same architecture bigger. The Chinchilla result refined it: for a given compute budget, most early large models were under-trained on too little data relative to their size.
 
-Practical consequences of size: Adam's optimiser state is twice the model, so large-scale training needs sharding (ZeRO, FSDP). Inference needs KV caching and quantisation; and fine-tuning uses parameter-efficient methods such as LoRA rather than updating every weight.
+Practical consequences of size: Adam's optimiser state is twice the model. So large-scale training needs sharding (ZeRO, FSDP). Inference needs KV caching and quantisation; and fine-tuning uses parameter-efficient methods such as LoRA rather than updating every weight.
 
 ## Questions people ask
 
@@ -308,11 +308,11 @@ Practical consequences of size: Adam's optimiser state is twice the model, so la
 
 <strong>Do transformers understand language?</strong> They model statistical structure in text extremely well. Whether that constitutes understanding is a genuine open question, not a settled one in either direction.
 
-<strong>Why pre-norm rather than post-norm?</strong> It leaves the residual path clean, so gradients flow back unimpeded. Post-norm needs careful warm-up beyond about 12 layers.
+<strong>Why pre-norm rather than post-norm?</strong> It leaves the residual path clean. So gradients flow back unimpeded. Post-norm needs careful warm-up beyond about 12 layers.
 
 <strong>How long can the context be?</strong> Architecturally unlimited; practically bounded by quadratic cost and by how far the positional scheme generalises. Current models reach hundreds of thousands of tokens.
 
-<strong>Are transformers only for text?</strong> No &mdash; vision transformers treat image patches as tokens, and the architecture is used for audio, protein structure, video and time series.
+<strong>Are transformers only for text?</strong> No &mdash; vision transformers treat image patches as tokens. And the architecture is used for audio, protein structure, video and time series.
 
 ## Recap in one screen
 

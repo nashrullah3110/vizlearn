@@ -25,7 +25,7 @@ Recall@k never decreases as k grows. Retrieve the entire corpus and recall is ex
 
 It also means recall must always be read alongside a cost. In classical IR that partner is precision, and the two are combined into F1. In RAG the more meaningful partner is your context budget: recall at the k you can actually afford to put in the prompt. Recall@100 is irrelevant if you pass three chunks.
 
-The useful diagnostic is the gap between recall at a large k and recall at your real k. A large gap means the documents are being found but ranked badly, which is exactly what a cross-encoder reranker fixes. A small gap means better ranking will not help and the problem is upstream &mdash; embeddings, chunking, or coverage.
+The useful diagnostic is the gap between recall at a large k and recall at your real k. A large gap means the documents are being found but ranked badly. This is exactly what a cross-encoder reranker fixes. A small gap means better ranking will not help and the problem is upstream &mdash; embeddings, chunking, or coverage.
 
 ## Where recall is the wrong metric
 
@@ -70,7 +70,7 @@ That curve diagnoses the system precisely.
 
 That distinction &mdash; <strong>found versus ranked</strong> &mdash; is the single most useful thing this metric tells you. And it is invisible if you only measure at one k.
 
-The other thing to read from the curve is where it flattens. Between k = 20 and k = 50 recall gains 0.02, so retrieving 50 candidates for reranking buys almost nothing over 20.
+The other thing to read from the curve is where it flattens. Between k = 20 and k = 50 recall gains 0.02. So retrieving 50 candidates for reranking buys almost nothing over 20.
 
 ## Recall against precision
 
@@ -82,7 +82,7 @@ Increasing k always increases recall (or leaves it unchanged) and usually decrea
 
 For RAG the asymmetry is real: <strong>a missing chunk is fatal, an extra chunk is merely wasteful</strong>. So the retrieval stage should favour recall, and precision is recovered by reranking and by passing only the top few to the model.
 
-That said, precision is not free. Irrelevant context measurably degrades answers &mdash; the model may use it, and it dilutes attention. So the shape that works is: high recall at a generous k in stage one, then a reranker, then a small precise set into the prompt.
+That said, precision is not free. Irrelevant context measurably degrades answers &mdash; the model may use it. And it dilutes attention. So the shape that works is: high recall at a generous k in stage one, then a reranker, then a small precise set into the prompt.
 
 |Stage|Optimise for|Typical k|
 |---|---|---|
@@ -302,7 +302,7 @@ Three routes to building the set:
 
 <strong>Hand-written</strong> by someone who knows the domain. Highest quality; 50 questions is enough to catch large regressions.
 
-<strong>Generated</strong> by asking a model to write a question for each chunk. Fast, and it flatters retrieval &mdash; the question is phrased like the document, so the vocabulary gap that causes real failures is absent by construction. Expect real-world recall to be lower.
+<strong>Made</strong> by asking a model to write a question for each chunk. Fast, and it flatters retrieval &mdash; the question is phrased like the document. So the vocabulary gap that causes real failures is absent by construction. Expect real-world recall to be lower.
 
 <strong>Mined from logs</strong> &mdash; real queries paired with the documents users clicked, cited or rated helpful. Most realistic, and it needs a system already in production.
 
@@ -329,7 +329,7 @@ That last row is worth stating plainly because it is a common confusion: <strong
 
 <strong>It says nothing about the answer.</strong> Perfect recall with a poor prompt still produces bad answers. Retrieval metrics and generation metrics are both needed.
 
-<strong>Generated evaluation sets overstate it.</strong> Worth repeating: the gap between generated-question recall and real-query recall is often large. And it is the whole problem query rewriting exists to solve.
+<strong>Made evaluation sets overstate it.</strong> Worth repeating: the gap between made-question recall and real-query recall is often large. And it is the whole problem query rewriting exists to solve.
 
 ## Questions people ask
 
@@ -343,12 +343,12 @@ That last row is worth stating plainly because it is a common confusion: <strong
 
 <strong>Does a reranker improve recall?</strong> Not at fixed k in the retrieval stage. It improves what reaches the model, which is why the two-stage pipeline exists.
 
-<strong>Why is production worse than my evaluation?</strong> Almost always because real queries are phrased differently from your generated ones.
+<strong>Why is production worse than my evaluation?</strong> Almost always because real queries are phrased differently from your made ones.
 
 ## Recap in one screen
 
-- Recall@k is the share of relevant documents present in the top k, and it caps the whole system.
+- Recall@k is the share of relevant documents present in the top k. And it caps the whole system.
 - Measure it at several k: a gap between recall@20 and recall@5 means a ranking problem, low recall@50 means a finding problem.
 - For RAG, favour recall in retrieval and recover precision with a reranker.
 - Build 50&ndash;200 questions with known relevant chunks, and include unanswerable ones.
-- Generated evaluation questions overstate recall, because they share the document's vocabulary.
+- Made evaluation questions overstate recall, because they share the document's vocabulary.

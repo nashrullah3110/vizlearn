@@ -7,13 +7,13 @@ The Forget Gate is a small neural layer with a <strong>sigmoid</strong> output. 
 
 $$f_t = \sigma(W_f \cdot [H_{t-1}, X_t] + b_f)$$
 
-Those numbers are then multiplied element-by-element into the old memory: $f_t \odot C_{t-1}$. A slot that receives <strong>1</strong> is copied forward perfectly. A slot that receives <strong>0</strong> is erased. Everything in between is partial fading. The sigmoid activation is the right choice precisely because its output is bounded between 0 and 1, making it a natural gate: each slot in the cell state is independently scaled by a retention fraction. Contrast this with the [candidate layer](candidate_memory_in_lstm.html), which uses tanh because it needs to propose both positive and negative updates. The forget gate's bias is typically set up to a large positive value (1 or 2) so that the gate starts near 1 and the network begins by remembering everything. Learning to forget specific slots over time is easier than learning to remember from scratch. Without this initialisation trick, LSTMs often fail to learn long-range dependencies at all. The [output gate](output_gate_in_lstm.html) controls what is revealed from memory, but the forget gate controls what survives in the first place &mdash; making it the most critical gate for long-term memory retention. This page animates the forget gate at each timestep, shows which memory slots are retained and which are erased, and covers the bias initialisation trick.
+Those numbers are then times element-by-element into the old memory: $f_t \odot C_{t-1}$. A slot that receives <strong>1</strong> is copied forward perfectly. A slot that receives <strong>0</strong> is erased. Everything in between is partial fading. The sigmoid activation is the right choice precisely because its output is bounded between 0 and 1, making it a natural gate: each slot in the cell state is independently scaled by a retention fraction. Contrast this with the [candidate layer](candidate_memory_in_lstm.html), which uses tanh because it needs to propose both positive and negative updates. The forget gate's bias is typically set up to a large positive value (1 or 2) so that the gate starts near 1 and the network begins by remembering everything. Learning to forget specific slots over time is easier than learning to remember from scratch. Without this initialisation trick, LSTMs often fail to learn long-range dependencies at all. The [output gate](output_gate_in_lstm.html) controls what is revealed from memory, but the forget gate controls what survives in the first place &mdash; making it the most critical gate for long-term memory retention. This page animates the forget gate at each timestep, shows which memory slots are retained and which are erased, and covers the bias initialisation trick.
 
 ## It Is a Dimmer, Not a Switch
 
 The word "gate" suggests open or closed, but the sigmoid makes it a <strong>dimmer per dimension</strong>. In a real trained LSTM the forget vector might look like $[0.98, 0.03, 0.71, 0.99, \dots]$. The cell holds on to some facts with near-perfect fidelity while dumping others in the same time step.
 
-This is the important difference from a plain RNN. An RNN squashes its <em>entire</em> state through $\tanh$ at every step, so everything decays together. The LSTM decides <em>slot by slot</em>, so a subject noun can survive twenty words while a comma is discarded at once.
+This is the important difference from a plain RNN. An RNN squashes its <em>entire</em> state through $\tanh$ at every step. So everything decays together. The LSTM decides <em>slot by slot</em>, so a subject noun can survive twenty words while a comma is discarded at once.
 
 ## Forgetting Compounds — and That Is the Whole Story
 
@@ -27,15 +27,15 @@ Because this is exponential, small differences in $f$ produce enormous differenc
 - $f = 0.9$ &mdash; after 20 steps about <strong>12%</strong> survives. Usable long-range context.
 - $f = 1.0$ &mdash; the memory is <strong>perfectly preserved</strong>, no matter how many steps pass.
 
-That last case is the reason LSTMs defeat the vanishing gradient. When $f_t \approx 1$, the update becomes $C_t \approx C_{t-1} + \text{something}$ &mdash; pure addition. Gradients flowing backwards along this path are multiplied by $f_t \approx 1$ instead of being squashed. So they survive the trip.
+That last case is the reason LSTMs defeat the vanishing gradient. When $f_t \approx 1$, the update becomes $C_t \approx C_{t-1} + \text{something}$ &mdash; pure addition. Gradients flowing backwards along this path are times by $f_t \approx 1$ instead of being squashed. So they survive the trip.
 
 ## A Practitioner's Trick: Positive Forget Bias
 
-At initialisation the weights are near zero, so $f_t \approx \sigma(0) = 0.5$. The network starts out forgetting half its memory every single step and struggles to learn anything long-range. The standard fix is to initialise the forget-gate bias $b_f$ to <strong>+1 or +2</strong>, which pushes the gate to roughly 0.73&ndash;0.88 from the start. The cell begins life inclined to remember, and learns what to discard from there.
+At initialisation the weights are near zero, so $f_t \approx \sigma(0) = 0.5$. The network starts out forgetting half its memory every single step and struggles to learn anything long-range. The standard fix is to initialise the forget-gate bias $b_f$ to <strong>+1 or +2</strong>. This pushes the gate to roughly 0.73&ndash;0.88 from the start. The cell begins life inclined to remember, and learns what to discard from there.
 
 ## Deciding what to drop
 
-The forget gate is the first thing an LSTM cell computes, and it answers one question: <em>of everything currently in memory, how much of each part should survive this step?</em>
+The forget gate is the first thing an LSTM cell computes. And it answers one question: <em>of everything currently in memory, how much of each part should survive this step?</em>
 
 <p class="mono-font">f&#7511; = &sigma;(W&#7584; &middot; [h&#7511;&#8331;&#8321;, x&#7511;] + b&#7584;)</p>
 
@@ -56,21 +56,21 @@ The multiplication is <strong>elementwise</strong>, which is the important detai
 
 Concretely, in a language model, the forget gate learns to clear state at boundaries.
 
-Suppose a dimension of the cell state tracks the grammatical number of the current subject, so that the verb can agree with it. When a new sentence begins, that information is no longer relevant &mdash; it would actively mislead. A trained forget gate learns to output near 0 for that dimension when it sees a full stop, and near 1 while the sentence continues.
+Suppose a dimension of the cell state tracks the grammatical number of the current subject. So that the verb can agree with it. When a new sentence begins, that information is no longer relevant &mdash; it would actively mislead. A trained forget gate learns to output near 0 for that dimension when it sees a full stop, and near 1 while the sentence continues.
 
 Other observed behaviours: clearing after a closing bracket, resetting on a topic shift, and dropping a tracked entity once a new one is introduced.
 
-The gate does not "know" any of this. It is a learned function of the previous state and the current input, and these behaviours are what minimising the loss produced.
+The gate does not "know" any of this. It is a learned function of the previous state and the current input. And these behaviours are what minimising the loss produced.
 
 ## Why it is the gradient's protector
 
-The forget gate is also the reason LSTMs handle long sequences, and the mechanism is a single derivative.
+The forget gate is also the reason LSTMs handle long sequences. And the mechanism is a single derivative.
 
 Differentiating the cell update about the previous cell state gives:
 
 <p class="mono-font">&part;c&#7511; / &part;c&#7511;&#8331;&#8321; = f&#7511;</p>
 
-That is it &mdash; the forget gate itself. So the gradient flowing back through k steps is multiplied by the product of k forget-gate values.
+That is it &mdash; the forget gate itself. So the gradient flowing back through k steps is times by the product of k forget-gate values.
 
 If the network has learned to keep a piece of information, those values are near 1. And the product stays near 1 across many steps. The gradient reaches back in effect undamped, and the network can learn that something 100 steps ago mattered.
 
@@ -200,7 +200,7 @@ The Forget Gate is the only component that can <em>remove</em> information from 
 
 All three use a sigmoid, because a gate must be a fraction between 0 and 1. The <em>content</em> they control &mdash; the candidate memory &mdash; uses tanh, because content should be able to be negative.
 
-Note that forget and input are separate gates in an LSTM, which means the cell can keep everything <em>and</em> add new information at full strength in the same step. A GRU merges them into one update gate with coefficients `z` and `1 − z`. So keeping more necessarily means adding less. That is the expressiveness the GRU trades away for a quarter fewer parameters.
+Note that forget and input are separate gates in an LSTM. This means the cell can keep everything <em>and</em> add new information at full strength in the same step. A GRU merges them into one update gate with coefficients `z` and `1 − z`. So keeping more necessarily means adding less. That is the expressiveness the GRU trades away for a quarter fewer parameters.
 
 ## Inspecting a trained gate
 
@@ -231,13 +231,13 @@ What to look for:
 
 <strong>Why is it called "forget" when 1 means keep?</strong> The value is the <em>retention</em> coefficient. The name refers to the gate's purpose, not to its numeric direction &mdash; a genuine source of confusion.
 
-<strong>Can it forget completely?</strong> A sigmoid never reaches exactly 0, so it asymptotes rather than erasing outright. In practice values of 0.01 are effectively erasure.
+<strong>Can it forget fully?</strong> A sigmoid never reaches exactly 0, so it asymptotes rather than erasing outright. In practice values of 0.01 are effectively erasure.
 
 <strong>Why initialise the bias to 1?</strong> So the gate starts open and memory is preserved by default. This trains faster and better than starting half-closed.
 
 <strong>Does the forget gate cause vanishing gradients?</strong> It is the reason they are <em>avoided</em>. When it is near 1, the gradient passes back undamped. Consistently small values would cause decay, which is what the bias initialisation guards against.
 
-<strong>Is it shared across dimensions?</strong> No &mdash; it produces one value per cell-state dimension, so each can be managed independently.
+<strong>Is it shared across dimensions?</strong> No &mdash; it produces one value per cell-state dimension. So each can be managed independently.
 
 <strong>Do GRUs have a forget gate?</strong> Not separately. Its update gate does the job of both forget and input, with coupled coefficients.
 

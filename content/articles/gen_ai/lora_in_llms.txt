@@ -9,13 +9,13 @@ So instead of learning a full <span class="mono-font">d &times; k</span> matrix,
 
 &Delta;W = B &middot; A &nbsp;&nbsp; where B is d&times;r and A is r&times;k, with r &lll; min(d, k)
 
-The original weights are <strong>frozen</strong>. Only A and B are trained. If the frozen matrix W is d-by-d and the rank r is 16, A is d-by-16 and B is 16-by-d. So the trainable parameter count drops from d-squared to 2dr. A reduction of roughly 10,000x for a 7B model's attention weights. At inference time the product BA is added directly to W, producing a single merged matrix with zero extra latency. Multiple LoRA adapters can coexist: each task gets its own A and B, and switching tasks means swapping two small matrices while the base model stays in memory once. This is how services like Hugging Face PEFT serve hundreds of fine-tuned variants from one base checkpoint. The rank r is the main hyperparameter: too low and the adapter cannot represent the task's deviation from the base model; too high and it overfits or loses the efficiency advantage. In practice, r between 4 and 64 covers most tasks. A is set up with a random Gaussian and B with zeros, so the adapter starts as a no-op and learns the delta. This page freezes a weight matrix, trains a low-rank adapter beside it, and shows how the merged output matches the full fine-tune within a controlled tolerance.
+The original weights are <strong>frozen</strong>. Only A and B are trained. If the frozen matrix W is d-by-d and the rank r is 16, A is d-by-16 and B is 16-by-d. So the trainable parameter count drops from d-squared to 2dr. A reduction of roughly 10,000x for a 7B model's attention weights. At inference time the product BA is added directly to W, producing a single merged matrix with zero extra latency. Multiple LoRA adapters can coexist: each task gets its own A and B, and switching tasks means swapping two small matrices while the base model stays in memory once. This is how services like Hugging Face PEFT serve hundreds of fine-tuned variants from one base checkpoint. The rank r is the main hyperparameter: too low and the adapter cannot represent the task's deviation from the base model; too high and it overfits or loses the efficiency advantage. In practice, r between 4 and 64 covers most tasks. A is set up with a random Gaussian and B with zeros. So the adapter starts as a no-op and learns the delta. This page freezes a weight matrix, trains a low-rank adapter beside it, and shows how the merged output matches the full fine-tune within a controlled tolerance.
 
 ## Why the Savings Are So Extreme
 
 A full update on a 4096&times;4096 layer is <strong>16.7 million</strong> parameters. The LoRA version at rank 8 is <span class="mono-font">8 &times; (4096 + 4096) = 65,536</span> &mdash; about <strong>0.4%</strong>. The saving comes from replacing a product of dimensions with a sum of them.
 
-The memory win is even larger than the parameter count suggests, because optimizers like Adam store two extra values per <em>trainable</em> parameter. Freezing 99.6% of the weights removes that overhead almost completely &mdash; which is what lets a 7B model be fine-tuned on a single consumer GPU.
+The memory win is even larger than the parameter count suggests, because optimizers like Adam store two extra values per <em>trainable</em> parameter. Freezing 99.6% of the weights removes that overhead almost fully &mdash; which is what lets a 7B model be fine-tuned on a single consumer GPU.
 
 ## Choosing the Rank
 
@@ -25,7 +25,7 @@ Rank is the one hyperparameter that matters, and it is a capacity dial:
 - <strong>r = 8&ndash;16</strong> &mdash; the common default. Handles most instruction-tuning and domain adaptation.
 - <strong>r = 64&ndash;128</strong> &mdash; for teaching genuinely new capabilities, approaching full fine-tuning behaviour at a fraction of the cost.
 
-Higher is not by itself better: past the task's intrinsic rank you are adding parameters that mostly learn noise. Note also that A is set up randomly while B is set up to <strong>zero</strong>, so <span class="mono-font">BA = 0</span> at the start and training begins from exactly the pretrained model.
+Higher is not by itself better: past the task's intrinsic rank you are adding parameters that mostly learn noise. Note also that A is set up randomly while B is set up to <strong>zero</strong>. So <span class="mono-font">BA = 0</span> at the start and training begins from exactly the pretrained model.
 
 ## The Practical Superpower: Swappable Adapters
 
@@ -328,7 +328,7 @@ The trade: an unmerged adapter adds a small amount of inference latency, since `
 
 <strong>Which modules should I target?</strong> All attention projections plus the feed-forward layers is a strong default. Query and value only is cheaper and usually slightly worse.
 
-<strong>Can I combine several adapters?</strong> Yes &mdash; adapters can be summed or weighted, which sometimes composes their behaviours and sometimes interferes.
+<strong>Can I combine several adapters?</strong> Yes &mdash; adapters can be summed or weighted. This sometimes composes their behaviours and sometimes interferes.
 
 <strong>Does merging change quality?</strong> No, if precision matches. Merging into a quantised base can lose a little.
 

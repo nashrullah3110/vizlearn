@@ -9,7 +9,7 @@ The window starts at the beginning of the sequence and shifts one step at a time
 
 Window size is a modelling choice, not a data property. A small window (w = 3 or 5) gives the model only a short look-back and produces many training examples. A large window captures longer dependencies but yields fewer rows and increases the input dimension. The right size depends on the timescale of the pattern you are trying to predict. Daily seasonality in hourly data might need w = 24 or more, while character-level language modelling often works well with w = 40 to 100.
 
-The same idea applies to text. Treat each word or character as a position, set a window size, and each window becomes the context the model uses to predict the next token. This is exactly how classical n-gram language models and early neural language models construct their training batches. Recurrent networks, LSTMs and transformers all consume data prepared this way, though their internal architectures handle the sequential structure differently once the window is built.
+The same idea applies to text. Treat each word or character as a position, set a window size. And each window becomes the context the model uses to predict the next token. This is exactly how classical n-gram language models and early neural language models construct their training batches. Recurrent networks, LSTMs and transformers all consume data prepared this way, though their internal architectures handle the sequential structure differently once the window is built.
 
 ## How It Works
 
@@ -223,17 +223,17 @@ print("are -- shuffling, random cross-validation, bootstrap -- is wrong here.")
 
 ## In one line
 
-The sliding window is the simplest bridge between sequential data and supervised learning: it manufactures labeled examples from an unlabeled stream. Its fixed width is both its strength (simplicity) and its weakness — the model can never look further back than w steps. This is exactly the limitation that motivates recurrent architectures.
+The sliding window is the simplest bridge between sequential data and supervised learning: it manufactures labeled examples from an unlabeled stream. Its fixed width is both its strength (ease) and its weakness — the model can never look further back than w steps. This is exactly the limitation that motivates recurrent architectures.
 
-## For text specifically
+## For text in detail
 
 Language model training is exactly this pattern, at scale.
 
-A corpus is tokenised into one long stream, chunked into windows of the context length, and each window's target is the same window shifted by one position. Predicting token t from tokens 1…t&minus;1 is the sliding window with a horizon of 1 and the causal mask doing the work.
+A corpus is tokenised into one long stream, chunked into windows of the context length. And each window's target is the same window shifted by one position. Predicting token t from tokens 1…t&minus;1 is the sliding window with a horizon of 1 and the causal mask doing the work.
 
 Two practical details:
 
-<strong>Chunking versus true sliding.</strong> Extracting every possible window with stride 1 gives the most examples and enormous redundancy. Language model training typically uses non-overlapping chunks (stride = window), which is far cheaper and loses little, since each token still appears in a training example.
+<strong>Chunking versus true sliding.</strong> Extracting every possible window with stride 1 gives the most examples and enormous redundancy. Language model training typically uses non-overlapping chunks (stride = window). This is far cheaper and loses little, since each token still appears in a training example.
 
 <strong>Document boundaries.</strong> Concatenating documents into one stream means some windows straddle two unrelated documents. Most implementations accept this; careful ones insert a separator token or mask attention across the boundary.
 
@@ -245,7 +245,7 @@ The lagged values are a starting point, not the finished feature set. For numeri
 
 <strong>Rolling statistics</strong> &mdash; mean, standard deviation, min and max over the window. A rolling mean is often a stronger feature than the individual lags.
 
-<strong>Calendar features</strong> &mdash; day of week, month, hour, holiday flags. Most human-generated series have strong calendar structure. Encode cyclical values as sine and cosine pairs so hour 23 sits next to hour 0.
+<strong>Calendar features</strong> &mdash; day of week, month, hour, holiday flags. Most human-made series have strong calendar structure. Encode cyclical values as sine and cosine pairs so hour 23 sits next to hour 0.
 
 <strong>Differences</strong> &mdash; the change from the previous value, or the ratio to the same time last week. This matters especially for tree models, which cannot extrapolate: a forest trained on values between 100 and 200 will never predict 250. But it can predict "a 5% increase" from a differenced target.
 
@@ -257,7 +257,7 @@ for lag in range(1, 8):
 df["roll_mean_7"] = df["y"].shift(1).rolling(7).mean()
 ```
 
-The `.shift(1)` before `.rolling()` is important. Without it the rolling mean at time t includes the value at time t &mdash; the thing being predicted. That is a leak, it is easy to write by accident, and it produces suspiciously excellent results.
+The `.shift(1)` before `.rolling()` is important. Without it the rolling mean at time t includes the value at time t &mdash; the thing being predicted. That is a leak, it is easy to write by accident. And it produces suspiciously excellent results.
 
 ## Questions people ask
 
@@ -265,7 +265,7 @@ The `.shift(1)` before `.rolling()` is important. Without it the rolling mean at
 
 <strong>Should windows overlap?</strong> For small datasets, yes &mdash; stride 1 maximises examples. For large corpora, non-overlapping chunks are cheaper and adequate.
 
-<strong>Why can I not shuffle?</strong> Overlapping windows leak across the split, and a shuffled split lets the model see the future.
+<strong>Why can I not shuffle?</strong> Overlapping windows leak across the split. And a shuffled split lets the model see the future.
 
 <strong>What about missing timestamps?</strong> Resample to a regular frequency first and decide explicitly how to fill gaps. Windows that silently span a gap are meaningless.
 

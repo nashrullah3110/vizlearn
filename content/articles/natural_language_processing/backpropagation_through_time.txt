@@ -3,7 +3,7 @@ intro: How gradient descent trains a network that contains a loop.
 
 ## The Problem With a Loop
 
-Backpropagation works on feed-forward graphs — signals flow one way, gradients flow back the same way. An RNN's feedback loop breaks that picture. The fix, <strong>Backpropagation Through Time (BPTT)</strong>, is beautifully blunt: <em>unroll</em> the loop into T copies of the cell, one per timestep. And the loop becomes an ordinary (deep) feed-forward chain that standard backprop can handle. Each unrolled copy shares the same weight matrices W and U, so the gradients from all timesteps are summed into a single weight update. The chain rule applied across T copies produces a product of T Jacobians. And that product is why RNNs struggle with long sequences. If the largest singular value of the recurrent Jacobian is below 1 the gradients shrink exponentially ([vanishing gradients](../deep_learning/exploding_and_vanishing_gradient.html)). Above 1 they grow exponentially (exploding gradients, handled by [gradient clipping](../deep_learning/gradient_clipping.html)). Truncated BPTT limits the unrolling to a fixed window of k steps, which caps the memory cost and the gradient path length at the expense of long-range learning. LSTMs and GRUs address the same problem architecturally, by adding gates that let gradients flow through an additive path rather than a multiplicative one. This page unrolls a small RNN, shows the gradient flowing backward through each timestep, and plots the gradient magnitude decaying or exploding as the sequence grows.
+Backpropagation works on feed-forward graphs — signals flow one way, gradients flow back the same way. An RNN's feedback loop breaks that picture. The fix, <strong>Backpropagation Through Time (BPTT)</strong>, is beautifully blunt: <em>unroll</em> the loop into T copies of the cell, one per timestep. And the loop becomes an ordinary (deep) feed-forward chain that standard backprop can handle. Each unrolled copy shares the same weight matrices W and U. So the gradients from all timesteps are summed into a single weight update. The chain rule applied across T copies produces a product of T Jacobians. And that product is why RNNs struggle with long sequences. If the largest singular value of the recurrent Jacobian is below 1 the gradients shrink exponentially ([vanishing gradients](../deep_learning/exploding_and_vanishing_gradient.html)). Above 1 they grow exponentially (exploding gradients, handled by [gradient clipping](../deep_learning/gradient_clipping.html)). Truncated BPTT limits the unrolling to a fixed window of k steps. This caps the memory cost and the gradient path length at the expense of long-range learning. LSTMs and GRUs address the same problem architecturally, by adding gates that let gradients flow through an additive path rather than a multiplicative one. This page unrolls a small RNN, shows the gradient flowing backward through each timestep, and plots the gradient magnitude decaying or exploding as the sequence grows.
 
 ## Forward, Then Backward
 
@@ -23,7 +23,7 @@ Ordinary backpropagation then applies to that unrolled graph. The only special f
 
 That summation is the entire difference between BPTT and standard backpropagation. Everything else &mdash; the chain rule, the storage of activations, the update &mdash; is the same.
 
-Two consequences follow directly. Memory grows with sequence length, because every step's activations must be kept for the backward pass. And the gradient for early steps is a long product of factors, which is where vanishing and exploding gradients come from.
+Two consequences follow directly. Memory grows with sequence length, because every step's activations must be kept for the backward pass. And the gradient for early steps is a long product of factors. This is where vanishing and exploding gradients come from.
 
 ## Truncated BPTT
 
@@ -57,7 +57,7 @@ Forgetting to detach is a real bug: the graph grows without bound, memory climbs
 |Activation memory|Linear in sequence length|
 |Parallelism across steps|None &mdash; strictly sequential|
 
-The last row is the one that mattered historically. Because step t needs `hₜ₋₁`, the steps cannot be computed at once, so a GPU's thousands of cores sit mostly idle and training time scales with length.
+The last row is the one that mattered historically. Because step t needs `hₜ₋₁`, the steps cannot be computed at once. So a GPU's thousands of cores sit mostly idle and training time scales with length.
 
 That is a hardware-utilisation limitation rather than a quality one, and gating cannot fix it. It is the main reason transformers &mdash; where every position is computed in parallel &mdash; displaced recurrent networks for large-scale work, independent of any argument about long-range dependencies.
 
@@ -186,7 +186,7 @@ for name, p, grad, (i, j) in (("Wx", 0, dWx, (0, 0)), ("Wh", 1, dWh, (0, 0)),
 print("   worst disagreement: %.2e -- floating point noise." % worst)
 ```
 
-In practice, running the full backward pass over thousands of steps is too expensive, so training uses truncated BPTT.
+In practice, running the full backward pass over thousands of steps is too expensive. So training uses truncated BPTT.
 
 ```python-run
 T = 14
@@ -222,7 +222,7 @@ print("removes the question by giving every pair of positions a direct path.")
 
 ## Worth remembering
 
-BPTT = unroll the loop, backpropagate through the chain, sum the shared-weight gradients. It makes RNNs trainable — but it also chains together T multiplications, and a long product of numbers below 1 races toward zero. That arithmetic inevitability is the vanishing gradient problem.
+BPTT = unroll the loop, backpropagate through the chain, sum the shared-weight gradients. It makes RNNs trainable — but it also chains together T multiplications. And a long product of numbers below 1 races toward zero. That arithmetic inevitability is the vanishing gradient problem.
 
 ## Practical notes
 
@@ -258,7 +258,7 @@ The shared weights are what create both the summation and the long product. A ne
 
 <strong>Do transformers need BPTT?</strong> No &mdash; there is no recurrence, so ordinary backpropagation applies and all positions are computed in parallel.
 
-<strong>Why does my memory grow every batch?</strong> A carried hidden state that was never detached, so the graph builds up.
+<strong>Why does my memory grow every batch?</strong> A carried hidden state that was never detached. So the graph builds up.
 
 <strong>Is gradient clipping always needed?</strong> For recurrent models, effectively yes.
 

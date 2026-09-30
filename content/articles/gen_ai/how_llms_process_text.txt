@@ -5,13 +5,13 @@ intro: A language model never sees text. It sees numbers &mdash; and the transfo
 
 Tokenization splits the string into subword pieces, and each piece is looked up in the vocabulary to get an integer ID. That is the model's entire input: a list of integers. Nothing about the <em>meaning</em> of a word has entered yet &mdash; ID 4021 is no closer to ID 4022 than to ID 9. The IDs are arbitrary addresses, not measurements.
 
-The embedding layer converts each ID into a dense vector of learned real numbers. Words used in similar contexts end up with similar vectors, so meaning enters here. Position is added next — either as sinusoidal encodings or as learned position embeddings — because self-attention treats its input as a set and would otherwise be blind to word order.
+The embedding layer converts each ID into a dense vector of learned real numbers. Words used in similar contexts end up with similar vectors. So meaning enters here. Position is added next — either as sinusoidal encodings or as learned position embeddings — because self-attention treats its input as a set and would otherwise be blind to word order.
 
 The transformer layers are the core of the model. Each layer applies self-attention (every token looks at every other token to decide what information to incorporate) followed by a feed-forward network (two linear layers with a nonlinearity). A typical LLM stacks 32 to 96 of these layers. At each layer the representations are refined: early layers learn syntax and local patterns, middle layers learn semantic relationships, and later layers learn task-specific features.
 
-The output layer projects the final hidden state of each position back to the vocabulary size, producing a score (logit) for every token in the vocabulary. Softmax converts those logits into a probability distribution, and the model samples or takes the argmax to produce the next token. This process repeats token by token — each generated token is appended to the input and the model runs again — which is why generation is called autoregressive and why it is slower than encoding.
+The output layer projects the final hidden state of each position back to the vocabulary size, producing a score (logit) for every token in the vocabulary. Softmax converts those logits into a probability distribution, and the model samples or takes the argmax to produce the next token. This process repeats token by token — each made token is appended to the input and the model runs again — which is why generation is called autoregressive and why it is slower than encoding.
 
-The entire pipeline — tokenise, embed, add position, transform through N layers, project, sample — is what happens every time the model generates a single token. Understanding it explains why context length matters (attention is quadratic in sequence length), why the first token is slow (the full input must be encoded) and why subsequent tokens are faster (the KV cache stores the attention keys and values from previous positions).
+The entire pipeline — tokenise, embed, add position, transform through N layers, project, sample — is what happens every time the model makes a single token. Understanding it explains why context length matters (attention is quadratic in sequence length), why the first token is slow (the full input must be encoded) and why subsequent tokens are faster (the KV cache stores the attention keys and values from previous positions).
 
 ## Stage 4: Embeddings Give IDs Meaning
 
@@ -21,7 +21,7 @@ Notice the shape change: a list of <span class="mono-font">n</span> integers bec
 
 ## Stage 5: Position Must Be Injected
 
-Self-attention has no inherent sense of order &mdash; it sees a <em>set</em> of vectors, so "dog bites man" and "man bites dog" would be the same. Position is therefore added directly into the vectors, classically with sinusoids of geometrically increasing wavelength:
+Self-attention has no inherent sense of order &mdash; it sees a <em>set</em> of vectors. So "dog bites man" and "man bites dog" would be the same. Position is therefore added directly into the vectors, classically with sinusoids of geometrically increasing wavelength:
 
 PE(pos, 2i) = sin(pos / 10000<sup>2i/d</sup>) &nbsp;&nbsp; PE(pos, 2i+1) = cos(pos / 10000<sup>2i/d</sup>)
 
@@ -39,7 +39,7 @@ The heatmap in this stage is a real computation from the vectors above it. Each 
 
 One attention block is repeated dozens of times, each with a feed-forward network, residual connections and normalisation. Early layers capture syntax; deeper layers capture semantics and task structure.
 
-At the very end only the <strong>last position's</strong> vector is used for the next token. It is multiplied by the vocabulary matrix to produce one logit per possible token. And we are back to a distribution over words. The chosen token is appended to the input and the entire pipeline runs again, from stage 1, for every single word generated.
+At the very end only the <strong>last position's</strong> vector is used for the next token. It is times by the vocabulary matrix to produce one logit per possible token. And we are back to a distribution over words. The chosen token is appended to the input and the entire pipeline runs again, from stage 1, for every single word made.
 
 ## The full path, once
 
@@ -75,7 +75,7 @@ Generation splits into two workloads, and the split explains most latency and pr
 
 <strong>Prefill</strong> processes the prompt. Every token is known, so all positions are computed in parallel in one pass. Compute-bound, efficient, cheap per token.
 
-<strong>Decode</strong> produces the output. Each token depends on the last, so it is strictly sequential, and every step must read the entire model's weights plus the KV cache from memory. Bandwidth-bound, and expensive per token.
+<strong>Decode</strong> produces the output. Each token depends on the last, so it is strictly sequential. And every step must read the entire model's weights plus the KV cache from memory. Bandwidth-bound, and expensive per token.
 
 |&nbsp;|Prefill|Decode|
 |---|---|---|
@@ -84,7 +84,7 @@ Generation splits into two workloads, and the split explains most latency and pr
 |Cost per token|Low|High|
 |User-visible metric|Time to first token|Tokens per second|
 
-That is why input tokens are priced below output tokens, why a long prompt delays the first word rather than slowing the stream, and why generating 500 tokens takes longer than reading 5,000.
+That is why input tokens are priced below output tokens, why a long prompt delays the first word rather than slowing the stream, and why making 500 tokens takes longer than reading 5,000.
 
 The <strong>KV cache</strong> is what keeps decode linear: previous tokens' keys and values are stored rather than recomputed. It costs memory &mdash; several gigabytes for a long context &mdash; and it is the dominant memory consumer in serving.
 
@@ -224,7 +224,7 @@ print("   calling a calculator.")
 
 ## What to remember
 
-Text in, integers, vectors, mixed vectors, logits, text out. The embeddings and attention weights in this lab are deterministic stand-ins for learned parameters, but the <em>operations</em> &mdash; sinusoidal positions, scaled dot-product attention, softmax &mdash; are the real ones. Understanding this pipeline makes context windows, tokenizer quirks and attention costs stop feeling arbitrary.
+Text in, integers, vectors, mixed vectors, logits, text out. The embeddings and attention weights in this lab are deterministic stand-ins for learned parameters. But the <em>operations</em> &mdash; sinusoidal positions, scaled dot-product attention, softmax &mdash; are the real ones. Understanding this pipeline makes context windows, tokenizer quirks and attention costs stop feeling arbitrary.
 
 ## What the model does and does not have
 
@@ -232,13 +232,13 @@ Text in, integers, vectors, mixed vectors, logits, text out. The embeddings and 
 
 <strong>No access to anything outside the prompt.</strong> No files, no internet, no database &mdash; unless a tool call provides it. Retrieval exists precisely to put external information into the context.
 
-<strong>No view of characters.</strong> The model sees tokens. "Strawberry" may be two or three tokens, none of which is a letter, which is why letter-counting and spelling questions are unreliable.
+<strong>No view of characters.</strong> The model sees tokens. "Strawberry" may be two or three tokens, none of which is a letter. This is why letter-counting and spelling questions are unreliable.
 
 <strong>No calculator.</strong> Numbers tokenise inconsistently, so arithmetic is pattern-matched rather than computed. Give it a tool.
 
 <strong>No calibrated confidence.</strong> It produces a distribution over tokens, not a belief about truth. A confident tone is a property of the text distribution.
 
-Those five limitations account for a large share of the surprising failures people report, and all five are structural rather than fixable by prompting.
+Those five limitations account for a large share of the surprising failures people report. And all five are structural rather than fixable by prompting.
 
 ## Where the parameters are
 
@@ -251,7 +251,7 @@ For a 7B-parameter model with 32 layers and a model dimension of 4096:
 |Embedding and output|~5%|
 |LayerNorm|Negligible|
 
-The embedding and output matrices are frequently <strong>tied</strong> &mdash; the same weights used in both directions &mdash; which saves a substantial number of parameters (a 128,000-token vocabulary times 4,096 dimensions is 524 million) and typically helps slightly.
+The embedding and output matrices are often <strong>tied</strong> &mdash; the same weights used in both directions &mdash; which saves a substantial number of parameters (a 128,000-token vocabulary times 4,096 dimensions is 524 million) and typically helps slightly.
 
 Memory at inference is roughly the parameter count times the bytes per parameter, plus the KV cache. That is the arithmetic behind every quantisation decision: 7 billion parameters is 14GB at 16-bit and 3.5GB at 4-bit.
 
@@ -277,7 +277,7 @@ Memory at inference is roughly the parameter count times the bytes per parameter
 
 <strong>Why does it fail at simple arithmetic?</strong> Tokenisation fragments numbers, and the model pattern-matches rather than calculating. Use a tool.
 
-<strong>What is the context window shared between?</strong> Prompt, system instructions, retrieved documents, conversation history and generated output. One budget for all of them.
+<strong>What is the context window shared between?</strong> Prompt, system instructions, retrieved documents, conversation history and made output. One budget for all of them.
 
 <strong>Why are output tokens more expensive?</strong> Prefill is parallel; decode is sequential and bandwidth-bound.
 
@@ -285,6 +285,6 @@ Memory at inference is roughly the parameter count times the bytes per parameter
 
 - Tokenise, embed, add position, pass through N the same blocks, project to the vocabulary, sample &mdash; then repeat.
 - Attention moves information between positions; the feed-forward layers hold most of the parameters.
-- Prefill is parallel and cheap; decode is sequential and expensive, which explains the pricing and latency asymmetry.
+- Prefill is parallel and cheap; decode is sequential and expensive. This explains the pricing and latency asymmetry.
 - The KV cache makes decode linear at a large memory cost.
 - No memory between calls, no view of characters, no calculator, no calibrated confidence.

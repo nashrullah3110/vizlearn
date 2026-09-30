@@ -7,7 +7,7 @@ A vector search returns the k nearest chunks whether or not any of them is relev
 
 That is the most damaging RAG failure in production, because the answer is fluent, sourced-looking and wrong. The user has no signal that the retrieval missed.
 
-Corrective RAG adds a checkpoint between retrieval and generation. Before the retrieved documents reach the language model, a grading step evaluates whether they actually answer the question. If nothing is relevant, the system takes a different path instead of generating from noise.
+Corrective RAG adds a checkpoint between retrieval and generation. Before the retrieved documents reach the language model, a grading step evaluates whether they actually answer the question. If nothing is relevant, the system takes a different path instead of making from noise.
 
 The idea comes from a 2024 paper by Yan et al. that formalised what production teams were already doing with ad-hoc relevance filters. The contribution is not the grading itself but the three-way branching: proceed, correct, or fall back. Most naive RAG pipelines treat retrieval as a black box and pass everything through. CRAG treats retrieval as a hypothesis that can be wrong, and builds the workflow around that assumption.
 
@@ -21,7 +21,7 @@ A grader &mdash; a small model, a cross-encoder, or a similarity threshold &mdas
 
 <p><strong>Correct.</strong> At least one document is relevant. Proceed, often after stripping the irrelevant ones so they do not distract the generator.</p>
 
-<p><strong>Incorrect.</strong> Nothing is relevant. Discard everything and take a corrective action rather than generating.</p>
+<p><strong>Incorrect.</strong> Nothing is relevant. Discard everything and take a corrective action rather than making.</p>
 
 <p><strong>Ambiguous.</strong> Something is partly relevant. Combine what you have with an external source.</p>
 
@@ -57,23 +57,23 @@ Measure the benefit rather than assuming it. The number that matters is how ofte
 
 Corrective RAG is one of a family that all add a decision point to the straight-line retrieve-then-generate pipeline. And they are easy to confuse.
 
-<p><strong>Self-RAG</strong> trains the model to emit retrieval and critique tokens itself, so the decision to retrieve and the judgement of what came back are part of generation rather than a separate step. More elegant, and it needs a fine-tuned model.</p>
+<p><strong>Self-RAG</strong> trains the model to emit retrieval and critique tokens itself. So the decision to retrieve and the judgement of what came back are part of generation rather than a separate step. More elegant, and it needs a fine-tuned model.</p>
 
 <p><strong>Adaptive RAG</strong> decides <em>whether to retrieve at all</em> based on the query. "What is 2+2" needs no corpus, and a pipeline that retrieves unconditionally wastes latency and pollutes the context.</p>
 
 <p><strong>Agentic RAG</strong> lets a loop plan several retrievals, decomposing a compound question into sub-questions. Strictly more powerful and much harder to bound &mdash; without a step limit it can run for a long time on a query it cannot satisfy.</p>
 
-CRAG is the cheapest of the four and needs no training, which is why it is usually the first one to add. The others are what you reach for once you have measured that grading alone is not enough.
+CRAG is the cheapest of the four and needs no training. This is why it is usually the first one to add. The others are what you reach for once you have measured that grading alone is not enough.
 
 ## Checking the retrieval before trusting it
 
-A plain RAG pipeline retrieves, then generates. It has no step that asks whether the retrieved documents are any good, so when retrieval fails the model still produces an answer. Fluently, with citations, from irrelevant context.
+A plain RAG pipeline retrieves, then makes. It has no step that asks whether the retrieved documents are any good. So when retrieval fails the model still produces an answer. Fluently, with citations, from irrelevant context.
 
 Corrective RAG adds an evaluation step between the two:
 
 <p class="mono-font">query &rarr; retrieve &rarr; <strong>grade the documents</strong> &rarr; act on the grade &rarr; generate</p>
 
-The grader assesses each retrieved chunk for relevance to the question, and the pipeline branches on the result:
+The grader assesses each retrieved chunk for relevance to the question. And the pipeline branches on the result:
 
 |Grade|Action|
 |---|---|
@@ -97,9 +97,9 @@ Is this document relevant to answering the question? Reply with JSON:
 
 Three design choices matter here:
 
-<strong>Grade relevance, not correctness.</strong> The grader is deciding whether the chunk is <em>about</em> the question, which is a much easier and more reliable judgement than whether it answers it.
+<strong>Grade relevance, not correctness.</strong> The grader is deciding whether the chunk is <em>about</em> the question. This is a much easier and more reliable judgement than whether it answers it.
 
-<strong>Use a small fast model.</strong> This runs per chunk on every query, so it is in the latency path. A small model does this adequately.
+<strong>Use a small fast model.</strong> This runs per chunk on every query. So it is in the latency path. A small model does this adequately.
 
 <strong>Batch the calls.</strong> Grading five chunks in one call is cheaper and faster than five calls, at some loss of independence.
 
@@ -111,17 +111,17 @@ The corrective branch is the interesting part, and there are four responses in i
 
 <strong>Refuse.</strong> "The available documents do not cover this." Honest, instant, and often the correct answer. Any corrective system should have this as its floor.
 
-<strong>Rewrite the query and retry.</strong> The failure may be phrasing. Ask a model to reformulate and search again &mdash; one extra round trip, and it recovers a meaningful share of failures.
+<strong>Rewrite the query and retry.</strong> The failure may be phrasing. Ask a model to reformulate and search again &mdash; one extra round trip. And it recovers a meaningful share of failures.
 
 <strong>Broaden the search.</strong> Drop filters, raise k, add keyword search, try a different index.
 
-<strong>Fall back to an external source.</strong> Web search, or another corpus. This is what the original Corrective RAG paper proposed for the no-relevant-documents case, and it is appropriate when the corpus is genuinely incomplete rather than badly searched.
+<strong>Fall back to an external source.</strong> Web search, or another corpus. This is what the original Corrective RAG paper proposed for the no-relevant-documents case. And it is appropriate when the corpus is genuinely incomplete rather than badly searched.
 
 A cap on retries is important. Two attempts then refuse is a reasonable policy; without a limit, a hard query can loop.
 
 ## What the grader costs, and what it buys
 
-The sections above describe the three verdicts and what correction means. The question they leave open is whether the grader is worth its latency, and that is arithmetic -- so here it is, run over a set of queries where retrieval succeeds, partly succeeds and fails outright.
+The sections above describe the three verdicts and what correction means. The question they leave open is whether the grader is worth its latency. And that is arithmetic -- so here it is, run over a set of queries where retrieval succeeds, partly succeeds and fails outright.
 
 ```python-run
 # 8 queries. for each: whether the retrieved set is actually good, and
@@ -144,7 +144,7 @@ for name, good, score in QUERIES:
     print("%-28s %10s %10.2f" % (name, "good" if good else "BAD", score))
 ```
 
-The threshold applied to that grader score decides every downstream call, so the next block sweeps it and counts the two kinds of mistake separately.
+The threshold applied to that grader score decides every downstream call. So the next block sweeps it and counts the two kinds of mistake separately.
 
 ```python-run
 QUERIES = [
@@ -204,7 +204,7 @@ bt = min(costs, key=lambda x: x[1])
 print("   the cheapest threshold is %.2f, with total cost %.1f." % (bt[0], bt[1]))
 ```
 
-That cheapest threshold turns out to differ from the most accurate one, and the gap between them is the actual lesson.
+That cheapest threshold turns out to differ from the most accurate one. And the gap between them is the actual lesson.
 
 ```python-run
 QUERIES = [
@@ -308,7 +308,7 @@ print("   that is an argument for MEASURING the free signal first -- a")
 print("   grader is worth its latency only where it beats it.")
 ```
 
-Whichever grader is used, its output collapses to one of three verdicts, and the middle one is what gives the pattern its name.
+Whichever grader is used, its output collapses to one of three verdicts. And the middle one is what gives the pattern its name.
 
 ```python-run
 print("THE THREE VERDICTS, and what each one is really for:")
@@ -327,15 +327,15 @@ print("   better description than 'a retry'.")
 
 1. Select <em>capital of Peru</em>. Nothing clears the threshold, and the pipeline declines &mdash; the answer naive RAG cannot give.
 2. Raise the <strong>relevance threshold</strong> to 0.8 on a query that was working. More queries take the corrective path; grading is a precision/recall trade like any other classifier.
-3. Lower the <strong>ambiguous floor</strong> to 0.05. Weak evidence is now treated as partial rather than absent, which changes which path a borderline query takes.
+3. Lower the <strong>ambiguous floor</strong> to 0.05. Weak evidence is now treated as partial rather than absent. This changes which path a borderline query takes.
 
 ## What to remember
 
-Corrective RAG grades retrieved documents before generating, and takes a different path when they are poor: rewrite the query, fall back to another source, or decline. Retrieval never fails loudly &mdash; it always returns its nearest k &mdash; so without a grader a query with no answer still produces a confident, sourced-looking one.
+Corrective RAG grades retrieved documents before making, and takes a different path when they are poor: rewrite the query, fall back to another source, or decline. Retrieval never fails loudly &mdash; it always returns its nearest k &mdash; so without a grader a query with no answer still produces a confident, sourced-looking one.
 
 ## The family of self-checking pipelines
 
-Corrective RAG is one of several patterns that add evaluation loops, and they check different things.
+Corrective RAG is one of several patterns that add evaluation loops. And they check different things.
 
 |Pattern|Checks|Acts by|
 |---|---|---|
@@ -344,7 +344,7 @@ Corrective RAG is one of several patterns that add evaluation loops, and they ch
 |Adaptive RAG|How hard is this question?|Routing to a cheaper or richer path|
 |Agentic RAG|Anything, iteratively|A planning loop with tools|
 
-<strong>Self-RAG</strong> adds two further checks: whether retrieval is needed at all (many questions do not need it), and whether the generated answer is supported by what was retrieved &mdash; regenerating if not.
+<strong>Self-RAG</strong> adds two further checks: whether retrieval is needed at all (many questions do not need it), and whether the made answer is supported by what was retrieved &mdash; regenerating if not.
 
 <strong>Adaptive RAG</strong> classifies the query first. A simple factoid goes straight to single-pass retrieval; a complex multi-hop question goes to a decomposition path. This saves latency on the easy majority.
 
@@ -404,7 +404,7 @@ Two things to log for every request: <strong>how many documents were graded rele
 
 ## Recap in one screen
 
-- Corrective RAG grades the retrieved documents before generating, and branches on the result.
+- Corrective RAG grades the retrieved documents before making, and branches on the result.
 - Its floor is an honest refusal instead of a confident answer from irrelevant context.
 - The corrective branch can rewrite the query, broaden the search, or fall back to another source &mdash; with a retry cap.
 - It costs one extra model call plus occasional retries; worth it where a wrong answer is expensive.

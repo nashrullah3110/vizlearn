@@ -9,9 +9,9 @@ Two consequences. The generator cannot answer from the chunk because it does not
 
 The fix is to add context that the prose assumes. The cheapest approach is prepending the document title and heading path to each chunk before embedding — deterministic, no model call, and usually the largest single improvement. A chunk from "Authentication > OAuth2 > Token Refresh" that opens with "This process repeats every hour" becomes far more retrievable when its heading trail is prepended.
 
-A more powerful approach is generated context: an LLM writes a sentence situating the chunk within the document. And that sentence is prepended before embedding. Anthropic's contextual retrieval paper showed this improves retrieval precision much. The cost is one model call per chunk at indexing time, which prompt caching over the shared document makes affordable for most corpus sizes.
+A more powerful approach is made context: an LLM writes a sentence situating the chunk within the document. And that sentence is prepended before embedding. Anthropic's contextual retrieval paper showed this improves retrieval precision much. The cost is one model call per chunk at indexing time. This prompt caching over the shared document makes affordable for most corpus sizes.
 
-Neighbour context stores the previous and next chunks alongside each chunk for generation but does not embed them. The retrieval model still sees only the target chunk (keeping the embedding focused), but the generator gets a wider window. This is the idea behind the parent-document retriever: retrieve the small, precise chunk but return the larger parent to the model.
+Neighbour context stores the previous and next chunks alongside each chunk for generation but does not embed them. The retrieval model still sees only the target chunk (keeping the embedding focused). But the generator gets a wider window. This is the idea behind the parent-document retriever: retrieve the small, precise chunk but return the larger parent to the model.
 
 The trade-off in all three approaches is dilution. Prepending 200 tokens of context to a 300-token chunk means the embedding is partly about the context. So chunks from the same section start looking alike to the retriever. The window between "too little context" and "too much" is narrow and corpus-dependent. Measuring retrieval recall on a held-out set is the only reliable way to tune it.
 
@@ -21,7 +21,7 @@ The trade-off in all three approaches is dilution. Prepending 200 tokens of cont
 
 <p><strong>Neighbour context:</strong> the previous and next chunk, or a window around the chunk, stored for generation but not embedded. The <a href="parent_document_retriever.html">parent document retriever</a> is exactly this idea, retrieving small and returning large.</p>
 
-<p><strong>Generated context:</strong> an LLM writes a sentence situating the chunk in the document, prepended before embedding. Anthropic's "contextual retrieval" is this, and it works well. It costs one model call per chunk at index time, which prompt caching over the shared document makes affordable.</p>
+<p><strong>Made context:</strong> an LLM writes a sentence situating the chunk in the document, prepended before embedding. Anthropic's "contextual retrieval" is this, and it works well. It costs one model call per chunk at index time. This prompt caching over the shared document makes affordable.</p>
 
 ## What it costs, and what to watch
 
@@ -33,7 +33,7 @@ Keep the enrichment short relative to the chunk, and measure on a retrieval eval
 
 The strongest published form of this is to have an LLM write a short sentence situating each chunk inside its document &mdash; what it is about, what it follows &mdash; and prepend that before embedding. Reported reductions in retrieval failure are large, and the technique is simple enough to implement in an afternoon.
 
-The cost is one model call per chunk at index time, which sounds prohibitive on a large corpus and mostly is not: the document is the same for every chunk in it. So <a href="caching_in_rag_pipelines.html">prompt caching</a> over that shared prefix makes the marginal call cheap. It is the clearest practical example of two of these techniques composing.
+The cost is one model call per chunk at index time. This sounds prohibitive on a large corpus and mostly is not: the document is the same for every chunk in it. So <a href="caching_in_rag_pipelines.html">prompt caching</a> over that shared prefix makes the marginal call cheap. It is the clearest practical example of two of these techniques composing.
 
 It is still an index-time cost paid on every re-index, so it belongs in your pipeline design rather than being bolted on: changing the chunker means regenerating every context sentence.
 
@@ -49,7 +49,7 @@ Once you see the pattern, the design question stops being "how should I chunk?" 
 
 Enrichment is easy to add and easy to overdo, and the only way to tell which you have done is to measure both halves.
 
-<p><strong>Did findability improve?</strong> <a href="recall_at_k.html">Recall@k</a> on a fixed query set, before and after. This is the number the technique is supposed to move, and it usually does.</p>
+<p><strong>Did findability improve?</strong> <a href="recall_at_k.html">Recall@k</a> on a fixed query set, before and after. This is the number the technique is supposed to move. And it usually does.</p>
 
 <p><strong>Did distinguishability degrade?</strong> The failure mode is chunks from one section becoming interchangeable. A cheap proxy is the mean pairwise similarity between chunks that share a parent: if it climbs sharply after enrichment, the shared context is dominating and the retriever is losing its ability to pick between them.</p>
 
@@ -57,7 +57,7 @@ Watching only the first will lead you to enrich more and more, because recall ke
 
 ## The missing-context problem
 
-A chunk is retrieved and passed to the model on its own. Frequently it cannot be understood on its own:
+A chunk is retrieved and passed to the model on its own. Often it cannot be understood on its own:
 
 <blockquote>"This must be requested at least 8 weeks in advance, and the form requires a manager's signature."</blockquote>
 
@@ -99,14 +99,14 @@ Write 1-2 sentences of context situating this chunk within the document,
 so it can be understood on its own. Reply with the context only.
 ```
 
-The generated context is prepended to the chunk text, and the combined text is embedded and stored.
+The made context is prepended to the chunk text, and the combined text is embedded and stored.
 
-<blockquote><strong>Generated:</strong> "This passage is from the parental leave section of the employee handbook, describing the application process for eligible employees."</blockquote>
+<blockquote><strong>Made:</strong> "This passage is from the parental leave section of the employee handbook, describing the application process for eligible employees."</blockquote>
 <blockquote><strong>Chunk:</strong> "This must be requested at least 8 weeks in advance..."</blockquote>
 
 Now the chunk is retrievable by a query about applying for parental leave, and interpretable when retrieved.
 
-The reported effect on retrieval failure rates is large &mdash; substantial reductions when combined with hybrid search and reranking. The cost is one model call per chunk at indexing time, which for a large corpus is significant. Two mitigations: use a small fast model, and exploit prompt caching, since the full document is repeated across all of its chunks' prompts.
+The reported effect on retrieval failure rates is large &mdash; substantial reductions when combined with hybrid search and reranking. The cost is one model call per chunk at indexing time. This for a large corpus is significant. Two mitigations: use a small fast model, and exploit prompt caching, since the full document is repeated across all of its chunks' prompts.
 
 ## Testing whether a chunk can stand alone
 
@@ -256,7 +256,7 @@ print("The LLM version earns its money only where there are no")
 print("headings -- transcripts, scanned documents, unstructured prose.")
 ```
 
-Enriched text improves retrieval, but the model should see the original chunk, not your generated context.
+Enriched text improves retrieval, but the model should see the original chunk, not your made context.
 
 ```python-run
 print("WHAT TO EMBED vs RETURN:")
@@ -329,16 +329,16 @@ Take twenty chunks at random and read each one cold. For each, ask:
 2. Do all the pronouns and references resolve?
 3. If someone asked a question this chunk answers, would this text answer it?
 
-If the answer to any is no, the chunk needs more context. That is a five-minute exercise that predicts retrieval quality better than most metrics, and it directly identifies which of the four techniques above is needed.
+If the answer to any is no, the chunk needs more context. That is a five-minute exercise that predicts retrieval quality better than most metrics. And it directly identifies which of the four techniques above is needed.
 
-Following it up quantitatively: measure recall@k with and without the context addition on a question set. The heading path alone frequently moves recall by several points.
+Following it up quantitatively: measure recall@k with and without the context addition on a question set. The heading path alone often moves recall by several points.
 
 ## Common mistakes
 
 - <strong>Adding context after embedding.</strong> The context must be present in the text that gets embedded, or it improves readability without improving retrieval.
 - <strong>Prepending so much context that it dominates the embedding.</strong> A 200-token context on a 100-token chunk means the vector is mostly about the context. Keep it to a sentence or two.
-- <strong>Not storing the original chunk separately,</strong> so citations quote generated context as if it were source text.
-- <strong>Generating context per chunk without prompt caching,</strong> paying for the full document repeatedly.
+- <strong>Not storing the original chunk separately,</strong> so citations quote made context as if it were source text.
+- <strong>Making context per chunk without prompt caching,</strong> paying for the full document repeatedly.
 - <strong>Assuming overlap solves reference resolution.</strong> It handles boundaries, not distant antecedents.
 
 ## Questions people ask
@@ -347,7 +347,7 @@ Following it up quantitatively: measure recall@k with and without the context ad
 
 <strong>How much does contextual retrieval cost?</strong> One model call per chunk. With a small model and prompt caching over the shared document, much less than it first appears.
 
-<strong>Does the generated context risk hallucination?</strong> It can misdescribe a chunk. Keep it to situating rather than summarising content, and store the original text separately for citation.
+<strong>Does the made context risk hallucination?</strong> It can misdescribe a chunk. Keep it to situating rather than summarising content, and store the original text separately for citation.
 
 <strong>Should context be embedded or only stored?</strong> Embedded &mdash; that is the point. Store the original separately for display.
 
@@ -360,5 +360,5 @@ Following it up quantitatively: measure recall@k with and without the context ad
 - Chunks routinely reference material outside themselves, and retrieval delivers them out of order.
 - Prepend the heading path always &mdash; free, and it fixes the most common case.
 - Overlap handles boundary loss; parent-child retrieval handles intra-section references.
-- Contextual retrieval generates a situating sentence per chunk at indexing time, and measurably reduces retrieval failures.
+- Contextual retrieval makes a situating sentence per chunk at indexing time, and measurably reduces retrieval failures.
 - Read twenty chunks cold and ask whether each stands alone &mdash; the cheapest diagnostic available.

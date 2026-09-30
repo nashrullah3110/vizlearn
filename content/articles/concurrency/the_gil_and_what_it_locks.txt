@@ -53,7 +53,7 @@ which is flagged where it happens.
 ## Where the switch happens
 
 The GIL is not held for the whole of a function. The interpreter drops and
-reacquires it periodically, and the period is a setting you can read:
+reacquires it at times, and the period is a setting you can read:
 
 ```python-run
 import sys, dis
@@ -169,7 +169,7 @@ which is the subject of
 [threads or processes](threads_or_processes.html).
 
 Run the same comparison with <code>time.sleep(1)</code> as the work and the
-numbers invert completely &mdash; two seconds sequentially, one second with two
+numbers invert fully &mdash; two seconds sequentially, one second with two
 threads &mdash; because sleeping releases the lock. Same threads, same pool,
 opposite result, and the only thing that changed is whether the work needed
 the interpreter.
@@ -264,7 +264,7 @@ increases overhead. Change the structure instead.
 
 <strong>Will the free-threaded build fix my program?</strong> It removes the parallelism ceiling and it does not remove the need for locks. In fact it makes races easier to hit, because two threads really do run at once. Code that was accidentally correct because of the GIL's coarse granularity can break there.
 
-<strong>Why not just use subinterpreters?</strong> Since 3.12 each has its own GIL, so they genuinely run Python in parallel, and sharing data between them is on purpose restrictive. It is a promising middle ground and still young; the stdlib interface is <code>interpreters</code> and it arrived in 3.13.
+<strong>Why not just use subinterpreters?</strong> Since 3.12 each has its own GIL. So they genuinely run Python in parallel, and sharing data between them is on purpose restrictive. It is a promising middle ground and still young; the stdlib interface is <code>interpreters</code> and it arrived in 3.13.
 
 <strong>Does <code>asyncio</code> avoid the GIL?</strong> No, it sidesteps the question. Async runs one thread and overlaps waiting, so the GIL is never contended because nothing is competing for it. For CPU-bound work async has exactly the same ceiling as threads &mdash; see [choosing between the three](choosing_threads_processes_or_async.html).
 
@@ -272,7 +272,7 @@ increases overhead. Change the structure instead.
 
 - Threads are real OS threads; holding the GIL is the price of executing Python bytecode, and only one thread may hold it.
 - So threads overlap **waiting** and never overlap **computing**. That single sentence predicts whether threading will help.
-- The interpreter offers a switch every 5 ms by default (<code>sys.getswitchinterval</code>), and a switch can only land between bytecodes.
+- The interpreter offers a switch every 5 ms by default (<code>sys.getswitchinterval</code>). And a switch can only land between bytecodes.
 - I/O, <code>time.sleep</code>, and C code that does not touch Python objects release the lock. Pure-Python loops, dict work and <code>json.loads</code> hold it.
 - Two threads on CPU work measure slightly slower than sequential; the same test with <code>time.sleep</code> measures twice as fast.
 - The GIL buys cheap reference counting and a guarantee C extensions were written against. 3.12 gave subinterpreters their own; 3.13 ships an test build without one.

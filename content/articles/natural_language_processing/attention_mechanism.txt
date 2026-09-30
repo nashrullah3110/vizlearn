@@ -3,9 +3,9 @@ intro: The idea that removed the bottleneck, and then removed recurrence altoget
 
 ## Quick Context
 
-The encoder&ndash;decoder models that came before attention worked like this: an <a href="rnn.html" style="color: var(--accent-primary)">RNN</a> read the whole input sentence and squeezed it into a single fixed-length vector. And a second RNN generated the output from that vector alone.
+The encoder&ndash;decoder models that came before attention worked like this: an <a href="rnn.html" style="color: var(--accent-primary)">RNN</a> read the whole input sentence and squeezed it into a single fixed-length vector. And a second RNN made the output from that vector alone.
 
-The flaw is visible as soon as you say it out loud. Every sentence, whether five words or fifty, has to fit in the same number of floats. The encoder's final state is dominated by whatever it read last, and the beginning of a long sentence is simply gone by the time decoding starts. Translation quality fell off a cliff past about twenty words. Attention (Bahdanau et al., 2014) removes the bottleneck entirely: instead of compressing the input into one vector, the decoder looks at all of the encoder's hidden states and computes a weighted average, with weights that depend on the current decoding step. At each output position, the decoder produces a query from its current state, scores it against every encoder state (the keys), and uses the scores to compute a weighted sum (the context vector). The scores go through softmax, so they sum to 1, and the highest-scoring encoder state dominates the context. This lets the model "attend" to the relevant part of the input for each output word: when translating "the cat sat," the word "chat" attends mostly to "cat." The scoring function can be a dot product (Luong attention), an additive network (Bahdanau attention), or a scaled dot product (transformer attention). [Self-attention](self_attention.html) applies the same mechanism within a single sequence rather than between encoder and decoder. This is the foundation of the [transformer](../gen_ai/how_llms_predict_next_word.html) architecture. [Multi-head attention](multi_head_attention.html) runs several attention operations in parallel to capture different types of relationships. This page shows the attention weights at each decoding step, highlights which input words the model focuses on, and covers the three scoring functions.
+The flaw is visible as soon as you say it out loud. Every sentence, whether five words or fifty, has to fit in the same number of floats. The encoder's final state is dominated by whatever it read last. And the beginning of a long sentence is simply gone by the time decoding starts. Translation quality fell off a cliff past about twenty words. Attention (Bahdanau et al., 2014) removes the bottleneck entirely: instead of compressing the input into one vector, the decoder looks at all of the encoder's hidden states and computes a weighted average, with weights that depend on the current decoding step. At each output position, the decoder produces a query from its current state, scores it against every encoder state (the keys), and uses the scores to compute a weighted sum (the context vector). The scores go through softmax, so they sum to 1. And the highest-scoring encoder state dominates the context. This lets the model "attend" to the relevant part of the input for each output word: when translating "the cat sat," the word "chat" attends mostly to "cat." The scoring function can be a dot product (Luong attention), an additive network (Bahdanau attention), or a scaled dot product (transformer attention). [Self-attention](self_attention.html) applies the same mechanism within a single sequence rather than between encoder and decoder. This is the foundation of the [transformer](../gen_ai/how_llms_predict_next_word.html) architecture. [Multi-head attention](multi_head_attention.html) runs several attention operations in parallel to capture different types of relationships. This page shows the attention weights at each decoding step, highlights which input words the model focuses on, and covers the three scoring functions.
 
 ## The fix
 
@@ -61,7 +61,7 @@ Softmax: e² = 7.39, e⁰·⁵ = 1.65, e¹ = 2.72; total 11.76. Weights: <strong
 
 The output for token 2 is 0.63 × value₁ + 0.14 × value₂ + 0.23 × value₃. Mostly the first token's contribution, with some of the third.
 
-Those weights are what get visualised as attention heatmaps. They are genuinely informative about what the model connected to what, and they are not an explanation of <em>why</em>. A caution worth keeping, since attention maps are frequently over-interpreted.
+Those weights are what get visualised as attention heatmaps. They are genuinely informative about what the model connected to what. And they are not an explanation of <em>why</em>. A caution worth keeping, since attention maps are often over-interpreted.
 
 ## The bottleneck it was invented to remove
 
@@ -110,7 +110,7 @@ print("   built this way degrades with sentence length, as the 2014 papers showe
 print()
 ```
 
-The fix: keep every encoder state and let the decoder choose which ones to look at as it generates each output word.
+The fix: keep every encoder state and let the decoder choose which ones to look at as it makes each output word.
 
 ```python-run
 import numpy as np
@@ -206,7 +206,7 @@ print("it does not need the recurrence at all.")
 Step 1 needs a way to compare two vectors. Two became standard:
 
 - <strong>Additive</strong> (Bahdanau, 2014): push both vectors through a small feed-forward layer. Flexible, works when the two have different sizes, but adds parameters and is slower.
-- <strong>Dot-product</strong> (Luong, 2015): just take the <a href="../maths/vectors_and_dot_product.html" style="color: var(--accent-primary)">dot product</a>. No parameters at all, and it is a matrix multiplication, which is exactly what accelerators are built for.
+- <strong>Dot-product</strong> (Luong, 2015): just take the <a href="../maths/vectors_and_dot_product.html" style="color: var(--accent-primary)">dot product</a>. No parameters at all, and it is a matrix multiplication. This is exactly what accelerators are built for.
 
 Dot-product won, and that decision is the reason transformers are fast. Its one wrinkle &mdash; that dot products grow with vector size and push softmax into saturation &mdash; is fixed by dividing by the square root of the dimension, the "scaled" in scaled dot-product attention.
 
@@ -219,8 +219,8 @@ The next module generalises the three steps above into the <a href="query_key_va
 ## Where this goes wrong
 
 - <strong>Treating attention weights as explanation.</strong> They show where information came from, not why the output was chosen. Different weightings can produce the same prediction.
-- <strong>Forgetting the cost.</strong> Every output position scores against every input position, so the work grows with the product of the two lengths. On long sequences this quadratic term, not the model size, is what runs out of memory.
-- <strong>Expecting clean alignments everywhere.</strong> Attention is often diffuse, and heads in a real model frequently attend to punctuation or to the first token for reasons that have nothing to do with meaning.
+- <strong>Forgetting the cost.</strong> Every output position scores against every input position. So the work grows with the product of the two lengths. On long sequences this quadratic term, not the model size, is what runs out of memory.
+- <strong>Expecting clean alignments everywhere.</strong> Attention is often diffuse, and heads in a real model often attend to punctuation or to the first token for reasons that have nothing to do with meaning.
 
 ## Summing up
 
@@ -253,7 +253,7 @@ The main responses:
 - <strong>FlashAttention</strong> computes exact attention without ever materialising the full score matrix, tiling the computation to fit in fast on-chip memory. Same result, several times faster, far less memory &mdash; now standard.
 - <strong>Sparse and local attention</strong> restrict each position to a window plus a few global positions (Longformer, BigBird).
 - <strong>Linear attention</strong> approximates the softmax to achieve linear scaling, at some quality cost.
-- <strong>Multi-query and grouped-query attention</strong> share key and value projections across heads, which mainly reduces the memory needed to cache them during generation.
+- <strong>Multi-query and grouped-query attention</strong> share key and value projections across heads. This mainly reduces the memory needed to cache them during generation.
 - <strong>KV caching</strong> stores the keys and values of previous tokens during generation so each new token costs one step rather than a full re-computation.
 
 ## Questions people ask
@@ -268,7 +268,7 @@ The main responses:
 
 <strong>Why replace RNNs entirely?</strong> Constant path length between any two positions, and full parallelism across the sequence. Together those made much larger models trainable.
 
-<strong>Can attention be used outside text?</strong> Yes &mdash; vision transformers attend across image patches, and it is used in graphs, audio and protein models.
+<strong>Can attention be used outside text?</strong> Yes &mdash; vision transformers attend across image patches. And it is used in graphs, audio and protein models.
 
 ## Recap in one screen
 

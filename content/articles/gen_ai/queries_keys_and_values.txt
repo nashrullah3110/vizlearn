@@ -7,7 +7,7 @@ If a token used the same vector to search with and to be found by, attention wou
 
 Separating value from key matters just as much. What makes a token worth attending to is not necessarily what it should contribute once attended to. The key is the address; the value is the payload.
 
-Concretely, the input embedding of each token is multiplied by three learned weight matrices &mdash; W_Q, W_K and W_V &mdash; to produce its query, key and value vectors. The query of the current token is dotted with the key of every other token to produce a score. The scores are scaled by 1/&radic;d (where d is the key dimension) and passed through softmax to become attention weights that sum to one. Those weights are then applied to the value vectors, and the weighted sum becomes the output for the current position.
+Concretely, the input embedding of each token is times by three learned weight matrices &mdash; W_Q, W_K and W_V &mdash; to produce its query, key and value vectors. The query of the current token is dotted with the key of every other token to produce a score. The scores are scaled by 1/&radic;d (where d is the key dimension) and passed through softmax to become attention weights that sum to one. Those weights are then applied to the value vectors, and the weighted sum becomes the output for the current position.
 
 The three projections give the model three independent degrees of freedom per token. A word like "bank" can have a key that advertises its grammatical role (noun, subject), a query that looks for a modifier or a prepositional phrase. And a value that carries its semantic content for the next layer. None of these needs to be the same vector, and learning them separately is what gives attention its representational power.
 
@@ -21,9 +21,9 @@ In self-attention all three come from the same sequence. In cross-attention the 
 
 ## Why this is a serving question too
 
-Generating token <em>n</em> needs the keys and values of all previous tokens &mdash; and those never change, because each depends only on tokens before it. So they are computed once and kept: the <a href="context_window_and_kv_cache.html">KV cache</a>.
+Making token <em>n</em> needs the keys and values of all previous tokens &mdash; and those never change, because each depends only on tokens before it. So they are computed once and kept: the <a href="context_window_and_kv_cache.html">KV cache</a>.
 
-Without it every new token would recompute K and V for the whole prefix, making generation quadratic. With it, each step is linear in the context length. The cost is memory: the cache grows with sequence length &times; layers &times; heads, and it is usually what limits how many requests a GPU can serve at once.
+Without it every new token would recompute K and V for the whole prefix, making generation quadratic. With it, each step is linear in the context length. The cost is memory: the cache grows with sequence length &times; layers &times; heads. And it is usually what limits how many requests a GPU can serve at once.
 
 ## Where the shapes come from
 
@@ -35,7 +35,7 @@ In multi-head attention the projections are split into h heads of dimension d/h,
 
 ## Masking, and what it has to do with the cache
 
-A decoder must not attend to tokens it has not generated yet, so the scores above the diagonal are set to negative infinity before the softmax. This drives their weights to zero. That is causal masking, and it is what makes the KV cache correct rather than merely convenient: since token <em>i</em> can only ever attend to tokens up to <em>i</em>, its keys and values can never be affected by anything generated later.
+A decoder must not attend to tokens it has not made yet. So the scores above the diagonal are set to negative infinity before the softmax. This drives their weights to zero. That is causal masking, and it is what makes the KV cache correct rather than merely convenient: since token <em>i</em> can only ever attend to tokens up to <em>i</em>, its keys and values can never be affected by anything made later.
 
 The cache's cost is memory, and it is the usual limit on how many requests a GPU can serve at once: roughly 2 &times; layers &times; heads &times; head dimension &times; sequence length &times; batch, per precision byte. Grouped-query and multi-query attention exist mostly to shrink it, by sharing K and V across heads while keeping separate queries. A large memory saving for a small quality cost.
 
@@ -97,7 +97,7 @@ Setting a score to negative infinity makes its softmax weight exactly zero &mdas
 
 ## Three projections, and why you need all three
 
-Attention gives every token a query, a key and a value, and the usual explanation stops at a database analogy. This builds the mechanism from vectors you can read, then removes each projection in turn to show what breaks -- which is the only way to see why three are needed rather than one.
+Attention gives every token a query, a key and a value. And the usual explanation stops at a database analogy. This builds the mechanism from vectors you can read, then removes each projection in turn to show what breaks -- which is the only way to see why three are needed rather than one.
 
 ```python-run
 import numpy as np
@@ -321,9 +321,9 @@ That asymmetry has a practical consequence during generation, and it underpins t
 
 ## Why the KV cache exists
 
-When generating token by token, the keys and values of all previous tokens do not change &mdash; only the new token's query is new.
+When making token by token, the keys and values of all previous tokens do not change &mdash; only the new token's query is new.
 
-<strong>Without a cache,</strong> generating the 1,000th token means recomputing keys and values for all 999 previous tokens. Generation is quadratic in output length.
+<strong>Without a cache,</strong> making the 1,000th token means recomputing keys and values for all 999 previous tokens. Generation is quadratic in output length.
 
 <strong>With a KV cache,</strong> each new token computes its own K and V, appends them to the stored ones, and attends against the cache. Generation becomes linear.
 
@@ -339,9 +339,9 @@ That arithmetic is why <strong>grouped-query attention</strong> exists: sharing 
 
 Multi-head attention runs several of these computations in parallel with different projections, then concatenates and projects once more.
 
-With a model dimension of 512 and 8 heads, each head works in 64 dimensions, so the total cost is roughly that of one 512-dimensional head. And the model gets 8 independent views of the sequence rather than 1.
+With a model dimension of 512 and 8 heads, each head works in 64 dimensions. So the total cost is roughly that of one 512-dimensional head. And the model gets 8 independent views of the sequence rather than 1.
 
-Inspected in trained models, heads specialise: some track the previous token, some link verbs to subjects, some match brackets, some connect pronouns to referents. And some do very little. Pruning studies find many can be removed with minimal loss, which suggests the redundancy helps training rather than inference.
+Inspected in trained models, heads specialise: some track the previous token, some link verbs to subjects, some match brackets, some connect pronouns to referents. And some do very little. Pruning studies find many can be removed with minimal loss. This suggests the redundancy helps training rather than inference.
 
 ## Questions people ask
 
@@ -349,13 +349,13 @@ Inspected in trained models, heads specialise: some track the previous token, so
 
 <strong>Must Q and K be the same size?</strong> Yes &mdash; they are dotted together. V can differ in principle and is usually the same in practice.
 
-<strong>Why divide by `√dₖ`?</strong> To stop the softmax saturating in high dimensions, which would kill the gradient.
+<strong>Why divide by `√dₖ`?</strong> To stop the softmax saturating in high dimensions. This would kill the gradient.
 
 <strong>Where are the parameters?</strong> In the three projection matrices per head, plus one output projection per layer. The attention formula itself has none.
 
-<strong>Can K and V come from elsewhere?</strong> That is exactly cross-attention, and it is how decoders read encoders and how modalities are connected.
+<strong>Can K and V come from elsewhere?</strong> That is exactly cross-attention. And it is how decoders read encoders and how modalities are connected.
 
-<strong>Why is the KV cache so large?</strong> Two tensors per layer per token, and it grows with context length &mdash; which is why long-context serving is a memory problem.
+<strong>Why is the KV cache so large?</strong> Two tensors per layer per token. And it grows with context length &mdash; which is why long-context serving is a memory problem.
 
 ## Recap in one screen
 

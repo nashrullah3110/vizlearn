@@ -5,15 +5,15 @@ intro: How do you stop a RAG system retrieving documents the user is not allowed
 
 Retrieve the top 10 by similarity, then remove what the user may not see. If eight were restricted you return two, and nothing reports that the result set collapsed. The generator answers from thin evidence and sounds no less confident.
 
-Over-fetching &mdash; retrieve 100, filter, keep 10 &mdash; makes it less likely and never fixes it. A user with access to 0.1% of the corpus needs an enormous k, and the failure is worst exactly for the most restricted users.
+Over-fetching &mdash; retrieve 100, filter, keep 10 &mdash; makes it less likely and never fixes it. A user with access to 0.1% of the corpus needs an enormous k. And the failure is worst exactly for the most restricted users.
 
 The core problem is that vector similarity search and access control operate on different axes. The index ranks by semantic relevance; the access layer filters by who is allowed to see what. Combining them correctly is a systems problem, not a modelling problem, and there are three approaches.
 
-Pre-filtering restricts the search space before retrieval: only documents the user is allowed to see are candidates. This guarantees the result set is clean and the right size, but it requires the vector index to support metadata filtering efficiently. Not all indexes do — a naive implementation scans the full corpus and checks permissions per document. This is as slow as brute-force search.
+Pre-filtering restricts the search space before retrieval: only documents the user is allowed to see are candidates. This guarantees the result set is clean and the right size. But it requires the vector index to support metadata filtering efficiently. Not all indexes do — a naive implementation scans the full corpus and checks permissions per document. This is as slow as brute-force search.
 
-Post-filtering retrieves by relevance first and removes forbidden documents afterwards. It is simple to implement but unreliable: the result set shrinks unpredictably, and the generator must work with whatever remains. Increasing k helps probabilistically but never guarantees enough permitted results.
+Post-filtering retrieves by relevance first and removes forbidden documents afterwards. It is simple to implement but unreliable: the result set shrinks unpredictably. And the generator must work with whatever remains. Increasing k helps probabilistically but never guarantees enough permitted results.
 
-Hybrid approaches retrieve a large candidate set, filter it, then backfill from a wider search if too few documents survive. This is more complex but produces a consistent result size. The trade-off is latency: two retrieval rounds instead of one, and the backfill query may not be as well-targeted as the original.
+Hybrid approaches retrieve a large candidate set, filter it, then backfill from a wider search if too few documents survive. This is more complex but produces a consistent result size. The trade-off is latency: two retrieval rounds instead of one. And the backfill query may not be as well-targeted as the original.
 
 Whichever approach you choose, the permission model itself must be correct. A document tagged with the wrong access group will be served to unauthorised users silently and confidently. Permission metadata must be propagated from the source system at indexing time and kept in sync when access rules change.
 
@@ -63,7 +63,7 @@ There are three places it could go, and only one is correct.
 
 <strong>After generation</strong> &mdash; check the answer for leaked content. Hopeless: the content is already in the output, and paraphrase makes detection unreliable.
 
-<strong>After retrieval, before the prompt</strong> &mdash; retrieve k documents, discard the ones the user cannot see, pass the rest. Better, and still wrong in two ways: the unauthorised documents occupied slots, so fewer authorised ones were considered; and their content has already been loaded into the application's memory.
+<strong>After retrieval, before the prompt</strong> &mdash; retrieve k documents, discard the ones the user cannot see, pass the rest. Better, and still wrong in two ways: the unauthorised documents occupied slots. So fewer authorised ones were considered; and their content has already been loaded into the application's memory.
 
 <strong>Inside the search</strong> &mdash; the index only ever considers documents matching the user's permissions. This is the correct answer, and it requires the store to support filtered search.
 
@@ -260,7 +260,7 @@ An alternative to storing ACLs in the index is to resolve them at query time aga
 |Correctness during changes|Window of over-sharing|Correct immediately|
 |Filtering inside the search|Yes|No &mdash; post-filter only|
 
-The trade is sharp: resolving at query time is always correct and forces post-filtering, which brings back the slot-wastage problem.
+The trade is sharp: resolving at query time is always correct and forces post-filtering. This brings back the slot-wastage problem.
 
 The pragmatic combination used in practice is <strong>both</strong>: filter inside the search using indexed ACLs to get a correct-enough candidate set efficiently, then verify the final selection against the source system before showing anything. The index filter does the heavy lifting; the verification catches the staleness window.
 
@@ -285,7 +285,7 @@ Retrieval is the main channel and not the only one.
 
 <strong>Logs and traces.</strong> Prompt logging captures retrieved document content, so log storage inherits the documents' classification.
 
-<strong>Embeddings themselves.</strong> Research has shown that text can be partially reconstructed from its embedding, so a vector store holding sensitive content is itself sensitive and needs the same protections as the documents.
+<strong>Embeddings themselves.</strong> Research has shown that text can be partially reconstructed from its embedding. So a vector store holding sensitive content is itself sensitive and needs the same protections as the documents.
 
 <strong>Aggregate answers.</strong> A user may be permitted to see individual documents but not a synthesis that reveals a pattern across them. This is a policy question rather than a technical one, and worth asking.
 

@@ -7,7 +7,7 @@ Define a function with <code>async def</code> and calling it does not run it. It
 hands you back a **coroutine object** &mdash; a description of work that has not
 started.
 
-These editors run inside a browser event loop that is already going, so the examples finish with <code>await main()</code>. In a standalone <code>.py</code> script &mdash; run with <code>python file.py</code> &mdash; you write <code>asyncio.run(main())</code> instead. This starts a loop, runs the coroutine, and closes it. The two are the same program with different entry points.
+These editors run inside a browser event loop that is already going. So the examples finish with <code>await main()</code>. In a standalone <code>.py</code> script &mdash; run with <code>python file.py</code> &mdash; you write <code>asyncio.run(main())</code> instead. This starts a loop, runs the coroutine, and closes it. The two are the same program with different entry points.
 
 ```python-run
 import asyncio
@@ -124,7 +124,7 @@ three lines up.
 
 ## Driving a coroutine by hand
 
-"A coroutine is a plan, not an action" is literally true, and you can prove it
+"A coroutine is a plan, not an action" is literally true. And you can prove it
 without a loop at all. A coroutine object is a *resumable* object: it supports
 <code>send</code>, and driving it is exactly what the event loop does.
 
@@ -243,11 +243,11 @@ handle, and await it.
 
 <strong>When do I need <code>create_task</code> rather than <code>await</code>?</strong> Await when you need the result before you can do anything else. Use a task when you want the work happening *while* you carry on. Two awaits in a row are two things in sequence; two tasks are two things at once.
 
-<strong>Does <code>create_task</code> start the coroutine at once?</strong> It schedules it at once, which is not quite the same. It begins running at the next opportunity the loop gets &mdash; the next time the current coroutine awaits &mdash; so the work starts before you await the handle. This is the entire reason the timings differ above.
+<strong>Does <code>create_task</code> start the coroutine at once?</strong> It schedules it at once. This is not quite the same. It begins running at the next opportunity the loop gets &mdash; the next time the current coroutine awaits &mdash; so the work starts before you await the handle. This is the entire reason the timings differ above.
 
-<strong>Is <code>gather</code> just a nicer <code>create_task</code>?</strong> Close. It wraps each argument in a task, so it gives you the same overlap plus results in call order and one place to handle failure. It is covered in [running work concurrently](running_work_concurrently.html), along with TaskGroup, which also cancels siblings when one fails.
+<strong>Is <code>gather</code> just a nicer <code>create_task</code>?</strong> Close. It wraps each argument in a task, so it gives you the same overlap plus results in call order and one place to handle failure. It is covered in [running work concurrently](running_work_concurrently.html), along with TaskGroup. This also cancels siblings when one fails.
 
-<strong>What happens to a task nobody keeps a reference to?</strong> It can be garbage-collected mid-flight, and an exception inside it may never be reported. Keep the handle &mdash; or better, create it inside a TaskGroup, which holds it for you and makes the lifetime visible.
+<strong>What happens to a task nobody keeps a reference to?</strong> It can be garbage-collected mid-flight. And an exception inside it may never be reported. Keep the handle &mdash; or better, create it inside a TaskGroup. This holds it for you and makes the lifetime visible.
 
 <strong>Should I ever catch <code>CancelledError</code>?</strong> Yes, to clean up &mdash; and then re-raise. Swallowing it tells the loop your task refuses to stop, and whatever requested the cancellation waits forever on a task that is still going.
 
@@ -258,6 +258,6 @@ handle, and await it.
 - <code>async def</code> is a factory for coroutine objects. Calling one runs nothing; it hands back a resumable object.
 - That object is driven by <code>send(None)</code>, and a finished coroutine returns its value by raising <code>StopIteration</code>. The loop is that pattern in a queue.
 - <code>await</code> both starts a coroutine and waits for it, so a row of awaits is strictly sequential. Overlap never comes from <code>await</code> alone.
-- <code>create_task</code> schedules work on the loop now and returns a handle, which is where concurrency actually comes from: two 0.2 s waits take 0.40 s awaited in turn and 0.20 s as tasks.
+- <code>create_task</code> schedules work on the loop now and returns a handle. This is where concurrency actually comes from: two 0.2 s waits take 0.40 s awaited in turn and 0.20 s as tasks.
 - <code>cancel()</code> requests cancellation by raising <code>CancelledError</code> at the task's current await; catch it to clean up, then always re-raise.
-- <code>wait_for</code> (or <code>asyncio.timeout</code>) is that same mechanism with a deadline, so a timeout is cancellation rather than a separate feature.
+- <code>wait_for</code> (or <code>asyncio.timeout</code>) is that same mechanism with a deadline. So a timeout is cancellation rather than a separate feature.

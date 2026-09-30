@@ -15,7 +15,7 @@ print(len(b))     # 5    bytes -- é needs two in UTF-8
 print(s[0])       # 'c'  a one-character str
 print(b[0])       # 99   an INTEGER, not b'c'
 ```
-Two details catch people out at once. Indexing `bytes` yields an `int`, not a one-byte `bytes` object &mdash; slicing does give `bytes`. So `b[0:1]` is `b'c'` while `b[0]` is `99`. And `len` differs between the two representations of the same text, which is the source of most truncation bugs.
+Two details catch people out at once. Indexing `bytes` yields an `int`, not a one-byte `bytes` object &mdash; slicing does give `bytes`. So `b[0:1]` is `b'c'` while `b[0]` is `99`. And `len` differs between the two representations of the same text. This is the source of most truncation bugs.
 
 This page covers when to use each type, what `encode` and `decode` actually do, why UTF-8 is the right default. And the common errors that appear at system boundaries &mdash; reading a file, calling a subprocess, or sending data over a socket &mdash; where the wrong type produces either a `TypeError` or silent corruption. The code blocks below encode and decode the same text in UTF-8 and Latin-1 so you can see the byte-level differences, then trigger the common errors on purpose &mdash; `TypeError` when you mix types, and `UnicodeDecodeError` when you guess the encoding wrong.
 
@@ -31,7 +31,7 @@ This page covers when to use each type, what `encode` and `decode` actually do, 
 
 ## Run it
 
-The same text as both types, with the ways they refuse to mix, and both Unicode errors triggered on purpose so you have seen the tracebacks before an interviewer describes one.
+The same text as both types, with the ways they refuse to mix. And both Unicode errors triggered on purpose so you have seen the tracebacks before an interviewer describes one.
 
 ```python-run
 # str is text. bytes is data. encode/decode is the border crossing.
@@ -93,7 +93,7 @@ print(b'caf\xc3\xa9'.decode("utf-8"))    # 'café'           bytes -> str
 ```
 The mental model: <em>encoding</em> is what you do to send text somewhere, because wires and disks carry bytes. <em>Decoding</em> is what you do on receipt, to recover meaning.
 
-UTF-8 is the default for both, and it is nearly always the right choice. It is ASCII-compatible, so English text costs one byte per character, and it represents every Unicode character.
+UTF-8 is the default for both, and it is nearly always the right choice. It is ASCII-compatible, so English text costs one byte per character. And it represents every Unicode character.
 
 <strong>Mixing the two types raises rather than coercing:</strong>
 
@@ -110,7 +110,7 @@ try:
 except TypeError as e:
     print("membership:", type(e).__name__ + ":", e)
 ```
-The `==` case is the dangerous one, because it fails silently. A dictionary keyed on `str` will never match a `bytes` lookup, and the result is a mysteriously empty response rather than an exception. This is the most common bug when reading a file in binary mode and comparing against string literals.
+The `==` case is the dangerous one, because it fails silently. A dictionary keyed on `str` will never match a `bytes` lookup. And the result is a mysteriously empty response rather than an exception. This is the most common bug when reading a file in binary mode and comparing against string literals.
 
 ## The errors that appear in production
 
@@ -149,13 +149,13 @@ Indexing differs too. <code>s[0]</code> on a str gives a one-character str; <cod
 
 Decode at the boundary in, encode at the boundary out, and keep the middle in <code>str</code>. Every layer of a well-behaved program works in text; only the outermost layer knows about UTF-8.
 
-Violating it produces the two classic errors. <code>UnicodeDecodeError</code> means you were handed bytes that are not valid in the encoding you claimed &mdash; usually the encoding is wrong, not the data. <code>UnicodeEncodeError</code> means you tried to write a character the target encoding cannot represent, which is what happens when something defaults to ASCII or latin-1.
+Violating it produces the two classic errors. <code>UnicodeDecodeError</code> means you were handed bytes that are not valid in the encoding you claimed &mdash; usually the encoding is wrong, not the data. <code>UnicodeEncodeError</code> means you tried to write a character the target encoding cannot represent. This is what happens when something defaults to ASCII or latin-1.
 
 ## Where it actually shows up
 
-Reading a file with <code>open(path)</code> gives str and applies your platform's default encoding, which differs between machines and is the source of "works on my laptop" bugs. Pass <code>encoding="utf-8"</code> explicitly, always. <code>open(path, "rb")</code> gives bytes and does not guess.
+Reading a file with <code>open(path)</code> gives str and applies your platform's default encoding. This differs between machines and is the source of "works on my laptop" bugs. Pass <code>encoding="utf-8"</code> explicitly, always. <code>open(path, "rb")</code> gives bytes and does not guess.
 
-Sockets, subprocess output, hashlib and most binary formats are bytes. <code>hashlib.sha256(s)</code> is a <code>TypeError</code> until you encode &mdash; a hash is defined over bytes, so the encoding is part of the answer.
+Sockets, subprocess output, hashlib and most binary formats are bytes. <code>hashlib.sha256(s)</code> is a <code>TypeError</code> until you encode &mdash; a hash is defined over bytes. So the encoding is part of the answer.
 
 ## Where the boundary sits in real code
 
@@ -182,13 +182,13 @@ print("binary mode:", data, type(data).__name__)
 # .decode() on the way back.
 print("to send    :", "hello".encode())
 ```
-<strong>Always pass `encoding=` explicitly when opening text files.</strong> Without it, Python uses the platform default, which is UTF-8 on Linux and macOS and historically a legacy code page on Windows. So the same code reads different characters on different machines. Python 3.15 makes UTF-8 the default everywhere, and being explicit remains the habit that survives version differences.
+<strong>Always pass `encoding=` explicitly when opening text files.</strong> Without it, Python uses the platform default. This is UTF-8 on Linux and macOS and historically a legacy code page on Windows. So the same code reads different characters on different machines. Python 3.15 makes UTF-8 the default everywhere, and being explicit remains the habit that survives version differences.
 
 Three things must stay in `bytes`:
 
 <strong>Hashing and cryptography.</strong> `hashlib.sha256("text")` raises; it needs `b"text"`. Digests are defined over bytes, so the encoding is part of the hash.
 <strong>Binary formats.</strong> Images, protocol buffers, compressed data &mdash; there is no text to recover.
-<strong>Anything length- or offset-sensitive at the wire level,</strong> such as a Content-Length header, which counts bytes rather than characters.
+<strong>Anything length- or offset-sensitive at the wire level,</strong> such as a Content-Length header. This counts bytes rather than characters.
 
 ## `bytearray` and `memoryview`
 
@@ -201,7 +201,7 @@ print(bytes(ba))                     # b'Hello world'
 mv = memoryview(ba)
 chunk = mv[0:5]               # zero-copy view
 ```
-`bytearray` is the mutable counterpart, useful for building a buffer incrementally without repeated concatenation. `memoryview` slices without copying, which is what makes parsing large binary payloads efficient. And it has no `str` equivalent, because a character offset in a variable-width representation is not a fixed byte offset.
+`bytearray` is the mutable counterpart, useful for building a buffer incrementally without repeated joining. `memoryview` slices without copying, which is what makes parsing large binary payloads efficient. And it has no `str` equivalent, because a character offset in a variable-width representation is not a fixed byte offset.
 
 ## Questions people ask
 
@@ -209,15 +209,15 @@ chunk = mv[0:5]               # zero-copy view
 
 <strong>Why does `b[0]` give a number?</strong> `bytes` is a sequence of integers. Use `b[0:1]` for a one-byte `bytes` object.
 
-<strong>Why is `b"abc" == "abc"` False rather than an error?</strong> Equality across unrelated types returns False by design; only ordering and concatenation raise. This is why the comparison bug is so easy to miss.
+<strong>Why is `b"abc" == "abc"` False rather than an error?</strong> Equality across unrelated types returns False by design; only ordering and joining raise. This is why the comparison bug is so easy to miss.
 
 <strong>What is the default encoding?</strong> UTF-8 for `encode`/`decode`. File `open` used the locale default before Python 3.15, so pass it explicitly.
 
 <strong>How do I get the byte length of text?</strong> `len(s.encode("utf-8"))`. `len(s)` counts characters.
 
-<strong>Can I put `bytes` and `str` keys in one dict?</strong> Yes, and they never collide &mdash; which is a footgun, not a feature.
+<strong>Can I put `bytes` and `str` keys in one dict?</strong> Yes. And they never collide &mdash; which is a footgun, not a feature.
 
-<strong>What about UTF-16 or Latin-1?</strong> Latin-1 is the identity mapping for bytes 0&ndash;255, so it never raises on decode &mdash; which makes it a tempting and usually wrong way to silence errors.
+<strong>What about UTF-16 or Latin-1?</strong> Latin-1 is the identity mapping for bytes 0&ndash;255. So it never raises on decode &mdash; which makes it a tempting and usually wrong way to silence errors.
 
 ## Recap in one screen
 

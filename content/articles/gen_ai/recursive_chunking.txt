@@ -13,13 +13,13 @@ The effect is that a paragraph break always wins over a line break, a line break
 
 LangChain's `RecursiveCharacterTextSplitter` is the most widely used implementation. It takes `chunk_size` (the maximum number of characters per chunk), `chunk_overlap` (how many characters to repeat between adjacent chunks), and `separators` (the ordered list of split boundaries). The defaults work for English prose but not for code, structured documents, or non-English text. Customising the separator list is the single most impactful tuning knob in a RAG chunking pipeline.
 
-The recursive approach does not understand semantics. It does not know that two sentences are about the same idea, and it does not know that a code block should stay together. It optimises for boundary quality within a size budget, which is a good heuristic but not a guarantee of semantic coherence. For that, you need semantic chunking, which embeds sentences and cuts where the similarity drops.
+The recursive approach does not understand semantics. It does not know that two sentences are about the same idea. And it does not know that a code block should stay together. It optimises for boundary quality within a size budget, which is a good heuristic but not a guarantee of semantic coherence. For that, you need semantic chunking, which embeds sentences and cuts where the similarity drops.
 
 ## The separator list is the whole configuration
 
-The default is roughly <code>["\n\n", "\n", ". ", " ", ""]</code> &mdash; paragraph, line, sentence, word, character. It descends only when a piece still exceeds the limit, so the last entry fires only on text with no whitespace at all.
+The default is roughly <code>["\n\n", "\n", ". ", " ", ""]</code> &mdash; paragraph, line, sentence, word, character. It descends only when a piece still exceeds the limit. So the last entry fires only on text with no whitespace at all.
 
-Change the list to match the document type. Code wants <code>["\nclass ", "\ndef ", "\n\n"]</code>; Markdown wants heading markers first. That is the cheapest large improvement available to a RAG pipeline, and it is usually left at the default.
+Change the list to match the document type. Code wants <code>["\nclass ", "\ndef ", "\n\n"]</code>; Markdown wants heading markers first. That is the cheapest large improvement available to a RAG pipeline. And it is usually left at the default.
 
 ## Overlap, and what it costs
 
@@ -39,13 +39,13 @@ Do not pick from a blog post. Build a small evaluation set of real questions, me
 
 Overlap exists because a boundary can fall mid-argument however carefully it is chosen. Repeating the last 10&ndash;20% of each chunk at the start of the next means a straddling sentence appears whole somewhere.
 
-It costs more than index size. Overlapping chunks are near-duplicates, so a query matching the overlapped region retrieves both, and your top 5 is really a top 3 with two copies. That crowds out genuinely different evidence, and it is the reason <a href="maximal_marginal_relevance.html">maximal marginal relevance</a> and other diversity-aware selection strategies exist.
+It costs more than index size. Overlapping chunks are near-duplicates, so a query matching the overlapped region retrieves both. And your top 5 is really a top 3 with two copies. That crowds out genuinely different evidence, and it is the reason <a href="maximal_marginal_relevance.html">maximal marginal relevance</a> and other diversity-aware selection strategies exist.
 
 If overlap is doing a lot of work for you, that is usually a signal the separators are wrong rather than that more overlap is needed. Fixing the boundaries is cheaper than paying for redundancy on every query.
 
 ## Tuning the separator list per format
 
-The default list &mdash; paragraph, line, sentence, word, character &mdash; assumes prose. Changing it for the document type is the single cheapest improvement available, and it is almost always left alone.
+The default list &mdash; paragraph, line, sentence, word, character &mdash; assumes prose. Changing it for the document type is the single cheapest improvement available. And it is almost always left alone.
 
 <p><strong>Code:</strong> lead with <code>\nclass </code>, <code>\ndef </code>, <code>\n\n</code>, so a function stays whole and a chunk is a unit someone could actually read.</p>
 
@@ -55,7 +55,7 @@ The default list &mdash; paragraph, line, sentence, word, character &mdash; assu
 
 <p><strong>CSV and logs:</strong> split on lines and never below, because a half-row is meaningless.</p>
 
-Every one of these is a few characters of configuration against an embedding-model migration, and they routinely produce more improvement.
+Every one of these is a few characters of configuration against an embedding-model migration. And they routinely produce more improvement.
 
 ## Splitting on the largest natural boundary that fits
 
@@ -107,7 +107,7 @@ chunks = splitter.split_text(document)
 
 <strong>Size</strong> is a compromise between context and precision. 200&ndash;500 tokens (roughly 800&ndash;2,000 characters) is the usual range. Too small and the chunk lacks context; too large and the embedding averages over several topics.
 
-<strong>Overlap</strong> of 10&ndash;20% means consecutive chunks share their boundary text, so a sentence spanning a split appears whole in at least one chunk. The cost is duplicated storage and sometimes two near-the same results, which deduplication or MMR handles.
+<strong>Overlap</strong> of 10&ndash;20% means consecutive chunks share their boundary text, so a sentence spanning a split appears whole in at least one chunk. The cost is duplicated storage and sometimes two near-the same results. This deduplication or MMR handles.
 
 One detail that catches people: <strong>character count is not token count</strong>. `chunk_size=1000` in characters is roughly 250 tokens for English prose and much fewer for code or non-Latin scripts. If the downstream constraint is a token budget, measure in tokens &mdash; most splitters accept a token-counting length function.
 
@@ -382,7 +382,7 @@ Recursive chunking is the right starting point because it is nearly free and cap
 
 <strong>What chunk size should I use?</strong> Start at 300&ndash;500 tokens with 15% overlap, then evaluate recall@k on your own question set.
 
-<strong>Is recursive chunking better than semantic?</strong> Cheaper and frequently comparable on structured documents. Semantic wins on unstructured prose &mdash; measure rather than assume.
+<strong>Is recursive chunking better than semantic?</strong> Cheaper and often comparable on structured documents. Semantic wins on unstructured prose &mdash; measure rather than assume.
 
 <strong>Should overlap be characters or sentences?</strong> Either. Sentence-based overlap is cleaner because it never cuts mid-thought.
 

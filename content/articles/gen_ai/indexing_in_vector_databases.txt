@@ -5,11 +5,11 @@ intro: What does a vector database index actually do, and why can&#x27;t it just
 
 A flat index stores the vectors and compares the query with every one. It is exact, trivially correct, and the right answer for small collections. And the cost is O(n&middot;d) per query, so a million 768-dimensional vectors is around 768 million multiply-adds for a single search.
 
-It is also the ground truth. To measure any approximate index's recall you need the true neighbours, and a flat search over a sample is how you get them.
+It is also the ground truth. To measure any approximate index's recall you need the true neighbours. And a flat search over a sample is how you get them.
 
 An index trades exact answers for speed. It organises vectors into a structure — clusters, graphs, trees or compressed codes — so that most vectors can be skipped without being compared. The result is approximate nearest-neighbour (ANN) search: faster by orders of magnitude, but with a small probability of missing a genuine neighbour.
 
-The three main families are IVF (inverted file), HNSW (hierarchical navigable small-world graph) and product quantisation. IVF clusters the vectors and searches only the nearest clusters, trading recall at cluster boundaries for speed. HNSW builds a layered graph and walks it greedily toward the query — best recall-for-latency, highest memory. Product quantisation compresses each vector into a short code, cutting memory dramatically at some recall cost, and is usually combined with IVF.
+The three main families are IVF (inverted file), HNSW (hierarchical navigable small-world graph) and product quantisation. IVF clusters the vectors and searches only the nearest clusters, trading recall at cluster boundaries for speed. HNSW builds a layered graph and walks it greedily toward the query — best recall-for-latency, highest memory. Product quantisation compresses each vector into a short code, cutting memory sharply at some recall cost, and is usually combined with IVF.
 
 The metric that matters is recall@k: of the k true nearest neighbours, how many did the index actually return? For RAG, 0.95 is usually fine because a reranker will re-score the top results anyway. For deduplication or exact matching, anything less than 1.0 is a data quality problem.
 
@@ -33,7 +33,7 @@ Also note what an index does <em>not</em> do: filtering by metadata is a separat
 
 ## Measuring recall, which needs a ground truth
 
-An approximate index is a lossy structure, so "is it working?" is a measurement rather than an assumption. The measurement needs the true answers, which means a flat exact search over a sample &mdash; typically a few hundred held-out queries, run once, stored.
+An approximate index is a lossy structure, so "is it working?" is a measurement rather than an assumption. The measurement needs the true answers. This means a flat exact search over a sample &mdash; typically a few hundred held-out queries, run once, stored.
 
 Then recall@k is the overlap between what the index returned and what the exact search returned. Track it as a deployment check: an index rebuilt with different parameters, or a library upgraded, can quietly lose recall while every latency dashboard stays green.
 
@@ -45,7 +45,7 @@ Two problems decide most real vector-database choices, and neither is about near
 
 <p><strong>Metadata filtering.</strong> Restricting to a tenant, a date range or a permission set fights the index, because the graph or the clustering was built over everything. Pre-filtering can disconnect a graph traversal; post-filtering silently returns fewer results. How a database handles this is the main thing that distinguishes them &mdash; see <a href="permission_filtering_in_rag.html">permission filtering</a>.</p>
 
-<p><strong>Updates and deletes.</strong> HNSW does not delete gracefully: removing a node can disconnect the graph, so implementations tombstone and rebuild periodically. If your corpus changes hourly, the rebuild cost may matter more than query latency, and IVF's cheaper updates start to look attractive despite worse recall-for-latency.</p>
+<p><strong>Updates and deletes.</strong> HNSW does not delete gracefully: removing a node can disconnect the graph. So implementations tombstone and rebuild at times. If your corpus changes hourly, the rebuild cost may matter more than query latency, and IVF's cheaper updates start to look attractive despite worse recall-for-latency.</p>
 
 Benchmarks almost always measure static-corpus query performance, which is the easy half.
 
@@ -55,7 +55,7 @@ Three things per record, and all three matter:
 
 <strong>The vector</strong> &mdash; the embedding, typically 384 to 1,536 floats.
 
-<strong>The payload</strong> &mdash; the text itself, or a reference to it, so the retrieved chunk can be put in a prompt.
+<strong>The payload</strong> &mdash; the text itself, or a reference to it. So the retrieved chunk can be put in a prompt.
 
 <strong>The metadata</strong> &mdash; source, date, document type, permissions, heading path. This is what makes filtering possible, and it must be populated at indexing time; adding a field later means re-indexing.
 
@@ -106,7 +106,7 @@ Also plan for <strong>re-embedding</strong>. Changing the embedding model invali
 
 ## What is stored, and what happens when it changes
 
-The ANN algorithm gets the attention, and the operational half decides whether a system survives contact with a corpus that changes. This works through what a record actually holds, what an update costs, and the staleness that follows from the answer.
+The ANN algorithm gets the attention, and the operational half decides whether a system survives contact with a corpus that changes. This works through what a record actually holds, what an update costs. And the staleness that follows from the answer.
 
 ```python-run
 import numpy as np
@@ -236,7 +236,7 @@ print("   them again later means going back to the original documents.")
 
 ## What to remember
 
-Without an index, finding the nearest vector means comparing against every stored vector. An index prunes most of them and pays for it in recall, so the metric is recall@k measured against an exact search. Recall, latency and memory are the three knobs, and every index type exposes them under different names.
+Without an index, finding the nearest vector means comparing against every stored vector. An index prunes most of them and pays for it in recall. So the metric is recall@k measured against an exact search. Recall, latency and memory are the three knobs, and every index type exposes them under different names.
 
 ## Filtering, and the interaction that surprises people
 
@@ -248,9 +248,9 @@ Two ways to apply them:
 
 <strong>Post-filter</strong> &mdash; search, then discard non-matching results. Fast, and it can return fewer than k results, or none, when the top matches are all filtered away.
 
-Modern vector databases implement <strong>filtered search</strong> that navigates the index while respecting the predicate, which is the right answer and why using a real database beats a raw index library once filtering matters.
+Modern vector databases implement <strong>filtered search</strong> that navigates the index while respecting the predicate. This is the right answer and why using a real database beats a raw index library once filtering matters.
 
-For permissions specifically, the filter must be applied <em>inside</em> the search, server-side. Retrieving first and filtering in the application means documents the user cannot see have already influenced which results came back. And in the worst case, their content has already crossed a trust boundary.
+For permissions in detail, the filter must be applied <em>inside</em> the search, server-side. Retrieving first and filtering in the application means documents the user cannot see have already influenced which results came back. And in the worst case, their content has already crossed a trust boundary.
 
 ## Choosing a store
 
@@ -268,7 +268,7 @@ Two observations that save a lot of unneeded infrastructure.
 
 <strong>Below about 100,000 vectors, you may not need any of these.</strong> A NumPy array plus a dot product is exact and fast. And a million-vector brute-force search takes tens of milliseconds with a good BLAS.
 
-<strong>pgvector is often the right answer</strong> for a system that already uses Postgres. One database to operate, transactional consistency with the rest of the data, and SQL for the filtering. It is slower than a dedicated store at very large scale, and that scale is further away than most projects reach.
+<strong>pgvector is often the right answer</strong> for a system that already uses Postgres. One database to operate, transactional consistency with the rest of the data, and SQL for the filtering. It is slower than a dedicated store at very large scale. And that scale is further away than most projects reach.
 
 ## Operational details worth deciding up front
 
@@ -276,7 +276,7 @@ Two observations that save a lot of unneeded infrastructure.
 
 <strong>Backups.</strong> The index is derivable from the documents, so the question is whether re-indexing is acceptable as recovery. For a large corpus that may be hours, which argues for snapshotting.
 
-<strong>Monitoring.</strong> Track query latency percentiles, recall against a periodic exact-search sample, index size, and the age of the oldest un-refreshed document.
+<strong>Monitoring.</strong> Track query latency percentiles, recall against a periodic exact-search sample, index size. And the age of the oldest un-refreshed document.
 
 <strong>Cost.</strong> Memory-resident indexes are priced by vector count and dimension. Reducing dimensions from 1,536 to 384 is a fourfold saving and often a small accuracy cost. Some models support truncating dimensions on purpose.
 
@@ -298,6 +298,6 @@ Two observations that save a lot of unneeded infrastructure.
 
 - Store the vector, the text and the metadata &mdash; and populate metadata at indexing time, because adding it later means re-indexing.
 - Batch the embedding calls, normalise once, use deterministic ids, and upsert.
-- Update incrementally by content hash, and rebuild periodically to reclaim deleted space.
+- Update incrementally by content hash, and rebuild at times to reclaim deleted space.
 - Filtering must happen inside the search for permissions to be enforced correctly.
 - Below 100k vectors a plain array is enough; pgvector is often the pragmatic choice above that.

@@ -7,11 +7,11 @@ A shallow copy builds a <strong>new container holding the same objects</strong>.
 
 <p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
 
-The distinction matters whenever a data structure contains mutable objects &mdash; lists of lists, dicts of dicts, objects holding references to other objects. A shallow copy of `[[1, 2], [3, 4]]` creates a new outer list but both inner lists are shared. So `copy[0].append(5)` changes the original too. `copy.deepcopy` rebuilds every nested object recursively, handles circular references by tracking `id`s, and respects `__deepcopy__` for custom classes. The cost is proportional to the total number of objects in the graph, which is why deep-copying a large nested structure (a parsed JSON tree, a graph of ORM objects) can be surprisingly slow. This page shows the divergence at each nesting level, shows where `deepcopy` handles cycles that a manual recursion would not, and covers the common interview follow-up: what does `dict(d)` copy?
+The distinction matters whenever a data structure contains mutable objects &mdash; lists of lists, dicts of dicts, objects holding references to other objects. A shallow copy of `[[1, 2], [3, 4]]` creates a new outer list but both inner lists are shared. So `copy[0].append(5)` changes the original too. `copy.deepcopy` rebuilds every nested object recursively, handles circular references by tracking `id`s, and respects `__deepcopy__` for custom classes. The cost is proportional to the total number of objects in the graph. This is why deep-copying a large nested structure (a parsed JSON tree, a graph of ORM objects) can be surprisingly slow. This page shows the divergence at each nesting level, shows where `deepcopy` handles cycles that a manual recursion would not, and covers the common interview follow-up: what does `dict(d)` copy?
 
 ## Run it
 
-The divergence at the inner level, the leak demonstrated by one append, and the cycle deepcopy survives.
+The divergence at the inner level, the leak demonstrated by one append. And the cycle deepcopy survives.
 
 Where the two diverge, and the one append that proves it.
 
@@ -93,7 +93,7 @@ print("a tuple is only as immutable as its contents:", t)
 
 ## What deepcopy costs, and when to avoid it
 
-<p>It walks the entire object graph and rebuilds it, so it is proportional to the total size rather than the top-level length. And it is slow enough to notice in a loop. It also copies things you may not want copied: a nested object holding a database connection, an open file or a lock either fails or produces a duplicate that is meaningless.</p><p>Classes control this. <code>__deepcopy__</code> and <code>__copy__</code> let a type define what copying means, and <code>copy.deepcopy</code> falls back to the pickle protocol (<code>__reduce_ex__</code>) &mdash; which is why objects that cannot be pickled frequently cannot be deep-copied either, for the same reason.</p><p>The cheapest fix is often neither: restructure so the nested mutable is not shared in the first place, or use immutable values so copying is unneeded.</p>
+<p>It walks the entire object graph and rebuilds it, so it is proportional to the total size rather than the top-level length. And it is slow enough to notice in a loop. It also copies things you may not want copied: a nested object holding a database connection, an open file or a lock either fails or produces a duplicate that is meaningless.</p><p>Classes control this. <code>__deepcopy__</code> and <code>__copy__</code> let a type define what copying means, and <code>copy.deepcopy</code> falls back to the pickle protocol (<code>__reduce_ex__</code>) &mdash; which is why objects that cannot be pickled often cannot be deep-copied either, for the same reason.</p><p>The cheapest fix is often neither: restructure so the nested mutable is not shared in the first place, or use immutable values so copying is unneeded.</p>
 
 ## The follow-up: the nested-list multiplication bug
 
@@ -101,7 +101,7 @@ print("a tuple is only as immutable as its contents:", t)
 
 ## What to say out loud
 
-<p>A shallow copy copies the outer container and shares the contents, so nested mutation leaks between them. copy.deepcopy rebuilds the whole tree. Slicing and list() are shallow, which is fine for flat data and a bug for nested data.</p>
+<p>A shallow copy copies the outer container and shares the contents. So nested mutation leaks between them. copy.deepcopy rebuilds the whole tree. Slicing and list() are shallow, which is fine for flat data and a bug for nested data.</p>
 
 <p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence and then talking for another minute until something wrong comes out.</p>
 
@@ -129,7 +129,7 @@ print("a tuple is only as immutable as its contents:", t)
 
 <p><strong>"Is <code>deepcopy</code> ever the wrong tool even when you need independence?"</strong> Often. It is proportional to the whole object graph, so in a loop it dominates. The cheaper answers are to restructure so the nested mutable is not shared, or to use immutable values so no copy is needed - both remove the question rather than answering it.</p>
 
-<p><strong>"What does <code>[[0] * 3] * 3</code> give you?"</strong> Three references to one inner list, so <code>grid[0][0] = 1</code> sets the first cell of every row. Same fact as this page, reached through multiplication. The fix is a comprehension, which evaluates the inner list once per row.</p>
+<p><strong>"What does <code>[[0] * 3] * 3</code> give you?"</strong> Three references to one inner list. So <code>grid[0][0] = 1</code> sets the first cell of every row. Same fact as this page, reached through multiplication. The fix is a comprehension, which evaluates the inner list once per row.</p>
 
 ## Common wrong answers
 

@@ -9,11 +9,11 @@ The query&ndash;key&ndash;value framing answers that, and it is worth learning p
 
 In self-attention, every token in the sequence plays all three roles. Each token is projected three times through different learned weight matrices, producing a query vector, a key vector and a value vector. The query asks "what am I looking for?" The key answers "what do I contain?" The value says "here is what you get if you attend to me."
 
-The dot product of a query with each key gives the raw attention scores. High dot product means the query and key point in similar directions, so the value at that position gets more weight. The scores are scaled and softmaxed into weights that sum to one, and the weighted sum of values is the output for that position.
+The dot product of a query with each key gives the raw attention scores. High dot product means the query and key point in similar directions. So the value at that position gets more weight. The scores are scaled and softmaxed into weights that sum to one. And the weighted sum of values is the output for that position.
 
 The reason there are three projections rather than two is that what a token is searching for, what it advertises about itself, and what it contributes to the output are three different things. A verb might search for a subject (query), advertise that it is an action (key), and contribute tense information (value). Collapsing any two of those into one projection would force a single vector to serve two purposes. This limits what the attention can learn.
 
-The weight matrices W_Q, W_K and W_V are learned during training. They are the parameters that determine what each token attends to, and they are what makes attention content-dependent rather than position-dependent. Different heads learn different W_Q, W_K, W_V, which is why multi-head attention captures multiple relationships at once.
+The weight matrices W_Q, W_K and W_V are learned during training. They are the parameters that determine what each token attends to. And they are what makes attention content-dependent rather than position-dependent. Different heads learn different W_Q, W_K, W_V, which is why multi-head attention captures multiple relationships at once.
 
 ## A soft dictionary lookup
 
@@ -186,7 +186,7 @@ print("   the same one.")
 ## Things to try
 
 1. <strong>Follow one lookup end to end.</strong> Set the <strong>Stage</strong> slider to 1 and step it up to 4. You see the raw dot products appear, get divided by the square root of the head dimension, become weights through softmax, and finally blend the value vectors into one output.
-2. <strong>Change who is asking.</strong> Set the <strong>Query Word</strong> to drank. The scores rearrange completely &mdash; the same six keys, a different question, a different answer.
+2. <strong>Change who is asking.</strong> Set the <strong>Query Word</strong> to drank. The scores rearrange fully &mdash; the same six keys, a different question, a different answer.
 3. <strong>Break the scaling.</strong> Set the <strong>Head Dimension</strong> slider to 64 and untick <strong>Scale by 1/&radic;d_k</strong>. The raw scores grow large, softmax saturates, and the weights collapse onto a single key with entropy near zero. In a real model that means a vanishing gradient and a layer that stops learning.
 4. <strong>Then fix it.</strong> Tick <strong>Scale by 1/&radic;d_k</strong> again with the dimension still at 64. The scores come back into a sane range and the distribution is usable again. That single division is the entire reason the mechanism is called <em>scaled</em> dot-product attention.
 5. <strong>Check the low-dimension case.</strong> Set the <strong>Head Dimension</strong> slider to 1. Now the scaling barely matters, because there was never anything to blow up. The correction only earns its keep as dimension grows.
@@ -203,7 +203,7 @@ The same formula covers every attention in a transformer; only where Q, K and V 
 
 <table> <tr><th>Kind</th><th>Query from</th><th>Key and value from</th></tr> <tr><td>Encoder self-attention</td><td>the input</td><td>the input</td></tr> <tr><td>Decoder self-attention</td><td>the output so far</td><td>the output so far (masked)</td></tr> <tr><td>Cross-attention</td><td>the decoder</td><td>the encoder</td></tr> </table>
 
-Cross-attention is the classic encoder&ndash;decoder attention of the previous module. When query, key and value all come from the same sequence you get <a href="self_attention.html" style="color: var(--accent-primary)">self-attention</a>, which is the next module.
+Cross-attention is the classic encoder&ndash;decoder attention of the previous module. When query, key and value all come from the same sequence you get <a href="self_attention.html" style="color: var(--accent-primary)">self-attention</a>. This is the next module.
 
 ## Traps worth knowing
 
@@ -214,7 +214,7 @@ Cross-attention is the classic encoder&ndash;decoder attention of the previous m
 
 ## Summing up
 
-Attention is a soft dictionary lookup: the query says what a position is looking for, each key says how well that position matches. And each value says what it contributes once matched, with all three being separate learned projections of the same input. Every key matches to some degree, so the output is a weighted blend rather than a single retrieved entry. And the whole mechanism is softmax(QKᵀ/&radic;d_k)V. Keys and values are kept apart because findability and content are different things, and the &radic;d_k division exists because dot products grow with dimension and would otherwise saturate the softmax into a hard, ungradient-able argmax.
+Attention is a soft dictionary lookup: the query says what a position is looking for, each key says how well that position matches. And each value says what it contributes once matched, with all three being separate learned projections of the same input. Every key matches to some degree, so the output is a weighted blend rather than a single retrieved entry. And the whole mechanism is softmax(QKᵀ/&radic;d_k)V. Keys and values are kept apart because findability and content are different things. And the &radic;d_k division exists because dot products grow with dimension and would otherwise saturate the softmax into a hard, ungradient-able argmax.
 
 ## Multiple heads, and where they come from
 
@@ -231,7 +231,7 @@ def attention(x, Wq, Wk, Wv, mask=None):
     return F.softmax(scores, dim=-1) @ V
 ```
 
-With a model dimension of 512 and 8 heads, each head projects to 64 dimensions, so the total work is roughly the same as one 512-dimensional head. And the model gets 8 independent views instead of 1.
+With a model dimension of 512 and 8 heads, each head projects to 64 dimensions. So the total work is roughly the same as one 512-dimensional head. And the model gets 8 independent views instead of 1.
 
 The masking line is how causal generation and padding are both handled: setting a score to negative infinity makes its softmax weight exactly zero.
 
@@ -241,13 +241,13 @@ In <strong>self-attention</strong> Q, K and V all come from the same sequence. I
 
 That asymmetry has a practical consequence during generation, and it is the basis of the most important inference optimisation in language models.
 
-When generating token by token, the keys and values for all previous tokens do not change &mdash; only the new token's query is new. So they can be computed once and cached:
+When making token by token, the keys and values for all previous tokens do not change &mdash; only the new token's query is new. So they can be computed once and cached:
 
-<strong>Without a KV cache,</strong> generating the 1,000th token requires recomputing keys and values for all 999 previous tokens. Generation is quadratic in output length.
+<strong>Without a KV cache,</strong> making the 1,000th token requires recomputing keys and values for all 999 previous tokens. Generation is quadratic in output length.
 
 <strong>With a KV cache,</strong> each new token computes its own K and V, appends them, and attends against the stored ones. Generation becomes linear.
 
-The cost is memory: the cache holds two tensors per layer per token, which for a large model and a long context runs to many gigabytes. That is exactly what <strong>multi-query</strong> and <strong>grouped-query attention</strong> address, by sharing key and value projections across heads and shrinking the cache several-fold.
+The cost is memory: the cache holds two tensors per layer per token. This for a large model and a long context runs to many gigabytes. That is exactly what <strong>multi-query</strong> and <strong>grouped-query attention</strong> address, by sharing key and value projections across heads and shrinking the cache several-fold.
 
 ## Questions people ask
 
@@ -259,9 +259,9 @@ The cost is memory: the cache holds two tensors per layer per token, which for a
 
 <strong>What is `dₖ`?</strong> The dimension of a single head's key vectors, typically 64. It is what the scaling factor is derived from.
 
-<strong>Why not use cosine similarity instead of a dot product?</strong> The dot product is cheaper, and the scaling plus LayerNorm already keeps magnitudes controlled. Some architectures do normalise the queries and keys.
+<strong>Why not use cosine similarity instead of a dot product?</strong> The dot product is cheaper. And the scaling plus LayerNorm already keeps magnitudes controlled. Some architectures do normalise the queries and keys.
 
-<strong>Can K and V come from a different source than Q?</strong> That is precisely cross-attention, and it is how decoders read encoders and how multimodal models connect modalities.
+<strong>Can K and V come from a different source than Q?</strong> That is precisely cross-attention. And it is how decoders read encoders and how multimodal models connect modalities.
 
 ## Recap in one screen
 

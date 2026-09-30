@@ -3,15 +3,15 @@ intro: Index the needle, return the haystack it came from.
 
 ## The problem it solves
 
-<a href="chunking_strategies_for_rag.html" style="color: var(--accent-primary)">Chunking</a> forces a trade-off. A small chunk concentrates the query's terms, so its similarity score is high and the match is precise. But on its own it may be a fragment that answers nothing. A large chunk carries the surrounding context that makes an answer possible, but dilutes the matching terms among hundreds of unrelated words. So it scores worse and may not be retrieved at all. A parent document retriever refuses the trade by indexing small child chunks for precision but returning the larger parent document for context. Each document is split into children (typically 200&ndash;400 tokens), and each child stores a pointer to its parent (typically 1,000&ndash;2,000 tokens). When a child wins the similarity search, the retriever looks up the parent and passes that to the language model instead. Two children from the same parent collapse into one context passage, so the model's context window is not spent sending the same document twice. In LangChain the implementation uses an in-memory or persistent `docstore` that maps child ids to parent documents, alongside a vector store that indexes only the children. This page splits a sample document into parents and children, runs a query, shows which child matched and which parent was returned, and covers the parent-size tradeoff.
+<a href="chunking_strategies_for_rag.html" style="color: var(--accent-primary)">Chunking</a> forces a trade-off. A small chunk concentrates the query's terms, so its similarity score is high and the match is precise. But on its own it may be a fragment that answers nothing. A large chunk carries the surrounding context that makes an answer possible, but dilutes the matching terms among hundreds of unrelated words. So it scores worse and may not be retrieved at all. A parent document retriever refuses the trade by indexing small child chunks for precision but returning the larger parent document for context. Each document is split into children (typically 200&ndash;400 tokens), and each child stores a pointer to its parent (typically 1,000&ndash;2,000 tokens). When a child wins the similarity search, the retriever looks up the parent and passes that to the language model instead. Two children from the same parent collapse into one context passage. So the model's context window is not spent sending the same document twice. In LangChain the implementation uses an in-memory or persistent `docstore` that maps child ids to parent documents, alongside a vector store that indexes only the children. This page splits a sample document into parents and children, runs a query, shows which child matched and which parent was returned, and covers the parent-size tradeoff.
 
 ## Searching one thing, returning another
 
-A parent document retriever refuses the trade. It splits each document into small <strong>child chunks</strong> and indexes only those, so retrieval is as precise as small chunks allow. But when a child chunk wins, what gets passed to the model is the <strong>parent</strong> it came from. The score decides <em>which</em> document is relevant; the parent decides <em>how much text</em> the model sees. Two chunks from the same parent collapse to one passage, so the context window is not spent sending the same document twice.
+A parent document retriever refuses the trade. It splits each document into small <strong>child chunks</strong> and indexes only those. So retrieval is as precise as small chunks allow. But when a child chunk wins, what gets passed to the model is the <strong>parent</strong> it came from. The score decides <em>which</em> document is relevant; the parent decides <em>how much text</em> the model sees. Two chunks from the same parent collapse to one passage. So the context window is not spent sending the same document twice.
 
 ## The chunk-size dilemma, and a way out of it
 
-Chunking forces a compromise. Small chunks embed precisely &mdash; a 100-token passage is about one thing, so its vector is sharp. Large chunks carry context &mdash; the paragraph that explains what "this" refers to.
+Chunking forces a compromise. Small chunks embed precisely &mdash; a 100-token passage is about one thing. So its vector is sharp. Large chunks carry context &mdash; the paragraph that explains what "this" refers to.
 
 You cannot have both from one chunk size. The parent document retriever resolves it by using <strong>different units for retrieval and for generation</strong>.
 
@@ -37,7 +37,7 @@ Retrieving the child and returning the parent gets both. This is the same reason
 
 ## Deduplication, and the detail people miss
 
-Several children frequently match the same parent &mdash; a query about parental leave may match three passages within one section.
+Several children often match the same parent &mdash; a query about parental leave may match three passages within one section.
 
 Without deduplication, the same parent is returned three times, consuming the context budget and telling the model nothing new. Worse, it displaces other parents that would have added information.
 
@@ -65,7 +65,7 @@ def retrieve_parents(query, k_children=20, n_parents=5):
 
 ## Small chunks in, large chunks out
 
-The sections above lay out the chunk-size dilemma and how searching one size while returning another escapes it. Here it is measured -- the same corpus indexed both ways, the retrieval scored, and the deduplication step that is easy to leave out and changes the answer when you do.
+The sections above lay out the chunk-size dilemma and how searching one size while returning another escapes it. Here it is measured -- the same corpus indexed both ways, the retrieval scored. And the deduplication step that is easy to leave out and changes the answer when you do.
 
 ```python-run
 import numpy as np
@@ -325,7 +325,7 @@ Two sensible ways to define the parent:
 
 <strong>Fixed-window.</strong> The parent is a fixed number of tokens centred on the child. Predictable sizes, and it may cut across topic boundaries.
 
-Structural parents are better where the documents have structure, which most real corpora do. Store the heading path with each parent and prepend it, so the model knows where in the document the passage sits.
+Structural parents are better where the documents have structure, which most real corpora do. Store the heading path with each parent and prepend it. So the model knows where in the document the passage sits.
 
 A related variant, <strong>sentence-window retrieval</strong>, indexes single sentences and returns the two or three either side. Same idea, finer granularity, and it suits question answering where the answer is one sentence but its meaning depends on its neighbours.
 
@@ -337,7 +337,7 @@ A related variant, <strong>sentence-window retrieval</strong>, indexes single se
 
 <strong>Redundancy.</strong> Overlapping parents can repeat content. Structural parents avoid most of this; fixed windows do not.
 
-<strong>Complexity.</strong> Two stores to keep consistent. When a document changes, both its children and its parent must be updated, and a partial update leaves children pointing at stale parents.
+<strong>Cost.</strong> Two stores to keep consistent. When a document changes, both its children and its parent must be updated. And a partial update leaves children pointing at stale parents.
 
 |&nbsp;|Flat chunking|Parent-child|
 |---|---|---|

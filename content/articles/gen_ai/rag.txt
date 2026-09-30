@@ -7,11 +7,11 @@ A language model knows what was in its training data, frozen at some cutoff date
 
 Retrieval-augmented generation is the fix that does not involve training anything. Find the passages that look relevant, paste them into the prompt, and ask the question with the evidence attached. The model stops recalling and starts reading.
 
-The pipeline has three stages: indexing, retrieval and generation. At indexing time, documents are split into chunks, each chunk is embedded into a vector. And the vectors are stored in an index. At query time, the question is embedded with the same model, the index returns the closest chunks. And those chunks are injected into the prompt alongside the question. The language model then generates an answer grounded in the retrieved evidence.
+The pipeline has three stages: indexing, retrieval and generation. At indexing time, documents are split into chunks, each chunk is embedded into a vector. And the vectors are stored in an index. At query time, the question is embedded with the same model, the index returns the closest chunks. And those chunks are injected into the prompt alongside the question. The language model then makes an answer grounded in the retrieved evidence.
 
 Each stage has its own failure modes. Chunking too coarsely means relevant information is buried in noise; chunking too finely means the chunk lacks enough context to be useful on its own. The retrieval step can miss relevant passages if the embedding model does not capture the right notion of similarity, or if the question is phrased differently from the stored text. The generation step can ignore the retrieved evidence entirely, hallucinate beyond it, or contradict it &mdash; a failure called unfaithfulness.
 
-RAG works because it separates knowledge from reasoning. The language model handles reasoning, and the retrieval system handles knowledge. Updating the knowledge requires re-indexing the documents, not retraining the model, which makes the system far cheaper to maintain than fine-tuning. It also provides attribution: each answer can cite the chunks it was based on, giving the user a way to verify the response.
+RAG works because it separates knowledge from reasoning. The language model handles reasoning, and the retrieval system handles knowledge. Updating the knowledge requires re-indexing the documents, not retraining the model. This makes the system far cheaper to maintain than fine-tuning. It also provides attribution: each answer can cite the chunks it was based on, giving the user a way to verify the response.
 
 ## The pipeline
 
@@ -29,7 +29,7 @@ The scores on this page are real cosine similarities over word-frequency vectors
 
 A language model knows what was in its training data, up to a cut-off date. It does not know your company's handbook, last week's incident report, or the contents of a customer's account.
 
-Two ways to fix that. <strong>Fine-tuning</strong> updates the weights on your data &mdash; expensive, slow to iterate, and it teaches style and format far better than it teaches facts. <strong>Retrieval-augmented generation</strong> leaves the model alone and puts the relevant documents into the prompt.
+Two ways to fix that. <strong>Fine-tuning</strong> updates the weights on your data &mdash; expensive, slow to iterate. And it teaches style and format far better than it teaches facts. <strong>Retrieval-augmented generation</strong> leaves the model alone and puts the relevant documents into the prompt.
 
 The pipeline has two halves, and the first is done once:
 
@@ -207,7 +207,7 @@ print("   first table rather than as a replacement for any of the others.")
 1. <strong>Turn retrieval off.</strong> Set <strong>Chunks Retrieved</strong> to 0. The prompt is the bare question, and the answer is what a model does when it has nothing: something plausible and unsupported, flagged in red.
 2. <strong>Turn it back on.</strong> At k = 1 the top-scoring chunk is pasted in and the answer arrives with a citation. Same model, same question, different prompt.
 3. <strong>Meet the distractor.</strong> Ask about the warranty and read the scores: chunk 1 wins on 0.213, but chunk 7 &mdash; the warranty for the <em>previous</em> model &mdash; is right behind it on 0.183, because it talks about warranties too. At k = 1 the ranking has to be right; at k = 2 breadth covers you instead. Retrieval fails quietly, and this is the shape it fails in.
-4. <strong>Watch the prompt grow.</strong> Push k to 6 and the prompt words climb steeply. Everything you retrieve is paid for on every request, in latency and in cost, and the useful chunk gets harder for the model to find among the noise.
+4. <strong>Watch the prompt grow.</strong> Push k to 6 and the prompt words climb steeply. Everything you retrieve is paid for on every request, in latency and in cost. And the useful chunk gets harder for the model to find among the noise.
 5. <strong>Ask something the documents do not cover.</strong> Choose the voltage question. Retrieval still returns its best matches &mdash; it always returns something &mdash; but none of them answer it. So the honest response is "not in the documents". A system that cannot say that is a system that will invent.
 
 ## Why not just fine-tune?
@@ -226,7 +226,7 @@ Retrieval also has a property fine-tuning cannot offer: you can show the user wh
 
 ## What to remember
 
-RAG answers questions a model was never trained on by finding relevant passages and putting them in the prompt. So generation becomes reading rather than recall. The retrieval step is ordinary similarity search and it always returns something, which makes the quality of your chunking, your ranking and your "I could not find it" path the whole ballgame. Raising k buys robustness against a bad ranking and costs latency, money and attention, so it is a trade rather than a setting. Use retrieval for facts that change or need citing, fine-tuning for behaviour that needs to change, and never assume the top result was actually relevant.
+RAG answers questions a model was never trained on by finding relevant passages and putting them in the prompt. So generation becomes reading rather than recall. The retrieval step is ordinary similarity search and it always returns something. This makes the quality of your chunking, your ranking and your "I could not find it" path the whole ballgame. Raising k buys robustness against a bad ranking and costs latency, money and attention. So it is a trade rather than a setting. Use retrieval for facts that change or need citing, fine-tuning for behaviour that needs to change, and never assume the top result was actually relevant.
 
 ## The decisions that determine quality
 
@@ -273,7 +273,7 @@ Evaluate the two stages separately, then end to end:
 |Generation, usefulness|Relevance and completeness against the question|
 |End to end|Correctness against known answers|
 
-Build a small evaluation set &mdash; 50&ndash;100 real questions with known correct answers and known source documents &mdash; before optimising anything. Without it, changes to chunk size and prompt wording are guesswork, and the usual outcome is a system that feels better and measures worse.
+Build a small evaluation set &mdash; 50&ndash;100 real questions with known correct answers and known source documents &mdash; before optimising anything. Without it, changes to chunk size and prompt wording are guesswork. And the usual outcome is a system that feels better and measures worse.
 
 ## Questions people ask
 

@@ -5,7 +5,7 @@ intro: Binary search without division. It splits the array at Fibonacci boundari
 
 Binary search computes <span class="mono-font">mid = (lo + hi) / 2</span>. That division &mdash; or at least a bit shift &mdash; was genuinely expensive on early hardware, and on some architectures it still is. Fibonacci search finds a comparable split point using nothing but addition and subtraction of precomputed Fibonacci numbers.
 
-The trick rests on a property of the sequence. Since <span class="mono-font">F(k) = F(k&minus;1) + F(k&minus;2)</span>, any Fibonacci number splits naturally into two smaller Fibonacci numbers. Use that split as the probe point and both resulting subarrays are themselves Fibonacci-sized, so the same trick applies recursively without ever computing a new boundary from scratch. The split ratio is about 0.618 (the golden ratio's reciprocal) rather than 0.5, so the probes are slightly off-centre. They favour one side, which gives slightly unequal subproblems. The worst-case number of comparisons is still O(log n), the same as binary search, but each step uses only addition and subtraction: the two Fibonacci state variables are updated by subtracting the smaller from the larger. This moves one step down the sequence. On modern hardware the division in binary search is practically free, so the practical advantage has disappeared. Fibonacci search remains useful in one niche: when the array is stored on a medium with non-uniform access cost (like a tape or a flash page), the unequal split can reduce the expected number of seeks. This page runs Fibonacci search and binary search on the same array, prints the probe positions and the arithmetic at each step, and compares the number of comparisons.
+The trick rests on a property of the sequence. Since <span class="mono-font">F(k) = F(k&minus;1) + F(k&minus;2)</span>, any Fibonacci number splits naturally into two smaller Fibonacci numbers. Use that split as the probe point and both resulting subarrays are themselves Fibonacci-sized. So the same trick applies recursively without ever computing a new boundary from scratch. The split ratio is about 0.618 (the golden ratio's reciprocal) rather than 0.5. So the probes are slightly off-centre. They favour one side, which gives slightly unequal subproblems. The worst-case number of comparisons is still O(log n), the same as binary search. But each step uses only addition and subtraction: the two Fibonacci state variables are updated by subtracting the smaller from the larger. This moves one step down the sequence. On modern hardware the division in binary search is practically free. So the practical advantage has disappeared. Fibonacci search remains useful in one niche: when the array is stored on a medium with non-uniform access cost (like a tape or a flash page), the unequal split can reduce the expected number of seeks. This page runs Fibonacci search and binary search on the same array, prints the probe positions and the arithmetic at each step, and compares the number of comparisons.
 
 ## The mechanism, step by step
 
@@ -19,7 +19,7 @@ Probe at <span class="mono-font">offset + F(k&minus;2)</span>, clamped to the ar
 
 Every update is an index addition or a step down the precomputed sequence. No division, no multiplication.
 
-## The complexity, and the honest comparison
+## The cost, and the honest comparison
 
 Because consecutive Fibonacci numbers approach the golden ratio &phi; &asymp; 1.618, each step shrinks the search space by a factor of about 1.618 rather than binary search’s 2. So Fibonacci search is O(log n) too, but with a slightly larger constant:
 
@@ -57,13 +57,13 @@ def fibonacci_search(arr, target):
     return -1
 ```
 
-The complexity is O(log n), the same as binary search. The number of comparisons is marginally higher, because the splits are uneven.
+The cost is O(log n), the same as binary search. The number of comparisons is marginally higher, because the splits are uneven.
 
 ## Why it exists: no division
 
 The reason for the algorithm is visible in the code above: <strong>it uses only addition and subtraction</strong>.
 
-Binary search computes `mid = lo + (hi - lo) // 2`, which needs a division (or a shift). Fibonacci search moves through a precomputed sequence by adding and subtracting.
+Binary search computes `mid = lo + (hi - lo) // 2`. This needs a division (or a shift). Fibonacci search moves through a precomputed sequence by adding and subtracting.
 
 On hardware without a hardware divide instruction &mdash; early processors, some microcontrollers, some digital signal processors &mdash; division was expensive enough that avoiding it mattered. That is the historical motivation, and it is largely obsolete: a shift is one cycle on any modern processor.
 
@@ -168,7 +168,7 @@ for n in (100, 10000, 100000):
     print("n=%6d  fib %.1f  bin %.1f  log2=%.1f" % (n, fb, bp, math.log2(n)))
 ```
 
-The folklore claim is that Fibonacci search probes positions that are closer together, which mattered for sequential storage like tape. Measuring the actual probe positions tests that claim.
+The folklore claim is that Fibonacci search probes positions that are closer together. This mattered for sequential storage like tape. Measuring the actual probe positions tests that claim.
 
 ```python-run
 def probe_positions_bin(a, target):
@@ -229,7 +229,7 @@ print("  largest jump: binary %d, fibonacci %d"
 
 ## The short version
 
-Fibonacci search is binary search rebuilt out of additions. It costs about 44% more comparisons because it divides by &phi; rather than by 2. And it earns that back only on hardware where division is expensive or where uneven, locality-friendly splits beat repeated jumps to the middle. Learn it for what it shows: the halving in binary search is not sacred, and any constant-factor shrink per step still gives you a logarithm.
+Fibonacci search is binary search rebuilt out of additions. It costs about 44% more comparisons because it divides by &phi; rather than by 2. And it earns that back only on hardware where division is expensive or where uneven, locality-friendly splits beat repeated jumps to the middle. Learn it for what it shows: the halving in binary search is not sacred. And any constant-factor shrink per step still gives you a logarithm.
 
 ## The related golden-section search
 
@@ -249,7 +249,7 @@ That reuse property is the same mathematical fact that motivates Fibonacci searc
 |Ternary search|The extremum of a function|Unimodality|
 |Bisection method|A root of a function|A sign change|
 
-Ternary search does the same job as golden-section by splitting into thirds, and it needs two new evaluations per step rather than one &mdash; which is why golden-section is preferred when evaluations are costly.
+Ternary search does the same job as golden-section by splitting into thirds. And it needs two new evaluations per step rather than one &mdash; which is why golden-section is preferred when evaluations are costly.
 
 ## Where the searching family stands
 
@@ -261,7 +261,7 @@ Putting the sorted-array searches together:
 
 <strong>Exponential search</strong> handles unknown or unbounded array size: double the probe index until the value exceeds the target, then binary search the last interval. O(log i) where i is the target's position.
 
-<strong>Fibonacci search</strong> matches binary search's complexity while avoiding division.
+<strong>Fibonacci search</strong> matches binary search's cost while avoiding division.
 
 <strong>Jump search</strong> steps forward by &radic;n and then scans linearly, giving O(&radic;n) &mdash; worse than binary search. And it only ever moves forward, which suits sequential media.
 
@@ -281,7 +281,7 @@ Those are the same class of off-by-one difficulties that make binary search famo
 
 ## Questions people ask
 
-<strong>Is Fibonacci search faster than binary search?</strong> No. Same complexity, marginally more comparisons, and only addition-and-subtraction arithmetic as a benefit.
+<strong>Is Fibonacci search faster than binary search?</strong> No. Same cost, marginally more comparisons, and only addition-and-subtraction arithmetic as a benefit.
 
 <strong>Why would anyone use it?</strong> Historically, on hardware where division was expensive. Today, in effect as a curiosity.
 
@@ -289,13 +289,13 @@ Those are the same class of off-by-one difficulties that make binary search famo
 
 <strong>What is golden-section search?</strong> The genuinely useful relative &mdash; it finds the extremum of a unimodal function, reusing one evaluation per step.
 
-<strong>What should I use for a sorted array?</strong> `bisect` from the standard library, which is binary search done correctly.
+<strong>What should I use for a sorted array?</strong> `bisect` from the standard library. This is binary search done correctly.
 
 <strong>When is exponential search better?</strong> When the array size is unknown or unbounded, or when the target is likely near the beginning.
 
 ## Recap in one screen
 
-- Split the range by Fibonacci ratios (~38/62) instead of in half; complexity is still O(log n).
+- Split the range by Fibonacci ratios (~38/62) instead of in half; cost is still O(log n).
 - Its purpose was avoiding division, which mattered on hardware without a divide instruction.
 - Marginally more comparisons than binary search, and a small theoretical locality advantage.
 - Golden-section search is the useful relative: it finds a unimodal function's extremum, reusing an evaluation each step.

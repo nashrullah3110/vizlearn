@@ -5,11 +5,11 @@ intro: What is semantic chunking, and when is it worth the extra cost?
 
 Split into sentences, embed each one, and compute the similarity between each consecutive pair. Where the text stays on topic the similarity is high; where the subject changes it dips. Cut at the dips.
 
-The threshold should be relative. A fixed number like 0.7 means something different in every corpus, so implementations use a percentile of the similarities observed in <em>this</em> document &mdash; the 5th percentile of gaps, say &mdash; which adapts by itself to how varied the writing is.
+The threshold should be relative. A fixed number like 0.7 means something different in every corpus. So implementations use a percentile of the similarities observed in <em>this</em> document &mdash; the 5th percentile of gaps, say &mdash; which adapts by itself to how varied the writing is.
 
 The result is chunks that align with topic shifts rather than arbitrary token counts. A paragraph about authentication stays in one chunk; the next paragraph about rate limiting starts a new one. This is the quality advantage over fixed-size chunking: the embedding of each chunk represents a coherent topic, not a random slice of text that starts mid-thought.
 
-Three parameters control the output. The embedding model determines how similarity is measured — a model trained on semantic similarity (like sentence-transformers) works; a general-purpose model may not distinguish topic boundaries cleanly. The percentile threshold sets how sensitive the splitting is: a lower percentile (more aggressive) produces more, smaller chunks; a higher percentile produces fewer, larger ones. The minimum chunk size prevents degenerate one-sentence chunks that carry too little context to be useful on their own.
+Three parameters control the output. The embedding model decides how similarity is measured — a model trained on semantic similarity (like sentence-transformers) works; a general-purpose model may not distinguish topic boundaries cleanly. The percentile threshold sets how sensitive the splitting is: a lower percentile (more aggressive) produces more, smaller chunks; a higher percentile produces fewer, larger ones. The minimum chunk size prevents degenerate one-sentence chunks that carry too little context to be useful on their own.
 
 Semantic chunking pairs well with metadata enrichment. Because each chunk represents a coherent topic, it is straightforward to generate a summary or title for each chunk and store it alongside the embedding. At retrieval time, the summary can be used for hybrid search (keyword plus vector) or for reranking, improving precision without increasing the embedding cost at query time.
 
@@ -38,9 +38,9 @@ Not worth it when the document already carries structure. If there are headings,
 
 ## Making the similarity signal usable
 
-Raw sentence-to-sentence similarity is noisy. Short sentences &mdash; "Yes.", "See above.", a heading fragment &mdash; have unstable embeddings, so the gap sequence contains dips that are artefacts rather than topic changes.
+Raw sentence-to-sentence similarity is noisy. Short sentences &mdash; "Yes.", "See above.", a heading fragment &mdash; have unstable embeddings. So the gap sequence contains dips that are artefacts rather than topic changes.
 
-Two standard mitigations. <strong>Buffering:</strong> embed each sentence together with its neighbours, so a short sentence inherits context and its vector stops swinging. <strong>Smoothing:</strong> take a rolling mean over the gap sequence before looking for troughs, so a single anomalous sentence cannot open a boundary on its own.
+Two standard mitigations. <strong>Buffering:</strong> embed each sentence together with its neighbours, so a short sentence inherits context and its vector stops swinging. <strong>Smoothing:</strong> take a rolling mean over the gap sequence before looking for troughs. So a single anomalous sentence cannot open a boundary on its own.
 
 Both trade sensitivity for stability, and both are worth having. Without them the technique looks impressive on a clean essay and falls apart on a support transcript. This is exactly the sort of unstructured text it was supposed to be good at.
 
@@ -48,9 +48,9 @@ Both trade sensitivity for stability, and both are worth having. Without them th
 
 Semantic chunking is the most cited of the strategies and the hardest to justify on evidence. It costs an embedding call per sentence at index time, produces chunks of unpredictable size that complicate context budgeting, and on published comparisons its advantage over a well-tuned recursive splitter is often small or absent.
 
-Where it does earn its cost: long unstructured prose with no formatting signal &mdash; interview transcripts, meeting notes, scanned reports &mdash; and corpora where topics shift within a paragraph, so paragraph boundaries mislead.
+Where it does earn its cost: long unstructured prose with no formatting signal &mdash; interview transcripts, meeting notes, scanned reports &mdash; and corpora where topics shift within a paragraph. So paragraph boundaries mislead.
 
-The honest order of operations is to tune the separators and the size first, measure, and only then try semantic chunking against that baseline. It is a real technique that is frequently adopted before the cheap options have been exhausted.
+The honest order of operations is to tune the separators and the size first, measure, and only then try semantic chunking against that baseline. It is a real technique that is often adopted before the cheap options have been exhausted.
 
 ## How it relates to the other three strategies
 
@@ -60,7 +60,7 @@ The four strategies answer genuinely different questions, which is why they comp
 
 <p><strong>Structure-aware</strong> asks what boundaries the author already marked. Free when the format carries them, and strictly better than guessing when it does.</p>
 
-<p><strong>Semantic</strong> asks where the meaning changes. It is the only one that can find a boundary the author did not mark. This is why it is for unstructured prose specifically.</p>
+<p><strong>Semantic</strong> asks where the meaning changes. It is the only one that can find a boundary the author did not mark. This is why it is for unstructured prose in detail.</p>
 
 <p><strong>Context-aware</strong> asks what the chunk lost by being cut, and is orthogonal to all three. You can enrich chunks produced by any splitter.</p>
 
@@ -243,7 +243,7 @@ print("implementation uses a percentile or standard-deviation threshold")
 print("rather than an absolute number.")
 ```
 
-Both threshold styles share one blind spot: they only compare adjacent sentences, which fails when a passage returns to an earlier topic.
+Both threshold styles share one blind spot: they only compare adjacent sentences. This fails when a passage returns to an earlier topic.
 
 ```python-run
 import numpy as np
@@ -313,7 +313,7 @@ print("compare recall@k.")
 
 ## What to remember
 
-Semantic chunking embeds each sentence and cuts where the similarity between neighbours drops, so boundaries land at topic changes rather than at character counts. It costs one embedding per sentence at index time, and it is usually not worth it on documents that already carry headings.
+Semantic chunking embeds each sentence and cuts where the similarity between neighbours drops. So boundaries land at topic changes rather than at character counts. It costs one embedding per sentence at index time, and it is usually not worth it on documents that already carry headings.
 
 ## Where it helps and where it does not
 
@@ -331,7 +331,7 @@ Semantic chunking embeds each sentence and cuts where the similarity between nei
 - Highly uniform text, where consecutive-sentence similarity is flat and no clear boundaries exist.
 - Code, where structural boundaries (functions, classes) are what matter.
 
-There is a further honest caveat: <strong>the measured benefit is often smaller than expected</strong>. Published comparisons on well-structured corpora frequently find semantic chunking roughly level with recursive chunking. It is worth evaluating rather than adopting on principle.
+There is a further honest caveat: <strong>the measured benefit is often smaller than expected</strong>. Published comparisons on well-structured corpora often find semantic chunking roughly level with recursive chunking. It is worth evaluating rather than adopting on principle.
 
 ## Variants
 
@@ -347,7 +347,7 @@ There is a further honest caveat: <strong>the measured benefit is often smaller 
 
 Start with <strong>recursive or structure-aware chunking</strong> and a proper evaluation set. Measure recall@k. Then, if retrieval is the bottleneck <em>and</em> the documents lack structure, try semantic chunking and measure the difference.
 
-That ordering matters because chunking is one of several levers, and it is not usually the largest. Hybrid search and reranking typically give bigger gains for less effort, and they are worth exhausting first.
+That ordering matters because chunking is one of several levers, and it is not usually the largest. Hybrid search and reranking typically give bigger gains for less effort. And they are worth exhausting first.
 
 Whatever strategy you choose, two things help regardless: <strong>prepend the heading path</strong> to each chunk so it carries context, and consider <strong>parent-child retrieval</strong> so small precise chunks can return larger context.
 

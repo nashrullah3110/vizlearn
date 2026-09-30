@@ -3,7 +3,7 @@ intro: Half the sentence is a subject. Half of it is a WHERE clause.
 
 ## The idea in brief
 
-Similarity search compares meaning, and that is all it does. Ask it for "papers about attention published after 2020" and the words <em>published after 2020</em> are treated as more subject matter to match, not as a rule to enforce. A 2017 paper that is squarely about attention will score well and be returned, because nothing in a cosine score knows what a year is. A self-query retriever fixes this by using a language model to split the user's question into two parts before any search runs: a semantic query (the subject to embed and compare) and a structured filter (the metadata constraint to enforce exactly). The LLM receives a schema describing the metadata fields each document carries &mdash; year, author, document type, department &mdash; and returns a JSON object with the semantic query string and a set of comparison operators over those fields. The vector store applies the filter first as a hard WHERE clause, then ranks only the surviving documents by cosine similarity to the semantic query. The constraint becomes a guarantee rather than a signal that the embedding may or may not capture. LangChain's `SelfQueryRetriever` wraps this pattern: you define an `AttributeInfo` list describing each metadata field, pass it alongside a natural-language description of the document collection. And the retriever handles the LLM call, filter construction, and filtered search in one step. This page walks through the split on several example queries, shows the generated filter, and covers the metadata schema definition.
+Similarity search compares meaning, and that is all it does. Ask it for "papers about attention published after 2020" and the words <em>published after 2020</em> are treated as more subject matter to match, not as a rule to enforce. A 2017 paper that is squarely about attention will score well and be returned, because nothing in a cosine score knows what a year is. A self-query retriever fixes this by using a language model to split the user's question into two parts before any search runs: a semantic query (the subject to embed and compare) and a structured filter (the metadata constraint to enforce exactly). The LLM receives a schema describing the metadata fields each document carries &mdash; year, author, document type, department &mdash; and returns a JSON object with the semantic query string and a set of comparison operators over those fields. The vector store applies the filter first as a hard WHERE clause, then ranks only the surviving documents by cosine similarity to the semantic query. The constraint becomes a guarantee rather than a signal that the embedding may or may not capture. LangChain's `SelfQueryRetriever` wraps this pattern: you define an `AttributeInfo` list describing each metadata field, pass it alongside a natural-language description of the document collection. And the retriever handles the LLM call, filter construction, and filtered search in one step. This page walks through the split on several example queries, shows the made filter, and covers the metadata schema definition.
 
 ## Two questions in one sentence
 
@@ -24,7 +24,7 @@ A self-query retriever uses a language model to split the question:
 <p class="mono-font">"What did the 2023 security reports say about phishing?"</p>
 <p class="mono-font">&rarr; query: "phishing" &nbsp;+&nbsp; filter: year = 2023 AND type = "security_report"</p>
 
-Then it runs a filtered vector search: the filter constrains the candidate set, and the semantic query orders what remains.
+Then it runs a filtered vector search: the filter constrains the candidate set. And the semantic query orders what remains.
 
 ## What it needs to work
 
@@ -48,13 +48,13 @@ The model is prompted with that schema and the user's question, and asked to ret
 
 ## The failure modes
 
-This is a language model producing a filter, so it fails in language-model ways, and each failure needs a specific guard.
+This is a language model producing a filter, so it fails in language-model ways. And each failure needs a specific guard.
 
 <strong>Invented field names.</strong> The model filters on `publication_date` when the schema says `year`. Validate the filter against the schema and drop or repair unknown fields.
 
 <strong>Invented values.</strong> A filter for `doc_type = "reports"` when the actual value is `"report"`. Enumerate allowed values in the schema, and fuzzy-match or reject.
 
-<strong>Over-filtering.</strong> The model adds a constraint the user did not intend, and the result set is empty. The standard remedy is to <strong>fall back to an unfiltered search</strong> when the filtered one returns nothing, and to say so in the response.
+<strong>Over-filtering.</strong> The model adds a constraint the user did not intend. And the result set is empty. The standard remedy is to <strong>fall back to an unfiltered search</strong> when the filtered one returns nothing, and to say so in the response.
 
 <strong>Under-filtering.</strong> The model ignores a constraint the user did state, and irrelevant results come back. Harder to detect by itself; it shows up in evaluation.
 
@@ -107,7 +107,7 @@ Where it is unneeded: a homogeneous corpus with no meaningful metadata, or an in
 
 These compose. A realistic pipeline: self-query to extract filters, multi-query to broaden the semantic search, hybrid retrieval over the filtered set, reciprocal rank fusion, then a cross-encoder rerank.
 
-Each stage adds latency, so the order to add them in is by measured benefit. In most systems, hybrid search and reranking are the largest gains; self-query matters specifically when the corpus has metadata users refer to.
+Each stage adds latency, so the order to add them in is by measured benefit. In most systems, hybrid search and reranking are the largest gains; self-query matters in detail when the corpus has metadata users refer to.
 
 ## Splitting a sentence into a filter and a search
 
@@ -335,7 +335,7 @@ print("relaxed and retried, or to give the LLM a schema with value")
 print("counts so it can see which clauses are safe.")
 ```
 
-One more thing determines whether any of this works at all: whether the store filters before ranking or after.
+One more thing decides whether any of this works at all: whether the store filters before ranking or after.
 
 ```python-run
 import numpy as np
@@ -395,7 +395,7 @@ print("Same data, same filter, different answers.")
 ## Recap in one screen
 
 - Questions often mix a semantic requirement with structured constraints; embeddings handle only the first.
-- A model parses the question into a query string plus a metadata filter, which is then applied at search time.
+- A model parses the question into a query string plus a metadata filter. This is then applied at search time.
 - It requires metadata populated at indexing time and a schema description in the prompt.
-- Validate the generated filter against the schema, and fall back to unfiltered search when it returns nothing.
+- Validate the made filter against the schema, and fall back to unfiltered search when it returns nothing.
 - Most valuable for dates, numeric constraints and faceted corpora; unneeded when the UI already offers filters.

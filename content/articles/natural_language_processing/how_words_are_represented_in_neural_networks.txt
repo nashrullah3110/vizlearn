@@ -5,7 +5,7 @@ intro: The four stages every word passes through before a network can compute wi
 
 A neural network is a pile of multiplications and additions — it can only consume numbers. So every word goes through a chain of translations: <strong>word &rarr; token ID &rarr; one-hot vector &rarr; dense embedding</strong>. Each stage exists to fix a shortcoming of the previous one.
 
-Token IDs assign each word an integer, which is compact but implies a fake ordering. One-hot vectors remove the ordering by giving each word its own dimension, but the vectors are enormous (one dimension per vocabulary word) and every pair of words is equally distant — "cat" is as far from "kitten" as from "parliament". Dense embeddings solve both problems: each word maps to a short vector of learned real numbers (typically 128 to 4096 dimensions), where words used in similar contexts drift toward similar vectors.
+Token IDs assign each word an integer, which is compact but implies a fake ordering. One-hot vectors remove the ordering by giving each word its own dimension. But the vectors are enormous (one dimension per vocabulary word) and every pair of words is equally distant — "cat" is as far from "kitten" as from "parliament". Dense embeddings solve both problems: each word maps to a short vector of learned real numbers (typically 128 to 4096 dimensions), where words used in similar contexts drift toward similar vectors.
 
 The embedding matrix is the bridge. It has one row per vocabulary entry and one column per embedding dimension. Looking up a word means selecting its row — a single index operation, not a multiplication. During training, backpropagation adjusts these rows so that semantically related words end up in nearby regions of the vector space. After training, you can measure similarity between words with a dot product or cosine similarity. And the results align with human intuition: "king" minus "man" plus "woman" lands near "queen".
 
@@ -13,7 +13,7 @@ Modern language models go one step further with contextual embeddings. In a stat
 
 ## Token IDs and Their Trap
 
-The dictionary lookup ("cat" &rarr; 1, "dog" &rarr; 3) is compact, but the raw integers smuggle in a false claim: that "dog" (3) is somehow three times "cat" (1), or that words with adjacent IDs are related. The IDs are arbitrary labels, and arithmetic on labels is meaningless — a network fed raw IDs will happily learn those fake relationships.
+The dictionary lookup ("cat" &rarr; 1, "dog" &rarr; 3) is compact. But the raw integers smuggle in a false claim: that "dog" (3) is somehow three times "cat" (1), or that words with adjacent IDs are related. The IDs are arbitrary labels, and arithmetic on labels is meaningless — a network fed raw IDs will happily learn those fake relationships.
 
 ## One-Hot: Honest but Wasteful
 
@@ -38,7 +38,7 @@ Inside a network, a word is a row of a matrix. The path from text to that row is
 
 That matrix is <strong>learned</strong>. It starts as small random values and is updated by gradient descent along with everything else. So the geometry that emerges &mdash; which words end up near which &mdash; is a product of the training objective, not of anything designed.
 
-Mathematically the lookup is equivalent to multiplying a one-hot vector by the matrix, which is why embeddings are sometimes described that way. Implementations never do it: `nn.Embedding` is a row lookup, because multiplying by a vector of 49,999 zeros is wasted work.
+Mathematically the lookup is equivalent to multiplying a one-hot vector by the matrix. This is why embeddings are sometimes described that way. Implementations never do it: `nn.Embedding` is a row lookup, because multiplying by a vector of 49,999 zeros is wasted work.
 
 ## Why not one-hot all the way through
 
@@ -66,11 +66,11 @@ An embedding of 768 dimensions is 65 times smaller and places related words near
 
 The embedding table still exists in a transformer &mdash; it supplies the input to layer one. Everything after that is contextual, refined by each block. So a transformer has both: a static lookup at the bottom, and increasingly context-dependent representations above it.
 
-A detail worth knowing: the output projection to vocabulary size is frequently <strong>tied</strong> to the embedding matrix, using the same weights transposed. It saves many parameters (50,000 × 768 is 38 million) and usually improves quality slightly, on the reasoning that the input and output spaces describe the same vocabulary.
+A detail worth knowing: the output projection to vocabulary size is often <strong>tied</strong> to the embedding matrix, using the same weights transposed. It saves many parameters (50,000 × 768 is 38 million) and usually improves quality slightly, on the reasoning that the input and output spaces describe the same vocabulary.
 
 ## From a string to a vector, in four steps
 
-A word becomes an index, the index becomes a static vector, and the static vector becomes a context-dependent one. Each step is run here, ending with the same word getting two different representations in two sentences.
+A word becomes an index, the index becomes a static vector. And the static vector becomes a context-dependent one. Each step is run here, ending with the same word getting two different representations in two sentences.
 
 ```python-run
 import numpy as np
@@ -210,9 +210,9 @@ The arrangement that emerges from training is genuinely structured, in ways that
 
 <strong>Neighbourhoods are semantic.</strong> The nearest vectors to "January" are the other months. The nearest to "hospital" are clinic, doctor, patient.
 
-<strong>Directions carry relations.</strong> The offset from "man" to "woman" is roughly the offset from "king" to "queen". This is what makes the famous analogy arithmetic work. It works cleanly for a small number of well-chosen relations and is frequently overstated.
+<strong>Directions carry relations.</strong> The offset from "man" to "woman" is roughly the offset from "king" to "queen". This is what makes the famous analogy arithmetic work. It works cleanly for a small number of well-chosen relations and is often overstated.
 
-<strong>Frequency affects magnitude.</strong> Rare words often have longer vectors than common ones, which is one reason cosine similarity &mdash; which ignores length &mdash; is preferred to the dot product for comparing them.
+<strong>Frequency affects magnitude.</strong> Rare words often have longer vectors than common ones. This is one reason cosine similarity &mdash; which ignores length &mdash; is preferred to the dot product for comparing them.
 
 <strong>Bias is encoded too.</strong> The vectors reproduce the statistical associations of the training corpus, including its prejudices. This is a documented and repeatedly reproduced finding, and it matters whenever embeddings feed decisions about people.
 
@@ -228,7 +228,7 @@ emb = nn.Embedding(num_embeddings=50_000, embedding_dim=768,
 x = emb(token_ids)                        # (batch, seq) -> (batch, seq, 768)
 ```
 
-`padding_idx` matters: it keeps that row fixed at zero and excludes it from gradient updates, so padding contributes nothing.
+`padding_idx` matters: it keeps that row fixed at zero and excludes it from gradient updates. So padding contributes nothing.
 
 Three further points that come up in real work:
 
@@ -246,7 +246,7 @@ Three further points that come up in real work:
 
 <strong>What dimension should I use?</strong> 300 for standalone word vectors; whatever the pretrained model uses otherwise. For categorical features, roughly the fourth root of the cardinality as a starting point.
 
-<strong>How are unseen words handled?</strong> Subword tokenisation splits them into known pieces, so there is always something to look up.
+<strong>How are unseen words handled?</strong> Subword tokenisation splits them into known pieces. So there is always something to look up.
 
 <strong>Can I inspect what a dimension means?</strong> Not usefully. Directions in the space are more interpretable than axes, and probing is the tool for finding them.
 

@@ -28,13 +28,13 @@ PE(pos, 2i+1) = cos( pos / 10000<sup>2i/d</sup> )
 
 The wavelengths form a geometric series from about 2 up to about 10000·2&pi;. Early dimensions flip every couple of positions; late dimensions barely move across the whole sequence. Together they behave like the digits of a binary counter &mdash; the fast bits distinguish neighbours, the slow bits distinguish regions &mdash; which is why the matrix above has that striped, fanning appearance.
 
-Every value stays inside &minus;1 to 1 no matter how long the sequence, and the pattern for position 500 is defined whether or not the model ever trained on a sequence that long.
+Every value stays inside &minus;1 to 1 no matter how long the sequence. And the pattern for position 500 is defined whether or not the model ever trained on a sequence that long.
 
 ## Attention cannot see order
 
 Self-attention computes a weighted mixture over all positions. Shuffle the input tokens and the same set of outputs comes back, permuted. The mechanism treats the sequence as a bag.
 
-For language that is fatal. "The dog bit the man" and "The man bit the dog" contain the same tokens, and a model without positional information cannot tell them apart.
+For language that is fatal. "The dog bit the man" and "The man bit the dog" contain the same tokens. And a model without positional information cannot tell them apart.
 
 So order has to be injected separately. That is the entire job of positional encoding, and there are three families of answer.
 
@@ -67,7 +67,7 @@ That gives three practical advantages, which is why in effect every current larg
 
 - <strong>Relative by construction</strong>, matching what language actually needs.
 - <strong>Extends further</strong> beyond the training length, and can be stretched on purpose with interpolation tricks (NTK scaling, YaRN) to extend context after training.
-- <strong>No parameters</strong>, and it applies inside attention rather than at the input, so it affects every layer consistently.
+- <strong>No parameters</strong>, and it applies inside attention rather than at the input. So it affects every layer consistently.
 
 <strong>ALiBi</strong> is the other approach worth knowing: it adds a penalty to attention scores proportional to distance. So tokens attend less to things far away. Simple, parameter-free, and it extrapolates well &mdash; at the cost of building in a bias towards locality.
 
@@ -211,7 +211,7 @@ print("into the values being summed.")
 
 1. <strong>Break word order.</strong> Set the <strong>Scheme</strong> to None and tick <strong>Swap Two Words</strong>. Input Difference reads 0.000 and the two sentences are literally the same to the model. Switch the <strong>Scheme</strong> back to Sinusoidal and the difference becomes non-zero &mdash; the encoding is what makes them different inputs.
 2. <strong>See the frequency fan.</strong> Look at the matrix with the <strong>Model Dimension</strong> slider at 64. The leftmost columns stripe rapidly down the page while the rightmost are almost flat. That spread of wavelengths is the whole design.
-3. <strong>Check it encodes distance.</strong> Set the <strong>Inspect Position</strong> slider to 12 and look at the lower panel. Similarity peaks at position 12 and falls away smoothly on both sides, so nearby positions have similar encodings. Move the position and the peak travels with it, keeping its shape. The pattern depends on the gap, not on where you are.
+3. <strong>Check it encodes distance.</strong> Set the <strong>Inspect Position</strong> slider to 12 and look at the lower panel. Similarity peaks at position 12 and falls away smoothly on both sides. So nearby positions have similar encodings. Move the position and the peak travels with it, keeping its shape. The pattern depends on the gap, not on where you are.
 4. <strong>Try the naive schemes.</strong> Set the <strong>Scheme</strong> to Raw integer position, then drag the <strong>Inspect Position</strong> slider up and watch Largest Value climb with it, without bound. Compare against Sinusoidal, where it never leaves 1. Then try Position / length and lengthen the sequence: every encoding shifts, because the same position now means a different fraction.
 5. <strong>Push past training length.</strong> Set the <strong>Sequence Length</strong> slider to its maximum with Sinusoidal selected. The values stay inside &minus;1 to 1 and every row is still distinct. Nothing had to be learned for those positions to exist.
 
@@ -231,14 +231,14 @@ Sinusoidal encoding is no longer the state of the art, but it is the clearest il
 
 ## Where this goes wrong
 
-- <strong>Leaving it out.</strong> The model still trains and the loss still falls, so the bug is silent. It just performs like a bag-of-words model and nobody knows why.
+- <strong>Leaving it out.</strong> The model still trains and the loss still falls. So the bug is silent. It just performs like a bag-of-words model and nobody knows why.
 - <strong>Exceeding the trained length.</strong> With learned encodings, positions past the table simply do not exist. Most context-extension work is about making positional information survive past where it was trained.
 - <strong>Adding it at every layer.</strong> The original adds it once, at the input. Re-adding it at each layer is a common misreading of the diagram.
 - <strong>Assuming the model reads it as a number.</strong> It is a pattern, not a counter. What the model learns is which patterns co-occur, not that dimension 7 means "position 12".
 
 ## Where that leaves you
 
-Self-attention has no notion of order, so position has to be supplied explicitly, and the naive options fail: raw indices grow without bound and normalised ones mean different things in different-length sentences. Sinusoidal encoding solves it with a bank of sine and cosine waves at geometrically spaced frequencies, giving every position a bounded, unique fingerprint that is defined for any length and whose similarity to other positions depends on the distance between them. It is added to the embedding rather than concatenated, and modern models mostly use learned or rotary variants. But all of them exist to answer the same question this one does.
+Self-attention has no notion of order, so position has to be supplied explicitly. And the naive options fail: raw indices grow without bound and normalised ones mean different things in different-length sentences. Sinusoidal encoding solves it with a bank of sine and cosine waves at geometrically spaced frequencies, giving every position a bounded, unique fingerprint that is defined for any length and whose similarity to other positions depends on the distance between them. It is added to the embedding rather than concatenated, and modern models mostly use learned or rotary variants. But all of them exist to answer the same question this one does.
 
 ## Learned absolute encodings, and their limit
 
@@ -258,19 +258,19 @@ Because RoPE is a formula rather than a table, the angles can be reinterpreted. 
 
 <strong>YaRN</strong> combines interpolation with attention-temperature adjustment and is the current standard for large extensions.
 
-All three usually involve a short fine-tune on long sequences to let the model adapt. The reason any of it works is that RoPE's rotations are continuous in position, so intermediate and stretched values remain meaningful.
+All three usually involve a short fine-tune on long sequences to let the model adapt. The reason any of it works is that RoPE's rotations are continuous in position. So intermediate and stretched values remain meaningful.
 
 ## Common mistakes
 
 - <strong>Assuming attention handles order.</strong> It does not, at all. This is the most common misconception about transformers.
 - <strong>Feeding input longer than the positional scheme supports</strong>, which either errors or silently degrades.
 - <strong>Mixing schemes</strong> &mdash; loading weights trained with learned positions into an architecture using RoPE produces fluent nonsense.
-- <strong>Forgetting positions shift with padding.</strong> Left-padding a batch moves every real token's index; most implementations handle it, and custom code frequently does not.
+- <strong>Forgetting positions shift with padding.</strong> Left-padding a batch moves every real token's index; most implementations handle it, and custom code often does not.
 - <strong>Expecting extrapolation for free.</strong> Even RoPE degrades well beyond its training length without an interpolation fix.
 
 ## Questions people ask
 
-<strong>Why add positional information rather than concatenate it?</strong> Addition keeps the dimension unchanged and works empirically. Concatenation would spend model width on position, and was tried and abandoned.
+<strong>Why add positional information rather than concatenate it?</strong> Addition keeps the dimension unchanged and works empirically. Joining would spend model width on position, and was tried and abandoned.
 
 <strong>Does adding to the embedding not corrupt the meaning?</strong> Somewhat, and the model learns to separate the two. There is enough room in a few hundred dimensions for both signals to coexist.
 

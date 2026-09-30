@@ -5,7 +5,7 @@ intro: Unrolling a recurrent cell across time gives a network as deep as the seq
 
 An RNN is usually drawn as a cell with an arrow looping back to itself. That is compact and slightly misleading. To understand training, unroll it: draw one copy of the cell per timestep, with the hidden state flowing left to right between copies.
 
-Unrolled, an RNN over a 50-token sentence is a <strong>50-layer deep network</strong>. Every layer is the same layer &mdash; the same weights &mdash; but the compute graph really is that deep. And the gradient really does have to travel all the way back through it. Weight sharing is the structural advantage: a single set of parameters handles any sequence length. So a model trained on 20-token sentences can process 200-token ones at inference with no extra parameters. But the gradient that must travel back through 50 (or 200) the same matrix multiplications either explodes or [vanishes](../deep_learning/exploding_and_vanishing_gradient.html). This is why plain RNNs struggle with dependencies longer than about 10-20 steps. [LSTMs](what_is_lstm.html) and [GRUs](what_is_a_gru.html) add gating mechanisms that create an additive path for the gradient, mitigating the vanishing problem at the cost of more parameters per cell. The hidden state has a fixed size (the hidden dimension), regardless of how long the sequence is. All information about the past must be compressed into that one vector, which is the fundamental bottleneck. [Attention](multi_head_attention.html) removes it by letting the decoder look directly at every encoder state. This page unrolls an RNN across a sequence, shows the hidden-state flow, and covers how gradient magnitude changes with depth.
+Unrolled, an RNN over a 50-token sentence is a <strong>50-layer deep network</strong>. Every layer is the same layer &mdash; the same weights &mdash; but the compute graph really is that deep. And the gradient really does have to travel all the way back through it. Weight sharing is the structural advantage: a single set of parameters handles any sequence length. So a model trained on 20-token sentences can process 200-token ones at inference with no extra parameters. But the gradient that must travel back through 50 (or 200) the same matrix multiplications either explodes or [vanishes](../deep_learning/exploding_and_vanishing_gradient.html). This is why plain RNNs struggle with dependencies longer than about 10-20 steps. [LSTMs](what_is_lstm.html) and [GRUs](what_is_a_gru.html) add gating mechanisms that create an additive path for the gradient, mitigating the vanishing problem at the cost of more parameters per cell. The hidden state has a fixed size (the hidden dimension), regardless of how long the sequence is. All information about the past must be compressed into that one vector. This is the fundamental bottleneck. [Attention](multi_head_attention.html) removes it by letting the decoder look directly at every encoder state. This page unrolls an RNN across a sequence, shows the hidden-state flow, and covers how gradient magnitude changes with depth.
 
 ## Counting the parameters
 
@@ -19,11 +19,11 @@ With d = 100 and h = 128 that is 12,800 + 16,384 + 128 = <strong>29,312</strong>
 
 ## Backpropagation through time
 
-<p>Training unrolls the network, runs a normal forward pass, then backpropagates from the loss all the way back to timestep 1. Because the same weights appear at every step, the gradient for <span class="mono-font">W<sub>h</sub></span> is the <em>sum</em> of its gradient contributions from all timesteps.</p><p>This is called backpropagation through time. And it has two practical consequences. Memory grows linearly with sequence length, since every intermediate hidden state must be kept for the backward pass. And the gradient reaching early timesteps is a long product, so it vanishes or explodes exactly as depth causes it to in a feedforward network.</p><strong>Truncated BPTT</strong> is the standard mitigation: backpropagate only k steps back, typically 20 to 50, and treat anything earlier as constant. It bounds memory and gradient depth at the cost of never learning dependencies longer than k.
+<p>Training unrolls the network, runs a normal forward pass, then backpropagates from the loss all the way back to timestep 1. Because the same weights appear at every step, the gradient for <span class="mono-font">W<sub>h</sub></span> is the <em>sum</em> of its gradient contributions from all timesteps.</p><p>This is called backpropagation through time. And it has two practical consequences. Memory grows linearly with sequence length, since every intermediate hidden state must be kept for the backward pass. And the gradient reaching early timesteps is a long product. So it vanishes or explodes exactly as depth causes it to in a feedforward network.</p><strong>Truncated BPTT</strong> is the standard mitigation: backpropagate only k steps back, typically 20 to 50, and treat anything earlier as constant. It bounds memory and gradient depth at the cost of never learning dependencies longer than k.
 
 ## The shapes a recurrent network can take
 
-The cell is the same in every case. What changes is where inputs enter and where outputs are taken, and that determines what the network can do.
+The cell is the same in every case. What changes is where inputs enter and where outputs are taken. And that decides what the network can do.
 
 |Shape|Input &rarr; output|Example|
 |---|---|---|
@@ -40,7 +40,7 @@ The cell is the same in every case. What changes is where inputs enter and where
 
 ## The encoder-decoder, and the bottleneck that motivated attention
 
-For translation, an encoder reads the source sentence and its final hidden state is passed to a decoder. This generates the target one token at a time.
+For translation, an encoder reads the source sentence and its final hidden state is passed to a decoder. This makes the target one token at a time.
 
 That final state is a fixed-size vector &mdash; 512 numbers, say &mdash; and it must contain everything about the source sentence. For five words that is comfortable. For fifty it is a severe compression, and translation quality was observed to fall sharply with sentence length.
 
@@ -199,8 +199,8 @@ print("where this loop is inherently sequential.")
 
 - <strong>Many-to-one</strong> &mdash; read the whole sequence, use only the final hidden state. Sentiment classification.
 - <strong>Many-to-many, aligned</strong> &mdash; one output per input. Part-of-speech tagging and named entity recognition.
-- <strong>Many-to-many, unaligned</strong> &mdash; an encoder reads the input into a state and a decoder generates a different-length output. Translation, and the architecture attention was invented to improve.
-- <strong>One-to-many</strong> &mdash; a single input generates a sequence. Image captioning.
+- <strong>Many-to-many, unaligned</strong> &mdash; an encoder reads the input into a state and a decoder makes a different-length output. Translation, and the architecture attention was invented to improve.
+- <strong>One-to-many</strong> &mdash; a single input makes a sequence. Image captioning.
 
 ## Where this goes wrong
 
@@ -211,7 +211,7 @@ print("where this loop is inherently sequential.")
 
 ## In one line
 
-An RNN is one cell unrolled across time, sharing weights at every step, so its parameter count is fixed at dh + h&sup2; + h regardless of sequence length. Training backpropagates through the whole unrolled graph, which makes the effective depth equal to the sequence length. Hence vanishing gradients, mandatory gradient clipping, and truncated BPTT. The sequential dependency is also what stops it parallelising, which is what eventually made attention the better architecture.
+An RNN is one cell unrolled across time, sharing weights at every step. So its parameter count is fixed at dh + h&sup2; + h regardless of sequence length. Training backpropagates through the whole unrolled graph, which makes the effective depth equal to the sequence length. Hence vanishing gradients, mandatory gradient clipping, and truncated BPTT. The sequential dependency is also what stops it parallelising, which is what eventually made attention the better architecture.
 
 ## Building one end to end
 
@@ -247,7 +247,7 @@ Getting any of the four wrong produces a model that trains and underperforms wit
 
 <strong>Sort or bucket by length</strong> when batching, so batches contain similar lengths and less computation is wasted on padding.
 
-<strong>Watch memory against sequence length.</strong> Activation memory grows linearly with the number of steps, so a model that fits at 200 tokens may fail at 500.
+<strong>Watch memory against sequence length.</strong> Activation memory grows linearly with the number of steps. So a model that fits at 200 tokens may fail at 500.
 
 <strong>Use pretrained embeddings</strong> where available, and consider freezing them with small datasets &mdash; there is far less to overfit.
 

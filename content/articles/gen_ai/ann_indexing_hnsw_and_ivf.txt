@@ -9,7 +9,7 @@ The top layers have long edges, so a few hops cross most of the space; the botto
 
 ## The parameters worth naming
 
-<p><strong>M</strong> &mdash; edges per node, fixed at build time. Higher means a better-connected graph, better recall, more memory. The graph itself is a real memory cost on top of the vectors, which is HNSW's main drawback.</p>
+<p><strong>M</strong> &mdash; edges per node, fixed at build time. Higher means a better-connected graph, better recall, more memory. The graph itself is a real memory cost on top of the vectors. This is HNSW's main drawback.</p>
 
 <p><strong>efConstruction</strong> &mdash; how hard the builder works to find good neighbours. Build-time only: slower indexing, better graph forever.</p>
 
@@ -17,7 +17,7 @@ The top layers have long edges, so a few hops cross most of the space; the botto
 
 ## How each one fails
 
-HNSW's search is greedy, so it can settle in a local minimum and return a neighbourhood that is good but not the best. A wider <code>efSearch</code> makes that less likely without removing it. Deletion is also awkward &mdash; removing a node can disconnect the graph &mdash; so most implementations tombstone and rebuild periodically.
+HNSW's search is greedy, so it can settle in a local minimum and return a neighbourhood that is good but not the best. A wider <code>efSearch</code> makes that less likely without removing it. Deletion is also awkward &mdash; removing a node can disconnect the graph &mdash; so most implementations tombstone and rebuild at times.
 
 IVF's failure is cleaner: a true neighbour sitting just across a cluster boundary is missed unless that cluster is probed. More probes fixes it and costs latency. IVF is cheaper to build and to update, which is why it survives alongside HNSW. And combined with product quantization it is what runs when memory, not latency, is the binding constraint.
 
@@ -74,7 +74,7 @@ The tunable is `nprobe`, and it is a direct recall-versus-latency dial:
 
 The failure mode is inherent: a vector just across a cluster boundary from the query is missed unless that cluster is probed. Higher `nprobe` reduces it.
 
-IVF requires a <strong>training step</strong> on a representative sample before vectors can be added, which is the main operational difference from HNSW.
+IVF requires a <strong>training step</strong> on a representative sample before vectors can be added. This is the main operational difference from HNSW.
 
 ## HNSW: a navigable graph
 
@@ -228,13 +228,13 @@ print("Default parameters were chosen on somebody else's data.")
 
 ## Things to try
 
-1. Sweep <strong>efSearch</strong> from 8 to 512. Recall and latency both climb &mdash; this is the knob you tune in production, and it can differ per query.
+1. Sweep <strong>efSearch</strong> from 8 to 512. Recall and latency both climb &mdash; this is the knob you tune in production. And it can differ per query.
 2. Drop <strong>M</strong> to 4. Recall is capped no matter how large efSearch gets: build-time damage cannot be repaired at query time.
 3. Raise M to 48 and watch the index memory. The graph is stored alongside the vectors, which is HNSW's main cost.
 
 ## What to remember
 
-HNSW stacks proximity graphs: sparse upper layers with long edges to cross the space, a dense bottom layer to refine. Search is greedy with a candidate list of width efSearch, which is the runtime recall/latency knob. M and efConstruction are fixed at build time. IVF is the simpler alternative &mdash; cluster then probe &mdash; cheaper to build and update. And it misses neighbours across cluster boundaries.
+HNSW stacks proximity graphs: sparse upper layers with long edges to cross the space, a dense bottom layer to refine. Search is greedy with a candidate list of width efSearch. This is the runtime recall/latency knob. M and efConstruction are fixed at build time. IVF is the simpler alternative &mdash; cluster then probe &mdash; cheaper to build and update. And it misses neighbours across cluster boundaries.
 
 ## Compression: product quantisation
 
@@ -244,7 +244,7 @@ Both index types can be combined with compression, which is what makes very larg
 
 Distances are then computed about from precomputed lookup tables, without decompressing.
 
-The cost is accuracy: the stored representation is lossy. The standard mitigation is <strong>re-ranking</strong> &mdash; use the compressed index to find 100 candidates cheaply, then rescore those against their full-precision vectors, which are fetched from disk.
+The cost is accuracy: the stored representation is lossy. The standard mitigation is <strong>re-ranking</strong> &mdash; use the compressed index to find 100 candidates cheaply, then rescore those against their full-precision vectors. This are fetched from disk.
 
 |&nbsp;|Memory per vector|Recall|
 |---|---|---|
