@@ -7,15 +7,15 @@ Correctness is only defined relative to a reference, and choosing that reference
 
 <p><strong>A written gold answer.</strong> The usual approach. A human writes the ideal answer per evaluation query and a judge compares. Precise, and expensive enough that evaluation sets stay small &mdash; which is why fifty carefully written references beat five hundred sloppy ones.</p>
 
-<p><strong>A key-facts list.</strong> Rather than prose, the reference is a set of facts the answer must state. Easier to write, much easier to judge consistently, and it composes naturally with <a href="completeness_in_llm_evaluation.html">completeness</a>.</p>
+<p><strong>A key-facts list.</strong> Rather than prose, the reference is a set of facts the answer must state. Easier to write, much easier to judge always, and it composes naturally with <a href="completeness_in_llm_evaluation.html">completeness</a>.</p>
 
 <p><strong>Verifiable work.</strong> Where the answer is code, a number or a query, correctness can be executed rather than judged. This is the gold standard when it is available and it almost never is for open-ended questions.</p>
 
-The cost is the reason this dimension needs separate treatment. Writing a gold answer takes domain expertise, verifying a model's answer against it takes judgement, and scaling either one takes money or an LLM-as-judge &mdash; which introduces its own biases. Exact string match fails at once on natural language. This is because paraphrase is the norm, and n-gram metrics (BLEU, ROUGE) reward surface overlap rather than factual accuracy. Claim-level judging &mdash; decomposing both the answer and the reference into atomic facts and comparing them &mdash; is the approach that handles paraphrase, gives partial credit, and identifies which specific fact was wrong. This page walks through each reference format, shows claim-level scoring on a worked example, and covers the failure mode this dimension exists to catch: the grounded-but-wrong answer. Where the model faithfully reports what a retrieved document says and that document is out of date.
+The cost is the reason this dimension needs separate treatment. Writing a gold answer takes domain expertise, verifying a model's answer against it takes judgement, and scaling either one takes money or an LLM-as-judge &mdash; which adds its own biases. Exact string match fails at once on natural language. This is because paraphrase is the norm, and n-gram metrics (BLEU, ROUGE) reward surface overlap rather than factual accuracy. Claim-level judging &mdash; decomposing both the answer and the reference into atomic facts and comparing them &mdash; is the approach that handles paraphrase, gives partial credit, and identifies which specific fact was wrong. This page walks through each reference format, shows claim-level scoring on a worked example, and covers the failure mode this dimension exists to catch: the grounded-but-wrong answer. Where the model faithfully reports what a retrieved document says and that document is out of date.
 
 ## Why exact match fails, and what replaces it
 
-The obvious automation &mdash; string comparison against the reference &mdash; fails at once on natural language. "14 days", "fourteen days" and "two weeks" are the same answer and share no characters. Exact match step by step punishes fluent phrasing.
+The obvious automation &mdash; string check against the reference &mdash; fails at once on natural language. "14 days", "fourteen days" and "two weeks" are the same answer and share no characters. Exact match step by step punishes fluent phrasing.
 
 The n-gram metrics inherited from translation (BLEU, ROUGE) are only a partial improvement: they reward surface overlap. So a wrong answer phrased like the reference can outscore a right answer phrased differently. They remain in use because they are cheap and deterministic. And they should not be trusted as a primary signal for factual correctness.
 
@@ -23,11 +23,11 @@ What works is claim-level judging: decompose both the answer and the reference i
 
 ## The failure this dimension exists to catch
 
-The important case is the <strong>grounded but wrong</strong> answer. The model faithfully reports what a retrieved document says, and that document is out of date, contradicted by a newer one, or simply mistaken.
+The important case is the <strong>grounded but wrong</strong> answer. The model faithfully reports what a retrieved document says. And that document is out of date, contradicted by a newer one, or simply mistaken.
 
 Groundedness scores this perfectly. Relevance scores it perfectly. The answer is fluent, cited, and misinforms the user. No amount of prompt engineering fixes it, because the model did exactly what it was asked; the corpus is the defect.
 
-That makes correctness the dimension that audits your <em>data</em> rather than your model. When correctness is low while groundedness is high, stop looking at the pipeline and go and look at the documents: stale versions, superseded policies, and duplicate chunks disagreeing with each other are the usual culprits.
+That makes correctness the dimension that audits your <em>data</em> rather than your model. When correctness is low while groundedness is high, stop looking at the pipeline and go and look at the documents. Stale versions, superseded policies, and copy chunks disagreeing with each other are the usual culprits.
 
 ## Judging it without fooling yourself
 
@@ -37,11 +37,11 @@ That makes correctness the dimension that audits your <em>data</em> rather than 
 
 <p><strong>Calibrate against humans.</strong> Have annotators label a sample and measure agreement with your judge. If the judge agrees 70% of the time, a 3-point movement in your correctness score is noise.</p>
 
-<p><strong>Watch for self-preference.</strong> A judge tends to favour answers written in its own style, and to prefer longer answers. Both biases are documented and both inflate scores in ways that have nothing to do with being right.</p>
+<p><strong>Watch for self-preference.</strong> A judge tends to favour answers written in its own style. And to prefer longer answers. Both biases are documented and both inflate scores in ways that have nothing to do with being right.</p>
 
 ## Is the answer right?
 
-Correctness compares the model's answer against a known ground truth. It is the metric stakeholders care about, and the hardest of the RAG metrics to measure well &mdash;. This is because natural language has many correct forms.
+Correctness compares the model's answer against a known ground truth. It is the metric stakeholders care about. And the hardest of the RAG metrics to measure well &mdash;. This is because natural language has many correct forms.
 
 <blockquote><strong>Question:</strong> "How long is parental leave?"</blockquote>
 <blockquote><strong>Truth:</strong> "39 weeks, of which 6 are at full pay."</blockquote>
@@ -49,7 +49,7 @@ Correctness compares the model's answer against a known ground truth. It is the 
 <blockquote><strong>Answer B:</strong> "Thirty-nine weeks." &mdash; correct but incomplete</blockquote>
 <blockquote><strong>Answer C:</strong> "39 weeks at full pay." &mdash; wrong in a detail that matters</blockquote>
 
-Exact string matching marks all three wrong. That is why correctness is usually scored by a model or a human rather than by comparison.
+Exact string matching marks all three wrong. That is why correctness is usually scored by a model or a human rather than by check.
 
 The methods, in ascending order of cost and quality:
 
@@ -86,7 +86,7 @@ Four practices separate a useful judge from a noisy one:
 
 <strong>Require a reason.</strong> It improves consistency and makes disagreements auditable.
 
-<strong>Validate against humans on a sample.</strong> Grade 50 answers manually and measure agreement with the judge. Below about 80% agreement, the judge's absolute numbers are not usable &mdash; though relative comparisons between configurations may still be.
+<strong>Validate against humans on a sample.</strong> Grade 50 answers manually and measure agreement with the judge. Below about 80% agreement, the judge's absolute numbers are not usable &mdash; though relative checks between configurations may still be.
 
 Known biases to guard against: judges prefer longer answers, prefer answers from the same model family, and are sensitive to the order in which candidates are presented. Randomising order and controlling for length help.
 
@@ -172,7 +172,7 @@ print("   for anything but a single-token answer -- a date, a name, a")
 print("   yes/no -- exact match is not an option.")
 ```
 
-Token overlap relaxes that, but it introduces a failure mode of its own: it cannot tell which shared word actually carries the answer.
+Token overlap relaxes that, but it adds a failure mode of its own: it cannot tell which shared word actually carries the answer.
 
 ```python-run
 def toks(s):
@@ -213,7 +213,7 @@ print("   scores it %.4f -- higher than several correct answers."
       % f1("Refunds are available within 60 days of purchase."))
 ```
 
-Since no snippet can run an actual model call, the next block lists what a model-as-judge fixes and the practical problems it introduces instead.
+Since no snippet can run an actual model call, the next block lists what a model-as-judge fixes and the practical problems it adds instead.
 
 ```python-run
 print("A MODEL-AS-JUDGE reads both and decides. this snippet cannot run")
@@ -279,7 +279,7 @@ Two habits make judge scores trustworthy. Ask for a decision and a justification
 
 Correctness needs ground truth, and where it comes from decides what the number means.
 
-<strong>Hand-written by domain experts.</strong> Highest quality. 50 questions with careful reference answers is enough to catch regressions; 200 gives stable comparisons.
+<strong>Hand-written by domain experts.</strong> Highest quality. 50 questions with careful reference answers is enough to catch regressions; 200 gives stable checks.
 
 <strong>Derived from existing content.</strong> FAQ pairs, resolved support tickets, before answered queries. Realistic and cheap where they exist.
 
@@ -317,13 +317,13 @@ The practical value comes from automation, not from a one-off measurement.
 
 <strong>Keep a hard subset</strong> of questions the system has failed before, as a regression guard.
 
-<strong>Version the evaluation set</strong> and record which version produced each score, or comparisons across time become meaningless.
+<strong>Version the evaluation set</strong> and record which version produced each score, or checks across time become meaningless.
 
 ## Questions people ask
 
-<strong>How many questions do I need?</strong> 50 to catch large regressions, 200 for stable comparison between similar configurations.
+<strong>How many questions do I need?</strong> 50 to catch large regressions, 200 for stable check between similar configurations.
 
-<strong>Can I trust a model as judge?</strong> For relative comparisons, usually yes. For absolute numbers, validate against human grading on a sample first.
+<strong>Can I trust a model as judge?</strong> For relative checks, usually yes. For absolute numbers, validate against human grading on a sample first.
 
 <strong>Should I use exact match?</strong> Only for short extracted values. Dates, amounts, identifiers. It fails on anything free-form.
 

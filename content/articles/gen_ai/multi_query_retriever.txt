@@ -5,7 +5,7 @@ intro: One question can be asked many ways, and vector search only finds what is
 
 Embedding-based retrieval finds documents whose vectors are near the query’s vector. That works well when the question and the document use similar language, and fails when they do not.
 
-Ask “how do I speed up my model?” of a corpus that discusses “reducing inference latency”, “quantisation” and “batch throughput” and the embedding may simply not land near any of them. The data is present and the phrasing is wrong, and a single query gets a single shot at matching it.
+Ask “how do I speed up my model?” of a corpus that discusses “reducing inference latency”, “quantisation” and “batch throughput” and the embedding may simply not land near any of them. The data is present and the phrasing is wrong. And a single query gets a single shot at matching it.
 
 The failure is silent. The retriever returns its nearest neighbours regardless, so you get plausible-looking, unhelpful chunks with no signal that anything was missed. A multi-query retriever fixes this by making several other phrasings of the question &mdash; usually 3 to 5 &mdash; using a language model. Then searching with each phrasing on its own and merging the results. "How do I speed up my model?" becomes "reduce inference latency," "optimise batch throughput," and "quantise model weights". Three queries that together cover vocabulary the first missed. The merge step deduplicates by document id and can either union the results (maximise recall) or intersect them (maximise precision). The cost is N extra embedding calls and N extra vector searches per user query. This is small compared to the generation step that follows. This page shows the vocabulary mismatch on a real corpus, shows the recall improvement from multiple queries, and covers the tradeoff between union and intersection merging.
 
@@ -17,20 +17,20 @@ A multi-query retriever asks a language model to produce N other phrasings of th
 - “How can I improve throughput at serving time?”
 - “What makes a neural network run faster in production?”
 
-Each is embedded and searched on its own. This gives N result sets which are then combined and deduplicated. Because the rewordings cover different vocabulary, their nearest neighbours differ. And the union covers substantially more of the relevant material than any one query would.
+Each is embedded and searched on its own. This gives N result sets which are then combined and deduplicated. Because the rewordings cover different vocabulary, their nearest neighbours differ. And the union covers much more of the relevant material than any one query would.
 
-Merging is usually done with <strong>reciprocal rank fusion</strong> rather than raw scores. RRF assigns each document a score of <span class="mono-font">&Sigma; 1/(60 + rank)</span> across the lists it appears in. This rewards documents that several rewordings agree on and avoids the problem that similarity scores from different queries are not directly comparable.
+Merging is usually done with <strong>reciprocal rank fusion</strong> rather than raw scores. RRF assigns each document a score of <span class="mono-font">&Sigma; 1/(60 + rank)</span> across the lists it appears in. This rewards documents that several rewordings agree on and avoids the problem that similarity scores from different queries are not right comparable.
 
 ## One question, several searches
 
-A single embedding of a question is one point in the space. If the question is phrased differently from the documents that answer it, that point sits in the wrong place, and no amount of index tuning will fix it.
+A single embedding of a question is one point in the space. If the question is phrased differently from the documents that answer it, that point sits in the wrong place. And no amount of index tuning will fix it.
 
 Multi-query retrieval hedges by making several rewrites of the question, searching with each, and combining the results.
 
 <blockquote>First: "How do I stop getting so many alerts?"</blockquote>
 <blockquote>1. "How to reduce alert volume"</blockquote>
 <blockquote>2. "Configuring notification thresholds"</blockquote>
-<blockquote>3. "Suppressing duplicate alerts"</blockquote>
+<blockquote>3. "Suppressing copy alerts"</blockquote>
 
 Each rewrite lands in a different region of the embedding space. And their union covers far more of the relevant material than any one of them. The third might be the only one that retrieves the deduplication documentation.
 
@@ -271,7 +271,7 @@ Related approaches make different trades. <strong>HyDE</strong> makes a hypothet
 
 ## What to remember
 
-A multi-query retriever compensates for the fact that a single embedding gets one attempt at matching the corpus vocabulary: it makes several rewordings, retrieves with each, and fuses the ranked lists. It buys recall at the cost of an extra LLM call, N searches, and some precision. So it pairs naturally with a reranker. Where the mismatch is about rare or exact terms, hybrid search with BM25 gets much of the same benefit far more cheaply.
+A multi-query retriever compensates for the fact that a single embedding gets one attempt at matching the corpus vocabulary. It makes several rewordings, retrieves with each, and fuses the ranked lists. It buys recall at the cost of an extra LLM call, N searches, and some precision. So it pairs naturally with a reranker. Where the mismatch is about rare or exact terms, hybrid search with BM25 gets much of the same benefit far more cheaply.
 
 ## Where it helps, and where it does not
 

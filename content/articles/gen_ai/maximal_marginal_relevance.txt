@@ -3,7 +3,7 @@ intro: Trading a little relevance for a lot of coverage.
 
 ## Context first
 
-Plain top-k retrieval picks the k highest-scoring documents on its own. If a document collection has several near-the same passages about the same popular sub-topic, all of them can legitimately score near the top — and a naive top-k fills the context with repetition instead of coverage. This wastes the retrieval budget on saying the same thing three times. Maximal Marginal Relevance (MMR) fixes this by selecting documents iteratively: at each step, it picks the document that maximises a weighted combination of relevance to the query and diversity from the documents already selected. The formula is `MMR = argmax[ lambda * sim(doc, query) - (1 - lambda) * max(sim(doc, selected)) ]`. Lambda controls the trade-off: lambda=1 is pure relevance (same as top-k), lambda=0 is pure diversity (maximally different from what you already have). Values between 0.5 and 0.7 are typical. The "marginal" in the name refers to the incremental value of adding one more document given what has already been chosen. MMR is used in RAG pipelines ([LangChain](parent_document_retriever.html), LlamaIndex) where the retrieved passages become context for a language model, and redundant context wastes the model's limited context window. It also appears in extractive summarisation, where selecting diverse sentences produces a better summary. This page retrieves documents with plain top-k and with MMR, shows the similarity matrix, and lets you adjust lambda to see the relevance-diversity trade-off.
+Plain top-k retrieval picks the k highest-scoring documents on its own. If a document collection has several near-the same passages about the same popular sub-topic, all of them can legitimately score near the top — and a naive top-k fills the context with repetition instead of coverage. This wastes the retrieval budget on saying the same thing three times. Maximal Marginal Relevance (MMR) fixes this by selecting documents iteratively. At each step, it picks the document that maximises a weighted combination of relevance to the query and diversity from the documents already selected. The formula is `MMR = argmax[ lambda * sim(doc, query) - (1 - lambda) * max(sim(doc, selected)) ]`. Lambda controls the trade-off: lambda=1 is pure relevance (same as top-k), lambda=0 is pure diversity (maximally different from what you already have). Values between 0.5 and 0.7 are typical. The "marginal" in the name refers to the incremental value of adding one more document given what has already been chosen. MMR is used in RAG pipelines ([LangChain](parent_document_retriever.html), LlamaIndex) where the retrieved passages become context for a language model, and redundant context wastes the model's limited context window. It also appears in extractive summarisation, where selecting diverse sentences produces a better summary. This page retrieves documents with plain top-k and with MMR, shows the similarity matrix, and lets you adjust lambda to see the relevance-diversity trade-off.
 
 ## The formula
 
@@ -13,7 +13,7 @@ Selection happens one document at a time, not all at once. The first pick is any
 
 ## The problem with taking the top five
 
-A vector search returns the five chunks closest to the query. On a corpus with any redundancy, those five are often near-duplicates of each other.
+A vector search returns the five chunks closest to the query. On a corpus with any redundancy, those five are often near-copies of each other.
 
 Ask "what is the refund policy?" of a corpus containing the policy in the handbook, in the FAQ, in a support macro and in two versions of the terms page. And the top five results are five statements of the same thing. Four slots wasted, and any nuance &mdash; the exceptions, the timescales, the process &mdash; is not retrieved at all.
 
@@ -247,15 +247,15 @@ print("   MMR turned off.")
 
 ## Guided tests
 
-1. <strong>Read the pairwise similarity grid.</strong> Three of the six candidates are near-duplicates of each other — high similarity across that block — while the rest cover different ground.
-2. <strong>Leave MMR off.</strong> The top 3 by relevance alone are the query-planning chunk plus two of the three near-duplicate B-tree chunks — the hash-index sub-topic is crowded out fully. This covers only 2 of 3 sub-topics with two of three slots spent restating the same B-tree point.
+1. <strong>Read the pairwise similarity grid.</strong> Three of the six candidates are near-copies of each other — high similarity across that block — while the rest cover different ground.
+2. <strong>Leave MMR off.</strong> The top 3 by relevance alone are the query-planning chunk plus two of the three near-copy B-tree chunks — the hash-index sub-topic is crowded out fully. This covers only 2 of 3 sub-topics with two of three slots spent restating the same B-tree point.
 3. <strong>Turn MMR on at &lambda;=0.5.</strong> The first pick does not change — it is still the most relevant document. Since nothing has been selected yet to be similar to. The second and third picks do change: instead of a second B-tree chunk, MMR reaches for the hash-index one, and coverage goes from 2 of 3 sub-topics to all 3.
 4. <strong>Push &lambda; to 1.0.</strong> The similarity penalty vanishes fully and the result is the same to MMR being off — &lambda;=1 is pure relevance by construction.
 5. <strong>Pull &lambda; to 0.0.</strong> Relevance stops mattering at all; only spreading out matters. This can surface a barely-related document purely because nothing already picked resembles it.
 
 ## What to remember
 
-MMR selects documents one at a time, and after the first pick, every later choice is weighed against how similar it is to what has already been selected — trading some relevance for coverage. &lambda; controls the trade directly: 1.0 is ordinary top-k relevance ranking, 0.0 ignores relevance and maximises spread, and all of it between balances the two. It costs one similarity comparison against the selected set per candidate per step. This is cheap next to embedding or reranking and is standard in any RAG system retrieving more than a couple of chunks per query.
+MMR selects documents one at a time, and after the first pick, every later choice is weighed against how similar it is to what has already been selected — trading some relevance for coverage. &lambda; controls the trade right: 1.0 is ordinary top-k relevance ranking, 0.0 ignores relevance and maximises spread. And all of it between balances the two. It costs one similarity check against the selected set per candidate per step. This is cheap next to embedding or reranking and is standard in any RAG system retrieving more than a couple of chunks per query.
 
 ## Where diversity helps and where it hurts
 
@@ -265,7 +265,7 @@ MMR selects documents one at a time, and after the first pick, every later choic
 
 <strong>It helps summarisation and overview tasks,</strong> where coverage matters more than precision.
 
-<strong>It hurts on narrow factual questions.</strong> "What is the notice period?" has one answer. And the best three chunks are probably all about it. Diversity here means introducing less relevant material.
+<strong>It hurts on narrow factual questions.</strong> "What is the notice period?" has one answer. And the best three chunks are probably all about it. Diversity here means adding less relevant material.
 
 <strong>It hurts when the corpus is already diverse.</strong> If there is no redundancy, the penalty term does nothing except distort the ordering slightly.
 
@@ -281,11 +281,11 @@ That split suggests treating &lambda; as query-dependent rather than fixed: high
 |Clustering|Group candidates, take one per cluster|
 |Parent deduplication|Collapse children of the same parent document|
 
-<strong>Threshold filtering</strong> is the simpler cousin of MMR and often sufficient: go down the ranked list and skip anything with cosine similarity above 0.95 to something already kept. It handles the near-duplicate case without changing the ordering of truly distinct results.
+<strong>Threshold filtering</strong> is the simpler cousin of MMR and often sufficient. Go down the ranked list and skip anything with cosine similarity above 0.95 to something already kept. It handles the near-copy case without changing the ordering of truly distinct results.
 
 <strong>Parent deduplication</strong> is worth doing regardless if you use parent-child retrieval. And it addresses a specific and common source of redundancy.
 
-The pragmatic recommendation: start with threshold-based near-duplicate filtering, which is cheap and rarely harmful. Add MMR when the queries are truly multi-faceted.
+The pragmatic recommendation: start with threshold-based near-copy filtering, which is cheap and rarely harmful. Add MMR when the queries are truly multi-faceted.
 
 ## Practical notes
 
@@ -317,4 +317,4 @@ The pragmatic recommendation: start with threshold-based near-duplicate filterin
 - MMR selects greedily, scoring each candidate for relevance minus similarity to what is already selected.
 - `λ` balances the two; 0.5&ndash;0.7 suits most retrieval, higher for narrow factual questions.
 - Apply it to a candidate set of 30&ndash;50, not to the whole corpus.
-- Simpler near-duplicate threshold filtering is often enough; MMR earns its place on multi-faceted queries.
+- Simpler near-copy threshold filtering is often enough; MMR earns its place on multi-faceted queries.

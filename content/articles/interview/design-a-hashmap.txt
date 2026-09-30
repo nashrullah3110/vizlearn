@@ -261,7 +261,7 @@ O(1) average for all three operations, O(n) worst case when every key collides.
 
 Two details are load-bearing:
 
-<strong>`put` must check for an existing key</strong> before appending, or updating a value inserts a duplicate and `get` returns the stale one.
+<strong>`put` must check for an existing key</strong> before appending, or updating a value inserts a copy and `get` returns the stale one.
 
 <strong>Resizing rehashes every entry,</strong> because the bucket index depends on the capacity. Copying buckets across without rehashing puts keys in the wrong places. And they become unreachable.
 
@@ -290,7 +290,7 @@ Choosing a <strong>power-of-two capacity</strong> allows `hash & (cap - 1)` inst
 
 Removing an entry leaves a hole, and a probe sequence that ran <em>through</em> that slot to reach a later entry now stops at the hole and reports the later entry missing.
 
-The fix is a <strong>tombstone</strong>: mark the slot deleted rather than empty. So probes continue past it but inserts may reuse it. Tombstones build up and eventually force a rehash even without growth. Being able to say that is usually what the question is really checking.
+The fix is a <strong>tombstone</strong>: mark the slot deleted rather than empty. So probes continue past it but inserts may reuse it. Tombstones build up and in time force a rehash even without growth. Being able to say that is usually what the question is really checking.
 
 ## The load factor and the resize
 
@@ -300,7 +300,7 @@ So the table doubles and <em>every key is rehashed</em>, because the index is <c
 
 ## Open addressing, the other
 
-Instead of a list per bucket, store entries directly in the array and probe for another slot on collision.
+Instead of a list per bucket, store entries right in the array and probe for another slot on collision.
 
 |&nbsp;|Chaining|Open addressing|
 |---|---|---|
@@ -344,7 +344,7 @@ Worth mentioning: Python randomises string hashes per process to prevent deliber
 
 ## Follow-up questions
 
-<strong>"What if keys are integers 0 to 1,000,000?"</strong> Use direct addressing. An array indexed by the key. No hashing, no collisions, O(1) guaranteed. Only viable when the key space is small and dense.
+<strong>"What if keys are integers 0 to 1,000,000?"</strong> Use direct addressing. An array indexed by the key. No hashing, no collisions, O(1) sure. Only viable when the key space is small and dense.
 
 <strong>"How would you make it thread-safe?"</strong> A single lock serialises all of it; striped locking &mdash; one lock per group of buckets &mdash; allows concurrency. Java's `ConcurrentHashMap` does this.
 
@@ -364,7 +364,7 @@ Worth mentioning: Python randomises string hashes per process to prevent deliber
 
 <strong>Do you rehash on resize?</strong> Copying buckets without recomputing indices is the classic bug.
 
-<strong>Do you check for an existing key in `put`?</strong> If not updates create duplicates.
+<strong>Do you check for an existing key in `put`?</strong> If not updates create copies.
 
 <strong>Do you know the real implementations?</strong> CPython open-addresses, Java chains and treeifies. Knowing that grounds the answer in reality.
 
@@ -373,5 +373,5 @@ Worth mentioning: Python randomises string hashes per process to prevent deliber
 - Three components: an array of buckets, a hash function, and a collision strategy.
 - Chaining stores a list per bucket; open addressing probes for another slot and needs tombstones for deletion.
 - Resize when the load factor exceeds about 0.75, and <strong>rehash every entry</strong> because indices depend on the capacity.
-- `put` must update an existing key rather than appending a duplicate.
+- `put` must update an existing key rather than appending a copy.
 - O(1) average, O(n) worst case; Java bounds the worst case by treeifying long chains.

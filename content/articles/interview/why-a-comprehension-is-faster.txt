@@ -7,9 +7,9 @@ Yes, by a little, and for a specific reason: the loop looks up <code>out.append<
 
 <p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
 
-The difference is visible in the bytecode. The loop body contains `LOAD_ATTR` to look up `.append`, `CALL_FUNCTION` to invoke it, and `POP_TOP` to discard the return value. Three extra instructions per iteration. The comprehension replaces all of that with a single `LIST_APPEND` opcode that writes directly to the list being built, with no attribute lookup and no Python-level function call overhead. The speedup is roughly 10&ndash;30% in CPython, depending on what the loop body does. The simpler the per-element work, the more the overhead dominates. Generator expressions and `dict`/`set` comprehensions have their own dedicated opcodes and follow the same pattern.
+The difference is visible in the bytecode. The loop body contains `LOAD_ATTR` to look up `.append`, `CALL_FUNCTION` to invoke it, and `POP_TOP` to discard the return value. Three extra instructions per iteration. The comprehension replaces all of that with a single `LIST_APPEND` opcode that writes right to the list being built, with no attribute lookup and no Python-level function call overhead. The speedup is roughly 10&ndash;30% in CPython, depending on what the loop body does. The simpler the per-element work, the more the overhead dominates. Generator expressions and `dict`/`set` comprehensions have their own dedicated opcodes and follow the same pattern.
 
-This page times both forms across several input sizes, prints the relevant bytecodes side by side with `dis.dis`, and covers the follow-up questions: whether a comprehension changes the cost (it does not). Where the speed gap disappears (when the per-element work is expensive enough to dwarf the call overhead), and when a loop is the right choice regardless (when you need early exit, exception handling, or side effects).
+This page times both forms across several input sizes, prints the relevant bytecodes side by side with `dis.dis`, and covers the follow-up questions. Whether a comprehension changes the cost (it does not). Where the speed gap disappears (when the per-element work is expensive enough to dwarf the call overhead). And when a loop is the right choice regardless (when you need early exit, exception handling, or side effects).
 
 ## Run it
 
@@ -96,11 +96,11 @@ print(f"  the generator  {sys.getsizeof(i * i for i in range(N)):,} bytes")
 
 ## Why the number is smaller than people expect
 
-<p>Folklore puts comprehensions at two or three times faster, and that has not been true for a while. Two things narrowed it.</p><p>The <strong>specialising interpreter</strong> added in 3.11 rewrites hot instruction sequences in place. And a repeated attribute-lookup-then-call on the same type is exactly the pattern it specialises. So the loop's overhead shrank.</p><p>And in 3.12 comprehensions were <strong>inlined</strong> (PEP 709). Before that, a list comprehension created and called a hidden function object on every evaluation. Real overhead that partly cancelled the LIST_APPEND saving. Removing it made comprehensions faster in a way that has nothing to do with the append path.</p><p>So the answer to give is "a bit faster,. This is because of a per-iteration lookup and call", not a multiplier. The editor below measures it on whichever interpreter you are running.</p>
+<p>Folklore puts comprehensions at two or three times faster. And that has not been true for a while. Two things narrowed it.</p><p>The <strong>specialising interpreter</strong> added in 3.11 rewrites hot instruction sequences in place. And a repeated attribute-lookup-then-call on the same type is exactly the pattern it specialises. So the loop's overhead shrank.</p><p>And in 3.12 comprehensions were <strong>inlined</strong> (PEP 709). Before that, a list comprehension created and called a hidden function object on every evaluation. Real overhead that partly cancelled the LIST_APPEND saving. Removing it made comprehensions faster in a way that has nothing to do with the append path.</p><p>So the answer to give is "a bit faster,. This is because of a per-iteration lookup and call", not a multiplier. The editor below measures it on whichever interpreter you are running.</p>
 
 ## When the loop is the right answer anyway
 
-<p>A comprehension has to be one expression. The moment the body needs a statement &mdash; a <code>try</code>, a <code>break</code>, a log line, two things per item &mdash; the loop is the only option, and forcing a comprehension produces the unreadable nested version everybody has met.</p><p>The real decision is readability at a glance. One transformation and one filter reads better as a comprehension; three levels of nesting with two conditions does not, any it costs. And if the result is only going to be consumed once, the better answer is often neither: a generator expression skips building the list at all. That is a memory win rather than a speed one &mdash; the editor below measures the two as roughly equal in time &mdash; but constant memory against a list of a million items is a larger practical difference than the constant factor this page is about.</p>
+<p>A comprehension has to be one expression. The moment the body needs a statement &mdash; a <code>try</code>, a <code>break</code>, a log line, two things per item &mdash; the loop is the only option, and forcing a comprehension produces the unreadable nested version everybody has met.</p><p>The real decision is readability at a glance. One transformation and one filter reads better as a comprehension; three levels of nesting with two conditions does not, any it costs. And if the result is only going to be consumed once, the better answer is often neither. A generator expression skips building the list at all. That is a memory win rather than a speed one &mdash; the editor below measures the two as roughly equal in time &mdash; but constant memory against a list of a million items is a larger practical difference than the constant factor this page is about.</p>
 
 ## The follow-up: what about map and filter
 
@@ -126,7 +126,7 @@ print(f"  the generator  {sys.getsizeof(i * i for i in range(N)):,} bytes")
 
 <p><strong>The measurement is noisy.</strong> The same code timed twice can differ by half. This is why the editor takes the best of five runs - and why quoting a single-run figure in an interview is a claim you cannot defend.</p>
 
-<p><strong>A comprehension over a huge input still builds the whole list.</strong> The speed argument is per item; the memory cost is the whole thing, and for a single pass a generator expression removes it.</p>
+<p><strong>A comprehension over a huge input still builds the whole list.</strong> The speed argument is per item; the memory cost is the whole thing. And for a single pass a generator expression removes it.</p>
 
 <p><strong>Readability wins at the point where you have to re-read it.</strong> Two <code>for</code> clauses and a condition is usually the limit, and volunteering that boundary is a better answer than defending comprehensions broadly.</p>
 
@@ -144,13 +144,13 @@ print(f"  the generator  {sys.getsizeof(i * i for i in range(N)):,} bytes")
 
 <p><strong>"They run in C, so they are parallel."</strong> Neither half is true. It is the same bytecode interpreter, one item at a time.</p>
 
-<p><strong>"Always prefer a comprehension."</strong> Not when the body needs a statement, and not when the nesting makes it unreadable. Volunteering that limit is usually what the question is actually probing.</p>
+<p><strong>"Always prefer a comprehension."</strong> Not when the body needs a statement. And not when the nesting makes it unreadable. Volunteering that limit is usually what the question is actually probing.</p>
 
 ## Recap in one screen
 
 - The loop's per-iteration bytecode contains LOAD_ATTR and CALL; the comprehension's does not.
 - Both forms are O(n) - the difference is per-item overhead.
 - The measured gap is modest, which is the honest answer to the question.
-- The one-line answer: Yes, by a little, and for a specific reason: the loop looks up out.
+- The one-line answer: Yes, by a little. And for a specific reason: the loop looks up out.
 - Worth trying: Hoist the lookup out of the loop with append = out.append and re-measure. This is classic advice and the result may surprise you on a modern interpreter - measure rather than assume.
 - Worth trying: Compare map(str, range(N)) against [str(i) for i in range(N)]. Then against map(lambda i: str(i), ...). The lambda undoes the advantage.

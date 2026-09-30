@@ -31,7 +31,7 @@ Keep the enrichment short relative to the chunk, and measure on a retrieval eval
 
 ## Contextual retrieval, and what it costs
 
-The strongest published form of this is to have an LLM write a short sentence situating each chunk inside its document &mdash; what it is about, what it follows &mdash; and prepend that before embedding. Reported reductions in retrieval failure are large, and the technique is simple enough to implement in an afternoon.
+The strongest published form of this is to have an LLM write a short sentence situating each chunk inside its document &mdash; what it is about, what it follows &mdash; and prepend that before embedding. Reported reductions in retrieval failure are large. And the technique is simple enough to implement in an afternoon.
 
 The cost is one model call per chunk at index time. This sounds prohibitive on a large corpus and mostly is not: the document is the same for every chunk in it. So <a href="caching_in_rag_pipelines.html">prompt caching</a> over that shared prefix makes the marginal call cheap. It is the clearest practical example of two of these techniques composing.
 
@@ -41,17 +41,17 @@ It is still an index-time cost paid on every re-index, so it belongs in your pip
 
 The enrichment does not have to be what the model reads. You can embed the enriched text &mdash; so the chunk is findable &mdash; while storing and returning the first. So the generator is not fed repetitive boilerplate.
 
-Separating the two is the general form of a pattern that appears everywhere in retrieval: embed something optimised for matching, return something optimised for reading. Parent-document retrieval embeds a small chunk and returns its parent. Summary indexing embeds a summary and returns the document. Contextual retrieval embeds chunk-plus-context and can return either.
+Separating the two is the general form of a pattern that appears everywhere in retrieval. Embed something optimised for matching, return something optimised for reading. Parent-document retrieval embeds a small chunk and returns its parent. Summary indexing embeds a summary and returns the document. Contextual retrieval embeds chunk-plus-context and can return either.
 
-Once you see the pattern, the design question stops being "how should I chunk?" and becomes two questions with different answers: what should be <em>matched</em> against, and what should be <em>read</em>?
+Once you see the pattern, the design question stops being "how should I chunk?" and becomes two questions with different answers. What should be <em>matched</em> against, and what should be <em>read</em>?
 
 ## Measuring whether the enrichment helped
 
-Enrichment is easy to add and easy to overdo, and the only way to tell which you have done is to measure both halves.
+Enrichment is easy to add and easy to overdo. And the only way to tell which you have done is to measure both halves.
 
 <p><strong>Did findability improve?</strong> <a href="recall_at_k.html">Recall@k</a> on a fixed query set, before and after. This is the number the technique is supposed to move. And it usually does.</p>
 
-<p><strong>Did distinguishability degrade?</strong> The failure mode is chunks from one section becoming alike. A cheap proxy is the mean pairwise similarity between chunks that share a parent: if it climbs sharply after enrichment, the shared context is dominating and the retriever is losing its ability to pick between them.</p>
+<p><strong>Did distinguishability degrade?</strong> The failure mode is chunks from one section becoming alike. A cheap proxy is the mean pairwise similarity between chunks that share a parent. If it climbs sharply after enrichment, the shared context is dominating and the retriever is losing its ability to pick between them.</p>
 
 Watching only the first will lead you to enrich more and more,. This is because recall keeps improving right up until the point where the top-k fills with near-the same chunks from the same section. At which point recall still looks fine and answers get worse.
 
@@ -86,7 +86,7 @@ Context-aware chunking is the family of techniques that give each chunk enough s
 
 ## Contextual retrieval, concretely
 
-The prompt is short and the effect is substantial:
+The prompt is short and the effect is large:
 
 ```
 Here is a document:
@@ -106,11 +106,11 @@ The made context is prepended to the chunk text, and the combined text is embedd
 
 Now the chunk is retrievable by a query about applying for parental leave, and interpretable when retrieved.
 
-The reported effect on retrieval failure rates is large. Substantial reductions when combined with hybrid search and reranking. The cost is one model call per chunk at indexing time. This for a large corpus is big. Two mitigations: use a small fast model, and exploit prompt caching. Since the full document is repeated across all of its chunks' prompts.
+The reported effect on retrieval failure rates is large. Large reductions when combined with hybrid search and reranking. The cost is one model call per chunk at indexing time. This for a large corpus is big. Two mitigations: use a small fast model, and exploit prompt caching. Since the full document is repeated across all of its chunks' prompts.
 
 ## Testing whether a chunk can stand alone
 
-The problem is coreference -- a chunk that says "it" or "the policy" is meaningless once separated from what it referred to. This measures that damage directly, applies the four repairs the article names, and shows which one is worth its cost.
+The problem is coreference -- a chunk that says "it" or "the policy" is meaningless once separated from what it referred to. This measures that damage right, applies the four repairs the article names, and shows which one is worth its cost.
 
 ```python-run
 import numpy as np
@@ -329,7 +329,7 @@ Take twenty chunks at random and read each one cold. For each, ask:
 2. Do all the pronouns and references resolve?
 3. If someone asked a question this chunk answers, would this text answer it?
 
-If the answer to any is no, the chunk needs more context. That is a five-minute exercise that predicts retrieval quality better than most metrics. And it directly identifies which of the four techniques above is needed.
+If the answer to any is no, the chunk needs more context. That is a five-minute exercise that predicts retrieval quality better than most metrics. And it right identifies which of the four techniques above is needed.
 
 Following it up quantitatively: measure recall@k with and without the context addition on a question set. The heading path alone often moves recall by several points.
 

@@ -13,7 +13,7 @@ A dictionary is a hash table. Three steps happen on `d[key]`:
 
 That is one arithmetic operation and one or two memory accesses. This is why lookup is O(1) on average and does not depend on how many keys the dictionary holds.
 
-The comparison in step 3 is needed because two different keys can hash to the same slot. Hashes are checked first &mdash; comparing integers is cheap &mdash; and only if the hashes match are the keys compared with `==`.
+The check in step 3 is needed because two different keys can hash to the same slot. Hashes are checked first &mdash; comparing integers is cheap &mdash; and only if the hashes match are the keys compared with `==`.
 
 This page builds a miniature hash table so you can watch the slot arithmetic, shows what happens when collisions pile up, and covers the CPython 3.6+ compact layout that made dictionaries both smaller and insertion-ordered. It also explains why keys must be hashable. And what that requirement actually means in practice.
 
@@ -108,7 +108,7 @@ for w in words: bad.get(w)
 print(f"  {bad.probes} key comparisons for the same {len(words)} lookups")
 print("Same structure, same answers, but every operation is now O(n).")
 ```
-Python also salts string hashes per process, which is a different but related property worth seeing directly.
+Python also salts string hashes per process, which is a different but related property worth seeing right.
 
 ```python-run
 print("hash('apple') this run:", hash("apple"))
@@ -155,11 +155,11 @@ For a custom class, define both together &mdash; and defining `__eq__` without `
 
 Two steps: hash the key to a number, then fold that number into a slot index. The lookup goes straight to that slot and compares keys there. Neither step depends on how many entries the dictionary holds. This is the entire O(1) claim.
 
-The comparison at the end is not optional. Two different keys can share a slot, so the answer is only correct because the key itself is checked. See <a href="../dsa/hash_tables.html">hash tables</a> for the machinery in full.
+The check at the end is not optional. Two different keys can share a slot, so the answer is only correct because the key itself is checked. See <a href="../dsa/hash_tables.html">hash tables</a> for the machinery in full.
 
 ## Collisions and the load factor
 
-When two keys want the same slot, CPython probes for another one using a sequence derived from the hash. That costs extra comparisons, and the fuller the table the longer the probe sequences get.
+When two keys want the same slot, CPython probes for another one using a sequence derived from the hash. That costs extra checks, and the fuller the table the longer the probe sequences get.
 
 So the table grows before that becomes a problem. Past roughly two-thirds occupancy it allocates a bigger one and reinserts all of it. A resize is O(n) and every key's slot changes, because the index is <code>hash % size</code> and <code>size</code> just moved. Amortised over the insertions that caused it, insertion is still O(1).
 
@@ -173,7 +173,7 @@ That is also why dictionary iteration order must never be assumed to be hash ord
 
 Since Python 3.7, dictionaries preserve insertion order, and this is a <strong>language guarantee</strong> rather than an implementation accident. (It appeared as an implementation detail in 3.6.)
 
-The mechanism is the <strong>compact dict</strong> layout introduced in 3.6, which splits the structure in two:
+The mechanism is the <strong>compact dict</strong> layout added in 3.6, which splits the structure in two:
 
 <strong>An indices array</strong> &mdash; the hash table proper, holding small integers pointing into the entries array.
 
@@ -212,9 +212,9 @@ Two practical notes. Deletion leaves a marker rather than a gap,. This is becaus
 
 ## Questions people ask
 
-<strong>Why is dictionary lookup O(1)?</strong> The hash computes the slot directly. So the work does not depend on the number of keys. The average chain length is bounded by keeping the table two thirds empty.
+<strong>Why is dictionary lookup O(1)?</strong> The hash computes the slot right. So the work does not depend on the number of keys. The average chain length is bounded by keeping the table two thirds empty.
 
-<strong>Are dictionaries ordered?</strong> Insertion order is guaranteed since 3.7. That is not sorted order.
+<strong>Are dictionaries ordered?</strong> Insertion order is sure since 3.7. That is not sorted order.
 
 <strong>Why can a list not be a key?</strong> Mutating it would change its hash and orphan the entry.
 

@@ -5,7 +5,7 @@ intro: Guess where the value should be rather than always splitting in the middl
 
 Looking up “Zhang” in a phone book, nobody opens it at the exact middle. You open near the back, because you know where Z falls. Interpolation search formalises that: instead of probing the midpoint, it estimates the target’s position from its <em>value</em> relative to the values at the two ends.
 
-If the low element is 10, the high element is 1000. And you are looking for 100, the target sits about 9% of the way through the range. So probe about 9% of the way into the array, not 50%. The formula is `pos = lo + ((target - arr[lo]) * (hi - lo)) // (arr[hi] - arr[lo])`. This is linear interpolation between the endpoint values mapped to the endpoint indices. On uniformly distributed data this converges in O(log log n) expected time,. This is because each probe removes a constant fraction of the left range rather than just half. But the guarantee depends on the distribution: if the values are fast spaced, the interpolated probe lands near the wrong end every time and the algorithm degrades to O(n), worse than [binary search](binary_search.html)'s guaranteed O(log n). A division by zero occurs when `arr[lo] == arr[hi]` (all left values are equal). So the implementation must check for that. Interpolation search is the right choice when you know the data is roughly uniform &mdash; sorted database keys, timestamps at regular intervals, dictionary words &mdash; and binary search is the safe default when you do not. This page runs both algorithms on the same sorted array, counts the probes, and lets you switch between uniform and skewed distributions to see the performance difference.
+If the low element is 10, the high element is 1000. And you are looking for 100, the target sits about 9% of the way through the range. So probe about 9% of the way into the array, not 50%. The formula is `pos = lo + ((target - arr[lo]) * (hi - lo)) // (arr[hi] - arr[lo])`. This is linear interpolation between the endpoint values mapped to the endpoint indices. On uniformly distributed data this converges in O(log log n) expected time,. This is because each probe removes a constant fraction of the left range rather than just half. But the guarantee depends on the distribution: if the values are fast spaced, the interpolated probe lands near the wrong end every time and the algorithm degrades to O(n), worse than [binary search](binary_search.html)'s sure O(log n). A division by zero occurs when `arr[lo] == arr[hi]` (all left values are equal). So the implementation must check for that. Interpolation search is the right choice when you know the data is roughly uniform &mdash; sorted database keys, timestamps at regular intervals, dictionary words &mdash; and binary search is the safe default when you do not. This page runs both algorithms on the same sorted array, counts the probes, and lets you switch between uniform and skewed distributions to see the performance difference.
 
 ## The probe formula
 
@@ -21,9 +21,9 @@ Index 6 holds exactly 70. <strong>One probe.</strong> Binary search would have n
 
 ## Why log log n, and when it collapses
 
-On uniformly distributed data each probe does not merely halve the left range. It reduces it to roughly its square root. That gives an average of O(log log n) comparisons, which for a million elements is about 4 rather than binary search’s 20.
+On uniformly distributed data each probe does not merely halve the left range. It reduces it to roughly its square root. That gives an average of O(log log n) checks, which for a million elements is about 4 rather than binary search’s 20.
 
-But the estimate assumes values grow linearly with index. When they do not, the guess is bad, and consistently bad guesses walk the array one element at a time. On fast distributed data such as <span class="mono-font">[1, 2, 4, 8, 16, &hellip;, 2<sup>n</sup>]</span> the interpolation lands near the start every single time and the worst case degrades to <strong>O(n)</strong>. Worse than the binary search it was meant to improve on.
+But the estimate assumes values grow linearly with index. When they do not, the guess is bad, and always bad guesses walk the array one element at a time. On fast distributed data such as <span class="mono-font">[1, 2, 4, 8, 16, &hellip;, 2<sup>n</sup>]</span> the interpolation lands near the start every single time and the worst case degrades to <strong>O(n)</strong>. Worse than the binary search it was meant to improve on.
 
 ## Guessing where the value should be
 
@@ -65,7 +65,7 @@ That is remarkably small. For a million elements, binary search takes 20 probes;
 |1,000,000|20|~4|
 |1,000,000,000|30|~5|
 
-The condition is doing all the work in that table. On <strong>non-uniform</strong> data the interpolation misleads, and the worst case is O(n). Worse than binary search's guaranteed O(log n).
+The condition is doing all the work in that table. On <strong>non-uniform</strong> data the interpolation misleads, and the worst case is O(n). Worse than binary search's sure O(log n).
 
 The classic bad case is fast distributed values: [1, 2, 4, 8, 16, ..., 2⁶⁴]. Searching for a small value, interpolation assumes it is near the start of a range whose upper end is astronomically large. So it probes almost at the beginning and advances one position at a time.
 
@@ -84,7 +84,7 @@ Honestly: rarely, and it is worth understanding why.
 
 <strong>The arithmetic is more expensive.</strong> Binary search's midpoint is an addition and a shift. Interpolation requires a multiplication and a division per probe, and division is slow. With only 20 probes to save, the per-probe cost matters.
 
-<strong>The worst case is worse.</strong> Trading a guaranteed O(log n) for an average O(log log n) with an O(n) tail is a poor trade for most systems, where predictability matters.
+<strong>The worst case is worse.</strong> Trading a sure O(log n) for an average O(log log n) with an O(n) tail is a poor trade for most systems, where predictability matters.
 
 <strong>Cache effects dominate at scale.</strong> On a large array, each probe is likely a cache miss no matter the algorithm. So the number of probes matters less than it appears. And fewer, more scattered probes do not help as much as the cost suggests.
 
@@ -151,7 +151,7 @@ print("\nworst case: interp O(n)=%d, binary O(log n)=%d" % (n, int(math.log2(n))
 
 ## The short version
 
-Interpolation search replaces binary search’s fixed midpoint with an estimate of where the value ought to live, and on uniformly distributed data that estimate is good enough to cut the cost from log n to log log n. The catch is that it is an assumption about the data, not a property of the algorithm: when the distribution is skewed the same formula degrades all the way to O(n). Use it when you know the distribution, and use binary search when you do not.
+Interpolation search replaces binary search’s fixed midpoint with an estimate of where the value ought to live. And on uniformly distributed data that estimate is good enough to cut the cost from log n to log log n. The catch is that it is an assumption about the data, not a property of the algorithm. When the distribution is skewed the same formula degrades all the way to O(n). Use it when you know the distribution, and use binary search when you do not.
 
 ## The safe hybrid
 
@@ -194,7 +194,7 @@ That is the same pattern as introsort: use the fast method, detect the pathologi
 
 <strong>Exponential search</strong> deserves a mention because it solves a real problem: searching an array of unknown or unbounded size. Probe indices 1, 2, 4, 8, … until the value at the probe exceeds the target. Then binary search the last interval. O(log i) where i is the target's position, which is better than O(log n) when the target is near the front.
 
-<strong>Fibonacci search</strong> splits by Fibonacci ratios and uses only addition and subtraction &mdash; no division. That mattered on hardware without a divide instruction, and it also touches fewer distinct cache lines than binary search on some access patterns.
+<strong>Fibonacci search</strong> splits by Fibonacci ratios and uses only addition and subtraction &mdash; no division. That mattered on hardware without a divide instruction. And it also touches fewer distinct cache lines than binary search on some access patterns.
 
 ## Where the idea truly appears
 

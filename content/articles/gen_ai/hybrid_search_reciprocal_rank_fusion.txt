@@ -3,11 +3,11 @@ intro: Neither method alone, combined by their agreement.
 
 ## The idea in brief
 
-<a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">Dense retrieval</a> and <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously. Hybrid search runs both and combines the results, so a failure in one is not by itself a failure of the whole system. The combination method matters: averaging raw scores is meaningless because the two scoring functions live on incomparable scales. Reciprocal Rank Fusion (RRF) solves this by discarding the scores fully and using only each document's position in each ranked list. The formula `RRF(d) = sum(1 / (k + rank(d)))` across all lists gives each document a score that rewards being ranked highly by multiple methods. The constant k (usually 60) dampens the difference between adjacent ranks so that a document at rank 1 does not overwhelm one at rank 3. A document that both methods agree on builds up contributions from both lists and rises to the top; a document that only one method likes gets a single contribution and ranks lower. RRF requires no tuning, no normalisation, and no learned weights. This is why it became the default fusion method in systems like Elasticsearch and Weaviate. This page runs dense and sparse retrieval on the same query, prints both ranked lists side by side, and shows the RRF scores and the fused ranking.
+<a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">Dense retrieval</a> and <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously. Hybrid search runs both and combines the results, so a failure in one is not by itself a failure of the whole system. The combination method matters: averaging raw scores is meaningless because the two scoring functions live on incomparable scales. Reciprocal Rank Fusion (RRF) solves this by discarding the scores fully and using only each document's position in each ranked list. The formula `RRF(d) = sum(1 / (k + rank(d)))` across all lists gives each document a score that rewards being ranked highly by multiple methods. The constant k (usually 60) dampens the difference between adjacent ranks. That way, a document at rank 1 does not overwhelm one at rank 3. A document that both methods agree on builds up contributions from both lists and rises to the top; a document that only one method likes gets a single contribution and ranks lower. RRF requires no tuning, no normalisation, and no learned weights. This is why it became the default fusion method in systems like Elasticsearch and Weaviate. This page runs dense and sparse retrieval on the same query, prints both ranked lists side by side, and shows the RRF scores and the fused ranking.
 
 ## Why fuse ranks, not raw scores
 
-A cosine similarity lives between -1 and 1. A BM25 score is an unbounded sum that depends on corpus size and term rarity. Averaging the two numbers directly is meaningless — a BM25 score of 8 is not "worth" anything notably next to a cosine of 0.6. <strong>Reciprocal Rank Fusion</strong> sidesteps this by throwing the scores away and using only each document's <em>position</em> in each list.
+A cosine similarity lives between -1 and 1. A BM25 score is an unbounded sum that depends on corpus size and term rarity. Averaging the two numbers right is meaningless — a BM25 score of 8 is not "worth" anything notably next to a cosine of 0.6. <strong>Reciprocal Rank Fusion</strong> sidesteps this by throwing the scores away and using only each document's <em>position</em> in each list.
 
 RRF(d) = &Sigma;<sub>list</sub> 1 / (k + rank<sub>list</sub>(d))
 
@@ -42,7 +42,7 @@ Normalising helps and is fragile: min-max normalisation depends on the highest s
 
 <p class="mono-font">RRF(d) = &Sigma;<sub>lists</sub> 1 / (k + rank<sub>list</sub>(d))</p>
 
-A document at rank 1 adds 1/61, at rank 2 adds 1/62, and so on with k = 60. A document appearing in both lists builds up from both.
+A document at rank 1 adds 1/61, at rank 2 adds 1/62. And so on with k = 60. A document appearing in both lists builds up from both.
 
 Because only ordering is used, no normalisation is needed and the method works with any number of retrievers &mdash; dense, sparse, a graph traversal, a metadata filter &mdash; without tuning their relative scales.
 
@@ -456,7 +456,7 @@ Where it matters least: short, clean, natural-language corpora with no identifie
 
 <strong>What value of k?</strong> 60, from the first paper. It is not sensitive &mdash; anything from 20 to 100 behaves similarly.
 
-<strong>Can I fuse more than two retrievers?</strong> Yes, and that is a strength &mdash; RRF extends to any number without recalibration.
+<strong>Can I fuse more than two retrievers?</strong> Yes. And that is a strength &mdash; RRF extends to any number without recalibration.
 
 <strong>Does RRF need scores at all?</strong> No, only ranks. That is exactly what makes it reliable.
 

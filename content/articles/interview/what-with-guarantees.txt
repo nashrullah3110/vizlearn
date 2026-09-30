@@ -11,7 +11,7 @@ The protocol has two methods. `__enter__` runs before the body and its return va
 
 ## Run it
 
-All three exits observed from inside __exit__, the suppression case, and a return from the body that still runs the cleanup.
+All three exits observed from inside __exit__, the suppression case. And a return from the body that still runs the cleanup.
 
 All three exits, observed from inside __exit__.
 
@@ -107,7 +107,7 @@ print("  carried on, nothing raised")
 
 ## The protocol, in full
 
-<p><code>with expr as name:</code> does four things. It evaluates <code>expr</code>. It calls <code>__enter__()</code> on the result and binds the return value to <code>name</code>. Note that this is <em>not</em> always the object itself, which is why <code>open()</code> can return a file and a lock can return <code>None</code>. It runs the body. Then it calls <code>__exit__(exc_type, exc, traceback)</code>.</p><p>The last step is the point. It happens on a normal fall-through, on a <code>return</code> from inside the body, on a <code>break</code>, and on an exception. That is a stronger promise than <code>try/finally</code> written by hand, only because it is harder to forget.</p>
+<p><code>with expr as name:</code> does four things. It evaluates <code>expr</code>. It calls <code>__enter__()</code> on the result and binds the return value to <code>name</code>. Note that this is <em>not</em> always the object itself, which is why <code>open()</code> can return a file and a lock can return <code>None</code>. It runs the body. Then it calls <code>__exit__(exc_type, exc, traceback)</code>.</p><p>The last step is the point. It happens on a normal fall-through, on a <code>return</code> from inside the body, on a <code>break</code>. And on an exception. That is a stronger promise than <code>try/finally</code> written by hand, only because it is harder to forget.</p>
 
 ## Suppression, and why it is rare
 
@@ -125,11 +125,11 @@ def timed(label):
 
 ## The follow-up: why not just use try/finally
 
-<p>You can, and <code>with</code> compiles to roughly that. The difference is that the cleanup lives with the <em>resource</em> rather than with every call site. So it cannot be forgotten at the twelfth place the resource is used. It also composes: <code>with a, b:</code> nests correctly, and both exits run even if the first one raises.</p><p>The async counterpart is <code>async with</code> and <code>__aenter__</code>/<code>__aexit__</code>. This is what an async HTTP client or database session uses. Same protocol, awaitable methods.</p>
+<p>You can, and <code>with</code> compiles to roughly that. The difference is that the cleanup lives with the <em>resource</em> rather than with every call site. So it cannot be forgotten at the twelfth place the resource is used. It also composes: <code>with a, b:</code> nests correctly. And both exits run even if the first one raises.</p><p>The async counterpart is <code>async with</code> and <code>__aenter__</code>/<code>__aexit__</code>. This is what an async HTTP client or database session uses. Same protocol, awaitable methods.</p>
 
 ## What to say out loud
 
-<p>with is the context manager protocol: __enter__ before the body, __exit__ after it, guaranteed, including on an exception or a return. __exit__ receives the exception details, and returning True from it suppresses the exception - which is exactly what contextlib.suppress does. I use it for anything with a cleanup that must happen.</p>
+<p>with is the context manager protocol: __enter__ before the body, __exit__ after it, sure, including on an exception or a return. __exit__ receives the exception details, and returning True from it suppresses the exception - which is exactly what contextlib.suppress does. I use it for anything with a cleanup that must happen.</p>
 
 <p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence. Then talking for another minute until something wrong comes out.</p>
 
@@ -155,9 +155,9 @@ def timed(label):
 
 <p><strong>"What if <code>__enter__</code> itself raises?"</strong> Then <code>__exit__</code> is <strong>not</strong> called, because the block was never entered. This catches people: any resource acquired partway through <code>__enter__</code> has to be cleaned up inside <code>__enter__</code> itself. It is also why <code>ExitStack</code> exists for multi-resource setup.</p>
 
-<p><strong>"How do you manage a variable number of resources?"</strong> <code>contextlib.ExitStack</code>: enter each one into the stack and it unwinds them all in reverse on exit, but many there are. The other - a recursive or dynamically nested <code>with</code> - is not writable.</p>
+<p><strong>"How do you manage a variable number of resources?"</strong> <code>contextlib.ExitStack</code>: enter each one into the stack and it unwinds them all in reverse on exit. But many there are. The other - a recursive or dynamically nested <code>with</code> - is not writable.</p>
 
-<p><strong>"What is the async equivalent?"</strong> <code>async with</code>, backed by <code>__aenter__</code> and <code>__aexit__</code>, which are coroutines. Same protocol, awaitable methods, and it is what an async HTTP client or database session gives you.</p>
+<p><strong>"What is the async the same?"</strong> <code>async with</code>, backed by <code>__aenter__</code> and <code>__aexit__</code>, which are coroutines. Same protocol, awaitable methods, and it is what an async HTTP client or database session gives you.</p>
 
 ## Common wrong answers
 

@@ -5,7 +5,7 @@ intro: Why a transformer has to be told what order the words came in, and the od
 
 <a href="self_attention.html" style="color: var(--accent-primary)">Self-attention</a> computes every position from every other position by dot products and weighted sums. Nowhere in that work does an index appear. Permute the input and the outputs permute with it, unchanged. The mechanism is <em>permutation-equivariant</em>.<p>For a bag of words that would be a feature. For language it is fatal: "dog bites man" and "man bites dog" contain exactly the same words. And a model that cannot tell them apart cannot do anything useful. An <a href="rnn.html" style="color: var(--accent-primary)">RNN</a> got order for free by reading left to right. Throwing out recurrence threw that away too, and it has to be put back by hand.</p>
 
-The first Transformer paper solved this by adding a fixed vector to each token embedding before attention sees it. The vector is different for each position, so tokens at different positions become distinguishable even though the mechanism itself is position-blind. The encoding uses sine and cosine functions at different frequencies: even dimensions get sin(pos / 10000^(2i/d)) and odd dimensions get the cosine of the same argument. Where pos is the position and i is the dimension index.
+The first Transformer paper solved this by adding a fixed vector to each token embedding before attention sees it. The vector is different for each position, so tokens at different positions become distinguishable even though the mechanism itself is position-blind. The encoding uses sine and cosine functions at different frequencies. Even dimensions get sin(pos / 10000^(2i/d)) and odd dimensions get the cosine of the same argument. Where pos is the position and i is the dimension index.
 
 This scheme has two useful properties. First, the encoding for each position is unique, so no two positions receive the same signal. Second, relative positions can be recovered from the encodings by a linear transformation,. This is because the relationship between sin(a) and sin(a + k) is a fixed rotation that depends only on k, not on a. That means the model can learn to attend to "the token two positions back" no matter absolute position.
 
@@ -14,7 +14,7 @@ Learned positional embeddings are the main other. Instead of computing the encod
 ## The obvious ideas, and why they fail
 
 - <strong>Append the integer position.</strong> Position 512 then adds a value five hundred times larger than position 1, swamping the embedding. And the model has never seen position 3000 during training.
-- <strong>Append position / length.</strong> Now it is bounded, but the same value means different things in different sentences &mdash; 0.5 is word 5 of 10 and word 50 of 100. Nothing consistent can be learned from it.
+- <strong>Append position / length.</strong> Now it is bounded. But the same value means different things in different sentences &mdash; 0.5 is word 5 of 10 and word 50 of 100. Nothing consistent can be learned from it.
 
 Both are available in the Scheme control above. What is wanted is something bounded, unique per position, consistent across sentence lengths, and &mdash; ideally &mdash; carrying data about <em>relative</em> distance. Since "the adjective three words back" is a far more useful notion than "the word at index 17".
 
@@ -67,7 +67,7 @@ That gives three practical advantages, which is why in effect every current larg
 
 - <strong>Relative by construction</strong>, matching what language actually needs.
 - <strong>Extends further</strong> beyond the training length, and can be stretched on purpose with interpolation tricks (NTK scaling, YaRN) to extend context after training.
-- <strong>No parameters</strong>, and it applies inside attention rather than at the input. So it affects every layer consistently.
+- <strong>No parameters</strong>, and it applies inside attention rather than at the input. So it affects every layer always.
 
 <strong>ALiBi</strong> is the other approach worth knowing: it adds a penalty to attention scores tied to to distance. So tokens attend less to things far away. Simple, parameter-free, and it extrapolates well &mdash; at the cost of building in a bias towards locality.
 
@@ -227,7 +227,7 @@ In practice it does not, and the usual reason is that in a space of several hund
 - <strong>Relative</strong> &mdash; bias the attention scores by the distance between the two positions rather than encoding absolutes at all. Closer to what attention actually wants to know.
 - <strong>RoPE</strong> (rotary) &mdash; rotate the query and key vectors by an angle tied to to position. So the dot product between them depends on their difference by construction. Now the default in most open-weight models.
 
-Sinusoidal encoding is no longer the state of the art, but it is the clearest illustration of what the problem is, and RoPE is easier to understand once you have seen it.
+Sinusoidal encoding is no longer the state of the art. But it is the clearest illustration of what the problem is, and RoPE is easier to understand once you have seen it.
 
 ## Where this goes wrong
 
@@ -272,7 +272,7 @@ All three usually involve a short fine-tune on long sequences to let the model a
 
 <strong>Why add positional data rather than concatenate it?</strong> Addition keeps the dimension unchanged and works empirically. Joining would spend model width on position, and was tried and abandoned.
 
-<strong>Does adding to the embedding not corrupt the meaning?</strong> Somewhat, and the model learns to separate the two. There is enough room in a few hundred dimensions for both signals to coexist.
+<strong>Does adding to the embedding not corrupt the meaning?</strong> Somewhat. And the model learns to separate the two. There is enough room in a few hundred dimensions for both signals to coexist.
 
 <strong>Do vision transformers need positional encodings?</strong> Yes &mdash; image patches are also an unordered set without them. Learned 2-D encodings are common there.
 

@@ -9,7 +9,7 @@ So instead of learning a full <span class="mono-font">d &times; k</span> matrix,
 
 &Delta;W = B &middot; A &nbsp;&nbsp; where B is d&times;r and A is r&times;k, with r &lll; min(d, k)
 
-The first weights are <strong>frozen</strong>. Only A and B are trained. If the frozen matrix W is d-by-d and the rank r is 16, A is d-by-16 and B is 16-by-d. So the trainable parameter count drops from d-squared to 2dr. A reduction of roughly 10,000x for a 7B model's attention weights. At inference time the product BA is added directly to W. This produces a single merged matrix with zero extra latency. Multiple LoRA adapters can coexist: each task gets its own A and B, and switching tasks means swapping two small matrices while the base model stays in memory once. This is how services like Hugging Face PEFT serve hundreds of fine-tuned variants from one base checkpoint. The rank r is the main hyperparameter: too low and the adapter cannot represent the task's deviation from the base model; too high and it overfits or loses the efficiency advantage. In practice, r between 4 and 64 covers most tasks. A is set up with a random Gaussian and B with zeros. So the adapter starts as a no-op and learns the delta. This page freezes a weight matrix, trains a low-rank adapter beside it, and shows how the merged output matches the full fine-tune within a controlled tolerance.
+The first weights are <strong>frozen</strong>. Only A and B are trained. If the frozen matrix W is d-by-d and the rank r is 16, A is d-by-16 and B is 16-by-d. So the trainable parameter count drops from d-squared to 2dr. A reduction of roughly 10,000x for a 7B model's attention weights. At inference time the product BA is added right to W. This produces a single merged matrix with zero extra latency. Multiple LoRA adapters can coexist: each task gets its own A and B, and switching tasks means swapping two small matrices while the base model stays in memory once. This is how services like Hugging Face PEFT serve hundreds of fine-tuned variants from one base checkpoint. The rank r is the main hyperparameter: too low and the adapter cannot represent the task's deviation from the base model; too high and it overfits or loses the speed advantage. In practice, r between 4 and 64 covers most tasks. A is set up with a random Gaussian and B with zeros. So the adapter starts as a no-op and learns the delta. This page freezes a weight matrix, trains a low-rank adapter beside it, and shows how the merged output matches the full fine-tune within a controlled tolerance.
 
 ## Why the Savings Are So Extreme
 
@@ -41,7 +41,7 @@ LoRA changes what is trained. The pretrained weights are <strong>frozen</strong>
 
 <p class="mono-font">h = W&#8320;x + BAx&nbsp;&nbsp;&nbsp;&nbsp;where A is r&times;d and B is d&times;r</p>
 
-`W₀` never changes. `A` and `B` are the learned update, and their product has the same shape as `W₀` while containing far fewer parameters,. This is because `r` &mdash; the <strong>rank</strong> &mdash; is small.
+`W₀` never changes. `A` and `B` are the learned update. And their product has the same shape as `W₀` while containing far fewer parameters,. This is because `r` &mdash; the <strong>rank</strong> &mdash; is small.
 
 For a 4096&times;4096 weight matrix with r = 8:
 
@@ -57,11 +57,11 @@ Across a whole model, LoRA usually trains 0.1&ndash;1% of the parameters. A few 
 
 The empirical claim behind the method is that <strong>the update needed to adapt a pretrained model to a task has low intrinsic rank</strong>. The base model already knows the language; adaptation is a comparatively small, structured change.
 
-That is an observation rather than a theorem, and it has held up well: LoRA fine-tunes usually match full fine-tuning on task metrics, sometimes within noise, sometimes better. This is because there is less capacity to overfit.
+That is an observation rather than a theorem. And it has held up well: LoRA fine-tunes usually match full fine-tuning on task metrics, sometimes within noise, sometimes better. This is because there is less capacity to overfit.
 
 Two details make it practical:
 
-<strong>A is set up randomly and B to zero</strong>, so `BA = 0` at the start and the model begins exactly as the pretrained one. Training then moves it gradually rather than disrupting it on the first step.
+<strong>A is set up randomly and B to zero</strong>, so `BA = 0` at the start and the model begins exactly as the pretrained one. Training then moves it slowly rather than disrupting it on the first step.
 
 <strong>The adapter can be merged.</strong> After training, `W₀ + BA` can be computed once and stored as a single matrix. So inference has <em>no</em> extra cost. Or the adapter can be kept separate and swapped &mdash; which is what allows one base model to serve many tasks.
 
@@ -322,7 +322,7 @@ The trade: an unmerged adapter adds a small amount of inference latency. Since `
 
 ## Questions people ask
 
-<strong>What rank should I use?</strong> 8&ndash;16 for style and format; 32&ndash;64 for substantial behaviour change. Tune it on your evaluation set.
+<strong>What rank should I use?</strong> 8&ndash;16 for style and format; 32&ndash;64 for large behaviour change. Tune it on your evaluation set.
 
 <strong>What is `alpha` for?</strong> It scales the adapter's contribution by `alpha/r`. Setting it to twice the rank is a common convention that keeps the effective scale stable as rank changes.
 
