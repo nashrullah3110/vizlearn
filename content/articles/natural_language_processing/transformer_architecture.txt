@@ -7,7 +7,7 @@ The previous modules built the parts: <a href="query_key_value.html" style="colo
 
 The surprise, when you finally see the block written out, is how little there is. Two sublayers, each wrapped in the same two-line pattern, repeated N times.
 
-The first sublayer is multi-head self-attention, which lets each position in the sequence attend to every other position and collect information weighted by relevance. The second sublayer is a feed-forward network &mdash; two linear layers with a ReLU (or GELU) in between &mdash; applied on its own to each position. The attention sublayer mixes information across positions. The feed-forward sublayer processes each position in isolation. Stacking the two is what gives the transformer both global context and per-position computation.
+The first sublayer is multi-head self-attention, which lets each position in the sequence attend to every other position and collect data weighted by relevance. The second sublayer is a feed-forward network &mdash; two linear layers with a ReLU (or GELU) in between &mdash; applied on its own to each position. The attention sublayer mixes data across positions. The feed-forward sublayer processes each position in isolation. Stacking the two is what gives the transformer both global context and per-position computation.
 
 Each sublayer is wrapped in a residual connection and a layer normalisation. The residual connection adds the sublayer's input back to its output. This keeps gradients flowing through deep stacks. The layer normalisation rescales the result so that each layer receives inputs in a stable range. Without these two wrappers, a transformer with more than a few blocks becomes difficult to train.
 
@@ -27,8 +27,8 @@ That is the entire thing. Two sublayers, and each is wrapped identically: run th
 
 ## What each piece is for
 
-- <strong>Attention</strong> moves information <em>between</em> positions. It is the only part of the block that lets one token see another.
-- <strong>The feed-forward network</strong> processes each position <em>on its own</em> &mdash; the same small two-layer MLP applied to every token apart. It is where the model does per-token computation on whatever attention just gathered.
+- <strong>Attention</strong> moves data <em>between</em> positions. It is the only part of the block that lets one token see another.
+- <strong>The feed-forward network</strong> processes each position <em>on its own</em> &mdash; the same small two-layer MLP applied to every token apart. It is where the model does per-token computation on any attention just gathered.
 - <strong>The residual connection</strong> gives the gradient a path that skips the sublayer fully.
 - <strong>Layer normalisation</strong> keeps the activations at a stable scale as depth grows.
 
@@ -41,13 +41,13 @@ A transformer is one block stacked many times. The block has two sublayers, each
 <p class="mono-font">x &rarr; LayerNorm &rarr; Multi-head attention &rarr; (+x)</p>
 <p class="mono-font">x &rarr; LayerNorm &rarr; Feed-forward &rarr; (+x)</p>
 
-<strong>Attention moves information between positions.</strong> Each token gathers a content-weighted mix of the others.
+<strong>Attention moves data between positions.</strong> Each token gathers a content-weighted mix of the others.
 
 <strong>The feed-forward network processes each position on its own.</strong> It expands to four times the model dimension, applies a non-linearity, and projects back. This is where most of the parameters live &mdash; roughly two thirds of them in a typical model &mdash; and it is a common misconception that attention does all the work.
 
 <strong>Residual connections</strong> give gradients a path back through dozens of blocks. <strong>LayerNorm</strong> keeps activations stable, and placing it <em>before</em> each sublayer rather than after is what makes 80-layer stacks trainable.
 
-Everything else about a transformer is the arrangement of these blocks and what goes in and out.
+All of it else about a transformer is the arrangement of these blocks and what goes in and out.
 
 ## Three arrangements, three jobs
 
@@ -69,7 +69,7 @@ Following a sentence through a decoder-only model:
 
 1. <strong>Tokenise</strong> &mdash; text becomes integer ids.
 2. <strong>Embed</strong> &mdash; each id looks up a vector from the embedding table.
-3. <strong>Add positional information</strong> &mdash; sinusoidal, learned, or rotary applied inside attention.
+3. <strong>Add positional data</strong> &mdash; sinusoidal, learned, or rotary applied inside attention.
 4. <strong>N transformer blocks</strong> &mdash; each refining the representation.
 5. <strong>Final LayerNorm.</strong>
 6. <strong>Output projection</strong> to vocabulary size, giving one logit per possible next token.
@@ -244,7 +244,7 @@ print("   arrangement that makes 100-layer models trainable.")
 1. <strong>Take the residuals away.</strong> Untick <strong>Residual Connections</strong> and set the <strong>Number of Layers</strong> slider to 24. Watch the gradient curve decay toward zero and Trainable flip to no. Each sublayer shrinks what passes through it, and twenty-four of those in a row leave nothing to learn from.
 2. <strong>Put them back.</strong> Tick <strong>Residual Connections</strong> with the depth still at 24. The gradient holds at 1 all the way back to layer 1. This is the single change that makes deep stacks trainable at all.
 3. <strong>Take normalisation away instead.</strong> Untick <strong>Layer Normalisation</strong> with residuals on and depth at 24. Now the opposite failure: with nothing rescaling between layers the gradient compounds instead of decaying. And a deep stack becomes unstable rather than dead.
-4. <strong>Find where the parameters are.</strong> With <strong>Feed-Forward Width</strong> at 4, read FFN Share. Roughly two thirds of every block sits in the feed-forward network, not in attention &mdash; which surprises most people, since attention is the part that gets all the attention.
+4. <strong>Find where the parameters are.</strong> With <strong>Feed-Forward Width</strong> at 4, read FFN Share. Roughly two thirds of every block sits in the feed-forward network, not in attention &mdash; which surprises most people. Since attention is the part that gets all the attention.
 5. <strong>Change the width.</strong> Set the <strong>Feed-Forward Width</strong> slider to 1 and watch FFN Share collapse. Then to 8 and watch it dominate. The 4× default is a convention, not a law.
 6. <strong>Scale it up.</strong> Set the <strong>Model Dimension</strong> slider to its maximum and watch the total. Parameters grow with the <em>square</em> of the dimension but only linearly with depth. This is why widening is so much more expensive than deepening.
 
@@ -263,13 +263,13 @@ The reason is practical: with post-norm the residual path itself gets normalised
 ## Where this goes wrong
 
 - <strong>Thinking the FFN is the small part.</strong> It is about two thirds of the block. Most of a transformer's parameters do per-token computation, not attention.
-- <strong>Forgetting the FFN is position-wise.</strong> It has no view of other tokens at all. Every bit of cross-token information arrived through attention.
+- <strong>Forgetting the FFN is position-wise.</strong> It has no view of other tokens at all. Every bit of cross-token data arrived through attention.
 - <strong>Mixing up pre-norm and post-norm.</strong> Implementing the paper's post-norm without warmup and wondering why a deep model will not converge is a rite of passage.
 - <strong>Expecting depth to be free.</strong> Layers add parameters linearly but add sequential compute too; width adds parameters quadratically but parallelises well. The trade is why model shapes look the way they do.
 
 ## In one line
 
-A transformer block is two sublayers, each wrapped in the same add-and-normalise pattern: attention moves information between positions. And a position-wise feed-forward network processes each token on its own. The residual connection is what makes depth possible, giving the gradient a path that skips each sublayer &mdash; remove it and a deep stack stops training fully &mdash; while layer normalisation holds the activation scale steady as layers build up. About two thirds of the parameters live in the feed-forward network rather than in attention, and parameters grow with the square of the model dimension but only linearly with depth.
+A transformer block is two sublayers, each wrapped in the same add-and-normalise pattern: attention moves data between positions. And a position-wise feed-forward network processes each token on its own. The residual connection is what makes depth possible, giving the gradient a path that skips each sublayer &mdash; remove it and a deep stack stops training fully &mdash; while layer normalisation holds the activation scale steady as layers build up. About two thirds of the parameters live in the feed-forward network rather than in attention, and parameters grow with the square of the model dimension but only linearly with depth.
 
 ## Why it replaced recurrent networks
 
@@ -316,7 +316,7 @@ Practical consequences of size: Adam's optimiser state is twice the model. So la
 
 ## Recap in one screen
 
-- One block: attention to move information between positions, a feed-forward network to process each position, both wrapped in residual connections and LayerNorm.
+- One block: attention to move data between positions, a feed-forward network to process each position, both wrapped in residual connections and LayerNorm.
 - Most parameters are in the feed-forward layers, not in attention.
 - Encoder-only for understanding, decoder-only for generation, encoder-decoder for sequence-to-sequence.
 - Parallelism and constant path length are why it replaced RNNs; quadratic attention is what it costs.

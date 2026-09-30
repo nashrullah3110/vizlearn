@@ -11,7 +11,7 @@ The core problem is that vector similarity search and access control operate on 
 
 Pre-filtering restricts the search space before retrieval: only documents the user is allowed to see are candidates. This guarantees the result set is clean and the right size. But it requires the vector index to support metadata filtering efficiently. Not all indexes do — a naive implementation scans the full corpus and checks permissions per document. This is as slow as brute-force search.
 
-Post-filtering retrieves by relevance first and removes forbidden documents afterwards. It is simple to implement but unreliable: the result set shrinks unpredictably. And the generator must work with whatever remains. Increasing k helps probabilistically but never guarantees enough permitted results.
+Post-filtering retrieves by relevance first and removes forbidden documents afterwards. It is simple to implement but unreliable: the result set shrinks unpredictably. And the generator must work with any remains. Increasing k helps probabilistically but never guarantees enough permitted results.
 
 Hybrid approaches retrieve a large candidate set, filter it. Then backfill from a wider search if too few documents survive. This is more complex but produces a consistent result size. The trade-off is latency: two retrieval rounds instead of one. And the backfill query may not be as well-targeted as the first.
 
@@ -19,7 +19,7 @@ Whichever approach you choose, the permission model itself must be correct. A do
 
 ## Pre-filtering, and why it is harder than it looks
 
-Pre-filtering restricts the candidate set before ranking, so the top k is k <em>permitted</em> results. That is the correct behaviour and it fights the index: an HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search. You traverse into a region where everything is filtered out and the walk stalls.
+Pre-filtering restricts the candidate set before ranking, so the top k is k <em>permitted</em> results. That is the correct behaviour and it fights the index: an HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search. You traverse into a region where all of it is filtered out and the walk stalls.
 
 Vector databases handle this differently, which is one of the real differences between them. Options include filtered graph traversal, per-tenant sub-indexes (clean, and costly at many tenants), and falling back to a flat scan when the filter is very selective &mdash; which is often truly fastest,. This is because the permitted set is small.
 
@@ -37,7 +37,7 @@ Pre-filtering is the correct behaviour and it is truly hard to implement,. This 
 
 Walking an HNSW graph while skipping most nodes can <strong>disconnect the traversal</strong>: the search reaches a region where every neighbour is filtered out and stalls, returning far fewer results than asked for even though plenty of permitted documents exist elsewhere in the graph.
 
-The strategies databases use, all with trade-offs: filtered traversal that keeps searching past excluded nodes; per-tenant sub-indexes. This are clean and expensive once tenants number in the thousands; and falling back to a flat scan when the filter is selective &mdash; which is often truly fastest, since a user with access to 0.1% of a million documents is a thousand-vector brute force.
+The strategies databases use, all with trade-offs: filtered traversal that keeps searching past excluded nodes; per-tenant sub-indexes. This are clean and expensive once tenants number in the thousands; and falling back to a flat scan when the filter is selective &mdash; which is often truly fastest. Since a user with access to 0.1% of a million documents is a thousand-vector brute force.
 
 ## Getting the model right, and failing closed
 
@@ -268,7 +268,7 @@ The pragmatic combination used in practice is <strong>both</strong>: filter insi
 
 Permission bugs do not announce themselves, so they have to be tested on purpose:
 
-- <strong>A user with no groups</strong> should retrieve nothing, not everything. A missing or empty filter that matches all documents is the classic catastrophic bug.
+- <strong>A user with no groups</strong> should retrieve nothing, not all of it. A missing or empty filter that matches all documents is the classic catastrophic bug.
 - <strong>A filter on a field that does not exist</strong> should fail closed, not open. Some stores silently ignore unknown fields.
 - <strong>Inherited restrictions</strong> on documents in restricted containers.
 - <strong>Deleted users and revoked groups.</strong>

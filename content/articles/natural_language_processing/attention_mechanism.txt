@@ -5,7 +5,7 @@ intro: The idea that removed the bottleneck, and then removed recurrence altoget
 
 The encoder&ndash;decoder models that came before attention worked like this: an <a href="rnn.html" style="color: var(--accent-primary)">RNN</a> read the whole input sentence and squeezed it into a single fixed-length vector. And a second RNN made the output from that vector alone.
 
-The flaw is visible as soon as you say it out loud. Every sentence, whether five words or fifty, has to fit in the same number of floats. The encoder's final state is dominated by whatever it read last. And the beginning of a long sentence is simply gone by the time decoding starts. Translation quality fell off a cliff past about twenty words. Attention (Bahdanau et al., 2014) removes the bottleneck fully: instead of compressing the input into one vector, the decoder looks at all of the encoder's hidden states and computes a weighted average, with weights that depend on the current decoding step. At each output position, the decoder produces a query from its current state, scores it against every encoder state (the keys), and uses the scores to compute a weighted sum (the context vector). The scores go through softmax, so they sum to 1. And the highest-scoring encoder state dominates the context. This lets the model "attend" to the relevant part of the input for each output word: when translating "the cat sat," the word "chat" attends mostly to "cat." The scoring function can be a dot product (Luong attention), an additive network (Bahdanau attention). Or a scaled dot product (transformer attention). [Self-attention](self_attention.html) applies the same mechanism within a single sequence rather than between encoder and decoder. This is the foundation of the [transformer](../gen_ai/how_llms_predict_next_word.html) architecture. [Multi-head attention](multi_head_attention.html) runs several attention operations in parallel to capture different types of relationships. This page shows the attention weights at each decoding step, highlights which input words the model focuses on, and covers the three scoring functions.
+The flaw is visible as soon as you say it out loud. Every sentence, whether five words or fifty, has to fit in the same number of floats. The encoder's final state is dominated by any it read last. And the beginning of a long sentence is simply gone by the time decoding starts. Translation quality fell off a cliff past about twenty words. Attention (Bahdanau et al., 2014) removes the bottleneck fully: instead of compressing the input into one vector, the decoder looks at all of the encoder's hidden states and computes a weighted average, with weights that depend on the current decoding step. At each output position, the decoder produces a query from its current state, scores it against every encoder state (the keys), and uses the scores to compute a weighted sum (the context vector). The scores go through softmax, so they sum to 1. And the highest-scoring encoder state dominates the context. This lets the model "attend" to the relevant part of the input for each output word: when translating "the cat sat," the word "chat" attends mostly to "cat." The scoring function can be a dot product (Luong attention), an additive network (Bahdanau attention). Or a scaled dot product (transformer attention). [Self-attention](self_attention.html) applies the same mechanism within a single sequence rather than between encoder and decoder. This is the foundation of the [transformer](../gen_ai/how_llms_predict_next_word.html) architecture. [Multi-head attention](multi_head_attention.html) runs several attention operations in parallel to capture different types of relationships. This page shows the attention weights at each decoding step, highlights which input words the model focuses on, and covers the three scoring functions.
 
 ## The fix
 
@@ -21,11 +21,11 @@ Nothing is discarded and nothing is compressed. The decoder reaches back into th
 
 Because they sum to 1 and are all positive, the weights read as a distribution of interest: "to produce this word, I looked 70% at <em>cat</em> and 20% at <em>the</em>". Plotting them for every output word against every input word gives the alignment matrix in the second panel, and on a translation task it recovers word alignment without ever having been told what alignment is.
 
-That interpretability is truly useful, but treat it carefully. Attention weights show where information was drawn from. This is not quite the same as showing why the model decided what it decided.
+That interpretability is truly useful, but treat it carefully. Attention weights show where data was drawn from. This is not quite the same as showing why the model decided what it decided.
 
-## Looking at everything at once
+## Looking at all of it at once
 
-A recurrent network reads a sentence one word at a time, carrying a fixed-size hidden state. By word fifty, everything about word one has been compressed into that state, competing with forty-nine other words for room. Long-range dependencies are lost by construction.
+A recurrent network reads a sentence one word at a time, carrying a fixed-size hidden state. By word fifty, all of it about word one has been compressed into that state, competing with forty-nine other words for room. Long-range dependencies are lost by construction.
 
 Attention removes the bottleneck. Every position looks directly at every other position and decides, per position, how much each one matters.
 
@@ -33,7 +33,7 @@ Concretely, for each word the mechanism computes a weight against every other wo
 
 Two consequences follow at once, and they are why transformers replaced recurrent networks:
 
-<strong>Path length is constant.</strong> Any two positions are one step apart, regardless of distance. In an RNN the path is proportional to the gap, and gradients decay along it.
+<strong>Path length is constant.</strong> Any two positions are one step apart, no matter distance. In an RNN the path is proportional to the gap, and gradients decay along it.
 
 <strong>It parallelises.</strong> Every position's attention can be computed at once, as one matrix multiplication. An RNN must process position t before t+1, so it cannot use a GPU's parallelism across the sequence.
 
@@ -218,7 +218,7 @@ The next module generalises the three steps above into the <a href="query_key_va
 
 ## Where this goes wrong
 
-- <strong>Treating attention weights as explanation.</strong> They show where information came from, not why the output was chosen. Different weightings can produce the same prediction.
+- <strong>Treating attention weights as explanation.</strong> They show where data came from, not why the output was chosen. Different weightings can produce the same prediction.
 - <strong>Forgetting the cost.</strong> Every output position scores against every input position. So the work grows with the product of the two lengths. On long sequences this quadratic term, not the model size, is what runs out of memory.
 - <strong>Expecting clean alignments everywhere.</strong> Attention is often diffuse, and heads in a real model often attend to punctuation or to the first token for reasons that have nothing to do with meaning.
 
@@ -264,7 +264,7 @@ The main responses:
 
 <strong>Does attention explain the model?</strong> It shows which positions were connected. That is not the same as why the prediction was made, and papers have shown attention weights can be altered substantially without changing the output.
 
-<strong>How does attention know word order?</strong> It does not. The mechanism is permutation-invariant. Positional encodings are added to supply that information.
+<strong>How does attention know word order?</strong> It does not. The mechanism is permutation-invariant. Positional encodings are added to supply that data.
 
 <strong>Why replace RNNs fully?</strong> Constant path length between any two positions, and full parallelism across the sequence. Together those made much larger models trainable.
 

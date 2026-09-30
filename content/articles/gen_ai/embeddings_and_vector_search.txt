@@ -7,7 +7,7 @@ An <a href="../natural_language_processing/what_are_embeddings.html" style="colo
 
 That is the whole trick behind semantic search, recommendation, deduplication and the retrieval half of <a href="rag.html" style="color: var(--accent-primary)">RAG</a>. Once meaning is a position, similarity is distance, and search becomes a nearest-neighbour problem.
 
-The embedding itself is a fixed-length vector, usually 384 to 1536 dimensions. A model like sentence-transformers or OpenAI's ada-002 reads a passage of text, runs it through a transformer, and outputs one vector per passage. Passages with similar meaning cluster together in this space, regardless of the exact words used, the language, or the phrasing. That is what makes the approach semantic rather than lexical: a keyword search for "dog" misses "puppy" and "canine", while embedding search places all three near the same point.
+The embedding itself is a fixed-length vector, usually 384 to 1536 dimensions. A model like sentence-transformers or OpenAI's ada-002 reads a passage of text, runs it through a transformer, and outputs one vector per passage. Passages with similar meaning cluster together in this space, no matter the exact words used, the language, or the phrasing. That is what makes the approach semantic rather than lexical: a keyword search for "dog" misses "puppy" and "canine". While embedding search places all three near the same point.
 
 Searching a million vectors by brute force &mdash; computing the distance from the query to every stored vector &mdash; takes milliseconds on a GPU and seconds on a CPU. At ten million vectors it becomes impractical. Approximate nearest-neighbour (ANN) indexes solve this by building a data structure that narrows the search to a small fraction of the corpus. HNSW and IVF are the two most common approaches, and both trade a small amount of recall for orders-of-magnitude speed gains. Choosing the right index, tuning its parameters, and knowing when brute force is still fast enough are the practical skills this page covers.
 
@@ -75,7 +75,7 @@ Real systems need constraints: only documents this user may see, only from the l
 
 Two ways to apply them, and the difference matters:
 
-<strong>Pre-filter</strong> &mdash; restrict the candidate set, then search within it. Correct results, and it can defeat the index structure, since the graph or clusters were built over everything.
+<strong>Pre-filter</strong> &mdash; restrict the candidate set, then search within it. Correct results, and it can defeat the index structure, since the graph or clusters were built over all of it.
 
 <strong>Post-filter</strong> &mdash; search first, then discard non-matching results. Fast, and it can return fewer than k results, or none, if the top matches are all filtered out.
 
@@ -246,16 +246,16 @@ print("   why the interesting engineering is in the combination.")
 ## Guided tour
 
 1. <strong>Look at the space.</strong> Four topics, four visible clumps. Nothing arranged them by keyword; they are grouped because their meanings are.
-2. <strong>Search exactly.</strong> The default compares all 18 documents and returns the true nearest three. Recall is 100% by definition &mdash; this <em>is</em> the answer everything else is measured against.
+2. <strong>Search exactly.</strong> The default compares all 18 documents and returns the true nearest three. Recall is 100% by definition &mdash; this <em>is</em> the answer all of it else is measured against.
 3. <strong>Partition it.</strong> Switch <strong>Search Mode</strong> to partitioned with one cell probed. Comparisons drop to the cell's contents plus the four centroids, and recall usually stays at 100%. The neighbours were in the obvious cell.
-4. <strong>Now find the failure.</strong> Raise <strong>k</strong> to 5 or 6 with one cell probed. The cell runs out of documents, so the search returns whatever it has and recall drops below 100%: real neighbours were sitting in a cell nobody looked at.
+4. <strong>Now find the failure.</strong> Raise <strong>k</strong> to 5 or 6 with one cell probed. The cell runs out of documents, so the search returns any it has and recall drops below 100%: real neighbours were sitting in a cell nobody looked at.
 5. <strong>Buy the recall back.</strong> Raise <strong>Cells Probed</strong>. Recall climbs back to 100% and the comparison count climbs with it. That trade is the entire tuning surface of a vector database.
-6. <strong>Probe everything.</strong> At 4 cells the search does 22 comparisons for an index of 18 documents. Worse than the exact scan, because you pay for the centroids too. Partitioning only pays when you skip most of the index.
+6. <strong>Probe all of it.</strong> At 4 cells the search does 22 comparisons for an index of 18 documents. Worse than the exact scan, because you pay for the centroids too. Partitioning only pays when you skip most of the index.
 7. <strong>Change the metric.</strong> On the mango query, cosine calls "a summer fruit salad" and "peeling a ripe mango" a tie at 1.000,. This is because they sit at almost the same angle from the origin. Euclidean puts "peeling a ripe mango" clearly first, because it is truly nearer. Same points, same query, different question being asked.
 
 ## Where this goes wrong
 
-- <strong>Mixing embedding models.</strong> Vectors from two different models are not comparable, even at the same dimension. Re-embed everything when you change model, or the index quietly returns nonsense.
+- <strong>Mixing embedding models.</strong> Vectors from two different models are not comparable, even at the same dimension. Re-embed all of it when you change model, or the index quietly returns nonsense.
 - <strong>Expecting exact matches.</strong> Embeddings are poor at part numbers, error codes and rare proper nouns. This is why serious systems run hybrid retrieval. Keyword search alongside vectors.
 - <strong>Ignoring recall.</strong> An approximate index that has drifted to 70% recall looks perfectly healthy from the outside; every query returns results. Measure against exact search on a sample.
 - <strong>Chunk size chosen by accident.</strong> A vector represents its whole chunk. So a chunk covering three topics has an embedding that means none of them.
@@ -302,7 +302,7 @@ Four things that matter at scale:
 
 <strong>Store the dimension you need.</strong> 384 dimensions instead of 1,536 is a quarter of the memory and search time, and often a small accuracy cost. Some models support truncating dimensions on purpose (Matryoshka embeddings).
 
-<strong>Version your index.</strong> Changing the embedding model means re-embedding everything, so record which model produced the index.
+<strong>Version your index.</strong> Changing the embedding model means re-embedding all of it, so record which model produced the index.
 
 ## Questions people ask
 

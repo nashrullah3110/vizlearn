@@ -3,7 +3,7 @@ intro: Two gates, one state, three-quarters of the parameters &mdash; and most o
 
 ## Simplify Without Breaking
 
-The <strong>Gated Recurrent Unit</strong> (Cho et al., 2014) asked a sharp question: does an LSTM really need three gates <em>and</em> two separate memory tracks? The GRU's answer: merge the cell state and hidden state into one vector, merge forget+input into a single <strong style="color: #c084fc">update gate z</strong>, and add a <strong style="color: #22d3ee">reset gate r</strong> for proposing new content. Same gating idea, leaner machine. The update gate z controls how much of the old state to keep: z near 1 copies the previous hidden state forward (like a [forget gate](forget_gate_in_lstm.html) at 1), and z near 0 replaces it with the candidate. The reset gate r controls how much of the old state feeds into the candidate computation: r near 0 lets the GRU ignore the past fully and propose fresh content, while r near 1 makes the candidate depend on everything so far. With two gates instead of three and one state vector instead of two, the GRU has roughly 75% of the LSTM's parameters for the same hidden size. On tasks with moderate sequence lengths (under a few hundred tokens), GRUs train faster and often match LSTM accuracy; on tasks requiring very long memory, the LSTM's separate cell state gives it an edge. In practice both have been largely replaced by [transformers](../gen_ai/how_llms_predict_next_word.html) for most NLP, but GRUs remain popular for time-series forecasting and on-device applications where parameter efficiency matters. This page animates the two gates at each timestep, shows the update/reset values, and compares GRU and LSTM on the same sequence.
+The <strong>Gated Recurrent Unit</strong> (Cho et al., 2014) asked a sharp question: does an LSTM really need three gates <em>and</em> two separate memory tracks? The GRU's answer: merge the cell state and hidden state into one vector, merge forget+input into a single <strong style="color: #c084fc">update gate z</strong>, and add a <strong style="color: #22d3ee">reset gate r</strong> for proposing new content. Same gating idea, leaner machine. The update gate z controls how much of the old state to keep: z near 1 copies the previous hidden state forward (like a [forget gate](forget_gate_in_lstm.html) at 1), and z near 0 replaces it with the candidate. The reset gate r controls how much of the old state feeds into the candidate computation: r near 0 lets the GRU ignore the past fully and propose fresh content. While r near 1 makes the candidate depend on all of it so far. With two gates instead of three and one state vector instead of two, the GRU has roughly 75% of the LSTM's parameters for the same hidden size. On tasks with moderate sequence lengths (under a few hundred tokens), GRUs train faster and often match LSTM accuracy; on tasks requiring very long memory, the LSTM's separate cell state gives it an edge. In practice both have been largely replaced by [transformers](../gen_ai/how_llms_predict_next_word.html) for most NLP, but GRUs remain popular for time-series forecasting and on-device applications where parameter efficiency matters. This page animates the two gates at each timestep, shows the update/reset values, and compares GRU and LSTM on the same sequence.
 
 ## How the Two Gates Cooperate
 
@@ -30,7 +30,7 @@ The last line is the whole idea: the new state is an <strong>interpolation</stro
 
 The <strong>reset gate</strong> does something subtler: it controls how much of the previous state the candidate is allowed to see. Near 0, the candidate is computed almost from the current input alone &mdash; which is how the cell starts fresh at a sentence boundary or a topic change.
 
-Because the two coefficients are `z` and `1 − z`, the GRU cannot both keep the old state and add new information at full strength. An LSTM's separate forget and input gates can. That is the expressiveness the simplification gives up.
+Because the two coefficients are `z` and `1 − z`, the GRU cannot both keep the old state and add new data at full strength. An LSTM's separate forget and input gates can. That is the expressiveness the simplification gives up.
 
 ## GRU or LSTM?
 
@@ -49,7 +49,7 @@ Practical guidance: try the GRU first &mdash; fewer parameters, faster, less to 
 
 ## The additive path, again
 
-The GRU keeps the property that made LSTMs work. Because `hₜ` includes `(1 − zₜ) ⊙ hₜ₋₁`, the derivative of `hₜ` about `hₜ₋₁` includes the term `(1 − zₜ)`. When the update gate is near 0 &mdash; the network has learned to preserve this information &mdash; that coefficient is near 1 and the gradient passes back nearly unchanged.
+The GRU keeps the property that made LSTMs work. Because `hₜ` includes `(1 − zₜ) ⊙ hₜ₋₁`, the derivative of `hₜ` about `hₜ₋₁` includes the term `(1 − zₜ)`. When the update gate is near 0 &mdash; the network has learned to preserve this data &mdash; that coefficient is near 1 and the gradient passes back nearly unchanged.
 
 That is the same structural trick as the LSTM's cell state and as a residual connection: an additive path with a derivative near 1, protecting the gradient from multiplicative decay through many steps.
 
@@ -223,7 +223,7 @@ out, h = gru(x)          # note: one state returned, not two
 
 The interface differs from `nn.LSTM` in one visible way: a GRU returns a single hidden state rather than a `(h, c)` tuple,. This is because there is no cell state. Code written for one needs that adjustment.
 
-Everything else transfers: pack variable-length sequences so the final state reflects the last real token rather than padding, clip gradients, and keep the layer count to one or two.
+All of it else transfers: pack variable-length sequences so the final state reflects the last real token rather than padding, clip gradients, and keep the layer count to one or two.
 
 Parameter count is `3 × ((input + hidden) × hidden + hidden)` per direction per layer. For 300-dimensional input and 256 hidden units, about 428,000, against roughly 570,000 for the equivalent LSTM.
 
@@ -231,7 +231,7 @@ Parameter count is `3 × ((input + hidden) × hidden + hidden)` per direction pe
 
 Transformers displaced both for large-scale language work, and there are situations where a GRU remains the better engineering choice:
 
-- <strong>Streaming with bounded memory.</strong> A GRU carries one fixed-size state regardless of how much has been processed. A transformer's KV cache grows with every token.
+- <strong>Streaming with bounded memory.</strong> A GRU carries one fixed-size state no matter how much has been processed. A transformer's KV cache grows with every token.
 - <strong>On-device inference.</strong> Small, fast, low memory, and no attention kernels needed.
 - <strong>Small datasets.</strong> With a few thousand examples, a GRU's inductive bias and small parameter count often beat a transformer trained from scratch.
 - <strong>Classical time series.</strong> Sensor data, demand forecasting and control problems, where sequences are numeric and moderate in length.

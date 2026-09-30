@@ -9,7 +9,7 @@ That is the most damaging RAG failure in production, because the answer is fluen
 
 Corrective RAG adds a checkpoint between retrieval and generation. Before the retrieved documents reach the language model, a grading step evaluates whether they actually answer the question. If nothing is relevant, the system takes a different path instead of making from noise.
 
-The idea comes from a 2024 paper by Yan et al. that formalised what production teams were already doing with ad-hoc relevance filters. The contribution is not the grading itself but the three-way branching: proceed, correct, or fall back. Most naive RAG pipelines treat retrieval as a black box and pass everything through. CRAG treats retrieval as a hypothesis that can be wrong, and builds the workflow around that assumption.
+The idea comes from a 2024 paper by Yan et al. that formalised what production teams were already doing with ad-hoc relevance filters. The contribution is not the grading itself but the three-way branching: proceed, correct, or fall back. Most naive RAG pipelines treat retrieval as a black box and pass all of it through. CRAG treats retrieval as a hypothesis that can be wrong, and builds the workflow around that assumption.
 
 The correction path is what gives the framework its name. When the grader says the retrieved set is irrelevant, a corrective action fires. That action might be a web search, a query to a different index, a reformulated query against the same index, or simply an honest refusal. The choice depends on your system and your tolerance for latency. What matters is that the system does not hallucinate from bad context.
 
@@ -21,7 +21,7 @@ A grader &mdash; a small model, a cross-encoder, or a similarity threshold &mdas
 
 <p><strong>Correct.</strong> At least one document is relevant. Proceed, often after stripping the irrelevant ones so they do not distract the generator.</p>
 
-<p><strong>Incorrect.</strong> Nothing is relevant. Discard everything and take a corrective action rather than making.</p>
+<p><strong>Incorrect.</strong> Nothing is relevant. Discard all of it and take a corrective action rather than making.</p>
 
 <p><strong>Ambiguous.</strong> Something is partly relevant. Combine what you have with an external source.</p>
 
@@ -242,7 +242,7 @@ print("   whenever your two errors cost different amounts, the threshold")
 print("   that maximises accuracy is the wrong threshold to pick.")
 ```
 
-Cost is only half the story; the other half is latency, since every query now pays for a grader call and some pay for a web search too.
+Cost is only half the story; the other half is latency. Since every query now pays for a grader call and some pay for a web search too.
 
 ```python-run
 QUERIES = [
@@ -362,7 +362,7 @@ The common thread is <strong>replacing a fixed pipeline with a conditional one</
 |Refuses appropriately|Only if prompted|By design|
 |Predictable cost|Yes|No &mdash; depends on branching|
 
-Worth paying when a wrong answer is expensive &mdash; regulated advice, medical or legal information, anything customer-facing where a confident error damages trust. Also worth paying when the corpus has known gaps, so refusal is a frequent correct answer.
+Worth paying when a wrong answer is expensive &mdash; regulated advice, medical or legal data, anything customer-facing where a confident error damages trust. Also worth paying when the corpus has known gaps, so refusal is a frequent correct answer.
 
 Not worth paying when latency is tight, when retrieval quality is already high (measure recall@k first), or when the cost of a wrong answer is low. A well-tuned plain pipeline with a good refusal instruction covers a great deal of the same ground for a fraction of the latency.
 

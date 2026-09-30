@@ -7,7 +7,7 @@ intro: Why a transformer has to be told what order the words came in, and the od
 
 The first Transformer paper solved this by adding a fixed vector to each token embedding before attention sees it. The vector is different for each position, so tokens at different positions become distinguishable even though the mechanism itself is position-blind. The encoding uses sine and cosine functions at different frequencies: even dimensions get sin(pos / 10000^(2i/d)) and odd dimensions get the cosine of the same argument, where pos is the position and i is the dimension index.
 
-This scheme has two useful properties. First, the encoding for each position is unique, so no two positions receive the same signal. Second, relative positions can be recovered from the encodings by a linear transformation,. This is because the relationship between sin(a) and sin(a + k) is a fixed rotation that depends only on k, not on a. That means the model can learn to attend to "the token two positions back" regardless of absolute position.
+This scheme has two useful properties. First, the encoding for each position is unique, so no two positions receive the same signal. Second, relative positions can be recovered from the encodings by a linear transformation,. This is because the relationship between sin(a) and sin(a + k) is a fixed rotation that depends only on k, not on a. That means the model can learn to attend to "the token two positions back" no matter absolute position.
 
 Learned positional embeddings are the main other. Instead of computing the encoding from a formula, each position gets a trainable vector that is learned during training, the same way word embeddings are learned. BERT and GPT use learned embeddings, and in practice they perform comparably to sinusoidal encodings for sequences within the training length. The disadvantage is that they do not generalise beyond the longest position seen during training.
 
@@ -16,7 +16,7 @@ Learned positional embeddings are the main other. Instead of computing the encod
 - <strong>Append the integer position.</strong> Position 512 then adds a value five hundred times larger than position 1, swamping the embedding. And the model has never seen position 3000 during training.
 - <strong>Append position / length.</strong> Now it is bounded, but the same value means different things in different sentences &mdash; 0.5 is word 5 of 10 and word 50 of 100. Nothing consistent can be learned from it.
 
-Both are available in the Scheme control above. What is wanted is something bounded, unique per position, consistent across sentence lengths, and &mdash; ideally &mdash; carrying information about <em>relative</em> distance, since "the adjective three words back" is a far more useful notion than "the word at index 17".
+Both are available in the Scheme control above. What is wanted is something bounded, unique per position, consistent across sentence lengths, and &mdash; ideally &mdash; carrying data about <em>relative</em> distance. Since "the adjective three words back" is a far more useful notion than "the word at index 17".
 
 ## The sinusoidal answer
 
@@ -34,7 +34,7 @@ Every value stays inside &minus;1 to 1 no matter how long the sequence. And the 
 
 Self-attention computes a weighted mixture over all positions. Shuffle the input tokens and the same set of outputs comes back, permuted. The mechanism treats the sequence as a bag.
 
-For language that is fatal. "The dog bit the man" and "The man bit the dog" contain the same tokens. And a model without positional information cannot tell them apart.
+For language that is fatal. "The dog bit the man" and "The man bit the dog" contain the same tokens. And a model without positional data cannot tell them apart.
 
 So order has to be injected apart. That is the entire job of positional encoding, and there are three families of answer.
 
@@ -219,7 +219,7 @@ print("into the values being summed.")
 
 The encoding is <em>added</em> to the word embedding, not stapled onto the end of it. That surprises people &mdash; surely adding corrupts the meaning?
 
-In practice it does not, and the usual explanation is that in a space of several hundred dimensions there is room for the model to keep the two kinds of information in largely separate subspaces. And the projections that follow can pull them apart again. Concatenating would be cleaner conceptually but would spend dimensions that are more useful elsewhere.
+In practice it does not, and the usual explanation is that in a space of several hundred dimensions there is room for the model to keep the two kinds of data in largely separate subspaces. And the projections that follow can pull them apart again. Concatenating would be cleaner conceptually but would spend dimensions that are more useful elsewhere.
 
 ## What is used now
 
@@ -232,7 +232,7 @@ Sinusoidal encoding is no longer the state of the art, but it is the clearest il
 ## Where this goes wrong
 
 - <strong>Leaving it out.</strong> The model still trains and the loss still falls. So the bug is silent. It just performs like a bag-of-words model and nobody knows why.
-- <strong>Exceeding the trained length.</strong> With learned encodings, positions past the table simply do not exist. Most context-extension work is about making positional information survive past where it was trained.
+- <strong>Exceeding the trained length.</strong> With learned encodings, positions past the table simply do not exist. Most context-extension work is about making positional data survive past where it was trained.
 - <strong>Adding it at every layer.</strong> The first adds it once, at the input. Re-adding it at each layer is a common misreading of the diagram.
 - <strong>Assuming the model reads it as a number.</strong> It is a pattern, not a counter. What the model learns is which patterns co-occur, not that dimension 7 means "position 12".
 
@@ -270,13 +270,13 @@ All three usually involve a short fine-tune on long sequences to let the model a
 
 ## Questions people ask
 
-<strong>Why add positional information rather than concatenate it?</strong> Addition keeps the dimension unchanged and works empirically. Joining would spend model width on position, and was tried and abandoned.
+<strong>Why add positional data rather than concatenate it?</strong> Addition keeps the dimension unchanged and works empirically. Joining would spend model width on position, and was tried and abandoned.
 
 <strong>Does adding to the embedding not corrupt the meaning?</strong> Somewhat, and the model learns to separate the two. There is enough room in a few hundred dimensions for both signals to coexist.
 
 <strong>Do vision transformers need positional encodings?</strong> Yes &mdash; image patches are also an unordered set without them. Learned 2-D encodings are common there.
 
-<strong>Which should I use?</strong> RoPE, if you are choosing. In practice you use whatever the pretrained model uses.
+<strong>Which should I use?</strong> RoPE, if you are choosing. In practice you use any the pretrained model uses.
 
 <strong>Why 10,000 in the sinusoidal formula?</strong> It sets the range of frequencies, chosen so the wavelengths span from a couple of positions to tens of thousands. It is a tuned constant, not a derived one.
 
