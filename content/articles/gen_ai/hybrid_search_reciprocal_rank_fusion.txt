@@ -3,7 +3,7 @@ intro: Neither method alone, combined by their agreement.
 
 ## The idea in brief
 
-<a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">Dense retrieval</a> and <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously. Hybrid search runs both and combines the results, so a failure in one is not by itself a failure of the whole system. The combination method matters: averaging raw scores is meaningless because the two scoring functions live on incomparable scales. Reciprocal Rank Fusion (RRF) solves this by discarding the scores fully and using only each document's position in each ranked list. The formula `RRF(d) = sum(1 / (k + rank(d)))` across all lists gives each document a score that rewards being ranked highly by multiple methods. The constant k (usually 60) dampens the difference between adjacent ranks. That way, a document at rank 1 does not overwhelm one at rank 3. A document that both methods agree on builds up contributions from both lists and rises to the top; a document that only one method likes gets a single contribution and ranks lower. RRF requires no tuning, no normalisation, and no learned weights. This is why it became the default fusion method in systems like Elasticsearch and Weaviate. This page runs dense and sparse retrieval on the same query, prints both ranked lists side by side, and shows the RRF scores and the fused ranking.
+<a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">Dense retrieval</a> and <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously. Hybrid search runs both and combines the results, so a failure in one is not by itself a failure of the whole system. The combination method matters: averaging raw scores is meaningless because the two scoring functions live on incomparable scales. Reciprocal Rank Fusion (RRF) solves this by discarding the scores fully and using only each document's position in each ranked list. The formula `RRF(d) = sum(1 / (k + rank(d)))` across all lists gives each document a score that rewards being ranked highly by multiple methods. The constant k (usually 60) dampens the gap between adjacent ranks. That way, a document at rank 1 does not overwhelm one at rank 3. A document that both methods agree on builds up contributions from both lists and rises to the top; a document that only one method likes gets a single contribution and ranks lower. RRF requires no tuning, no normalisation, and no learned weights. This is why it became the default fusion method in systems like Elasticsearch and Weaviate. This page runs dense and sparse retrieval on the same query, prints both ranked lists side by side, and shows the RRF scores and the fused ranking.
 
 ## Why fuse ranks, not raw scores
 
@@ -34,7 +34,7 @@ The pattern is consistent enough that combining them is the standard recommendat
 
 The obvious combination &mdash; add the two scores &mdash; does not work, because they are not comparable.
 
-BM25 scores are unbounded and depend on term rarity and document length; a good match might score 8.4 or 31.2 depending on the corpus. Cosine similarities sit between &minus;1 and 1, and in practice cluster in a narrow band. Adding them means the BM25 score dominates fully.
+BM25 scores are unbounded and depend on term rarity and document length; a good match might score 8.4 or 31.2 depending on the corpus. Cosine similarities sit between &minus;1 and 1, and in practice cluster in a narrow band. Adding them means the BM25 score rules fully.
 
 Normalising helps and is fragile: min-max normalisation depends on the highest score in this particular result set. So the same document scores differently depending on what else was retrieved.
 
@@ -141,7 +141,7 @@ print("   how good the results actually were -- and it is unstable: add")
 print("   one more result to either list and every number changes.")
 ```
 
-Reciprocal rank fusion sidesteps both problems by dropping scores fully and working from rank alone. The next block sets up the formula and the constant k that keeps any single top result from dominating.
+Reciprocal rank fusion sidesteps both problems by dropping scores fully and working from rank alone. The next block sets up the formula and the constant k that keeps any single top result from ruling.
 
 ```python-run
 K = 60
@@ -162,7 +162,7 @@ print("   across retrievers matters more than any one retriever's")
 print("   confidence.")
 ```
 
-With the formula in hand, the next block actually fuses the two ranked lists from the running example.
+With the formula in hand, the next block really fuses the two ranked lists from the running example.
 
 ```python-run
 BM25 = [("C", 18.4), ("A", 12.1), ("F", 9.7), ("B", 4.2), ("H", 1.1)]
@@ -394,10 +394,10 @@ print("   retrievals and two indexes on every query instead of one.")
 
 ## Try it yourself
 
-1. <strong>Compare the two lists.</strong> They do not agree on the #1 result — dense and sparse are weighting the same five documents by truly different criteria.
+1. <strong>Compare the two lists.</strong> They do not agree on the #1 result — dense and sparse are weighting the same five documents by truly different rules.
 2. <strong>Read the fused ranking.</strong> The winner is not always #1 in either single list — it is the document both methods placed respectably. This is exactly what "fused by rank" is built to surface.
-3. <strong>Push k up toward 60.</strong> The gaps between fused scores shrink and consensus dominates even more strongly — this is the standard default, chosen to be forgiving of exactly how far down a list something sits.
-4. <strong>Pull k down to 1.</strong> Rank 1 in either list is now worth sharply more than rank 2 — a document has to actually top one of the lists to compete.
+3. <strong>Push k up toward 60.</strong> The gaps between fused scores shrink and consensus rules even more strongly — this is the standard default, chosen to be forgiving of exactly how far down a list something sits.
+4. <strong>Pull k down to 1.</strong> Rank 1 in either list is now worth sharply more than rank 2 — a document has to really top one of the lists to compete.
 
 ## Summing up
 

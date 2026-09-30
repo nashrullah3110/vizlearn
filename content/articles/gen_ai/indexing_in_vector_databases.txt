@@ -11,7 +11,7 @@ An index trades exact answers for speed. It organises vectors into a structure â
 
 The three main families are IVF (inverted file), HNSW (hierarchical navigable small-world graph) and product quantisation. IVF clusters the vectors and searches only the nearest clusters. This trades recall at cluster boundaries for speed. HNSW builds a layered graph and walks it greedily toward the query â€” best recall-for-latency, highest memory. Product quantisation compresses each vector into a short code. This cuts memory sharply at some recall cost, and is usually combined with IVF.
 
-The metric that matters is recall@k: of the k true nearest neighbours, how many did the index actually return? For RAG, 0.95 is usually fine because a reranker will re-score the top results anyway. For deduplication or exact matching, anything less than 1.0 is a data quality problem.
+The metric that matters is recall@k: of the k true nearest neighbours, how many did the index really return? For RAG, 0.95 is usually fine because a reranker will re-score the top results anyway. For deduplication or exact matching, anything less than 1.0 is a data quality problem.
 
 Choosing an index means choosing where on the recall-latency-memory triangle you want to sit. HNSW gives the best recall for a given latency but uses the most memory. IVF-PQ uses the least memory but has lower recall. IVF-flat sits in the middle. The right choice depends on your corpus size, your hardware budget and how much recall loss your use can tolerate.
 
@@ -57,7 +57,7 @@ Three things per record, and all three matter:
 
 <strong>The payload</strong> &mdash; the text itself, or a reference to it. So the retrieved chunk can be put in a prompt.
 
-<strong>The metadata</strong> &mdash; source, date, document type, permissions, heading path. This is what makes filtering possible, and it must be populated at indexing time; adding a field later means re-indexing.
+<strong>The metadata</strong> &mdash; source, date, document type, permissions, heading path. This is what makes filtering doable, and it must be populated at indexing time; adding a field later means re-indexing.
 
 The index is the structure built over the vectors. That way, a nearest-neighbour query does not have to compare against all of them. All of it else the database provides. Persistence, filtering, updates, copying. Is why you use one rather than a NumPy array.
 
@@ -80,7 +80,7 @@ for doc in documents:
 
 Four things in that snippet are the ones that go wrong in practice.
 
-<strong>Batch the embedding calls.</strong> One call per chunk is dominated by overhead; batches of 32&ndash;128 are a few times faster.
+<strong>Batch the embedding calls.</strong> One call per chunk is ruled by cost; batches of 32&ndash;128 are a few times faster.
 
 <strong>Normalise once, here.</strong> Then every query is a dot product rather than a cosine work.
 
@@ -106,7 +106,7 @@ Also plan for <strong>re-embedding</strong>. Changing the embedding model invali
 
 ## What is stored, and what happens when it changes
 
-The ANN algorithm gets the attention, and the operational half decides whether a system survives contact with a corpus that changes. This works through what a record actually holds, what an update costs. And the staleness that follows from the answer.
+The ANN algorithm gets the attention, and the operational half decides whether a system survives contact with a corpus that changes. This works through what a record really holds, what an update costs. And the staleness that follows from the answer.
 
 ```python-run
 import numpy as np
@@ -234,7 +234,7 @@ print("   them again later means going back to the original documents.")
 2. Raise probes until recall reaches 1.0. You are now comparing against the whole corpus: an exact search with extra steps.
 3. Raise <strong>clusters</strong> with probes fixed. Finer clusters mean fewer checks and lower recall. The same trade from the other direction.
 
-## What to remember
+## What to recall
 
 Without an index, finding the nearest vector means comparing against every stored vector. An index prunes most of them and pays for it in recall. So the metric is recall@k measured against an exact search. Recall, latency and memory are the three knobs. And every index type exposes them under different names.
 
@@ -272,7 +272,7 @@ Two observations that save a lot of unneeded infrastructure.
 
 ## Operational details worth deciding up front
 
-<strong>Collection layout.</strong> One collection per tenant isolates cleanly and multiplies index overhead; one collection with a tenant field in the metadata scales better and relies on filtering being correct.
+<strong>Collection layout.</strong> One collection per tenant isolates cleanly and multiplies index cost; one collection with a tenant field in the metadata scales better and relies on filtering being correct.
 
 <strong>Backups.</strong> The index is derivable from the documents, so the question is whether re-indexing is acceptable as fix. For a large corpus that may be hours, which argues for snapshotting.
 

@@ -57,7 +57,7 @@ grammar. It gives confident, well-formed sentences that mean something else.
 ## How beam search works
 
 Keep the k best partial sequences at every step. Expand each with every
-possible next token, score all the candidates, keep the best k again, and
+doable next token, score all the candidates, keep the best k again, and
 continue until they have all emitted end-of-sequence.
 
 The tree in the explorer draws this. Each row is one step, the surviving beams
@@ -75,13 +75,13 @@ short and dull, and a narrow beam's failure to find it is doing useful work.
 The statistic in the explorer comparing your beam against beam 5 is there to
 make the point that wider is often just the same answer for more compute.
 
-## The length penalty
+## The length cost
 
 Every token multiplies another probability below 1, so a longer sequence has a
 lower total probability, always. Unnormalised, the search so prefers to
 stop early &mdash; it will truncate rather than finish the sentence.
 
-Set the length penalty **alpha to 0** in the explorer on the first sentence.
+Set the length cost **alpha to 0** in the explorer on the first sentence.
 The winning beam becomes "the cat", with a total log-probability of
 &minus;1.72, beating the full "the black cat sleeps on the mat" at &minus;2.10.
 The short output is not better; it is shorter.
@@ -126,7 +126,7 @@ def beam_search(model, src, beam=4, alpha=0.7, max_len=64, eos=2):
 
 The comment marks the mistake that is easiest to make: normalising after
 selection rather than before means the pruning at every step still has the
-short-sequence bias, and the penalty only affects the final pick.
+short-sequence bias, and the cost only affects the final pick.
 
 ## Why it stops
 
@@ -139,7 +139,7 @@ that after a complete sentence the most likely next token is the one that ends
 it. Generation stops when that token is emitted &mdash; or when a maximum
 length is hit, which is a safety net rather than the intended path.
 
-This is why the length penalty operates where it does. The competition is
+This is why the length cost operates where it does. The competition is
 between emitting end-of-sequence now and emitting another content word, and
 both are just entries in the same distribution. When the built up
 log-probability is the score, stopping is always locally attractive, because it
@@ -165,24 +165,24 @@ which is what stopped translations containing `<unk>` for every rare name.
 
 All of it on the second half of this page survived unchanged. A transformer
 still gives a distribution over the next token and still needs a search over
-sequences to turn that into output. Beam width and length penalty are still
+sequences to turn that into output. Beam width and length cost are still
 tuned per model. And a large language model making text is doing exactly
 this, usually with sampling instead of beam search &mdash; temperature, top-k
 and nucleus sampling are other answers to the same question this page
-asks: given a next-token distribution, which sequence do you actually emit?
+asks: given a next-token distribution, which sequence do you really emit?
 ## Questions people ask
 
 <strong>Why does greedy decoding fail so badly here?</strong> Because the damage is semantic rather than grammatical. After `i`, `speak` outscores `do` by about a tenth of a nat, and taking it deletes the negation with no route back &mdash; "i speak french" is perfectly fluent and means the opposite. Greedy decoding rarely gives bad grammar; it gives confident, well-formed sentences that say something else.
 
 <strong>Is a wider beam always better?</strong> No, in two ways. It is not exact search. A prefix that falls out of the top k at any step is gone permanently. And past a width of roughly 10, BLEU usually *degrades*. The model's true highest-probability output tends to be short and dull. So a narrow beam's failure to find it is quietly doing useful work.
 
-<strong>What should the length penalty be?</strong> There is no principled value; it is tuned on a development set, usually somewhere around 0.6&ndash;0.7. At alpha = 0 the search truncates, because a shorter sequence multiplies fewer probabilities below 1 and so always scores better. Past alpha = 1 the correction over-corrects and the model pads, because length is now rewarded on its own.
+<strong>What should the length cost be?</strong> There is no principled value; it is tuned on a development set, usually somewhere around 0.6&ndash;0.7. At alpha = 0 the search truncates, because a shorter sequence multiplies fewer probabilities below 1 and so always scores better. Past alpha = 1 the correction over-corrects and the model pads, because length is now rewarded on its own.
 
-<strong>Where does the length normalisation go in the loop?</strong> Before ranking, not after. Normalising only the final pick leaves every intermediate pruning step with the full short-sequence bias. So the penalty appears to be applied and mostly is not. It is the easiest version of this bug to ship because the output is plausible.
+<strong>Where does the length normalisation go in the loop?</strong> Before ranking, not after. Normalising only the final pick leaves every middle pruning step with the full short-sequence bias. So the cost appears to be applied and mostly is not. It is the easiest version of this bug to ship because the output is plausible.
 
-<strong>What decides how long the output is?</strong> Not a length setting. End-of-sequence is an ordinary vocabulary entry competing with the content words, and. This is because every extra token lowers the built up log-probability, stopping is always locally attractive &mdash;. This is exactly what the length penalty exists to counteract. The opposite failure comes from under-predicted end-of-sequence, usually from training data with few short examples. Generation runs to the cap and trails off mid-clause.
+<strong>What decides how long the output is?</strong> Not a length setting. End-of-sequence is an ordinary vocabulary entry competing with the content words, and. This is because every extra token lowers the built up log-probability, stopping is always locally attractive &mdash;. This is exactly what the length cost exists to counteract. The opposite failure comes from under-predicted end-of-sequence, usually from training data with few short examples. Generation runs to the cap and trails off mid-clause.
 
-<strong>Does any of this survive the transformer?</strong> The whole second half of the page does. A transformer still emits a distribution over the next token and still needs a search to turn that into text, and beam width and length penalty are still tuned per model. Temperature, top-k and nucleus sampling are other answers to the same question. Given a next-token distribution, what do you actually emit?
+<strong>Does any of this survive the transformer?</strong> The whole second half of the page does. A transformer still emits a distribution over the next token and still needs a search to turn that into text, and beam width and length cost are still tuned per model. Temperature, top-k and nucleus sampling are other answers to the same question. Given a next-token distribution, what do you really emit?
 
 ## Recap in one screen
 

@@ -5,11 +5,11 @@ intro: Three techniques that all get called "training", doing three different jo
 
 A pretrained model is a text predictor. Ask it a question and it gives something a document containing that question might plausibly continue with &mdash;. This is not the same as an answer, and certainly not a helpful one.
 
-Two more stages turn that into an assistant. <strong>Supervised fine-tuning</strong> shows it thousands of written demonstrations of the behaviour you want. <strong>Preference optimisation</strong> then shows it pairs of answers with a human verdict on which is better, for all the cases where nobody could write the ideal answer but anyone can pick the better of two. The division of labour matters: SFT teaches format and basic instruction following. While preference optimisation teaches the subtler qualities. Helpfulness, safety, tone. That humans can spot easily but cannot show perfectly in a single gold-standard example. RLHF was the first preference method: train a reward model on human checks. Then optimise the language model against that reward with PPO while penalising drift from the SFT checkpoint. DPO simplified the pipeline by showing that the same optimum can be reached with a supervised loss right on the preference pairs. This skips the reward model and the reinforcement learning loop fully. Both methods solve the same constrained optimisation problem. Maximise reward subject to a KL penalty that keeps the model close to its reference. And the temperature parameter beta controls how tight the leash is. This page computes the reward, the KL divergence. And the policy shift for a toy vocabulary so you can see exactly what the penalty does.
+Two more stages turn that into an assistant. <strong>Supervised fine-tuning</strong> shows it thousands of written demonstrations of the behaviour you want. <strong>Preference optimisation</strong> then shows it pairs of answers with a human verdict on which is better, for all the cases where nobody could write the ideal answer but anyone can pick the better of two. The division of labour matters: SFT teaches format and basic instruction following. While preference optimisation teaches the subtler qualities. Helpfulness, safety, tone. That humans can spot easily but cannot show perfectly in a single gold-standard example. RLHF was the first preference method: train a reward model on human checks. Then optimise the language model against that reward with PPO while penalising drift from the SFT checkpoint. DPO simplified the pipeline by showing that the same optimum can be reached with a supervised loss right on the preference pairs. This skips the reward model and the reinforcement learning loop fully. Both methods solve the same constrained optimisation problem. Maximise reward subject to a KL cost that keeps the model close to its reference. And the temperature parameter beta controls how tight the leash is. This page computes the reward, the KL divergence. And the policy shift for a toy vocabulary so you can see exactly what the cost does.
 
 ## The maths both preference methods share
 
-<p>Every preference method optimises the same objective: get more reward without drifting far from the model you started with. That constraint has a closed form,</p><p>&pi;(y) &prop; &pi;<sub>ref</sub>(y) &middot; exp( r(y) / &beta; )</p><p>which is exactly what this page computes. The reference policy is the SFT model, <span class="mono-font">r</span> is the reward, and <span class="mono-font">&beta;</span> is the leash. Large &beta; keeps the tuned model close to its reference, small &beta; lets it chase reward wherever that leads. The drift readout is the <a href="../maths/cross_entropy_and_kl_divergence.html" style="color: var(--accent-primary)">KL divergence</a> between the two. This is the quantity the penalty is penalising.</p><strong>RLHF</strong> gets <span class="mono-font">r</span> from a reward model trained on human checks. Then optimises against it with PPO. <strong>DPO</strong> skips the reward model fully: the same optimum can be reached by a supervised-looking loss on the preference pairs themselves. Same target, far less machinery, which is why DPO and its relatives took over so quickly.
+<p>Every preference method optimises the same objective: get more reward without drifting far from the model you started with. That constraint has a closed form,</p><p>&pi;(y) &prop; &pi;<sub>ref</sub>(y) &middot; exp( r(y) / &beta; )</p><p>which is exactly what this page computes. The reference policy is the SFT model, <span class="mono-font">r</span> is the reward, and <span class="mono-font">&beta;</span> is the leash. Large &beta; keeps the tuned model close to its reference, small &beta; lets it chase reward wherever that leads. The drift readout is the <a href="../maths/cross_entropy_and_kl_divergence.html" style="color: var(--accent-primary)">KL divergence</a> between the two. This is the quantity the cost is penalising.</p><strong>RLHF</strong> gets <span class="mono-font">r</span> from a reward model trained on human checks. Then optimises against it with PPO. <strong>DPO</strong> skips the reward model fully: the same optimum can be reached by a supervised-looking loss on the preference pairs themselves. Same target, far less machinery, which is why DPO and its relatives took over so quickly.
 
 ## Three stages, three different jobs
 
@@ -43,9 +43,9 @@ There is a second reason, which is about the loss function. SFT maximises the li
 
 1. Collect human checks of response pairs.
 2. Train a <strong>reward model</strong> to predict which response a human would prefer.
-3. Optimise the language model against that reward with reinforcement learning (PPO), including a KL penalty keeping it close to the SFT model.
+3. Optimise the language model against that reward with reinforcement learning (PPO), including a KL cost keeping it close to the SFT model.
 
-The KL penalty is not optional. Without it the policy drifts into degenerate text that scores highly on the reward model and is useless &mdash; <em>reward hacking</em>. And it is the trait failure of the method.
+The KL cost is not optional. Without it the policy drifts into degenerate text that scores highly on the reward model and is useless &mdash; <em>reward hacking</em>. And it is the trait failure of the method.
 
 Practically, RLHF is complicated: two models in memory, an RL loop that is sensitive to hyperparameters. And a reward model that can be gamed.
 
@@ -235,8 +235,8 @@ print("   the answer to that problem is retrieval rather than training.")
 1. <strong>Start at pretraining.</strong> With SFT at 0 and no preference method, the dense jargon answer is the most likely one. That is what "most probable follow-up" looks like when the text you trained on is the internet.
 2. <strong>Apply SFT.</strong> Raise <strong>Supervised Fine-Tuning</strong> to 2. The demonstrated answer &mdash; short, clear, aimed at a child &mdash; takes over. Nothing has been rewarded yet; it is just imitation.
 3. <strong>Add RLHF with a tight leash.</strong> Set the method to RLHF with beta at 3. The good answer gains a little, the drift stays small, and human ratings go up.
-4. <strong>Loosen the leash.</strong> Drag <strong>beta</strong> down towards 0.1. The model collapses onto the long, hedging, flattering answer &mdash; because the reward model scores it highest. Reward goes up, the human rating goes <em>down</em>, and the drift readout goes through the roof. That is reward hacking, and it is why the KL penalty is not optional.
-5. <strong>Fix the reward model instead.</strong> Uncheck <strong>Reward Model Likes Long Answers</strong> and the collapse stops happening, at the same beta. The KL penalty was never the real fix; it was a guard rail against a proxy that was wrong.
+4. <strong>Loosen the leash.</strong> Drag <strong>beta</strong> down towards 0.1. The model collapses onto the long, hedging, flattering answer &mdash; because the reward model scores it highest. Reward goes up, the human rating goes <em>down</em>, and the drift readout goes through the roof. That is reward hacking, and it is why the KL cost is not optional.
+5. <strong>Fix the reward model instead.</strong> Uncheck <strong>Reward Model Likes Long Answers</strong> and the collapse stops happening, at the same beta. The KL cost was never the real fix; it was a guard rail against a proxy that was wrong.
 6. <strong>Compare DPO.</strong> Switch the method to DPO. It moves probability towards the preferred answer and away from the rejected one. And it has no reward model to hack. But it also has no opinion at all about answers nobody compared.
 
 ## Choosing between them
@@ -254,7 +254,7 @@ print("   the answer to that problem is retrieval rather than training.")
 - <strong>Preference data that disagrees with itself.</strong> Two annotators, two answers, no shared rubric. The resulting reward model learns the noise.
 - <strong>Evaluating on the reward model.</strong> If the reward model is also your evaluation, you have measured the thing you optimised and learned nothing.
 
-## Worth remembering
+## Worth recalling
 
 Pretraining supplies knowledge and fluency, supervised fine-tuning supplies behaviour by imitation, and preference optimisation supplies judgement between answers that are all plausible. RLHF and DPO reach the same optimum. A policy tied to to the reference times the exponentiated reward. With DPO skipping the reward model that RLHF has to train and then defend. The beta term is the leash, and slackening it gives exactly the failure you would predict. Reward climbs, human ratings fall. And the model drifts into any the proxy overrates. None of these stages is a way to teach a model new facts; that is what retrieval is for.
 
@@ -287,7 +287,7 @@ So the decision table most projects need:
 
 <strong>If fine-tuning, use LoRA.</strong> A few hundred to a few thousand well-curated examples, adapters. Rather than full weights, and evaluation against a held-out set that existed before you started.
 
-<strong>Data quality dominates quantity.</strong> A thousand carefully written examples beat ten thousand scraped ones. The well-known result here is that a small, high-quality instruction set can give a surprisingly capable assistant.
+<strong>Data quality rules quantity.</strong> A thousand carefully written examples beat ten thousand scraped ones. The well-known result here is that a small, high-quality instruction set can give a surprisingly capable assistant.
 
 <strong>Preference optimisation is rarely the first move</strong> for an use team. It matters when you are shipping a model whose tone and refusal behaviour you own.
 
