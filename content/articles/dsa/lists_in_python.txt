@@ -14,7 +14,7 @@ A Python list is a contiguous block of pointers to objects, with spare capacity 
 |`lst.pop(0)`|O(n)|Shifts every element left|
 |`x in lst`|O(n)|Linear scan|
 
-The spare capacity is what makes `append` amortised O(1): CPython over-allocates by roughly 12.5% each time the array fills. So most appends write into existing space without a reallocation. When a reallocation does happen, the entire block is copied to a new, larger block. An O(n) operation that is amortised over the many O(1) appends that preceded it. `insert(0, x)` and `pop(0)` are O(n) because every element must shift; if you need fast operations at both ends, use `collections.deque`. This is a doubly-linked list of fixed-size blocks with O(1) append and popleft. Slicing (`lst[a:b]`) always copies: the result is a new list with new pointers to the same objects. So modifying the slice does not affect the original. List comprehensions are faster than equivalent `for` + `append` loops because the bytecode avoids the method lookup and function-call overhead on each iteration. Sorting is O(n log n) via Timsort, which is adaptive. Nearly-sorted data finishes in O(n). This page times every core operation, prints the internal capacity after each append to show the over-allocation pattern, and compares list against deque for front-insertion workloads.
+The spare capacity is what makes `append` amortised O(1): CPython over-allocates by roughly 12.5% each time the array fills. So most appends write into existing space without a reallocation. When a reallocation does happen, the entire block is copied to a new, larger block. An O(n) operation that is amortised over the many O(1) appends that preceded it. `insert(0, x)` and `pop(0)` are O(n) because every element must shift; if you need fast operations at both ends, use `collections.deque`. This is a doubly-linked list of fixed-size blocks with O(1) append and popleft. Slicing (`lst[a:b]`) always copies: the result is a new list with new pointers to the same objects. So modifying the slice does not affect the first. List comprehensions are faster than equivalent `for` + `append` loops because the bytecode avoids the method lookup and function-call overhead on each iteration. Sorting is O(n log n) via Timsort, which is adaptive. Nearly-sorted data finishes in O(n). This page times every core operation, prints the internal capacity after each append to show the over-allocation pattern, and compares list against deque for front-insertion workloads.
 |`lst.remove(x)`|O(n)|Scan, then shift|
 |`len(lst)`|O(1)|Stored, not counted|
 |Slicing `lst[a:b]`|O(b&minus;a)|Copies|
@@ -37,7 +37,7 @@ lst[::2]&nbsp;&nbsp;&rarr; [10, 30, 50]&nbsp;&nbsp;&nbsp;# every second element
 
 lst[::-1]&nbsp;&rarr; [50, 40, 30, 20, 10]&nbsp;# reversed
 
-The exclusive stop is deliberate: it makes <span class="mono-font">lst[:k] + lst[k:]</span> reconstruct the original for any k. And it makes the length of a slice simply <span class="mono-font">stop &minus; start</span>. Every slice returns a <strong>new list</strong>, so slicing an n-element list costs O(n) time and O(n) memory. Slicing in a loop is a common accidental quadratic.
+The exclusive stop is deliberate: it makes <span class="mono-font">lst[:k] + lst[k:]</span> reconstruct the first for any k. And it makes the length of a slice simply <span class="mono-font">stop &minus; start</span>. Every slice returns a <strong>new list</strong>, so slicing an n-element list costs O(n) time and O(n) memory. Slicing in a loop is a common accidental quadratic.
 
 ## What each operation costs
 
@@ -85,7 +85,7 @@ flat[0].append(9)
 print(grid)         # [[0, 0, 9], [0, 0]] - the inner lists are shared
 ```
 
-Use `copy.deepcopy()` when the nested objects must be independent.
+Use `copy.deepcopy()` when the nested objects must be free.
 
 The same aliasing produces the most notorious Python gotcha:
 
@@ -101,8 +101,8 @@ board = [[0] * 3 for _ in range(3)]     # three separate rows - correct
 
 ## Exploration guide
 
-1. <strong>Watch the exclusive stop.</strong> Set <strong>Start</strong> to 1 and <strong>Stop</strong> to 4, then press <strong>Run Expression</strong>. Three elements come back, not four &mdash; index 4 is the boundary, not a member.
-2. <strong>Reverse with a negative step.</strong> Set <strong>Step</strong> to &minus;1 and leave start and stop empty. The whole list comes back reversed, and it is a copy: the original is untouched.
+1. <strong>Watch the exclusive stop.</strong> Set <strong>Start</strong> to 1 and <strong>Stop</strong> to 4. Then press <strong>Run Expression</strong>. Three elements come back, not four &mdash; index 4 is the boundary, not a member.
+2. <strong>Reverse with a negative step.</strong> Set <strong>Step</strong> to &minus;1 and leave start and stop empty. The whole list comes back reversed, and it is a copy: the first is untouched.
 3. <strong>Index from the end.</strong> Set <strong>Index (i)</strong> to &minus;1 and run. You get the last element without needing to know the length. The idiom that replaces <span class="mono-font">lst[len(lst)&minus;1]</span>.
 4. <strong>Compare a front insert with an append.</strong> Use <strong>Select Method</strong> to insert at index 0, then to append. Both look instant here, but only one avoids shifting every element. The difference shows up at a hundred thousand elements, not five.
 
@@ -116,7 +116,7 @@ board = [[0] * 3 for _ in range(3)]     # three separate rows - correct
 
 ## What to remember
 
-A Python list is a contiguous dynamic array, so indexing is O(1), appending is amortised O(1), and anything touching the front is O(n) because every later element must shift. Slices are always copies, negative indices count from the end. And the stop bound is exclusive. Most list performance bugs are one of two things: treating the front like the back, or slicing inside a loop.
+A Python list is a contiguous dynamic array, so indexing is O(1), appending is amortised O(1), and anything touching the front is O(n). This is because every later element must shift. Slices are always copies, negative indices count from the end. And the stop bound is exclusive. Most list performance bugs are one of two things: treating the front like the back, or slicing inside a loop.
 
 ## Sorting, and the in-place trap
 
@@ -129,7 +129,7 @@ new = sorted(items)           # returns a NEW sorted list
 items = items.sort()          # BUG - items is now None
 ```
 
-That last line is the classic mistake, and it follows a Python convention: <strong>methods that mutate return `None`</strong>, precisely so this error fails loudly rather than silently.
+That last line is the classic mistake, and it follows a Python convention: <strong>methods that mutate return `None`</strong>, exactly so this error fails loudly rather than silently.
 
 The `key` parameter is where the useful power is:
 
@@ -139,7 +139,7 @@ people.sort(key=lambda p: (p.surname, p.first))  # by surname, then first name
 items.sort(key=lambda x: -x.score)               # descending by score
 ```
 
-Sorting by a tuple gives multi-key sorting in one pass. And because Timsort is <strong>stable</strong>, sorting by one key and then another also works. The second sort preserves the first's order within ties, which is how "sort by department, then by name within department" is done as two sorts.
+Sorting by a tuple gives multi-key sorting in one pass. And because Timsort is <strong>stable</strong>, sorting by one key. Then another also works. The second sort preserves the first's order within ties, which is how "sort by department. Then by name within department" is done as two sorts.
 
 ## Choosing the right structure
 

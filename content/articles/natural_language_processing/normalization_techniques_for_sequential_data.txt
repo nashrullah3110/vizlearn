@@ -3,11 +3,11 @@ intro: Batch normalisation works beautifully on images and badly on sequences. L
 
 ## Normalising over the wrong axis
 
-<p>Every normalisation layer does the same arithmetic &mdash; subtract a mean, divide by a standard deviation, then apply a learned scale and shift. What differs is <em>which</em> values are pooled to compute that mean and deviation.</p><strong>Batch normalisation</strong> computes statistics per feature, across the batch: for feature 3, average over all samples in the batch. <strong>Layer normalisation</strong> computes statistics per sample, across the features: for sample 3, average over all of its features.<p>On images batch norm is excellent. On sequences it breaks, for three separate reasons: variable-length inputs make per-timestep statistics unstable, the running averages have no values for positions longer than the training data. And a single sample at inference produces meaningless batch statistics. Layer normalisation sidesteps all three by computing statistics per sample rather than per batch. This is why it is the default in transformers and recurrent networks. RMSNorm simplifies layer norm further by dropping the mean subtraction, and group norm covers the vision cases where batch sizes are too small for batch norm. The choice of which axis to normalise over is not a minor implementation detail. It decides whether the layer works at all in the target setting, and switching from batch norm to layer norm is often the single change that makes a sequence model train stably. This page computes batch norm and layer norm on the same tensor, prints the per-feature and per-sample statistics side by side, and covers the failure cases for each.</p>
+<p>Every normalisation layer does the same arithmetic &mdash; subtract a mean, divide by a standard deviation. Then apply a learned scale and shift. What differs is <em>which</em> values are pooled to compute that mean and deviation.</p><strong>Batch normalisation</strong> computes statistics per feature, across the batch: for feature 3, average over all samples in the batch. <strong>Layer normalisation</strong> computes statistics per sample, across the features: for sample 3, average over all of its features.<p>On images batch norm is excellent. On sequences it breaks, for three separate reasons: variable-length inputs make per-timestep statistics unstable, the running averages have no values for positions longer than the training data. And a single sample at inference produces meaningless batch statistics. Layer normalisation sidesteps all three by computing statistics per sample rather than per batch. This is why it is the default in transformers and recurrent networks. RMSNorm simplifies layer norm further by dropping the mean subtraction, and group norm covers the vision cases where batch sizes are too small for batch norm. The choice of which axis to normalise over is not a minor implementation detail. It decides whether the layer works at all in the target setting, and switching from batch norm to layer norm is often the single change that makes a sequence model train stably. This page computes batch norm and layer norm on the same tensor, prints the per-feature and per-sample statistics side by side, and covers the failure cases for each.</p>
 
 ## Why batch norm fails on sequences
 
-<strong>Variable length.</strong> Sequences in a batch have different lengths, so timestep 50 might have 32 real values in one batch and 3 in another, with the rest padding. Statistics computed over that are unstable, and computed over padding they are simply wrong.<strong>Per-timestep statistics.</strong> A recurrent network applies the same cell at every step, but batch norm would need separate running statistics for each timestep. And at inference on a sequence longer than anything seen in training, there are no statistics for those positions at all.<strong>Batch dependence.</strong> A sample’s normalised representation depends on the other samples it happens to be batched with. For generation, where inference often runs one sequence at a time, the batch statistics are meaningless.<p>Layer norm sidesteps all three. It uses only the sample’s own features, so it is independent of batch size, the same at training and inference, and unaffected by how many other sequences are present or how long they are.</p> RMSNorm, used in LLaMA and other recent models, simplifies layer norm further by dropping the mean subtraction and normalising by the root mean square alone. One fewer statistic to compute per token, with no measurable loss in quality. Group norm (used in vision when batch sizes are small) and instance norm (used in style transfer) are two other axis choices that solve different problems. The choice of normalisation axis is not a detail. It decides whether the layer works at all in the target setting, and switching from batch norm to layer norm is often the single change that makes a sequence model train stably. This page computes batch norm and layer norm on the same tensor, prints the per-feature and per-sample statistics side by side, and covers the failure cases for each.
+<strong>Variable length.</strong> Sequences in a batch have different lengths, so timestep 50 might have 32 real values in one batch and 3 in another, with the rest padding. Statistics computed over that are unstable, and computed over padding they are simply wrong.<strong>Per-timestep statistics.</strong> A recurrent network applies the same cell at every step, but batch norm would need separate running statistics for each timestep. And at inference on a sequence longer than anything seen in training, there are no statistics for those positions at all.<strong>Batch dependence.</strong> A sample’s normalised representation depends on the other samples it happens to be batched with. For generation, where inference often runs one sequence at a time, the batch statistics are meaningless.<p>Layer norm sidesteps all three. It uses only the sample’s own features, so it is free of batch size, the same at training and inference, and unaffected by how many other sequences are present or how long they are.</p> RMSNorm, used in LLaMA and other recent models, simplifies layer norm further by dropping the mean subtraction and normalising by the root mean square alone. One fewer statistic to compute per token, with no measurable loss in quality. Group norm (used in vision when batch sizes are small) and instance norm (used in style transfer) are two other axis choices that solve different problems. The choice of normalisation axis is not a detail. It decides whether the layer works at all in the target setting, and switching from batch norm to layer norm is often the single change that makes a sequence model train stably. This page computes batch norm and layer norm on the same tensor, prints the per-feature and per-sample statistics side by side, and covers the failure cases for each.
 
 ## Two different meanings of "normalisation"
 
@@ -75,7 +75,7 @@ Note that a log transform handles a specific and common case: when a series grow
 - <strong>Group norm</strong> &mdash; per sample, across groups of channels. Vision with small batches, where batch norm’s estimates go noisy.
 - <strong>RMSNorm</strong> &mdash; layer norm without the mean subtraction, dividing by the root mean square only. Slightly cheaper, works as well, and is what most recent large language models use.
 
-The placement matters too. Original transformers put layer norm after the residual addition (post-norm). Modern ones put it before the sublayer (pre-norm), which makes deep stacks far easier to train and often removes the need for a learning-rate warmup.
+The placement matters too. First transformers put layer norm after the residual addition (post-norm). Modern ones put it before the sublayer (pre-norm), which makes deep stacks far easier to train and often removes the need for a learning-rate warmup.
 
 ## Where this goes wrong
 
@@ -86,7 +86,7 @@ The placement matters too. Original transformers put layer norm after the residu
 
 ## The short version
 
-All normalisation layers subtract a mean and divide by a deviation; they differ only in which values are pooled. Batch norm pools across the batch, which makes it unusable for sequences of varying length and inference on single examples. Layer norm pools across each sample’s own features, so it is independent of batch size and the same at training and inference &mdash; which is why every transformer uses it.
+All normalisation layers subtract a mean and divide by a deviation; they differ only in which values are pooled. Batch norm pools across the batch, which makes it unusable for sequences of varying length and inference on single examples. Layer norm pools across each sample’s own features, so it is free of batch size and the same at training and inference &mdash; which is why every transformer uses it.
 
 ## Layer normalisation inside the network
 
@@ -98,7 +98,7 @@ For recurrent and transformer models, the internal normalisation choice is not t
 
 <p class="mono-font">x&#770; = (x &minus; &mu;<sub>example</sub>) / &radic;(&sigma;&sup2;<sub>example</sub> + &epsilon;)&nbsp;&nbsp;&nbsp;out = &gamma;x&#770; + &beta;</p>
 
-It is fully independent of the batch, works at batch size 1, handles variable lengths, and behaves identically in training and inference. That is why every transformer uses it.
+It is fully free of the batch, works at batch size 1, handles variable lengths, and behaves identically in training and inference. That is why every transformer uses it.
 
 |Normalisation|Statistics over|Sequence-safe?|
 |---|---|---|
@@ -113,7 +113,7 @@ It is fully independent of the batch, works at batch size 1, handles variable le
 
 In transformers, where the normalisation sits relative to the residual connection is a real architectural decision.
 
-<strong>Post-norm</strong> &mdash; `LayerNorm(x + sublayer(x))` &mdash; was the original arrangement. It works, and beyond roughly 12 layers it requires careful warm-up to train at all.
+<strong>Post-norm</strong> &mdash; `LayerNorm(x + sublayer(x))` &mdash; was the first arrangement. It works, and beyond roughly 12 layers it requires careful warm-up to train at all.
 
 <strong>Pre-norm</strong> &mdash; `x + sublayer(LayerNorm(x))` &mdash; puts the normalisation inside the residual branch, leaving the identity path fully clean. Gradients flow back through it unchanged, and very deep stacks become trainable.
 
@@ -267,5 +267,5 @@ print("   padding will happily learn to predict padding.")
 - Two meanings: scaling the input data, and normalising activations inside the network.
 - Fit input scalers on the training period only. Using the whole series leaks the future.
 - Non-stationary series need differencing, log transforms, rolling normalisation or periodic refitting.
-- Batch normalisation is wrong for sequences; LayerNorm and RMSNorm are batch-independent and correct.
+- Batch normalisation is wrong for sequences; LayerNorm and RMSNorm are batch-free and correct.
 - Place normalisation before each sublayer (pre-norm) so the residual path stays clean.

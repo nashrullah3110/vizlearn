@@ -5,11 +5,11 @@ intro: What do Q, K and V actually mean in attention, and why are they three sep
 
 If a token used the same vector to search with and to be found by, attention would collapse into plain similarity: tokens would attend to tokens like themselves. Separating query from key lets a token look for something <em>different</em> from itself. A verb seeking its subject, a pronoun seeking its referent.
 
-Separating value from key matters just as much. What makes a token worth attending to is not necessarily what it should contribute once attended to. The key is the address; the value is the payload.
+Separating value from key matters just as much. What makes a token worth attending to is not necessarily what it should add once attended to. The key is the address; the value is the payload.
 
 Concretely, the input embedding of each token is times by three learned weight matrices &mdash; W_Q, W_K and W_V &mdash; to produce its query, key and value vectors. The query of the current token is dotted with the key of every other token to produce a score. The scores are scaled by 1/&radic;d (where d is the key dimension) and passed through softmax to become attention weights that sum to one. Those weights are then applied to the value vectors, and the weighted sum becomes the output for the current position.
 
-The three projections give the model three independent degrees of freedom per token. A word like "bank" can have a key that advertises its grammatical role (noun, subject), a query that looks for a modifier or a prepositional phrase. And a value that carries its semantic content for the next layer. None of these needs to be the same vector, and learning them apart is what gives attention its representational power.
+The three projections give the model three free degrees of freedom per token. A word like "bank" can have a key that advertises its grammatical role (noun, subject), a query that looks for a modifier or a prepositional phrase. And a value that carries its semantic content for the next layer. None of these needs to be the same vector, and learning them apart is what gives attention its representational power.
 
 Multi-head attention repeats this mechanism several times in parallel, each head with its own W_Q, W_K and W_V. Different heads learn to attend to different kinds of relationships. One head might focus on syntactic dependency, another on coreference, a third on positional proximity. The outputs of all heads are concatenated and projected to produce the final representation.
 
@@ -47,7 +47,7 @@ An ordinary dictionary takes a key and returns exactly one value. Attention take
 
 - <strong>Query</strong> &mdash; what this position is looking for.
 - <strong>Key</strong> &mdash; the label each position advertises.
-- <strong>Value</strong> &mdash; what each position contributes when selected.
+- <strong>Value</strong> &mdash; what each position adds when selected.
 
 All three are linear projections of the same input, with separate learned matrices:
 
@@ -59,11 +59,11 @@ That is where every parameter in the mechanism lives. Attention itself has no we
 
 If all three come from the same input, why not use the input directly for all of them?
 
-Because the three roles want different information. What a token is <em>looking for</em> is not the same as how it wants to <em>be found</em>, and neither is the same as what it should <em>contribute</em>.
+Because the three roles want different information. What a token is <em>looking for</em> is not the same as how it wants to <em>be found</em>, and neither is the same as what it should <em>add</em>.
 
-Take "it" in "The cat sat on the mat because it was warm". As a query, "it" needs to search for a nearby noun that could plausibly be warm. As a key, "mat" needs to advertise itself as a warmable surface. As a value, "mat" contributes its full semantic content.
+Take "it" in "The cat sat on the mat because it was warm". As a query, "it" needs to search for a nearby noun that could plausibly be warm. As a key, "mat" needs to advertise itself as a warmable surface. As a value, "mat" adds its full semantic content.
 
-The clean example is that Q and K are used <em>only</em> to compute compatibility, and V <em>only</em> to produce output. A token can so be attended to for one reason and contribute something quite different &mdash; which a single shared projection could not express.
+The clean example is that Q and K are used <em>only</em> to compute compatibility, and V <em>only</em> to produce output. A token can so be attended to for one reason and add something quite different &mdash; which a single shared projection could not express.
 
 ## The computation, with shapes
 
@@ -97,7 +97,7 @@ Setting a score to negative infinity makes its softmax weight exactly zero &mdas
 
 ## Three projections, and why you need all three
 
-Attention gives every token a query, a key and a value. And the usual explanation stops at a database analogy. This builds the mechanism from vectors you can read, then removes each projection in turn to show what breaks -- which is the only way to see why three are needed rather than one.
+Attention gives every token a query, a key and a value. And the usual explanation stops at a database analogy. This builds the mechanism from vectors you can read. Then removes each projection in turn to show what breaks -- which is the only way to see why three are needed rather than one.
 
 ```python-run
 import numpy as np
@@ -303,7 +303,7 @@ print("   what you match on is not what you retrieve.")
 
 ## What to remember
 
-Q, K and V are three learned projections of one embedding. The query is what a token looks for, the key is what it advertises, the value is what it contributes. Scores come from Q&middot;K and the output is a weighted sum of V. Because K and V for a token never change once computed, they can be cached &mdash; which is what makes generation linear rather than quadratic.
+Q, K and V are three learned projections of one embedding. The query is what a token looks for, the key is what it advertises, the value is what it adds. Scores come from Q&middot;K and the output is a weighted sum of V. Because K and V for a token never change once computed, they can be cached &mdash; which is what makes generation linear rather than quadratic.
 
 ## Self-attention and cross-attention
 
@@ -333,19 +333,19 @@ The cost is memory: two tensors per layer per token. The size is calculable:
 
 For a 32-layer model with 32 heads of dimension 128, at 16-bit, with 8,000 tokens: about <strong>4.2GB for one request</strong>. Ten concurrent requests exceed most single GPUs before the weights are counted.
 
-That arithmetic is why <strong>grouped-query attention</strong> exists: sharing key and value projections across groups of query heads shrinks the cache several-fold. With 32 query heads and 8 KV groups it is a quarter the size, with quality close to full multi-head. It is an architectural choice driven entirely by inference economics.
+That arithmetic is why <strong>grouped-query attention</strong> exists: sharing key and value projections across groups of query heads shrinks the cache several-fold. With 32 query heads and 8 KV groups it is a quarter the size, with quality close to full multi-head. It is an architectural choice driven fully by inference economics.
 
 ## Multiple heads
 
-Multi-head attention runs several of these computations in parallel with different projections, then concatenates and projects once more.
+Multi-head attention runs several of these computations in parallel with different projections. Then concatenates and projects once more.
 
-With a model dimension of 512 and 8 heads, each head works in 64 dimensions. So the total cost is roughly that of one 512-dimensional head. And the model gets 8 independent views of the sequence rather than 1.
+With a model dimension of 512 and 8 heads, each head works in 64 dimensions. So the total cost is roughly that of one 512-dimensional head. And the model gets 8 free views of the sequence rather than 1.
 
 Inspected in trained models, heads specialise: some track the previous token, some link verbs to subjects, some match brackets, some connect pronouns to referents. And some do very little. Pruning studies find many can be removed with minimal loss. This suggests the redundancy helps training rather than inference.
 
 ## Questions people ask
 
-<strong>Why the names query, key and value?</strong> By analogy with a database lookup. The analogy is genuinely useful; the mechanism is soft rather than exact.
+<strong>Why the names query, key and value?</strong> By analogy with a database lookup. The analogy is truly useful; the mechanism is soft rather than exact.
 
 <strong>Must Q and K be the same size?</strong> Yes. They are dotted together. V can differ in principle and is usually the same in practice.
 
@@ -359,7 +359,7 @@ Inspected in trained models, heads specialise: some track the previous token, so
 
 ## Recap in one screen
 
-- Query is what a position seeks, key is how a position advertises itself, value is what it contributes.
+- Query is what a position seeks, key is how a position advertises itself, value is what it adds.
 - All three are learned linear projections; the attention formula itself has no parameters.
 - Score with `QKᵀ`, scale by `√dₖ`, softmax, then weight the values.
 - Masking by setting scores to negative infinity gives causal generation and correct padding.

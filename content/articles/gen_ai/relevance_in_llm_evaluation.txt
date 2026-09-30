@@ -9,7 +9,7 @@ The word is used for two distinct measurements and conflating them makes evaluat
 
 <p><strong>Answer relevance</strong> scores the made answer against the query. It is a <em>generation</em> metric, and it is what this page is about.</p>
 
-They fail independently. Perfect context and an irrelevant answer means the generator wandered; irrelevant context and a relevant answer usually means the model answered from memory. This <a href="groundedness_in_llm_evaluation.html">groundedness</a> will catch. Always say which one you mean. Answer relevance is usually scored by an LLM judge that reads the question and the answer, then rates how directly the answer addresses what was asked. A common implementation makes synthetic questions from the answer and measures the semantic similarity between those questions and the original. If the answer is relevant, the questions it implies should resemble the question that was asked. Scores are usually normalised to 0&ndash;1. A low score means the answer drifted off topic, included unrelated information, or addressed a different question entirely. The metric pairs with [faithfulness](groundedness_in_llm_evaluation.html) (does the answer stick to the retrieved context?) and context relevance (did the retriever find the right passages?) to form the three-axis evaluation framework used by RAGAS, DeepEval, and similar libraries. This page scores several question-answer pairs, shows the synthetic-question method step by step, and covers the distinction between relevance and faithfulness that trips up most evaluations.
+They fail on its own. Perfect context and an irrelevant answer means the generator wandered; irrelevant context and a relevant answer usually means the model answered from memory. This <a href="groundedness_in_llm_evaluation.html">groundedness</a> will catch. Always say which one you mean. Answer relevance is usually scored by an LLM judge that reads the question and the answer. Then rates how directly the answer addresses what was asked. A common implementation makes synthetic questions from the answer and measures the semantic similarity between those questions and the first. If the answer is relevant, the questions it implies should resemble the question that was asked. Scores are usually normalised to 0&ndash;1. A low score means the answer drifted off topic, included unrelated information, or addressed a different question fully. The metric pairs with [faithfulness](groundedness_in_llm_evaluation.html) (does the answer stick to the retrieved context?) and context relevance (did the retriever find the right passages?) to form the three-axis evaluation framework used by RAGAS, DeepEval, and similar libraries. This page scores several question-answer pairs, shows the synthetic-question method step by step, and covers the distinction between relevance and faithfulness that trips up most evaluations.
 
 ## The failures it exists to catch
 
@@ -25,7 +25,7 @@ They fail independently. Perfect context and an irrelevant answer means the gene
 
 The tempting approach &mdash; embed the question and the answer and take cosine similarity &mdash; is bad. It rewards vocabulary overlap, so restating the question scores highly and a correct answer that shares no words with the question scores poorly. "When are refunds issued?" answered with "Within a fortnight of delivery" is perfect and lexically distant.
 
-The approach that works is <strong>question generation</strong>: ask a model to write the questions this answer would be a good response to, then compare those against the real question. If the made questions match, the answer is on point; if they are broader or different, it is padded or off target. It measures what relevance actually means rather than a proxy for it.
+The approach that works is <strong>question generation</strong>: ask a model to write the questions this answer would be a good response to. Then compare those against the real question. If the made questions match, the answer is on point; if they are broader or different, it is padded or off target. It measures what relevance actually means rather than a proxy for it.
 
 The other is claim-level judging, as in the visualisation above: split the answer into claims and mark each as responsive or not. Relevance is then the supported proportion, and you can see exactly which sentence was padding.
 
@@ -41,14 +41,14 @@ Note also that relevance is the dimension most affected by your prompt rather th
 
 ## Did it answer the question that was asked?
 
-Relevance asks whether the response addresses the user's actual question. It is separate from correctness, and a system can fail on it while being entirely factual.
+Relevance asks whether the response addresses the user's actual question. It is separate from correctness, and a system can fail on it while being fully factual.
 
 <blockquote><strong>Question:</strong> "How do I cancel my subscription?"</blockquote>
 <blockquote><strong>Answer A:</strong> "Go to Settings, then Billing, then Cancel." &mdash; relevant</blockquote>
 <blockquote><strong>Answer B:</strong> "Our subscription plans include Basic at &pound;9 and Pro at &pound;29.". True, and not an answer</blockquote>
 <blockquote><strong>Answer C:</strong> "Cancellation is available. You may also downgrade, pause, transfer or gift your subscription. And our refund policy states..." &mdash; buried|</blockquote>
 
-B is the classic retrieval-driven failure: the model was given documents about subscriptions and produced something about subscriptions. C is the padding failure, which is common in tuned models and genuinely reduces usefulness.
+B is the classic retrieval-driven failure: the model was given documents about subscriptions and produced something about subscriptions. C is the padding failure, which is common in tuned models and truly reduces usefulness.
 
 Three distinguishable problems hide under low relevance:
 
@@ -73,9 +73,9 @@ Reply as JSON: {"verdict": "relevant" | "partially_relevant" | "irrelevant",
                 "reason": "<one sentence>"}
 ```
 
-The instruction to ignore correctness matters. Without it, judges conflate the two and the metric stops being independently useful.
+The instruction to ignore correctness matters. Without it, judges conflate the two and the metric stops being on its own useful.
 
-An other measurement worth knowing: <strong>answer-to-question similarity via made questions</strong>. Ask a model what question the answer appears to be answering, embed both that and the original question, and compare. A large gap indicates the answer drifted. It is cheaper than a judge and cruder.
+An other measurement worth knowing: <strong>answer-to-question similarity via made questions</strong>. Ask a model what question the answer appears to be answering, embed both that and the first question, and compare. A large gap indicates the answer drifted. It is cheaper than a judge and cruder.
 
 ## Why answers drift off-topic
 
@@ -271,7 +271,7 @@ Track it per question type as well as in aggregate. Relevance is often high on s
 
 ## Questions people ask
 
-<strong>Is relevance the same as correctness?</strong> No. An answer can be entirely true and not address the question.
+<strong>Is relevance the same as correctness?</strong> No. An answer can be fully true and not address the question.
 
 <strong>How is it different from precision@k?</strong> Precision measures retrieved documents; relevance measures the made answer.
 
@@ -285,7 +285,7 @@ Track it per question type as well as in aggregate. Relevance is often high on s
 
 ## Recap in one screen
 
-- Relevance asks whether the answer addresses the question, independently of whether it is true.
+- Relevance asks whether the answer addresses the question, on its own of whether it is true.
 - Three failure shapes: off-topic, partial, and correct-but-buried.
 - The most common cause is retrieval returning topically-related but unhelpful chunks.
 - Contextualise follow-up questions, decompose multi-part ones, and constrain answer length.

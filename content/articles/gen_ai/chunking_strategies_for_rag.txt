@@ -3,13 +3,13 @@ intro: The retrieval step can only ever be as good as the pieces it is choosing 
 
 ## Before the details
 
-Every piece of <a href="rag.html" style="color: var(--accent-primary)">RAG</a> downstream of chunking — embedding, indexing, retrieval, reranking — operates on whatever the chunk boundaries produced. Cut a sentence in half and both halves lose the context that made the original sentence meaningful; the embedding of a fragment is not a fragment of the embedding.
+Every piece of <a href="rag.html" style="color: var(--accent-primary)">RAG</a> downstream of chunking — embedding, indexing, retrieval, reranking — operates on whatever the chunk boundaries produced. Cut a sentence in half and both halves lose the context that made the first sentence meaningful; the embedding of a fragment is not a fragment of the embedding.
 
-The strategies form a spectrum. Fixed-size chunking splits by token count, ignoring content entirely — simple and fast. But it regularly cuts mid-sentence. Recursive chunking tries paragraph breaks first, then sentence breaks, then word breaks. This keeps units coherent when the document cooperates. Structure-aware chunking reads headings and section markers and splits at the boundaries the author provided. Semantic chunking embeds every sentence and splits where the topic shifts, at the cost of one embedding call per sentence at indexing time.
+The strategies form a spectrum. Fixed-size chunking splits by token count, ignoring content fully — simple and fast. But it regularly cuts mid-sentence. Recursive chunking tries paragraph breaks first, then sentence breaks, then word breaks. This keeps units coherent when the document cooperates. Structure-aware chunking reads headings and section markers and splits at the boundaries the author provided. Semantic chunking embeds every sentence and splits where the topic shifts, at the cost of one embedding call per sentence at indexing time.
 
 Chunk size controls a direct trade-off. Small chunks (100–200 tokens) are precise — each one is about one idea. So retrieval is accurate — but they lose surrounding context. Large chunks (500–1000 tokens) carry more context but dilute the embedding: a chunk about three topics is weakly relevant to all three and strongly relevant to none. Most production systems settle between 200 and 500 tokens, with 50–100 tokens of overlap to soften boundary effects.
 
-Overlap is a patch, not a fix. It duplicates tokens across chunks so that a sentence split at a boundary still appears whole in at least one chunk. The cost is storage (every overlapped token is embedded and indexed twice) and occasional duplicate retrieval results that need deduplication downstream. The benefit is measurable: removing overlap usually drops recall by 5–15% on boundary-sensitive queries.
+Overlap is a patch, not a fix. It duplicates tokens across chunks so that a sentence split at a boundary still appears whole in at least one chunk. The cost is storage (every overlapped token is embedded and indexed twice) and rare duplicate retrieval results that need deduplication downstream. The benefit is measurable: removing overlap usually drops recall by 5–15% on boundary-sensitive queries.
 
 ## Fixed-size vs semantic
 
@@ -44,7 +44,7 @@ So documents are split into chunks, each embedded apart. The chunk becomes the u
 
 <strong>Fixed-size</strong> splitting at 500 characters cuts sentences in half, separates a heading from its content and splits tables. It is the default in many tutorials and the first thing worth replacing.
 
-<strong>Recursive</strong> splitting tries separators in order &mdash; paragraph break, then newline, then sentence end, then space &mdash; taking the largest unit that fits. It respects natural boundaries most of the time and costs nothing extra. This is the sensible default.
+<strong>Recursive</strong> splitting tries separators in order &mdash; paragraph break. Then newline. Then sentence end. Then space &mdash; taking the largest unit that fits. It respects natural boundaries most of the time and costs nothing extra. This is the sensible default.
 
 <strong>Structure-aware</strong> splitting uses the document's own markup: Markdown headings, HTML sections, PDF outline. A chunk is then a semantically coherent unit by construction. And the heading path can be prepended to give the chunk context ("Handbook &gt; Leave &gt; Parental leave").
 
@@ -425,7 +425,7 @@ Adding metadata after the fact means re-indexing. Deciding it up front costs not
 
 ## Questions people ask
 
-<strong>What chunk size should I use?</strong> Start at 300&ndash;500 tokens with 15% overlap and recursive splitting, then evaluate against your own question set.
+<strong>What chunk size should I use?</strong> Start at 300&ndash;500 tokens with 15% overlap and recursive splitting. Then evaluate against your own question set.
 
 <strong>Is semantic chunking worth the cost?</strong> Often yes for heterogeneous documents. And the gain over structure-aware chunking on well-structured documents is usually small.
 

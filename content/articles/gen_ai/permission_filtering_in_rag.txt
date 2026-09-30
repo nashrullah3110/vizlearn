@@ -13,7 +13,7 @@ Pre-filtering restricts the search space before retrieval: only documents the us
 
 Post-filtering retrieves by relevance first and removes forbidden documents afterwards. It is simple to implement but unreliable: the result set shrinks unpredictably. And the generator must work with whatever remains. Increasing k helps probabilistically but never guarantees enough permitted results.
 
-Hybrid approaches retrieve a large candidate set, filter it, then backfill from a wider search if too few documents survive. This is more complex but produces a consistent result size. The trade-off is latency: two retrieval rounds instead of one. And the backfill query may not be as well-targeted as the original.
+Hybrid approaches retrieve a large candidate set, filter it. Then backfill from a wider search if too few documents survive. This is more complex but produces a consistent result size. The trade-off is latency: two retrieval rounds instead of one. And the backfill query may not be as well-targeted as the first.
 
 Whichever approach you choose, the permission model itself must be correct. A document tagged with the wrong access group will be served to unauthorised users silently and confidently. Permission metadata must be propagated from the source system at indexing time and kept in sync when access rules change.
 
@@ -21,7 +21,7 @@ Whichever approach you choose, the permission model itself must be correct. A do
 
 Pre-filtering restricts the candidate set before ranking, so the top k is k <em>permitted</em> results. That is the correct behaviour and it fights the index: an HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search. You traverse into a region where everything is filtered out and the walk stalls.
 
-Vector databases handle this differently, which is one of the real differences between them. Options include filtered graph traversal, per-tenant sub-indexes (clean, and costly at many tenants), and falling back to a flat scan when the filter is very selective &mdash; which is often genuinely fastest, because the permitted set is small.
+Vector databases handle this differently, which is one of the real differences between them. Options include filtered graph traversal, per-tenant sub-indexes (clean, and costly at many tenants), and falling back to a flat scan when the filter is very selective &mdash; which is often truly fastest,. This is because the permitted set is small.
 
 ## Where the permissions live
 
@@ -33,11 +33,11 @@ Two more things to say. Deleted documents must leave the index, not just be filt
 
 ## Why pre-filtering fights the index
 
-Pre-filtering is the correct behaviour and it is genuinely hard to implement, because an ANN index was built over the whole corpus and does not know about your predicate.
+Pre-filtering is the correct behaviour and it is truly hard to implement,. This is because an ANN index was built over the whole corpus and does not know about your predicate.
 
 Walking an HNSW graph while skipping most nodes can <strong>disconnect the traversal</strong>: the search reaches a region where every neighbour is filtered out and stalls, returning far fewer results than asked for even though plenty of permitted documents exist elsewhere in the graph.
 
-The strategies databases use, all with trade-offs: filtered traversal that keeps searching past excluded nodes; per-tenant sub-indexes. This are clean and expensive once tenants number in the thousands; and falling back to a flat scan when the filter is selective &mdash; which is often genuinely fastest, since a user with access to 0.1% of a million documents is a thousand-vector brute force.
+The strategies databases use, all with trade-offs: filtered traversal that keeps searching past excluded nodes; per-tenant sub-indexes. This are clean and expensive once tenants number in the thousands; and falling back to a flat scan when the filter is selective &mdash; which is often truly fastest, since a user with access to 0.1% of a million documents is a thousand-vector brute force.
 
 ## Getting the model right, and failing closed
 
@@ -47,7 +47,7 @@ Two design rules cover most of the damage.
 
 <p><strong>Index groups, resolve membership per query.</strong> Baking a user list into each chunk means a departure leaves the index granting access until the next re-index. And stale permissions fail <em>open</em>, which is the wrong direction. Indexing a stable group id and resolving the user's groups per request makes revocation immediate.</p>
 
-Also: filtering is not deletion. A document removed for legal or privacy reasons must leave the index and any cached answers derived from it, or it remains recoverable by anyone who can still see it &mdash; which is a different and worse problem than a missing result.
+Also: filtering is not deletion. A document removed for legal or privacy reasons must leave the index and any cached answers derived from it. Or it remains recoverable by anyone who can still see it &mdash; which is a different and worse problem than a missing result.
 
 ## The failure mode that matters most
 
@@ -75,7 +75,7 @@ results = store.search(
 )
 ```
 
-The difference between the second and third options is not theoretical. With post-filtering, a user in a small group querying a corpus dominated by other groups' documents may get zero results while relevant authorised documents exist &mdash; because all ten retrieved slots went to documents they cannot see.
+The difference between the second and third options is not theoretical. With post-filtering, a user in a small group querying a corpus dominated by other groups' documents may get zero results while relevant authorised documents exist &mdash;. This is because all ten retrieved slots went to documents they cannot see.
 
 ## Modelling permissions in metadata
 
@@ -262,7 +262,7 @@ An other to storing ACLs in the index is to resolve them at query time against t
 
 The trade is sharp: resolving at query time is always correct and forces post-filtering. This brings back the slot-wastage problem.
 
-The pragmatic combination used in practice is <strong>both</strong>: filter inside the search using indexed ACLs to get a correct-enough candidate set efficiently, then verify the final selection against the source system before showing anything. The index filter does the heavy lifting; the verification catches the staleness window.
+The pragmatic combination used in practice is <strong>both</strong>: filter inside the search using indexed ACLs to get a correct-enough candidate set efficiently. Then verify the final selection against the source system before showing anything. The index filter does the heavy lifting; the verification catches the staleness window.
 
 ## Failure modes to test for by name
 
@@ -307,6 +307,6 @@ Retrieval is the main channel and not the only one.
 
 - An unfiltered retrieval will faithfully summarise documents the user may not read.
 - Apply the filter <em>inside</em> the search; post-filtering both leaks and wastes retrieval slots.
-- Store effective ACLs at indexing time, resolving inheritance, and refresh them independently of content.
+- Store effective ACLs at indexing time, resolving inheritance, and refresh them on its own of content.
 - Default to deny for documents with no recorded permissions, and test the no-groups case by name.
 - Caches, logs, conversation history and the vectors themselves are all extra leak channels.

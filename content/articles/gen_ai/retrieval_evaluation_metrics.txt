@@ -23,11 +23,11 @@ Precision@k asks how much of what you returned was useful. Recall@k asks how muc
 
 With 3 relevant documents in the collection and a top-5 list containing 2 of them: precision@5 = 2/5 = 0.4, recall@5 = 2/3 = 0.67.
 
-Both ignore order entirely &mdash; a relevant document at position 1 and at position 5 count identically. For a RAG pipeline feeding a fixed number of chunks to a model that may be the right simplification; for a search results page it is not.
+Both ignore order fully &mdash; a relevant document at position 1 and at position 5 count identically. For a RAG pipeline feeding a fixed number of chunks to a model that may be the right simplification; for a search results page it is not.
 
 ## MRR and NDCG
 
-<strong>MRR</strong> (mean reciprocal rank) uses only the position of the <em>first</em> relevant result, averaged over queries:<p>MRR = mean(1 / rank of first relevant)</p><p>First position scores 1.0, second 0.5, third 0.33. It is the right metric when the user needs one good answer and will stop reading once they have it &mdash; question answering, navigational search &mdash; and it on purpose ignores everything after the first hit.</p><strong>NDCG</strong> (normalised discounted cumulative gain) is the most complete of the four. It handles <em>graded</em> relevance rather than a binary label, applies a logarithmic discount so later positions contribute less, and normalises by the score of the ideal ranking so the result lands in [0, 1] and is comparable across queries.<p>Use NDCG when relevance comes in degrees and the whole ordering matters; use MRR when only the first hit does.</p>
+<strong>MRR</strong> (mean reciprocal rank) uses only the position of the <em>first</em> relevant result, averaged over queries:<p>MRR = mean(1 / rank of first relevant)</p><p>First position scores 1.0, second 0.5, third 0.33. It is the right metric when the user needs one good answer and will stop reading once they have it &mdash; question answering, navigational search &mdash; and it on purpose ignores everything after the first hit.</p><strong>NDCG</strong> (normalised discounted cumulative gain) is the most complete of the four. It handles <em>graded</em> relevance rather than a binary label, applies a logarithmic discount so later positions add less, and normalises by the score of the ideal ranking so the result lands in [0, 1] and is comparable across queries.<p>Use NDCG when relevance comes in degrees and the whole ordering matters; use MRR when only the first hit does.</p>
 
 ## Measuring the stage that usually fails
 
@@ -66,7 +66,7 @@ Measure it at several k and read the curve:
 |20|0.94|The right chunk is nearly always in the top 20|
 |50|0.96|Diminishing|
 
-That table diagnoses precisely. Recall@20 of 0.94 with recall@5 of 0.71 means the retrieval <em>finds</em> the document but does not <em>rank</em> it highly &mdash; which is a reranking problem, not a chunking or embedding problem. If recall@50 were 0.6, the document is not being found at all, and reranking cannot help.
+That table diagnoses exactly. Recall@20 of 0.94 with recall@5 of 0.71 means the retrieval <em>finds</em> the document but does not <em>rank</em> it highly &mdash; which is a reranking problem, not a chunking or embedding problem. If recall@50 were 0.6, the document is not being found at all, and reranking cannot help.
 
 That distinction &mdash; find versus rank &mdash; is the single most useful thing these metrics tell you.
 
@@ -111,7 +111,7 @@ Set k to the number of chunks you actually pass to the model and measure recall 
 
 ## Key takeaway
 
-Retrieval returns a ranking, so metrics are computed at a cutoff k and differ mainly in whether they care about position. Precision@k and recall@k ignore order within the cutoff; MRR looks only at the first relevant result; NDCG discounts by position and handles graded relevance. For RAG, recall@k at your actual context size is the number to optimise, because the model can survive a bad chunk but not a missing one.
+Retrieval returns a ranking, so metrics are computed at a cutoff k and differ mainly in whether they care about position. Precision@k and recall@k ignore order within the cutoff; MRR looks only at the first relevant result; NDCG discounts by position and handles graded relevance. For RAG, recall@k at your actual context size is the number to optimise,. This is because the model can survive a bad chunk but not a missing one.
 
 ## Building the evaluation set
 
@@ -123,9 +123,9 @@ This is the work that makes everything else possible, and there are three routes
 
 <strong>Mined from logs.</strong> Real user queries paired with the documents that were clicked, cited or rated helpful. The most realistic, and it requires a system already in production.
 
-The practical compromise: generate a first set to get moving, then replace it with mined real queries as they become available, and keep a hand-written set of known-hard cases as a regression suite.
+The practical compromise: generate a first set to get moving. Then replace it with mined real queries as they become available, and keep a hand-written set of known-hard cases as a regression suite.
 
-Two habits that matter. Include <strong>negative cases</strong> &mdash; questions the corpus genuinely cannot answer &mdash; so you can measure whether the system declines rather than inventing. And version the set, so a change in the score means a change in the system rather than a change in the questions.
+Two habits that matter. Include <strong>negative cases</strong> &mdash; questions the corpus truly cannot answer &mdash; so you can measure whether the system declines rather than inventing. And version the set, so a change in the score means a change in the system rather than a change in the questions.
 
 ## Measuring end to end as well
 

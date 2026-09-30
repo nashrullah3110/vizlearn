@@ -17,12 +17,12 @@ train.
 Set **m = 1** in the visualisation to see exactly this. One codebook, a
 handful of representable positions, and the top-k answer collapses.
 
-This page shows how product quantization escapes that limit by splitting each vector into short subvectors and quantising each piece independently, trading a controllable amount of recall for a compression ratio that makes billion-scale search fit in RAM.
+This page shows how product quantization escapes that limit by splitting each vector into short subvectors and quantising each piece on its own, trading a controllable amount of recall for a compression ratio that makes billion-scale search fit in RAM.
 
 ## The product trick
 
 Product quantization escapes that by quantising *pieces* of the vector
-independently.
+on its own.
 
 Split a 768-dimensional vector into m = 96 chunks of 8 dimensions each. Give
 each chunk its own codebook of 256 centroids, trained by k-means over that
@@ -99,7 +99,7 @@ and 32 bytes when memory is the binding constraint and a reranking stage will
 clean up afterwards.
 
 One structural assumption worth knowing: PQ splits dimensions in their
-original order, which implicitly assumes neighbouring dimensions belong
+first order, which implicitly assumes neighbouring dimensions belong
 together. For learned embeddings that is arbitrary. **OPQ** — optimised
 product quantization — learns a rotation of the space first, so that variance
 is balanced across the subspaces before splitting. It costs a matrix multiply
@@ -184,8 +184,8 @@ is less work than any of this.
 PQ splits a vector into m subvectors and stores the index of the nearest
 centroid in each subspace's codebook. m codebooks of k centroids describe
 `kᵐ` positions from `m·k` stored centroids, which is why the compression is so
-extreme. Queries build an `m × k` distance table once and then cost m lookups
-per candidate, independent of dimension. It compresses but does not prune, so
+extreme. Queries build an `m × k` distance table once. Then cost m lookups
+per candidate, free of dimension. It compresses but does not prune, so
 it is almost always paired with IVF or a graph.
 
 ## Questions people ask
@@ -194,7 +194,7 @@ it is almost always paired with IVF or a graph.
 
 <strong>Should nbits ever be anything but 8?</strong> Rarely. A byte is what hardware likes, 256 centroids per subspace is a good operating point. And the SIMD lookup implementations that make PQ fast assume it. Lower values exist for extreme compression and lose recall quickly.
 
-<strong>Should I use OPQ?</strong> Usually yes. PQ splits dimensions in their original order, which implicitly assumes neighbouring dimensions belong together. Arbitrary for a learned embedding. OPQ learns a rotation that balances variance across the subspaces first, costs one matrix multiply per query, and usually buys a few points of recall.
+<strong>Should I use OPQ?</strong> Usually yes. PQ splits dimensions in their first order, which implicitly assumes neighbouring dimensions belong together. Arbitrary for a learned embedding. OPQ learns a rotation that balances variance across the subspaces first, costs one matrix multiply per query, and usually buys a few points of recall.
 
 <strong>Why asymmetric distance instead of decoding the code?</strong> Because it leaves the query exact. Quantising the query too would let you precompute a symmetric table between codebook entries. This is marginally faster and measurably less accurate. You would be adding the query's own quantisation error to every comparison for no benefit.
 
@@ -206,7 +206,7 @@ it is almost always paired with IVF or a graph.
 
 - Quantise pieces rather than the whole vector: m subvectors, each with its own 256-entry codebook, stored as m one-byte indices.
 - 3,072 bytes becomes 96 at m = 96. The compression comes from the Cartesian product of the codebooks &mdash; which is what "product" in the name means.
-- A query builds an `m × 256` distance table once, then each candidate costs m lookups and m additions: no multiplications, no decoding. And a cost independent of d.
-- Asymmetric is the default because only the stored side is quantised. So the query contributes no error of its own.
+- A query builds an `m × 256` distance table once. Then each candidate costs m lookups and m additions: no multiplications, no decoding. And a cost free of d.
+- Asymmetric is the default because only the stored side is quantised. So the query adds no error of its own.
 - Quantisation error is PQ's only failure mode. It shows up as recall and as nothing else.
 - It compresses without pruning, so pair it with IVF, a graph, or a rescoring stage. Pure PQ on its own is unusual.

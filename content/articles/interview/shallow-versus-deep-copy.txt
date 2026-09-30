@@ -7,7 +7,7 @@ A shallow copy builds a <strong>new container holding the same objects</strong>.
 
 <p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
 
-The distinction matters whenever a data structure contains mutable objects. Lists of lists, dicts of dicts, objects holding references to other objects. A shallow copy of `[[1, 2], [3, 4]]` creates a new outer list but both inner lists are shared. So `copy[0].append(5)` changes the original too. `copy.deepcopy` rebuilds every nested object recursively, handles circular references by tracking `id`s, and respects `__deepcopy__` for custom classes. The cost is proportional to the total number of objects in the graph. This is why deep-copying a large nested structure (a parsed JSON tree, a graph of ORM objects) can be surprisingly slow. This page shows the divergence at each nesting level, shows where `deepcopy` handles cycles that a manual recursion would not, and covers the common interview follow-up: what does `dict(d)` copy?
+The distinction matters whenever a data structure contains mutable objects. Lists of lists, dicts of dicts, objects holding references to other objects. A shallow copy of `[[1, 2], [3, 4]]` creates a new outer list but both inner lists are shared. So `copy[0].append(5)` changes the first too. `copy.deepcopy` rebuilds every nested object recursively, handles circular references by tracking `id`s, and respects `__deepcopy__` for custom classes. The cost is proportional to the total number of objects in the graph. This is why deep-copying a large nested structure (a parsed JSON tree, a graph of ORM objects) can be surprisingly slow. This page shows the divergence at each nesting level, shows where `deepcopy` handles cycles that a manual recursion would not, and covers the common interview follow-up: what does `dict(d)` copy?
 
 ## Run it
 
@@ -83,9 +83,9 @@ print()
 print("a tuple is only as immutable as its contents:", t)
 ```
 
-## What "shallow" means precisely
+## What "shallow" means exactly
 
-<p>A shallow copy allocates a new container and fills it with the <em>same references</em> the original holds. So the outer objects are independent &mdash; appending to the copy does not lengthen the original &mdash; and every element is shared.</p><p>For flat data that distinction never appears. A list of integers or strings copies shallowly and behaves exactly as you would want, because the shared elements are immutable and nobody can change them. The bug needs two ingredients: nesting, and mutation.</p>
+<p>A shallow copy allocates a new container and fills it with the <em>same references</em> the first holds. So the outer objects are free &mdash; appending to the copy does not lengthen the first &mdash; and every element is shared.</p><p>For flat data that distinction never appears. A list of integers or strings copies shallowly and behaves exactly as you would want,. This is because the shared elements are immutable and nobody can change them. The bug needs two ingredients: nesting, and mutation.</p>
 
 ## Everything is shallow unless you asked
 
@@ -103,14 +103,14 @@ print("a tuple is only as immutable as its contents:", t)
 
 <p>A shallow copy copies the outer container and shares the contents. So nested mutation leaks between them. copy.deepcopy rebuilds the whole tree. Slicing and list() are shallow, which is fine for flat data and a bug for nested data.</p>
 
-<p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence and then talking for another minute until something wrong comes out.</p>
+<p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence. Then talking for another minute until something wrong comes out.</p>
 
 ## What to notice while it runs
 
 <ul>
 <li>Both copies are new <em>outer</em> objects &mdash; that part is not the difference.</li>
 <li>The shallow copy shares the inner lists, which is where the mutation leaks.</li>
-<li><code>original[:]</code> and <code>list(original)</code> behave exactly like <code>copy.copy</code>.</li>
+<li><code>first[:]</code> and <code>list(first)</code> behave exactly like <code>copy.copy</code>.</li>
 </ul>
 
 ## Edge cases to raise
@@ -121,7 +121,7 @@ print("a tuple is only as immutable as its contents:", t)
 
 <p><strong>A dict comprehension over a dict is shallow too</strong>, as is <code>{**d}</code>. Every spelling of "make me a new dict from this one" shares the values.</p>
 
-<p><strong><code>copy.deepcopy</code> on a large structure can be slower than recomputing it.</strong> Worth saying out loud, because it shows you are costing the fix rather than reaching for the safest-sounding call.</p>
+<p><strong><code>copy.deepcopy</code> on a large structure can be slower than recomputing it.</strong> Worth saying out loud,. This is because it shows you are costing the fix rather than reaching for the safest-sounding call.</p>
 
 ## The follow-ups interviewers ask
 
@@ -133,7 +133,7 @@ print("a tuple is only as immutable as its contents:", t)
 
 ## Common wrong answers
 
-<p><strong>"<code>list(x)</code> gives you an independent copy."</strong> One level. Nested mutables are shared, which is the entire question.</p>
+<p><strong>"<code>list(x)</code> gives you an free copy."</strong> One level. Nested mutables are shared, which is the entire question.</p>
 
 <p><strong>"<code>deepcopy</code> is always the safe default."</strong> It is slow, it copies things you may not want duplicated. And it fails on unpicklable attributes. Safe is not the same as correct.</p>
 
@@ -143,7 +143,7 @@ print("a tuple is only as immutable as its contents:", t)
 
 - Both copies are new outer objects - that part is not the difference.
 - The shallow copy shares the inner lists, which is where the mutation leaks.
-- original[:] and list(original) behave exactly like copy.copy.
+- first[:] and list(first) behave exactly like copy.copy.
 - The one-line answer: A shallow copy builds a new container holding the same objects.
 - Worth trying: Make the inner values immutable - [(1, 2), (3, 4)] - and try to reproduce the leak. You cannot, which is the argument for immutable values over defensive copying.
 - Worth trying: Put an open file in the structure and call deepcopy. The failure is the same one pickle gives, because deepcopy falls back to the same protocol.

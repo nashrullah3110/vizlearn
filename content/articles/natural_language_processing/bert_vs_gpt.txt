@@ -9,9 +9,9 @@ Delete nothing and every token sees the whole sentence: that is an encoder, and 
 
 ## Why the mask decides the objective
 
-A model that can see the future cannot be trained to predict it. If position 4 can attend to position 5, then "predict the token at position 5" is answered by copying it, and nothing is learned. So the two masks admit different training tasks.
+A model that can see the future cannot be trained to predict it. If position 4 can attend to position 5. Then "predict the token at position 5" is answered by copying it, and nothing is learned. So the two masks admit different training tasks.
 
-- <strong>Bidirectional &rarr; masked language modelling.</strong> Hide 15% of the tokens and predict them from both sides. Nothing is being copied because the answer has been removed from the input entirely.
+- <strong>Bidirectional &rarr; masked language modelling.</strong> Hide 15% of the tokens and predict them from both sides. Nothing is being copied because the answer has been removed from the input fully.
 - <strong>Causal &rarr; next-token prediction.</strong> Every position predicts the token after it. And the mask guarantees it cannot cheat. One pass over a sentence supplies a training signal at every position at once. This is what makes it so efficient at scale.
 
 The consequence is the interesting part. Masked language modelling produces excellent representations and no way to generate: there is no "next" for a model where every position already saw everything. Next-token prediction produces a generator whose representations are weaker per parameter, because each token was built without the right-hand context.
@@ -196,7 +196,7 @@ print("scale, not about the mask.")
 
 - <strong>Classifying, tagging, reranking, embedding for search?</strong> Encoder. You already have the whole text; a model that reads it bidirectionally will represent it better and is far cheaper to run. A BERT-sized encoder is hundreds of times smaller than a frontier decoder.
 - <strong>Producing text?</strong> Decoder. Nothing else can.
-- <strong>Strict input-to-output rewriting, like translation?</strong> Encoder-decoder, which reads with full attention and writes causally, plus cross-attention between the two. T5 and the original transformer are this shape.
+- <strong>Strict input-to-output rewriting, like translation?</strong> Encoder-decoder, which reads with full attention and writes causally, plus cross-attention between the two. T5 and the first transformer are this shape.
 
 The industry has drifted decisively towards decoder-only for general systems, because one model that can be prompted to do anything beats a family of specialists. But for a high-volume classifier or a retrieval encoder, the small bidirectional model is still usually the right engineering answer.
 
@@ -206,7 +206,7 @@ Encoder-only and decoder-only transformers differ by one thing: whether the atte
 
 ## The third family: encoder-decoder
 
-T5, BART and the original transformer use both stacks: an encoder that reads the input bidirectionally. And a decoder that makes while attending to the encoder's output through cross-attention.
+T5, BART and the first transformer use both stacks: an encoder that reads the input bidirectionally. And a decoder that makes while attending to the encoder's output through cross-attention.
 
 That structure suits tasks with a clear input and a distinct output. Translation, summarisation, grammatical correction. T5's framing was to treat every task as text-to-text, with a prefix saying which task it is.
 
@@ -216,13 +216,13 @@ That structure suits tasks with a clear input and a distinct output. Translation
 |Decoder-only|GPT, Llama, Mistral, Claude, Gemini|
 |Encoder-decoder|T5, BART, mT5, Flan-T5|
 
-Encoder-decoder models are less prominent now, largely because decoder-only models scaled better and can do the same tasks by prompting. They remain strong when the task is genuinely a fixed transformation and you can fine-tune.
+Encoder-decoder models are less prominent now, largely because decoder-only models scaled better and can do the same tasks by prompting. They remain strong when the task is truly a fixed transformation and you can fine-tune.
 
 ## The training details that mattered
 
 <strong>BERT's masked language modelling</strong> replaces 15% of tokens: 80% with `[MASK]`, 10% with a random token, 10% left unchanged. The randomisation exists because `[MASK]` never appears at fine-tuning time. And a model trained only on it would be mismatched.
 
-<strong>Next sentence prediction</strong> was BERT's second objective &mdash; predicting whether two sentences were adjacent. RoBERTa showed it was unhelpful and removed it, along with training longer on more data, which improved results substantially. It is a useful reminder that the original recipe was not optimal.
+<strong>Next sentence prediction</strong> was BERT's second objective &mdash; predicting whether two sentences were adjacent. RoBERTa showed it was unhelpful and removed it, along with training longer on more data, which improved results substantially. It is a useful reminder that the first recipe was not optimal.
 
 <strong>GPT's next-token prediction</strong> needs no labelling at all: any text is training data. That ease is a large part of why decoder-only models scaled. The training set is the internet rather than an annotated corpus.
 
@@ -232,7 +232,7 @@ Encoder-decoder models are less prominent now, largely because decoder-only mode
 
 <strong>Which is better?</strong> Neither &mdash; they are shaped for different jobs. For embeddings and cheap fixed-task classification, an encoder. For anything generative or open-ended, a decoder.
 
-<strong>Can I use GPT-style models for embeddings?</strong> Yes, by pooling hidden states, and purpose-trained embedding models usually do better because they are trained with a similarity objective.
+<strong>Can I use GPT-style models for embeddings?</strong> Yes, by pooling hidden states, and purpose-trained embedding models usually do better. This is because they are trained with a similarity objective.
 
 <strong>Why does BERT have `[CLS]`?</strong> It is a position whose final representation is used as a summary of the whole sequence for classification.
 

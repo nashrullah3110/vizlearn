@@ -5,7 +5,7 @@ intro: Guess where the value should be rather than always splitting in the middl
 
 Looking up “Zhang” in a phone book, nobody opens it at the exact middle. You open near the back, because you know where Z falls. Interpolation search formalises that: instead of probing the midpoint, it estimates the target’s position from its <em>value</em> relative to the values at the two ends.
 
-If the low element is 10, the high element is 1000. And you are looking for 100, the target sits about 9% of the way through the range. So probe about 9% of the way into the array, not 50%. The formula is `pos = lo + ((target - arr[lo]) * (hi - lo)) // (arr[hi] - arr[lo])`. This is linear interpolation between the endpoint values mapped to the endpoint indices. On uniformly distributed data this converges in O(log log n) expected time, because each probe removes a constant fraction of the remaining range rather than just half. But the guarantee depends on the distribution: if the values are exponentially spaced, the interpolated probe lands near the wrong end every time and the algorithm degrades to O(n), worse than [binary search](binary_search.html)'s guaranteed O(log n). A division by zero occurs when `arr[lo] == arr[hi]` (all remaining values are equal). So the implementation must check for that. Interpolation search is the right choice when you know the data is roughly uniform &mdash; sorted database keys, timestamps at regular intervals, dictionary words &mdash; and binary search is the safe default when you do not. This page runs both algorithms on the same sorted array, counts the probes, and lets you switch between uniform and skewed distributions to see the performance difference.
+If the low element is 10, the high element is 1000. And you are looking for 100, the target sits about 9% of the way through the range. So probe about 9% of the way into the array, not 50%. The formula is `pos = lo + ((target - arr[lo]) * (hi - lo)) // (arr[hi] - arr[lo])`. This is linear interpolation between the endpoint values mapped to the endpoint indices. On uniformly distributed data this converges in O(log log n) expected time,. This is because each probe removes a constant fraction of the remaining range rather than just half. But the guarantee depends on the distribution: if the values are exponentially spaced, the interpolated probe lands near the wrong end every time and the algorithm degrades to O(n), worse than [binary search](binary_search.html)'s guaranteed O(log n). A division by zero occurs when `arr[lo] == arr[hi]` (all remaining values are equal). So the implementation must check for that. Interpolation search is the right choice when you know the data is roughly uniform &mdash; sorted database keys, timestamps at regular intervals, dictionary words &mdash; and binary search is the safe default when you do not. This page runs both algorithms on the same sorted array, counts the probes, and lets you switch between uniform and skewed distributions to see the performance difference.
 
 ## The probe formula
 
@@ -88,7 +88,7 @@ Honestly: rarely, and it is worth understanding why.
 
 <strong>Cache effects dominate at scale.</strong> On a large array, each probe is likely a cache miss regardless of the algorithm. So the number of probes matters less than it appears. And fewer, more scattered probes do not help as much as the cost suggests.
 
-Where it does earn its place: <strong>large, static, genuinely uniform numeric datasets</strong>. Searching a sorted array of timestamps evenly spaced in time, or of uniformly distributed identifiers, is a legitimate case.
+Where it does earn its place: <strong>large, static, truly uniform numeric datasets</strong>. Searching a sorted array of timestamps evenly spaced in time, or of uniformly distributed identifiers, is a legitimate case.
 
 ## The guess that beats halving, and the distribution it depends on
 
@@ -137,7 +137,7 @@ print("\nworst case: interp O(n)=%d, binary O(log n)=%d" % (n, int(math.log2(n))
 
 ## Things to try
 
-1. <strong>Watch a one-probe hit.</strong> Set <strong>Array Size</strong> to 30 and press <strong>Reset Array</strong> until the values look evenly spread, then set <strong>Search Target</strong> to a middling value and press <strong>Next Step</strong> once. The first probe often lands on or beside the answer.
+1. <strong>Watch a one-probe hit.</strong> Set <strong>Array Size</strong> to 30 and press <strong>Reset Array</strong> until the values look evenly spread. Then set <strong>Search Target</strong> to a middling value and press <strong>Next Step</strong> once. The first probe often lands on or beside the answer.
 2. <strong>Compare against a midpoint split.</strong> Note where the first probe lands for a small target such as the second-smallest value. Interpolation goes straight to the left edge; binary search would still have started dead centre.
 3. <strong>Make it work hard.</strong> Set <strong>Search Target</strong> to a value near one extreme and press <strong>Auto-Run</strong>. Watch the probes cluster at that end &mdash; the algorithm homes in from the correct side at once rather than converging symmetrically.
 4. <strong>Scale it up.</strong> Step through a search at <strong>Array Size</strong> 5, then at 30. The probe count barely moves. That flatness is log log n: it grows so slowly that at these sizes it looks like a constant.
@@ -147,7 +147,7 @@ print("\nworst case: interp O(n)=%d, binary O(log n)=%d" % (n, int(math.log2(n))
 - <strong>Dividing by zero.</strong> When <span class="mono-font">a[hi] == a[lo]</span> &mdash; every remaining element is equal &mdash; the denominator is zero. Guard that case by name before computing the probe.
 - <strong>Using it on non-uniform data.</strong> This is the real trap. Interpolation search is only a win when values are close to uniformly distributed. On skewed, clustered, or exponential data it is slower than binary search. And the failure is a quiet performance collapse rather than a crash.
 - <strong>Overflow in the numerator.</strong> <span class="mono-font">(target &minus; a[lo]) &times; (hi &minus; lo)</span> multiplies two potentially large numbers. Use a wide enough type, or reorder to divide first.
-- <strong>Skipping the bounds check.</strong> A computed position must still be clamped to <span class="mono-font">[lo, hi]</span>. With unsorted or corrupted input the formula can point outside the array entirely.
+- <strong>Skipping the bounds check.</strong> A computed position must still be clamped to <span class="mono-font">[lo, hi]</span>. With unsorted or corrupted input the formula can point outside the array fully.
 
 ## The short version
 
@@ -192,11 +192,11 @@ That is the same pattern as introsort: use the fast method, detect the pathologi
 |Exponential|Double until overshoot, then binary|Sorted, unbounded or unknown size|
 |Ternary|Two points, thirds|Unimodal functions|
 
-<strong>Exponential search</strong> deserves a mention because it solves a real problem: searching an array of unknown or unbounded size. Probe indices 1, 2, 4, 8, … until the value at the probe exceeds the target, then binary search the last interval. O(log i) where i is the target's position, which is better than O(log n) when the target is near the front.
+<strong>Exponential search</strong> deserves a mention because it solves a real problem: searching an array of unknown or unbounded size. Probe indices 1, 2, 4, 8, … until the value at the probe exceeds the target. Then binary search the last interval. O(log i) where i is the target's position, which is better than O(log n) when the target is near the front.
 
 <strong>Fibonacci search</strong> splits by Fibonacci ratios and uses only addition and subtraction &mdash; no division. That mattered on hardware without a divide instruction, and it also touches fewer distinct cache lines than binary search on some access patterns.
 
-## Where the idea genuinely appears
+## Where the idea truly appears
 
 Interpolation search itself is niche. The <em>idea</em> &mdash; using the distribution of the data to predict where something is &mdash; is not.
 
@@ -204,7 +204,7 @@ Interpolation search itself is niche. The <em>idea</em> &mdash; using the distri
 
 <strong>Learned index structures</strong> are a research direction that replaces the index with a model predicting a key's position &mdash; in effect interpolation search with a learned function instead of a linear one.
 
-<strong>Interpolation in numerical methods.</strong> Root-finding by the secant method or the false-position method is interpolation search applied to continuous functions. And it converges much faster than bisection.
+<strong>Interpolation in numerical methods.</strong> Root-finding by the secant method or the false-position method is interpolation search applied to smooth functions. And it converges much faster than bisection.
 
 So the algorithm is a small instance of a broadly useful principle: <strong>if you know something about the distribution, use it</strong>.
 
@@ -220,7 +220,7 @@ So the algorithm is a small instance of a broadly useful principle: <strong>if y
 
 <strong>Does it need sorted data?</strong> Yes, like binary search. And it also assumes the values are roughly evenly spread.
 
-<strong>What is exponential search for?</strong> Arrays of unknown size, or where the target is likely near the start: probe doubling positions, then binary search the final interval.
+<strong>What is exponential search for?</strong> Arrays of unknown size, or where the target is likely near the start: probe doubling positions. Then binary search the final interval.
 
 ## Recap in one screen
 

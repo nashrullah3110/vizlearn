@@ -3,13 +3,13 @@ intro: Give the model the page before you ask it the question.
 
 ## Quick Context
 
-A language model knows what was in its training data, frozen at some cutoff date. It does not know your company's handbook, last week's incident report, or a product invented for a teaching page. Asked anyway, it will answer &mdash; fluently, and wrongly.
+A language model knows what was in its training data, frozen at some cutoff date. It does not know your company's handbook, last week's incident report. Or a product invented for a teaching page. Asked anyway, it will answer &mdash; fluently, and wrongly.
 
 Retrieval-augmented generation is the fix that does not involve training anything. Find the passages that look relevant, paste them into the prompt, and ask the question with the evidence attached. The model stops recalling and starts reading.
 
 The pipeline has three stages: indexing, retrieval and generation. At indexing time, documents are split into chunks, each chunk is embedded into a vector. And the vectors are stored in an index. At query time, the question is embedded with the same model, the index returns the closest chunks. And those chunks are injected into the prompt alongside the question. The language model then makes an answer grounded in the retrieved evidence.
 
-Each stage has its own failure modes. Chunking too coarsely means relevant information is buried in noise; chunking too finely means the chunk lacks enough context to be useful on its own. The retrieval step can miss relevant passages if the embedding model does not capture the right notion of similarity, or if the question is phrased differently from the stored text. The generation step can ignore the retrieved evidence entirely, hallucinate beyond it, or contradict it. A failure called unfaithfulness.
+Each stage has its own failure modes. Chunking too coarsely means relevant information is buried in noise; chunking too finely means the chunk lacks enough context to be useful on its own. The retrieval step can miss relevant passages if the embedding model does not capture the right notion of similarity, or if the question is phrased differently from the stored text. The generation step can ignore the retrieved evidence fully, hallucinate beyond it, or contradict it. A failure called unfaithfulness.
 
 RAG works because it separates knowledge from reasoning. The language model handles reasoning, and the retrieval system handles knowledge. Updating the knowledge requires re-indexing the documents, not retraining the model. This makes the system far cheaper to maintain than fine-tuning. It also provides attribution: each answer can cite the chunks it was based on, giving the user a way to verify the response.
 
@@ -23,11 +23,11 @@ RAG works because it separates knowledge from reasoning. The language model hand
 
 Only steps 3 to 5 happen per question. Steps 1 and 2 happen once, when the documents change &mdash; which is why RAG updates in the time it takes to re-index rather than the time it takes to retrain.
 
-The scores on this page are real cosine similarities over word-frequency vectors rather than a neural embedding. So the retrieval you are watching genuinely runs. A production system embeds meaning rather than words, which is exactly why it can match "descale" to "limescale" where this cannot.
+The scores on this page are real cosine similarities over word-frequency vectors rather than a neural embedding. So the retrieval you are watching truly runs. A production system embeds meaning rather than words, which is exactly why it can match "descale" to "limescale" where this cannot.
 
 ## Giving a model documents instead of retraining it
 
-A language model knows what was in its training data, up to a cut-off date. It does not know your company's handbook, last week's incident report, or the contents of a customer's account.
+A language model knows what was in its training data, up to a cut-off date. It does not know your company's handbook, last week's incident report. Or the contents of a customer's account.
 
 Two ways to fix that. <strong>Fine-tuning</strong> updates the weights on your data &mdash; expensive, slow to iterate. And it teaches style and format far better than it teaches facts. <strong>Retrieval-augmented generation</strong> leaves the model alone and puts the relevant documents into the prompt.
 
@@ -58,9 +58,9 @@ The access-control row matters nearly as much. Fine-tuning on documents means th
 
 Almost never in the language model. The failures are in retrieval, and they have distinct causes:
 
-<strong>The right chunk was never retrieved.</strong> The most common failure by a wide margin. Poor chunking, an embedding model that does not cover the domain vocabulary, or a query phrased differently from the document.
+<strong>The right chunk was never retrieved.</strong> The most common failure by a wide margin. Poor chunking, an embedding model that does not cover the domain vocabulary. Or a query phrased differently from the document.
 
-<strong>The chunk was retrieved but incomplete.</strong> A table split down the middle, or a paragraph whose subject was named in the previous chunk.
+<strong>The chunk was retrieved but incomplete.</strong> A table split down the middle. Or a paragraph whose subject was named in the previous chunk.
 
 <strong>The right chunk was buried.</strong> Retrieved at position 9 of 10, where models attend to it less. The "lost in the middle" effect.
 
@@ -206,7 +206,7 @@ print("   first table rather than as a replacement for any of the others.")
 
 1. <strong>Turn retrieval off.</strong> Set <strong>Chunks Retrieved</strong> to 0. The prompt is the bare question, and the answer is what a model does when it has nothing: something plausible and unsupported, flagged in red.
 2. <strong>Turn it back on.</strong> At k = 1 the top-scoring chunk is pasted in and the answer arrives with a citation. Same model, same question, different prompt.
-3. <strong>Meet the distractor.</strong> Ask about the warranty and read the scores: chunk 1 wins on 0.213, but chunk 7 &mdash; the warranty for the <em>previous</em> model &mdash; is right behind it on 0.183, because it talks about warranties too. At k = 1 the ranking has to be right; at k = 2 breadth covers you instead. Retrieval fails quietly, and this is the shape it fails in.
+3. <strong>Meet the distractor.</strong> Ask about the warranty and read the scores: chunk 1 wins on 0.213, but chunk 7 &mdash; the warranty for the <em>previous</em> model &mdash; is right behind it on 0.183,. This is because it talks about warranties too. At k = 1 the ranking has to be right; at k = 2 breadth covers you instead. Retrieval fails quietly, and this is the shape it fails in.
 4. <strong>Watch the prompt grow.</strong> Push k to 6 and the prompt words climb steeply. Everything you retrieve is paid for on every request, in latency and in cost. And the useful chunk gets harder for the model to find among the noise.
 5. <strong>Ask something the documents do not cover.</strong> Choose the voltage question. Retrieval still returns its best matches &mdash; it always returns something &mdash; but none of them answer it. So the honest response is "not in the documents". A system that cannot say that is a system that will invent.
 
@@ -214,13 +214,13 @@ print("   first table rather than as a replacement for any of the others.")
 
 Fine-tuning changes how a model behaves; retrieval changes what it knows right now. Facts that change weekly, documents with access rules, anything that needs a citation. All of those want retrieval. Tone, format, a domain's vocabulary, a stubborn output schema. Those want fine-tuning. They are not competitors, and production systems often use both.
 
-Retrieval also has a property fine-tuning cannot offer: you can show the user where the answer came from, and delete a document and have it genuinely gone.
+Retrieval also has a property fine-tuning cannot offer: you can show the user where the answer came from, and delete a document and have it truly gone.
 
 ## Common mistakes
 
 - <strong>Chunking badly.</strong> Too small and a passage loses the context that made it meaningful; too large and the embedding averages several topics into mush. Overlapping windows of a few hundred tokens are the usual compromise.
 - <strong>Assuming retrieval succeeded.</strong> Similarity search always returns its best k, but bad they are. Without a relevance floor, an unanswerable question quietly becomes a confident wrong answer.
-- <strong>Stuffing the context.</strong> More chunks is not more accuracy. Models attend unevenly across a long context, and a fact buried in the middle of twenty passages can be missed entirely.
+- <strong>Stuffing the context.</strong> More chunks is not more accuracy. Models attend unevenly across a long context, and a fact buried in the middle of twenty passages can be missed fully.
 - <strong>Pure vector search.</strong> Embeddings are poor at exact identifiers. Part numbers, error codes, names. Hybrid retrieval, combining keyword search with vectors, is standard for a reason.
 - <strong>A stale index.</strong> The documents changed and nobody re-embedded them. Now the system cites yesterday's policy with complete confidence.
 
@@ -232,7 +232,7 @@ RAG answers questions a model was never trained on by finding relevant passages 
 
 <strong>Chunk size.</strong> 200&ndash;500 tokens is the usual range. Too small and the chunk lacks context; too large and the embedding is a blurred average of several topics. And the prompt fills up. Overlap of 10&ndash;20% keeps sentences that straddle a boundary intact.
 
-<strong>Chunking strategy.</strong> Splitting on structure &mdash; headings, sections, paragraphs &mdash; beats splitting on a fixed character count almost always, because it respects where topics actually change.
+<strong>Chunking strategy.</strong> Splitting on structure &mdash; headings, sections, paragraphs &mdash; beats splitting on a fixed character count almost always,. This is because it respects where topics actually change.
 
 <strong>Hybrid retrieval.</strong> Combine dense embedding search with keyword search (BM25). Embeddings catch paraphrase; keywords catch names, codes, numbers and exact terms that embeddings blur. Reciprocal rank fusion merges the two ranked lists. This is the single highest-value improvement in most systems.
 
@@ -283,9 +283,9 @@ Build a small evaluation set &mdash; 50&ndash;100 real questions with known corr
 
 <strong>Do long context windows make RAG obsolete?</strong> No. Retrieval is cheaper, more precise, and it tells you which source an answer came from. Stuffing a million tokens is expensive and dilutes attention.
 
-<strong>Why does it hallucinate even with the right context?</strong> Usually the prompt does not constrain it firmly enough, or the context is contradictory, or the answer genuinely is not there and it has no permission to say so.
+<strong>Why does it hallucinate even with the right context?</strong> Usually the prompt does not constrain it firmly enough. Or the context is contradictory. Or the answer truly is not there and it has no permission to say so.
 
-<strong>Which embedding model?</strong> Start with a strong general one, then test domain-specific options on your own evaluation set. The benchmark leaderboard is a weaker signal than your own data.
+<strong>Which embedding model?</strong> Start with a strong general one. Then test domain-specific options on your own evaluation set. The benchmark leaderboard is a weaker signal than your own data.
 
 <strong>Should I re-embed when I change models?</strong> Yes &mdash; vectors from different models are not comparable. So the whole corpus must be re-indexed.
 

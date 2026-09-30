@@ -15,13 +15,13 @@ Searching a million vectors by brute force &mdash; computing the distance from t
 
 Retrieval almost always ranks by <a href="../machine_learning/cosine_similarity.html" style="color: var(--accent-primary)">cosine similarity</a>: the angle between the query vector and the document vector, ignoring how long either one is. Length in an embedding tends to carry things like document length or token count rather than meaning. So ignoring it is the point.
 
-On vectors normalised to unit length, ranking by cosine and ranking by Euclidean distance give the same orders. This is why many systems normalise once at index time and then use whichever their hardware does faster. Switch the metric here and watch how little changes. And, on the points that are not near the unit circle, exactly where it does.
+On vectors normalised to unit length, ranking by cosine and ranking by Euclidean distance give the same orders. This is why many systems normalise once at index time. Then use whichever their hardware does faster. Switch the metric here and watch how little changes. And, on the points that are not near the unit circle, exactly where it does.
 
 ## Exact search does not scale
 
 An exact search compares the query against every vector in the index. That is 18 comparisons here and 18 million in a real corpus, per query. And it is why nobody runs exact search at scale.
 
-The standard fix is to partition the space. Cluster the vectors once, keep a centroid per cell, and at query time compare against the centroids first and then search only the nearest few cells. This is an inverted file index (IVF); HNSW does the same job with a navigable graph instead of cells. Both are <strong>approximate</strong>: they trade a small chance of missing a true neighbour for an enormous reduction in work.
+The standard fix is to partition the space. Cluster the vectors once, keep a centroid per cell, and at query time compare against the centroids first. Then search only the nearest few cells. This is an inverted file index (IVF); HNSW does the same job with a navigable graph instead of cells. Both are <strong>approximate</strong>: they trade a small chance of missing a true neighbour for an enormous reduction in work.
 
 That chance is what recall@k measures &mdash; the share of the true top k that the approximate search actually returned. It is a dial, not a defect: probing more cells raises recall and costs comparisons.
 
@@ -48,7 +48,7 @@ The standard comparison is the angle between vectors:
 
 Length in an embedding tends to reflect frequency or confidence rather than meaning. So ignoring it is deliberate: a long document and a short one about the same subject should be close.
 
-On vectors normalised to length 1, cosine similarity and the dot product are the same, and Euclidean distance ranks the same way. That is why libraries normalise on the way in and then use fast dot products. A matrix multiply is far cheaper than computing norms per comparison.
+On vectors normalised to length 1, cosine similarity and the dot product are the same, and Euclidean distance ranks the same way. That is why libraries normalise on the way in. Then use fast dot products. A matrix multiply is far cheaper than computing norms per comparison.
 
 Calibrate the threshold rather than assuming one. Many sentence-embedding models score unrelated text at 0.2&ndash;0.4, so a threshold of 0.5 admits large noise. Score a few hundred known-related and known-unrelated pairs and put the cut where the distributions separate.
 
@@ -65,7 +65,7 @@ Comparing a query against every stored vector is exact and linear. With a millio
 |HNSW|A navigable graph of neighbours|Very fast, high recall, memory-hungry|
 |PQ / compression|Store compressed vectors|Large memory saving, some accuracy loss|
 
-<strong>HNSW</strong> is the common default: build a multi-layer graph where each vector links to its neighbours, then walk it greedily from a coarse layer down to a fine one. Query time grows logarithmically rather than linearly.
+<strong>HNSW</strong> is the common default: build a multi-layer graph where each vector links to its neighbours. Then walk it greedily from a coarse layer down to a fine one. Query time grows logarithmically rather than linearly.
 
 The parameter to understand is the search-time breadth (`ef_search` in HNSW, `nprobe` in IVF). Higher means better recall and slower queries &mdash; a dial you set from measured recall against exact search, not from intuition.
 
@@ -251,7 +251,7 @@ print("   why the interesting engineering is in the combination.")
 4. <strong>Now find the failure.</strong> Raise <strong>k</strong> to 5 or 6 with one cell probed. The cell runs out of documents, so the search returns whatever it has and recall drops below 100%: real neighbours were sitting in a cell nobody looked at.
 5. <strong>Buy the recall back.</strong> Raise <strong>Cells Probed</strong>. Recall climbs back to 100% and the comparison count climbs with it. That trade is the entire tuning surface of a vector database.
 6. <strong>Probe everything.</strong> At 4 cells the search does 22 comparisons for an index of 18 documents. Worse than the exact scan, because you pay for the centroids too. Partitioning only pays when you skip most of the index.
-7. <strong>Change the metric.</strong> On the mango query, cosine calls "a summer fruit salad" and "peeling a ripe mango" a tie at 1.000, because they sit at almost the same angle from the origin. Euclidean puts "peeling a ripe mango" clearly first, because it is genuinely nearer. Same points, same query, different question being asked.
+7. <strong>Change the metric.</strong> On the mango query, cosine calls "a summer fruit salad" and "peeling a ripe mango" a tie at 1.000,. This is because they sit at almost the same angle from the origin. Euclidean puts "peeling a ripe mango" clearly first, because it is truly nearer. Same points, same query, different question being asked.
 
 ## Where this goes wrong
 
@@ -263,7 +263,7 @@ print("   why the interesting engineering is in the combination.")
 
 ## The short of it
 
-An embedding puts meaning somewhere in space, so similarity becomes geometry and retrieval becomes nearest-neighbour search, ranked by cosine because vector length carries length rather than meaning. Exact search costs one comparison per document and does not survive scale. So production indexes partition the space and probe only the nearest few cells. Buying a large drop in work for a small, measurable chance of missing a true neighbour. That chance is recall@k, and it moves with how many cells you probe. This makes vector search a tuning problem rather than a solved one.
+An embedding puts meaning somewhere in space, so similarity becomes geometry and retrieval becomes nearest-neighbour search, ranked by cosine. This is because vector length carries length rather than meaning. Exact search costs one comparison per document and does not survive scale. So production indexes partition the space and probe only the nearest few cells. Buying a large drop in work for a small, measurable chance of missing a true neighbour. That chance is recall@k, and it moves with how many cells you probe. This makes vector search a tuning problem rather than a solved one.
 
 ## Why hybrid search wins
 
@@ -277,7 +277,7 @@ Combining them beats either alone, reliably enough that it is the standard recom
 
 with k around 60. It needs no score normalisation between the two systems, which is what makes it practical &mdash; BM25 scores and cosine similarities are not on comparable scales.
 
-Add a <strong>reranker</strong> on top: retrieve 50 candidates from the hybrid stage, then score each against the query with a cross-encoder that reads both together rather than comparing precomputed vectors. Substantially more accurate, and affordable because it runs on 50 items.
+Add a <strong>reranker</strong> on top: retrieve 50 candidates from the hybrid stage. Then score each against the query with a cross-encoder that reads both together rather than comparing precomputed vectors. Substantially more accurate, and affordable because it runs on 50 items.
 
 ## Practical notes
 
@@ -306,13 +306,13 @@ Four things that matter at scale:
 
 ## Questions people ask
 
-<strong>Which embedding model should I use?</strong> Start with a well-regarded general model, then evaluate options on your own question set. Public benchmarks are a weaker signal than your own data.
+<strong>Which embedding model should I use?</strong> Start with a well-regarded general model. Then evaluate options on your own question set. Public benchmarks are a weaker signal than your own data.
 
-<strong>Do I need a vector database?</strong> Below ~100,000 vectors, a NumPy array and a dot product is genuinely fine. Above that, an index earns its place.
+<strong>Do I need a vector database?</strong> Below ~100,000 vectors, a NumPy array and a dot product is truly fine. Above that, an index earns its place.
 
 <strong>How do I choose k?</strong> 3&ndash;10 chunks for generation. Measure recall@k on known answers to find where returns flatten.
 
-<strong>Why does search miss obvious matches?</strong> Usually vocabulary the embedding model has not seen, or an exact identifier that embeddings blur. Hybrid search is the fix.
+<strong>Why does search miss obvious matches?</strong> Usually vocabulary the embedding model has not seen. Or an exact identifier that embeddings blur. Hybrid search is the fix.
 
 <strong>Can I search across languages?</strong> With a multilingual embedding model, yes. A query in one language retrieves documents in another.
 

@@ -5,11 +5,11 @@ intro: How does TF-IDF decide which words in a document actually matter?
 
 <p><strong>Term frequency</strong> is how often a term occurs in a document, usually damped. A word appearing twenty times is not twenty times as relevant. So implementations take a logarithm or normalise by document length.</p>
 
-<p><strong>Inverse document frequency</strong> is <code>log(N / df)</code>, where <code>df</code> is the number of documents containing the term. When a term is in every document that ratio is 1 and the log is 0. So the term contributes nothing at all.</p>
+<p><strong>Inverse document frequency</strong> is <code>log(N / df)</code>, where <code>df</code> is the number of documents containing the term. When a term is in every document that ratio is 1 and the log is 0. So the term adds nothing at all.</p>
 
 That zero is the elegant part: stopwords are removed by the arithmetic rather than by a list you have to maintain per language.
 
-The product of TF and IDF gives each term a score that is high when the term appears often in the current document and rarely across the corpus. A term that appears in every document gets an IDF of zero and contributes nothing, regardless of its frequency. A term that appears in only one document gets a high IDF and dominates that document's representation. This is why TF-IDF works well for document retrieval: the terms that distinguish one document from the rest are exactly the terms that carry the most weight.
+The product of TF and IDF gives each term a score that is high when the term appears often in the current document and rarely across the corpus. A term that appears in every document gets an IDF of zero and adds nothing, regardless of its frequency. A term that appears in only one document gets a high IDF and dominates that document's representation. This is why TF-IDF works well for document retrieval: the terms that distinguish one document from the rest are exactly the terms that carry the most weight.
 
 In scikit-learn, `TfidfVectorizer` computes TF-IDF in one step: it tokenises the text, counts term frequencies, applies IDF weights, and normalises each document vector to unit length. The normalisation matters because without it, longer documents would have higher scores simply by containing more words. The result is a sparse matrix where each row is a document and each column is a term from the vocabulary.
 
@@ -25,7 +25,7 @@ TF-IDF is the baseline for text classification, document similarity, keyword ext
 
 ## Why it still matters in a RAG system
 
-Exact terms still win on identifiers, error codes, product names and rare jargon. Precisely the queries where an embedding model has seen too little to place the token meaningfully. A vector-only pipeline reliably fails on "error TS2345".
+Exact terms still win on identifiers, error codes, product names and rare jargon. Exactly the queries where an embedding model has seen too little to place the token meaningfully. A vector-only pipeline reliably fails on "error TS2345".
 
 TF-IDF is also the honest baseline. If a dense retriever cannot beat it on your evaluation set, the problem is the embedding model or the chunking, not the ranking.
 
@@ -83,7 +83,7 @@ Worked through with 1,000 documents:
 |"parental"|30|log(33) = 3.50|
 |"encephalopathy"|2|log(500) = 6.21|
 
-A term in every document contributes <strong>exactly nothing</strong>, whatever its frequency. That is automatic stop-word removal, derived from the corpus rather than from a list. And it is the single most useful property of the method.
+A term in every document adds <strong>exactly nothing</strong>, whatever its frequency. That is automatic stop-word removal, derived from the corpus rather than from a list. And it is the single most useful property of the method.
 
 ## Why the logarithm
 
@@ -91,7 +91,7 @@ Without it, a term in 1 document out of 1,000 would get a weight of 1,000 and a 
 
 The logarithm compresses that: 6.9 against 4.6. Rare terms still win, and not by an absurd margin.
 
-The same reasoning motivates <strong>sublinear term frequency</strong>: using `1 + log(TF)` instead of the raw count, because a term appearing 50 times is not 50 times more relevant than one appearing once. Scikit-learn exposes this as `sublinear_tf=True`, and it usually helps.
+The same reasoning motivates <strong>sublinear term frequency</strong>: using `1 + log(TF)` instead of the raw count,. This is because a term appearing 50 times is not 50 times more relevant than one appearing once. Scikit-learn exposes this as `sublinear_tf=True`, and it usually helps.
 
 Two more refinements that matter in practice:
 
@@ -121,13 +121,13 @@ model.fit(train_texts, train_labels)
 
 That is a strong text classifier in eight lines. It trains in seconds on tens of thousands of documents, runs on a CPU, and is fully interpretable. The model's coefficients map directly to words, so you can read what it learned.
 
-<strong>`min_df` is doing the heavy lifting.</strong> Dropping terms that appear in fewer than three documents usually removes most of the vocabulary and almost none of the signal, because the long tail is mostly typos and one-off tokens.
+<strong>`min_df` is doing the heavy lifting.</strong> Dropping terms that appear in fewer than three documents usually removes most of the vocabulary and almost none of the signal,. This is because the long tail is mostly typos and one-off tokens.
 
 <strong>`ngram_range=(1, 2)`</strong> adds bigrams, which is what lets the model represent "not good". The single most valuable addition for sentiment tasks.
 
 ## Counting words, then discounting the common ones
 
-TF-IDF is two ideas times together, and both of them are visible in a handful of documents. This builds the matrix by hand, shows what each half contributes, and finds the case where the whole thing collapses.
+TF-IDF is two ideas times together, and both of them are visible in a handful of documents. This builds the matrix by hand, shows what each half adds, and finds the case where the whole thing collapses.
 
 ```python-run
 import numpy as np
@@ -336,7 +336,7 @@ print("   what most serious retrieval systems actually ship.")
 ## Things to try
 
 1. Turn <strong>idf</strong> off and query <em>the</em>. Every document scores, and the ranking is driven by a word that distinguishes nothing.
-2. Query <em>the cat</em> with idf on. Only <em>cat</em> contributes &mdash; the stopword cancels itself without a stopword list.
+2. Query <em>the cat</em> with idf on. Only <em>cat</em> adds &mdash; the stopword cancels itself without a stopword list.
 3. Turn <strong>tf damping</strong> off and watch the document that repeats a term run away with the score. That runaway is what BM25's saturation fixes.
 
 ## What to remember
@@ -349,7 +349,7 @@ TF-IDF weights a term by how often it appears here times how rare it is everywhe
 
 <strong>No word order beyond n-grams.</strong> Bigrams capture adjacent pairs; anything longer-range is invisible.
 
-<strong>No handling of unseen vocabulary.</strong> A term absent from the training corpus has no column. So it contributes nothing at prediction time.
+<strong>No handling of unseen vocabulary.</strong> A term absent from the training corpus has no column. So it adds nothing at prediction time.
 
 <strong>Very high dimensionality.</strong> Fifty thousand features, almost all zero per document. Manageable with sparse matrices and sparse-aware models, and it rules out anything that requires dense input.
 

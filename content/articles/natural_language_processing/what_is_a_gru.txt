@@ -3,7 +3,7 @@ intro: Two gates, one state, three-quarters of the parameters &mdash; and most o
 
 ## Simplify Without Breaking
 
-The <strong>Gated Recurrent Unit</strong> (Cho et al., 2014) asked a sharp question: does an LSTM really need three gates <em>and</em> two separate memory tracks? The GRU's answer: merge the cell state and hidden state into one vector, merge forget+input into a single <strong style="color: #c084fc">update gate z</strong>, and add a <strong style="color: #22d3ee">reset gate r</strong> for proposing new content. Same gating idea, leaner machine. The update gate z controls how much of the old state to keep: z near 1 copies the previous hidden state forward (like a [forget gate](forget_gate_in_lstm.html) at 1), and z near 0 replaces it with the candidate. The reset gate r controls how much of the old state feeds into the candidate computation: r near 0 lets the GRU ignore the past entirely and propose fresh content, while r near 1 makes the candidate depend on everything so far. With two gates instead of three and one state vector instead of two, the GRU has roughly 75% of the LSTM's parameters for the same hidden size. On tasks with moderate sequence lengths (under a few hundred tokens), GRUs train faster and often match LSTM accuracy; on tasks requiring very long memory, the LSTM's separate cell state gives it an edge. In practice both have been largely replaced by [transformers](../gen_ai/how_llms_predict_next_word.html) for most NLP, but GRUs remain popular for time-series forecasting and on-device applications where parameter efficiency matters. This page animates the two gates at each timestep, shows the update/reset values, and compares GRU and LSTM on the same sequence.
+The <strong>Gated Recurrent Unit</strong> (Cho et al., 2014) asked a sharp question: does an LSTM really need three gates <em>and</em> two separate memory tracks? The GRU's answer: merge the cell state and hidden state into one vector, merge forget+input into a single <strong style="color: #c084fc">update gate z</strong>, and add a <strong style="color: #22d3ee">reset gate r</strong> for proposing new content. Same gating idea, leaner machine. The update gate z controls how much of the old state to keep: z near 1 copies the previous hidden state forward (like a [forget gate](forget_gate_in_lstm.html) at 1), and z near 0 replaces it with the candidate. The reset gate r controls how much of the old state feeds into the candidate computation: r near 0 lets the GRU ignore the past fully and propose fresh content, while r near 1 makes the candidate depend on everything so far. With two gates instead of three and one state vector instead of two, the GRU has roughly 75% of the LSTM's parameters for the same hidden size. On tasks with moderate sequence lengths (under a few hundred tokens), GRUs train faster and often match LSTM accuracy; on tasks requiring very long memory, the LSTM's separate cell state gives it an edge. In practice both have been largely replaced by [transformers](../gen_ai/how_llms_predict_next_word.html) for most NLP, but GRUs remain popular for time-series forecasting and on-device applications where parameter efficiency matters. This page animates the two gates at each timestep, shows the update/reset values, and compares GRU and LSTM on the same sequence.
 
 ## How the Two Gates Cooperate
 
@@ -59,12 +59,12 @@ It reduces vanishing gradients rather than removing them, and exploding gradient
 
 1. <strong>Auto-run with learned gates</strong> and watch z&#772; hover in the middle. The cell constantly negotiates between keeping and rewriting.
 2. <strong>Force z &rarr; 1.</strong> The hidden state freezes at zero no matter what you feed in: with the update gate fully closed to new content, the GRU is a perfect (if useless) memory.
-3. <strong>Force z &rarr; 0.</strong> Now the state is rewritten from scratch at every token. The network becomes almost memoryless. The learned mode is powerful precisely because it sits <em>between</em> these extremes, per dimension, per step.
+3. <strong>Force z &rarr; 0.</strong> Now the state is rewritten from scratch at every token. The network becomes almost memoryless. The learned mode is powerful exactly because it sits <em>between</em> these extremes, per dimension, per step.
 4. <strong>Drag the hidden-size slider</strong> and watch the LSTM/GRU parameter gap widen. At H = 512 the GRU saves over a million weights in a single layer.
 
 ## The same job with two gates instead of three
 
-A GRU ties the forget and input gates together and drops the cell state entirely. Both simplifications are run side by side against an LSTM here, along with what the GRU so cannot express.
+A GRU ties the forget and input gates together and drops the cell state fully. Both simplifications are run side by side against an LSTM here, along with what the GRU so cannot express.
 
 ```python-run
 import numpy as np
@@ -221,7 +221,7 @@ out, h = gru(x)          # note: one state returned, not two
 # h:   (layers*2, batch, 256)
 ```
 
-The interface differs from `nn.LSTM` in one visible way: a GRU returns a single hidden state rather than a `(h, c)` tuple, because there is no cell state. Code written for one needs that adjustment.
+The interface differs from `nn.LSTM` in one visible way: a GRU returns a single hidden state rather than a `(h, c)` tuple,. This is because there is no cell state. Code written for one needs that adjustment.
 
 Everything else transfers: pack variable-length sequences so the final state reflects the last real token rather than padding, clip gradients, and keep the layer count to one or two.
 
