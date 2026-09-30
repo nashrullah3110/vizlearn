@@ -3,7 +3,7 @@ intro: Half the sentence is a subject. Half of it is a WHERE clause.
 
 ## The idea in brief
 
-Likeness search compares meaning, and that is all it does. Ask it for "papers about attention published after 2020" and the words <em>published after 2020</em> are treated as more subject matter to match, not as a rule to enforce. A 2017 paper that is squarely about attention will score well and be returned,. This is because nothing in a cosine score knows what a year is. A self-query retriever fixes this by using a language model to split the user's question into two parts before any search runs. A semantic query (the subject to embed and compare) and a structured filter (the metadata constraint to enforce exactly). The LLM receives a schema describing the metadata fields each document carries. Year, author, document type, department. And returns a JSON object with the semantic query string and a set of check operators over those fields. The vector store applies the filter first as a hard WHERE clause. Then ranks only the surviving documents by cosine likeness to the semantic query. The constraint becomes a guarantee rather than a signal that the embedding may or may not capture. LangChain's `SelfQueryRetriever` wraps this pattern: you define an `AttributeInfo` list describing each metadata field, pass it alongside a natural-language description of the document collection. And the retriever handles the LLM call, filter construction, and filtered search in one step. This page walks through the split on a few case queries, shows the made filter, and covers the metadata schema definition.
+Likeness search compares meaning, and that is all it does. Ask it for "papers about attention published after 2020" and the words <em>published after 2020</em> are treated as more subject matter to match, not as a rule to enforce. A 2017 paper that is squarely about attention will score well and be returned,. This is because nothing in a cosine score knows what a year is. A self-query retriever fixes this by using a language model to split the user's question into two parts before any search runs. A semantic query (the subject to embed and compare) and a structured filter (the metadata constraint to enforce just). The LLM receives a schema describing the metadata fields each document carries. Year, author, document type, department. And returns a JSON object with the semantic query string and a set of check operators over those fields. The vector store applies the filter first as a hard WHERE clause. Then ranks only the surviving documents by cosine likeness to the semantic query. The constraint becomes a guarantee rather than a sign that the embedding may or may not capture. LangChain's `SelfQueryRetriever` wraps this pattern: you define an `AttributeInfo` list describing each metadata field, pass it alongside a natural-language description of the document collection. And the retriever handles the LLM call, filter construction, and filtered search in one step. This page walks through the split on a few case queries, shows the made filter, and covers the metadata schema definition.
 
 ## Two questions in one sentence
 
@@ -30,7 +30,7 @@ Then it runs a filtered vector search: the filter constrains the candidate set. 
 
 Two things, and the first is the part that is easy to under-invest in.
 
-<strong>Metadata on each document, populated at indexing time.</strong> The filter can only reference fields that exist. Adding a date field later means re-indexing.
+<strong>Metadata on each document, populated at indexing time.</strong> The filter can only guide fields that exist. Adding a date field later means re-indexing.
 
 <strong>A schema description given to the model,</strong> so it knows which fields exist and what values they take:
 
@@ -48,7 +48,7 @@ The model is prompted with that schema and the user's question, and asked to ret
 
 ## The failure modes
 
-This is a language model giving a filter, so it fails in language-model ways. And each failure needs a specific guard.
+This is a language model giving a filter, so it fails in language-model ways. And each failure needs a set guard.
 
 <strong>Invented field names.</strong> The model filters on `publication_date` when the schema says `year`. Validate the filter against the schema and drop or repair unknown fields.
 
@@ -85,9 +85,9 @@ Embeddings compare meaning and cannot enforce a rule, so any constraint left ins
 
 ## Where it earns its place
 
-<strong>Time-bounded questions.</strong> "Last quarter", "since the policy changed", "in 2023". Dates are exactly the kind of constraint embeddings handle badly and filters handle perfectly.
+<strong>Time-bounded questions.</strong> "Last quarter", "since the policy changed", "in 2023". Dates are just the kind of constraint embeddings handle badly and filters handle perfectly.
 
-<strong>Faceted corpora.</strong> Documents with meaningful categories &mdash; department, product line, region, document type, author. Users naturally phrase questions that reference them.
+<strong>Faceted corpora.</strong> Documents with meaningful categories &mdash; department, product line, region, document type, author. Users naturally phrase questions that guide them.
 
 <strong>Numeric constraints.</strong> "Products under &pound;50", "incidents affecting more than 100 users". A vector search cannot express an inequality.
 
@@ -388,7 +388,7 @@ print("Same data, same filter, different answers.")
 
 <strong>Can I use it without a vector database?</strong> The filtering needs a store that backs metadata predicates. Most do; plain in-memory vector arrays often do not.
 
-<strong>Should filters be hard or soft?</strong> Hard for correctness constraints such as permissions and dates. Think of soft (a score boost) for preferences, where over-filtering to zero results is worse than imperfect ordering.
+<strong>Should filters be hard or soft?</strong> Hard for correctness constraints such as permissions and dates. Think of soft (a score boost) for choices, where over-filtering to zero results is worse than imperfect ordering.
 
 <strong>Does it replace hybrid search?</strong> No &mdash; it constrains the candidate set. Hybrid search still decides the ordering within it.
 

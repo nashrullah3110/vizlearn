@@ -5,13 +5,13 @@ intro: How do you stop a RAG system retrieving documents the user is not allowed
 
 Retrieve the top 10 by likeness, then remove what the user may not see. If eight were restricted you return two, and nothing reports that the result set collapsed. The generator answers from thin evidence and sounds no less confident.
 
-Over-fetching &mdash; retrieve 100, filter, keep 10 &mdash; makes it less likely and never fixes it. A user with access to 0.1% of the corpus needs an enormous k. And the failure is worst exactly for the most restricted users.
+Over-fetching &mdash; retrieve 100, filter, keep 10 &mdash; makes it less likely and never fixes it. A user with access to 0.1% of the corpus needs an enormous k. And the failure is worst just for the most restricted users.
 
 The core problem is that vector likeness search and access control operate on different axes. The index ranks by semantic relevance; the access layer filters by who is allowed to see what. Combining them correctly is a systems problem, not a modelling problem, and there are three approaches.
 
 Pre-filtering restricts the search space before retrieval: only documents the user is allowed to see are candidates. This guarantees the result set is clean and the right size. But it needs the vector index to support metadata filtering fast. Not all indexes do — a naive implementation scans the full corpus and checks permissions per document. This is as slow as brute-force search.
 
-Post-filtering retrieves by relevance first and removes forbidden documents afterwards. It is simple to implement but unreliable: the result set shrinks unpredictably. And the generator must work with any remains. Raising k helps probabilistically but never guarantees enough permitted results.
+Post-filtering fetches by relevance first and removes forbidden documents afterwards. It is simple to implement but unreliable: the result set shrinks unpredictably. And the generator must work with any remains. Raising k helps probabilistically but never guarantees enough permitted results.
 
 Hybrid approaches retrieve a large candidate set, filter it. Then backfill from a wider search if too few documents survive. This is more complex but gives a steady result size. The trade-off is latency: two retrieval rounds instead of one. And the backfill query may not be as well-targeted as the first.
 
@@ -21,7 +21,7 @@ Whichever approach you choose, the permission model itself must be correct. A do
 
 Pre-filtering restricts the candidate set before ranking, so the top k is k <em>permitted</em> results. That is the correct behaviour and it fights the index. An HNSW graph is built over all vectors, and walking it while skipping most nodes can disconnect the search. You traverse into a region where all of it is filtered out and the walk stalls.
 
-Vector databases handle this differently, which is one of the real differences between them. Options include filtered graph traversal, per-tenant sub-indexes (clean, and costly at many tenants), and falling back to a flat scan when the filter is very selective &mdash;. This is often truly fastest,. This is because the permitted set is small.
+Vector databases handle this differently, which is one of the real gaps between them. Options include filtered graph traversal, per-tenant sub-indexes (clean, and costly at many tenants), and falling back to a flat scan when the filter is very selective &mdash;. This is often truly fastest,. This is because the permitted set is small.
 
 ## Where the permissions live
 
@@ -51,11 +51,11 @@ Also: filtering is not deletion. A document removed for legal or privacy reasons
 
 ## The failure mode that matters most
 
-A RAG system retrieves documents and puts them in a prompt. If the retrieval does not respect who is asking, the model will faithfully summarise a document the user was never allowed to see. And it will do so fluently, with a citation.
+A RAG system fetches documents and puts them in a prompt. If the retrieval does not respect who is asking, the model will faithfully summarise a document the user was never allowed to see. And it will do so fluently, with a citation.
 
 That is a data breach with a helpful tone. And it is the most consequential thing that can go wrong in an enterprise retrieval system. Unlike a hallucination, it is not a quality problem; it is a security one.
 
-The requirement is straightforward to state and easy to implement incorrectly: <strong>the set of documents thought of must be exactly the set this user may read</strong>.
+The requirement is straightforward to state and easy to implement incorrectly: <strong>the set of documents thought of must be just the set this user may read</strong>.
 
 ## Where the filter has to be applied
 
@@ -75,7 +75,7 @@ results = store.search(
 )
 ```
 
-The gap between the second and third options is not theoretical. With post-filtering, a user in a small group querying a corpus ruled by other groups' documents may get zero results while apt authorised documents exist &mdash;. This is because all ten retrieved slots went to documents they cannot see.
+The gap between the second and third options is not theoretical. With post-filtering, a user in a small group querying a corpus ruled by other groups' documents may get zero results while apt authorised documents exist &mdash;. This is because all ten fetched slots went to documents they cannot see.
 
 ## Modelling permissions in metadata
 
@@ -131,7 +131,7 @@ print("   thin arbitrary subset of what they were entitled to see, and")
 print("   the failure is invisible: every log line says success.")
 ```
 
-That average hides how deep the true results are really sitting. Measuring how far down the ranked list a low-privilege user's real results fall shows why "just retrieve more" is not a free patch.
+That average hides how deep the true results are really sitting. Gauging how far down the ranked list a low-privilege user's real results fall shows why "just retrieve more" is not a free patch.
 
 ```python-run
 import numpy as np
@@ -241,7 +241,7 @@ print("   that a user CANNOT retrieve a document, run on every deploy.")
 
 1. Drop <strong>corpus visible</strong> to 5%. Post-filtering returns almost nothing while pre-filtering still returns k. The control fails worst for the most restricted user.
 2. Raise <strong>over-fetch</strong> to 500. The shortfall shrinks and never disappears, which is why over-fetching is a mitigation rather than a fix.
-3. Set visibility to 100%. All three plans agree, which is exactly why this bug survives testing on an admin account.
+3. Set visibility to 100%. All three plans agree, which is just why this bug survives testing on an admin account.
 
 ## What to recall
 
@@ -251,7 +251,7 @@ Permission filtering has to happen inside the search, not around it. Post-filter
 
 An other to storing ACLs in the index is to resolve them at query time against the source system.
 
-<strong>Store only a reference</strong> &mdash; the source id &mdash; and after retrieving candidates, ask the source system which of them this user may read.
+<strong>Store only a guide</strong> &mdash; the source id &mdash; and after fetching candidates, ask the source system which of them this user may read.
 
 |&nbsp;|ACLs in the index|Resolve at query time|
 |---|---|---|
@@ -281,9 +281,9 @@ That last one is worth stating plainly because caching is added later, as a spee
 
 Retrieval is the main channel and not the only one.
 
-<strong>Conversation history</strong> carries content forward. If a user's permissions change mid-session, earlier retrieved content is still in the context.
+<strong>Conversation history</strong> carries content forward. If a user's permissions change mid-session, earlier fetched content is still in the context.
 
-<strong>Logs and traces.</strong> Prompt logging captures retrieved document content, so log storage inherits the documents' classification.
+<strong>Logs and traces.</strong> Prompt logging captures fetched document content, so log storage inherits the documents' classification.
 
 <strong>Embeddings themselves.</strong> Research has shown that text can be partially reconstructed from its embedding. So a vector store holding sensitive content is itself sensitive and needs the same protections as the documents.
 

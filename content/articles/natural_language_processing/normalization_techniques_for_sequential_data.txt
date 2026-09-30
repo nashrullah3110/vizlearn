@@ -3,11 +3,11 @@ intro: Batch normalisation works beautifully on images and badly on sequences. L
 
 ## Normalising over the wrong axis
 
-<p>Each normalisation layer does the same arithmetic &mdash; subtract a mean, divide by a standard deviation. Then apply a learned scale and shift. What differs is <em>which</em> values are pooled to compute that mean and deviation.</p><strong>Batch normalisation</strong> computes statistics per feature, across the batch. For feature 3, average over all samples in the batch. <strong>Layer normalisation</strong> computes statistics per sample, across the features. For sample 3, average over all of its features.<p>On images batch norm is excellent. On sequences it breaks, for three separate reasons. Variable-length inputs make per-timestep statistics unstable, the running averages have no values for positions longer than the training data. And a single sample at inference gives meaningless batch statistics. Layer normalisation sidesteps all three by computing statistics per sample rather than per batch. This is why it is the default in transformers and recurrent networks. RMSNorm cuts down layer norm further by dropping the mean subtraction, and group norm covers the vision cases where batch sizes are too small for batch norm. The choice of which axis to normalise over is not a minor implementation detail. It decides whether the layer works at all in the target setting, and switching from batch norm to layer norm is often the single change that makes a sequence model train stably. This page computes batch norm and layer norm on the same tensor, prints the per-feature and per-sample statistics side by side, and covers the failure cases for each.</p>
+<p>Each normalisation layer does the same arithmetic &mdash; subtract a mean, divide by a standard deviation. Then apply a learned scale and shift. What differs is <em>which</em> values are pooled to compute that mean and deviation.</p><strong>Batch normalisation</strong> computes stats per feature, across the batch. For feature 3, average over all samples in the batch. <strong>Layer normalisation</strong> computes stats per sample, across the features. For sample 3, average over all of its features.<p>On images batch norm is excellent. On sequences it breaks, for three separate reasons. Variable-length inputs make per-timestep stats unstable, the running averages have no values for spots longer than the training data. And a single sample at inference gives meaningless batch stats. Layer normalisation sidesteps all three by computing stats per sample rather than per batch. This is why it is the default in transformers and recurrent networks. RMSNorm cuts down layer norm further by dropping the mean subtraction, and group norm covers the vision cases where batch sizes are too small for batch norm. The choice of which axis to normalise over is not a minor implementation detail. It decides whether the layer works at all in the target setting, and switching from batch norm to layer norm is often the single change that makes a sequence model train stably. This page computes batch norm and layer norm on the same tensor, prints the per-feature and per-sample stats side by side, and covers the failure cases for each.</p>
 
 ## Why batch norm fails on sequences
 
-<strong>Variable length.</strong> Sequences in a batch have different lengths, so timestep 50 might have 32 real values in one batch and 3 in another, with the rest padding. Statistics computed over that are unstable, and computed over padding they are simply wrong.<strong>Per-timestep statistics.</strong> A recurrent network applies the same cell at each step, but batch norm would need separate running statistics for each timestep. And at inference on a sequence longer than anything seen in training, there are no statistics for those positions at all.<strong>Batch dependence.</strong> A sample’s normalised representation depends on the other samples it happens to be batched with. For generation, where inference often runs one sequence at a time, the batch statistics are meaningless.<p>Layer norm sidesteps all three. It uses only the sample’s own features, so it is free of batch size, the same at training and inference, and unaffected by how many other sequences are present or how long they are.</p> RMSNorm, used in LLaMA and other recent models, cuts down layer norm further by dropping the mean subtraction and normalising by the root mean square alone. One fewer statistic to compute per token, with no measurable loss in quality. Group norm (used in vision when batch sizes are small) and instance norm (used in style transfer) are two other axis choices that solve different problems. The choice of normalisation axis is not a detail. It decides whether the layer works at all in the target setting, and switching from batch norm to layer norm is often the single change that makes a sequence model train stably. This page computes batch norm and layer norm on the same tensor, prints the per-feature and per-sample statistics side by side, and covers the failure cases for each.
+<strong>Variable length.</strong> Sequences in a batch have different lengths, so timestep 50 might have 32 real values in one batch and 3 in another, with the rest padding. Stats computed over that are unstable, and computed over padding they are simply wrong.<strong>Per-timestep stats.</strong> A recurrent network applies the same cell at each step, but batch norm would need separate running stats for each timestep. And at inference on a sequence longer than anything seen in training, there are no stats for those spots at all.<strong>Batch dependence.</strong> A sample’s normalised form depends on the other samples it happens to be batched with. For generation, where inference often runs one sequence at a time, the batch stats are meaningless.<p>Layer norm sidesteps all three. It uses only the sample’s own features, so it is free of batch size, the same at training and inference, and unaffected by how many other sequences are present or how long they are.</p> RMSNorm, used in LLaMA and other recent models, cuts down layer norm further by dropping the mean subtraction and normalising by the root mean square alone. One fewer statistic to compute per token, with no measurable loss in quality. Group norm (used in vision when batch sizes are small) and instance norm (used in style transfer) are two other axis choices that solve different problems. The choice of normalisation axis is not a detail. It decides whether the layer works at all in the target setting, and switching from batch norm to layer norm is often the single change that makes a sequence model train stably. This page computes batch norm and layer norm on the same tensor, prints the per-feature and per-sample stats side by side, and covers the failure cases for each.
 
 ## Two different meanings of "normalisation"
 
@@ -23,7 +23,7 @@ Both matter for sequences, and for different reasons. This covers both.
 
 The requirement is the same as for tabular data. A feature ranging over thousands will dominate the first layer's weighted sum, and gradients for the other features become tiny.
 
-The rule that is specific to sequences is <strong>fit the scaler on the training period only</strong>:
+The rule that is set to sequences is <strong>fit the scaler on the training period only</strong>:
 
 ```python
 from sklearn.preprocessing import StandardScaler
@@ -45,27 +45,27 @@ Computing the mean and standard deviation over the whole series uses future valu
 
 Differencing deserves a note: tree-based models cannot extrapolate beyond their training range. So on a trending series they will never predict a new high. Modelling the <em>change</em> rather than the level fixes it. And this is one of the most valuable transformations in applied forecasting.
 
-## Non-stationarity, the sequence-specific problem
+## Non-stationarity, the sequence-set problem
 
-A series whose statistics change over time is <strong>non-fixed</strong>. And a single scaler fitted once is wrong for the later part of it.
+A series whose stats change over time is <strong>non-fixed</strong>. And a single scaler fitted once is wrong for the later part of it.
 
 A stock price in 2015 and in 2025 differ in level and volatility; a website's traffic in its first month and its fifth year are different distributions. Scaling both with one mean and standard deviation puts the recent data far from zero.
 
 Three responses:
 
-<strong>Difference the series</strong> so the model works on changes, which are often far more fixed than levels.
+<strong>Gap the series</strong> so the model works on changes, which are often far more fixed than levels.
 
-<strong>Use rolling normalisation</strong> &mdash; scale each window by its own statistics. So each case is locally normalised. This is standard in financial modelling, and it discards absolute level. This is sometimes exactly what you want and sometimes the signal.
+<strong>Use rolling normalisation</strong> &mdash; scale each window by its own stats. So each case is locally normalised. This is standard in financial modelling, and it discards absolute level. This is sometimes just what you want and sometimes the sign.
 
 <strong>Refit at times,</strong> as part of a retraining schedule, and monitor for drift.
 
-Note that a log transform handles a specific and common case. When a series grows multiplicatively, differencing the logarithm gives percentage changes. This are often fixed where absolute changes are not.
+Note that a log transform handles a set and common case. When a series grows multiplicatively, differencing the logarithm gives percentage changes. This are often fixed where absolute changes are not.
 
 ## Interactive Exploration Guide
 
 1. <strong>Look at the unnormalised distribution.</strong> With the outlier toggle off, note the spread of the raw values. Features on different scales pull the layer’s triggers around.
 2. <strong>Introduce an outlier.</strong> Enable the outlier toggle. Watch how a single extreme value shifts the computed mean and inflates the standard deviation, dragging each other value with it.
-3. <strong>Compare the axes.</strong> Note which values get pooled. Normalising across the batch means one sample’s statistics depend on its neighbours; normalising across features means each sample is self-held.
+3. <strong>Compare the axes.</strong> Note which values get pooled. Normalising across the batch means one sample’s stats depend on its neighbours; normalising across features means each sample is self-held.
 4. <strong>Toggle back and forth.</strong> The response to a single outlier is the practical argument for reliable preprocessing before the layer ever sees the data.
 
 ## The variants worth knowing
@@ -80,9 +80,9 @@ The placement matters too. First transformers put layer norm after the residual 
 ## Where this goes wrong
 
 - <strong>Batch norm with a batch size of 1 or 2.</strong> The variance estimate is meaningless. Use layer or group norm.
-- <strong>Forgetting eval mode.</strong> Batch norm uses batch statistics in training and running averages at inference. Leaving the model in training mode makes predictions depend on any else is in the batch.
-- <strong>Normalising over padded positions.</strong> Pollutes the statistics with zeros that carry no data.
-- <strong>Adding a bias before a normalisation layer.</strong> The mean subtraction cancels it exactly. So those parameters do nothing. Disable the bias on a layer feeding into a norm.
+- <strong>Forgetting eval mode.</strong> Batch norm uses batch stats in training and running averages at inference. Leaving the model in training mode makes predictions depend on any else is in the batch.
+- <strong>Normalising over padded spots.</strong> Pollutes the stats with zeros that carry no data.
+- <strong>Adding a bias before a normalisation layer.</strong> The mean subtraction cancels it just. So those parameters do nothing. Disable the bias on a layer feeding into a norm.
 
 ## The short version
 
@@ -92,7 +92,7 @@ All normalisation layers subtract a mean and divide by a deviation; they differ 
 
 For recurrent and transformer models, the internal normalisation choice is not the same as for convolutional networks. And the reason is structural.
 
-<strong>Batch normalisation does not suit sequences.</strong> It computes statistics across the batch for each feature. This means mixing position 3 of one sentence with position 3 of another. And with padding, mixing real tokens with filler. It also needs a fair batch size, and it behaves differently at inference. This matters when serving one request at a time.
+<strong>Batch normalisation does not suit sequences.</strong> It computes stats across the batch for each feature. This means mixing spot 3 of one sentence with spot 3 of another. And with padding, mixing real tokens with filler. It also needs a fair batch size, and it behaves differently at inference. This matters when serving one request at a time.
 
 <strong>Layer normalisation</strong> standardises each case across its own features:
 
@@ -111,7 +111,7 @@ It is fully free of the batch, works at batch size 1, handles variable lengths, 
 
 ## Placement matters
 
-In transformers, where the normalisation sits relative to the residual connection is a real architectural decision.
+In transformers, where the normalisation sits next to the residual connection is a real architectural decision.
 
 <strong>Post-norm</strong> &mdash; `LayerNorm(x + sublayer(x))` &mdash; was the first arrangement. It works, and beyond roughly 12 layers it needs careful warm-up to train at all.
 
@@ -123,7 +123,7 @@ For recurrent cells, layer normalisation applied to the gate pre-triggers stabil
 
 ## Why BatchNorm loses to LayerNorm on sequences
 
-Sequences are ragged, arrive one at a time, and vary in length. Each of those breaks BatchNorm in a specific way. And this measures all three on padded batches.
+Sequences are ragged, arrive one at a time, and vary in length. Each of those breaks BatchNorm in a set way. And this measures all three on padded batches.
 
 ```python-run
 import numpy as np
@@ -188,7 +188,7 @@ print("   sentences happened to be batched with it.")
 print()
 ```
 
-The following block covers the left steps.
+The below block covers the left steps.
 
 ```python-run
 import numpy as np
@@ -250,15 +250,15 @@ print("   padding will happily learn to predict padding.")
 
 ## Questions people ask
 
-<strong>Why not batch normalisation for sequences?</strong> It mixes statistics across positions and padding, needs a decent batch size, and differs between training and inference.
+<strong>Why not batch normalisation for sequences?</strong> It mixes stats across spots and padding, needs a decent batch size, and differs between training and inference.
 
 <strong>Do I still need to scale the inputs if I use LayerNorm?</strong> Yes. The first layer receives the raw input, and normalisation only affects triggers after it.
 
-<strong>Should I difference my series?</strong> If it trends, and especially if the model is tree-based, yes. Check stationarity rather than assuming.
+<strong>Should I gap my series?</strong> If it trends, and especially if the model is tree-based, yes. Check stationarity rather than assuming.
 
-<strong>What is rolling normalisation?</strong> Scaling each window by its own statistics. So each case is locally normalised. Standard in finance, and it discards absolute level.
+<strong>What is rolling normalisation?</strong> Scaling each window by its own stats. So each case is locally normalised. Standard in finance, and it discards absolute level.
 
-<strong>Can I scale on the whole series if I am careful?</strong> No &mdash; that is the leak. Training-period statistics only.
+<strong>Can I scale on the whole series if I am careful?</strong> No &mdash; that is the leak. Training-period stats only.
 
 <strong>Pre-norm or post-norm?</strong> Pre-norm for anything deep. It is what all current large models use.
 

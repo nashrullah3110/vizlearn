@@ -7,7 +7,7 @@ intro: What does the with statement actually do, and what happens to an exceptio
 
 <p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
 
-The protocol has two methods. `__enter__` runs before the body and its return value is bound by `as`. `__exit__` receives the exception type, value, and traceback (all `None` when the body exits often). And it runs **regardless** of how the body ended. Normal completion, `return`, `break`, or an unhandled exception. If `__exit__` returns a truthy value the exception is suppressed; if not it propagates often after `__exit__` finishes. Files, database connections, locks, and `decimal.localcontext` all use this pattern. `contextlib.contextmanager` lets you write a context manager as a generator with a single `yield`. Rather than a class, and `contextlib.suppress` wraps a body that is expected to raise a specific exception. This page shows all three exit paths observed from inside `__exit__`, shows exception suppression, and covers the `contextmanager` shortcut with a timing decorator as the case.
+The protocol has two methods. `__enter__` runs before the body and its return value is bound by `as`. `__exit__` receives the exception type, value, and traceback (all `None` when the body exits often). And it runs **regardless** of how the body ended. Normal completion, `return`, `break`, or an unhandled exception. If `__exit__` returns a truthy value the exception is suppressed; if not it propagates often after `__exit__` finishes. Files, database connections, locks, and `decimal.localcontext` all use this pattern. `contextlib.contextmanager` lets you write a context manager as a generator with a single `yield`. Rather than a class, and `contextlib.suppress` wraps a body that is expected to raise a set exception. This page shows all three exit paths observed from inside `__exit__`, shows exception suppression, and covers the `contextmanager` shortcut with a timing decorator as the case.
 
 ## Run it
 
@@ -111,7 +111,7 @@ print("  carried on, nothing raised")
 
 ## Suppression, and why it is rare
 
-<p>A truthy return from <code>__exit__</code> tells Python the exception has been handled, and execution goes on after the block. It is a real feature with one common use &mdash; <code>contextlib.suppress(FileNotFoundError)</code> is a context manager whose entire job is to return <code>True</code> for the types you named.</p><p>Writing it yourself is often a mistake,. This is because a manager that swallows exceptions silently is a manager that hides bugs. The convention is to return <code>None</code> and let the exception through, doing cleanup on the way out. If you do suppress, suppress one specific type and nothing else.</p>
+<p>A truthy return from <code>__exit__</code> tells Python the exception has been handled, and execution goes on after the block. It is a real feature with one common use &mdash; <code>contextlib.suppress(FileNotFoundError)</code> is a context manager whose entire job is to return <code>True</code> for the types you named.</p><p>Writing it yourself is often a mistake,. This is because a manager that swallows exceptions silently is a manager that hides bugs. The convention is to return <code>None</code> and let the exception through, doing cleanup on the way out. If you do suppress, suppress one set type and nothing else.</p>
 
 ## contextlib, and the generator form
 
@@ -125,11 +125,11 @@ def timed(label):
 
 ## The follow-up: why not just use try/finally
 
-<p>You can, and <code>with</code> compiles to roughly that. The difference is that the cleanup lives with the <em>resource</em> rather than with each call site. So it cannot be forgotten at the twelfth place the resource is used. It also composes: <code>with a, b:</code> nests correctly. And both exits run even if the first one raises.</p><p>The async counterpart is <code>async with</code> and <code>__aenter__</code>/<code>__aexit__</code>. This is what an async HTTP client or database session uses. Same protocol, awaitable methods.</p>
+<p>You can, and <code>with</code> compiles to roughly that. The gap is that the cleanup lives with the <em>resource</em> rather than with each call site. So it cannot be forgotten at the twelfth place the resource is used. It also composes: <code>with a, b:</code> nests correctly. And both exits run even if the first one raises.</p><p>The async counterpart is <code>async with</code> and <code>__aenter__</code>/<code>__aexit__</code>. This is what an async HTTP client or database session uses. Same protocol, awaitable methods.</p>
 
 ## What to say out loud
 
-<p>with is the context manager protocol: __enter__ before the body, __exit__ after it, sure, including on an exception or a return. __exit__ receives the exception details, and returning True from it suppresses the exception - which is exactly what contextlib.suppress does. I use it for anything with a cleanup that must happen.</p>
+<p>with is the context manager protocol: __enter__ before the body, __exit__ after it, sure, including on an exception or a return. __exit__ receives the exception details, and returning True from it suppresses the exception - which is just what contextlib.suppress does. I use it for anything with a cleanup that must happen.</p>
 
 <p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence. Then talking for another minute until something wrong comes out.</p>
 

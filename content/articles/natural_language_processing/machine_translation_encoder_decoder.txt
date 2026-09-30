@@ -29,10 +29,10 @@ depends on two source words can only look at one.
 
 ## The second problem: which sequence?
 
-The model gives a probability distribution over the next token. It depends on the source and last output. It does *not* give a translation. Converting probabilities into a sentence needs search. The search is a separate algorithm.
+The model gives a chance distribution over the next token. It depends on the source and last output. It does *not* give a translation. Converting chances into a sentence needs search. The search is a separate algorithm.
 
-**Greedy decoding** takes the highest-probability token at each step. It is
-cheap, it is what people implement first, and it is wrong in a specific and
+**Greedy decoding** takes the highest-chance token at each step. It is
+cheap, it is what people implement first, and it is wrong in a set and
 damaging way.
 
 Select the second sentence in the explorer and set the beam width to 1. The
@@ -47,7 +47,7 @@ model's own next-token table gives, after `i`:
 Greedy takes `speak`, and the output is **"i speak french"** &mdash; a fluent
 sentence with the opposite meaning, because the negation is gone and there is
 no way back. Widen the beam to 3 and `do` stays alive; it leads to `not`,
-`speak`, `french`, and a total log-probability of &minus;1.22 against greedy's
+`speak`, `french`, and a total log-chance of &minus;1.22 against greedy's
 &minus;2.25.
 
 That is the entire argument for beam search, and the case is chosen because
@@ -63,26 +63,26 @@ continue until they have all emitted end-of-sequence.
 The tree in the explorer draws this. Each row is one step, the surviving beams
 are the boxes, and the edges show which parent each came from. The best-scoring
 beam is highlighted, and you can watch it change parent partway down &mdash;
-which is exactly the moment beam search does something greedy cannot.
+which is just the moment beam search does something greedy cannot.
 
 Two things are worth knowing about the width. It is *not* exact search: beam
-search offers no guarantee of finding the highest-probability sequence, because
+search offers no guarantee of finding the highest-chance sequence, because
 a sequence whose prefix falls out of the top k at any step is gone forever. And
 raising it does not monotonically help. Past roughly 10, translation quality
 measured by BLEU often *degrades*, which is a well-documented and slightly
-uncomfortable result: the model's true highest-probability output tends to be
+uncomfortable result: the model's true highest-chance output tends to be
 short and dull, and a narrow beam's failure to find it is doing useful work.
 The statistic in the explorer comparing your beam against beam 5 is there to
 make the point that wider is often just the same answer for more compute.
 
 ## The length cost
 
-Each token multiplies another probability below 1, so a longer sequence has a
-lower total probability, always. Unnormalised, the search so prefers to
+Each token multiplies another chance below 1, so a longer sequence has a
+lower total chance, always. Unnormalised, the search so prefers to
 stop early &mdash; it will truncate rather than finish the sentence.
 
 Set the length cost **alpha to 0** in the explorer on the first sentence.
-The winning beam becomes "the cat", with a total log-probability of
+The winning beam becomes "the cat", with a total log-chance of
 &minus;1.72, beating the full "the black cat sleeps on the mat" at &minus;2.10.
 The short output is not better; it is shorter.
 
@@ -142,7 +142,7 @@ length is hit, which is a safety net rather than the intended path.
 This is why the length cost operates where it does. The competition is
 between emitting end-of-sequence now and emitting another content word, and
 both are just entries in the same distribution. When the built up
-log-probability is the score, stopping is always locally attractive, because it
+log-chance is the score, stopping is always locally attractive, because it
 is the only choice that stops making the score worse.
 
 Watch the beam table with the first sentence and alpha at 0: the winning
@@ -158,7 +158,7 @@ and are, at bottom, arithmetic about one token.
 
 ## What changed, and what did not
 
-The recurrence in this architecture is gone &mdash; a transformer encoder and
+The recurrence in this design is gone &mdash; a transformer encoder and
 decoder replaced it, and the attention that was one part became the whole
 model. Word-level vocabularies are gone too, replaced by subword tokenisation,
 which is what stopped translations holding `<unk>` for each rare name.
@@ -166,7 +166,7 @@ which is what stopped translations holding `<unk>` for each rare name.
 All of it on the second half of this page survived unchanged. A transformer
 still gives a distribution over the next token and still needs a search over
 sequences to turn that into output. Beam width and length cost are still
-tuned per model. And a large language model making text is doing exactly
+tuned per model. And a large language model making text is doing just
 this, often with sampling instead of beam search &mdash; temperature, top-k
 and nucleus sampling are other answers to the same question this page
 asks: given a next-token distribution, which sequence do you really emit?
@@ -174,13 +174,13 @@ asks: given a next-token distribution, which sequence do you really emit?
 
 <strong>Why does greedy decoding fail so badly here?</strong> Because the damage is semantic rather than grammatical. After `i`, `speak` outscores `do` by about a tenth of a nat, and taking it deletes the negation with no route back &mdash; "i speak french" is perfectly fluent and means the opposite. Greedy decoding rarely gives bad grammar; it gives confident, well-formed sentences that say something else.
 
-<strong>Is a wider beam always better?</strong> No, in two ways. It is not exact search. A prefix that falls out of the top k at any step is gone permanently. And past a width of roughly 10, BLEU often *degrades*. The model's true highest-probability output tends to be short and dull. So a narrow beam's failure to find it is quietly doing useful work.
+<strong>Is a wider beam always better?</strong> No, in two ways. It is not exact search. A prefix that falls out of the top k at any step is gone permanently. And past a width of roughly 10, BLEU often *degrades*. The model's true highest-chance output tends to be short and dull. So a narrow beam's failure to find it is quietly doing useful work.
 
-<strong>What should the length cost be?</strong> There is no principled value; it is tuned on a development set, often somewhere around 0.6&ndash;0.7. At alpha = 0 the search truncates, because a shorter sequence multiplies fewer probabilities below 1 and so always scores better. Past alpha = 1 the correction over-corrects and the model pads, because length is now rewarded on its own.
+<strong>What should the length cost be?</strong> There is no principled value; it is tuned on a development set, often somewhere around 0.6&ndash;0.7. At alpha = 0 the search truncates, because a shorter sequence multiplies fewer chances below 1 and so always scores better. Past alpha = 1 the correction over-corrects and the model pads, because length is now rewarded on its own.
 
 <strong>Where does the length normalisation go in the loop?</strong> Before ranking, not after. Normalising only the final pick leaves each middle pruning step with the full short-sequence bias. So the cost appears to be applied and mostly is not. It is the easiest version of this bug to ship because the output is plausible.
 
-<strong>What decides how long the output is?</strong> Not a length setting. End-of-sequence is an ordinary vocabulary entry competing with the content words, and. This is because each extra token lowers the built up log-probability, stopping is always locally attractive &mdash;. This is exactly what the length cost exists to counteract. The opposite failure comes from under-predicted end-of-sequence, often from training data with few short cases. Generation runs to the cap and trails off mid-clause.
+<strong>What decides how long the output is?</strong> Not a length setting. End-of-sequence is an ordinary vocabulary entry competing with the content words, and. This is because each extra token lowers the built up log-chance, stopping is always locally attractive &mdash;. This is just what the length cost exists to counteract. The opposite failure comes from under-predicted end-of-sequence, often from training data with few short cases. Generation runs to the cap and trails off mid-clause.
 
 <strong>Does any of this survive the transformer?</strong> The whole second half of the page does. A transformer still emits a distribution over the next token and still needs a search to turn that into text, and beam width and length cost are still tuned per model. Temperature, top-k and nucleus sampling are other answers to the same question. Given a next-token distribution, what do you really emit?
 
@@ -190,4 +190,4 @@ asks: given a next-token distribution, which sequence do you really emit?
 - Attention weights give alignment for free, trained on nothing but next-token prediction. Including crossing alignments, and one target word attending to two source words as `not` does to `ne` and `pas`.
 - A target word with no source counterpart, like the auxiliary `do`, gets diffuse attention. That is the model correctly reporting there is nothing to point at.
 - Greedy decoding is cheap and fails semantically; beam search keeps k prefixes alive so a single token cannot find the rest of the sentence.
-- Built up log-probability always favours stopping early, so the score is divided by a function of length. With an exponent that is tuned, not derived.
+- Built up log-chance always favours stopping early, so the score is divided by a function of length. With an exponent that is tuned, not derived.

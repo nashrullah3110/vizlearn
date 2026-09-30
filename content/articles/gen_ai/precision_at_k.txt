@@ -3,7 +3,7 @@ intro: What does Precision@k measure, and why does it matter more in RAG than pe
 
 ## The definition, and the denominator that never moves
 
-Precision@k is the number of apt documents in the top k divided by k. Not by the number of apt documents in the corpus, and not by the number retrieved. By k, always.
+Precision@k is the number of apt documents in the top k divided by k. Not by the number of apt documents in the corpus, and not by the number fetched. By k, always.
 
 That fixed denominator is what makes precision cheap to measure. You only need judgements for the k results you really returned, not for the whole corpus. An evaluation set for precision can be built by judging a few hundred query-document pairs; one for recall needs exhaustive or pooled labelling. If you can only afford one, precision is the affordable one.
 
@@ -15,11 +15,11 @@ This page shows why precision matters more in RAG pipelines than old data-retrie
 
 The old intuition &mdash; "the model can just ignore irrelevant chunks" &mdash; is not quite true. And the ways it fails are worth naming.
 
-<p><strong>Cost and latency.</strong> Each retrieved chunk is input tokens on each request. Halving the number of chunks halves that bill and shortens time to first token.</p>
+<p><strong>Cost and latency.</strong> Each fetched chunk is input tokens on each request. Halving the number of chunks halves that bill and shortens time to first token.</p>
 
-<p><strong>Distraction.</strong> Irrelevant context measurably reduces answer quality. A plausible-but-wrong passage is worse than no passage. The model has been handed a reason to be confidently incorrect. And it is grounded in a real retrieved document. This makes the error harder to spot.</p>
+<p><strong>Distraction.</strong> Irrelevant context measurably reduces answer quality. A plausible-but-wrong passage is worse than no passage. The model has been handed a reason to be confidently incorrect. And it is grounded in a real fetched document. This makes the error harder to spot.</p>
 
-<p><strong>Position effects.</strong> Attention over a long context is uneven, with the middle attended least. Padding the prompt with irrelevant chunks pushes good evidence into that dead zone.</p>
+<p><strong>Spot effects.</strong> Attention over a long context is uneven, with the middle attended least. Padding the prompt with irrelevant chunks pushes good evidence into that dead zone.</p>
 
 So precision is not merely an speed metric here. Past a point, improving precision improves the answers.
 
@@ -27,15 +27,15 @@ So precision is not merely an speed metric here. Past a point, improving precisi
 
 Precision and recall pull against each other as k moves. Raising k can only help recall and often hurts precision,. This is because the highest-scoring results were already at the top and what follows is step by step worse.
 
-The standard combination is F1, the harmonic mean, which punishes an imbalance. A system with precision 1.0 and recall 0.1 scores 0.18, not 0.55. The harmonic mean is used exactly because it refuses to let one strong number hide a weak one.
+The standard combination is F1, the harmonic mean, which punishes an imbalance. A system with precision 1.0 and recall 0.1 scores 0.18, not 0.55. The harmonic mean is used just because it refuses to let one strong number hide a weak one.
 
-In a modern RAG stack the two are often optimised at different stages. The retriever runs at high k for recall; the <a href="reranking_bi_encoders_vs_cross_encoders.html">reranker</a> cuts that to a handful for precision. Measuring recall@50 and precision@5 in the same evaluation tells you which of the two stages is failing. And they are fixed by fully different work.
+In a modern RAG stack the two are often optimised at different stages. The retriever runs at high k for recall; the <a href="reranking_bi_encoders_vs_cross_encoders.html">reranker</a> cuts that to a handful for precision. Gauging recall@50 and precision@5 in the same evaluation tells you which of the two stages is failing. And they are fixed by fully different work.
 
 ## What precision cannot see
 
-<p><strong>Order within k.</strong> Apt documents at ranks 1 and 2 score the same as apt documents at ranks 4 and 5. For a generator, that difference is real; precision is blind to it and <a href="mean_reciprocal_rank.html">MRR</a> or nDCG is not.</p>
+<p><strong>Order within k.</strong> Apt documents at ranks 1 and 2 score the same as apt documents at ranks 4 and 5. For a generator, that gap is real; precision is blind to it and <a href="mean_reciprocal_rank.html">MRR</a> or nDCG is not.</p>
 
-<p><strong>What was missed.</strong> A retriever that returns three perfect documents and misses seven more scores precision 1.0. The metric is silent about the corpus it did not touch. This is exactly why it is never reported alone.</p>
+<p><strong>What was missed.</strong> A retriever that returns three perfect documents and misses seven more scores precision 1.0. The metric is silent about the corpus it did not touch. This is just why it is never reported alone.</p>
 
 <p><strong>Degrees of usefulness.</strong> Binary relevance forces a yes/no on documents that are truly partial. If your judgements are graded, nDCG uses that data and precision discards it.</p>
 
@@ -75,7 +75,7 @@ That does not make precision irrelevant, for three reasons:
 
 <strong>Attention dilution.</strong> More context means each apt chunk gets proportionally less attention, and material in the middle of a long context is attended to less reliably.
 
-So the target is high recall in stage one and high precision in what finally reaches the prompt &mdash;. This is exactly what a reranker gives.
+So the target is high recall in stage one and high precision in what finally reaches the prompt &mdash;. This is just what a reranker gives.
 
 ## Where precision is the primary metric
 
@@ -121,7 +121,7 @@ print("   the two always trade off, which is why a bare 'precision' with")
 print("   no k attached is not a number you can act on.")
 ```
 
-Precision@k also throws away the order results came back in. And that turns out to hide real differences between result lists.
+Precision@k also throws away the order results came back in. And that turns out to hide real gaps between result lists.
 
 ```python-run
 import numpy as np
@@ -159,7 +159,7 @@ print("   three questions -- what is IN the top k, where the FIRST good")
 print("   one is, and how well the whole list is ordered.")
 ```
 
-A second blind spot: precision@k only ever looks at the k positions it was given. So it cannot tell you how much apt material got left behind.
+A second blind spot: precision@k only ever looks at the k spots it was given. So it cannot tell you how much apt material got left behind.
 
 ```python-run
 RESULTS = [True, True, False, True, False, False, True, False]
@@ -202,7 +202,7 @@ print("   you stuff 5 chunks into a prompt, precision@5 is the number")
 print("   that predicts how much of that prompt is noise.")
 ```
 
-That last point is exactly what makes precision@k the metric that matters for a RAG pipeline in detail. Each irrelevant chunk it lets through is not just wasted, it is a distraction the model has to actively ignore.
+That last point is just what makes precision@k the metric that matters for a RAG pipeline in detail. Each irrelevant chunk it lets through is not just wasted, it is a distraction the model has to actively ignore.
 
 ```python-run
 RESULTS = [True, True, False, True, False, False, True, False]
@@ -224,7 +224,7 @@ print("   better. that is the whole argument for reranking: retrieve")
 print("   widely, then throw most of it away before the model sees it.")
 ```
 
-One last trap sits above all of these blind spots. Reporting a single system-wide precision@k number, averaged across queries, buries exactly the failures a team most needs to see.
+One last trap sits above all of these blind spots. Reporting a single system-wide precision@k number, averaged across queries, buries just the failures a team most needs to see.
 
 ```python-run
 import numpy as np
@@ -266,7 +266,7 @@ print("   the number a user would recognise as 'it often does not work'.")
 
 Precision@k is the fraction of the returned k that was apt, with k always as the denominator. It is the cheap metric to label, because it needs judgements only for what you returned. In a RAG pipeline it is not just about speed. Irrelevant context costs tokens, pushes good evidence into the least-attended part of the prompt, and gives the model plausible material to be wrong with. Optimise recall at the retriever and precision at the reranker, and report both with their k.
 
-All four of these read the same object: an ordered list of retrieved results, with each one labelled apt or not by a human or a strong model. They differ only in what they choose to notice about it &mdash;. This is why quoting one without saying. This is close to meaningless, and why the visualisation above shows all four at once.
+All four of these read the same object: an ordered list of fetched results, with each one labelled apt or not by a human or a strong model. They differ only in what they choose to notice about it &mdash;. This is why quoting one without saying. This is close to meaningless, and why the visualisation above shows all four at once.
 
 The labels are the costly part. A relevance judgement per query-document pair is human work. And an evaluation set of fifty queries with judged results is worth more than any amount of metric sophistication on top of unjudged data. Build the set first.
 
@@ -280,7 +280,7 @@ Neither metric alone describes a retrieval system, and there are standard ways t
 
 <strong>Average precision (AP)</strong> averages the precision at each rank where a apt document appears. So it rewards putting apt documents early, unlike plain precision@k. Averaged across queries it gives <strong>MAP</strong>, a standard data-retrieval measure.
 
-<strong>nDCG@k</strong> handles graded relevance and discounts by position logarithmically. The most complete measure, and it needs graded judgements rather than binary ones.
+<strong>nDCG@k</strong> handles graded relevance and discounts by spot logarithmically. The most complete measure, and it needs graded judgements rather than binary ones.
 
 |Metric|Sensitive to rank order?|Needs graded labels?|
 |---|---|---|
@@ -292,7 +292,7 @@ Neither metric alone describes a retrieval system, and there are standard ways t
 
 For most RAG work, recall@k plus MRR is enough. Add nDCG if you have graded judgements and are comparing configurations closely.
 
-## Measuring it
+## Gauging it
 
 ```python
 def precision_at_k(retrieved, relevant, k):
@@ -322,7 +322,7 @@ Two practical notes on interpretation.
 |Metadata filtering|Removes structurally irrelevant candidates|
 |Hybrid search|Helps both, mostly recall|
 
-Reranking is the direct instrument. A cross-encoder reads the query and each candidate together and scores them far more accurately than a check of precomputed vectors. This is exactly the step that raises precision within a fixed candidate set.
+Reranking is the direct instrument. A cross-encoder reads the query and each candidate together and scores them far more well than a check of precomputed vectors. This is just the step that raises precision within a fixed candidate set.
 
 ## Questions people ask
 

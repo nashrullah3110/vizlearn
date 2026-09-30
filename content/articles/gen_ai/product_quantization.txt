@@ -14,8 +14,8 @@ index. To get useful resolution you would need a codebook with millions of
 entries — which you would then have to store, and which k-means could not
 train.
 
-Set **m = 1** in the visualisation to see exactly this. One codebook, a
-handful of representable positions, and the top-k answer collapses.
+Set **m = 1** in the visualisation to see just this. One codebook, a
+handful of representable spots, and the top-k answer collapses.
 
 This page shows how product quantization escapes that limit by splitting each vector into short subvectors and quantising each piece on its own. This trades a controllable amount of recall for a compression ratio that makes billion-scale search fit in RAM.
 
@@ -41,12 +41,12 @@ subspace codebooks.
 
 Set **m = 2** in the visualisation at the same bit depth. The number of
 representable points squares, the grid appears, and recall jumps. Same
-centroids stored; vastly more positions described.
+centroids stored; vastly more spots described.
 
 ## Reading the picture
 
 With d = 2 and m = 2, each subspace is one axis and its codebook is a set of
-positions along it. The faint grid is each position the index can represent —
+spots along it. The faint grid is each spot the index can represent —
 the intersections are the reachable points. The blue line from each vector
 runs to where the index thinks that vector is: the quantisation error, drawn
 right.
@@ -77,7 +77,7 @@ the memory bandwidth.
 
 It is called **asymmetric** because only one side is quantised. Quantising the
 query too would let you precompute a even table between codebook entries,
-which is marginally faster and measurably less accurate: you would be adding
+which is marginally faster and measurably less exact: you would be adding
 the query's own quantisation error to each check for no gain. Always
 use asymmetric distance unless something very unusual is going on.
 
@@ -120,7 +120,7 @@ So PQ is nearly always combined with something that prunes:
 - [DiskANN](diskann_index.html) keeps PQ codes in RAM to route a graph search
   whose full vectors live on SSD.
 - [ScaNN](scann_index.html) changes the quantisation objective itself for
-  inner product search, then rescores exactly.
+  inner product search, then rescores just.
 
 Pure PQ on its own is unusual, and appears mainly where you already have a
 small candidate set and only memory hurts.
@@ -175,7 +175,7 @@ shortlist fixes the ordering. That proviso is the same one
 that the first 256 of its 768 dimensions are themselves a usable embedding, so
 you truncate rather than quantise &mdash; and you can still quantise afterwards.
 
-What PQ retains is accuracy per byte at aggressive ratios, and the fact that it
+What PQ retains is precision per byte at aggressive ratios, and the fact that it
 composes with a partition through residual encoding. If 4&times; is enough, int8
 is less work than any of this.
 
@@ -183,20 +183,20 @@ is less work than any of this.
 
 PQ splits a vector into m subvectors and stores the index of the nearest
 centroid in each subspace's codebook. m codebooks of k centroids describe
-`kᵐ` positions from `m·k` stored centroids, which is why the compression is so
+`kᵐ` spots from `m·k` stored centroids, which is why the compression is so
 extreme. Queries build an `m × k` distance table once. Then cost m lookups
 per candidate, free of dimension. It compresses but does not prune, so
 it is almost always paired with IVF or a graph.
 
 ## Questions people ask
 
-<strong>Why does splitting help so much?</strong> Because representable positions *times* while stored centroids only add. m codebooks of k centroids describe `kᵐ` positions from `m·k` stored centroids. At m = 96 and k = 256, that is 256⁹⁶ positions from 24,576 centroids. Plain quantization has to store each position it can represent.
+<strong>Why does splitting help so much?</strong> Because representable spots *times* while stored centroids only add. m codebooks of k centroids describe `kᵐ` spots from `m·k` stored centroids. At m = 96 and k = 256, that is 256⁹⁶ spots from 24,576 centroids. Plain quantization has to store each spot it can represent.
 
 <strong>Should nbits ever be anything but 8?</strong> Rarely. A byte is what hardware likes, 256 centroids per subspace is a good operating point. And the SIMD lookup implementations that make PQ fast assume it. Lower values exist for extreme compression and lose recall quickly.
 
 <strong>Should I use OPQ?</strong> Often yes. PQ splits dimensions in their first order, which implicitly assumes neighbouring dimensions belong together. Arbitrary for a learned embedding. OPQ learns a rotation that balances variance across the subspaces first, costs one matrix times per query, and often buys a few points of recall.
 
-<strong>Why asymmetric distance instead of decoding the code?</strong> Because it leaves the query exact. Quantising the query too would let you precompute a even table between codebook entries. This is marginally faster and measurably less accurate. You would be adding the query's own quantisation error to each check for no gain.
+<strong>Why asymmetric distance instead of decoding the code?</strong> Because it leaves the query exact. Quantising the query too would let you precompute a even table between codebook entries. This is marginally faster and measurably less exact. You would be adding the query's own quantisation error to each check for no gain.
 
 <strong>FAISS rejected my m. Why?</strong> Because m must divide d. 768 divides by 96, 64, 48, 32 and 16, and so does 1536. One small reason those embedding dimensions are popular. This is what catches people who change embedding model without revisiting the index recipe.
 

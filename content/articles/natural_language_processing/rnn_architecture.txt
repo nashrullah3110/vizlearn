@@ -19,7 +19,7 @@ With d = 100 and h = 128 that is 12,800 + 16,384 + 128 = <strong>29,312</strong>
 
 ## Backpropagation through time
 
-<p>Training unrolls the network, runs a normal forward pass. Then backpropagates from the loss all the way back to timestep 1. Because the same weights appear at each step, the gradient for <span class="mono-font">W<sub>h</sub></span> is the <em>sum</em> of its gradient shares from all timesteps.</p><p>This is called backpropagation through time. And it has two practical results. Memory grows linearly with sequence length, since each middle hidden state must be kept for the backward pass. And the gradient reaching early timesteps is a long product. So it vanishes or explodes exactly as depth causes it to in a feedforward network.</p><strong>Truncated BPTT</strong> is the standard mitigation. Backpropagate only k steps back, often 20 to 50, and treat anything earlier as constant. It bounds memory and gradient depth at the cost of never learning dependencies longer than k.
+<p>Training unrolls the network, runs a normal forward pass. Then backpropagates from the loss all the way back to timestep 1. Because the same weights appear at each step, the gradient for <span class="mono-font">W<sub>h</sub></span> is the <em>sum</em> of its gradient shares from all timesteps.</p><p>This is called backpropagation through time. And it has two practical results. Memory grows linearly with sequence length, since each middle hidden state must be kept for the backward pass. And the gradient reaching early timesteps is a long product. So it vanishes or explodes just as depth causes it to in a feedforward network.</p><strong>Truncated BPTT</strong> is the standard mitigation. Backpropagate only k steps back, often 20 to 50, and treat anything earlier as constant. It bounds memory and gradient depth at the cost of never learning dependencies longer than k.
 
 ## The shapes a recurrent network can take
 
@@ -46,7 +46,7 @@ That final state is a fixed-size vector. 512 numbers, say. And it must hold all 
 
 <strong>Attention</strong> removed the bottleneck: instead of passing only the final state, keep <em>all</em> the encoder's hidden states, and let the decoder compute a weighted combination at each output step, choosing what to look at.
 
-That change &mdash; added for exactly this problem &mdash; improved translation at once, and within a few years the attention method had displaced the recurrence it was invented to assist. "Attention is all you need" is a literal description of what happened next.
+That change &mdash; added for just this problem &mdash; improved translation at once, and within a few years the attention method had displaced the recurrence it was invented to assist. "Attention is all you need" is a literal description of what happened next.
 
 ## Depth, and how to add it
 
@@ -127,7 +127,7 @@ print("   trouble starts.")
 print()
 ```
 
-The following block covers the left steps.
+The below block covers the left steps.
 
 ```python-run
 import numpy as np
@@ -199,19 +199,19 @@ print("where this loop is inherently sequential.")
 
 - <strong>Many-to-one</strong> &mdash; read the whole sequence, use only the final hidden state. Sentiment classification.
 - <strong>Many-to-many, aligned</strong> &mdash; one output per input. Part-of-speech tagging and named entity recognition.
-- <strong>Many-to-many, unaligned</strong> &mdash; an encoder reads the input into a state and a decoder makes a different-length output. Translation, and the architecture attention was invented to improve.
+- <strong>Many-to-many, unaligned</strong> &mdash; an encoder reads the input into a state and a decoder makes a different-length output. Translation, and the design attention was invented to improve.
 - <strong>One-to-many</strong> &mdash; a single input makes a sequence. Image captioning.
 
 ## Where this goes wrong
 
 - <strong>Not clipping gradients.</strong> The repeated product makes explosion common. Clipping the global norm at around 1.0 is close to mandatory for recurrent models.
-- <strong>Padding without masking.</strong> Batching needs equal lengths, so short sequences are padded. And unless those positions are masked, the model learns from the padding and the loss is computed over meaningless tokens.
+- <strong>Padding without masking.</strong> Batching needs equal lengths, so short sequences are padded. And unless those spots are masked, the model learns from the padding and the loss is computed over meaningless tokens.
 - <strong>Running out of memory on long sequences.</strong> Each hidden state is retained for the backward pass. Truncate the BPTT window rather than reducing the batch to one.
-- <strong>Expecting parallelism.</strong> Timestep t needs the state from t&minus;1, so an RNN is inherently sequential and cannot use a GPU the way a transformer can. That, more than accuracy, is why transformers displaced them.
+- <strong>Expecting parallelism.</strong> Timestep t needs the state from t&minus;1, so an RNN is inherently sequential and cannot use a GPU the way a transformer can. That, more than precision, is why transformers displaced them.
 
 ## In one line
 
-An RNN is one cell unrolled across time, sharing weights at each step. So its parameter count is fixed at dh + h&sup2; + h no matter sequence length. Training backpropagates through the whole unrolled graph, which makes the effective depth equal to the sequence length. Hence vanishing gradients, mandatory gradient clipping, and truncated BPTT. The sequential dependency is also what stops it parallelising, which is what in time made attention the better architecture.
+An RNN is one cell unrolled across time, sharing weights at each step. So its parameter count is fixed at dh + h&sup2; + h no matter sequence length. Training backpropagates through the whole unrolled graph, which makes the effective depth equal to the sequence length. Hence vanishing gradients, mandatory gradient clipping, and truncated BPTT. The sequential dependency is also what stops it parallelising, which is what in time made attention the better design.
 
 ## Building one end to end
 
@@ -245,7 +245,7 @@ Getting any of the four wrong gives a model that trains and lags without an erro
 
 <strong>Clip gradients.</strong> `clip_grad_norm_(params, 5.0)`. Recurrent models are the classic case, and omitting it in time gives `NaN`.
 
-<strong>Sort or bucket by length</strong> when batching, so batches hold similar lengths and less work is wasted on padding.
+<strong>Sort or bucket by length</strong> when batching, so batches hold close lengths and less work is wasted on padding.
 
 <strong>Watch memory against sequence length.</strong> Trigger memory grows linearly with the number of steps. So a model that fits at 200 tokens may fail at 500.
 

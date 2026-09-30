@@ -3,11 +3,11 @@ intro: Spend the expensive model only on the candidates that survived the cheap 
 
 ## The idea in brief
 
-A <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">bi-encoder</a> embeds the query and each document <em>apart</em>, ahead of time — that is what makes the embeddings precomputable and search fast. But it also means the model never looks at a query and a document together. A <strong>cross-encoder</strong> takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable. The accuracy gap between these two approaches is real and well-measured. On MS MARCO and similar benchmarks, a cross-encoder always and much beats a bi-encoder by 5-15 points of nDCG,. This is because joint attention can model fine-grained query-document links (negation, qualification, partial match) that free embeddings compress away. The standard pattern is a **two-stage pipeline**: the bi-encoder (or BM25) retrieves a shortlist of 20-100 candidates cheaply. And the cross-encoder rescores only that shortlist to find the final ranking. This page shows both models scoring the same query-document pairs side by side, shows where the bi-encoder's ranking disagrees with the cross-encoder's, and covers the latency-accuracy tradeoff as the shortlist size changes.
+A <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">bi-encoder</a> embeds the query and each document <em>apart</em>, ahead of time — that is what makes the embeddings precomputable and search fast. But it also means the model never looks at a query and a document together. A <strong>cross-encoder</strong> takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable. The precision gap between these two approaches is real and well-measured. On MS MARCO and close benchmarks, a cross-encoder always and much beats a bi-encoder by 5-15 points of nDCG,. This is because joint attention can model fine-grained query-document links (negation, qualification, partial match) that free embeddings compress away. The standard pattern is a **two-stage pipeline**: the bi-encoder (or BM25) fetches a shortlist of 20-100 candidates cheaply. And the cross-encoder rescores only that shortlist to find the final ranking. This page shows both models scoring the same query-document pairs side by side, shows where the bi-encoder's ranking disagrees with the cross-encoder's, and covers the latency-precision tradeoff as the shortlist size changes.
 
 ## The two-stage pattern
 
-Cross-encoders are far more accurate but cost too much to run over an entire corpus — a million documents means a million forward passes per query. The standard fix is two stages: a cheap bi-encoder (or BM25, or both) retrieves a shortlist of maybe 20-100 candidates. And only that shortlist is re-scored by the costly cross-encoder. This then decides the final order. You pay the cross-encoder's cost dozens of times per query instead of millions of times.
+Cross-encoders are far more exact but cost too much to run over an entire corpus — a million documents means a million forward passes per query. The standard fix is two stages: a cheap bi-encoder (or BM25, or both) fetches a shortlist of maybe 20-100 candidates. And only that shortlist is re-scored by the costly cross-encoder. This then decides the final order. You pay the cross-encoder's cost dozens of times per query instead of millions of times.
 
 ## Two ways to score a query against a document
 
@@ -18,7 +18,7 @@ Cross-encoders are far more accurate but cost too much to run over an entire cor
 <p class="mono-font">bi-encoder:&nbsp;&nbsp;&nbsp;score = cos(embed(q), embed(d))</p>
 <p class="mono-font">cross-encoder:&nbsp;score = model(q, d)</p>
 
-That structural difference gives the entire trade-off:
+That structural gap gives the entire trade-off:
 
 |&nbsp;|Bi-encoder|Cross-encoder|
 |---|---|---|
@@ -40,7 +40,7 @@ So the standard arrangement uses each for what it is good at:
 2. <strong>Rerank</strong> those candidates with the cross-encoder. Costly per item, affordable on 50.
 3. <strong>Pass</strong> the top 3&ndash;10 to the model.
 
-The insight is that recall and precision can be separated. Stage one needs high recall &mdash; the right document must be <em>somewhere</em> in the 50. Stage two gives precision, ordering them accurately.
+The insight is that recall and precision can be separated. Stage one needs high recall &mdash; the right document must be <em>somewhere</em> in the 50. Stage two gives precision, ordering them well.
 
 Measured on standard benchmarks, adding a cross-encoder reranker often improves nDCG by 10&ndash;20% over dense retrieval alone. It is one of the highest-value additions to a RAG pipeline. And it is often skipped.
 
@@ -68,7 +68,7 @@ Rough latency for 50 candidates with a small cross-encoder on a GPU: 20&ndash;50
 
 ## Why one vector per document is not enough
 
-The code above shows the two-stage API. What it cannot show is the reason the second stage helps at all -- that a bi-encoder commits to one vector per document before it knows the question. This builds both scorers from scratch on a case where that commitment is exactly the problem.
+The code above shows the two-stage API. What it cannot show is the reason the second stage helps at all -- that a bi-encoder commits to one vector per document before it knows the question. This builds both scorers from scratch on a case where that commitment is just the problem.
 
 ```python-run
 import numpy as np
@@ -176,7 +176,7 @@ print("worded chunks punch above their weight in a vector index, and")
 print("reranking is what puts them back in their place.")
 ```
 
-That accuracy is exactly why cross-encoders are not used alone. The next block shows what running one over a whole corpus would cost, and why the two-stage split exists.
+That precision is just why cross-encoders are not used alone. The next block shows what running one over a whole corpus would cost, and why the two-stage split exists.
 
 ```python-run
 N = 1_000_000
@@ -218,12 +218,12 @@ print("reranker is. Tune k by watching recall@k of stage one.")
 
 1. <strong>Read Stage 1.</strong> Pure cosine likeness over word overlap. One candidate about python <em>the snake</em> ranks deceptively high — it shares the words "python" and "memory" with the query. And a bi-encoder scoring query and document on its own has no way to notice they mean something different in context.
 2. <strong>Turn on the reranker.</strong> The final order changes: the snake document drops sharply. And a truly on-topic document that Stage 1 under-ranked moves up. This is what "reading query and document together" catches that comparing two free vectors cannot.
-3. <strong>Turn it back off.</strong> The order reverts to pure Stage 1 — the reranker did not change what was retrieved, only the order the survivors are returned in.
-4. <strong>Read the cost panel.</strong> The bi-encoder cost is already paid, before the query ever arrived. The cross-encoder cost is exactly the number of candidates it re-scores — six forward passes, not a million.
+3. <strong>Turn it back off.</strong> The order reverts to pure Stage 1 — the reranker did not change what was fetched, only the order the survivors are returned in.
+4. <strong>Read the cost panel.</strong> The bi-encoder cost is already paid, before the query ever arrived. The cross-encoder cost is just the number of candidates it re-scores — six forward passes, not a million.
 
 ## Worth recalling
 
-A bi-encoder scores query and document on its own, which is what makes it fast enough to search a whole corpus but blind to links between them — a lexical coincidence can outrank a genuine match. A cross-encoder reads both together and catches that, at a cost that only scales with the shortlist, not the corpus. Two-stage retrieval — cheap and broad, then costly and narrow — is how production search gets both speed and accuracy instead of choosing one.
+A bi-encoder scores query and document on its own, which is what makes it fast enough to search a whole corpus but blind to links between them — a lexical coincidence can outrank a genuine match. A cross-encoder reads both together and catches that, at a cost that only scales with the shortlist, not the corpus. Two-stage retrieval — cheap and broad, then costly and narrow — is how production search gets both speed and precision instead of choosing one.
 
 ## Choosing a reranker
 
@@ -251,7 +251,7 @@ The parameter to tune, and it is a straight latency-versus-quality trade.
 
 The number to measure is stage one's <strong>recall@n</strong>: if recall@50 is 0.95 and recall@100 is 0.96, reranking 100 buys almost nothing. If recall@50 is 0.7, the bottleneck is retrieval, not ranking, and fixing chunking or adding hybrid search matters more than a bigger reranker.
 
-That diagnostic ordering is worth stating plainly: <strong>reranking cannot recover a document that was never retrieved.</strong>
+That diagnostic ordering is worth stating plainly: <strong>reranking cannot recover a document that was never fetched.</strong>
 
 ## Questions people ask
 
@@ -265,12 +265,12 @@ That diagnostic ordering is worth stating plainly: <strong>reranking cannot reco
 
 <strong>Does reranking help with the "lost in the middle" problem?</strong> Yes. It puts the most apt chunk first, where the model attends to it most.
 
-<strong>Can I fine-tune a reranker?</strong> Yes, on (query, apt, irrelevant) triples from your own data. It often beats a general model by a wide margin on a specific domain.
+<strong>Can I fine-tune a reranker?</strong> Yes, on (query, apt, irrelevant) triples from your own data. It often beats a general model by a wide margin on a set domain.
 
 ## Recap in one screen
 
 - A bi-encoder embeds query and document apart, so documents can be indexed and search is fast.
-- A cross-encoder reads both together, which is far more accurate and cannot be precomputed.
+- A cross-encoder reads both together, which is far more exact and cannot be precomputed.
 - Use both: broad cheap retrieval for recall, then reranking for precision.
 - Rerank around 50 candidates; measure stage-one recall to know whether that is the bottleneck.
 - Reranking cannot rescue a document that retrieval never returned.

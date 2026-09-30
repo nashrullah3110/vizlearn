@@ -13,7 +13,7 @@ Three parameters control the output. The embedding model decides how likeness is
 
 Semantic chunking pairs well with metadata enrichment. Because each chunk represents a coherent topic, it is straightforward to generate a summary or title for each chunk and store it alongside the embedding. At retrieval time, the summary can be used for hybrid search (keyword plus vector) or for reranking. This improves precision without raising the embedding cost at query time.
 
-The implementation in LangChain is `SemanticChunker`, and in LlamaIndex it is `SemanticSplitterNodeParser`. Both follow the same algorithm: split into sentences, embed, compute pairwise likeness, cut at dips. The differences are in defaults and the API surface, not in the underlying logic.
+The implementation in LangChain is `SemanticChunker`, and in LlamaIndex it is `SemanticSplitterNodeParser`. Both follow the same algorithm: split into sentences, embed, compute pairwise likeness, cut at dips. The gaps are in defaults and the API surface, not in the underlying logic.
 
 ## What it costs
 
@@ -32,23 +32,23 @@ Whether that trade is worth it depends on one thing: <strong>does the document h
 
 ## When to reach for it
 
-Worth it for long unstructured prose. Transcripts, interviews, reports without headings. Where no formatting signal exists and a fixed-size split reliably cuts mid-argument.
+Worth it for long unstructured prose. Transcripts, interviews, reports without headings. Where no formatting sign exists and a fixed-size split reliably cuts mid-argument.
 
 Not worth it when the document already carries structure. If there are headings, they are an explicit, author-provided, free topic boundary, and structure-aware chunking will beat semantic chunking at a fraction of the cost. Measure before adopting: on a retrieval evaluation set the gain over a well-tuned recursive splitter is often small.
 
-## Making the likeness signal usable
+## Making the likeness sign usable
 
 Raw sentence-to-sentence likeness is noisy. Short sentences &mdash; "Yes.", "See above.", a heading fragment &mdash; have unstable embeddings. So the gap sequence holds dips that are artefacts rather than topic changes.
 
 Two standard mitigations. <strong>Buffering:</strong> embed each sentence together with its neighbours, so a short sentence inherits context and its vector stops swinging. <strong>Smoothing:</strong> take a rolling mean over the gap sequence before looking for troughs. So a single anomalous sentence cannot open a boundary on its own.
 
-Both trade response for stability, and both are worth having. Without them the technique looks impressive on a clean essay and falls apart on a support transcript. This is exactly the sort of unstructured text it was supposed to be good at.
+Both trade response for stability, and both are worth having. Without them the technique looks impressive on a clean essay and falls apart on a support transcript. This is just the sort of unstructured text it was supposed to be good at.
 
 ## Is it worth it? Measure before adopting
 
 Semantic chunking is the most cited of the plans and the hardest to justify on evidence. It costs an embedding call per sentence at index time, gives chunks of unpredictable size that complicate context budgeting. And on published checks its edge over a well-tuned recursive splitter is often small or absent.
 
-Where it does earn its cost: long unstructured prose with no formatting signal. Interview transcripts, meeting notes, scanned reports. And corpora where topics shift within a paragraph. So paragraph boundaries mislead.
+Where it does earn its cost: long unstructured prose with no formatting sign. Interview transcripts, meeting notes, scanned reports. And corpora where topics shift within a paragraph. So paragraph boundaries mislead.
 
 The honest order of steps is to tune the separators and the size first, measure. And only then try semantic chunking against that baseline. It is a real technique that is often adopted before the cheap options have been exhausted.
 
@@ -70,7 +70,7 @@ A sensible production pipeline is often structure first, recursive to enforce th
 
 Fixed-size chunking cuts each 500 characters no matter what is there. Recursive chunking respects paragraph and sentence boundaries. Neither knows whether a boundary is a <em>topic</em> boundary.
 
-Semantic chunking finds those boundaries by measuring meaning right:
+Semantic chunking finds those boundaries by gauging meaning right:
 
 1. Split the document into sentences.
 2. Embed each sentence.
@@ -114,7 +114,7 @@ boundaries = [i+1 for i, s in enumerate(sims) if s < threshold]
 
 ## The likeness curve, and where it dips
 
-Semantic chunking splits where in a row sentences stop resembling each other. That description leaves the key question open -- how big a dip counts -- so here is the actual signal from a passage. And the boundaries each threshold gives.
+Semantic chunking splits where in a row sentences stop resembling each other. That description leaves the key question open -- how big a dip counts -- so here is the actual sign from a passage. And the boundaries each threshold gives.
 
 ```python-run
 import numpy as np
@@ -202,7 +202,7 @@ print("works here is worthless on another corpus, model or language --")
 print("an absolute cutoff is tuning to a coincidence.")
 ```
 
-A threshold relative to the document's own spread of similarities fixes that.
+A threshold next to the document's own spread of similarities fixes that.
 
 ```python-run
 import numpy as np
@@ -337,7 +337,7 @@ There is a further honest caveat: <strong>the measured gain is often smaller tha
 
 <strong>Numeric / gradient-based.</strong> Instead of a percentile threshold, look for the largest local drops in likeness. The points of steepest change. Which adapts better to documents with varying likeness levels.
 
-<strong>Double-pass.</strong> Chunk semantically, then merge adjacent chunks whose embeddings are similar. Cleans up over-splitting.
+<strong>Double-pass.</strong> Chunk semantically, then merge adjacent chunks whose embeddings are close. Cleans up over-splitting.
 
 <strong>LLM-based (agentic) chunking.</strong> Ask a model to propose boundaries, or to group sentences into topics. Highest quality on difficult text, and by far the most costly &mdash; often reserved for small high-value corpora.
 
@@ -345,7 +345,7 @@ There is a further honest caveat: <strong>the measured gain is often smaller tha
 
 ## Practical guidance
 
-Start with <strong>recursive or structure-aware chunking</strong> and a proper evaluation set. Measure recall@k. Then, if retrieval is the bottleneck <em>and</em> the documents lack structure, try semantic chunking and measure the difference.
+Start with <strong>recursive or structure-aware chunking</strong> and a proper evaluation set. Measure recall@k. Then, if retrieval is the bottleneck <em>and</em> the documents lack structure, try semantic chunking and measure the gap.
 
 That ordering matters because chunking is one of a few levers, and it is not often the largest. Hybrid search and reranking often give bigger gains for less effort. And they are worth exhausting first.
 
