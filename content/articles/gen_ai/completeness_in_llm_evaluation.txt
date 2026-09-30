@@ -9,11 +9,11 @@ Writing that list is the real work, and it is worth doing carefully because it i
 
 It also forces a decision your users have already made implicitly. Is the caveat about digital goods a needed point or a nice-to-have? Teams often discover during this exercise that they do not agree on what a good answer is. This is more valuable than any score.
 
-Completeness is scored as the fraction of needed key points that appear in the answer, checked either by an LLM judge or by embedding similarity against each point. It is free of correctness, <a href="groundedness_in_llm_evaluation.html">groundedness</a>, and <a href="relevance_in_llm_evaluation.html">relevance</a>. An answer can score perfectly on all three and still omit the one fact that makes it actionable. This page walks through a concrete case. This shows how a partial answer scores on each dimension, explains where incompleteness comes from (retrieval failures, aggressive chunking, length limits, and the model stopping early), and covers the practical traps in optimising for it. The temptation to pad answers with every retrieved fact. This raises completeness at the cost of relevance and user trust.
+Completeness is scored as the fraction of needed key points that appear in the answer, checked either by an LLM judge or by embedding likeness against each point. It is free of correctness, <a href="groundedness_in_llm_evaluation.html">groundedness</a>, and <a href="relevance_in_llm_evaluation.html">relevance</a>. An answer can score perfectly on all three and still omit the one fact that makes it actionable. This page walks through a concrete case. This shows how a partial answer scores on each dimension, explains where incompleteness comes from (retrieval failures, aggressive chunking, length limits, and the model stopping early), and covers the practical traps in optimising for it. The temptation to pad answers with each retrieved fact. This raises completeness at the cost of relevance and user trust.
 
 ## Why the other dimensions cannot see it
 
-Think of an answer that states only "Refunds are issued within 14 days." when the question was about the full refund policy. It is correct. It is grounded. It is fully relevant. It scores 1.0 on three dimensions and leaves out the condition that makes it actionable.
+Think of an answer that states only "Refunds are issued within 14 days." when the question was about the full refund policy. It is correct. It is grounded. It is fully apt. It scores 1.0 on three dimensions and leaves out the condition that makes it actionable.
 
 This asymmetry is the reason completeness is worth measuring apart. The other three dimensions all penalise <em>saying the wrong thing</em>. Only completeness penalises <em>not saying the right thing</em>, and omission is the harder failure to notice,. This is because there is nothing on the screen to catch your eye.
 
@@ -25,7 +25,7 @@ It is also the failure with the worst results in practice. A user who reads a wr
 
 <p><strong>Chunking.</strong> A policy split across two chunks where only one was retrieved gives a confidently half-right answer &mdash;. This is exactly what <a href="parent_document_retriever.html">parent-document retrieval</a> and generous chunk overlap exist to prevent.</p>
 
-<p><strong>Length limits.</strong> A max-tokens cap or a "be concise" instruction trades completeness for brevity, often without anyone deciding to.</p>
+<p><strong>Length limits.</strong> A max-tokens cap or a "be concise" cue trades completeness for brevity, often without anyone deciding to.</p>
 
 <p><strong>The model stopping early.</strong> Given ten chunks, models reliably use the first few more than the rest. A needed point in chunk eight is retrieved, in context, and still absent from the answer &mdash;. This is why <a href="mean_reciprocal_rank.html">MRR</a> is worth tracking next to recall.</p>
 
@@ -44,7 +44,7 @@ Completeness asks whether the answer includes all the data needed. It is the cou
 <blockquote><strong>Question:</strong> "What are the eligibility requirements for parental leave?"</blockquote>
 <blockquote><strong>Context:</strong> "Employees must have 26 weeks' smooth service by the qualifying week, must give 8 weeks' notice, and must provide a MATB1 certificate."</blockquote>
 <blockquote><strong>Answer A:</strong> "You need 26 weeks' smooth service, 8 weeks' notice and a MATB1 certificate." &mdash; complete</blockquote>
-<blockquote><strong>Answer B:</strong> "You need 26 weeks' smooth service." &mdash; correct, grounded, relevant, and <strong>incomplete</strong></blockquote>
+<blockquote><strong>Answer B:</strong> "You need 26 weeks' smooth service." &mdash; correct, grounded, apt, and <strong>incomplete</strong></blockquote>
 
 Answer B passes correctness (what it says is true), groundedness (it is backed) and relevance (it fixes the question). Only completeness catches it &mdash; which is why the metric exists as a separate measurement.
 
@@ -58,7 +58,7 @@ Completeness needs a reference for what "all of it" means, and there are two sou
 
 <p class="mono-font">completeness = needed points covered / total needed points</p>
 
-<strong>Against the retrieved context.</strong> Check whether the answer used all the relevant data available in the context. This measures the generation stage in detail, without needing hand-written references.
+<strong>Against the retrieved context.</strong> Check whether the answer used all the apt data available in the context. This measures the generation stage in detail, without needing hand-written references.
 
 ```
 Question: {question}
@@ -79,11 +79,11 @@ The distinction between the two references matters diagnostically. If the answer
 
 <strong>The context was incomplete.</strong> Retrieval returned two of the three chunks needed. This is the most common cause, and it is a recall problem &mdash; especially for multi-hop questions whose answer spans documents.
 
-<strong>The relevant chunk was ranked low.</strong> Present at position 9 of 10. Where models attend to it less. The "lost in the middle" effect. A reranker fixes this.
+<strong>The apt chunk was ranked low.</strong> Present at position 9 of 10. Where models attend to it less. The "lost in the middle" effect. A reranker fixes this.
 
 <strong>The model stopped early.</strong> Answering the first part of a multi-part question and treating that as done.
 
-<strong>Length constraints.</strong> An instruction to be concise, or a low token limit, can truncate needed detail. This is a real tension with relevance.
+<strong>Length constraints.</strong> An cue to be concise, or a low token limit, can truncate needed detail. This is a real tension with relevance.
 
 <strong>Chunking split the requirements.</strong> A list of five conditions cut after the third. So the retrieved chunk looks complete and is not.
 
@@ -251,7 +251,7 @@ print("   different component about as often as it is in the generator.")
 
 Completeness is the share of needed points an answer really states. And it needs a key-points reference to be set at all. It is the one dimension that penalises omission rather than error. This makes it the failure users notice last and act on first. Low completeness is often a retrieval or chunking problem rather than a generation one. Measure it per point so you know what was dropped, and always read it against relevance. Optimised alone it rewards dumping the entire context into the answer.
 
-These four are often measured with an <strong>LLM as judge</strong>. A strong model is shown the question, the retrieved context, the answer and sometimes a reference, and asked to score one dimension at a time. Judging one dimension per call is not a stylistic choice. A single prompt asking for all four gives linked, mushy scores, because the model settles on a general impression and applies it everywhere.
+These four are often measured with an <strong>LLM as judge</strong>. A strong model is shown the question, the retrieved context, the answer and sometimes a reference, and asked to score one dimension at a time. Judging one dimension per call is not a stylistic choice. A single prompt asking for all four gives linked, mushy scores, because the model settles on a general impression and applies it all over.
 
 Two habits make judge scores trustworthy. Ask for a decision and a justification, so a human can audit disagreements. And calibrate against a small human-labelled set before believing any of it. A judge that agrees with your annotators 70% of the time is not measuring what you think it is measuring.
 
@@ -268,7 +268,7 @@ Two ways to have both:
 
 <strong>Structure the answer.</strong> Direct answer first, then the backing detail. Nothing is missing, and nothing is buried. Needing a specific format &mdash; a short answer then a bulleted list of conditions &mdash; reaches this reliably.
 
-<strong>Distinguish needed from optional.</strong> Instruct the model to include all of it the question asked for and nothing it did not. That is a narrower instruction than "be thorough", which gives padding.
+<strong>Distinguish needed from optional.</strong> Instruct the model to include all of it the question asked for and nothing it did not. That is a narrower cue than "be thorough", which gives padding.
 
 The practical target is not maximum completeness. It is <em>enough</em> completeness &mdash; all of it the question needed, and no more.
 
@@ -278,7 +278,7 @@ The case where completeness fails hardest is a question whose answer needs combi
 
 <blockquote>"Which of our offices are in countries where the standard VAT rate is above 20%?"</blockquote>
 
-That needs the office list and the VAT rates, which are almost certainly in different documents. A single retrieval pass ranked by similarity to the whole question may return one and not the other,. This is because neither document is a good match for the combined query.
+That needs the office list and the VAT rates, which are almost certainly in different documents. A single retrieval pass ranked by likeness to the whole question may return one and not the other,. This is because neither document is a good match for the combined query.
 
 Three approaches:
 
@@ -306,7 +306,7 @@ Measuring completeness apart is what makes multi-hop weakness visible. On single
 
 <strong>Is completeness the same as recall?</strong> Related but distinct. Recall is about retrieved documents, completeness about the made answer's coverage.
 
-<strong>How do I know what "complete" means?</strong> From a reference answer, or from the relevant data present in the retrieved context. The second needs no hand-written reference.
+<strong>How do I know what "complete" means?</strong> From a reference answer, or from the apt data present in the retrieved context. The second needs no hand-written reference.
 
 <strong>Does asking for longer answers improve it?</strong> It improves coverage and damages relevance. Structure the answer instead.
 

@@ -11,7 +11,7 @@ Because of the rapid, small gaps in logits become large gaps in probability. A t
 
 ## Step 2: Temperature Reshapes Confidence
 
-That <span class="mono-font">T</span> in the formula divides every logit before the rapid. This stretches or compresses the gaps between them:
+That <span class="mono-font">T</span> in the formula divides each logit before the rapid. This stretches or compresses the gaps between them:
 
 - <strong>T &lt; 1</strong> &mdash; gaps widen, the leader runs away with it. Output becomes focused and repetitive. As T approaches 0 this is the same to always taking the argmax.
 - <strong>T = 1</strong> &mdash; the model's own distribution, untouched.
@@ -65,13 +65,13 @@ The distribution is not the answer &mdash; something must pick from it. And the 
 
 ## Why generation gets slower with length, and how caching fixes it
 
-Each new token attends to every last token. Naively, making token 1,000 means recomputing keys and values for all 999 before it. So generation is quadratic in output length.
+Each new token attends to each last token. Naively, making token 1,000 means recomputing keys and values for all 999 before it. So generation is quadratic in output length.
 
 The <strong>KV cache</strong> removes that. The keys and values for last tokens do not change. So they are computed once and stored. Each new token computes only its own, appends them, and attends against the cache. Generation becomes linear.
 
 The cost is memory: two tensors per layer per token. For a long context and a large model that runs to many gigabytes. And it is why <strong>grouped-query attention</strong> exists. Sharing key and value projections across heads shrinks the cache a few-fold.
 
-This also explains a visible asymmetry in API pricing and latency. Handling the prompt is one parallel pass over all its tokens; making the output is one sequential step per token. Input is cheap and fast, output is expensive and slow.
+This also explains a visible asymmetry in API pricing and latency. Handling the prompt is one parallel pass over all its tokens; making the output is one sequential step per token. Input is cheap and fast, output is costly and slow.
 
 ## One distribution over the vocabulary, sampled
 
@@ -298,7 +298,7 @@ print("   someone made, not the model 'thinking differently' this time.")
 2. <strong>Push temperature to 2.0 and sample again.</strong> The distribution flattens and the model starts confidently naming the wrong city. This is exactly how hallucination looks at the token level.
 3. <strong>Drop temperature to 0.05.</strong> One bar takes in effect all the probability mass; sampling and greedy become the same thing.
 4. <strong>Set top-p to 0.9 and switch prompts.</strong> Note how many candidates survive on the factual prompt versus the open-ended one. Same setting, fully different cutoff. That adaptivity is why nucleus sampling largely replaced top-k.
-5. <strong>Set top-k to 1.</strong> Every filter collapses to greedy decoding no matter temperature. Proof that truncation, not temperature, is what removes randomness fully.
+5. <strong>Set top-k to 1.</strong> Each filter collapses to greedy decoding no matter temperature. Proof that truncation, not temperature, is what removes randomness fully.
 
 ## In one line
 
@@ -308,7 +308,7 @@ The model supplies a distribution; the <em>decoding plan</em> supplies the behav
 
 Training on "predict the next token" over enormous quantities of text gives powers nobody put in by name.
 
-To predict the next word well, a model must in effect track syntax, resolve references, hold facts, follow instructions embedded in text, and continue patterns. All of those emerge because they reduce prediction error on real text.
+To predict the next word well, a model must in effect track syntax, resolve references, hold facts, follow cues embedded in text, and continue patterns. All of those emerge because they reduce prediction error on real text.
 
 <strong>In-context learning</strong> is the most striking. Show three cases in the prompt and the model goes on the pattern, having learned nothing &mdash; no weights changed. It is pattern follow-up, which is exactly what next-token prediction rewards. Research on "induction heads" traces this to specific attention circuits that copy and complete patterns seen earlier in the context.
 
@@ -322,7 +322,7 @@ Two things it does <em>not</em> buy, and both follow from the objective:
 
 A raw next-token predictor goes on text; it does not answer questions. Turning one into an assistant takes two further stages.
 
-<strong>Instruction tuning</strong> &mdash; supervised fine-tuning on cases of instructions and good responses. This is what teaches the model that a question should be answered rather than continued with more questions.
+<strong>Cue tuning</strong> &mdash; supervised fine-tuning on cases of cues and good responses. This is what teaches the model that a question should be answered rather than continued with more questions.
 
 <strong>Preference optimisation</strong> &mdash; RLHF, DPO or similar. Humans rank pairs of responses, and the model is tuned towards the preferred ones. This shapes helpfulness, tone and refusal behaviour.
 
@@ -338,7 +338,7 @@ Neither changes the underlying method. The model is still predicting the next to
 
 <strong>Why is output slower than input?</strong> The prompt is handled in one parallel pass; output is one sequential step per token.
 
-<strong>Can it see the whole conversation?</strong> All of it within the context window. This is re-sent with every request. It has no memory between calls beyond what you include.
+<strong>Can it see the whole conversation?</strong> All of it within the context window. This is re-sent with each request. It has no memory between calls beyond what you include.
 
 <strong>Why do the same inputs give different answers?</strong> Sampling, unless temperature is 0. And even then, batching and hardware non-determinism can give small changes.
 

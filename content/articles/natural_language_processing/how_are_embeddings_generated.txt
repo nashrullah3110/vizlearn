@@ -5,7 +5,7 @@ intro: Nobody hand-labels an embedding space. It falls out of a simple predictio
 
 The whole field rests on one claim: a word is characterised by the company it keeps. Words appearing in similar contexts tend to mean similar things.
 
-It is easy to check. <em>Cat</em> and <em>dog</em> both appear near <em>pet</em>, <em>feed</em>, <em>vet</em> and <em>fur</em>. <em>Bulldozer</em> does not. So if you build vectors that predict a word’s context well, words with similar contexts must end up with similar vectors. The semantic structure is a by-product of the prediction task, never an objective in itself. Word2Vec offers two architectures: Skip-gram (predict context words from a centre word) and CBOW (predict the centre word from its context). Skip-gram works better on small datasets and rare words; CBOW is faster and works better on frequent words. Both give a weight matrix whose rows are the word embeddings. GloVe takes a different approach: it factorises the global word co-instance matrix. This captures the same distributional data but in a single matrix factorisation rather than iterative gradient updates. FastText extends Word2Vec by embedding character n-grams, so it can give vectors for words never seen in training by combining their subword pieces. All three give static embeddings (one vector per word no matter context). Contextual embeddings from transformers supersede them for most downstream tasks but are much more expensive to compute. This page trains a small Skip-gram model on a sample corpus, shows the embedding vectors converging during training, and shows the vector-arithmetic property.
+It is easy to check. <em>Cat</em> and <em>dog</em> both appear near <em>pet</em>, <em>feed</em>, <em>vet</em> and <em>fur</em>. <em>Bulldozer</em> does not. So if you build vectors that predict a word’s context well, words with similar contexts must end up with similar vectors. The semantic structure is a by-product of the prediction task, never an objective in itself. Word2Vec offers two architectures: Skip-gram (predict context words from a centre word) and CBOW (predict the centre word from its context). Skip-gram works better on small datasets and rare words; CBOW is faster and works better on frequent words. Both give a weight matrix whose rows are the word embeddings. GloVe takes a different approach: it factorises the global word co-instance matrix. This captures the same distributional data but in a single matrix factorisation rather than iterative gradient updates. FastText extends Word2Vec by embedding character n-grams, so it can give vectors for words never seen in training by combining their subword pieces. All three give static embeddings (one vector per word no matter context). Contextual embeddings from transformers supersede them for most downstream tasks but are much more costly to compute. This page trains a small Skip-gram model on a sample corpus, shows the embedding vectors converging during training, and shows the vector-arithmetic property.
 
 ## Skip-gram and CBOW
 
@@ -18,11 +18,11 @@ The architecture is on purpose trivial: an input embedding layer, no hidden laye
 
 ## Negative sampling
 
-<p>The naive setup predicts a probability distribution over the whole vocabulary. This means a softmax over 50,000 words for every training case. That is prohibitively expensive.</p><strong>Negative sampling</strong> replaces it with a much cheaper question. Instead of “which of 50,000 words is the context?”, ask “is this pair a real (word, context) pair or a fabricated one?” &mdash; a binary classification. For each true pair, draw perhaps 5 to 20 random words as negatives and train the model to score the real pair high and the fakes low.<p>Cost drops from 50,000 output steps to about 20, and quality is comparable. This is what made training on billions of words practical.</p>
+<p>The naive setup predicts a probability distribution over the whole vocabulary. This means a softmax over 50,000 words for each training case. That is prohibitively costly.</p><strong>Negative sampling</strong> replaces it with a much cheaper question. Instead of “which of 50,000 words is the context?”, ask “is this pair a real (word, context) pair or a fabricated one?” &mdash; a binary classification. For each true pair, draw perhaps 5 to 20 random words as negatives and train the model to score the real pair high and the fakes low.<p>Cost drops from 50,000 output steps to about 20, and quality is comparable. This is what made training on billions of words practical.</p>
 
 ## Learned from context, not assigned
 
-Nobody writes embedding vectors by hand. They are learned, and every method rests on the same observation: <strong>words that appear in similar contexts tend to mean similar things</strong>. Fill in "I poured myself a cup of ___" and the plausible answers. Tea, coffee, water. Are related exactly because they share contexts.
+Nobody writes embedding vectors by hand. They are learned, and each method rests on the same observation: <strong>words that appear in similar contexts tend to mean similar things</strong>. Fill in "I poured myself a cup of ___" and the plausible answers. Tea, coffee, water. Are related exactly because they share contexts.
 
 Turn that into a training objective and the vectors fall out.
 
@@ -41,7 +41,7 @@ Turn that into a training objective and the vectors fall out.
 
 The model is a shallow network: an embedding lookup. Then a projection to vocabulary size. After training, the projection layer is discarded and <strong>the embedding table is the product</strong>. The prediction task was only ever a means to shape those vectors.
 
-The practical problem is the output layer. A softmax over 100,000 words for every training pair is prohibitively expensive. So Word2Vec uses <strong>negative sampling</strong>: instead of scoring all words, score the true context word and a handful (5&ndash;20) of random ones, and train the model to tell them apart. That turns a 100,000-way softmax into a few binary classifications and is the trick that made the method practical.
+The practical problem is the output layer. A softmax over 100,000 words for each training pair is prohibitively costly. So Word2Vec uses <strong>negative sampling</strong>: instead of scoring all words, score the true context word and a handful (5&ndash;20) of random ones, and train the model to tell them apart. That turns a 100,000-way softmax into a few binary classifications and is the trick that made the method practical.
 
 <strong>CBOW</strong> is the mirror image &mdash; predict the centre word from the average of its context. It trains faster and does slightly worse on rare words, since averaging washes them out.
 
@@ -51,13 +51,13 @@ The practical problem is the output layer. A softmax over 100,000 words for ever
 
 This is the parameter that changes what "similar" means. And it is worth knowing because it is easy to get wrong.
 
-<strong>A small window (2&ndash;5)</strong> captures syntactic similarity &mdash; words that are alike in a sentence. "Run" ends up near "walk" and "jog", and near "runs" and "ran".
+<strong>A small window (2&ndash;5)</strong> captures syntactic likeness &mdash; words that are alike in a sentence. "Run" ends up near "walk" and "jog", and near "runs" and "ran".
 
-<strong>A large window (10&ndash;15)</strong> captures topical similarity &mdash; words that appear in the same subject matter. "Run" ends up near "race", "marathon" and "athlete".
+<strong>A large window (10&ndash;15)</strong> captures topical likeness &mdash; words that appear in the same subject matter. "Run" ends up near "race", "marathon" and "athlete".
 
-Neither is correct broadly. For a part-of-speech task, small. For document retrieval or topic work, large. Setting it without thinking about which kind of similarity the task needs is how embeddings end up subtly unfit for purpose.
+Neither is correct broadly. For a part-of-speech task, small. For document retrieval or topic work, large. Setting it without thinking about which kind of likeness the task needs is how embeddings end up subtly unfit for purpose.
 
-Other parameters that matter: dimension (100&ndash;300 for word vectors), minimum count (drop words appearing fewer than five times), and subsampling of very frequent words. This stops "the" ruling every context.
+Other parameters that matter: dimension (100&ndash;300 for word vectors), minimum count (drop words appearing fewer than five times), and subsampling of very frequent words. This stops "the" ruling each context.
 
 ## Trained by prediction, not by design
 
@@ -221,7 +221,7 @@ print("identical; only the amount of evidence differs.)")
 - <strong>Comparing vectors across models.</strong> Two training runs give different, incompatible spaces. Vectors are only meaningful relative to others from the same run.
 - <strong>Too little data.</strong> These methods need tens of millions of tokens. On a small corpus the vectors are noise, and a pretrained set is almost always better.
 - <strong>Leaving frequent words unsubsampled.</strong> <em>The</em> and <em>of</em> co-occur with all of it and carry almost no data. Word2Vec subsamples them aggressively, which improves both speed and quality.
-- <strong>Assuming a bigger window is better.</strong> Small windows (2&ndash;5) capture syntactic similarity; large windows (10+) capture topical relatedness. They are different notions of “similar” and the right one depends on the task.
+- <strong>Assuming a bigger window is better.</strong> Small windows (2&ndash;5) capture syntactic likeness; large windows (10+) capture topical relatedness. They are different notions of “similar” and the right one depends on the task.
 
 ## What to recall
 
@@ -276,5 +276,5 @@ Training word vectors from scratch on a small corpus is almost always worse than
 - Embeddings are learned from the principle that words in similar contexts have similar meanings.
 - Skip-gram predicts context from a word; CBOW does the reverse; GloVe factorises co-instance counts.
 - Negative sampling replaces an unaffordable softmax with a few binary checks.
-- Window size chooses between syntactic and topical similarity. Pick it for the task.
+- Window size chooses between syntactic and topical likeness. Pick it for the task.
 - Contextual embeddings from transformers give a different vector per instance, which resolves polysemy.

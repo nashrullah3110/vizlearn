@@ -3,16 +3,16 @@ intro: Before a language model sees a single word, a <strong>tokenizer</strong> 
 
 ## The Two Failure Modes It Avoids
 
-- <strong>Word-level:</strong> every distinct word needs its own entry. The vocabulary explodes into the millions, and any word missing from it becomes a useless <span class="mono-font">[UNK]</span>. Every typo, name and new term is lost.
+- <strong>Word-level:</strong> each distinct word needs its own entry. The vocabulary explodes into the millions, and any word missing from it becomes a useless <span class="mono-font">[UNK]</span>. Each typo, name and new term is lost.
 - <strong>Character-level:</strong> a tiny vocabulary that can spell anything, but sequences become enormously long and the model must relearn that <span class="mono-font">c-a-t</span> means something.
 
 BPE lands in between: frequent words become single tokens, rare words split into meaningful pieces, and <em>nothing</em> is ever out-of-vocabulary. The algorithm starts with the character-level vocabulary (plus a special end-of-word marker) and iteratively merges the most frequent adjacent pair into a new token. Each merge reduces the total sequence length by the number of instances of that pair. After a fixed number of merges (the vocabulary size minus the initial character set), the vocabulary is complete. GPT-2 uses 50,257 tokens; GPT-4 uses around 100,000. A larger vocabulary means shorter sequences (fewer tokens per sentence, so faster inference and a longer effective context window) but a larger embedding table. The merge order is the tokenizer &mdash; at inference time, it applies the same merges in the same priority to any new text, greedily splitting unknown words into the longest known pieces. This page runs BPE step by step on a sample corpus, shows the merge table growing after each iteration, and covers the vocabulary-size tradeoff that decides how many merges to perform.
 
 ## The Algorithm, in Four Lines
 
-1. Split every word into characters, marking the word end (shown here as <span class="mono-font">&lt;/w&gt;</span>).
-2. Count every adjacent symbol pair across the whole corpus.
-3. Merge the <strong>single most frequent pair</strong> everywhere it occurs, and record that merge.
+1. Split each word into characters, marking the word end (shown here as <span class="mono-font">&lt;/w&gt;</span>).
+2. Count each adjacent symbol pair across the whole corpus.
+3. Merge the <strong>single most frequent pair</strong> all over it occurs, and record that merge.
 4. Repeat until you have the number of merges you asked for.
 
 That is the entire method. Vocabulary size is simply base characters plus the number of merges &mdash; which is why it is an exact dial. Rather than something you discover after the fact.
@@ -273,7 +273,7 @@ print("error.")
 
 ## Tests to try
 
-1. <strong>Set merges to 0.</strong> Every word shatters into single characters. The tokens-per-word figure is at its worst.
+1. <strong>Set merges to 0.</strong> Each word shatters into single characters. The tokens-per-word figure is at its worst.
 2. <strong>Drag the slider up slowly</strong> and watch "Tokens / Word" fall. Each merge buys compression, with the earliest merges buying the most.
 3. <strong>Tokenize <span class="mono-font">lowest</span> after training on the repetitive sample.</strong> It often splits into a stem plus <span class="mono-font">est</span>. A suffix the algorithm found purely from count.
 4. <strong>Now type a word the corpus has never seen</strong>, such as <span class="mono-font">zyxwv</span>. It falls back to characters instead of failing. This graceful degradation is BPE's most key property.
@@ -308,7 +308,7 @@ A few well-known model behaviours trace right back to this step.
 
 <strong>Context limits in tokens, not words.</strong> A 128,000-token window is roughly 96,000 English words, and far fewer for code or other scripts.
 
-<strong>Sensitivity to trailing spaces.</strong> Because the space is part of the token, a prompt ending with a space tokenises differently from one that does not.
+<strong>Response to trailing spaces.</strong> Because the space is part of the token, a prompt ending with a space tokenises differently from one that does not.
 
 <strong>The tokeniser must ship with the model.</strong> Token id 1,547 means one thing in one vocabulary and something else in another. A mismatch gives fluent nonsense rather than an error.
 
@@ -332,4 +332,4 @@ A few well-known model behaviours trace right back to this step.
 - Frequent words become single tokens; rare ones fragment; characters remain as a fallback. So nothing is unknown.
 - Byte-level BPE works on UTF-8 bytes, so any text is representable. At more tokens for non-Latin scripts.
 - WordPiece, Unigram and SentencePiece are changes on the same idea with different merge or pruning rules.
-- Tokenisation explains poor spelling, inconsistent arithmetic, token-based context limits and trailing-space sensitivity.
+- Tokenisation explains poor spelling, inconsistent arithmetic, token-based context limits and trailing-space response.

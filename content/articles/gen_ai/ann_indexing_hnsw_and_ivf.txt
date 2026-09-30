@@ -23,7 +23,7 @@ IVF's failure is cleaner: a true neighbour sitting just across a cluster boundar
 
 ## Product quantization, and when memory is the constraint
 
-HNSW keeps every vector in memory plus the graph, so a million 768-dimensional float32 vectors is about 3&nbsp;GB before the graph. Past some scale that, not latency, is what stops you.
+HNSW keeps each vector in memory plus the graph, so a million 768-dimensional float32 vectors is about 3&nbsp;GB before the graph. Past some scale that, not latency, is what stops you.
 
 Product quantization splits each vector into subvectors, clusters each subspace, and stores the cluster ids instead of the values &mdash; often a 10&ndash;30&times; reduction. Distances are then computed against the codes using a precomputed lookup table, which is also faster.
 
@@ -43,7 +43,7 @@ Measure on your own data. Recall/latency curves depend on the intrinsic dimensio
 
 ## Why exact search stops working
 
-Finding the nearest vectors exactly means comparing the query against every stored vector. With a million 768-dimensional vectors that is 768 million times-adds per query. Fine in a batch job, too slow for an interactive request, and hopeless at ten million.
+Finding the nearest vectors exactly means comparing the query against each stored vector. With a million 768-dimensional vectors that is 768 million times-adds per query. Fine in a batch job, too slow for an interactive request, and hopeless at ten million.
 
 Approximate nearest neighbour indexes trade a small amount of recall for orders of size of speed. "Approximate" means they may miss a true nearest neighbour sometimes; in practice, well-tuned indexes return 95&ndash;99% of them. And the misses rarely change what a user sees.
 
@@ -58,7 +58,7 @@ Approximate nearest neighbour indexes trade a small amount of recall for orders 
 
 The idea is a library organised into sections.
 
-<strong>Build:</strong> run k-means over the vectors to find, say, 4,096 centroids. Assign every vector to its nearest centroid, giving an inverted list per cluster.
+<strong>Build:</strong> run k-means over the vectors to find, say, 4,096 centroids. Assign each vector to its nearest centroid, giving an inverted list per cluster.
 
 <strong>Query:</strong> compare the query against the 4,096 centroids, pick the closest `nprobe` of them, and search only the vectors in those lists.
 
@@ -98,7 +98,7 @@ The cost is memory. The graph links themselves consume roughly `M × 2 × 4` byt
 
 ## Building an IVF index and measuring what it misses
 
-The sections above describe how IVF partitions the space and why exact search stops scaling. Here it is built and measured. A real index over real vectors, with the recall it loses and the work it saves at every setting of nprobe.
+The sections above describe how IVF partitions the space and why exact search stops scaling. Here it is built and measured. A real index over real vectors, with the recall it loses and the work it saves at each setting of nprobe.
 
 ```python-run
 import numpy as np
@@ -121,7 +121,7 @@ print("  %s queries x %s vectors = %s dot products"
 print("  at 100M vectors this becomes 100 billion/s -- does not scale.")
 ```
 
-Exact search checks every vector. An IVF index partitions vectors into clusters so that a query scans only a few of them.
+Exact search checks each vector. An IVF index partitions vectors into clusters so that a query scans only a few of them.
 
 ```python-run
 import numpy as np
@@ -284,7 +284,7 @@ approx = index.search(queries, k=10)
 recall = sum(len(set(a) & set(e)) for a, e in zip(approx, exact)) / (10 * len(queries))
 ```
 
-Run that for a few settings of `ef_search` or `nprobe` and plot recall against latency. The resulting curve is what the parameter should be chosen from. And the shape is often a sharp rise followed by a long flat region. So there is a clear point past which extra latency buys nothing.
+Run that for a few settings of `ef_search` or `nprobe` and plot recall against latency. The coming curve is what the parameter should be chosen from. And the shape is often a sharp rise followed by a long flat region. So there is a clear point past which extra latency buys nothing.
 
 ## Questions people ask
 

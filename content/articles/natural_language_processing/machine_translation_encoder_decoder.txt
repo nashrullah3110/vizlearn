@@ -7,7 +7,7 @@ Before 2014, machine translation used alignment models. These were separate part
 
 Neural translation dropped alignment models. It got alignment for free. Attention weights train on one task: predict the next token. They by itself concentrate on the right source words.
 
-The heatmap in the explorer shows this. Every row is one target word, every
+The heatmap in the explorer shows this. Each row is one target word, each
 column one source word, and the row sums to 1. Look at the first sentence: `le
 chat noir` becomes `the black cat`, and the alignment **crosses**, because
 French puts the adjective after the noun. Target word 2 (`black`) attends to
@@ -56,7 +56,7 @@ grammar. It gives confident, well-formed sentences that mean something else.
 
 ## How beam search works
 
-Keep the k best partial sequences at every step. Expand each with every
+Keep the k best partial sequences at each step. Expand each with each
 doable next token, score all the candidates, keep the best k again, and
 continue until they have all emitted end-of-sequence.
 
@@ -77,7 +77,7 @@ make the point that wider is often just the same answer for more compute.
 
 ## The length cost
 
-Every token multiplies another probability below 1, so a longer sequence has a
+Each token multiplies another probability below 1, so a longer sequence has a
 lower total probability, always. Unnormalised, the search so prefers to
 stop early &mdash; it will truncate rather than finish the sentence.
 
@@ -125,7 +125,7 @@ def beam_search(model, src, beam=4, alpha=0.7, max_len=64, eos=2):
 ```
 
 The comment marks the mistake that is easiest to make: normalising after
-choice rather than before means the pruning at every step still has the
+choice rather than before means the pruning at each step still has the
 short-sequence bias, and the cost only affects the final pick.
 
 ## Why it stops
@@ -161,7 +161,7 @@ and are, at bottom, arithmetic about one token.
 The recurrence in this architecture is gone &mdash; a transformer encoder and
 decoder replaced it, and the attention that was one part became the whole
 model. Word-level vocabularies are gone too, replaced by subword tokenisation,
-which is what stopped translations holding `<unk>` for every rare name.
+which is what stopped translations holding `<unk>` for each rare name.
 
 All of it on the second half of this page survived unchanged. A transformer
 still gives a distribution over the next token and still needs a search over
@@ -178,9 +178,9 @@ asks: given a next-token distribution, which sequence do you really emit?
 
 <strong>What should the length cost be?</strong> There is no principled value; it is tuned on a development set, often somewhere around 0.6&ndash;0.7. At alpha = 0 the search truncates, because a shorter sequence multiplies fewer probabilities below 1 and so always scores better. Past alpha = 1 the correction over-corrects and the model pads, because length is now rewarded on its own.
 
-<strong>Where does the length normalisation go in the loop?</strong> Before ranking, not after. Normalising only the final pick leaves every middle pruning step with the full short-sequence bias. So the cost appears to be applied and mostly is not. It is the easiest version of this bug to ship because the output is plausible.
+<strong>Where does the length normalisation go in the loop?</strong> Before ranking, not after. Normalising only the final pick leaves each middle pruning step with the full short-sequence bias. So the cost appears to be applied and mostly is not. It is the easiest version of this bug to ship because the output is plausible.
 
-<strong>What decides how long the output is?</strong> Not a length setting. End-of-sequence is an ordinary vocabulary entry competing with the content words, and. This is because every extra token lowers the built up log-probability, stopping is always locally attractive &mdash;. This is exactly what the length cost exists to counteract. The opposite failure comes from under-predicted end-of-sequence, often from training data with few short cases. Generation runs to the cap and trails off mid-clause.
+<strong>What decides how long the output is?</strong> Not a length setting. End-of-sequence is an ordinary vocabulary entry competing with the content words, and. This is because each extra token lowers the built up log-probability, stopping is always locally attractive &mdash;. This is exactly what the length cost exists to counteract. The opposite failure comes from under-predicted end-of-sequence, often from training data with few short cases. Generation runs to the cap and trails off mid-clause.
 
 <strong>Does any of this survive the transformer?</strong> The whole second half of the page does. A transformer still emits a distribution over the next token and still needs a search to turn that into text, and beam width and length cost are still tuned per model. Temperature, top-k and nucleus sampling are other answers to the same question. Given a next-token distribution, what do you really emit?
 

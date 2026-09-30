@@ -3,11 +3,11 @@ intro: Half the sentence is a subject. Half of it is a WHERE clause.
 
 ## The idea in brief
 
-Similarity search compares meaning, and that is all it does. Ask it for "papers about attention published after 2020" and the words <em>published after 2020</em> are treated as more subject matter to match, not as a rule to enforce. A 2017 paper that is squarely about attention will score well and be returned,. This is because nothing in a cosine score knows what a year is. A self-query retriever fixes this by using a language model to split the user's question into two parts before any search runs. A semantic query (the subject to embed and compare) and a structured filter (the metadata constraint to enforce exactly). The LLM receives a schema describing the metadata fields each document carries. Year, author, document type, department. And returns a JSON object with the semantic query string and a set of check operators over those fields. The vector store applies the filter first as a hard WHERE clause. Then ranks only the surviving documents by cosine similarity to the semantic query. The constraint becomes a guarantee rather than a signal that the embedding may or may not capture. LangChain's `SelfQueryRetriever` wraps this pattern: you define an `AttributeInfo` list describing each metadata field, pass it alongside a natural-language description of the document collection. And the retriever handles the LLM call, filter construction, and filtered search in one step. This page walks through the split on a few case queries, shows the made filter, and covers the metadata schema definition.
+Likeness search compares meaning, and that is all it does. Ask it for "papers about attention published after 2020" and the words <em>published after 2020</em> are treated as more subject matter to match, not as a rule to enforce. A 2017 paper that is squarely about attention will score well and be returned,. This is because nothing in a cosine score knows what a year is. A self-query retriever fixes this by using a language model to split the user's question into two parts before any search runs. A semantic query (the subject to embed and compare) and a structured filter (the metadata constraint to enforce exactly). The LLM receives a schema describing the metadata fields each document carries. Year, author, document type, department. And returns a JSON object with the semantic query string and a set of check operators over those fields. The vector store applies the filter first as a hard WHERE clause. Then ranks only the surviving documents by cosine likeness to the semantic query. The constraint becomes a guarantee rather than a signal that the embedding may or may not capture. LangChain's `SelfQueryRetriever` wraps this pattern: you define an `AttributeInfo` list describing each metadata field, pass it alongside a natural-language description of the document collection. And the retriever handles the LLM call, filter construction, and filtered search in one step. This page walks through the split on a few case queries, shows the made filter, and covers the metadata schema definition.
 
 ## Two questions in one sentence
 
-A self-query retriever hands the sentence to an LLM along with a description of the metadata each document carries, and asks it to return two things. The <strong>semantic query</strong> &mdash; the part that should be embedded and compared &mdash; and a <strong>structured filter</strong> over the metadata, in the form of real checks like <code>year &gt; 2020</code>. The filter runs first as an ordinary database-style predicate; similarity then ranks only the documents that survived it. The constraint becomes a guarantee rather than a hint.
+A self-query retriever hands the sentence to an LLM along with a description of the metadata each document carries, and asks it to return two things. The <strong>semantic query</strong> &mdash; the part that should be embedded and compared &mdash; and a <strong>structured filter</strong> over the metadata, in the form of real checks like <code>year &gt; 2020</code>. The filter runs first as an ordinary database-style predicate; likeness then ranks only the documents that survived it. The constraint becomes a guarantee rather than a hint.
 
 ## Turning a question into a filter plus a search
 
@@ -30,7 +30,7 @@ Then it runs a filtered vector search: the filter constrains the candidate set. 
 
 Two things, and the first is the part that is easy to under-invest in.
 
-<strong>Metadata on every document, populated at indexing time.</strong> The filter can only reference fields that exist. Adding a date field later means re-indexing.
+<strong>Metadata on each document, populated at indexing time.</strong> The filter can only reference fields that exist. Adding a date field later means re-indexing.
 
 <strong>A schema description given to the model,</strong> so it knows which fields exist and what values they take:
 
@@ -74,14 +74,14 @@ if not results:
 ## Exploration guide
 
 1. <strong>Read the parse for the first query.</strong> Note what was removed from the semantic half. Only <em>attention</em> is left to match on,. This is because the date has become a filter instead.
-2. <strong>Turn the filter off.</strong> This is plain similarity search over all of it. A 2017 paper takes the top spot &mdash; it is truly the best match for "attention". And it breaks the constraint the reader stated.
+2. <strong>Turn the filter off.</strong> This is plain likeness search over all of it. A 2017 paper takes the top spot &mdash; it is truly the best match for "attention". And it breaks the constraint the reader stated.
 3. <strong>Turn it back on.</strong> The 2017 paper is struck out with the reason it failed. And the top result is now both about attention and inside the requested date range.
 4. <strong>Try "short surveys on retrieval".</strong> Two constraints this time, on different fields and different types. A number and a category. Combined with AND.
-5. <strong>Try "anything about attention".</strong> No constraint in the sentence, so the filter is empty and the retriever degrades gracefully into ordinary similarity search.
+5. <strong>Try "anything about attention".</strong> No constraint in the sentence, so the filter is empty and the retriever degrades gracefully into ordinary likeness search.
 
 ## The short of it
 
-Embeddings compare meaning and cannot enforce a rule, so any constraint left inside the query text is at best a weak hint. Self-querying separates the sentence into the part worth embedding and the part worth executing as a filter. This turns "after 2020" from a phrase competing for cosine similarity into a predicate that simply removes the documents that fail it. The trade is an extra LLM call before retrieval. And a hard dependency on documents really carrying the metadata the filter names.
+Embeddings compare meaning and cannot enforce a rule, so any constraint left inside the query text is at best a weak hint. Self-querying separates the sentence into the part worth embedding and the part worth executing as a filter. This turns "after 2020" from a phrase competing for cosine likeness into a predicate that simply removes the documents that fail it. The trade is an extra LLM call before retrieval. And a hard dependency on documents really carrying the metadata the filter names.
 
 ## Where it earns its place
 

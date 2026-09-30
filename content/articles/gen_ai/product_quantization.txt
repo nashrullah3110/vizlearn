@@ -5,7 +5,7 @@ intro: How does product quantization compress a vector, and why does splitting i
 
 Before splitting anything, think of the obvious compression: run k-means over
 the whole corpus with 256 centroids and replace each vector with the index of
-its nearest one. Every vector becomes a single byte.
+its nearest one. Each vector becomes a single byte.
 
 The compression is spectacular and the index is useless. 256 centroids cannot
 describe a million distinct 768-dimensional vectors; the average error is
@@ -46,7 +46,7 @@ centroids stored; vastly more positions described.
 ## Reading the picture
 
 With d = 2 and m = 2, each subspace is one axis and its codebook is a set of
-positions along it. The faint grid is every position the index can represent —
+positions along it. The faint grid is each position the index can represent —
 the intersections are the reachable points. The blue line from each vector
 runs to where the index thinks that vector is: the quantisation error, drawn
 right.
@@ -78,7 +78,7 @@ the memory bandwidth.
 It is called **asymmetric** because only one side is quantised. Quantising the
 query too would let you precompute a even table between codebook entries,
 which is marginally faster and measurably less accurate: you would be adding
-the query's own quantisation error to every check for no gain. Always
+the query's own quantisation error to each check for no gain. Always
 use asymmetric distance unless something very unusual is going on.
 
 ## The parameters
@@ -109,7 +109,7 @@ FAISS's `OPQ64_256,IVF...,PQ64` recipes are so common.
 ## What PQ does not do
 
 PQ is a **compression** scheme, not a search structure. A pure PQ index still
-computes a distance for every vector in the corpus — it is a flat scan over
+computes a distance for each vector in the corpus — it is a flat scan over
 short codes rather than over full vectors. That is roughly 20–30× faster than
 scanning float32, which is a real win, and it is still `O(n)`.
 
@@ -190,17 +190,17 @@ it is almost always paired with IVF or a graph.
 
 ## Questions people ask
 
-<strong>Why does splitting help so much?</strong> Because representable positions *times* while stored centroids only add. m codebooks of k centroids describe `kᵐ` positions from `m·k` stored centroids. At m = 96 and k = 256, that is 256⁹⁶ positions from 24,576 centroids. Plain quantization has to store every position it can represent.
+<strong>Why does splitting help so much?</strong> Because representable positions *times* while stored centroids only add. m codebooks of k centroids describe `kᵐ` positions from `m·k` stored centroids. At m = 96 and k = 256, that is 256⁹⁶ positions from 24,576 centroids. Plain quantization has to store each position it can represent.
 
 <strong>Should nbits ever be anything but 8?</strong> Rarely. A byte is what hardware likes, 256 centroids per subspace is a good operating point. And the SIMD lookup implementations that make PQ fast assume it. Lower values exist for extreme compression and lose recall quickly.
 
 <strong>Should I use OPQ?</strong> Often yes. PQ splits dimensions in their first order, which implicitly assumes neighbouring dimensions belong together. Arbitrary for a learned embedding. OPQ learns a rotation that balances variance across the subspaces first, costs one matrix times per query, and often buys a few points of recall.
 
-<strong>Why asymmetric distance instead of decoding the code?</strong> Because it leaves the query exact. Quantising the query too would let you precompute a even table between codebook entries. This is marginally faster and measurably less accurate. You would be adding the query's own quantisation error to every check for no gain.
+<strong>Why asymmetric distance instead of decoding the code?</strong> Because it leaves the query exact. Quantising the query too would let you precompute a even table between codebook entries. This is marginally faster and measurably less accurate. You would be adding the query's own quantisation error to each check for no gain.
 
 <strong>FAISS rejected my m. Why?</strong> Because m must divide d. 768 divides by 96, 64, 48, 32 and 16, and so does 1536. One small reason those embedding dimensions are popular. This is what catches people who change embedding model without revisiting the index recipe.
 
-<strong>Is PQ an index?</strong> No, it is a compression scheme. A pure PQ index still computes a distance for every vector in the corpus. A flat scan over short codes, perhaps 20&ndash;30&times; faster than scanning float32, and still `O(n)`. It is almost always wrapped in something that prunes.
+<strong>Is PQ an index?</strong> No, it is a compression scheme. A pure PQ index still computes a distance for each vector in the corpus. A flat scan over short codes, perhaps 20&ndash;30&times; faster than scanning float32, and still `O(n)`. It is almost always wrapped in something that prunes.
 
 ## Recap in one screen
 

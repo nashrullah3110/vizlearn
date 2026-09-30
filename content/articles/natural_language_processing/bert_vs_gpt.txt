@@ -5,16 +5,16 @@ intro: One triangle of zeros, and everything that follows from it.
 
 Both families are stacks of the same block: <a href="multi_head_attention.html" style="color: var(--accent-primary)">multi-head attention</a> and a feed-forward layer, repeated. The difference is a mask applied inside <a href="self_attention.html" style="color: var(--accent-primary)">self-attention</a>. A matrix of minus infinities that deletes some of the attention scores before the softmax.
 
-Delete nothing and every token sees the whole sentence. That is an encoder, and BERT is the famous one. Delete all of it above the diagonal and each token sees only itself and what came before. That is a decoder, and GPT is the famous one. The mask decides the training objective. A bidirectional model cannot be trained to predict the next token (it would see the answer). So BERT uses **masked language modelling**. Hide 15% of the tokens and predict them from both sides. A causal model trains on **next-token prediction**, which supplies a training signal at every position in one pass and scales to trillions of tokens. The result: BERT gives contextual embeddings that see the whole sentence and excels at classification, NER, and extractive QA (fine-tune a head on top). GPT makes text token by token and excels at open-ended generation, summarisation. And in-context learning (prompt it, no fine-tuning needed). This page shows the attention mask for both architectures, shows how the same sentence gives different representations, and covers the encoder-decoder models (T5, BART) that combine both halves.
+Delete nothing and each token sees the whole sentence. That is an encoder, and BERT is the famous one. Delete all of it above the diagonal and each token sees only itself and what came before. That is a decoder, and GPT is the famous one. The mask decides the training objective. A bidirectional model cannot be trained to predict the next token (it would see the answer). So BERT uses **masked language modelling**. Hide 15% of the tokens and predict them from both sides. A causal model trains on **next-token prediction**, which supplies a training signal at each position in one pass and scales to trillions of tokens. The result: BERT gives contextual embeddings that see the whole sentence and excels at classification, NER, and extractive QA (fine-tune a head on top). GPT makes text token by token and excels at open-ended generation, summarisation. And in-context learning (prompt it, no fine-tuning needed). This page shows the attention mask for both architectures, shows how the same sentence gives different representations, and covers the encoder-decoder models (T5, BART) that combine both halves.
 
 ## Why the mask decides the objective
 
 A model that can see the future cannot be trained to predict it. If position 4 can attend to position 5. Then "predict the token at position 5" is answered by copying it, and nothing is learned. So the two masks admit different training tasks.
 
 - <strong>Bidirectional &rarr; masked language modelling.</strong> Hide 15% of the tokens and predict them from both sides. Nothing is being copied because the answer has been removed from the input fully.
-- <strong>Causal &rarr; next-token prediction.</strong> Every position predicts the token after it. And the mask guarantees it cannot cheat. One pass over a sentence supplies a training signal at every position at once. This is what makes it so fast at scale.
+- <strong>Causal &rarr; next-token prediction.</strong> Each position predicts the token after it. And the mask guarantees it cannot cheat. One pass over a sentence supplies a training signal at each position at once. This is what makes it so fast at scale.
 
-The result is the notable part. Masked language modelling gives excellent representations and no way to generate. There is no "next" for a model where every position already saw all of it. Next-token prediction gives a generator whose representations are weaker per parameter, because each token was built without the right-hand context.
+The result is the notable part. Masked language modelling gives excellent representations and no way to generate. There is no "next" for a model where each position already saw all of it. Next-token prediction gives a generator whose representations are weaker per parameter, because each token was built without the right-hand context.
 
 ## Two ways to train on the same architecture
 
@@ -47,7 +47,7 @@ What changed is scale. A sufficiently large decoder, prompted rightly, does clas
 
 <strong>Use a BERT-style encoder when:</strong>
 
-- You need <strong>embeddings</strong> for search, clustering or similarity. Sentence-BERT and its successors dominate here.
+- You need <strong>embeddings</strong> for search, clustering or likeness. Sentence-BERT and its successors dominate here.
 - You are doing <strong>token classification</strong>. Named entities, part-of-speech tagging. Where bidirectional context helps and the whole input is available.
 - You want a <strong>small, fast, cheap</strong> classifier. A fine-tuned DistilBERT runs on a CPU in milliseconds; a large decoder does not.
 - You have a <strong>fixed task with labelled data</strong>. Fine-tuning a 110M-parameter encoder often matches or beats prompting a much larger model, at a fraction of the cost.
@@ -202,13 +202,13 @@ The industry has drifted decisively towards decoder-only for general systems, be
 
 ## The short of it
 
-Encoder-only and decoder-only transformers differ by one thing: whether the attention mask deletes the upper triangle. Bidirectional attention lets every token see the whole sequence, which rules out next-token prediction and demands a masked objective instead, and yields strong representations with no ability to generate. Causal attention lets each token see only what precedes it. This makes next-token prediction both doable and enormously fast, and yields a generator. Pick by the task rather than by fashion. Text out means a decoder, and understanding text you already have is still cheaper and often better with an encoder.
+Encoder-only and decoder-only transformers differ by one thing: whether the attention mask deletes the upper triangle. Bidirectional attention lets each token see the whole sequence, which rules out next-token prediction and demands a masked objective instead, and yields strong representations with no ability to generate. Causal attention lets each token see only what precedes it. This makes next-token prediction both doable and enormously fast, and yields a generator. Pick by the task rather than by fashion. Text out means a decoder, and understanding text you already have is still cheaper and often better with an encoder.
 
 ## The third family: encoder-decoder
 
 T5, BART and the first transformer use both stacks: an encoder that reads the input bidirectionally. And a decoder that makes while attending to the encoder's output through cross-attention.
 
-That structure suits tasks with a clear input and a distinct output. Translation, summarisation, grammatical correction. T5's framing was to treat every task as text-to-text, with a prefix saying which task it is.
+That structure suits tasks with a clear input and a distinct output. Translation, summarisation, grammatical correction. T5's framing was to treat each task as text-to-text, with a prefix saying which task it is.
 
 |Family|Example models|
 |---|---|
@@ -226,13 +226,13 @@ Encoder-decoder models are less prominent now, largely because decoder-only mode
 
 <strong>GPT's next-token prediction</strong> needs no labelling at all: any text is training data. That ease is a large part of why decoder-only models scaled. The training set is the internet rather than an annotated corpus.
 
-<strong>Instruction tuning and RLHF</strong> are what turn a raw next-token predictor into something that follows instructions. A base GPT-style model completes text; it does not answer questions until it has been fine-tuned to.
+<strong>Cue tuning and RLHF</strong> are what turn a raw next-token predictor into something that follows cues. A base GPT-style model completes text; it does not answer questions until it has been fine-tuned to.
 
 ## Questions people ask
 
 <strong>Which is better?</strong> Neither &mdash; they are shaped for different jobs. For embeddings and cheap fixed-task classification, an encoder. For anything generative or open-ended, a decoder.
 
-<strong>Can I use GPT-style models for embeddings?</strong> Yes, by pooling hidden states, and purpose-trained embedding models often do better. This is because they are trained with a similarity objective.
+<strong>Can I use GPT-style models for embeddings?</strong> Yes, by pooling hidden states, and purpose-trained embedding models often do better. This is because they are trained with a likeness objective.
 
 <strong>Why does BERT have `[CLS]`?</strong> It is a position whose final representation is used as a summary of the whole sequence for classification.
 

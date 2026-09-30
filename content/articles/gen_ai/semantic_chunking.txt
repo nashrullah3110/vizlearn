@@ -3,17 +3,17 @@ intro: What is semantic chunking, and when is it worth the extra cost?
 
 ## How the boundary is chosen
 
-Split into sentences, embed each one, and compute the similarity between each in a row pair. Where the text stays on topic the similarity is high; where the subject changes it dips. Cut at the dips.
+Split into sentences, embed each one, and compute the likeness between each in a row pair. Where the text stays on topic the likeness is high; where the subject changes it dips. Cut at the dips.
 
-The threshold should be relative. A fixed number like 0.7 means something different in every corpus. So implementations use a percentile of the similarities observed in <em>this</em> document. The 5th percentile of gaps, say. Which adapts by itself to how varied the writing is.
+The threshold should be relative. A fixed number like 0.7 means something different in each corpus. So implementations use a percentile of the similarities observed in <em>this</em> document. The 5th percentile of gaps, say. Which adapts by itself to how varied the writing is.
 
 The result is chunks that align with topic shifts rather than arbitrary token counts. A paragraph about authentication stays in one chunk; the next paragraph about rate limiting starts a new one. This is the quality edge over fixed-size chunking. The embedding of each chunk represents a coherent topic, not a random slice of text that starts mid-thought.
 
-Three parameters control the output. The embedding model decides how similarity is measured — a model trained on semantic similarity (like sentence-transformers) works; a general-purpose model may not distinguish topic boundaries cleanly. The percentile threshold sets how sensitive the splitting is. A lower percentile (more aggressive) gives more, smaller chunks; a higher percentile gives fewer, larger ones. The minimum chunk size prevents degenerate one-sentence chunks that carry too little context to be useful on their own.
+Three parameters control the output. The embedding model decides how likeness is measured — a model trained on semantic likeness (like sentence-transformers) works; a general-purpose model may not distinguish topic boundaries cleanly. The percentile threshold sets how sensitive the splitting is. A lower percentile (more aggressive) gives more, smaller chunks; a higher percentile gives fewer, larger ones. The minimum chunk size prevents degenerate one-sentence chunks that carry too little context to be useful on their own.
 
 Semantic chunking pairs well with metadata enrichment. Because each chunk represents a coherent topic, it is straightforward to generate a summary or title for each chunk and store it alongside the embedding. At retrieval time, the summary can be used for hybrid search (keyword plus vector) or for reranking. This improves precision without raising the embedding cost at query time.
 
-The implementation in LangChain is `SemanticChunker`, and in LlamaIndex it is `SemanticSplitterNodeParser`. Both follow the same algorithm: split into sentences, embed, compute pairwise similarity, cut at dips. The differences are in defaults and the API surface, not in the underlying logic.
+The implementation in LangChain is `SemanticChunker`, and in LlamaIndex it is `SemanticSplitterNodeParser`. Both follow the same algorithm: split into sentences, embed, compute pairwise likeness, cut at dips. The differences are in defaults and the API surface, not in the underlying logic.
 
 ## What it costs
 
@@ -36,13 +36,13 @@ Worth it for long unstructured prose. Transcripts, interviews, reports without h
 
 Not worth it when the document already carries structure. If there are headings, they are an explicit, author-provided, free topic boundary, and structure-aware chunking will beat semantic chunking at a fraction of the cost. Measure before adopting: on a retrieval evaluation set the gain over a well-tuned recursive splitter is often small.
 
-## Making the similarity signal usable
+## Making the likeness signal usable
 
-Raw sentence-to-sentence similarity is noisy. Short sentences &mdash; "Yes.", "See above.", a heading fragment &mdash; have unstable embeddings. So the gap sequence holds dips that are artefacts rather than topic changes.
+Raw sentence-to-sentence likeness is noisy. Short sentences &mdash; "Yes.", "See above.", a heading fragment &mdash; have unstable embeddings. So the gap sequence holds dips that are artefacts rather than topic changes.
 
 Two standard mitigations. <strong>Buffering:</strong> embed each sentence together with its neighbours, so a short sentence inherits context and its vector stops swinging. <strong>Smoothing:</strong> take a rolling mean over the gap sequence before looking for troughs. So a single anomalous sentence cannot open a boundary on its own.
 
-Both trade sensitivity for stability, and both are worth having. Without them the technique looks impressive on a clean essay and falls apart on a support transcript. This is exactly the sort of unstructured text it was supposed to be good at.
+Both trade response for stability, and both are worth having. Without them the technique looks impressive on a clean essay and falls apart on a support transcript. This is exactly the sort of unstructured text it was supposed to be good at.
 
 ## Is it worth it? Measure before adopting
 
@@ -68,16 +68,16 @@ A sensible production pipeline is often structure first, recursive to enforce th
 
 ## Splitting where the meaning changes
 
-Fixed-size chunking cuts every 500 characters no matter what is there. Recursive chunking respects paragraph and sentence boundaries. Neither knows whether a boundary is a <em>topic</em> boundary.
+Fixed-size chunking cuts each 500 characters no matter what is there. Recursive chunking respects paragraph and sentence boundaries. Neither knows whether a boundary is a <em>topic</em> boundary.
 
 Semantic chunking finds those boundaries by measuring meaning right:
 
 1. Split the document into sentences.
 2. Embed each sentence.
-3. Compute the similarity between each in a row pair.
-4. Split where the similarity drops below a threshold.
+3. Compute the likeness between each in a row pair.
+4. Split where the likeness drops below a threshold.
 
-Where two in a row sentences are semantically close, they belong together. Where the similarity falls sharply, the topic has changed and that is where the chunk should end.
+Where two in a row sentences are semantically close, they belong together. Where the likeness falls sharply, the topic has changed and that is where the chunk should end.
 
 <p class="mono-font">sim(s&#7522;, s&#7522;&#8330;&#8321;) high &rarr; same chunk &nbsp;&nbsp;&nbsp; sim low &rarr; boundary</p>
 
@@ -85,7 +85,7 @@ The result is chunks that are each about one thing, at any length that takes &md
 
 ## The threshold, and how to set it
 
-An absolute similarity threshold does not transfer between documents or models, because typical similarity levels vary enormously.
+An absolute likeness threshold does not transfer between documents or models, because typical likeness levels vary enormously.
 
 The reliable approach is a <strong>percentile of the distances within this document</strong>. Compute all in a row-sentence distances, and split at the ones above the 90th or 95th percentile.
 
@@ -112,7 +112,7 @@ threshold = np.percentile(sims, 10)         # lowest 10% of similarities
 boundaries = [i+1 for i, s in enumerate(sims) if s < threshold]
 ```
 
-## The similarity curve, and where it dips
+## The likeness curve, and where it dips
 
 Semantic chunking splits where in a row sentences stop resembling each other. That description leaves the key question open -- how big a dip counts -- so here is the actual signal from a passage. And the boundaries each threshold gives.
 
@@ -307,13 +307,13 @@ print("compare recall@k.")
 
 ## Things to try
 
-1. Raise the <strong>split percentile</strong> to 70. It splits almost everywhere, giving chunks too small to carry an idea.
+1. Raise the <strong>split percentile</strong> to 70. It splits almost all over, giving chunks too small to carry an idea.
 2. Drop it to 10. Only the single largest topic change survives as a boundary.
-3. Note that the threshold is derived from this document's own gaps. A fixed number would behave differently on every corpus.
+3. Note that the threshold is derived from this document's own gaps. A fixed number would behave differently on each corpus.
 
 ## What to recall
 
-Semantic chunking embeds each sentence and cuts where the similarity between neighbours drops. So boundaries land at topic changes rather than at character counts. It costs one embedding per sentence at index time. And it is often not worth it on documents that already carry headings.
+Semantic chunking embeds each sentence and cuts where the likeness between neighbours drops. So boundaries land at topic changes rather than at character counts. It costs one embedding per sentence at index time. And it is often not worth it on documents that already carry headings.
 
 ## Where it helps and where it does not
 
@@ -326,20 +326,20 @@ Semantic chunking embeds each sentence and cuts where the similarity between nei
 
 <strong>It does not help on:</strong>
 
-- Well-structured technical documentation. The headings are better boundaries than any similarity measure, and free.
+- Well-structured technical documentation. The headings are better boundaries than any likeness measure, and free.
 - Short documents already about one thing &mdash; FAQ entries, product descriptions, tickets.
-- Highly uniform text, where in a row-sentence similarity is flat and no clear boundaries exist.
+- Highly uniform text, where in a row-sentence likeness is flat and no clear boundaries exist.
 - Code, where structural boundaries (functions, classes) are what matter.
 
 There is a further honest caveat: <strong>the measured gain is often smaller than expected</strong>. Published checks on well-structured corpora often find semantic chunking roughly level with recursive chunking. It is worth evaluating rather than adopting on principle.
 
 ## Variants
 
-<strong>Numeric / gradient-based.</strong> Instead of a percentile threshold, look for the largest local drops in similarity. The points of steepest change. Which adapts better to documents with varying similarity levels.
+<strong>Numeric / gradient-based.</strong> Instead of a percentile threshold, look for the largest local drops in likeness. The points of steepest change. Which adapts better to documents with varying likeness levels.
 
 <strong>Double-pass.</strong> Chunk semantically, then merge adjacent chunks whose embeddings are similar. Cleans up over-splitting.
 
-<strong>LLM-based (agentic) chunking.</strong> Ask a model to propose boundaries, or to group sentences into topics. Highest quality on difficult text, and by far the most expensive &mdash; often reserved for small high-value corpora.
+<strong>LLM-based (agentic) chunking.</strong> Ask a model to propose boundaries, or to group sentences into topics. Highest quality on difficult text, and by far the most costly &mdash; often reserved for small high-value corpora.
 
 <strong>Late chunking.</strong> A recent other worth knowing: embed the <em>whole</em> document with a long-context embedding model. Then pool the token embeddings into chunk vectors. Each chunk's vector is informed by the entire document, which fixes the missing-context problem without needing per-sentence calls.
 
@@ -367,7 +367,7 @@ Any plan you choose, two things help regardless: <strong>prepend the heading pat
 
 ## Recap in one screen
 
-- Embed sentences, measure in a row similarity, and split where it drops. Boundaries at real topic changes.
+- Embed sentences, measure in a row likeness, and split where it drops. Boundaries at real topic changes.
 - Use a percentile of the document's own distances rather than an absolute threshold.
 - Add a check buffer and enforce minimum and maximum sizes.
 - It costs one embedding call per sentence, which is a large indexing cost.

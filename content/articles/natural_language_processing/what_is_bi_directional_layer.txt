@@ -7,7 +7,7 @@ A forward RNN at position t has seen tokens 1 to t and nothing after. That is a 
 
 Take “The <strong>bank</strong> was steep and muddy.” At the word <em>bank</em> a forward-only model has seen only “The”, and must commit to a representation before <em>steep and muddy</em> arrives to settle the meaning. A backward pass has that data at once.
 
-The fix is to run two passes &mdash; one forward, one backward &mdash; and concatenate their outputs at every position. The forward pass gives a hidden state that encodes all of it to the left; the backward pass gives a hidden state that encodes all of it to the right. Stacking the two gives each position a representation that sees the entire sequence.
+The fix is to run two passes &mdash; one forward, one backward &mdash; and concatenate their outputs at each position. The forward pass gives a hidden state that encodes all of it to the left; the backward pass gives a hidden state that encodes all of it to the right. Stacking the two gives each position a representation that sees the entire sequence.
 
 This is the idea behind the bidirectional layer. It doubles the hidden dimension, because it concatenates two free states. And it doubles the parameter count, because the forward and backward cells learn separate weights. The accuracy gain is large for tasks like named-entity recognition, part-of-speech tagging, sentiment classification and question answering. Any task where the label at position t depends on tokens that come after t. The cost is that the full sequence must be available before the layer can run. This rules out autoregressive generation: you cannot predict the next word with a backward pass that needs words you have not made yet. That constraint is why GPT-style models use only a forward pass and BERT-style models use bidirectional layers.
 
@@ -82,7 +82,7 @@ summary = torch.cat([h_fwd, h_bwd], dim=-1)     # correct for classification
 
 ## Reading the sequence twice, in both directions
 
-A bidirectional layer runs two free RNNs and concatenates them. That doubles the parameters, gives every position full context, and makes the layer unusable for generation. All for the same reason.
+A bidirectional layer runs two free RNNs and concatenates them. That doubles the parameters, gives each position full context, and makes the layer unusable for generation. All for the same reason.
 
 ```python-run
 import numpy as np
@@ -213,13 +213,13 @@ Where the full sequence <em>is</em> available &mdash; classification, tagging, n
 
 ## The short version
 
-A bidirectional layer runs free forward and backward recurrent passes and concatenates them. So every position is shown with context from both sides. At twice the parameters and twice the output width. It is the right default for classification and tagging. Where the whole sequence is available, and not doable for generation or streaming, where the backward pass would be reading the future it is meant to predict.
+A bidirectional layer runs free forward and backward recurrent passes and concatenates them. So each position is shown with context from both sides. At twice the parameters and twice the output width. It is the right default for classification and tagging. Where the whole sequence is available, and not doable for generation or streaming, where the backward pass would be reading the future it is meant to predict.
 
 ## The cost
 
 <strong>Twice the work and twice the parameters.</strong> Two free LSTMs, each with its own four weight matrices. For 300-dimensional input and 256 hidden units, about 1.15 million parameters instead of 574,000.
 
-<strong>Twice the memory during training,</strong> since both passes' activations must be stored.
+<strong>Twice the memory during training,</strong> since both passes' triggers must be stored.
 
 <strong>No latency gain from parallelism.</strong> The two directions are free of each other and can run concurrently. But each is still strictly sequential internally.
 
@@ -231,7 +231,7 @@ Whether the accuracy gain justifies it depends on the task. For tagging and span
 
 Bidirectionality in transformers is not a separate layer &mdash; it is the default, and unidirectionality is what has to be added.
 
-An encoder's self-attention lets every position attend to every other, in both directions, with no extra machinery. That is exactly what BERT is: a bidirectional encoder. And its masked-language-model training objective exists exactly because bidirectional attention makes next-token prediction trivial.
+An encoder's self-attention lets each position attend to each other, in both directions, with no extra machinery. That is exactly what BERT is: a bidirectional encoder. And its masked-language-model training objective exists exactly because bidirectional attention makes next-token prediction trivial.
 
 A decoder adds a <strong>causal mask</strong> that sets attention scores for future positions to negative infinity. So their weights become zero. Generation becomes doable because the model truly cannot see ahead.
 
@@ -253,7 +253,7 @@ So "bidirectional layer" is largely a recurrent-era concept. The idea survives; 
 
 <strong>Is BERT a bidirectional LSTM?</strong> No &mdash; it is a bidirectional transformer encoder. The word "bidirectional" in its name means unmasked attention.
 
-<strong>Does bidirectionality help every task?</strong> No. It helps most where right context disambiguates. Tagging, entity recognition, span extraction. And least on tasks with redundant global signal.
+<strong>Does bidirectionality help each task?</strong> No. It helps most where right context disambiguates. Tagging, entity recognition, span extraction. And least on tasks with redundant global signal.
 
 <strong>Can I stack bidirectional layers?</strong> Yes, and each layer's doubled output feeds the next. Two is often the practical limit.
 

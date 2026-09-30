@@ -5,21 +5,21 @@ intro: The idea that removed the bottleneck, and then removed recurrence altoget
 
 The encoder&ndash;decoder models that came before attention worked like this: an <a href="rnn.html" style="color. Var(--accent-primary)">RNN</a> read the whole input sentence and squeezed it into a single fixed-length vector. And a second RNN made the output from that vector alone.
 
-The flaw is visible as soon as you say it out loud. Every sentence, whether five words or fifty, has to fit in the same number of floats. The encoder's final state is ruled by any it read last. And the beginning of a long sentence is simply gone by the time decoding starts. Translation quality fell off a cliff past about twenty words. Attention (Bahdanau et al., 2014) removes the bottleneck fully. Instead of compressing the input into one vector, the decoder looks at all of the encoder's hidden states and computes a weighted average, with weights that depend on the current decoding step. At each output position, the decoder gives a query from its current state, scores it against every encoder state (the keys), and uses the scores to compute a weighted sum (the context vector). The scores go through softmax, so they sum to 1. And the highest-scoring encoder state rules the context. This lets the model "attend" to the relevant part of the input for each output word. When translating "the cat sat," the word "chat" attends mostly to "cat." The scoring function can be a dot product (Luong attention), an additive network (Bahdanau attention). Or a scaled dot product (transformer attention). [Self-attention](self_attention.html) applies the same method within a single sequence rather than between encoder and decoder. This is the foundation of the [transformer](../gen_ai/how_llms_predict_next_word.html) architecture. [Multi-head attention](multi_head_attention.html) runs a few attention steps in parallel to capture different types of links. This page shows the attention weights at each decoding step, highlights. This input words the model focuses on, and covers the three scoring functions.
+The flaw is visible as soon as you say it out loud. Each sentence, whether five words or fifty, has to fit in the same number of floats. The encoder's final state is ruled by any it read last. And the beginning of a long sentence is simply gone by the time decoding starts. Translation quality fell off a cliff past about twenty words. Attention (Bahdanau et al., 2014) removes the bottleneck fully. Instead of compressing the input into one vector, the decoder looks at all of the encoder's hidden states and computes a weighted average, with weights that depend on the current decoding step. At each output position, the decoder gives a query from its current state, scores it against each encoder state (the keys), and uses the scores to compute a weighted sum (the context vector). The scores go through softmax, so they sum to 1. And the highest-scoring encoder state rules the context. This lets the model "attend" to the apt part of the input for each output word. When translating "the cat sat," the word "chat" attends mostly to "cat." The scoring function can be a dot product (Luong attention), an additive network (Bahdanau attention). Or a scaled dot product (transformer attention). [Self-attention](self_attention.html) applies the same method within a single sequence rather than between encoder and decoder. This is the foundation of the [transformer](../gen_ai/how_llms_predict_next_word.html) architecture. [Multi-head attention](multi_head_attention.html) runs a few attention steps in parallel to capture different types of links. This page shows the attention weights at each decoding step, highlights. This input words the model focuses on, and covers the three scoring functions.
 
 ## The fix
 
-Attention throws away the assumption that the decoder needs one summary. Instead, keep <em>every</em> encoder state, and at each output step let the decoder build a fresh context vector by weighting them:
+Attention throws away the assumption that the decoder needs one summary. Instead, keep <em>each</em> encoder state, and at each output step let the decoder build a fresh context vector by weighting them:
 
-1. <strong>Score.</strong> Compare the decoder's current state against every encoder state. One number per input word &mdash; how relevant is this word, right now?
+1. <strong>Score.</strong> Compare the decoder's current state against each encoder state. One number per input word &mdash; how apt is this word, right now?
 2. <strong>Normalise.</strong> Push the scores through <a href="../deep_learning/softmax_and_cross_entropy.html" style="color: var(--accent-primary)">softmax</a> so they are positive and sum to 1. These are the attention weights.
-3. <strong>Blend.</strong> Take the weighted average of the encoder states. That is the context vector for this step, and it is different for every output word.
+3. <strong>Blend.</strong> Take the weighted average of the encoder states. That is the context vector for this step, and it is different for each output word.
 
-Nothing is discarded and nothing is compressed. The decoder reaches back into the full input every single time it gives a word.
+Nothing is discarded and nothing is compressed. The decoder reaches back into the full input each single time it gives a word.
 
 ## Why the weights are interpretable
 
-Because they sum to 1 and are all positive, the weights read as a distribution of interest: "to give this word, I looked 70% at <em>cat</em> and 20% at <em>the</em>". Plotting them for every output word against every input word gives the alignment matrix in the second panel. And on a translation task it recovers word alignment without ever having been told what alignment is.
+Because they sum to 1 and are all positive, the weights read as a distribution of interest: "to give this word, I looked 70% at <em>cat</em> and 20% at <em>the</em>". Plotting them for each output word against each input word gives the alignment matrix in the second panel. And on a translation task it recovers word alignment without ever having been told what alignment is.
 
 That interpretability is truly useful, but treat it carefully. Attention weights show where data was drawn from. This is not quite the same as showing why the model decided what it decided.
 
@@ -27,15 +27,15 @@ That interpretability is truly useful, but treat it carefully. Attention weights
 
 A recurrent network reads a sentence one word at a time, carrying a fixed-size hidden state. By word fifty, all of it about word one has been compressed into that state, competing with forty-nine other words for room. Long-range dependencies are lost by construction.
 
-Attention removes the bottleneck. Every position looks right at every other position and decides, per position, how much each one matters.
+Attention removes the bottleneck. Each position looks right at each other position and decides, per position, how much each one matters.
 
-Concretely, for each word the method computes a weight against every other word. Then gives a weighted average of their representations. "It" in "The cat sat on the mat because it was warm" can attend strongly to "mat". A direct connection, not a signal relayed through five middle states.
+Concretely, for each word the method computes a weight against each other word. Then gives a weighted average of their representations. "It" in "The cat sat on the mat because it was warm" can attend strongly to "mat". A direct connection, not a signal relayed through five middle states.
 
 Two results follow at once, and they are why transformers replaced recurrent networks:
 
 <strong>Path length is constant.</strong> Any two positions are one step apart, no matter distance. In an RNN the path is tied to to the gap, and gradients decay along it.
 
-<strong>It parallelises.</strong> Every position's attention can be computed at once, as one matrix product. An RNN must process position t before t+1, so it cannot use a GPU's parallelism across the sequence.
+<strong>It parallelises.</strong> Each position's attention can be computed at once, as one matrix product. An RNN must process position t before t+1, so it cannot use a GPU's parallelism across the sequence.
 
 ## Queries, keys and values
 
@@ -45,11 +45,11 @@ The method is best read as a soft dictionary lookup.
 - The <strong>key</strong> is what each position offers as a label.
 - The <strong>value</strong> is what each position really adds if selected.
 
-Compare the query against every key to get a score, turn the scores into weights, and take the weighted sum of the values:
+Compare the query against each key to get a score, turn the scores into weights, and take the weighted sum of the values:
 
 <p class="mono-font">Attention(Q, K, V) = softmax(QK&#7488; / &radic;d<sub>k</sub>) V</p>
 
-Reading it left to right: `QKᵀ` is every query dotted with every key. This gives a score matrix. Dividing by `√dₖ` keeps those scores in a range where softmax is not saturated. Without it, large dimensions give huge dot products, the softmax becomes nearly one-hot, and gradients vanish. The softmax turns scores into weights summing to 1. Multiplying by V gives the output.
+Reading it left to right: `QKᵀ` is each query dotted with each key. This gives a score matrix. Dividing by `√dₖ` keeps those scores in a range where softmax is not saturated. Without it, large dimensions give huge dot products, the softmax becomes nearly one-hot, and gradients vanish. The softmax turns scores into weights summing to 1. Multiplying by V gives the output.
 
 All three &mdash; Q, K and V &mdash; are linear projections of the input, with learned weight matrices. That is the only place parameters enter the method.
 
@@ -59,7 +59,7 @@ Three tokens, and suppose token 2's query gives these dot products against the t
 
 Softmax: e² = 7.39, e⁰·⁵ = 1.65, e¹ = 2.72; total 11.76. Weights: <strong>0.63, 0.14, 0.23</strong>.
 
-The output for token 2 is 0.63 × value₁ + 0.14 × value₂ + 0.23 × value₃. Mostly the first token's contribution, with some of the third.
+The output for token 2 is 0.63 × value₁ + 0.14 × value₂ + 0.23 × value₃. Mostly the first token's share, with some of the third.
 
 Those weights are what get visualised as attention heatmaps. They are truly informative about what the model connected to what. And they are not an reason of <em>why</em>. A caution worth keeping, since attention maps are often over-interpreted.
 
@@ -110,7 +110,7 @@ print("   built this way degrades with sentence length, as the 2014 papers showe
 print()
 ```
 
-The fix: keep every encoder state and let the decoder choose which ones to look at as it makes each output word.
+The fix: keep each encoder state and let the decoder choose which ones to look at as it makes each output word.
 
 ```python-run
 import numpy as np
@@ -195,8 +195,8 @@ print("it does not need the recurrence at all.")
 
 ## Things to try
 
-1. <strong>Walk the output.</strong> Set the <strong>Output Step</strong> slider to 1. Then step it up one at a time. The bright connection moves across the source sentence as each output word is gave. The decoder is looking somewhere different every time.
-2. <strong>See the bottleneck it replaced.</strong> Tick <strong>Bottleneck Mode</strong>. Now every output step gets the same flat average of the input, exactly as a fixed context vector would give it. The weights stop moving, focus collapses, and the model has nothing left to distinguish one step from another.
+1. <strong>Walk the output.</strong> Set the <strong>Output Step</strong> slider to 1. Then step it up one at a time. The bright connection moves across the source sentence as each output word is gave. The decoder is looking somewhere different each time.
+2. <strong>See the bottleneck it replaced.</strong> Tick <strong>Bottleneck Mode</strong>. Now each output step gets the same flat average of the input, exactly as a fixed context vector would give it. The weights stop moving, focus collapses, and the model has nothing left to distinguish one step from another.
 3. <strong>Sharpen the focus.</strong> Set the <strong>Sharpness</strong> slider to 4. The weights concentrate almost fully on one source word and the entropy readout falls toward zero. This is a hard alignment.
 4. <strong>Blur it.</strong> Set the <strong>Sharpness</strong> slider to 0.2. The weights spread almost evenly and entropy rises toward its maximum. The context vector becomes a bland average, which is the bottleneck failure again, arrived at from a different direction.
 5. <strong>Watch the whole matrix.</strong> Look at the second panel while you change sharpness. The bright diagonal-ish band is the alignment the model has learned; blurring smears it into a uniform grey.
@@ -214,17 +214,17 @@ Dot-product won, and that decision is the reason transformers are fast. Its one 
 
 Attention was invented as a patch for RNNs, and for three years that is what it was. Then came the observation that gave the paper <em>Attention Is All You Need</em> its title. If the decoder can reach any input position right, the recurrence is no longer doing anything key. Remove it, apply attention to the sequence against itself, and you get <a href="self_attention.html" style="color. Var(--accent-primary)">self-attention</a> &mdash; which trains in parallel across all positions instead of stepping through them one at a time.
 
-The next module extends the three steps above into the <a href="query_key_value.html" style="color. Var(--accent-primary)">query, key and value</a> framing that every transformer is written in.
+The next module extends the three steps above into the <a href="query_key_value.html" style="color. Var(--accent-primary)">query, key and value</a> framing that each transformer is written in.
 
 ## Where this goes wrong
 
 - <strong>Treating attention weights as reason.</strong> They show where data came from, not why the output was chosen. Different weightings can give the same prediction.
-- <strong>Forgetting the cost.</strong> Every output position scores against every input position. So the work grows with the product of the two lengths. On long sequences this quadratic term, not the model size, is what runs out of memory.
-- <strong>Expecting clean alignments everywhere.</strong> Attention is often diffuse, and heads in a real model often attend to punctuation or to the first token for reasons that have nothing to do with meaning.
+- <strong>Forgetting the cost.</strong> Each output position scores against each input position. So the work grows with the product of the two lengths. On long sequences this quadratic term, not the model size, is what runs out of memory.
+- <strong>Expecting clean alignments all over.</strong> Attention is often diffuse, and heads in a real model often attend to punctuation or to the first token for reasons that have nothing to do with meaning.
 
 ## Summing up
 
-Attention replaces the single fixed context vector with a fresh weighted average of every encoder state, recomputed at each output step. Score the decoder state against each input position, softmax the scores into weights that sum to 1, and blend. Because nothing is compressed, long sentences stop degrading, and because the weights are a proper distribution they can be read as an alignment. Dot-product scoring made it fast enough to be worth doing everywhere, and once the decoder could reach any position right, recurrence turned out to be optional.
+Attention replaces the single fixed context vector with a fresh weighted average of each encoder state, recomputed at each output step. Score the decoder state against each input position, softmax the scores into weights that sum to 1, and blend. Because nothing is compressed, long sentences stop degrading, and because the weights are a proper distribution they can be read as an alignment. Dot-product scoring made it fast enough to be worth doing all over, and once the decoder could reach any position right, recurrence turned out to be optional.
 
 ## Self-attention, cross-attention, and masking
 
@@ -244,7 +244,7 @@ Attention replaces the single fixed context vector with a fresh weighted average
 
 ## The cost, and what is being done about it
 
-Attention compares every position with every other, so cost grows with the <strong>square</strong> of the sequence length. Doubling the context quadruples the compute and the memory for the score matrix.
+Attention compares each position with each other, so cost grows with the <strong>square</strong> of the sequence length. Doubling the context quadruples the compute and the memory for the score matrix.
 
 At 512 tokens that is 262,144 pairs &mdash; trivial. At 100,000 tokens it is ten billion, which is why long context was the central engineering problem of the last few years.
 
@@ -272,7 +272,7 @@ The main responses:
 
 ## Recap in one screen
 
-- Attention lets every position draw right from every other, with weights computed from content.
+- Attention lets each position draw right from each other, with weights computed from content.
 - Query, key, value: compare the query with all keys, softmax the scores, take the weighted sum of values.
 - Divide by `√dₖ` or the softmax saturates and gradients vanish.
 - Masking makes generation doable (causal) and batching correct (padding).

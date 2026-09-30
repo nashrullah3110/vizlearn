@@ -3,37 +3,37 @@ intro: Retrieval returns a ranked list, so the metric has to care about order. P
 
 ## Why classification metrics are not enough
 
-A retriever does not return a yes or no; it returns an ordered list of candidates. Two systems can retrieve exactly the same documents and be very different in quality if one puts the relevant ones first and the other buries them at position 10.
+A retriever does not return a yes or no; it returns an ordered list of candidates. Two systems can retrieve exactly the same documents and be very different in quality if one puts the apt ones first and the other buries them at position 10.
 
 So retrieval metrics are evaluated <strong>at a cutoff k</strong>. The number of results a user or a downstream model will really see. And the better ones are sensitive to position within that cutoff.
 
-Precision@k asks: of the k results returned, how many are relevant? Recall@k asks: of all the relevant documents in the corpus, how many appeared in the top k? Both are simple ratios, and both ignore position within the list — a relevant document at rank 1 and one at rank k count equally.
+Precision@k asks: of the k results returned, how many are apt? Recall@k asks: of all the apt documents in the corpus, how many appeared in the top k? Both are simple ratios, and both ignore position within the list — a apt document at rank 1 and one at rank k count equally.
 
-MRR (mean reciprocal rank) cares about position. For each query, it finds the rank of the first relevant result and takes the reciprocal: 1 for rank 1, 0.5 for rank 2, 0.1 for rank 10. Averaged over queries, it tells you how far down the list a user often has to look to find the first useful result. It is the right metric when the user needs exactly one answer and will stop as soon as they find it.
+MRR (mean reciprocal rank) cares about position. For each query, it finds the rank of the first apt result and takes the reciprocal: 1 for rank 1, 0.5 for rank 2, 0.1 for rank 10. Averaged over queries, it tells you how far down the list a user often has to look to find the first useful result. It is the right metric when the user needs exactly one answer and will stop as soon as they find it.
 
-NDCG (normalised discounted cumulative gain) is the most general metric. It assigns a graded relevance score to each result (not just relevant/irrelevant), discounts it by position (a logarithmic discount, so rank 1 matters most), sums the discounted scores, and normalises by the ideal ranking. The result is a number between 0 and 1 where 1 means the system returned the best doable ranking. NDCG is the standard metric for search engines and recommendation systems. And it is the metric most RAG pipelines should optimise if they can afford graded relevance labels.
+NDCG (normalised discounted cumulative gain) is the most general metric. It assigns a graded relevance score to each result (not just apt/irrelevant), discounts it by position (a logarithmic discount, so rank 1 matters most), sums the discounted scores, and normalises by the ideal ranking. The result is a number between 0 and 1 where 1 means the system returned the best doable ranking. NDCG is the standard metric for search engines and recommendation systems. And it is the metric most RAG pipelines should optimise if they can afford graded relevance labels.
 
 ## Precision@k and Recall@k
 
-precision@k = (relevant in top k) / k
+precision@k = (apt in top k) / k
 
-recall@k&nbsp;&nbsp;&nbsp; = (relevant in top k) / (total relevant)
+recall@k&nbsp;&nbsp;&nbsp; = (apt in top k) / (total apt)
 
 Precision@k asks how much of what you returned was useful. Recall@k asks how much of what exists you managed to find.
 
-With 3 relevant documents in the collection and a top-5 list holding 2 of them. Precision@5 = 2/5 = 0.4, recall@5 = 2/3 = 0.67.
+With 3 apt documents in the collection and a top-5 list holding 2 of them. Precision@5 = 2/5 = 0.4, recall@5 = 2/3 = 0.67.
 
-Both ignore order fully &mdash; a relevant document at position 1 and at position 5 count identically. For a RAG pipeline feeding a fixed number of chunks to a model that may be the right simplification; for a search results page it is not.
+Both ignore order fully &mdash; a apt document at position 1 and at position 5 count identically. For a RAG pipeline feeding a fixed number of chunks to a model that may be the right simplification; for a search results page it is not.
 
 ## MRR and NDCG
 
-<strong>MRR</strong> (mean reciprocal rank) uses only the position of the <em>first</em> relevant result, averaged over queries:<p>MRR = mean(1 / rank of first relevant)</p><p>First position scores 1.0, second 0.5, third 0.33. It is the right metric when the user needs one good answer and will stop reading once they have it. Question answering, navigational search. And it on purpose ignores all of it after the first hit.</p><strong>NDCG</strong> (normalised discounted cumulative gain) is the most complete of the four. It handles <em>graded</em> relevance rather than a binary label, applies a logarithmic discount so later positions add less, and normalises by the score of the ideal ranking so the result lands in [0, 1] and is comparable across queries.<p>Use NDCG when relevance comes in degrees and the whole ordering matters; use MRR when only the first hit does.</p>
+<strong>MRR</strong> (mean reciprocal rank) uses only the position of the <em>first</em> apt result, averaged over queries:<p>MRR = mean(1 / rank of first apt)</p><p>First position scores 1.0, second 0.5, third 0.33. It is the right metric when the user needs one good answer and will stop reading once they have it. Question answering, navigational search. And it on purpose ignores all of it after the first hit.</p><strong>NDCG</strong> (normalised discounted cumulative gain) is the most complete of the four. It handles <em>graded</em> relevance rather than a binary label, applies a logarithmic discount so later positions add less, and normalises by the score of the ideal ranking so the result lands in [0, 1] and is comparable across queries.<p>Use NDCG when relevance comes in degrees and the whole ordering matters; use MRR when only the first hit does.</p>
 
 ## Measuring the stage that often fails
 
 Almost all RAG failures are retrieval failures: the right chunk never reached the model. Debugging the prompt while recall is 0.4 is wasted effort. So retrieval needs its own metrics, measured apart.
 
-What you need is a small evaluation set &mdash; 50 to 200 real questions, each with the id of the chunk (or chunks) that really answers it. Building it is the unglamorous part and it is what makes every later decision measurable rather than anecdotal.
+What you need is a small evaluation set &mdash; 50 to 200 real questions, each with the id of the chunk (or chunks) that really answers it. Building it is the unglamorous part and it is what makes each later decision measurable rather than anecdotal.
 
 The metrics divide into two families:
 
@@ -53,9 +53,9 @@ The metrics divide into two families:
 
 Because the model only sees the top k, <strong>recall@k is a ceiling on the whole system</strong>. If the answer is not in the retrieved set, no prompt engineering recovers it.
 
-<p class="mono-font">recall@k = (relevant documents in the top k) / (all relevant documents)</p>
+<p class="mono-font">recall@k = (apt documents in the top k) / (all apt documents)</p>
 
-With one relevant document per question, recall@k equals hit rate@k. And that is the common case for factoid evaluation sets.
+With one apt document per question, recall@k equals hit rate@k. And that is the common case for factoid evaluation sets.
 
 Measure it at a few k and read the curve:
 
@@ -72,7 +72,7 @@ That distinction &mdash; find versus rank &mdash; is the single most useful thin
 
 ## Rank-sensitive metrics
 
-<strong>MRR (mean reciprocal rank)</strong> averages 1/rank of the first relevant result:
+<strong>MRR (mean reciprocal rank)</strong> averages 1/rank of the first apt result:
 
 |First relevant at rank|Reciprocal rank|
 |---|---|
@@ -84,20 +84,20 @@ That distinction &mdash; find versus rank &mdash; is the single most useful thin
 
 MRR is right when there is in effect one right answer and its position matters &mdash; which describes most question answering. It is harsh on rank 2 versus rank 1, which is arguably correct given how much more attention a model pays to the first chunk.
 
-<strong>nDCG@k</strong> handles <em>graded</em> relevance: a document can be highly relevant, somewhat relevant or irrelevant. And the metric discounts gains logarithmically by position. It is the standard in data retrieval research and needs graded judgements. This are more expensive to collect than binary ones.
+<strong>nDCG@k</strong> handles <em>graded</em> relevance: a document can be highly apt, somewhat apt or irrelevant. And the metric discounts gains logarithmically by position. It is the standard in data retrieval research and needs graded judgements. This are more costly to collect than binary ones.
 
 <strong>Precision@k</strong> matters less for RAG than the others, because passing a few irrelevant chunks alongside the right one is often tolerable. It matters when context budget is tight or when irrelevant context measurably degrades answers &mdash; which it does.
 
 ## Interactive Exploration Guide
 
 1. <strong>Move the cutoff.</strong> Slide <strong>k</strong> from 1 to 10 and watch precision@k and recall@k move in opposite directions. A larger k almost always raises recall and lowers precision.
-2. <strong>Change the ranking.</strong> Switch <strong>Ranking</strong> so the relevant documents sit lower. Precision@k and recall@k at a large k barely move. While MRR and NDCG drop sharply &mdash; that difference is exactly what order-aware metrics measure.
-3. <strong>Put one relevant result first.</strong> Choose a ranking with a relevant document at position 1. MRR jumps to 1.0 no matter what follows, which shows how much it ignores.
+2. <strong>Change the ranking.</strong> Switch <strong>Ranking</strong> so the apt documents sit lower. Precision@k and recall@k at a large k barely move. While MRR and NDCG drop sharply &mdash; that difference is exactly what order-aware metrics measure.
+3. <strong>Put one apt result first.</strong> Choose a ranking with a apt document at position 1. MRR jumps to 1.0 no matter what follows, which shows how much it ignores.
 4. <strong>Set k = 1.</strong> Precision@1 and recall@1 become very blunt. At small k the choice of metric matters far more than at large k.
 
 ## Choosing one for a RAG pipeline
 
-For retrieval feeding a language model, <strong>recall@k</strong> is often the metric that matters most. The model can ignore an irrelevant chunk among the k it receives. But it cannot use a relevant chunk that was never retrieved. A missed document is unrecoverable, whereas a spurious one is merely noise.
+For retrieval feeding a language model, <strong>recall@k</strong> is often the metric that matters most. The model can ignore an irrelevant chunk among the k it receives. But it cannot use a apt chunk that was never retrieved. A missed document is unrecoverable, whereas a spurious one is merely noise.
 
 Set k to the number of chunks you really pass to the model and measure recall at that value. Then use precision or NDCG as a secondary check. Since packing the context with irrelevant material does cost tokens and can distract the model.
 
@@ -106,12 +106,12 @@ Set k to the number of chunks you really pass to the model and measure recall at
 - <strong>Reporting a metric without its k.</strong> “Precision 0.4” is meaningless; precision@5 is a number.
 - <strong>Using accuracy.</strong> It has no meaning over a ranked list of a large corpus. Where almost all of it is irrelevant.
 - <strong>Ignoring order when order matters.</strong> Precision@k cannot distinguish a system that ranks well from one that merely retrieves the same set in a worse order.
-- <strong>Assuming complete relevance labels.</strong> Most evaluation sets label only judged documents. So an unjudged-but-relevant result counts against you and recall is step by step understated.
+- <strong>Assuming complete relevance labels.</strong> Most evaluation sets label only judged documents. So an unjudged-but-apt result counts against you and recall is step by step understated.
 - <strong>Averaging over too few queries.</strong> These metrics are noisy per query; differences need many queries to be meaningful.
 
 ## Key takeaway
 
-Retrieval returns a ranking, so metrics are computed at a cutoff k and differ mainly in whether they care about position. Precision@k and recall@k ignore order within the cutoff; MRR looks only at the first relevant result; NDCG discounts by position and handles graded relevance. For RAG, recall@k at your actual context size is the number to optimise,. This is because the model can survive a bad chunk but not a missing one.
+Retrieval returns a ranking, so metrics are computed at a cutoff k and differ mainly in whether they care about position. Precision@k and recall@k ignore order within the cutoff; MRR looks only at the first apt result; NDCG discounts by position and handles graded relevance. For RAG, recall@k at your actual context size is the number to optimise,. This is because the model can survive a bad chunk but not a missing one.
 
 ## Building the evaluation set
 
@@ -277,7 +277,7 @@ print("reads all five either way. Report the metric your SYSTEM cares")
 print("about: ask how many retrieved documents the next stage reads.")
 ```
 
-Every one of those metrics rests on something that is not itself a metric. How the relevance labels were made.
+Each one of those metrics rests on something that is not itself a metric. How the relevance labels were made.
 
 ```python-run
 ROWS = [
@@ -316,7 +316,7 @@ print("most of the effort of evaluating retrieval at all.")
 
 <strong>Do I need graded relevance?</strong> Only if you are using nDCG. Binary judgements suffice for recall, hit rate and MRR.
 
-<strong>How do I evaluate when there is no single right chunk?</strong> Mark all acceptable chunks as relevant and use recall, or move to graded judgements and nDCG.
+<strong>How do I evaluate when there is no single right chunk?</strong> Mark all acceptable chunks as apt and use recall, or move to graded judgements and nDCG.
 
 ## Recap in one screen
 
