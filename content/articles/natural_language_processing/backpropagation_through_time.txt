@@ -3,7 +3,7 @@ intro: How gradient descent trains a network that contains a loop.
 
 ## The Problem With a Loop
 
-Backpropagation works on feed-forward graphs — signals flow one way, gradients flow back the same way. An RNN's feedback loop breaks that picture. The fix, <strong>Backpropagation Through Time (BPTT)</strong>, is beautifully blunt: <em>unroll</em> the loop into T copies of the cell, one per timestep. And the loop becomes an ordinary (deep) feed-forward chain that standard backprop can handle. Each unrolled copy shares the same weight matrices W and U. So the gradients from all timesteps are summed into a single weight update. The chain rule applied across T copies produces a product of T Jacobians. And that product is why RNNs struggle with long sequences. If the largest singular value of the recurrent Jacobian is below 1 the gradients shrink exponentially ([vanishing gradients](../deep_learning/exploding_and_vanishing_gradient.html)). Above 1 they grow exponentially (exploding gradients, handled by [gradient clipping](../deep_learning/gradient_clipping.html)). Truncated BPTT limits the unrolling to a fixed window of k steps. This caps the memory cost and the gradient path length at the expense of long-range learning. LSTMs and GRUs address the same problem architecturally, by adding gates that let gradients flow through an additive path rather than a multiplicative one. This page unrolls a small RNN, shows the gradient flowing backward through each timestep, and plots the gradient magnitude decaying or exploding as the sequence grows.
+Backpropagation works on feed-forward graphs — signals flow one way, gradients flow back the same way. An RNN's feedback loop breaks that picture. The fix, <strong>Backpropagation Through Time (BPTT)</strong>, is beautifully blunt: <em>unroll</em> the loop into T copies of the cell, one per timestep. And the loop becomes an ordinary (deep) feed-forward chain that standard backprop can handle. Each unrolled copy shares the same weight matrices W and U. So the gradients from all timesteps are summed into a single weight update. The chain rule applied across T copies produces a product of T Jacobians. And that product is why RNNs struggle with long sequences. If the largest singular value of the recurrent Jacobian is below 1 the gradients shrink fast ([vanishing gradients](../deep_learning/exploding_and_vanishing_gradient.html)). Above 1 they grow fast (exploding gradients, handled by [gradient clipping](../deep_learning/gradient_clipping.html)). Truncated BPTT limits the unrolling to a fixed window of k steps. This caps the memory cost and the gradient path length at the expense of long-range learning. LSTMs and GRUs address the same problem architecturally, by adding gates that let gradients flow through an additive path rather than a multiplicative one. This page unrolls a small RNN, shows the gradient flowing backward through each timestep, and plots the gradient magnitude decaying or exploding as the sequence grows.
 
 ## Forward, Then Backward
 
@@ -23,11 +23,11 @@ Ordinary backpropagation then applies to that unrolled graph. The only special f
 
 That summation is the entire difference between BPTT and standard backpropagation. All of it else &mdash; the chain rule, the storage of activations, the update &mdash; is the same.
 
-Two consequences follow directly. Memory grows with sequence length, because every step's activations must be kept for the backward pass. And the gradient for early steps is a long product of factors. This is where vanishing and exploding gradients come from.
+Two results follow directly. Memory grows with sequence length, because every step's activations must be kept for the backward pass. And the gradient for early steps is a long product of factors. This is where vanishing and exploding gradients come from.
 
 ## Truncated BPTT
 
-Backpropagating through a 10,000-step sequence is impossible: the memory required is proportional to the length.
+Backpropagating through a 10,000-step sequence is impossible: the memory required is tied to to the length.
 
 Truncated BPTT bounds it by propagating only k steps back. Then detaching the hidden state and continuing forward:
 
@@ -69,7 +69,7 @@ That is a hardware-utilisation limitation rather than a quality one, and gating 
 
 ## Unrolling the loop to differentiate it
 
-Training an RNN means treating the loop as a deep network with shared weights. This runs the full backward pass by hand, checks it numerically, and shows why the gradients from every timestep are summed rather than averaged.
+Training an RNN means treating the loop as a deep network with shared weights. This runs the full backward pass by hand, checks it in numbers, and shows why the gradients from every timestep are summed rather than averaged.
 
 ```python-run
 import numpy as np
@@ -234,7 +234,7 @@ BPTT = unroll the loop, backpropagate through the chain, sum the shared-weight g
 
 <strong>Detach the carried state</strong> between chunks in stateful training, or the graph never gets freed.
 
-<strong>Consider gradient checkpointing</strong> for long sequences: store activations only every few steps and recompute the rest during the backward pass, trading about 30% more compute for a large memory saving.
+<strong>Consider gradient checkpointing</strong> for long sequences: store activations only every few steps and recompute the rest during the backward pass. This trades about 30% more compute for a large memory saving.
 
 ## How it differs from feed-forward backpropagation
 

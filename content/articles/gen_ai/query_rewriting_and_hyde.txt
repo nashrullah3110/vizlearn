@@ -3,7 +3,7 @@ intro: Sometimes the query is the part that needs fixing, not the index.
 
 ## Before the details
 
-A user's question and the passage that answers it are usually written in different registers: short and colloquial versus long-form and technical. Every similarity metric in this batch — <a href="dot_product_vs_cosine_similarity.html" style="color: var(--accent-primary)">cosine</a>, <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> — depends on shared vocabulary between what is embedded and what is stored. If the question and the answer do not share words, no similarity metric can bridge that gap on its own; the fix has to happen before retrieval, to the query itself. Query rewriting uses an LLM to rephrase the user's question into the vocabulary of the indexed documents. Expanding acronyms, adding synonyms, and making the intent explicit. HyDE (Hypothetical Document Embeddings) takes a more radical approach: instead of rewriting the query, it asks the LLM to generate a hypothetical answer, embeds that answer, and uses the embedding as the search vector. The hypothetical answer does not need to be correct; it just needs to be written in the same register as the real documents. So its embedding lands in the right neighbourhood of the vector space. Both techniques add one LLM call before retrieval, which increases latency by 200-500ms but can sharply improve recall when the vocabulary gap is wide. Query rewriting is simpler and more predictable; HyDE works better when the query is very short or ambiguous. A [multi-query](multi_query_retriever.html) variant makes several rewrites and merges the retrieved results, trading more LLM calls for broader coverage. This page rewrites a sample query, makes a hypothetical document, embeds both, and shows which real passages each retrieves.
+A user's question and the passage that answers it are usually written in different registers: short and colloquial versus long-form and technical. Every similarity metric in this batch — <a href="dot_product_vs_cosine_similarity.html" style="color: var(--accent-primary)">cosine</a>, <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> — depends on shared vocabulary between what is embedded and what is stored. If the question and the answer do not share words, no similarity metric can bridge that gap on its own; the fix has to happen before retrieval, to the query itself. Query rewriting uses an LLM to rephrase the user's question into the vocabulary of the indexed documents. Expanding acronyms, adding synonyms, and making the intent explicit. HyDE (Hypothetical Document Embeddings) takes a more radical approach: instead of rewriting the query, it asks the LLM to generate a hypothetical answer, embeds that answer, and uses the embedding as the search vector. The hypothetical answer does not need to be correct; it just needs to be written in the same register as the real documents. So its embedding lands in the right neighbourhood of the vector space. Both techniques add one LLM call before retrieval, which increases latency by 200-500ms but can sharply improve recall when the vocabulary gap is wide. Query rewriting is simpler and more predictable; HyDE works better when the query is very short or ambiguous. A [multi-query](multi_query_retriever.html) variant makes several rewrites and merges the retrieved results. This trades more LLM calls for broader coverage. This page rewrites a sample query, makes a hypothetical document, embeds both, and shows which real passages each retrieves.
 
 ## Two ways to close the gap
 
@@ -98,7 +98,7 @@ print("done")
 
 ```
 
-The next block continues with the remaining demonstrations.
+The next block continues with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -135,7 +135,7 @@ print()
 
 ```
 
-The next block continues with the remaining demonstrations.
+The next block continues with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -165,7 +165,7 @@ for label, q in REWRITES.items():
 
 ```
 
-The next block continues with the remaining demonstrations.
+The next block continues with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -195,7 +195,7 @@ print()
 
 ```
 
-The next block continues with the remaining demonstrations.
+The next block continues with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -239,7 +239,7 @@ print()
 
 ```
 
-The next block continues with the remaining demonstrations.
+The next block continues with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -269,7 +269,7 @@ print()
 
 ```
 
-The next block continues with the remaining demonstrations.
+The next block continues with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -304,7 +304,7 @@ print("   exists.")
 
 ```
 
-## Experiments to try
+## Tests to try
 
 1. <strong>Read the raw query's ranking.</strong> A passage about data drift in production beats the overfitting passage — it happens to share more surface words ("model", "worse", "new", "data") with the terse question, even though the overfitting passage is the intended answer.
 2. <strong>Switch to the expanded query.</strong> A handful of added technical terms — "overfitting", "extension" — appear in the target passage but not the drift one. And that is enough to move the target back to the top.
@@ -313,7 +313,7 @@ print("   exists.")
 
 ## What can go wrong
 
-HyDE embeds a fabrication. If the hypothetical answer is confidently wrong about the topic rather than just stylistically answer-shaped, it can retrieve confidently wrong documents just as easily as right ones — it improves vocabulary match, not correctness. It also costs an extra model call before retrieval even starts. This query expansion usually does not.
+HyDE embeds a fabrication. If the hypothetical answer is confidently wrong about the topic. Rather than just stylistically answer-shaped, it can retrieve confidently wrong documents just as easily as right ones — it improves vocabulary match, not correctness. It also costs an extra model call before retrieval even starts. This query expansion usually does not.
 
 ## The short of it
 
@@ -346,7 +346,7 @@ Three mitigations worth having:
 
 <strong>They hurt when:</strong> the query already contains exact identifiers. Rewriting "error E4471" can lose the code. This was the most useful part. Guard by keeping the first query in the fused search alongside any rewrites.
 
-<strong>HyDE in detail hurts</strong> when the model has no knowledge of the domain and makes a hypothetical answer that is not merely wrong but off-topic, pulling retrieval in an unhelpful direction.
+<strong>HyDE in detail hurts</strong> when the model has no knowledge of the domain and makes a hypothetical answer that is not merely wrong but off-topic. This pulls retrieval in an unhelpful direction.
 
 The safe general pattern is <strong>additive rather than substitutive</strong>: search with the first query <em>and</em> the rewrites, and fuse. That way a bad rewrite dilutes the results slightly rather than replacing them.
 
@@ -368,7 +368,7 @@ Measure each addition on a question set with known answers. In most systems hybr
 
 <strong>Does HyDE need a large model?</strong> No &mdash; the hypothetical answer only needs the right register and vocabulary. A small fast model works well.
 
-<strong>Does it matter that the hypothetical answer is wrong?</strong> Not for retrieval, since it is used only as a search key. It would matter if you showed it to the user, which you should not.
+<strong>Does it matter that the hypothetical answer is wrong?</strong> Not for retrieval. Since it is used only as a search key. It would matter if you showed it to the user, which you should not.
 
 <strong>Should I replace the first query?</strong> No &mdash; search with both and fuse. That way a poor rewrite cannot destroy the results.
 
@@ -383,5 +383,5 @@ Measure each addition on a question set with known answers. In most systems hybr
 - Users phrase questions differently from how documents phrase answers, and that gap causes retrieval failures.
 - Query rewriting expands, clarifies, decomposes or contextualises the question before searching.
 - Contextualising against conversation history is important in chat, and often forgotten.
-- HyDE makes a plausible answer and searches with its embedding, matching the documents' register.
+- HyDE makes a plausible answer and searches with its embedding. This matches the documents' register.
 - Search with the first query as well as the rewrites, and fuse. Never substitute blindly.

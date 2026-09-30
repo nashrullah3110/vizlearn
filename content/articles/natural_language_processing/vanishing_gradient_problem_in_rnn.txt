@@ -3,12 +3,12 @@ intro: A geometric series is all it takes to erase long-term memory — and to m
 
 ## The Arithmetic of Forgetting
 
-BPTT multiplies the gradient by &part;h&#8348;/&part;h&#8348;&#8331;&#8321; once per timestep. Call that factor's typical size <em>w</em>. After travelling back T steps the gradient is scaled by <strong>w<sup>T</sup></strong> — a geometric series. At w = 0.7 and T = 30, that's 0.7&sup3;&#8304; &asymp; 0.00002: the beginning of the sentence receives <em>two hundred-thousandths</em> of the learning signal. Exploding gradients are the mirror case: when w > 1, the geometric series grows without bound. And the weight update becomes catastrophically large. Gradient clipping (capping the gradient norm before the update) is the standard fix for exploding gradients, but there is no symmetric fix for vanishing. You cannot amplify a signal that has already been times to zero. The [LSTM](what_is_lstm.html) solves this architecturally: its cell state flows through an additive path (C_t = f_t * C_{t-1} + i_t * candidate) rather than a multiplicative one. So the gradient along the cell state does not pass through a weight matrix at every step. The [forget gate](forget_gate_in_lstm.html) controls how much of the old state survives, and when it is near 1, the gradient flows through almost undiminished &mdash; which is exactly why biasing the forget gate toward 1 at initialisation is so important. [GRUs](what_is_a_gru.html) achieve the same effect with fewer parameters. This page computes the gradient magnitude at each timestep, shows how it decays geometrically, and covers the LSTM's additive path as the architectural solution.
+BPTT multiplies the gradient by &part;h&#8348;/&part;h&#8348;&#8331;&#8321; once per timestep. Call that factor's typical size <em>w</em>. After travelling back T steps the gradient is scaled by <strong>w<sup>T</sup></strong> — a geometric series. At w = 0.7 and T = 30, that's 0.7&sup3;&#8304; &asymp; 0.00002: the beginning of the sentence receives <em>two hundred-thousandths</em> of the learning signal. Exploding gradients are the mirror case: when w > 1, the geometric series grows without bound. And the weight update becomes catastrophically large. Gradient clipping (capping the gradient norm before the update) is the standard fix for exploding gradients, but there is no even fix for vanishing. You cannot amplify a signal that has already been times to zero. The [LSTM](what_is_lstm.html) solves this architecturally: its cell state flows through an additive path (C_t = f_t * C_{t-1} + i_t * candidate) rather than a multiplicative one. So the gradient along the cell state does not pass through a weight matrix at every step. The [forget gate](forget_gate_in_lstm.html) controls how much of the old state survives, and when it is near 1, the gradient flows through almost undiminished &mdash; which is exactly why biasing the forget gate toward 1 at initialisation is so important. [GRUs](what_is_a_gru.html) achieve the same effect with fewer parameters. This page computes the gradient magnitude at each timestep, shows how it decays geometrically, and covers the LSTM's additive path as the architectural solution.
 
 ## Vanishing and Exploding: Two Sides of One Coin
 
-- <strong>w &lt; 1 &rarr; vanishing:</strong> gradients decay exponentially; early timesteps stop learning; the network only captures short-range patterns.
-- <strong>w &gt; 1 &rarr; exploding:</strong> gradients grow exponentially; updates become huge and training destabilizes into NaNs. (The blunt fix — gradient clipping — just caps the magnitude.)
+- <strong>w &lt; 1 &rarr; vanishing:</strong> gradients decay fast; early timesteps stop learning; the network only captures short-range patterns.
+- <strong>w &gt; 1 &rarr; exploding:</strong> gradients grow fast; updates become huge and training destabilizes into NaNs. (The blunt fix — gradient clipping — just caps the magnitude.)
 - <strong>w = 1 exactly:</strong> stable — but nothing keeps a trained weight matrix pinned there. The knife-edge is why vanilla RNNs are at its core fragile on long sequences.
 
 ## The Way Out: Gates
@@ -98,7 +98,7 @@ print()
 
 ```
 
-The next block continues with the remaining demonstrations.
+The next block continues with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -138,7 +138,7 @@ print("done")
 
 ```
 
-The next block continues with the remaining demonstrations.
+The next block continues with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -175,7 +175,7 @@ print()
 
 ```
 
-The next block continues with the remaining demonstrations.
+The next block continues with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -199,7 +199,7 @@ print()
 
 ```
 
-The next block continues with the remaining demonstrations.
+The next block continues with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -230,7 +230,7 @@ print("were patched; vanishing ones needed the LSTM, and then attention.")
 
 ```
 
-## Guided experiments
+## Guided tests
 
 1. <strong>Start at w = 0.70, T = 20.</strong> The bars die out about a third of the way back — most of the sentence is unreachable by the learning signal.
 2. <strong>Enable log scale.</strong> The decay becomes a straight line — the visual signature of an exponential. Now drag T to 40 and read the survival value: it falls off a cliff.
@@ -252,7 +252,7 @@ Contrast with a plain RNN, where the factor is the derivative of a tanh times a 
 
 The GRU achieves the same with its update gate: `hₜ` includes `(1 − zₜ) ⊙ hₜ₋₁`. So the derivative includes `(1 − zₜ)`, near 1 when the state is being preserved.
 
-This is structurally the same trick as a <strong>residual connection</strong>: an additive path whose derivative is 1, giving gradients a route that multiplication cannot crush. The transformer's `x + sublayer(x)`, the LSTM's cell state and the GRU's interpolation are three expressions of one idea.
+This is structurally the same trick as a <strong>residual connection</strong>: an additive path whose derivative is 1. This gives gradients a route that multiplication cannot crush. The transformer's `x + sublayer(x)`, the LSTM's cell state and the GRU's interpolation are three expressions of one idea.
 
 Gating reduces the problem rather than solving it. LSTMs handle hundreds of steps reliably and thousands unreliably, which is part of why attention &mdash; where any two positions are one step apart no matter distance &mdash; eventually displaced them.
 

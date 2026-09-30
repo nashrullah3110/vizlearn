@@ -5,7 +5,7 @@ intro: How does approximate nearest neighbour search actually work? Explain HNSW
 
 Take a proximity graph &mdash; each vector linked to its nearest neighbours &mdash; and stack several, each a random sample of the one below. Search enters at the sparse top layer and greedily moves to whichever neighbour is closer to the query, until no neighbour improves. Then it drops a layer and repeats.
 
-The top layers have long edges, so a few hops cross most of the space; the bottom layer has short edges. So the final steps are precise. It is the skip-list idea applied to geometry, and it is the reason HNSW dominates: excellent recall at low latency. IVF (Inverted File Index) takes a different approach: partition the vector space into clusters (usually using k-means), assign each vector to its nearest cluster centroid, and at query time search only the vectors in the nearest nprobe clusters. IVF trades recall for speed linearly: more probes give better recall at higher cost. HNSW is faster at high recall but uses more memory (the graph structure); IVF is more memory-efficient but slower at the same recall level. Product Quantization (PQ) compresses vectors by splitting each one into subvectors and quantizing each subvector to the nearest codebook entry. This reduces memory by 4-8x at a small accuracy cost. IVF + PQ (IVFPQ) is the standard combination for billion-scale search: IVF narrows the candidates, PQ compresses the stored vectors. Libraries like FAISS, Annoy, and ScaNN implement these structures; vector databases like Pinecone, Weaviate, and Milvus wrap them with persistence and APIs. This page builds both an HNSW graph and an IVF index on the same vectors, runs the same query against each, and compares recall, latency, and memory.
+The top layers have long edges, so a few hops cross most of the space; the bottom layer has short edges. So the final steps are precise. It is the skip-list idea applied to geometry, and it is the reason HNSW dominates: excellent recall at low latency. IVF (Inverted File Index) takes a different approach: partition the vector space into clusters (usually using k-means), assign each vector to its nearest cluster centroid, and at query time search only the vectors in the nearest nprobe clusters. IVF trades recall for speed linearly: more probes give better recall at higher cost. HNSW is faster at high recall but uses more memory (the graph structure). IVF is more memory-efficient but slower at the same recall level. Product Quantization (PQ) compresses vectors by splitting each one into subvectors and quantizing each subvector to the nearest codebook entry. This reduces memory by 4-8x at a small accuracy cost. IVF + PQ (IVFPQ) is the standard combination for billion-scale search: IVF narrows the candidates, PQ compresses the stored vectors. Libraries like FAISS, Annoy, and ScaNN implement these structures; vector databases like Pinecone, Weaviate, and Milvus wrap them with persistence and APIs. This page builds both an HNSW graph and an IVF index on the same vectors, runs the same query against each, and compares recall, latency, and memory.
 
 ## The parameters worth naming
 
@@ -62,7 +62,7 @@ The idea is a library organised into sections.
 
 <strong>Query:</strong> compare the query against the 4,096 centroids, pick the closest `nprobe` of them, and search only the vectors in those lists.
 
-With `nprobe = 8` out of 4,096 clusters, roughly 0.2% of the vectors are examined. The speed-up is proportional.
+With `nprobe = 8` out of 4,096 clusters, roughly 0.2% of the vectors are examined. The speed-up is tied to.
 
 The tunable is `nprobe`, and it is a direct recall-versus-latency dial:
 
@@ -203,7 +203,7 @@ print()
 print("Boundary queries lose far more; raising nprobe helps them most.")
 ```
 
-Memory is a separate constraint. Product quantisation compresses each vector to a short code, trading accuracy for a smaller footprint.
+Memory is a separate constraint. Product quantisation compresses each vector to a short code. This trades accuracy for a smaller footprint.
 
 ```python-run
 D = 32
@@ -270,7 +270,7 @@ Operational differences that matter as much as the benchmarks:
 
 <strong>Deletions.</strong> Both handle them poorly &mdash; usually via tombstones, with periodic rebuilds to reclaim space and quality.
 
-<strong>Filtered search.</strong> Applying a metadata filter can defeat the index structure, since the graph or clusters were built over all of it. Modern vector databases implement filter-aware traversal; where unavailable, over-retrieve and filter afterwards.
+<strong>Filtered search.</strong> Applying a metadata filter can defeat the index structure. Since the graph or clusters were built over all of it. Modern vector databases implement filter-aware traversal; where unavailable, over-retrieve and filter afterwards.
 
 ## Measuring recall
 
@@ -304,6 +304,6 @@ Run that for several settings of `ef_search` or `nprobe` and plot recall against
 
 - Exact search is linear and stops being interactive past a few hundred thousand vectors.
 - IVF clusters the space and searches only the nearest clusters; `nprobe` trades recall for speed.
-- HNSW walks a layered neighbour graph, giving logarithmic search and high recall at 1.5&ndash;2&times; the memory.
+- HNSW walks a layered neighbour graph. This gives logarithmic search and high recall at 1.5&ndash;2&times; the memory.
 - Product quantisation compresses vectors 30-fold, with a full-precision rerank to recover accuracy.
 - Measure recall against exact search and pick parameters from the recall-latency curve.

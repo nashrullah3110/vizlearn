@@ -13,7 +13,7 @@ Searching a million vectors by brute force &mdash; computing the distance from t
 
 ## Cosine, and why it is the default
 
-Retrieval almost always ranks by <a href="../machine_learning/cosine_similarity.html" style="color: var(--accent-primary)">cosine similarity</a>: the angle between the query vector and the document vector, ignoring how long either one is. Length in an embedding tends to carry things like document length or token count rather than meaning. So ignoring it is the point.
+Retrieval almost always ranks by <a href="../machine_learning/cosine_similarity.html" style="color: var(--accent-primary)">cosine similarity</a>: the angle between the query vector and the document vector. This ignores how long either one is. Length in an embedding tends to carry things like document length or token count rather than meaning. So ignoring it is the point.
 
 On vectors normalised to unit length, ranking by cosine and ranking by Euclidean distance give the same orders. This is why many systems normalise once at index time. Then use whichever their hardware does faster. Switch the metric here and watch how little changes. And, on the points that are not near the unit circle, exactly where it does.
 
@@ -21,7 +21,7 @@ On vectors normalised to unit length, ranking by cosine and ranking by Euclidean
 
 An exact search compares the query against every vector in the index. That is 18 comparisons here and 18 million in a real corpus, per query. And it is why nobody runs exact search at scale.
 
-The standard fix is to partition the space. Cluster the vectors once, keep a centroid per cell, and at query time compare against the centroids first. Then search only the nearest few cells. This is an inverted file index (IVF); HNSW does the same job with a navigable graph instead of cells. Both are <strong>approximate</strong>: they trade a small chance of missing a true neighbour for an enormous reduction in work.
+The standard fix is to partition the space. Cluster the vectors once, keep a centroid per cell, and at query time compare against the centroids first. Then search only the nearest few cells. This is an inverted file index (IVF). HNSW does the same job with a navigable graph instead of cells. Both are <strong>approximate</strong>: they trade a small chance of missing a true neighbour for an enormous reduction in work.
 
 That chance is what recall@k measures &mdash; the share of the true top k that the approximate search actually returned. It is a dial, not a defect: probing more cells raises recall and costs comparisons.
 
@@ -75,9 +75,9 @@ Real systems need constraints: only documents this user may see, only from the l
 
 Two ways to apply them, and the difference matters:
 
-<strong>Pre-filter</strong> &mdash; restrict the candidate set, then search within it. Correct results, and it can defeat the index structure, since the graph or clusters were built over all of it.
+<strong>Pre-filter</strong> &mdash; restrict the candidate set, then search within it. Correct results, and it can defeat the index structure. Since the graph or clusters were built over all of it.
 
-<strong>Post-filter</strong> &mdash; search first, then discard non-matching results. Fast, and it can return fewer than k results, or none, if the top matches are all filtered out.
+<strong>Post-filter</strong> &mdash; search first, then discard non-matching results. Fast, and it can return fewer than k results, or none. If the top matches are all filtered out.
 
 Modern vector databases implement filtered search that navigates the index while respecting the filter. This is the right answer. Where that is unavailable, the workaround is to over-retrieve &mdash; ask for 10&times; k and filter &mdash; and accept that a highly selective filter may still come up short.
 

@@ -7,11 +7,11 @@ A 32-bit float can express billions of distinct values. An 8-bit integer can exp
 
 scale = (max &minus; min) / (2<sup>bits</sup> &minus; 1) &nbsp;&nbsp;&nbsp; q = round(w / scale)
 
-Every weight is then snapped to its nearest level. The difference between where a weight <em>was</em> and where it <em>landed</em> is the quantization error. Unavoidable, and the entire subject in one sentence. **Post-training quantization (PTQ)** applies the snapping to a model that was already trained in full precision, with no further training. It is fast (minutes, not days) and usually works at 8 bits with negligible accuracy loss. **Quantization-aware training (QAT)** simulates low-precision arithmetic during training so the model learns to tolerate rounding. And it is the path to aggressive 4-bit and even 3-bit quantization. GPTQ, AWQ, and GGML/GGUF are the formats and algorithms that brought 4-bit quantization to consumer GPUs, making 70B-parameter models runnable on a single 24 GB card. This page shows the quantization grid at different bit widths, shows the accuracy-memory tradeoff on a worked example, and covers the difference between symmetric and asymmetric quantization schemes.
+Every weight is then snapped to its nearest level. The difference between where a weight <em>was</em> and where it <em>landed</em> is the quantization error. Unavoidable, and the entire subject in one sentence. **Post-training quantization (PTQ)** applies the snapping to a model that was already trained in full precision, with no further training. It is fast (minutes, not days) and usually works at 8 bits with negligible accuracy loss. **Quantization-aware training (QAT)** simulates low-precision arithmetic during training so the model learns to tolerate rounding. And it is the path to aggressive 4-bit and even 3-bit quantization. GPTQ, AWQ, and GGML/GGUF are the formats and algorithms that brought 4-bit quantization to consumer GPUs. This makes 70B-parameter models runnable on a single 24 GB card. This page shows the quantization grid at different bit widths, shows the accuracy-memory tradeoff on a worked example, and covers the difference between even and asymmetric quantization schemes.
 
-## Symmetric vs Asymmetric
+## Even vs Asymmetric
 
-- <strong>Symmetric</strong> centres the grid on zero, using a range of &plusmn;max(|w|). Simpler and faster, since zero maps exactly to zero. But if your weights are lopsided, half the levels are wasted on values that never occur.
+- <strong>Even</strong> centres the grid on zero, using a range of &plusmn;max(|w|). Simpler and faster, since zero maps exactly to zero. But if your weights are lopsided, half the levels are wasted on values that never occur.
 - <strong>Asymmetric</strong> fits the grid to the actual min and max. This adds a <em>zero-point</em> offset. It uses every level, at the cost of slightly more arithmetic at inference.
 
 Toggle between them with the outlier enabled and watch the step size and RMS error change.
@@ -64,7 +64,7 @@ The methods that work all address this:
 
 <strong>Group-wise quantisation.</strong> Use a separate scale per block of 64 or 128 values rather than per tensor. So an outlier only damages its own group. This is the foundation of most 4-bit formats.
 
-<strong>GPTQ</strong> quantises layer by layer, adjusting the remaining weights to compensate for the error introduced. A one-shot method needing a small calibration set.
+<strong>GPTQ</strong> quantises layer by layer, adjusting the left weights to compensate for the error introduced. A one-shot method needing a small calibration set.
 
 <strong>AWQ</strong> identifies the weights that matter most for activations and protects them at higher precision.
 
@@ -111,7 +111,7 @@ print("   tensor, so the overhead is negligible.")
 print()
 ```
 
-Building on the same setup, the next block shows the remaining cases.
+Building on the same setup, the next block shows the left cases.
 
 ```python-run
 import numpy as np
@@ -136,7 +136,7 @@ print("   model, it is a different model.")
 print()
 ```
 
-The following block covers the remaining operations.
+The following block covers the left operations.
 
 ```python-run
 import numpy as np
@@ -175,7 +175,7 @@ print("   fundamentally an outlier strategy.")
 print()
 ```
 
-The next block continues with the remaining demonstrations.
+The next block continues with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -205,7 +205,7 @@ print("   the single whole-tensor scale gave, and it cost %d extra floats"
 print("   -- about %.2f of an extra bit per weight. this is exactly what"
 ```
 
-Building on the same setup, the next block shows the remaining cases.
+Building on the same setup, the next block shows the left cases.
 
 ```python-run
       % (32.0 / 64))
