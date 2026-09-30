@@ -20,7 +20,7 @@ are decoupled, so the lengths need not match.
 
 The training signal is the same one a language model uses: at each decoder
 step, predict the next target token, with the loss being cross-entropy against
-the real one. During training the decoder is fed the *true* previous token
+the real one. During training the decoder is fed the *true* last token
 rather than its own guess &mdash; **teacher forcing** &mdash; which makes the
 gradient well behaved and creates the exposure-bias problem, because at
 inference the decoder must consume its own mistakes.
@@ -133,7 +133,7 @@ class Attention(nn.Module):
         return torch.bmm(weights.unsqueeze(1), keys).squeeze(1), weights
 ```
 
-The `masked_fill` line is the one that is quietly important. Batched sequences
+The `masked_fill` line is the one that is quietly key. Batched sequences
 are padded to equal length, and without the mask the softmax spreads probability
 onto padding tokens &mdash; the model learns to attend to nothing, and the bug
 shows up as mysteriously poor translation of short sentences in a batch of long
@@ -144,14 +144,14 @@ ones.
 One detail of how these models are trained shapes how they fail, and it is
 invisible in the architecture diagram.
 
-During training the decoder is fed the **true** previous target token at every
-step. Feeding it its own previous prediction instead would mean that early in
+During training the decoder is fed the **true** last target token at every
+step. Feeding it its own last prediction instead would mean that early in
 training it conditions on nonsense, and learning never gets started. Teacher
 forcing avoids that and makes every step's gradient free of the
-others, which is also what lets the whole target sequence be processed in
+others, which is also what lets the whole target sequence be handled in
 parallel.
 
-At inference there is no true previous token. The decoder must consume its own
+At inference there is no true last token. The decoder must consume its own
 output, which means it is operating on a distribution of prefixes it never saw
 during training &mdash; **exposure bias**. One mistake shifts the context away
 from anything familiar, and the errors compound: a model that is 95% accurate
@@ -184,7 +184,7 @@ and ended up replacing the network it was patching.
 
 <strong>Is attention the same thing as alignment?</strong> It behaves like alignment without being trained as it. The weights come from "predict the next token" and nothing else, yet they concentrate where a translator would point. The difference that matters: attention is a soft allocation summing to 1. So it always points somewhere, including when no source word corresponds to the token being emitted.
 
-<strong>If teacher forcing causes exposure bias, why use it?</strong> Because without it the decoder spends early training conditioned on its own nonsense and never gets started. It also makes each step's gradient free of the others. This is what lets the whole target sequence be processed in parallel. Scheduled sampling and sequence-level training are partial mitigations; in practice beam search helps more than either.
+<strong>If teacher forcing causes exposure bias, why use it?</strong> Because without it the decoder spends early training conditioned on its own nonsense and never gets started. It also makes each step's gradient free of the others. This is what lets the whole target sequence be handled in parallel. Scheduled sampling and sequence-level training are partial mitigations; in practice beam search helps more than either.
 
 <strong>Do I really need the padding mask?</strong> Yes. Batches are padded to equal length, and without the mask the softmax spreads probability onto padding tokens. The model learns to attend to nothing. The symptom is short sentences translating badly when they share a batch with long ones. This is a long way from the cause.
 

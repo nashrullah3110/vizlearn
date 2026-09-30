@@ -7,7 +7,7 @@ A training label says "this is a dog" and nothing else. But a trained teacher, s
 
 Those small numbers are not noise &mdash; they encode <strong>similarity structure</strong> the label cannot express. A dog resembles a wolf far more than a car. Geoffrey Hinton named this <em>dark knowledge</em>. It is the teacher's entire learned view of how the classes relate. And it is free supervision on every single case. The student trains on two losses at once. One against the hard labels (the standard cross-entropy) and one against the teacher's soft predictions (the KL divergence between the student's and teacher's output distributions). The total loss is a weighted combination: `L = alpha * L_hard + (1 - alpha) * T^2 * L_soft`. Where T is the temperature and alpha controls the balance. Temperature softens the teacher's output distribution: at T=1 the distribution is peaked (the top class rules), at T=5 the small probabilities are amplified and the dark knowledge becomes visible. The T-squared scaling compensates for the fact that higher temperature reduces the size of the gradients. In practice, T between 2 and 20 and alpha between 0.1 and 0.5 are common. For LLMs, distillation often happens at the sequence level. The student learns to match the teacher's token-level probabilities across a full generation, not just a single classification. DistilBERT (66M parameters) distilled from BERT-base (110M) retains 97% of BERT's speed at 60% of the size and 2x the speed. This page trains a student from a teacher, shows the soft label distribution at different temperatures, and covers the alpha/T tradeoff.
 
-## Why Temperature Is Important
+## Why Temperature Is Key
 
 There is a catch: a confident teacher's non-target probabilities are so tiny that they add almost nothing to the gradient. At <span class="mono-font">T = 1</span> the distribution is nearly one-hot. So the student learns roughly what the plain label already told it.
 
@@ -37,9 +37,9 @@ For generative models the idea extends naturally: the teacher's full next-token 
 
 Distillation trains a small <strong>student</strong> model to reproduce the behaviour of a large <strong>teacher</strong>. The result is a model with a fraction of the parameters that retains much of the teacher's quality on the tasks it was distilled for.
 
-The insight is about what the teacher provides. A hard label says "this is a cat". A teacher's full output distribution says "90% cat, 7% dog, 2% fox, 1% all of it else". And that shape carries data about how the classes relate. This a one-hot label does not.
+The insight is about what the teacher gives. A hard label says "this is a cat". A teacher's full output distribution says "90% cat, 7% dog, 2% fox, 1% all of it else". And that shape carries data about how the classes relate. This a one-hot label does not.
 
-Those richer targets are called <strong>soft labels</strong>, and they are why a distilled student often outperforms the same architecture trained from scratch on the same data. Each case teaches more.
+Those richer targets are called <strong>soft labels</strong>, and they are why a distilled student often beats the same architecture trained from scratch on the same data. Each case teaches more.
 
 |&nbsp;|Hard labels|Soft labels from a teacher|
 |---|---|---|
@@ -261,19 +261,19 @@ That caveat matters. A student distilled on customer-support conversations will 
 
 <strong>Reach for it when:</strong> inference cost or latency is the binding constraint, the task is narrow and well-set, you have or can generate plenty of representative inputs. And you have a strong teacher available.
 
-<strong>Do not, when:</strong> the task is open-ended and you need broad capability, you lack representative prompts, quantising the larger model would already meet the budget. Or the licence forbids it.
+<strong>Do not, when:</strong> the task is open-ended and you need broad power, you lack representative prompts, quantising the larger model would already meet the budget. Or the licence forbids it.
 
 The honest ordering for most teams: try quantisation first, since it is far cheaper and often enough. Distil when quantisation is not enough and the task is narrow enough to survive the specialisation.
 
 ## Questions people ask
 
-<strong>How much smaller can the student be?</strong> Commonly 2&ndash;10&times;, with 40&ndash;60% reductions retaining most quality on the distilled task.
+<strong>How much smaller can the student be?</strong> Often 2&ndash;10&times;, with 40&ndash;60% reductions retaining most quality on the distilled task.
 
 <strong>Do I need the teacher's logits?</strong> For logit distillation, yes. Sequence-level distillation works from made text alone, which is what makes API-based teachers usable at all.
 
 <strong>What temperature?</strong> 2&ndash;5. Higher reveals more structure in confident predictions and in time flattens away the signal.
 
-<strong>Can a student beat its teacher?</strong> On the narrow distilled task, sometimes. The soft targets regularise. And the smaller model overfits less. Not broadly capability.
+<strong>Can a student beat its teacher?</strong> On the narrow distilled task, sometimes. The soft targets regularise. And the smaller model overfits less. Not broadly power.
 
 <strong>Is this the same as fine-tuning?</strong> Fine-tuning adapts a model to a task using ground-truth labels. Distillation trains one model to imitate another. They are often combined.
 
