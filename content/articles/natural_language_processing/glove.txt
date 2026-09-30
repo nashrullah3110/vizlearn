@@ -6,9 +6,9 @@ intro: Start from the corpus-wide count matrix instead of one window at a time, 
 By 2014 there were two ways to get word vectors and they came from different
 traditions.
 
-**Count-based** methods build a word-by-word co-occurrence matrix over the
+**Count-based** methods build a word-by-word co-instance matrix over the
 whole corpus and factorise it &mdash; LSA and its relatives. They use the
-global statistics efficiently, and they had historically done badly on analogy
+global statistics fast, and they had historically done badly on analogy
 tasks.
 
 **Prediction-based** methods slide a window and train on local pairs &mdash;
@@ -20,7 +20,7 @@ GloVe is the argument that this is a false choice. Its name is short for
 *global vectors*, and it takes the count matrix as its starting point while
 keeping the vector arithmetic that made word2vec work.
 
-This page walks through the co-occurrence matrix, the weighted least-squares objective, and how the resulting vectors compare to [word2vec](word2vec.html) on analogy and similarity tasks.
+This page walks through the co-instance matrix, the weighted least-squares objective, and how the resulting vectors compare to [word2vec](word2vec.html) on analogy and similarity tasks.
 
 ## Counting
 
@@ -193,7 +193,7 @@ type cannot represent a word with two senses.
 
 Static vectors still earn their place where the constraints are tight. They are
 a lookup table &mdash; no forward pass, no GPU, microseconds per word. They are
-interpretable enough to debug. And they are a reasonable initialisation for the
+interpretable enough to debug. And they are a fair initialisation for the
 embedding layer of a small model trained on little data. Between the two, GloVe
 and skip-gram perform similarly on most benchmarks once the corpus and
 dimension are matched, and the practical difference is that GloVe's training
@@ -202,7 +202,7 @@ parallelises trivially over the count matrix while word2vec streams text.
 
 <strong>GloVe or word2vec?</strong> With the corpus and dimension matched they score similarly on most benchmarks. So it is rarely the interesting decision. The real difference is operational: GloVe trains over a precomputed count matrix and parallelises trivially. Word2vec streams text and holds up better on small corpora, because there a pair adds many free gradient steps instead of one least-squares term.
 
-<strong>Why fit the logarithm of the count?</strong> Because the signal lives in *ratios* of co-occurrence probabilities. And the logarithm is what turns a ratio into a difference of vectors that a dot product can express. Fitting raw counts would also ask a bounded dot product to span several orders of magnitude, which it cannot do.
+<strong>Why fit the logarithm of the count?</strong> Because the signal lives in *ratios* of co-instance probabilities. And the logarithm is what turns a ratio into a difference of vectors that a dot product can express. Fitting raw counts would also ask a bounded dot product to span several orders of magnitude, which it cannot do.
 
 <strong>Do I have to build the count matrix myself?</strong> Usually not. The released vectors cover 6 billion to 840 billion tokens. If you do build one, note that the matrix, not the optimisation, is the expensive part: it is |V|&sup2; in the worst case. This is why implementations store it sparsely and only ever visit the non-zero cells.
 
@@ -214,7 +214,7 @@ parallelises trivially over the count matrix while word2vec streams text.
 
 ## Recap in one screen
 
-- GloVe summarises the whole corpus into a co-occurrence matrix first; the training loop never touches the text again.
+- GloVe summarises the whole corpus into a co-instance matrix first; the training loop never touches the text again.
 - Neighbours are weighted by 1/d, so proximity counts as evidence and distance weakens it without the hard edge a plain window imposes.
 - Single conditional probabilities are dominated by frequency. The *ratio* between two of them cancels that out, and is where the data actually is.
 - The objective fits `w_i . w~_j + b_i + b~_j` to `log X_ij`, with the biases absorbing "this word is common" so the dot product only has to explain what is specific to the pair.

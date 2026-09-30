@@ -5,20 +5,20 @@ intro: Nobody hand-labels an embedding space. It falls out of a simple predictio
 
 The whole field rests on one claim: a word is characterised by the company it keeps. Words appearing in similar contexts tend to mean similar things.
 
-It is easy to check. <em>Cat</em> and <em>dog</em> both appear near <em>pet</em>, <em>feed</em>, <em>vet</em> and <em>fur</em>. <em>Bulldozer</em> does not. So if you build vectors that predict a word’s context well, words with similar contexts must end up with similar vectors. The semantic structure is a by-product of the prediction task, never an objective in itself. Word2Vec offers two architectures: Skip-gram (predict context words from a centre word) and CBOW (predict the centre word from its context). Skip-gram works better on small datasets and rare words; CBOW is faster and works better on frequent words. Both produce a weight matrix whose rows are the word embeddings. GloVe takes a different approach: it factorises the global word co-occurrence matrix. This captures the same distributional data but in a single matrix factorisation rather than iterative gradient updates. FastText extends Word2Vec by embedding character n-grams, so it can produce vectors for words never seen in training by combining their subword pieces. All three produce static embeddings (one vector per word no matter context). Contextual embeddings from transformers supersede them for most downstream tasks but are much more expensive to compute. This page trains a small Skip-gram model on a sample corpus, shows the embedding vectors converging during training, and shows the vector-arithmetic property.
+It is easy to check. <em>Cat</em> and <em>dog</em> both appear near <em>pet</em>, <em>feed</em>, <em>vet</em> and <em>fur</em>. <em>Bulldozer</em> does not. So if you build vectors that predict a word’s context well, words with similar contexts must end up with similar vectors. The semantic structure is a by-product of the prediction task, never an objective in itself. Word2Vec offers two architectures: Skip-gram (predict context words from a centre word) and CBOW (predict the centre word from its context). Skip-gram works better on small datasets and rare words; CBOW is faster and works better on frequent words. Both produce a weight matrix whose rows are the word embeddings. GloVe takes a different approach: it factorises the global word co-instance matrix. This captures the same distributional data but in a single matrix factorisation rather than iterative gradient updates. FastText extends Word2Vec by embedding character n-grams, so it can produce vectors for words never seen in training by combining their subword pieces. All three produce static embeddings (one vector per word no matter context). Contextual embeddings from transformers supersede them for most downstream tasks but are much more expensive to compute. This page trains a small Skip-gram model on a sample corpus, shows the embedding vectors converging during training, and shows the vector-arithmetic property.
 
 ## Skip-gram and CBOW
 
 Word2Vec offers two ways to set up the prediction:
 
-- <strong>Skip-gram</strong> &mdash; given the centre word, predict the surrounding words. From “the cat sat on the mat”, given <em>sat</em>, predict <em>the</em>, <em>cat</em>, <em>on</em>, <em>the</em>. Slower, and better on rare words because each occurrence makes several training examples.
+- <strong>Skip-gram</strong> &mdash; given the centre word, predict the surrounding words. From “the cat sat on the mat”, given <em>sat</em>, predict <em>the</em>, <em>cat</em>, <em>on</em>, <em>the</em>. Slower, and better on rare words because each instance makes several training examples.
 - <strong>CBOW</strong> &mdash; given the surrounding words, predict the centre. Faster, and better on frequent words.
 
 The architecture is on purpose trivial: an input embedding layer, no hidden layer. And an output projection. The embedding matrix is the only thing anybody wants; the output layer is discarded after training. The vectors are a side effect of a task nobody cares about the answers to.
 
 ## Negative sampling
 
-<p>The naive setup predicts a probability distribution over the whole vocabulary. This means a softmax over 50,000 words for every training example. That is prohibitively expensive.</p><strong>Negative sampling</strong> replaces it with a much cheaper question. Instead of “which of 50,000 words is the context?”, ask “is this pair a real (word, context) pair or a fabricated one?” &mdash; a binary classification. For each true pair, draw perhaps 5 to 20 random words as negatives and train the model to score the real pair high and the fakes low.<p>Cost drops from 50,000 output computations to about 20, and quality is comparable. This is what made training on billions of words practical.</p>
+<p>The naive setup predicts a probability distribution over the whole vocabulary. This means a softmax over 50,000 words for every training example. That is prohibitively expensive.</p><strong>Negative sampling</strong> replaces it with a much cheaper question. Instead of “which of 50,000 words is the context?”, ask “is this pair a real (word, context) pair or a fabricated one?” &mdash; a binary classification. For each true pair, draw perhaps 5 to 20 random words as negatives and train the model to score the real pair high and the fakes low.<p>Cost drops from 50,000 output steps to about 20, and quality is comparable. This is what made training on billions of words practical.</p>
 
 ## Learned from context, not assigned
 
@@ -45,7 +45,7 @@ The practical problem is the output layer. A softmax over 100,000 words for ever
 
 <strong>CBOW</strong> is the mirror image &mdash; predict the centre word from the average of its context. It trains faster and does slightly worse on rare words, since averaging washes them out.
 
-<strong>GloVe</strong> takes a different route fully: build a matrix of how often each word co-occurs with each other word. Then factorise it so that the dot product of two vectors approximates the logarithm of their co-occurrence count. Global statistics rather than local windows, with comparable results.
+<strong>GloVe</strong> takes a different route fully: build a matrix of how often each word co-occurs with each other word. Then factorise it so that the dot product of two vectors approximates the logarithm of their co-instance count. Global statistics rather than local windows, with comparable results.
 
 ## What the window size decides
 
@@ -231,7 +231,7 @@ Embeddings are learned by training a on purpose simple model on a proxy task &md
 
 Word2Vec gives "bank" one vector, averaging the river and the financial senses into something that is neither.
 
-A transformer produces a different vector for each occurrence, computed from the surrounding words. In "the river bank" the vector has absorbed "river". In "the savings bank" it has absorbed "savings". Polysemy is resolved by construction.
+A transformer produces a different vector for each instance, computed from the surrounding words. In "the river bank" the vector has absorbed "river". In "the savings bank" it has absorbed "savings". Polysemy is resolved by construction.
 
 The training objective is what makes them:
 
@@ -274,7 +274,7 @@ Training word vectors from scratch on a small corpus is almost always worse than
 ## Recap in one screen
 
 - Embeddings are learned from the principle that words in similar contexts have similar meanings.
-- Skip-gram predicts context from a word; CBOW does the reverse; GloVe factorises co-occurrence counts.
+- Skip-gram predicts context from a word; CBOW does the reverse; GloVe factorises co-instance counts.
 - Negative sampling replaces an unaffordable softmax with a few binary comparisons.
 - Window size chooses between syntactic and topical similarity. Pick it for the task.
-- Contextual embeddings from transformers give a different vector per occurrence, which resolves polysemy.
+- Contextual embeddings from transformers give a different vector per instance, which resolves polysemy.
