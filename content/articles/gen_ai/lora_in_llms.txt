@@ -9,7 +9,7 @@ So instead of learning a full <span class="mono-font">d &times; k</span> matrix,
 
 &Delta;W = B &middot; A &nbsp;&nbsp; where B is d&times;r and A is r&times;k, with r &lll; min(d, k)
 
-The first weights are <strong>frozen</strong>. Only A and B are trained. If the frozen matrix W is d-by-d and the rank r is 16, A is d-by-16 and B is 16-by-d. So the trainable parameter count drops from d-squared to 2dr. A reduction of roughly 10,000x for a 7B model's attention weights. At inference time the product BA is added right to W. This produces a single merged matrix with zero extra latency. Multiple LoRA adapters can coexist: each task gets its own A and B, and switching tasks means swapping two small matrices while the base model stays in memory once. This is how services like Hugging Face PEFT serve hundreds of fine-tuned variants from one base checkpoint. The rank r is the main hyperparameter: too low and the adapter cannot represent the task's deviation from the base model; too high and it overfits or loses the speed edge. In practice, r between 4 and 64 covers most tasks. A is set up with a random Gaussian and B with zeros. So the adapter starts as a no-op and learns the delta. This page freezes a weight matrix, trains a low-rank adapter beside it, and shows how the merged output matches the full fine-tune within a controlled tolerance.
+The first weights are <strong>frozen</strong>. Only A and B are trained. If the frozen matrix W is d-by-d and the rank r is 16, A is d-by-16 and B is 16-by-d. So the trainable parameter count drops from d-squared to 2dr. A reduction of roughly 10,000x for a 7B model's attention weights. At inference time the product BA is added right to W. This gives a single merged matrix with zero extra latency. Multiple LoRA adapters can coexist: each task gets its own A and B, and switching tasks means swapping two small matrices while the base model stays in memory once. This is how services like Hugging Face PEFT serve hundreds of fine-tuned variants from one base checkpoint. The rank r is the main hyperparameter: too low and the adapter cannot represent the task's deviation from the base model; too high and it overfits or loses the speed edge. In practice, r between 4 and 64 covers most tasks. A is set up with a random Gaussian and B with zeros. So the adapter starts as a no-op and learns the delta. This page freezes a weight matrix, trains a low-rank adapter beside it, and shows how the merged output matches the full fine-tune within a controlled tolerance.
 
 ## Why the Savings Are So Extreme
 
@@ -160,7 +160,7 @@ print("   not close, exact -- and every rank above it is wasted capacity.")
 print()
 ```
 
-The following block covers the left operations.
+The following block covers the left steps.
 
 ```python-run
 import numpy as np
@@ -198,7 +198,7 @@ print("   largely do.")
 print()
 ```
 
-The next block continues with the left demonstrations.
+The next block goes on with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -306,7 +306,7 @@ Because a LoRA adapter is a few megabytes rather than gigabytes, it changes how 
 
 <strong>Cheap distribution.</strong> A 20MB adapter can be versioned in git and downloaded in seconds. A 14GB full fine-tune cannot.
 
-<strong>Cheap testing.</strong> Training several adapters and comparing them is affordable, where several full fine-tunes are not.
+<strong>Cheap testing.</strong> Training a few adapters and comparing them is affordable, where a few full fine-tunes are not.
 
 The trade: an unmerged adapter adds a small amount of inference latency. Since `BAx` is computed alongside `W₀x`. Merging removes it and gives up the ability to swap.
 
@@ -328,7 +328,7 @@ The trade: an unmerged adapter adds a small amount of inference latency. Since `
 
 <strong>Which modules should I target?</strong> All attention projections plus the feed-forward layers is a strong default. Query and value only is cheaper and usually slightly worse.
 
-<strong>Can I combine several adapters?</strong> Yes &mdash; adapters can be summed or weighted. This sometimes composes their behaviours and sometimes interferes.
+<strong>Can I combine a few adapters?</strong> Yes &mdash; adapters can be summed or weighted. This sometimes composes their behaviours and sometimes interferes.
 
 <strong>Does merging change quality?</strong> No, if precision matches. Merging into a quantised base can lose a little.
 

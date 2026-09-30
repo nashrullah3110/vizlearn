@@ -3,7 +3,7 @@ intro: How does approximate nearest neighbour search actually work? Explain HNSW
 
 ## HNSW: skip lists, in vector space
 
-Take a proximity graph &mdash; each vector linked to its nearest neighbours &mdash; and stack several, each a random sample of the one below. Search enters at the sparse top layer and greedily moves to whichever neighbour is closer to the query, until no neighbour improves. Then it drops a layer and repeats.
+Take a proximity graph &mdash; each vector linked to its nearest neighbours &mdash; and stack a few, each a random sample of the one below. Search enters at the sparse top layer and greedily moves to whichever neighbour is closer to the query, until no neighbour improves. Then it drops a layer and repeats.
 
 The top layers have long edges, so a few hops cross most of the space; the bottom layer has short edges. So the final steps are precise. It is the skip-list idea applied to geometry. And it is the reason HNSW dominates: excellent recall at low latency. IVF (Inverted File Index) takes a different approach. Partition the vector space into clusters (usually using k-means), assign each vector to its nearest cluster centroid. And at query time search only the vectors in the nearest nprobe clusters. IVF trades recall for speed linearly: more probes give better recall at higher cost. HNSW is faster at high recall but uses more memory (the graph structure). IVF is more memory-efficient but slower at the same recall level. Product Quantization (PQ) compresses vectors by splitting each one into subvectors and quantizing each subvector to the nearest codebook entry. This reduces memory by 4-8x at a small accuracy cost. IVF + PQ (IVFPQ) is the standard combination for billion-scale search: IVF narrows the candidates, PQ compresses the stored vectors. Libraries like FAISS, Annoy, and ScaNN implement these structures; vector databases like Pinecone, Weaviate, and Milvus wrap them with persistence and APIs. This page builds both an HNSW graph and an IVF index on the same vectors, runs the same query against each, and compares recall, latency, and memory.
 
@@ -17,7 +17,7 @@ The top layers have long edges, so a few hops cross most of the space; the botto
 
 ## How each one fails
 
-HNSW's search is greedy, so it can settle in a local minimum and return a neighbourhood that is good but not the best. A wider <code>efSearch</code> makes that less likely without removing it. Deletion is also awkward &mdash; removing a node can disconnect the graph &mdash; so most implementations tombstone and rebuild at times.
+HNSW's search is greedy, so it can settle in a local minimum and return a neighbourhood that is good but not the best. A wider <code>efSearch</code> makes that less likely without removing it. Deletion is also awkward. Removing a node can disconnect the graph. So most implementations tombstone and rebuild at times.
 
 IVF's failure is cleaner: a true neighbour sitting just across a cluster boundary is missed unless that cluster is probed. More probes fixes it and costs latency. IVF is cheaper to build and to update, which is why it survives alongside HNSW. And combined with product quantization it is what runs when memory, not latency, is the binding constraint.
 
@@ -58,7 +58,7 @@ Approximate nearest neighbour indexes trade a small amount of recall for orders 
 
 The idea is a library organised into sections.
 
-<strong>Build:</strong> run k-means over the vectors to find, say, 4,096 centroids. Assign every vector to its nearest centroid, producing an inverted list per cluster.
+<strong>Build:</strong> run k-means over the vectors to find, say, 4,096 centroids. Assign every vector to its nearest centroid, giving an inverted list per cluster.
 
 <strong>Query:</strong> compare the query against the 4,096 centroids, pick the closest `nprobe` of them, and search only the vectors in those lists.
 
@@ -284,7 +284,7 @@ approx = index.search(queries, k=10)
 recall = sum(len(set(a) & set(e)) for a, e in zip(approx, exact)) / (10 * len(queries))
 ```
 
-Run that for several settings of `ef_search` or `nprobe` and plot recall against latency. The resulting curve is what the parameter should be chosen from. And the shape is usually a sharp rise followed by a long flat region. So there is a clear point past which extra latency buys nothing.
+Run that for a few settings of `ef_search` or `nprobe` and plot recall against latency. The resulting curve is what the parameter should be chosen from. And the shape is usually a sharp rise followed by a long flat region. So there is a clear point past which extra latency buys nothing.
 
 ## Questions people ask
 

@@ -7,11 +7,11 @@ Embedding-based retrieval finds documents whose vectors are near the query’s v
 
 Ask “how do I speed up my model?” of a corpus that discusses “reducing inference latency”, “quantisation” and “batch throughput” and the embedding may simply not land near any of them. The data is present and the phrasing is wrong. And a single query gets a single shot at matching it.
 
-The failure is silent. The retriever returns its nearest neighbours regardless, so you get plausible-looking, unhelpful chunks with no signal that anything was missed. A multi-query retriever fixes this by making several other phrasings of the question &mdash; usually 3 to 5 &mdash; using a language model. Then searching with each phrasing on its own and merging the results. "How do I speed up my model?" becomes "reduce inference latency," "optimise batch throughput," and "quantise model weights". Three queries that together cover vocabulary the first missed. The merge step deduplicates by document id and can either union the results (maximise recall) or intersect them (maximise precision). The cost is N extra embedding calls and N extra vector searches per user query. This is small compared to the generation step that follows. This page shows the vocabulary mismatch on a real corpus, shows the recall improvement from multiple queries, and covers the tradeoff between union and intersection merging.
+The failure is silent. The retriever returns its nearest neighbours regardless, so you get plausible-looking, unhelpful chunks with no signal that anything was missed. A multi-query retriever fixes this by making a few other phrasings of the question. Usually 3 to 5. Using a language model. Then searching with each phrasing on its own and merging the results. "How do I speed up my model?" becomes "reduce inference latency," "optimise batch throughput," and "quantise model weights". Three queries that together cover vocabulary the first missed. The merge step deduplicates by document id and can either union the results (maximise recall) or intersect them (maximise precision). The cost is N extra embedding calls and N extra vector searches per user query. This is small compared to the generation step that follows. This page shows the vocabulary mismatch on a real corpus, shows the recall improvement from multiple queries, and covers the tradeoff between union and intersection merging.
 
-## Making several queries and merging
+## Making a few queries and merging
 
-A multi-query retriever asks a language model to produce N other phrasings of the question. Usually 3 to 5. Each approaching it from a different angle. The first question above might become:
+A multi-query retriever asks a language model to give N other phrasings of the question. Usually 3 to 5. Each approaching it from a different angle. The first question above might become:
 
 - “What techniques reduce model inference latency?”
 - “How can I improve throughput at serving time?”
@@ -19,13 +19,13 @@ A multi-query retriever asks a language model to produce N other phrasings of th
 
 Each is embedded and searched on its own. This gives N result sets which are then combined and deduplicated. Because the rewordings cover different vocabulary, their nearest neighbours differ. And the union covers much more of the relevant material than any one query would.
 
-Merging is usually done with <strong>reciprocal rank fusion</strong> rather than raw scores. RRF assigns each document a score of <span class="mono-font">&Sigma; 1/(60 + rank)</span> across the lists it appears in. This rewards documents that several rewordings agree on and avoids the problem that similarity scores from different queries are not right comparable.
+Merging is usually done with <strong>reciprocal rank fusion</strong> rather than raw scores. RRF assigns each document a score of <span class="mono-font">&Sigma; 1/(60 + rank)</span> across the lists it appears in. This rewards documents that a few rewordings agree on and avoids the problem that similarity scores from different queries are not right comparable.
 
-## One question, several searches
+## One question, a few searches
 
 A single embedding of a question is one point in the space. If the question is phrased differently from the documents that answer it, that point sits in the wrong place. And no amount of index tuning will fix it.
 
-Multi-query retrieval hedges by making several rewrites of the question, searching with each, and combining the results.
+Multi-query retrieval hedges by making a few rewrites of the question, searching with each, and combining the results.
 
 <blockquote>First: "How do I stop getting so many alerts?"</blockquote>
 <blockquote>1. "How to reduce alert volume"</blockquote>
@@ -51,7 +51,7 @@ Note that the first question is included. The rewrites are additions, not replac
 
 ## Why fusion rather than joining
 
-The results from several searches must be combined, and how matters.
+The results from a few searches must be combined, and how matters.
 
 <strong>Concatenating and deduplicating</strong> loses the ranking data: a document ranked first by two rewrites is treated the same as one ranked twentieth by one.
 
@@ -61,7 +61,7 @@ The results from several searches must be combined, and how matters.
 
 <p class="mono-font">score(d) = &Sigma;<sub>queries</sub> 1 / (60 + rank(d))</p>
 
-A document retrieved highly by several rewrites builds up from each. So <strong>agreement across rewrites becomes evidence</strong>. That is exactly the property you want: a document that only one rewrite found is plausible; one that all four found is probably right.
+A document retrieved highly by a few rewrites builds up from each. So <strong>agreement across rewrites becomes evidence</strong>. That is exactly the property you want: a document that only one rewrite found is plausible; one that all four found is probably right.
 
 RRF also needs no normalisation, which is what makes it practical when combining an arbitrary number of retrievers.
 
@@ -80,7 +80,7 @@ Three or four rewrites is the usual range. Beyond that, the extra rewrites are p
 
 Cache aggressively: at temperature 0 the rewrites are deterministic, and repeated or similar questions are common in real traffic.
 
-## What several searches recover that one does not
+## What a few searches recover that one does not
 
 The sections above explain why the pattern makes variants and fuses them rather than concatenating. Here it is run -- three phrasings of one question against one corpus, the union measured against each variant alone. And the case where extra queries make the result worse.
 
@@ -252,30 +252,30 @@ print("   like a retrieval problem rather than a prompt problem.")
 
 1. <strong>Compare a single query with the set.</strong> Look at what one phrasing retrieves against the union of all of them. The union is broader, and usually includes at least one document no single query found.
 2. <strong>Find the documents only one variant retrieves.</strong> These are exactly the recall the technique is buying. Material the first phrasing would have missed fully.
-3. <strong>Look for agreement.</strong> Documents retrieved by several variants are the strongest candidates. And that consensus is what rank fusion promotes to the top.
+3. <strong>Look for agreement.</strong> Documents retrieved by a few variants are the strongest candidates. And that consensus is what rank fusion promotes to the top.
 4. <strong>Watch the precision cost.</strong> The merged list is longer and contains more marginal results. Multi-query improves recall and dilutes precision, which is why a reranker usually follows it.
 
 ## What it costs, and what to use instead
 
 Multi-query is not free. Making the variants is an extra LLM call on the critical path. This adds latency and cost to every request. And it runs N searches instead of one. For an interactive use that overhead is real.
 
-Related approaches make different trades. <strong>HyDE</strong> makes a hypothetical <em>answer</em> and embeds that, on the argument that an answer is textually closer to the passage containing it than a question is. <strong>Query decomposition</strong> splits a multi-part question into separate sub-questions, which multi-query does not do. It rephrases rather than divides. And <strong>hybrid search</strong>, combining dense retrieval with BM25 keyword matching, addresses much of the same vocabulary problem for a fraction of the cost,. This is because exact term matching catches exactly the rare words embeddings handle worst.
+Related approaches make different trades. <strong>HyDE</strong> makes a hypothetical <em>answer</em> and embeds that, on the argument that an answer is textually closer to the passage containing it than a question is. <strong>Query decomposition</strong> splits a multi-part question into separate sub-questions, which multi-query does not do. It rephrases rather than divides. And <strong>hybrid search</strong>, combining dense retrieval with BM25 keyword matching, fixes much of the same vocabulary problem for a fraction of the cost,. This is because exact term matching catches exactly the rare words embeddings handle worst.
 
 ## Common mistakes
 
 - <strong>Making variants that all say the same thing.</strong> If the rewordings are near-the same, they retrieve the same documents and you have paid for nothing. The prompt must push for truly different angles and vocabulary.
 - <strong>Merging by raw similarity score.</strong> Scores from different query embeddings are not comparable. Use rank-based fusion.
-- <strong>Skipping deduplication.</strong> The same chunk retrieved by four variants will if not occupy four slots of context.
+- <strong>Skipping deduplication.</strong> The same chunk retrieved by four variants will if not take four slots of context.
 - <strong>Not reranking afterwards.</strong> The merged list is broader and noisier; a cross-encoder reranker recovers the precision.
 - <strong>Using it where the problem is chunking.</strong> If the relevant text is split badly across chunks, no amount of query rewriting will retrieve it intact.
 
 ## What to remember
 
-A multi-query retriever compensates for the fact that a single embedding gets one try at matching the corpus vocabulary. It makes several rewordings, retrieves with each, and fuses the ranked lists. It buys recall at the cost of an extra LLM call, N searches, and some precision. So it pairs naturally with a reranker. Where the mismatch is about rare or exact terms, hybrid search with BM25 gets much of the same benefit far more cheaply.
+A multi-query retriever compensates for the fact that a single embedding gets one try at matching the corpus vocabulary. It makes a few rewordings, retrieves with each, and fuses the ranked lists. It buys recall at the cost of an extra LLM call, N searches, and some precision. So it pairs naturally with a reranker. Where the mismatch is about rare or exact terms, hybrid search with BM25 gets much of the same benefit far more cheaply.
 
 ## Where it helps, and where it does not
 
-<strong>It helps with vague or short queries.</strong> "It's broken" gives an embedding with almost no signal; several specific rewrites give several usable ones.
+<strong>It helps with vague or short queries.</strong> "It's broken" gives an embedding with almost no signal; a few specific rewrites give a few usable ones.
 
 <strong>It helps when documents use different vocabulary</strong> from users. Jargon, product names, formal register.
 
@@ -285,7 +285,7 @@ A multi-query retriever compensates for the fact that a single embedding gets on
 
 <strong>It does not help when recall is already high.</strong> If recall@20 is 0.97, there is almost nothing left to find and the extra latency buys nothing. Measure before adding it.
 
-That last point extends: <strong>multi-query addresses a recall problem</strong>. If your failures are ordering failures. The right document is retrieved at rank 15. A reranker is the correct tool, not more queries.
+That last point extends: <strong>multi-query fixes a recall problem</strong>. If your failures are ordering failures. The right document is retrieved at rank 15. A reranker is the correct tool, not more queries.
 
 ## Related techniques, and how they combine
 
@@ -315,11 +315,11 @@ These compose, and each adds latency. The ordering to add them in is by measured
 
 <strong>How do I combine the result lists?</strong> Reciprocal rank fusion, which needs only ranks.
 
-<strong>Is it better than HyDE?</strong> They address the same gap differently and can be used together. HyDE matches the documents' register; multi-query covers several phrasings.
+<strong>Is it better than HyDE?</strong> They address the same gap differently and can be used together. HyDE matches the documents' register; multi-query covers a few phrasings.
 
 ## Recap in one screen
 
-- One embedding of a badly-phrased question searches from the wrong point; several rewrites cover more ground.
+- One embedding of a badly-phrased question searches from the wrong point; a few rewrites cover more ground.
 - Generate 3&ndash;4 phrasings, search with each, and fuse with reciprocal rank fusion.
 - Always include the first query, so a poor rewrite cannot destroy the results.
 - Agreement across rewrites is evidence, and RRF rewards it by itself.

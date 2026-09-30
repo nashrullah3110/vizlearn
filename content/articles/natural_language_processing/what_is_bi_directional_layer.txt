@@ -7,7 +7,7 @@ A forward RNN at position t has seen tokens 1 to t and nothing after. That is a 
 
 Take “The <strong>bank</strong> was steep and muddy.” At the word <em>bank</em> a forward-only model has seen only “The”, and must commit to a representation before <em>steep and muddy</em> arrives to settle the meaning. A backward pass has that data at once.
 
-The fix is to run two passes &mdash; one forward, one backward &mdash; and concatenate their outputs at every position. The forward pass produces a hidden state that encodes all of it to the left; the backward pass produces a hidden state that encodes all of it to the right. Stacking the two gives each position a representation that sees the entire sequence.
+The fix is to run two passes &mdash; one forward, one backward &mdash; and concatenate their outputs at every position. The forward pass gives a hidden state that encodes all of it to the left; the backward pass gives a hidden state that encodes all of it to the right. Stacking the two gives each position a representation that sees the entire sequence.
 
 This is the idea behind the bidirectional layer. It doubles the hidden dimension, because it concatenates two free states. And it doubles the parameter count, because the forward and backward cells learn separate weights. The accuracy gain is large for tasks like named-entity recognition, part-of-speech tagging, sentiment classification and question answering. Any task where the label at position t depends on tokens that come after t. The cost is that the full sequence must be available before the layer can run. This rules out autoregressive generation: you cannot predict the next word with a backward pass that requires words you have not made yet. That constraint is why GPT-style models use only a forward pass and BERT-style models use bidirectional layers.
 
@@ -33,7 +33,7 @@ Why it helps is easiest to see with an ambiguous word:
 
 "The <strong>bank</strong> was steep and muddy."
 
-At "bank", a forward-only model has seen "the" and nothing else. It cannot yet know which sense is meant. The backward pass has seen "steep and muddy" and resolves it at once. Neither direction alone is sufficient; together they are.
+At "bank", a forward-only model has seen "the" and nothing else. It cannot yet know which sense is meant. The backward pass has seen "steep and muddy" and resolves it at once. Neither direction alone is enough; together they are.
 
 The same argument applies to named entities ("Washington" as a person or a place depends on what follows), part-of-speech tagging, and coreference.
 
@@ -57,7 +57,7 @@ So the rule is clear: <strong>bidirectional for understanding a complete input, 
 |Machine translation encoder|Yes|
 |Machine translation decoder|No|
 
-That last pair is worth noting: an encoder-decoder model is often bidirectional in the encoder and causal in the decoder,. This is because the source sentence is complete and the target is being produced.
+That last pair is worth noting: an encoder-decoder model is often bidirectional in the encoder and causal in the decoder,. This is because the source sentence is complete and the target is being gave.
 
 ## Using one
 
@@ -71,7 +71,7 @@ h.shape            # (2, batch, 256)    -- one final state per direction
 
 Two details cause most of the confusion.
 
-<strong>The output is twice as wide.</strong> Any layer after it must expect `2 × hidden_size`. Forgetting this is the most common bidirectional bug, and it produces an immediate shape error.
+<strong>The output is twice as wide.</strong> Any layer after it must expect `2 × hidden_size`. Forgetting this is the most common bidirectional bug, and it gives an immediate shape error.
 
 <strong>The final states are not simply the last row of `out`.</strong> The forward direction's final state corresponds to the <em>last</em> token; the backward direction's corresponds to the <em>first</em>. For classification, concatenate the two final states, or pool over `out`. Do not take `out[:, -1, :]`. This mixes the forward state at the end with the backward state at the end (which has seen only the last token).
 
@@ -158,7 +158,7 @@ print("   grow too. a stack of bidirectional layers costs more than 2x.")
 print()
 ```
 
-The following block covers the left operations.
+The following block covers the left steps.
 
 ```python-run
 import numpy as np
@@ -196,11 +196,11 @@ print("   for most of a decade before encoders replaced it.")
 
 ## When you cannot use it
 
-A bidirectional layer requires the <em>entire</em> sequence before it can produce any output, because the backward pass starts at the end. That rules it out when the future truly is not available:
+A bidirectional layer requires the <em>entire</em> sequence before it can give any output, because the backward pass starts at the end. That rules it out when the future truly is not available:
 
 - <strong>Language modelling and text generation.</strong> Predicting the next token while having already read it is not a prediction. A bidirectional model here achieves perfect accuracy and learns nothing. The answer leaks in through the backward pass.
 - <strong>Real-time and streaming uses.</strong> Live transcription cannot wait for the end of the utterance.
-- <strong>Autoregressive decoding of any kind</strong>, where output is produced one token at a time.
+- <strong>Autoregressive decoding of any kind</strong>, where output is gave one token at a time.
 
 Where the full sequence <em>is</em> available &mdash; classification, tagging, named entity recognition. And the encoder half of a translation model. Bidirectionality is close to free accuracy. This is exactly the split between BERT, which is bidirectional and cannot generate, and GPT. This is unidirectional and can.
 
@@ -251,9 +251,9 @@ So "bidirectional layer" is largely a recurrent-era concept. The idea survives; 
 
 <strong>Should I concatenate or sum the two directions?</strong> Concatenate, which is the standard and keeps both intact. Summing halves the width and loses data.
 
-<strong>Is BERT a bidirectional LSTM?</strong> No &mdash; it is a bidirectional transformer encoder. The word "bidirectional" in its name refers to unmasked attention.
+<strong>Is BERT a bidirectional LSTM?</strong> No &mdash; it is a bidirectional transformer encoder. The word "bidirectional" in its name means unmasked attention.
 
-<strong>Does bidirectionality help every task?</strong> No. It helps most where right context disambiguates &mdash; tagging, entity recognition, span extraction &mdash; and least on tasks with redundant global signal.
+<strong>Does bidirectionality help every task?</strong> No. It helps most where right context disambiguates. Tagging, entity recognition, span extraction. And least on tasks with redundant global signal.
 
 <strong>Can I stack bidirectional layers?</strong> Yes, and each layer's doubled output feeds the next. Two is usually the practical limit.
 

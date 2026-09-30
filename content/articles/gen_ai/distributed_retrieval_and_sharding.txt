@@ -3,7 +3,7 @@ intro: How do you scale retrieval past one machine? What are the trade-offs betw
 
 ## Shards and replicas are different things
 
-A <strong>shard</strong> holds a slice of the corpus. Sharding handles data that will not fit &mdash; memory or index build time &mdash; and every query must visit every shard.
+A <strong>shard</strong> holds a slice of the corpus. Sharding handles data that will not fit. Memory or index build time. And every query must visit every shard.
 
 A <strong>replica</strong> holds a complete copy of a shard. Copying handles query volume and failure, and a query goes to one replica of each shard.
 
@@ -35,7 +35,7 @@ The merge itself needs care. Scores must be comparable across shards &mdash; fin
 
 Merging local top-k lists assumes the scores are comparable across shards. And that assumption quietly fails for lexical retrieval.
 
-BM25's idf term depends on corpus statistics &mdash; document frequency and average document length &mdash; which differ per shard. A term that is rare on shard 1 and common on shard 3 gets different weights. So a merged ranking is comparing numbers computed on different scales. The fix is global statistics: compute df and avgdl across the whole corpus and distribute them. This is an extra coordination step people discover only after the rankings look wrong.
+BM25's idf term depends on corpus statistics &mdash; document count and average document length &mdash; which differ per shard. A term that is rare on shard 1 and common on shard 3 gets different weights. So a merged ranking is comparing numbers computed on different scales. The fix is global statistics: compute df and avgdl across the whole corpus and distribute them. This is an extra coordination step people discover only after the rankings look wrong.
 
 Dense retrieval escapes this. Cosine similarity between a query and a document vector involves no corpus statistics at all. So shard-local scores are right comparable. It is one of the underrated operational gains of vector search.
 
@@ -282,7 +282,7 @@ Distribution interacts badly with filtering unless it is planned for.
 
 <strong>A selective filter across random shards</strong> means every shard is queried and most return nothing. The work is done and thrown away. Sharding by the filtered attribute instead makes the filter a routing decision.
 
-<strong>Permissions</strong> must be enforced per shard, inside each shard's search, not merged afterwards. Filtering after the gather step means unauthorised content has already crossed the boundary and has already occupied result slots.
+<strong>Permissions</strong> must be enforced per shard, inside each shard's search, not merged afterwards. Filtering after the gather step means unauthorised content has already crossed the boundary and has already taken result slots.
 
 <strong>Global statistics break.</strong> BM25's IDF term depends on how many documents in the <em>corpus</em> contain a term. And each shard only knows its own counts. With random sharding the local estimate is usually close enough; with metadata sharding it can be badly skewed, and correcting it requires distributing global term statistics.
 

@@ -3,13 +3,13 @@ intro: A language model never sees text. It sees numbers &mdash; and the transfo
 
 ## Stages 1–3: Text Becomes Integers
 
-Tokenization splits the string into subword pieces, and each piece is looked up in the vocabulary to get an integer ID. That is the model's entire input: a list of integers. Nothing about the <em>meaning</em> of a word has entered yet &mdash; ID 4021 is no closer to ID 4022 than to ID 9. The IDs are arbitrary addresses, not measurements.
+Tokenization splits the string into subword pieces, and each piece is looked up in the vocabulary to get an integer ID. That is the model's entire input: a list of integers. Nothing about the <em>meaning</em> of a word has entered yet &mdash; ID 4021 is no closer to ID 4022 than to ID 9. The IDs are arbitrary fixes, not measurements.
 
 The embedding layer converts each ID into a dense vector of learned real numbers. Words used in similar contexts end up with similar vectors. So meaning enters here. Position is added next — either as sinusoidal encodings or as learned position embeddings —. This is because self-attention treats its input as a set and would if not be blind to word order.
 
 The transformer layers are the core of the model. Each layer applies self-attention (every token looks at every other token to decide what data to include) followed by a feed-forward network (two linear layers with a nonlinearity). A typical LLM stacks 32 to 96 of these layers. At each layer the representations are refined: early layers learn syntax and local patterns, middle layers learn semantic links, and later layers learn task-specific features.
 
-The output layer projects the final hidden state of each position back to the vocabulary size. This produces a score (logit) for every token in the vocabulary. Softmax converts those logits into a probability distribution. And the model samples or takes the argmax to produce the next token. This process repeats token by token — each made token is appended to the input and the model runs again —. This is why generation is called autoregressive and why it is slower than encoding.
+The output layer projects the final hidden state of each position back to the vocabulary size. This gives a score (logit) for every token in the vocabulary. Softmax converts those logits into a probability distribution. And the model samples or takes the argmax to give the next token. This process repeats token by token — each made token is appended to the input and the model runs again —. This is why generation is called autoregressive and why it is slower than encoding.
 
 The entire pipeline — tokenise, embed, add position, transform through N layers, project, sample — is what happens every time the model makes a single token. Understanding it explains why context length matters (attention is quadratic in sequence length), why the first token is slow (the full input must be encoded) and why later tokens are faster (the KV cache stores the attention keys and values from previous positions).
 
@@ -29,7 +29,7 @@ The values in this lab are the genuine formula. Look along a row and you will se
 
 ## Stage 6: Attention Mixes the Tokens
 
-Now every token looks at every other token. Each position produces a query and a key; their dot product, scaled by <span class="mono-font">&radic;d</span>, scores how relevant one token is to another. And a softmax over each row turns those scores into weights that sum to 1:
+Now every token looks at every other token. Each position gives a query and a key; their dot product, scaled by <span class="mono-font">&radic;d</span>, scores how relevant one token is to another. And a softmax over each row turns those scores into weights that sum to 1:
 
 Attention(Q, K, V) = softmax(QK&#7488; / &radic;d) V
 
@@ -39,7 +39,7 @@ The heatmap in this stage is a real work from the vectors above it. Each row sho
 
 One attention block is repeated dozens of times, each with a feed-forward network, residual connections and normalisation. Early layers capture syntax; deeper layers capture semantics and task structure.
 
-At the very end only the <strong>last position's</strong> vector is used for the next token. It is times by the vocabulary matrix to produce one logit per possible token. And we are back to a distribution over words. The chosen token is appended to the input and the entire pipeline runs again, from stage 1, for every single word made.
+At the very end only the <strong>last position's</strong> vector is used for the next token. It is times by the vocabulary matrix to give one logit per possible token. And we are back to a distribution over words. The chosen token is appended to the input and the entire pipeline runs again, from stage 1, for every single word made.
 
 ## The full path, once
 
@@ -61,9 +61,9 @@ Every block is the same two sublayers, each wrapped in a residual connection and
 
 <p class="mono-font">x &rarr; LayerNorm &rarr; Attention &rarr; (+x) &rarr; LayerNorm &rarr; FFN &rarr; (+x)</p>
 
-<strong>Attention</strong> lets each token gather data from others. Each token produces a query, compares it against every token's key, and takes a weighted mixture of their values. In a decoder, future positions are masked out so generation is possible.
+<strong>Attention</strong> lets each token gather data from others. Each token gives a query, compares it against every token's key, and takes a weighted mixture of their values. In a decoder, future positions are masked out so generation is possible.
 
-<strong>The feed-forward network</strong> processes each position on its own, expanding to roughly four times the model dimension and back. This is where <em>most of the parameters live</em> &mdash; usually two thirds of the model &mdash; which is worth knowing. This is because attention gets all the attention.
+<strong>The feed-forward network</strong> processes each position on its own, expanding to roughly four times the model dimension and back. This is where <em>most of the parameters live</em>. Usually two thirds of the model. Which is worth knowing. This is because attention gets all the attention.
 
 <strong>Residual connections</strong> give gradients a clean path back through dozens of blocks. Without them, deep stacks do not train.
 
@@ -75,7 +75,7 @@ Generation splits into two workloads, and the split explains most latency and pr
 
 <strong>Prefill</strong> processes the prompt. Every token is known, so all positions are computed in parallel in one pass. Compute-bound, efficient, cheap per token.
 
-<strong>Decode</strong> produces the output. Each token depends on the last, so it is strictly sequential. And every step must read the entire model's weights plus the KV cache from memory. Bandwidth-bound, and expensive per token.
+<strong>Decode</strong> gives the output. Each token depends on the last, so it is strictly sequential. And every step must read the entire model's weights plus the KV cache from memory. Bandwidth-bound, and expensive per token.
 
 |&nbsp;|Prefill|Decode|
 |---|---|---|
@@ -86,7 +86,7 @@ Generation splits into two workloads, and the split explains most latency and pr
 
 That is why input tokens are priced below output tokens, why a long prompt delays the first word. Rather than slowing the stream, and why making 500 tokens takes longer than reading 5,000.
 
-The <strong>KV cache</strong> is what keeps decode linear: previous tokens' keys and values are stored rather than recomputed. It costs memory &mdash; several gigabytes for a long context &mdash; and it is the dominant memory consumer in serving.
+The <strong>KV cache</strong> is what keeps decode linear: previous tokens' keys and values are stored rather than recomputed. It costs memory &mdash; a few gigabytes for a long context &mdash; and it is the dominant memory consumer in serving.
 
 ## The shapes, end to end
 
@@ -224,7 +224,7 @@ print("   calling a calculator.")
 
 ## What to remember
 
-Text in, integers, vectors, mixed vectors, logits, text out. The embeddings and attention weights in this lab are deterministic stand-ins for learned parameters. But the <em>operations</em> &mdash; sinusoidal positions, scaled dot-product attention, softmax &mdash; are the real ones. Understanding this pipeline makes context windows, tokenizer quirks and attention costs stop feeling arbitrary.
+Text in, integers, vectors, mixed vectors, logits, text out. The embeddings and attention weights in this lab are deterministic stand-ins for learned parameters. But the <em>steps</em> &mdash; sinusoidal positions, scaled dot-product attention, softmax &mdash; are the real ones. Understanding this pipeline makes context windows, tokenizer quirks and attention costs stop feeling arbitrary.
 
 ## What the model does and does not have
 
@@ -236,7 +236,7 @@ Text in, integers, vectors, mixed vectors, logits, text out. The embeddings and 
 
 <strong>No calculator.</strong> Numbers tokenise inconsistently, so arithmetic is pattern-matched rather than computed. Give it a tool.
 
-<strong>No calibrated confidence.</strong> It produces a distribution over tokens, not a belief about truth. A confident tone is a property of the text distribution.
+<strong>No calibrated confidence.</strong> It gives a distribution over tokens, not a belief about truth. A confident tone is a property of the text distribution.
 
 Those five limitations account for a large share of the surprising failures people report. And all five are structural rather than fixable by prompting.
 
@@ -271,7 +271,7 @@ Memory at inference is roughly the parameter count times the bytes per parameter
 
 <strong>Does the model understand what it reads?</strong> It models statistical structure in text very well. Whether that constitutes understanding is a genuine open question rather than a settled one.
 
-<strong>Why is the same question answered differently each time?</strong> Sampling, unless temperature is 0. And even then, batching and hardware non-determinism produce small changes.
+<strong>Why is the same question answered differently each time?</strong> Sampling, unless temperature is 0. And even then, batching and hardware non-determinism give small changes.
 
 <strong>Can it read a file I mention?</strong> Only if something puts the contents into the context. Naming a path does nothing.
 

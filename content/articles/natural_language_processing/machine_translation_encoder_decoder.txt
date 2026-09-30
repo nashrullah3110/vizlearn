@@ -51,8 +51,8 @@ no way back. Widen the beam to 3 and `do` stays alive; it leads to `not`,
 &minus;2.25.
 
 That is the entire argument for beam search, and the example is chosen because
-the failure is *semantic*. Greedy decoding does not produce clearly worse
-grammar. It produces confident, well-formed sentences that mean something else.
+the failure is *semantic*. Greedy decoding does not give clearly worse
+grammar. It gives confident, well-formed sentences that mean something else.
 
 ## How beam search works
 
@@ -98,7 +98,7 @@ model starts padding, because length is now rewarded on its own.
 
 This is a genuine hyperparameter with no principled value, tuned on a
 development set, and it is the reason two implementations of "the same" model
-produce different output.
+give different output.
 
 ```python
 import torch
@@ -141,18 +141,18 @@ length is hit, which is a safety net rather than the intended path.
 
 This is why the length penalty operates where it does. The competition is
 between emitting end-of-sequence now and emitting another content word, and
-both are just entries in the same distribution. When the accumulated
+both are just entries in the same distribution. When the built up
 log-probability is the score, stopping is always locally attractive, because it
 is the only choice that stops making the score worse.
 
 Watch the beam table with the first sentence and alpha at 0: the winning
 sequence ends after two words, with `</s>` scoring &minus;0.95 against
-continuing. It is not that the model does not know the rest of the sentence; it
+going on. It is not that the model does not know the rest of the sentence; it
 is that the search prefers not to say it.
 
-The same method produces the opposite failure in a badly-trained model.
+The same method gives the opposite failure in a badly-trained model.
 If end-of-sequence is under-predicted &mdash; common when training data has few
-short examples &mdash; generation runs to the length cap and produces a
+short examples &mdash; generation runs to the length cap and gives a
 sentence that trails off mid-clause. Both failures look like decoder problems
 and are, at bottom, arithmetic about one token.
 
@@ -164,7 +164,7 @@ model. Word-level vocabularies are gone too, replaced by subword tokenisation,
 which is what stopped translations containing `<unk>` for every rare name.
 
 All of it on the second half of this page survived unchanged. A transformer
-still produces a distribution over the next token and still needs a search over
+still gives a distribution over the next token and still needs a search over
 sequences to turn that into output. Beam width and length penalty are still
 tuned per model. And a large language model making text is doing exactly
 this, usually with sampling instead of beam search &mdash; temperature, top-k
@@ -172,7 +172,7 @@ and nucleus sampling are other answers to the same question this page
 asks: given a next-token distribution, which sequence do you actually emit?
 ## Questions people ask
 
-<strong>Why does greedy decoding fail so badly here?</strong> Because the damage is semantic rather than grammatical. After `i`, `speak` outscores `do` by about a tenth of a nat, and taking it deletes the negation with no route back &mdash; "i speak french" is perfectly fluent and means the opposite. Greedy decoding rarely produces bad grammar; it produces confident, well-formed sentences that say something else.
+<strong>Why does greedy decoding fail so badly here?</strong> Because the damage is semantic rather than grammatical. After `i`, `speak` outscores `do` by about a tenth of a nat, and taking it deletes the negation with no route back &mdash; "i speak french" is perfectly fluent and means the opposite. Greedy decoding rarely gives bad grammar; it gives confident, well-formed sentences that say something else.
 
 <strong>Is a wider beam always better?</strong> No, in two ways. It is not exact search. A prefix that falls out of the top k at any step is gone permanently. And past a width of roughly 10, BLEU usually *degrades*. The model's true highest-probability output tends to be short and dull. So a narrow beam's failure to find it is quietly doing useful work.
 
@@ -180,7 +180,7 @@ asks: given a next-token distribution, which sequence do you actually emit?
 
 <strong>Where does the length normalisation go in the loop?</strong> Before ranking, not after. Normalising only the final pick leaves every intermediate pruning step with the full short-sequence bias. So the penalty appears to be applied and mostly is not. It is the easiest version of this bug to ship because the output is plausible.
 
-<strong>What decides how long the output is?</strong> Not a length setting. End-of-sequence is an ordinary vocabulary entry competing with the content words, and. This is because every extra token lowers the accumulated log-probability, stopping is always locally attractive &mdash;. This is exactly what the length penalty exists to counteract. The opposite failure comes from under-predicted end-of-sequence, usually from training data with few short examples. Generation runs to the cap and trails off mid-clause.
+<strong>What decides how long the output is?</strong> Not a length setting. End-of-sequence is an ordinary vocabulary entry competing with the content words, and. This is because every extra token lowers the built up log-probability, stopping is always locally attractive &mdash;. This is exactly what the length penalty exists to counteract. The opposite failure comes from under-predicted end-of-sequence, usually from training data with few short examples. Generation runs to the cap and trails off mid-clause.
 
 <strong>Does any of this survive the transformer?</strong> The whole second half of the page does. A transformer still emits a distribution over the next token and still needs a search to turn that into text, and beam width and length penalty are still tuned per model. Temperature, top-k and nucleus sampling are other answers to the same question. Given a next-token distribution, what do you actually emit?
 
@@ -190,4 +190,4 @@ asks: given a next-token distribution, which sequence do you actually emit?
 - Attention weights give alignment for free, trained on nothing but next-token prediction. Including crossing alignments, and one target word attending to two source words as `not` does to `ne` and `pas`.
 - A target word with no source counterpart, like the auxiliary `do`, gets diffuse attention. That is the model correctly reporting there is nothing to point at.
 - Greedy decoding is cheap and fails semantically; beam search keeps k prefixes alive so a single token cannot find the rest of the sentence.
-- Accumulated log-probability always favours stopping early, so the score is divided by a function of length. With an exponent that is tuned, not derived.
+- Built up log-probability always favours stopping early, so the score is divided by a function of length. With an exponent that is tuned, not derived.

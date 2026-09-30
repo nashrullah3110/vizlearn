@@ -3,7 +3,7 @@ intro: Batch normalisation works beautifully on images and badly on sequences. L
 
 ## Normalising over the wrong axis
 
-<p>Every normalisation layer does the same arithmetic &mdash; subtract a mean, divide by a standard deviation. Then apply a learned scale and shift. What differs is <em>which</em> values are pooled to compute that mean and deviation.</p><strong>Batch normalisation</strong> computes statistics per feature, across the batch. For feature 3, average over all samples in the batch. <strong>Layer normalisation</strong> computes statistics per sample, across the features. For sample 3, average over all of its features.<p>On images batch norm is excellent. On sequences it breaks, for three separate reasons. Variable-length inputs make per-timestep statistics unstable, the running averages have no values for positions longer than the training data. And a single sample at inference produces meaningless batch statistics. Layer normalisation sidesteps all three by computing statistics per sample rather than per batch. This is why it is the default in transformers and recurrent networks. RMSNorm simplifies layer norm further by dropping the mean subtraction, and group norm covers the vision cases where batch sizes are too small for batch norm. The choice of which axis to normalise over is not a minor implementation detail. It decides whether the layer works at all in the target setting, and switching from batch norm to layer norm is often the single change that makes a sequence model train stably. This page computes batch norm and layer norm on the same tensor, prints the per-feature and per-sample statistics side by side, and covers the failure cases for each.</p>
+<p>Every normalisation layer does the same arithmetic &mdash; subtract a mean, divide by a standard deviation. Then apply a learned scale and shift. What differs is <em>which</em> values are pooled to compute that mean and deviation.</p><strong>Batch normalisation</strong> computes statistics per feature, across the batch. For feature 3, average over all samples in the batch. <strong>Layer normalisation</strong> computes statistics per sample, across the features. For sample 3, average over all of its features.<p>On images batch norm is excellent. On sequences it breaks, for three separate reasons. Variable-length inputs make per-timestep statistics unstable, the running averages have no values for positions longer than the training data. And a single sample at inference gives meaningless batch statistics. Layer normalisation sidesteps all three by computing statistics per sample rather than per batch. This is why it is the default in transformers and recurrent networks. RMSNorm simplifies layer norm further by dropping the mean subtraction, and group norm covers the vision cases where batch sizes are too small for batch norm. The choice of which axis to normalise over is not a minor implementation detail. It decides whether the layer works at all in the target setting, and switching from batch norm to layer norm is often the single change that makes a sequence model train stably. This page computes batch norm and layer norm on the same tensor, prints the per-feature and per-sample statistics side by side, and covers the failure cases for each.</p>
 
 ## Why batch norm fails on sequences
 
@@ -11,7 +11,7 @@ intro: Batch normalisation works beautifully on images and badly on sequences. L
 
 ## Two different meanings of "normalisation"
 
-The word covers two unrelated operations in sequence work, and conflating them causes confusion.
+The word covers two unrelated steps in sequence work, and conflating them causes confusion.
 
 <strong>Data normalisation</strong> scales the input values &mdash; putting a temperature series and a price series on comparable footing before the model sees them.
 
@@ -21,7 +21,7 @@ Both matter for sequences, and for different reasons. This covers both.
 
 ## Scaling sequence inputs
 
-The requirement is the same as for tabular data. A feature ranging over thousands will dominate the first layer's weighted sum, and gradients for the other features become negligible.
+The requirement is the same as for tabular data. A feature ranging over thousands will dominate the first layer's weighted sum, and gradients for the other features become tiny.
 
 The rule that is specific to sequences is <strong>fit the scaler on the training period only</strong>:
 
@@ -188,7 +188,7 @@ print("   sentences happened to be batched with it.")
 print()
 ```
 
-The following block covers the left operations.
+The following block covers the left steps.
 
 ```python-run
 import numpy as np
@@ -218,7 +218,7 @@ rows = [("normalises over", "batch and time", "features of one position"),
         ("variable length", "awkward", "fine")]
 ```
 
-The next block continues with the left demonstrations.
+The next block goes on with the left demonstrations.
 
 ```python-run
 print("%24s %24s %28s" % ("", "BatchNorm", "LayerNorm"))

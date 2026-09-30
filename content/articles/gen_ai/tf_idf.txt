@@ -3,15 +3,15 @@ intro: How does TF-IDF decide which words in a document actually matter?
 
 ## The two halves
 
-<p><strong>Term frequency</strong> is how often a term occurs in a document, usually damped. A word appearing twenty times is not twenty times as relevant. So implementations take a logarithm or normalise by document length.</p>
+<p><strong>Term count</strong> is how often a term occurs in a document, usually damped. A word appearing twenty times is not twenty times as relevant. So implementations take a logarithm or normalise by document length.</p>
 
-<p><strong>Inverse document frequency</strong> is <code>log(N / df)</code>, where <code>df</code> is the number of documents containing the term. When a term is in every document that ratio is 1 and the log is 0. So the term adds nothing at all.</p>
+<p><strong>Inverse document count</strong> is <code>log(N / df)</code>, where <code>df</code> is the number of documents containing the term. When a term is in every document that ratio is 1 and the log is 0. So the term adds nothing at all.</p>
 
 That zero is the elegant part: stopwords are removed by the arithmetic rather than by a list you have to maintain per language.
 
-The product of TF and IDF gives each term a score that is high when the term appears often in the current document and rarely across the corpus. A term that appears in every document gets an IDF of zero and adds nothing, no matter its frequency. A term that appears in only one document gets a high IDF and dominates that document's representation. This is why TF-IDF works well for document retrieval. The terms that distinguish one document from the rest are exactly the terms that carry the most weight.
+The product of TF and IDF gives each term a score that is high when the term appears often in the current document and rarely across the corpus. A term that appears in every document gets an IDF of zero and adds nothing, no matter its count. A term that appears in only one document gets a high IDF and dominates that document's representation. This is why TF-IDF works well for document retrieval. The terms that distinguish one document from the rest are exactly the terms that carry the most weight.
 
-In scikit-learn, `TfidfVectorizer` computes TF-IDF in one step: it tokenises the text, counts term frequencies, applies IDF weights, and normalises each document vector to unit length. The normalisation matters because without it, longer documents would have higher scores simply by containing more words. The result is a sparse matrix where each row is a document and each column is a term from the vocabulary.
+In scikit-learn, `TfidfVectorizer` computes TF-IDF in one step: it tokenises the text, counts term counts, applies IDF weights, and normalises each document vector to unit length. The normalisation matters because without it, longer documents would have higher scores simply by containing more words. The result is a sparse matrix where each row is a document and each column is a term from the vocabulary.
 
 TF-IDF is the baseline for text classification, document similarity, keyword extraction and simple search engines. It requires no training data, no GPU. And no neural network &mdash; just a corpus and a few seconds of work. For many practical tasks it performs well enough that a more complex model is not worth the overhead. Where it fails is synonymy ("car" and "automobile" are treated as unrelated terms) and polysemy ("bank" the institution and "bank" the riverbank share a vector dimension). Embedding-based methods solve both problems by mapping words to dense vectors rather than sparse term counts. But they trade interpretability and ease for that improvement.
 
@@ -19,7 +19,7 @@ TF-IDF is the baseline for text classification, document similarity, keyword ext
 
 <p><strong>No length normalisation by default.</strong> A long document contains more of all of it. So raw TF favours it. Dividing by length overcorrects and favours very short ones. BM25's <code>b</code> parameter exists to tune between the two.</p>
 
-<p><strong>Unbounded term frequency.</strong> TF keeps growing with repetition. BM25 saturates it, so the tenth instance adds far less than the second &mdash; which matches how relevance actually behaves.</p>
+<p><strong>Unbounded term count.</strong> TF keeps growing with repetition. BM25 saturates it, so the tenth instance adds far less than the second &mdash; which matches how relevance actually behaves.</p>
 
 <p><strong>No understanding of meaning.</strong> "car" and "automobile" are unrelated terms. That is what dense embeddings fix, and why modern retrieval runs both and fuses the results. See <a href="hybrid_search_reciprocal_rank_fusion.html">hybrid search</a>.</p>
 
@@ -56,7 +56,7 @@ When someone says two TF-IDF implementations disagree, it is nearly always one o
 
 ## Where it sits in a modern stack
 
-TF-IDF is rarely the ranker any more. <a href="bm25_and_sparse_retrieval.html">BM25</a> supersedes it by saturating term frequency and normalising length properly. But it is still the thing to reach for in three situations.
+TF-IDF is rarely the ranker any more. <a href="bm25_and_sparse_retrieval.html">BM25</a> supersedes it by saturating term count and normalising length properly. But it is still the thing to reach for in three situations.
 
 <p><strong>As a baseline.</strong> If a dense retriever cannot beat TF-IDF on your evaluation set, the problem is the embedding model, the chunking or the evaluation set itself. It costs minutes to run and it has saved a great many people from tuning the wrong thing.</p>
 
@@ -70,9 +70,9 @@ Counting words treats "the" and "encephalopathy" as equally interesting. TF-IDF 
 
 <p class="mono-font">TF-IDF(t, d) = TF(t, d) &times; log(N / DF(t))</p>
 
-<strong>Term frequency</strong> &mdash; how often the term appears in this document. More mentions, more relevance.
+<strong>Term count</strong> &mdash; how often the term appears in this document. More mentions, more relevance.
 
-<strong>Inverse document frequency</strong> &mdash; the logarithm of the total number of documents divided by how many contain the term. Rare terms score high; ubiquitous terms score near zero.
+<strong>Inverse document count</strong> &mdash; the logarithm of the total number of documents divided by how many contain the term. Rare terms score high; ubiquitous terms score near zero.
 
 Worked through with 1,000 documents:
 
@@ -83,7 +83,7 @@ Worked through with 1,000 documents:
 |"parental"|30|log(33) = 3.50|
 |"encephalopathy"|2|log(500) = 6.21|
 
-A term in every document adds <strong>exactly nothing</strong>, any its frequency. That is automatic stop-word removal, derived from the corpus rather than from a list. And it is the single most useful property of the method.
+A term in every document adds <strong>exactly nothing</strong>, any its count. That is automatic stop-word removal, derived from the corpus rather than from a list. And it is the single most useful property of the method.
 
 ## Why the logarithm
 
@@ -91,7 +91,7 @@ Without it, a term in 1 document out of 1,000 would get a weight of 1,000 and a 
 
 The logarithm compresses that: 6.9 against 4.6. Rare terms still win, and not by an absurd margin.
 
-The same reasoning motivates <strong>sublinear term frequency</strong>: using `1 + log(TF)` instead of the raw count,. This is because a term appearing 50 times is not 50 times more relevant than one appearing once. Scikit-learn exposes this as `sublinear_tf=True`, and it usually helps.
+The same reasoning motivates <strong>sublinear term count</strong>: using `1 + log(TF)` instead of the raw count,. This is because a term appearing 50 times is not 50 times more relevant than one appearing once. Scikit-learn exposes this as `sublinear_tf=True`, and it usually helps.
 
 Two more refinements that matter in practice:
 
@@ -166,7 +166,7 @@ print()
 
 ```
 
-The next block continues with the left demonstrations.
+The next block goes on with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -211,7 +211,7 @@ tfidf_n = tfidf / np.where(norms == 0, 1, norms)
 
 ```
 
-The next block continues with the left demonstrations.
+The next block goes on with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -248,7 +248,7 @@ print()
 
 ```
 
-The next block continues with the left demonstrations.
+The next block goes on with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -291,7 +291,7 @@ print()
 
 ```
 
-The next block continues with the left demonstrations.
+The next block goes on with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -368,7 +368,7 @@ That table is the argument for using both, which is exactly what hybrid retrieva
 
 <strong>As the first baseline for any text classification task.</strong> It is fast enough to try in five minutes. And it often comes within a few points of a fine-tuned transformer on topic classification with adequate labels. Not measuring it means not knowing whether the transformer was worth it.
 
-<strong>Keyword retrieval,</strong> usually in its refined form BM25, which adds term-frequency saturation and document-length normalisation. Every search engine is built on this.
+<strong>Keyword retrieval,</strong> usually in its refined form BM25, which adds term-count saturation and document-length normalisation. Every search engine is built on this.
 
 <strong>Keyness analysis</strong> &mdash; comparing two corpora to find the terms that distinguish them. Far more informative than a word cloud.
 
@@ -380,7 +380,7 @@ That table is the argument for using both, which is exactly what hybrid retrieva
 
 BM25 is TF-IDF with two corrections, and it is what you should use for retrieval rather than plain TF-IDF:
 
-<strong>Term-frequency saturation.</strong> The contribution of repeated instances flattens, controlled by `k₁` (around 1.2). A document mentioning a term twenty times is not twenty times more relevant.
+<strong>Term-count saturation.</strong> The contribution of repeated instances flattens, controlled by `k₁` (around 1.2). A document mentioning a term twenty times is not twenty times more relevant.
 
 <strong>Document-length normalisation</strong> relative to the corpus average, controlled by `b` (around 0.75). A long document will contain most query terms by chance.
 

@@ -9,7 +9,7 @@ The threshold should be relative. A fixed number like 0.7 means something differ
 
 The result is chunks that align with topic shifts rather than arbitrary token counts. A paragraph about authentication stays in one chunk; the next paragraph about rate limiting starts a new one. This is the quality edge over fixed-size chunking. The embedding of each chunk represents a coherent topic, not a random slice of text that starts mid-thought.
 
-Three parameters control the output. The embedding model decides how similarity is measured — a model trained on semantic similarity (like sentence-transformers) works; a general-purpose model may not distinguish topic boundaries cleanly. The percentile threshold sets how sensitive the splitting is. A lower percentile (more aggressive) produces more, smaller chunks; a higher percentile produces fewer, larger ones. The minimum chunk size prevents degenerate one-sentence chunks that carry too little context to be useful on their own.
+Three parameters control the output. The embedding model decides how similarity is measured — a model trained on semantic similarity (like sentence-transformers) works; a general-purpose model may not distinguish topic boundaries cleanly. The percentile threshold sets how sensitive the splitting is. A lower percentile (more aggressive) gives more, smaller chunks; a higher percentile gives fewer, larger ones. The minimum chunk size prevents degenerate one-sentence chunks that carry too little context to be useful on their own.
 
 Semantic chunking pairs well with metadata enrichment. Because each chunk represents a coherent topic, it is straightforward to generate a summary or title for each chunk and store it alongside the embedding. At retrieval time, the summary can be used for hybrid search (keyword plus vector) or for reranking. This improves precision without increasing the embedding cost at query time.
 
@@ -46,11 +46,11 @@ Both trade sensitivity for stability, and both are worth having. Without them th
 
 ## Is it worth it? Measure before adopting
 
-Semantic chunking is the most cited of the strategies and the hardest to justify on evidence. It costs an embedding call per sentence at index time, produces chunks of unpredictable size that complicate context budgeting. And on published checks its edge over a well-tuned recursive splitter is often small or absent.
+Semantic chunking is the most cited of the strategies and the hardest to justify on evidence. It costs an embedding call per sentence at index time, gives chunks of unpredictable size that complicate context budgeting. And on published checks its edge over a well-tuned recursive splitter is often small or absent.
 
 Where it does earn its cost: long unstructured prose with no formatting signal. Interview transcripts, meeting notes, scanned reports. And corpora where topics shift within a paragraph. So paragraph boundaries mislead.
 
-The honest order of operations is to tune the separators and the size first, measure. And only then try semantic chunking against that baseline. It is a real technique that is often adopted before the cheap options have been exhausted.
+The honest order of steps is to tune the separators and the size first, measure. And only then try semantic chunking against that baseline. It is a real technique that is often adopted before the cheap options have been exhausted.
 
 ## How it relates to the other three strategies
 
@@ -62,7 +62,7 @@ The four strategies answer truly different questions, which is why they compose 
 
 <p><strong>Semantic</strong> asks where the meaning changes. It is the only one that can find a boundary the author did not mark. This is why it is for unstructured prose in detail.</p>
 
-<p><strong>Context-aware</strong> asks what the chunk lost by being cut, and is orthogonal to all three. You can enrich chunks produced by any splitter.</p>
+<p><strong>Context-aware</strong> asks what the chunk lost by being cut, and is orthogonal to all three. You can enrich chunks gave by any splitter.</p>
 
 A sensible production pipeline is usually structure first, recursive to enforce the size limit, and context enrichment on the result. Semantic chunking enters when the documents have no structure to exploit.
 
@@ -97,9 +97,9 @@ The reliable approach is a <strong>percentile of the distances within this docum
 
 Two refinements that materially improve results:
 
-<strong>Use a buffer.</strong> Compare a small window of sentences either side of the candidate boundary rather than single sentences. A single short sentence &mdash; "This is important." &mdash; produces a spurious dip on its own.
+<strong>Use a buffer.</strong> Compare a small window of sentences either side of the candidate boundary rather than single sentences. A single short sentence &mdash; "This is important." &mdash; gives a spurious dip on its own.
 
-<strong>Enforce size limits.</strong> Semantic boundaries can produce a 4,000-token chunk or a 30-token one. Cap the maximum and merge below a minimum, or the downstream context budget becomes unpredictable.
+<strong>Enforce size limits.</strong> Semantic boundaries can give a 4,000-token chunk or a 30-token one. Cap the maximum and merge below a minimum, or the downstream context budget becomes unpredictable.
 
 ```python
 import numpy as np
@@ -114,7 +114,7 @@ boundaries = [i+1 for i, s in enumerate(sims) if s < threshold]
 
 ## The similarity curve, and where it dips
 
-Semantic chunking splits where in a row sentences stop resembling each other. That description leaves the important question open -- how big a dip counts -- so here is the actual signal from a passage. And the boundaries each threshold produces.
+Semantic chunking splits where in a row sentences stop resembling each other. That description leaves the important question open -- how big a dip counts -- so here is the actual signal from a passage. And the boundaries each threshold gives.
 
 ```python-run
 import numpy as np
@@ -307,7 +307,7 @@ print("compare recall@k.")
 
 ## Things to try
 
-1. Raise the <strong>split percentile</strong> to 70. It splits almost everywhere, producing chunks too small to carry an idea.
+1. Raise the <strong>split percentile</strong> to 70. It splits almost everywhere, giving chunks too small to carry an idea.
 2. Drop it to 10. Only the single largest topic change survives as a boundary.
 3. Note that the threshold is derived from this document's own gaps. A fixed number would behave differently on every corpus.
 
@@ -341,13 +341,13 @@ There is a further honest caveat: <strong>the measured benefit is often smaller 
 
 <strong>LLM-based (agentic) chunking.</strong> Ask a model to propose boundaries, or to group sentences into topics. Highest quality on difficult text, and by far the most expensive &mdash; usually reserved for small high-value corpora.
 
-<strong>Late chunking.</strong> A recent other worth knowing: embed the <em>whole</em> document with a long-context embedding model. Then pool the token embeddings into chunk vectors. Each chunk's vector is informed by the entire document, which addresses the missing-context problem without needing per-sentence calls.
+<strong>Late chunking.</strong> A recent other worth knowing: embed the <em>whole</em> document with a long-context embedding model. Then pool the token embeddings into chunk vectors. Each chunk's vector is informed by the entire document, which fixes the missing-context problem without needing per-sentence calls.
 
 ## Practical guidance
 
 Start with <strong>recursive or structure-aware chunking</strong> and a proper evaluation set. Measure recall@k. Then, if retrieval is the bottleneck <em>and</em> the documents lack structure, try semantic chunking and measure the difference.
 
-That ordering matters because chunking is one of several levers, and it is not usually the largest. Hybrid search and reranking usually give bigger gains for less effort. And they are worth exhausting first.
+That ordering matters because chunking is one of a few levers, and it is not usually the largest. Hybrid search and reranking usually give bigger gains for less effort. And they are worth exhausting first.
 
 Any strategy you choose, two things help regardless: <strong>prepend the heading path</strong> to each chunk so it carries context, and consider <strong>parent-child retrieval</strong> so small precise chunks can return larger context.
 

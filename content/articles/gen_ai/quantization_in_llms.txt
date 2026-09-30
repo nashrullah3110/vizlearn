@@ -3,11 +3,11 @@ intro: A 70B-parameter model in full 32-bit precision needs about <strong>280 GB
 
 ## The Core Idea: A Coarser Ruler
 
-A 32-bit float can express billions of distinct values. An 8-bit integer can express 256, and a 4-bit integer just 16. Quantization finds the range your weights actually occupy and divides it into that many evenly spaced levels:
+A 32-bit float can express billions of distinct values. An 8-bit integer can express 256, and a 4-bit integer just 16. Quantization finds the range your weights actually take and divides it into that many evenly spaced levels:
 
 scale = (max &minus; min) / (2<sup>bits</sup> &minus; 1) &nbsp;&nbsp;&nbsp; q = round(w / scale)
 
-Every weight is then snapped to its nearest level. The difference between where a weight <em>was</em> and where it <em>landed</em> is the quantization error. Unavoidable, and the entire subject in one sentence. **Post-training quantization (PTQ)** applies the snapping to a model that was already trained in full precision, with no further training. It is fast (minutes, not days) and usually works at 8 bits with negligible accuracy loss. **Quantization-aware training (QAT)** simulates low-precision arithmetic during training so the model learns to tolerate rounding. And it is the path to aggressive 4-bit and even 3-bit quantization. GPTQ, AWQ, and GGML/GGUF are the formats and algorithms that brought 4-bit quantization to consumer GPUs. This makes 70B-parameter models runnable on a single 24 GB card. This page shows the quantization grid at different bit widths, shows the accuracy-memory tradeoff on a worked example, and covers the difference between even and asymmetric quantization schemes.
+Every weight is then snapped to its nearest level. The difference between where a weight <em>was</em> and where it <em>landed</em> is the quantization error. Unavoidable, and the entire subject in one sentence. **Post-training quantization (PTQ)** applies the snapping to a model that was already trained in full precision, with no further training. It is fast (minutes, not days) and usually works at 8 bits with tiny accuracy loss. **Quantization-aware training (QAT)** simulates low-precision arithmetic during training so the model learns to tolerate rounding. And it is the path to aggressive 4-bit and even 3-bit quantization. GPTQ, AWQ, and GGML/GGUF are the formats and algorithms that brought 4-bit quantization to consumer GPUs. This makes 70B-parameter models runnable on a single 24 GB card. This page shows the quantization grid at different bit widths, shows the accuracy-memory tradeoff on a worked example, and covers the difference between even and asymmetric quantization schemes.
 
 ## Even vs Asymmetric
 
@@ -54,7 +54,7 @@ The practical guidance follows: <strong>prefer a larger model quantised over a s
 
 ## How it works, and why outliers matter
 
-The basic operation maps a range of floats onto a small set of integers:
+The basic step maps a range of floats onto a small set of integers:
 
 <p class="mono-font">q = round((w &minus; zero_point) / scale)</p>
 
@@ -136,7 +136,7 @@ print("   model, it is a different model.")
 print()
 ```
 
-The following block covers the left operations.
+The following block covers the left steps.
 
 ```python-run
 import numpy as np
@@ -175,7 +175,7 @@ print("   fundamentally an outlier strategy.")
 print()
 ```
 
-The next block continues with the left demonstrations.
+The next block goes on with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -238,7 +238,7 @@ print("same weights, at a cost of half a bit each.")
 ## Try it yourself
 
 1. <strong>Step from FP32 down to INT4.</strong> Levels fall from billions to 16, the horizontal grid lines thin out. And the green dots drift visibly away from the grey ones.
-2. <strong>Watch RMS error against memory saved.</strong> FP16 is nearly free. Huge savings, negligible error. That is why it is the default almost everywhere.
+2. <strong>Watch RMS error against memory saved.</strong> FP16 is nearly free. Huge savings, tiny error. That is why it is the default almost everywhere.
 3. <strong>Now enable the outlier at INT4.</strong> Step size roughly doubles and every ordinary weight is punished for one extreme value.
 4. <strong>Switch to asymmetric with the outlier on.</strong> Error usually improves, because the grid stops wasting levels on an empty side of the range.
 5. <strong>Pick 70B and compare FP16 to INT4.</strong> 140 GB versus roughly 35 GB. The difference between a multi-GPU server and a single high-end card. That is the whole reason anyone tolerates the error.
@@ -275,7 +275,7 @@ cfg = BitsAndBytesConfig(
 model = AutoModelForCausalLM.from_pretrained("model-name", quantization_config=cfg)
 ```
 
-Note `compute_dtype`: weights are <em>stored</em> in 4-bit and de-quantised to bfloat16 for the actual multiplication. The saving is in memory and bandwidth, not in the arithmetic.
+Note `compute_dtype`: weights are <em>stored</em> in 4-bit and de-quantised to bfloat16 for the actual product. The saving is in memory and bandwidth, not in the arithmetic.
 
 ## What else can be quantised
 

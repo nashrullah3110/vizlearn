@@ -7,11 +7,11 @@ Logits are unbounded and can be negative, so they are pushed through <strong>sof
 
 p&#7522; = exp(z&#7522; / T) / &Sigma;&#11002; exp(z&#11002; / T)
 
-Because of the exponential, small gaps in logits become large gaps in probability. A token scoring 2 points higher is not slightly more likely. It is roughly seven times more likely. The temperature T controls how peaked the distribution is: T=1 is the model's native confidence, T&lt;1 sharpens the distribution toward the top token (more deterministic), and T&gt;1 flattens it (more random). After softmax produces probabilities, a sampling strategy picks the next token. Greedy decoding always takes the highest-probability token, which is fast but repetitive. Top-k sampling restricts the choice to the k most likely tokens and samples among them. Top-p (nucleus) sampling keeps the smallest set of tokens whose cumulative probability exceeds p. This adapts the candidate set size to the model's confidence. All three strategies can be combined with temperature. The model then appends the chosen token to the input and runs the entire sequence through the transformer again to produce the next token's logit distribution. This autoregressive loop continues until a stop token is made or a length limit is reached. This page shows the logit-to-probability conversion, shows temperature scaling, and compares greedy, top-k, and top-p sampling on the same prompt.
+Because of the rapid, small gaps in logits become large gaps in probability. A token scoring 2 points higher is not slightly more likely. It is roughly seven times more likely. The temperature T controls how peaked the distribution is: T=1 is the model's native confidence, T&lt;1 sharpens the distribution toward the top token (more deterministic), and T&gt;1 flattens it (more random). After softmax gives probabilities, a sampling strategy picks the next token. Greedy decoding always takes the highest-probability token, which is fast but repetitive. Top-k sampling restricts the choice to the k most likely tokens and samples among them. Top-p (nucleus) sampling keeps the smallest set of tokens whose cumulative probability exceeds p. This adapts the candidate set size to the model's confidence. All three strategies can be combined with temperature. The model then appends the chosen token to the input and runs the entire sequence through the transformer again to give the next token's logit distribution. This autoregressive loop goes on until a stop token is made or a length limit is reached. This page shows the logit-to-probability conversion, shows temperature scaling, and compares greedy, top-k, and top-p sampling on the same prompt.
 
 ## Step 2: Temperature Reshapes Confidence
 
-That <span class="mono-font">T</span> in the formula divides every logit before the exponential. This stretches or compresses the gaps between them:
+That <span class="mono-font">T</span> in the formula divides every logit before the rapid. This stretches or compresses the gaps between them:
 
 - <strong>T &lt; 1</strong> &mdash; gaps widen, the leader runs away with it. Output becomes focused and repetitive. As T approaches 0 this is the same to always taking the argmax.
 - <strong>T = 1</strong> &mdash; the model's own distribution, untouched.
@@ -30,11 +30,11 @@ After truncating, the survivors are renormalised so they sum to 1 again &mdash;.
 
 ## One token at a time
 
-A language model does exactly one thing: given a sequence of tokens, produce a probability distribution over what comes next. All of it else &mdash; conversation, code, summarisation &mdash; is that operation repeated.
+A language model does exactly one thing: given a sequence of tokens, give a probability distribution over what comes next. All of it else &mdash; conversation, code, summarisation &mdash; is that step repeated.
 
 <p class="mono-font">"The capital of France is" &rarr; { " Paris": 0.89, " a": 0.03, " located": 0.02, &hellip; }</p>
 
-Concretely, the final layer produces one <strong>logit</strong> per token in the vocabulary. An unbounded score, perhaps 100,000 of them. Softmax converts those into probabilities summing to 1. Then one token is chosen, appended to the sequence, and the whole process repeats.
+Concretely, the final layer gives one <strong>logit</strong> per token in the vocabulary. An unbounded score, perhaps 100,000 of them. Softmax converts those into probabilities summing to 1. Then one token is chosen, appended to the sequence, and the whole process repeats.
 
 That loop is called <strong>autoregressive generation</strong>, and it has a direct result: the model cannot revise. Once a token is emitted it becomes part of the input. And a poor early choice constrains all of it after it.
 
@@ -61,7 +61,7 @@ The distribution is not the answer &mdash; something must pick from it. And the 
 
 <strong>Top-p</strong> is the more reliable of the truncation methods: it adapts to the distribution's shape. This takes few tokens when the model is confident and many when it is not. Top-k takes a fixed number regardless, which is too restrictive on uncertain steps and too permissive on confident ones.
 
-<strong>Greedy decoding is not the best answer.</strong> Picking the most likely token at each step does not produce the most likely <em>sequence</em>. This is why beam search exists. And why greedy output tends towards repetition.
+<strong>Greedy decoding is not the best answer.</strong> Picking the most likely token at each step does not give the most likely <em>sequence</em>. This is why beam search exists. And why greedy output tends towards repetition.
 
 ## Why generation gets slower with length, and how caching fixes it
 
@@ -69,7 +69,7 @@ Each new token attends to every previous token. Naively, making token 1,000 mean
 
 The <strong>KV cache</strong> removes that. The keys and values for previous tokens do not change. So they are computed once and stored. Each new token computes only its own, appends them, and attends against the cache. Generation becomes linear.
 
-The cost is memory: two tensors per layer per token. For a long context and a large model that runs to many gigabytes. And it is why <strong>grouped-query attention</strong> exists. Sharing key and value projections across heads shrinks the cache several-fold.
+The cost is memory: two tensors per layer per token. For a long context and a large model that runs to many gigabytes. And it is why <strong>grouped-query attention</strong> exists. Sharing key and value projections across heads shrinks the cache a few-fold.
 
 This also explains a visible asymmetry in API pricing and latency. Handling the prompt is one parallel pass over all its tokens; making the output is one sequential step per token. Input is cheap and fast, output is expensive and slow.
 
@@ -126,7 +126,7 @@ print("   exp turns differences into ratios: exp(%.1f) = %.2f."
       % (LOGITS[0] - LOGITS[1], np.exp(LOGITS[0] - LOGITS[1])))
 ```
 
-Temperature is the knob that reshapes that spread before softmax runs. The next block divides the same logits by several temperatures and reads off the entropy.
+Temperature is the knob that reshapes that spread before softmax runs. The next block divides the same logits by a few temperatures and reads off the entropy.
 
 ```python-run
 import numpy as np
@@ -302,25 +302,25 @@ print("   someone made, not the model 'thinking differently' this time.")
 
 ## In one line
 
-The model supplies a distribution; the <em>decoding strategy</em> supplies the behaviour. The same weights can produce rigid factual answers or freewheeling prose depending purely on temperature and truncation. And because each pick is appended and fed back in, one unlucky sample early on steers all of it that follows &mdash;. This is why these knobs matter far more than their obscurity suggests.
+The model supplies a distribution; the <em>decoding strategy</em> supplies the behaviour. The same weights can give rigid factual answers or freewheeling prose depending purely on temperature and truncation. And because each pick is appended and fed back in, one unlucky sample early on steers all of it that follows &mdash;. This is why these knobs matter far more than their obscurity suggests.
 
 ## What next-token prediction turns out to buy
 
-Training on "predict the next token" over enormous quantities of text produces capabilities nobody put in by name.
+Training on "predict the next token" over enormous quantities of text gives capabilities nobody put in by name.
 
 To predict the next word well, a model must in effect track syntax, resolve references, hold facts, follow instructions embedded in text, and continue patterns. All of those emerge because they reduce prediction error on real text.
 
-<strong>In-context learning</strong> is the most striking. Show three examples in the prompt and the model continues the pattern, having learned nothing &mdash; no weights changed. It is pattern follow-up, which is exactly what next-token prediction rewards. Research on "induction heads" traces this to specific attention circuits that copy and complete patterns seen earlier in the context.
+<strong>In-context learning</strong> is the most striking. Show three examples in the prompt and the model goes on the pattern, having learned nothing &mdash; no weights changed. It is pattern follow-up, which is exactly what next-token prediction rewards. Research on "induction heads" traces this to specific attention circuits that copy and complete patterns seen earlier in the context.
 
 Two things it does <em>not</em> buy, and both follow from the objective:
 
-<strong>Calibrated uncertainty.</strong> The model produces a distribution over tokens, not a belief about truth. High probability means "this is what such text looks like". This is why confident falsehoods are the trait failure.
+<strong>Calibrated uncertainty.</strong> The model gives a distribution over tokens, not a belief about truth. High probability means "this is what such text looks like". This is why confident falsehoods are the trait failure.
 
 <strong>Arithmetic and character-level reasoning.</strong> Tokenisation fragments numbers inconsistently, and letters are not visible as separate units. Counting the r's in "strawberry" asks the model to reason about something it cannot see.
 
 ## From base model to assistant
 
-A raw next-token predictor continues text; it does not answer questions. Turning one into an assistant takes two further stages.
+A raw next-token predictor goes on text; it does not answer questions. Turning one into an assistant takes two further stages.
 
 <strong>Instruction tuning</strong> &mdash; supervised fine-tuning on examples of instructions and good responses. This is what teaches the model that a question should be answered rather than continued with more questions.
 
@@ -330,7 +330,7 @@ Neither changes the underlying method. The model is still predicting the next to
 
 ## Questions people ask
 
-<strong>Does the model plan ahead?</strong> Architecturally it produces one token at a time, and there is evidence that internal states encode data about tokens several steps ahead. Whether that constitutes planning is an open question.
+<strong>Does the model plan ahead?</strong> Architecturally it gives one token at a time, and there is evidence that internal states encode data about tokens a few steps ahead. Whether that constitutes planning is an open question.
 
 <strong>Why does it repeat itself?</strong> Low temperature and greedy decoding favour high-probability continuations, and repetition is high-probability. Raise the temperature, use top-p, or apply a repetition penalty.
 
@@ -340,7 +340,7 @@ Neither changes the underlying method. The model is still predicting the next to
 
 <strong>Can it see the whole conversation?</strong> All of it within the context window. This is re-sent with every request. It has no memory between calls beyond what you include.
 
-<strong>Why do the same inputs give different answers?</strong> Sampling, unless temperature is 0. And even then, batching and hardware non-determinism can produce small changes.
+<strong>Why do the same inputs give different answers?</strong> Sampling, unless temperature is 0. And even then, batching and hardware non-determinism can give small changes.
 
 ## Recap in one screen
 
