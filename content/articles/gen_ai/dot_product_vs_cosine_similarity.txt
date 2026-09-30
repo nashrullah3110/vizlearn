@@ -3,7 +3,7 @@ intro: The same two vectors, two different questions asked of them.
 
 ## What this is
 
-<a href="../machine_learning/cosine_similarity.html" style="color: var(--accent-primary)">Cosine similarity</a> asks "what angle apart are these two vectors" and ignores length fully. Dot product asks "how much do these two vectors agree, weighted by how long they both are" — length is part of the answer, not discarded. Most embedding search defaults to cosine, but a growing number of models (some recommendation embeddings, some matryoshka and MIPS-optimised models) are trained. That way, <em>dot product</em> is the correct similarity, and using cosine on them silently under-uses the model. In [embedding](../deep_learning/how_are_embeddings_generated.html) spaces, cosine similarity is the standard retrieval metric because documents of different lengths give vectors of different magnitudes. And you want a long document about cats to match a short query about cats. The dot product would rank the long document higher simply because its vector is longer, not because it is more relevant. But in attention methods inside [transformers](how_llms_predict_next_word.html), the dot product is used on purpose. The magnitude of a key vector encodes how strongly that token wants to be attended to, and normalising it away would lose that signal. Scaled dot-product attention divides by the square root of the dimension to keep the values in a range where softmax gives useful gradients. But it does not normalise the vectors themselves. The two measures agree on direction and disagree on scale. If both vectors are unit-length, cosine similarity and the dot product return exactly the same number. This page computes both measures on pairs of vectors, shows how magnitude affects each one, and covers when to use which in practice.
+<a href="../machine_learning/cosine_similarity.html" style="color: var(--accent-primary)">Cosine similarity</a> asks "what angle apart are these two vectors" and ignores length fully. Dot product asks "how much do these two vectors agree, weighted by how long they both are" — length is part of the answer, not discarded. Most embedding search defaults to cosine, but a growing number of models (some recommendation embeddings, some matryoshka and MIPS-optimised models) are trained. That way, <em>dot product</em> is the correct similarity, and using cosine on them silently under-uses the model. In [embedding](../deep_learning/how_are_embeddings_generated.html) spaces, cosine similarity is the standard retrieval metric because documents of different lengths give vectors of different sizes. And you want a long document about cats to match a short query about cats. The dot product would rank the long document higher simply because its vector is longer, not because it is more relevant. But in attention methods inside [transformers](how_llms_predict_next_word.html), the dot product is used on purpose. The size of a key vector encodes how strongly that token wants to be attended to, and normalising it away would lose that signal. Scaled dot-product attention divides by the square root of the dimension to keep the values in a range where softmax gives useful gradients. But it does not normalise the vectors themselves. The two measures agree on direction and disagree on scale. If both vectors are unit-length, cosine similarity and the dot product return exactly the same number. This page computes both measures on pairs of vectors, shows how size affects each one, and covers when to use which in practice.
 
 ## The formulas
 
@@ -16,7 +16,7 @@ Cosine is the dot product after dividing out both vectors' lengths —. This is 
 <p class="mono-font">dot product = a &middot; b = &Sigma; a&#7522;b&#7522;</p>
 <p class="mono-font">cosine similarity = (a &middot; b) / (&#8214;a&#8214; &#8214;b&#8214;)</p>
 
-Cosine similarity is the dot product divided by both lengths. That division is the whole difference, and it removes magnitude from the check, leaving only direction.
+Cosine similarity is the dot product divided by both lengths. That division is the whole difference, and it removes size from the check, leaving only direction.
 
 Worked through. Take a = [3, 4] and two candidates:
 
@@ -30,11 +30,11 @@ Worked through. Take a = [3, 4] and two candidates:
 
 By dot product, b scores twice as high as c. By cosine, b is a perfect match (the same direction) and c is very close. The two measures rank them the same way here, and for different reasons. And they will disagree when lengths vary much.
 
-## When magnitude is noise, and when it is signal
+## When size is noise, and when it is signal
 
 <strong>Use cosine when length carries no meaning.</strong> Text embeddings are the standard case. A 4,000-word article and a 200-word summary of it should be close. And their vector lengths differ mainly because of length and count, not content.
 
-<strong>Use the dot product when length carries meaning.</strong> Some recommendation systems on purpose encode popularity or confidence as vector magnitude. So that a popular item scores higher for an equally-good direction match. Discarding the length would discard that data.
+<strong>Use the dot product when length carries meaning.</strong> Some recommendation systems on purpose encode popularity or confidence as vector size. So that a popular item scores higher for an equally-good direction match. Discarding the length would discard that data.
 
 |Situation|Measure|
 |---|---|
@@ -44,7 +44,7 @@ By dot product, b scores twice as high as c. By cosine, b is a perfect match (th
 |Trained with a dot-product objective|Dot product &mdash; match the training|
 |Comparing images by feature vectors|Cosine, usually|
 
-That fourth row is the one people miss. If the embedding model was trained with an inner-product objective, its geometry is arranged for the dot product, and using cosine may not be what it was optimised for. Model documentation usually states which to use, and following it matters more than the general argument.
+That fourth row is the one people miss. If the embedding model was trained with an inner-product objective, its geometry is arranged for the dot product, and using cosine may not be what it was optimised for. Model documentation often states which to use, and following it matters more than the general argument.
 
 ## The identity that makes this a non-issue in practice
 
@@ -271,7 +271,7 @@ Cosine similarity has a fixed range, which makes it thresholdable:
 |0.0|Orthogonal &mdash; nothing in common|
 |Negative|Opposed directions|
 
-The dot product has no fixed range at all, which is a practical downside. A score of 42 means nothing without knowing the typical magnitudes in that space.
+The dot product has no fixed range at all, which is a practical downside. A score of 42 means nothing without knowing the typical sizes in that space.
 
 Two cautions about cosine thresholds:
 
@@ -283,7 +283,7 @@ Two cautions about cosine thresholds:
 
 Cosine similarity divides by the vector lengths, so a zero-length vector gives a division by zero.
 
-That is not hypothetical. An empty document, a chunk that contained only whitespace or markup, a user with no links. All give zero vectors, and the result is a `nan` that propagates silently through averages and rankings.
+That is not hypothetical. An empty document, a chunk that held only whitespace or markup, a user with no links. All give zero vectors, and the result is a `nan` that propagates silently through averages and rankings.
 
 ```python
 def cosine(a, b):
@@ -303,7 +303,7 @@ The dot product has no such problem, which is a minor point in its favour. The r
 |Manhattan|Yes|Sparse or high-dimensional data|
 |Mahalanobis|Yes, and accounts for correlation|Outlier detection|
 
-Euclidean distance is the one people reach for by habit from geometry. And it is usually the wrong choice for unnormalised embeddings. A long vector is far from all of it. So document length rules the ranking. Normalise, and it becomes the same to cosine.
+Euclidean distance is the one people reach for by habit from geometry. And it is often the wrong choice for unnormalised embeddings. A long vector is far from all of it. So document length rules the ranking. Normalise, and it becomes the same to cosine.
 
 ## Questions people ask
 
@@ -315,14 +315,14 @@ Euclidean distance is the one people reach for by habit from geometry. And it is
 
 <strong>Can cosine similarity be negative?</strong> In math yes, down to &minus;1. With most text embedding models it is uncommon.
 
-<strong>Does normalising lose data?</strong> It discards magnitude. For text embeddings that is usually noise; for models that encode confidence in the magnitude, it is a loss.
+<strong>Does normalising lose data?</strong> It discards size. For text embeddings that is often noise; for models that encode confidence in the size, it is a loss.
 
 <strong>What threshold should I use?</strong> Do not guess &mdash; measure it on labelled pairs from your own corpus. Model-to-model change is large.
 
 ## Recap in one screen
 
-- Cosine similarity is the dot product divided by both lengths. This removes magnitude and keeps direction.
-- Use cosine when length is noise (almost always, for text). Use the dot product when magnitude encodes something real.
+- Cosine similarity is the dot product divided by both lengths. This removes size and keeps direction.
+- Use cosine when length is noise (almost always, for text). Use the dot product when size encodes something real.
 - On unit-length vectors the two are the same, and Euclidean distance ranks the same way.
-- Normalise once at indexing time, then a fast matrix multiply gives you cosine scores.
+- Normalise once at indexing time, then a fast matrix times gives you cosine scores.
 - Guard against zero vectors, and calibrate thresholds against your own labelled pairs.

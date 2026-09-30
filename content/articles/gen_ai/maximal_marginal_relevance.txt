@@ -3,19 +3,19 @@ intro: Trading a little relevance for a lot of coverage.
 
 ## Context first
 
-Plain top-k retrieval picks the k highest-scoring documents on its own. If a document collection has a few near-the same passages about the same popular sub-topic, all of them can legitimately score near the top — and a naive top-k fills the context with repetition instead of coverage. This wastes the retrieval budget on saying the same thing three times. Maximal Marginal Relevance (MMR) fixes this by selecting documents iteratively. At each step, it picks the document that maximises a weighted combination of relevance to the query and diversity from the documents already selected. The formula is `MMR = argmax[ lambda * sim(doc, query) - (1 - lambda) * max(sim(doc, selected)) ]`. Lambda controls the trade-off: lambda=1 is pure relevance (same as top-k), lambda=0 is pure diversity (maximally unlike what you already have). Values between 0.5 and 0.7 are typical. The "marginal" in the name means the incremental value of adding one more document given what has already been chosen. MMR is used in RAG pipelines ([LangChain](parent_document_retriever.html), LlamaIndex) where the retrieved passages become context for a language model, and redundant context wastes the model's limited context window. It also appears in extractive summarisation, where selecting diverse sentences gives a better summary. This page retrieves documents with plain top-k and with MMR, shows the similarity matrix, and lets you adjust lambda to see the relevance-diversity trade-off.
+Plain top-k retrieval picks the k highest-scoring documents on its own. If a document collection has a few near-the same passages about the same popular sub-topic, all of them can legitimately score near the top — and a naive top-k fills the context with repetition instead of coverage. This wastes the retrieval budget on saying the same thing three times. Maximal Marginal Relevance (MMR) fixes this by selecting documents iteratively. At each step, it picks the document that boosts a weighted combination of relevance to the query and diversity from the documents already selected. The formula is `MMR = argmax[ lambda * sim(doc, query) - (1 - lambda) * max(sim(doc, selected)) ]`. Lambda controls the trade-off: lambda=1 is pure relevance (same as top-k), lambda=0 is pure diversity (maximally unlike what you already have). Values between 0.5 and 0.7 are typical. The "marginal" in the name means the incremental value of adding one more document given what has already been chosen. MMR is used in RAG pipelines ([LangChain](parent_document_retriever.html), LlamaIndex) where the retrieved passages become context for a language model, and redundant context wastes the model's limited context window. It also appears in extractive summarisation, where selecting diverse sentences gives a better summary. This page retrieves documents with plain top-k and with MMR, shows the similarity matrix, and lets you adjust lambda to see the relevance-diversity trade-off.
 
 ## The formula
 
 MMR = argmax<sub>d &isin; left</sub> [ &lambda; &middot; relevance(d, query) &minus; (1&minus;&lambda;) &middot; max<sub>s &isin; selected</sub> similarity(d, s) ]
 
-Selection happens one document at a time, not all at once. The first pick is any is most relevant, exactly like ordinary retrieval. Every pick after that is penalised by how similar it is to any has already been chosen — so a document that would have ranked highly on relevance alone can lose to a less relevant document that covers new ground.
+Choice happens one document at a time, not all at once. The first pick is any is most relevant, exactly like ordinary retrieval. Every pick after that is penalised by how similar it is to any has already been chosen — so a document that would have ranked highly on relevance alone can lose to a less relevant document that covers new ground.
 
 ## The problem with taking the top five
 
 A vector search returns the five chunks closest to the query. On a corpus with any redundancy, those five are often near-copies of each other.
 
-Ask "what is the refund policy?" of a corpus containing the policy in the handbook, in the FAQ, in a support macro and in two versions of the terms page. And the top five results are five statements of the same thing. Four slots wasted, and any nuance &mdash; the exceptions, the timescales, the process &mdash; is not retrieved at all.
+Ask "what is the refund policy?" of a corpus holding the policy in the handbook, in the FAQ, in a support macro and in two versions of the terms page. And the top five results are five statements of the same thing. Four slots wasted, and any nuance &mdash; the exceptions, the timescales, the process &mdash; is not retrieved at all.
 
 <strong>Maximal marginal relevance</strong> fixes this by selecting results one at a time, each chosen to be relevant to the query <em>and</em> unlike what has already been selected:
 
@@ -57,7 +57,7 @@ def mmr(query_vec, cand_vecs, lam=0.7, k=5):
 
 Note that it operates on a <em>candidate set</em>, not the whole corpus. Retrieve 30&ndash;50 by plain similarity first, then apply MMR to select the final 5. Running it over a million vectors would be quadratic and pointless.
 
-## A worked selection
+## A worked choice
 
 Query: "refund policy". Suppose five candidates with these similarities to the query, and high mutual similarity among the first three:
 
@@ -75,7 +75,7 @@ Query: "refund policy". Suppose five candidates with these similarities to the q
 
 The result is A, D, E &mdash; the policy, the timescales and the exceptions. That is a far better context for answering the question. And it came from the same candidate set.
 
-## Running the selection, and watching lambda move it
+## Running the choice, and watching lambda move it
 
 The formula and the dial are described above. Here they are executed -- the greedy loop written out, every candidate's score at every step. And the point where turning lambda stops adding diversity and starts discarding relevance.
 
@@ -255,7 +255,7 @@ print("   MMR turned off.")
 
 ## What to recall
 
-MMR selects documents one at a time, and after the first pick, every later choice is weighed against how similar it is to what has already been selected — trading some relevance for coverage. &lambda; controls the trade right: 1.0 is ordinary top-k relevance ranking, 0.0 ignores relevance and maximises spread. And all of it between balances the two. It costs one similarity check against the selected set per candidate per step. This is cheap next to embedding or reranking and is standard in any RAG system retrieving more than a couple of chunks per query.
+MMR selects documents one at a time, and after the first pick, every later choice is weighed against how similar it is to what has already been selected — trading some relevance for coverage. &lambda; controls the trade right: 1.0 is ordinary top-k relevance ranking, 0.0 ignores relevance and boosts spread. And all of it between balances the two. It costs one similarity check against the selected set per candidate per step. This is cheap next to embedding or reranking and is standard in any RAG system retrieving more than a couple of chunks per query.
 
 ## Where diversity helps and where it hurts
 
@@ -291,7 +291,7 @@ The pragmatic recommendation: start with threshold-based near-copy filtering, wh
 
 <strong>It needs the candidate vectors,</strong> not just their ids. The redundancy term compares candidates with each other. Retrieval must return the embeddings, or they must be re-fetched.
 
-<strong>Order matters after selection.</strong> MMR chooses a set; the order in which it is presented to the model still matters,. This is because attention favours the ends of a long context. Keep the most relevant first.
+<strong>Order matters after choice.</strong> MMR chooses a set; the order in which it is presented to the model still matters,. This is because attention favours the ends of a long context. Keep the most relevant first.
 
 <strong>It interacts with reranking.</strong> A cross-encoder gives more accurate relevance scores; running MMR on reranked candidates using cross-encoder scores for the relevance term and embedding similarity for the redundancy term works well.
 

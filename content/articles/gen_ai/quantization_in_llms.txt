@@ -7,7 +7,7 @@ A 32-bit float can express billions of distinct values. An 8-bit integer can exp
 
 scale = (max &minus; min) / (2<sup>bits</sup> &minus; 1) &nbsp;&nbsp;&nbsp; q = round(w / scale)
 
-Every weight is then snapped to its nearest level. The gap between where a weight <em>was</em> and where it <em>landed</em> is the quantization error. Unavoidable, and the entire subject in one sentence. **Post-training quantization (PTQ)** applies the snapping to a model that was already trained in full precision, with no further training. It is fast (minutes, not days) and usually works at 8 bits with tiny accuracy loss. **Quantization-aware training (QAT)** simulates low-precision arithmetic during training so the model learns to tolerate rounding. And it is the path to aggressive 4-bit and even 3-bit quantization. GPTQ, AWQ, and GGML/GGUF are the formats and algorithms that brought 4-bit quantization to consumer GPUs. This makes 70B-parameter models runnable on a single 24 GB card. This page shows the quantization grid at different bit widths, shows the accuracy-memory tradeoff on a worked example, and covers the gap between even and asymmetric quantization schemes.
+Every weight is then snapped to its nearest level. The gap between where a weight <em>was</em> and where it <em>landed</em> is the quantization error. Unavoidable, and the entire subject in one sentence. **Post-training quantization (PTQ)** applies the snapping to a model that was already trained in full precision, with no further training. It is fast (minutes, not days) and often works at 8 bits with tiny accuracy loss. **Quantization-aware training (QAT)** simulates low-precision arithmetic during training so the model learns to tolerate rounding. And it is the path to aggressive 4-bit and even 3-bit quantization. GPTQ, AWQ, and GGML/GGUF are the formats and algorithms that brought 4-bit quantization to consumer GPUs. This makes 70B-parameter models runnable on a single 24 GB card. This page shows the quantization grid at different bit widths, shows the accuracy-memory tradeoff on a worked case, and covers the gap between even and asymmetric quantization schemes.
 
 ## Even vs Asymmetric
 
@@ -35,7 +35,7 @@ A model's weights are numbers, and how exactly each is stored is a choice. Quant
 
 The arithmetic is what makes this matter: a 70B model in 16-bit needs 140GB and does not fit on a single GPU. At 4-bit it is 35GB and fits on one. Quantisation is often the gap between a model being deployable and not.
 
-Speed also improves, and for a reason worth understanding: generation is <strong>memory-bandwidth-bound</strong>, not compute-bound. Every token requires reading all the weights, so halving their size roughly halves the time spent waiting for memory.
+Speed also improves, and for a reason worth understanding: generation is <strong>memory-bandwidth-bound</strong>, not compute-bound. Every token needs reading all the weights, so halving their size roughly halves the time spent waiting for memory.
 
 ## The trade, measured
 
@@ -48,7 +48,7 @@ Quality loss is real and, at the sizes people use, modest.
 |INT4|Small but present; more visible on reasoning tasks|
 |INT3 and below|Noticeable degradation|
 
-Two patterns hold across evaluations. Larger models tolerate quantisation better &mdash; a 70B model at 4-bit usually beats a 13B model at 16-bit. And it is the better use of the same memory. And degradation appears first on tasks with narrow margins: multi-step reasoning and code, rather than fluent prose.
+Two patterns hold across evaluations. Larger models tolerate quantisation better &mdash; a 70B model at 4-bit often beats a 13B model at 16-bit. And it is the better use of the same memory. And degradation appears first on tasks with narrow margins: multi-step reasoning and code, rather than fluent prose.
 
 The practical guidance follows: <strong>prefer a larger model quantised over a smaller model at full precision.</strong>
 
@@ -58,7 +58,7 @@ The basic step maps a range of floats onto a small set of integers:
 
 <p class="mono-font">q = round((w &minus; zero_point) / scale)</p>
 
-Applied per tensor, this fails on transformers for a specific reason. Their weight and activation distributions contain <strong>outliers</strong>, values far larger than the rest. One outlier in a tensor forces the scale to cover its range. And every other value collapses into a handful of levels.
+Applied per tensor, this fails on transformers for a specific reason. Their weight and activation distributions hold <strong>outliers</strong>, values far larger than the rest. One outlier in a tensor forces the scale to cover its range. And every other value collapses into a handful of levels.
 
 The methods that work all address this:
 
@@ -66,7 +66,7 @@ The methods that work all address this:
 
 <strong>GPTQ</strong> quantises layer by layer, adjusting the left weights to compensate for the error added. A one-shot method needing a small calibration set.
 
-<strong>AWQ</strong> identifies the weights that matter most for activations and protects them at higher precision.
+<strong>AWQ</strong> finds the weights that matter most for activations and protects them at higher precision.
 
 <strong>LLM.int8()</strong> keeps outlier dimensions in 16-bit and quantises the rest to 8-bit.
 
@@ -240,18 +240,18 @@ print("same weights, at a cost of half a bit each.")
 1. <strong>Step from FP32 down to INT4.</strong> Levels fall from billions to 16, the horizontal grid lines thin out. And the green dots drift visibly away from the grey ones.
 2. <strong>Watch RMS error against memory saved.</strong> FP16 is nearly free. Huge savings, tiny error. That is why it is the default almost everywhere.
 3. <strong>Now enable the outlier at INT4.</strong> Step size roughly doubles and every ordinary weight is punished for one extreme value.
-4. <strong>Switch to asymmetric with the outlier on.</strong> Error usually improves, because the grid stops wasting levels on an empty side of the range.
+4. <strong>Switch to asymmetric with the outlier on.</strong> Error often improves, because the grid stops wasting levels on an empty side of the range.
 5. <strong>Pick 70B and compare FP16 to INT4.</strong> 140 GB versus roughly 35 GB. The gap between a multi-GPU server and a single high-end card. That is the whole reason anyone tolerates the error.
 
 ## Summing up
 
-Quantization buys memory and speed with precision. The surprise is how cheap the trade is: 8-bit is usually indistinguishable from full precision, and modern 4-bit methods come remarkably close. The size numbers here count weights only &mdash; real deployments also need memory for activations and the KV cache. This grows with context length.
+Quantization buys memory and speed with precision. The surprise is how cheap the trade is: 8-bit is often indistinguishable from full precision, and modern 4-bit methods come remarkably close. The size numbers here count weights only &mdash; real deployments also need memory for activations and the KV cache. This grows with context length.
 
 ## Post-training versus quantisation-aware
 
-<strong>Post-training quantisation (PTQ)</strong> takes a trained model and converts it, using a small calibration dataset to choose scales. Minutes to hours, no training required, and it is what almost everyone uses.
+<strong>Post-training quantisation (PTQ)</strong> takes a trained model and converts it, using a small calibration dataset to choose scales. Minutes to hours, no training needed, and it is what almost everyone uses.
 
-<strong>Quantisation-aware training (QAT)</strong> simulates quantisation during training so the model learns weights that survive it. Better quality at low bit widths, and it requires the full training pipeline &mdash; usually only worth it for very aggressive quantisation or for models shipped at enormous volume.
+<strong>Quantisation-aware training (QAT)</strong> simulates quantisation during training so the model learns weights that survive it. Better quality at low bit widths, and it needs the full training pipeline &mdash; often only worth it for very aggressive quantisation or for models shipped at enormous volume.
 
 For LLMs, PTQ with a good method (GPTQ, AWQ) at 4-bit is the standard path.
 
@@ -281,7 +281,7 @@ Note `compute_dtype`: weights are <em>stored</em> in 4-bit and de-quantised to b
 
 <strong>Weights</strong> are the usual target &mdash; they dominate memory and are static. So quantising them is straightforward.
 
-<strong>Activations</strong> are harder, because they vary per input and contain worse outliers. Weight-only quantisation is much more common so.
+<strong>Activations</strong> are harder, because they vary per input and hold worse outliers. Weight-only quantisation is much more common so.
 
 <strong>The KV cache</strong> is increasingly quantised, and for long contexts it can exceed the weights in size. 8-bit cache quantisation is a meaningful saving with a small quality cost.
 
@@ -291,9 +291,9 @@ Note `compute_dtype`: weights are <em>stored</em> in 4-bit and de-quantised to b
 
 <strong>Which precision should I use?</strong> 4-bit for local inference where memory binds, 8-bit when quality matters more than memory, 16-bit when memory is not a constraint.
 
-<strong>Does quantisation make inference faster?</strong> Usually yes, because generation is bandwidth-bound and smaller weights mean less to read.
+<strong>Does quantisation make inference faster?</strong> Often yes, because generation is bandwidth-bound and smaller weights mean less to read.
 
-<strong>Is a quantised large model better than a small one at full precision?</strong> Usually yes, for the same memory budget. This is a well-replicated result.
+<strong>Is a quantised large model better than a small one at full precision?</strong> Often yes, for the same memory budget. This is a well-replicated result.
 
 <strong>Can I fine-tune a quantised model?</strong> With QLoRA, yes. The frozen base is 4-bit and the trained adapters are higher precision.
 
@@ -307,4 +307,4 @@ Note `compute_dtype`: weights are <em>stored</em> in 4-bit and de-quantised to b
 - Generation is memory-bandwidth-bound, so smaller weights are also faster.
 - Outliers break naive per-tensor quantisation; group-wise scales, GPTQ, AWQ and NF4 all address them.
 - 8-bit is nearly free in quality; 4-bit costs a little, mostly on reasoning tasks.
-- For a fixed memory budget, a larger quantised model usually beats a smaller full-precision one.
+- For a fixed memory budget, a larger quantised model often beats a smaller full-precision one.

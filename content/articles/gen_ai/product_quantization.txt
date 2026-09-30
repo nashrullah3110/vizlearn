@@ -3,7 +3,7 @@ intro: How does product quantization compress a vector, and why does splitting i
 
 ## Start with plain quantization
 
-Before splitting anything, consider the obvious compression: run k-means over
+Before splitting anything, think of the obvious compression: run k-means over
 the whole corpus with 256 centroids and replace each vector with the index of
 its nearest one. Every vector becomes a single byte.
 
@@ -72,7 +72,7 @@ d(q, code) ≈ table[0][code[0]] + table[1][code[1]] + … + table[m-1][code[m-1
 m table lookups and m additions. No products, no decoding, and — this
 is the part that matters — **the per-candidate cost no longer depends on d**.
 Scanning a million 96-byte codes is 96 million lookups; scanning a million
-768-dimensional float vectors is 768 million multiply-adds over eight times
+768-dimensional float vectors is 768 million times-adds over eight times
 the memory bandwidth.
 
 It is called **asymmetric** because only one side is quantised. Quantising the
@@ -102,8 +102,8 @@ One structural assumption worth knowing: PQ splits dimensions in their
 first order, which implicitly assumes neighbouring dimensions belong
 together. For learned embeddings that is arbitrary. **OPQ** — optimised
 product quantization — learns a rotation of the space first, so that variance
-is balanced across the subspaces before splitting. It costs a matrix multiply
-per query and usually buys a few points of recall for free, which is why
+is balanced across the subspaces before splitting. It costs a matrix times
+per query and often buys a few points of recall for free, which is why
 FAISS's `OPQ64_256,IVF...,PQ64` recipes are so common.
 
 ## What PQ does not do
@@ -161,7 +161,7 @@ this:
 
 **Scalar quantization** stores each dimension as one byte against a recorded
 range. There is no codebook, calibration is a single pass, and on normalised
-embeddings the ranking loss is usually small enough to ignore. It is the
+embeddings the ranking loss is often small enough to ignore. It is the
 cheapest real compression available and the first thing to try.
 
 **Binary quantization** keeps one bit per dimension &mdash; the sign &mdash; and
@@ -190,11 +190,11 @@ it is almost always paired with IVF or a graph.
 
 ## Questions people ask
 
-<strong>Why does splitting help so much?</strong> Because representable positions *multiply* while stored centroids only add. m codebooks of k centroids describe `kᵐ` positions from `m·k` stored centroids. At m = 96 and k = 256, that is 256⁹⁶ positions from 24,576 centroids. Plain quantization has to store every position it can represent.
+<strong>Why does splitting help so much?</strong> Because representable positions *times* while stored centroids only add. m codebooks of k centroids describe `kᵐ` positions from `m·k` stored centroids. At m = 96 and k = 256, that is 256⁹⁶ positions from 24,576 centroids. Plain quantization has to store every position it can represent.
 
 <strong>Should nbits ever be anything but 8?</strong> Rarely. A byte is what hardware likes, 256 centroids per subspace is a good operating point. And the SIMD lookup implementations that make PQ fast assume it. Lower values exist for extreme compression and lose recall quickly.
 
-<strong>Should I use OPQ?</strong> Usually yes. PQ splits dimensions in their first order, which implicitly assumes neighbouring dimensions belong together. Arbitrary for a learned embedding. OPQ learns a rotation that balances variance across the subspaces first, costs one matrix multiply per query, and usually buys a few points of recall.
+<strong>Should I use OPQ?</strong> Often yes. PQ splits dimensions in their first order, which implicitly assumes neighbouring dimensions belong together. Arbitrary for a learned embedding. OPQ learns a rotation that balances variance across the subspaces first, costs one matrix times per query, and often buys a few points of recall.
 
 <strong>Why asymmetric distance instead of decoding the code?</strong> Because it leaves the query exact. Quantising the query too would let you precompute a even table between codebook entries. This is marginally faster and measurably less accurate. You would be adding the query's own quantisation error to every check for no gain.
 

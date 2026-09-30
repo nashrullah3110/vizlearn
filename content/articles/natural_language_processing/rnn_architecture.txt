@@ -3,9 +3,9 @@ intro: Unrolling a recurrent cell across time gives a network as deep as the seq
 
 ## Unrolling
 
-An RNN is usually drawn as a cell with an arrow looping back to itself. That is compact and slightly misleading. To understand training, unroll it: draw one copy of the cell per timestep, with the hidden state flowing left to right between copies.
+An RNN is often drawn as a cell with an arrow looping back to itself. That is compact and slightly misleading. To understand training, unroll it: draw one copy of the cell per timestep, with the hidden state flowing left to right between copies.
 
-Unrolled, an RNN over a 50-token sentence is a <strong>50-layer deep network</strong>. Every layer is the same layer &mdash; the same weights &mdash; but the compute graph really is that deep. And the gradient really does have to travel all the way back through it. Weight sharing is the structural edge: a single set of parameters handles any sequence length. So a model trained on 20-token sentences can process 200-token ones at inference with no extra parameters. But the gradient that must travel back through 50 (or 200) the same matrix products either explodes or [vanishes](../deep_learning/exploding_and_vanishing_gradient.html). This is why plain RNNs struggle with dependencies longer than about 10-20 steps. [LSTMs](what_is_lstm.html) and [GRUs](what_is_a_gru.html) add gating methods that create an additive path for the gradient, mitigating the vanishing problem at the cost of more parameters per cell. The hidden state has a fixed size (the hidden dimension), no matter how long the sequence is. All data about the past must be compressed into that one vector. This is the basic bottleneck. [Attention](multi_head_attention.html) removes it by letting the decoder look right at every encoder state. This page unrolls an RNN across a sequence, shows the hidden-state flow, and covers how gradient magnitude changes with depth.
+Unrolled, an RNN over a 50-token sentence is a <strong>50-layer deep network</strong>. Every layer is the same layer &mdash; the same weights &mdash; but the compute graph really is that deep. And the gradient really does have to travel all the way back through it. Weight sharing is the structural edge: a single set of parameters handles any sequence length. So a model trained on 20-token sentences can process 200-token ones at inference with no extra parameters. But the gradient that must travel back through 50 (or 200) the same matrix products either explodes or [vanishes](../deep_learning/exploding_and_vanishing_gradient.html). This is why plain RNNs struggle with dependencies longer than about 10-20 steps. [LSTMs](what_is_lstm.html) and [GRUs](what_is_a_gru.html) add gating methods that create an additive path for the gradient, mitigating the vanishing problem at the cost of more parameters per cell. The hidden state has a fixed size (the hidden dimension), no matter how long the sequence is. All data about the past must be compressed into that one vector. This is the basic bottleneck. [Attention](multi_head_attention.html) removes it by letting the decoder look right at every encoder state. This page unrolls an RNN across a sequence, shows the hidden-state flow, and covers how gradient size changes with depth.
 
 ## Counting the parameters
 
@@ -15,11 +15,11 @@ W<sub>x</sub>: d &times; h&nbsp;&nbsp;&nbsp;&nbsp;W<sub>h</sub>: h &times; h&nbs
 
 total = dh + h&sup2; + h
 
-With d = 100 and h = 128 that is 12,800 + 16,384 + 128 = <strong>29,312</strong> parameters. And that number does not change whether the sequence is 5 tokens or 5,000. The <span class="mono-font">h&sup2;</span> term usually rules, which is why hidden size is the expensive dimension and doubling it roughly quadruples the recurrent weights.
+With d = 100 and h = 128 that is 12,800 + 16,384 + 128 = <strong>29,312</strong> parameters. And that number does not change whether the sequence is 5 tokens or 5,000. The <span class="mono-font">h&sup2;</span> term often rules, which is why hidden size is the expensive dimension and doubling it roughly quadruples the recurrent weights.
 
 ## Backpropagation through time
 
-<p>Training unrolls the network, runs a normal forward pass. Then backpropagates from the loss all the way back to timestep 1. Because the same weights appear at every step, the gradient for <span class="mono-font">W<sub>h</sub></span> is the <em>sum</em> of its gradient contributions from all timesteps.</p><p>This is called backpropagation through time. And it has two practical results. Memory grows linearly with sequence length, since every middle hidden state must be kept for the backward pass. And the gradient reaching early timesteps is a long product. So it vanishes or explodes exactly as depth causes it to in a feedforward network.</p><strong>Truncated BPTT</strong> is the standard mitigation. Backpropagate only k steps back, usually 20 to 50, and treat anything earlier as constant. It bounds memory and gradient depth at the cost of never learning dependencies longer than k.
+<p>Training unrolls the network, runs a normal forward pass. Then backpropagates from the loss all the way back to timestep 1. Because the same weights appear at every step, the gradient for <span class="mono-font">W<sub>h</sub></span> is the <em>sum</em> of its gradient contributions from all timesteps.</p><p>This is called backpropagation through time. And it has two practical results. Memory grows linearly with sequence length, since every middle hidden state must be kept for the backward pass. And the gradient reaching early timesteps is a long product. So it vanishes or explodes exactly as depth causes it to in a feedforward network.</p><strong>Truncated BPTT</strong> is the standard mitigation. Backpropagate only k steps back, often 20 to 50, and treat anything earlier as constant. It bounds memory and gradient depth at the cost of never learning dependencies longer than k.
 
 ## The shapes a recurrent network can take
 
@@ -34,7 +34,7 @@ The cell is the same in every case. What changes is where inputs enter and where
 
 <strong>Many-to-one</strong> takes an output only at the end. Use pooled hidden states rather than only the final one. Since the final state over-weights the end of the input.
 
-<strong>Many-to-many aligned</strong> takes an output at every step, and a bidirectional layer usually helps because right context disambiguates.
+<strong>Many-to-many aligned</strong> takes an output at every step, and a bidirectional layer often helps because right context disambiguates.
 
 <strong>Many-to-many unaligned</strong> needs two networks: an encoder that reads the input and a decoder that gives the output. This is where attention was invented.
 
@@ -42,7 +42,7 @@ The cell is the same in every case. What changes is where inputs enter and where
 
 For translation, an encoder reads the source sentence and its final hidden state is passed to a decoder. This makes the target one token at a time.
 
-That final state is a fixed-size vector. 512 numbers, say. And it must contain all of it about the source sentence. For five words that is comfortable. For fifty it is a severe compression, and translation quality was observed to fall sharply with sentence length.
+That final state is a fixed-size vector. 512 numbers, say. And it must hold all of it about the source sentence. For five words that is comfortable. For fifty it is a severe compression, and translation quality was observed to fall sharply with sentence length.
 
 <strong>Attention</strong> removed the bottleneck: instead of passing only the final state, keep <em>all</em> the encoder's hidden states, and let the decoder compute a weighted combination at each output step, choosing what to look at.
 
@@ -64,7 +64,7 @@ Two other structural choices:
 
 <strong>Bidirectional</strong> layers run a second pass backwards and concatenate. This doubles the output width. Excellent for tagging and classification, unusable for generation or streaming.
 
-<strong>Where the output head goes.</strong> On the final layer, always. But note that in a stacked bidirectional model, extracting the right final states requires care. Since each direction's final state corresponds to a different end of the sequence.
+<strong>Where the output head goes.</strong> On the final layer, always. But note that in a stacked bidirectional model, extracting the right final states needs care. Since each direction's final state corresponds to a different end of the sequence.
 
 ## One weight matrix, applied over and over
 
@@ -205,7 +205,7 @@ print("where this loop is inherently sequential.")
 ## Where this goes wrong
 
 - <strong>Not clipping gradients.</strong> The repeated product makes explosion common. Clipping the global norm at around 1.0 is close to mandatory for recurrent models.
-- <strong>Padding without masking.</strong> Batching requires equal lengths, so short sequences are padded. And unless those positions are masked, the model learns from the padding and the loss is computed over meaningless tokens.
+- <strong>Padding without masking.</strong> Batching needs equal lengths, so short sequences are padded. And unless those positions are masked, the model learns from the padding and the loss is computed over meaningless tokens.
 - <strong>Running out of memory on long sequences.</strong> Every hidden state is retained for the backward pass. Truncate the BPTT window rather than reducing the batch to one.
 - <strong>Expecting parallelism.</strong> Timestep t needs the state from t&minus;1, so an RNN is inherently sequential and cannot use a GPU the way a transformer can. That, more than accuracy, is why transformers displaced them.
 
@@ -245,17 +245,17 @@ Getting any of the four wrong gives a model that trains and lags without an erro
 
 <strong>Clip gradients.</strong> `clip_grad_norm_(params, 5.0)`. Recurrent models are the classic case, and omitting it in time gives `NaN`.
 
-<strong>Sort or bucket by length</strong> when batching, so batches contain similar lengths and less work is wasted on padding.
+<strong>Sort or bucket by length</strong> when batching, so batches hold similar lengths and less work is wasted on padding.
 
 <strong>Watch memory against sequence length.</strong> Activation memory grows linearly with the number of steps. So a model that fits at 200 tokens may fail at 500.
 
-<strong>Use pretrained embeddings</strong> where available, and consider freezing them with small datasets. There is far less to overfit.
+<strong>Use pretrained embeddings</strong> where available, and think of freezing them with small datasets. There is far less to overfit.
 
 <strong>Truncate backpropagation</strong> for very long sequences, detaching the state every k steps.
 
 ## Questions people ask
 
-<strong>How many layers should I use?</strong> One or two. Deeper recurrent stacks rarely repay the training difficulty.
+<strong>How many layers should I use?</strong> One or two. Deeper recurrent stacks rarely repay the training trouble.
 
 <strong>Should I use the last hidden state or pool?</strong> Pool, for classification.
 
@@ -272,5 +272,5 @@ Getting any of the four wrong gives a model that trains and lags without an erro
 - One cell, four arrangements: one-to-many, many-to-one, aligned and unaligned many-to-many.
 - Unaligned tasks need an encoder and a decoder. And the fixed-size state between them was the bottleneck attention was invented to remove.
 - Stack at most two layers; put dropout between them, not inside the recurrence.
-- Bidirectional doubles the output width and requires the complete input.
+- Bidirectional doubles the output width and needs the complete input.
 - Pack padded batches, clip gradients, and pool over states rather than taking the last one.

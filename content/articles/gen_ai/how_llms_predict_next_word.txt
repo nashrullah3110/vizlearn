@@ -7,7 +7,7 @@ Logits are unbounded and can be negative, so they are pushed through <strong>sof
 
 p&#7522; = exp(z&#7522; / T) / &Sigma;&#11002; exp(z&#11002; / T)
 
-Because of the rapid, small gaps in logits become large gaps in probability. A token scoring 2 points higher is not slightly more likely. It is roughly seven times more likely. The temperature T controls how peaked the distribution is: T=1 is the model's native confidence, T&lt;1 sharpens the distribution toward the top token (more deterministic), and T&gt;1 flattens it (more random). After softmax gives probabilities, a sampling strategy picks the next token. Greedy decoding always takes the highest-probability token, which is fast but repetitive. Top-k sampling restricts the choice to the k most likely tokens and samples among them. Top-p (nucleus) sampling keeps the smallest set of tokens whose cumulative probability exceeds p. This adapts the candidate set size to the model's confidence. All three strategies can be combined with temperature. The model then appends the chosen token to the input and runs the entire sequence through the transformer again to give the next token's logit distribution. This autoregressive loop goes on until a stop token is made or a length limit is reached. This page shows the logit-to-probability conversion, shows temperature scaling, and compares greedy, top-k, and top-p sampling on the same prompt.
+Because of the rapid, small gaps in logits become large gaps in probability. A token scoring 2 points higher is not slightly more likely. It is roughly seven times more likely. The temperature T controls how peaked the distribution is: T=1 is the model's native confidence, T&lt;1 sharpens the distribution toward the top token (more deterministic), and T&gt;1 flattens it (more random). After softmax gives probabilities, a sampling plan picks the next token. Greedy decoding always takes the highest-probability token, which is fast but repetitive. Top-k sampling restricts the choice to the k most likely tokens and samples among them. Top-p (nucleus) sampling keeps the smallest set of tokens whose cumulative probability exceeds p. This adapts the candidate set size to the model's confidence. All three plans can be combined with temperature. The model then appends the chosen token to the input and runs the entire sequence through the transformer again to give the next token's logit distribution. This autoregressive loop goes on until a stop token is made or a length limit is reached. This page shows the logit-to-probability conversion, shows temperature scaling, and compares greedy, top-k, and top-p sampling on the same prompt.
 
 ## Step 2: Temperature Reshapes Confidence
 
@@ -17,13 +17,13 @@ That <span class="mono-font">T</span> in the formula divides every logit before 
 - <strong>T = 1</strong> &mdash; the model's own distribution, untouched.
 - <strong>T &gt; 1</strong> &mdash; gaps compress toward uniform. Unlikely tokens become truly reachable, which reads as creativity right up until it reads as nonsense.
 
-Temperature never changes the <em>ranking</em>, only the confidence spread. Watch the entropy readout as you drag it &mdash; that number is the distribution's uncertainty in bits.
+Temperature never changes the <em>ranking</em>, only the confidence spread. Watch the entropy readout as you drag it &mdash; that number is the distribution's doubt in bits.
 
 ## Step 3: Truncation — Top-k and Top-p
 
 Even after temperature, the long tail of thousands of near-zero tokens still holds meaningful total probability. Sample from it often enough and you in time draw something absurd. Two filters prevent this:
 
-- <strong>Top-k</strong> keeps the k highest-scoring tokens and discards the rest. Simple, but rigid: k=5 is far too narrow when the model is truly uncertain and far too wide when only one answer is correct.
+- <strong>Top-k</strong> keeps the k highest-scoring tokens and discards the rest. Simple, but rigid: k=5 is far too narrow when the model is truly unclear and far too wide when only one answer is correct.
 - <strong>Top-p (nucleus)</strong> keeps the smallest set whose probabilities sum to p. The cutoff <em>adapts</em>: for "The capital of France is" the nucleus may hold one token. While for an open-ended prompt it may hold forty.
 
 After truncating, the survivors are renormalised so they sum to 1 again &mdash;. This is why the surviving bars grow when you tighten the filter.
@@ -59,7 +59,7 @@ The distribution is not the answer &mdash; something must pick from it. And the 
 |0.8&ndash;1.0|Creative writing|
 |&gt;1.2|Usually incoherent|
 
-<strong>Top-p</strong> is the more reliable of the truncation methods: it adapts to the distribution's shape. This takes few tokens when the model is confident and many when it is not. Top-k takes a fixed number regardless, which is too restrictive on uncertain steps and too permissive on confident ones.
+<strong>Top-p</strong> is the more reliable of the truncation methods: it adapts to the distribution's shape. This takes few tokens when the model is confident and many when it is not. Top-k takes a fixed number regardless, which is too restrictive on unclear steps and too permissive on confident ones.
 
 <strong>Greedy decoding is not the best answer.</strong> Picking the most likely token at each step does not give the most likely <em>sequence</em>. This is why beam search exists. And why greedy output tends towards repetition.
 
@@ -195,7 +195,7 @@ print("   but fine' from 'unlikely because wrong' -- it only knows the")
 print("   ranking, and it flattens the whole thing.")
 ```
 
-Cutting the tail off fully is the fix temperature cannot make on its own. The next block applies top-k truncation, then shows why a single fixed k is wrong for both a confident and an uncertain step.
+Cutting the tail off fully is the fix temperature cannot make on its own. The next block applies top-k truncation, then shows why a single fixed k is wrong for both a confident and an unclear step.
 
 ```python-run
 import numpy as np
@@ -232,7 +232,7 @@ print("   pick, and the uncertain step throws away 7 perfectly reasonable")
 print("   ones. a single k cannot be right for both.")
 ```
 
-Top-p (nucleus) sampling fixes that by adapting the cutoff to the model's own confidence rather than fixing a count. The next block compares it right against the confident and uncertain distributions above.
+Top-p (nucleus) sampling fixes that by adapting the cutoff to the model's own confidence rather than fixing a count. The next block compares it right against the confident and unclear distributions above.
 
 ```python-run
 import numpy as np
@@ -302,7 +302,7 @@ print("   someone made, not the model 'thinking differently' this time.")
 
 ## In one line
 
-The model supplies a distribution; the <em>decoding strategy</em> supplies the behaviour. The same weights can give rigid factual answers or freewheeling prose depending purely on temperature and truncation. And because each pick is appended and fed back in, one unlucky sample early on steers all of it that follows &mdash;. This is why these knobs matter far more than their obscurity suggests.
+The model supplies a distribution; the <em>decoding plan</em> supplies the behaviour. The same weights can give rigid factual answers or freewheeling prose depending purely on temperature and truncation. And because each pick is appended and fed back in, one unlucky sample early on steers all of it that follows &mdash;. This is why these knobs matter far more than their obscurity suggests.
 
 ## What next-token prediction turns out to buy
 
@@ -310,11 +310,11 @@ Training on "predict the next token" over enormous quantities of text gives capa
 
 To predict the next word well, a model must in effect track syntax, resolve references, hold facts, follow instructions embedded in text, and continue patterns. All of those emerge because they reduce prediction error on real text.
 
-<strong>In-context learning</strong> is the most striking. Show three examples in the prompt and the model goes on the pattern, having learned nothing &mdash; no weights changed. It is pattern follow-up, which is exactly what next-token prediction rewards. Research on "induction heads" traces this to specific attention circuits that copy and complete patterns seen earlier in the context.
+<strong>In-context learning</strong> is the most striking. Show three cases in the prompt and the model goes on the pattern, having learned nothing &mdash; no weights changed. It is pattern follow-up, which is exactly what next-token prediction rewards. Research on "induction heads" traces this to specific attention circuits that copy and complete patterns seen earlier in the context.
 
 Two things it does <em>not</em> buy, and both follow from the objective:
 
-<strong>Calibrated uncertainty.</strong> The model gives a distribution over tokens, not a belief about truth. High probability means "this is what such text looks like". This is why confident falsehoods are the trait failure.
+<strong>Calibrated doubt.</strong> The model gives a distribution over tokens, not a belief about truth. High probability means "this is what such text looks like". This is why confident falsehoods are the trait failure.
 
 <strong>Arithmetic and character-level reasoning.</strong> Tokenisation fragments numbers inconsistently, and letters are not visible as separate units. Counting the r's in "strawberry" asks the model to reason about something it cannot see.
 
@@ -322,7 +322,7 @@ Two things it does <em>not</em> buy, and both follow from the objective:
 
 A raw next-token predictor goes on text; it does not answer questions. Turning one into an assistant takes two further stages.
 
-<strong>Instruction tuning</strong> &mdash; supervised fine-tuning on examples of instructions and good responses. This is what teaches the model that a question should be answered rather than continued with more questions.
+<strong>Instruction tuning</strong> &mdash; supervised fine-tuning on cases of instructions and good responses. This is what teaches the model that a question should be answered rather than continued with more questions.
 
 <strong>Preference optimisation</strong> &mdash; RLHF, DPO or similar. Humans rank pairs of responses, and the model is tuned towards the preferred ones. This shapes helpfulness, tone and refusal behaviour.
 
@@ -334,7 +334,7 @@ Neither changes the underlying method. The model is still predicting the next to
 
 <strong>Why does it repeat itself?</strong> Low temperature and greedy decoding favour high-probability continuations, and repetition is high-probability. Raise the temperature, use top-p, or apply a repetition cost.
 
-<strong>What temperature should I use?</strong> 0 for anything requiring a determinate answer; 0.7 for general use; higher for creative work.
+<strong>What temperature should I use?</strong> 0 for anything needing a determinate answer; 0.7 for general use; higher for creative work.
 
 <strong>Why is output slower than input?</strong> The prompt is processed in one parallel pass; output is one sequential step per token.
 
@@ -346,6 +346,6 @@ Neither changes the underlying method. The model is still predicting the next to
 
 - The model outputs a probability distribution over the next token; generation appends one and repeats.
 - Temperature, top-k and top-p decide how that distribution is sampled &mdash; 0 for determinism, higher for variety.
-- Greedy decoding is not optimal for the sequence, and it tends to repeat.
+- Greedy decoding is not best for the sequence, and it tends to repeat.
 - The KV cache makes generation linear rather than quadratic, at a large memory cost.
 - In-context learning is pattern follow-up; confident falsehoods follow from optimising likelihood rather than truth.

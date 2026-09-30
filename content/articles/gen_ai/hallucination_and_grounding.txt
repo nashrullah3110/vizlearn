@@ -5,7 +5,7 @@ intro: Not a bug in the model. A property of asking a distribution for a fact.
 
 Ask a model something it has barely seen and it does not go quiet. <a href="how_llms_predict_next_word.html" style="color: var(--accent-primary)">Next-token prediction</a> gives a distribution over the whole vocabulary, that distribution sums to one, and decoding picks from it. There is no branch in the architecture where "not enough evidence" lives.
 
-So the mass lands on any is most plausible. A real researcher who works in the area, a plausible-looking citation, an API method that ought to exist. The output is fluent because fluency is what was trained, and being wrong does not make it any less fluent. **Grounding** is the family of techniques that ties a model's output back to verifiable sources. Retrieved documents, tool calls, citations, structured data. Retrieval-augmented generation (RAG) is the most common approach. Fetch relevant passages and include them in the prompt so the model can copy rather than guess. But grounding does not remove hallucination; it redirects it. A grounded model can still misquote a passage, combine facts from two documents into a claim neither supports, or ignore the retrieved context fully when the training distribution pulls harder. This page shows grounded and ungrounded answers side by side, shows the failure modes that survive grounding, and covers the detection techniques. Self-consistency, citation verification, and NLI-based fact checking. That catch what grounding misses.
+So the mass lands on any is most plausible. A real researcher who works in the area, a plausible-looking citation, an API method that ought to exist. The output is fluent because fluency is what was trained, and being wrong does not make it any less fluent. **Grounding** is the family of techniques that ties a model's output back to verifiable sources. Retrieved documents, tool calls, citations, structured data. Retrieval-augmented generation (RAG) is the most common approach. Fetch relevant passages and include them in the prompt so the model can copy rather than guess. But grounding does not remove hallucination; it redirects it. A grounded model can still misquote a passage, combine facts from two documents into a claim neither backs, or ignore the retrieved context fully when the training distribution pulls harder. This page shows grounded and ungrounded answers side by side, shows the failure modes that survive grounding, and covers the detection techniques. Self-consistency, citation verification, and NLI-based fact checking. That catch what grounding misses.
 
 ## Where hallucinations come from
 
@@ -56,7 +56,7 @@ Context:
 Question: {question}
 ```
 
-<strong>Verification.</strong> Check the output against the context afterwards, either with a model asked "is this claim supported by this passage?" or by matching cited spans.
+<strong>Verification.</strong> Check the output against the context afterwards, either with a model asked "is this claim backed by this passage?" or by matching cited spans.
 
 The escape hatch is the part people leave out. A model given no permission to fail will always give something, and what it gives will be plausible.
 
@@ -64,7 +64,7 @@ The escape hatch is the part people leave out. A model given no permission to fa
 
 Two metrics, and they answer different questions:
 
-<strong>Groundedness (faithfulness)</strong> &mdash; is every claim in the answer supported by the retrieved context? Measured by splitting the answer into claims and checking each against the context, usually with a model as judge.
+<strong>Groundedness (faithfulness)</strong> &mdash; is every claim in the answer backed by the retrieved context? Measured by splitting the answer into claims and checking each against the context, often with a model as judge.
 
 <strong>Correctness</strong> &mdash; is the answer right, against a known ground truth?
 
@@ -213,7 +213,7 @@ print("   groundedness check catches and a document-level one does not.")
 
 1. <strong>Start on thin ice.</strong> With evidence at 2.0 the correct name holds about half the mass and three plausible wrong ones hold the other half. So the hallucination rate reads 49.6%. Nothing here is broken; this is what a weak memory looks like written as a distribution.
 2. <strong>Turn the temperature up.</strong> At 2.0 the distribution flattens. The correct answer falls from 50.4% to 36.9% and the hallucination rate climbs past 63%. Temperature is a fluency control that doubles as a hallucination control.
-3. <strong>Ground it.</strong> Tick <strong>Ground It With Retrieval</strong>. The supporting passage is in the prompt, the correct answer takes almost all the mass. And the hallucination rate collapses. This is why <a href="rag.html" style="color: var(--accent-primary)">RAG</a> is the first thing anyone reaches for.
+3. <strong>Ground it.</strong> Tick <strong>Ground It With Retrieval</strong>. The backing passage is in the prompt, the correct answer takes almost all the mass. And the hallucination rate collapses. This is why <a href="rag.html" style="color: var(--accent-primary)">RAG</a> is the first thing anyone reaches for.
 4. <strong>Let it decline.</strong> Turn retrieval off again and tick <strong>Allow &ldquo;I Don&rsquo;t Know&rdquo;</strong>. The top candidate is 50.4%, under the 0.60 threshold, so the system declines outright. The hallucination rate goes to zero, and so does the chance of getting an answer at all.
 5. <strong>Now lower the bar.</strong> Drag <strong>Confidence Threshold</strong> down to 0.45. It answers again, and the hallucination rate comes straight back. A system that never answers is safe and useless; a system that always answers is neither. The threshold is where you choose between them.
 6. <strong>Give it real evidence.</strong> Raise <strong>Evidence In Training</strong> to 5. The correct answer rules without any of the machinery. Models are not unreliable broadly, they are unreliable at the edges of what they saw.
@@ -234,19 +234,19 @@ A model hallucinates because it answers by sampling a distribution that has no s
 
 ## What reduces it, ranked by effect
 
-<strong>1. Better retrieval.</strong> The largest single factor. Most "hallucinations" in a RAG system are the model doing its best with context that did not contain the answer. Measure recall@k first.
+<strong>1. Better retrieval.</strong> The largest single factor. Most "hallucinations" in a RAG system are the model doing its best with context that did not hold the answer. Measure recall@k first.
 
 <strong>2. An explicit "I don't know" option.</strong> Costs one sentence in the prompt and removes a large class of fabrication.
 
-<strong>3. Required citations.</strong> Asking for a source per claim makes the answer checkable, and appears to reduce unsupported claims by itself.
+<strong>3. Needed citations.</strong> Asking for a source per claim makes the answer checkable, and appears to reduce unsupported claims by itself.
 
 <strong>4. Temperature 0.</strong> Sampling adds change, and change in factual output is error.
 
 <strong>5. Smaller, cleaner context.</strong> Contradictory or irrelevant chunks actively cause wrong answers. Fewer, better chunks beat more.
 
-<strong>6. A verification pass.</strong> A second call asking whether each claim is supported. Doubles cost, catches a lot.
+<strong>6. A verification pass.</strong> A second call asking whether each claim is backed. Doubles cost, catches a lot.
 
-<strong>7. Structured output.</strong> Requiring JSON with a `source` field per claim makes unsupported statements structurally awkward to give.
+<strong>7. Structured output.</strong> Needing JSON with a `source` field per claim makes unsupported statements structurally awkward to give.
 
 Note what is <em>not</em> on that list: telling the model to "be accurate" or "do not hallucinate". Instructions of that kind have little measurable effect, because the model is not knowingly inventing.
 
@@ -260,7 +260,7 @@ Some limitations are structural and need a different tool:
 
 <strong>Precise quotations from memory.</strong> Verbatim recall is unreliable. Retrieve the source and quote from it.
 
-<strong>Its own uncertainty.</strong> A model's stated confidence is poorly calibrated, and asking "how sure are you?" gives a plausible number rather than a measured one.
+<strong>Its own doubt.</strong> A model's stated confidence is poorly calibrated, and asking "how sure are you?" gives a plausible number rather than a measured one.
 
 The general principle: <strong>if a fact must be right, it should come from a source in the context, not from the weights.</strong>
 
@@ -268,7 +268,7 @@ The general principle: <strong>if a fact must be right, it should come from a so
 
 <strong>Can hallucination be eliminated?</strong> Not fully with current models. It can be reduced much and, notably, made <em>detectable</em> through citations and verification.
 
-<strong>Do bigger models hallucinate less?</strong> Usually yes on well-covered topics, and they remain confident when wrong. This can make errors harder to spot.
+<strong>Do bigger models hallucinate less?</strong> Often yes on well-covered topics, and they remain confident when wrong. This can make errors harder to spot.
 
 <strong>Does RAG solve it?</strong> It fixes the root cause for domain facts, and only if retrieval works. A RAG system with poor recall hallucinates while appearing grounded.
 

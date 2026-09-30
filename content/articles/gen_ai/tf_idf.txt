@@ -3,21 +3,21 @@ intro: How does TF-IDF decide which words in a document actually matter?
 
 ## The two halves
 
-<p><strong>Term count</strong> is how often a term occurs in a document, usually damped. A word appearing twenty times is not twenty times as relevant. So implementations take a logarithm or normalise by document length.</p>
+<p><strong>Term count</strong> is how often a term occurs in a document, often damped. A word appearing twenty times is not twenty times as relevant. So implementations take a logarithm or normalise by document length.</p>
 
-<p><strong>Inverse document count</strong> is <code>log(N / df)</code>, where <code>df</code> is the number of documents containing the term. When a term is in every document that ratio is 1 and the log is 0. So the term adds nothing at all.</p>
+<p><strong>Inverse document count</strong> is <code>log(N / df)</code>, where <code>df</code> is the number of documents holding the term. When a term is in every document that ratio is 1 and the log is 0. So the term adds nothing at all.</p>
 
 That zero is the elegant part: stopwords are removed by the arithmetic rather than by a list you have to maintain per language.
 
 The product of TF and IDF gives each term a score that is high when the term appears often in the current document and rarely across the corpus. A term that appears in every document gets an IDF of zero and adds nothing, no matter its count. A term that appears in only one document gets a high IDF and rules that document's representation. This is why TF-IDF works well for document retrieval. The terms that distinguish one document from the rest are exactly the terms that carry the most weight.
 
-In scikit-learn, `TfidfVectorizer` computes TF-IDF in one step: it tokenises the text, counts term counts, applies IDF weights, and normalises each document vector to unit length. The normalisation matters because without it, longer documents would have higher scores simply by containing more words. The result is a sparse matrix where each row is a document and each column is a term from the vocabulary.
+In scikit-learn, `TfidfVectorizer` computes TF-IDF in one step: it tokenises the text, counts term counts, applies IDF weights, and normalises each document vector to unit length. The normalisation matters because without it, longer documents would have higher scores simply by holding more words. The result is a sparse matrix where each row is a document and each column is a term from the vocabulary.
 
-TF-IDF is the baseline for text classification, document similarity, keyword extraction and simple search engines. It requires no training data, no GPU. And no neural network &mdash; just a corpus and a few seconds of work. For many practical tasks it performs well enough that a more complex model is not worth the cost. Where it fails is synonymy ("car" and "automobile" are treated as unrelated terms) and polysemy ("bank" the institution and "bank" the riverbank share a vector dimension). Embedding-based methods solve both problems by mapping words to dense vectors rather than sparse term counts. But they trade interpretability and ease for that improvement.
+TF-IDF is the baseline for text classification, document similarity, keyword extraction and simple search engines. It needs no training data, no GPU. And no neural network &mdash; just a corpus and a few seconds of work. For many practical tasks it performs well enough that a more complex model is not worth the cost. Where it fails is synonymy ("car" and "automobile" are treated as unrelated terms) and polysemy ("bank" the institution and "bank" the riverbank share a vector dimension). Embedding-based methods solve both problems by mapping words to dense vectors rather than sparse term counts. But they trade interpretability and ease for that improvement.
 
 ## Where it falls short
 
-<p><strong>No length normalisation by default.</strong> A long document contains more of all of it. So raw TF favours it. Dividing by length overcorrects and favours very short ones. BM25's <code>b</code> parameter exists to tune between the two.</p>
+<p><strong>No length normalisation by default.</strong> A long document holds more of all of it. So raw TF favours it. Dividing by length overcorrects and favours very short ones. BM25's <code>b</code> parameter exists to tune between the two.</p>
 
 <p><strong>Unbounded term count.</strong> TF keeps growing with repetition. BM25 saturates it, so the tenth instance adds far less than the second &mdash; which matches how relevance really behaves.</p>
 
@@ -40,7 +40,7 @@ idf(the) = log(4 / 4) = 0.00
 ```
 
 
-A document containing <em>cat</em> twice scores (1 + log 2) &times; 0.69 = 1.17. A document containing it once scores 0.69. And a document containing <em>the</em> ten times still scores zero for that term, because anything times by zero is zero.
+A document holding <em>cat</em> twice scores (1 + log 2) &times; 0.69 = 1.17. A document holding it once scores 0.69. And a document holding <em>the</em> ten times still scores zero for that term, because anything times by zero is zero.
 
 That last line is the one worth internalising. The stopword is not filtered, thresholded or special-cased anywhere. It is removed because the logarithm of one is zero. This is a much more meeting reason than a hand-maintained list. And it adapts by itself to a corpus where <em>patient</em> or <em>invoice</em> is in effect a stopword.
 
@@ -66,13 +66,13 @@ TF-IDF is rarely the ranker any more. <a href="bm25_and_sparse_retrieval.html">B
 
 ## Weighting words by how informative they are
 
-Counting words treats "the" and "encephalopathy" as equally interesting. TF-IDF corrects that by multiplying two terms:
+Counting words treats "the" and "encephalopathy" as equally notable. TF-IDF corrects that by multiplying two terms:
 
 <p class="mono-font">TF-IDF(t, d) = TF(t, d) &times; log(N / DF(t))</p>
 
 <strong>Term count</strong> &mdash; how often the term appears in this document. More mentions, more relevance.
 
-<strong>Inverse document count</strong> &mdash; the logarithm of the total number of documents divided by how many contain the term. Rare terms score high; ubiquitous terms score near zero.
+<strong>Inverse document count</strong> &mdash; the logarithm of the total number of documents divided by how many hold the term. Rare terms score high; ubiquitous terms score near zero.
 
 Worked through with 1,000 documents:
 
@@ -83,7 +83,7 @@ Worked through with 1,000 documents:
 |"parental"|30|log(33) = 3.50|
 |"encephalopathy"|2|log(500) = 6.21|
 
-A term in every document adds <strong>exactly nothing</strong>, any its count. That is automatic stop-word removal, derived from the corpus rather than from a list. And it is the single most useful property of the method.
+A term in every document adds <strong>exactly nothing</strong>, any its count. That is automatic stop-word cutting, derived from the corpus rather than from a list. And it is the single most useful property of the method.
 
 ## Why the logarithm
 
@@ -91,11 +91,11 @@ Without it, a term in 1 document out of 1,000 would get a weight of 1,000 and a 
 
 The logarithm compresses that: 6.9 against 4.6. Rare terms still win, and not by an absurd margin.
 
-The same reasoning motivates <strong>sublinear term count</strong>: using `1 + log(TF)` instead of the raw count,. This is because a term appearing 50 times is not 50 times more relevant than one appearing once. Scikit-learn exposes this as `sublinear_tf=True`, and it usually helps.
+The same reasoning motivates <strong>sublinear term count</strong>: using `1 + log(TF)` instead of the raw count,. This is because a term appearing 50 times is not 50 times more relevant than one appearing once. Scikit-learn exposes this as `sublinear_tf=True`, and it often helps.
 
 Two more refinements that matter in practice:
 
-<strong>L2 normalisation</strong> of each document's vector, so long documents do not dominate simply by containing more words. Applied by default in most implementations.
+<strong>L2 normalisation</strong> of each document's vector, so long documents do not dominate simply by holding more words. Applied by default in most implementations.
 
 <strong>Smoothing</strong> the IDF denominator (`log(1 + N/DF)`) so a term appearing in no documents does not divide by zero.
 
@@ -121,7 +121,7 @@ model.fit(train_texts, train_labels)
 
 That is a strong text classifier in eight lines. It trains in seconds on tens of thousands of documents, runs on a CPU, and is fully interpretable. The model's coefficients map right to words, so you can read what it learned.
 
-<strong>`min_df` is doing the heavy lifting.</strong> Dropping terms that appear in fewer than three documents usually removes most of the vocabulary and almost none of the signal,. This is because the long tail is mostly typos and one-off tokens.
+<strong>`min_df` is doing the heavy lifting.</strong> Dropping terms that appear in fewer than three documents often removes most of the vocabulary and almost none of the signal,. This is because the long tail is mostly typos and one-off tokens.
 
 <strong>`ngram_range=(1, 2)`</strong> adds bigrams, which is what lets the model represent "not good". The single most valuable addition for sentiment tasks.
 
@@ -345,13 +345,13 @@ TF-IDF weights a term by how often it appears here times how rare it is everywhe
 
 ## What it cannot do
 
-<strong>No sense of similar words.</strong> "Excellent" and "superb" are unrelated columns. A model trained on documents containing one learns nothing about documents containing the other. This is the basic limitation, and it is what embeddings fix.
+<strong>No sense of similar words.</strong> "Excellent" and "superb" are unrelated columns. A model trained on documents holding one learns nothing about documents holding the other. This is the basic limitation, and it is what embeddings fix.
 
 <strong>No word order beyond n-grams.</strong> Bigrams capture adjacent pairs; anything longer-range is invisible.
 
 <strong>No handling of unseen vocabulary.</strong> A term absent from the training corpus has no column. So it adds nothing at prediction time.
 
-<strong>Very high dimensionality.</strong> Fifty thousand features, almost all zero per document. Manageable with sparse matrices and sparse-aware models, and it rules out anything that requires dense input.
+<strong>Very high dimensionality.</strong> Fifty thousand features, almost all zero per document. Manageable with sparse matrices and sparse-aware models, and it rules out anything that needs dense input.
 
 |&nbsp;|TF-IDF|Embeddings|
 |---|---|---|
@@ -368,11 +368,11 @@ That table is the argument for using both, which is exactly what hybrid retrieva
 
 <strong>As the first baseline for any text classification task.</strong> It is fast enough to try in five minutes. And it often comes within a few points of a fine-tuned transformer on topic classification with adequate labels. Not measuring it means not knowing whether the transformer was worth it.
 
-<strong>Keyword retrieval,</strong> usually in its refined form BM25, which adds term-count saturation and document-length normalisation. Every search engine is built on this.
+<strong>Keyword retrieval,</strong> often in its refined form BM25, which adds term-count saturation and document-length normalisation. Every search engine is built on this.
 
 <strong>Keyness review</strong> &mdash; comparing two corpora to find the terms that distinguish them. Far more informative than a word cloud.
 
-<strong>Interpretable models</strong> in regulated settings, where "the model weighted these words" is a required reason.
+<strong>Interpretable models</strong> in regulated settings, where "the model weighted these words" is a needed reason.
 
 <strong>Low-resource environments</strong> &mdash; no GPU, no model download, no inference latency.
 
@@ -382,13 +382,13 @@ BM25 is TF-IDF with two corrections, and it is what you should use for retrieval
 
 <strong>Term-count saturation.</strong> The contribution of repeated instances flattens, controlled by `k₁` (around 1.2). A document mentioning a term twenty times is not twenty times more relevant.
 
-<strong>Document-length normalisation</strong> relative to the corpus average, controlled by `b` (around 0.75). A long document will contain most query terms by chance.
+<strong>Document-length normalisation</strong> relative to the corpus average, controlled by `b` (around 0.75). A long document will hold most query terms by chance.
 
 Both corrections address ways raw TF-IDF over-rewards documents. For classification features TF-IDF is fine; for ranking search results, BM25 is meaningfully better.
 
 ## Questions people ask
 
-<strong>Do I need stop-word removal?</strong> Not really &mdash; IDF drives ubiquitous terms to zero. Removing them shrinks the vocabulary, which is the only gain.
+<strong>Do I need stop-word cutting?</strong> Not really &mdash; IDF drives ubiquitous terms to zero. Removing them shrinks the vocabulary, which is the only gain.
 
 <strong>Should I stem or lemmatise?</strong> For TF-IDF, yes &mdash; it pools evidence across word forms and shrinks the vocabulary. Never for transformers.
 
@@ -403,7 +403,7 @@ Both corrections address ways raw TF-IDF over-rewards documents. For classificat
 ## Recap in one screen
 
 - TF-IDF multiplies how often a term appears here by how rare it is across the corpus.
-- A term in every document gets an IDF of zero. Automatic, corpus-derived stop-word removal.
+- A term in every document gets an IDF of zero. Automatic, corpus-derived stop-word cutting.
 - The logarithm stops rare terms getting absurd weights; sublinear TF does the same for repetition.
 - TF-IDF plus logistic regression is a fast, interpretable baseline worth measuring before anything heavier.
 - It cannot relate similar words, which is what embeddings add. And BM25 is the version to use for retrieval.

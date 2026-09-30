@@ -9,7 +9,7 @@ So retrieval metrics are evaluated <strong>at a cutoff k</strong>. The number of
 
 Precision@k asks: of the k results returned, how many are relevant? Recall@k asks: of all the relevant documents in the corpus, how many appeared in the top k? Both are simple ratios, and both ignore position within the list — a relevant document at rank 1 and one at rank k count equally.
 
-MRR (mean reciprocal rank) cares about position. For each query, it finds the rank of the first relevant result and takes the reciprocal: 1 for rank 1, 0.5 for rank 2, 0.1 for rank 10. Averaged over queries, it tells you how far down the list a user usually has to look to find the first useful result. It is the right metric when the user needs exactly one answer and will stop as soon as they find it.
+MRR (mean reciprocal rank) cares about position. For each query, it finds the rank of the first relevant result and takes the reciprocal: 1 for rank 1, 0.5 for rank 2, 0.1 for rank 10. Averaged over queries, it tells you how far down the list a user often has to look to find the first useful result. It is the right metric when the user needs exactly one answer and will stop as soon as they find it.
 
 NDCG (normalised discounted cumulative gain) is the most general metric. It assigns a graded relevance score to each result (not just relevant/irrelevant), discounts it by position (a logarithmic discount, so rank 1 matters most), sums the discounted scores, and normalises by the ideal ranking. The result is a number between 0 and 1 where 1 means the system returned the best doable ranking. NDCG is the standard metric for search engines and recommendation systems. And it is the metric most RAG pipelines should optimise if they can afford graded relevance labels.
 
@@ -21,7 +21,7 @@ recall@k&nbsp;&nbsp;&nbsp; = (relevant in top k) / (total relevant)
 
 Precision@k asks how much of what you returned was useful. Recall@k asks how much of what exists you managed to find.
 
-With 3 relevant documents in the collection and a top-5 list containing 2 of them. Precision@5 = 2/5 = 0.4, recall@5 = 2/3 = 0.67.
+With 3 relevant documents in the collection and a top-5 list holding 2 of them. Precision@5 = 2/5 = 0.4, recall@5 = 2/3 = 0.67.
 
 Both ignore order fully &mdash; a relevant document at position 1 and at position 5 count identically. For a RAG pipeline feeding a fixed number of chunks to a model that may be the right simplification; for a search results page it is not.
 
@@ -29,7 +29,7 @@ Both ignore order fully &mdash; a relevant document at position 1 and at positio
 
 <strong>MRR</strong> (mean reciprocal rank) uses only the position of the <em>first</em> relevant result, averaged over queries:<p>MRR = mean(1 / rank of first relevant)</p><p>First position scores 1.0, second 0.5, third 0.33. It is the right metric when the user needs one good answer and will stop reading once they have it. Question answering, navigational search. And it on purpose ignores all of it after the first hit.</p><strong>NDCG</strong> (normalised discounted cumulative gain) is the most complete of the four. It handles <em>graded</em> relevance rather than a binary label, applies a logarithmic discount so later positions add less, and normalises by the score of the ideal ranking so the result lands in [0, 1] and is comparable across queries.<p>Use NDCG when relevance comes in degrees and the whole ordering matters; use MRR when only the first hit does.</p>
 
-## Measuring the stage that usually fails
+## Measuring the stage that often fails
 
 Almost all RAG failures are retrieval failures: the right chunk never reached the model. Debugging the prompt while recall is 0.4 is wasted effort. So retrieval needs its own metrics, measured apart.
 
@@ -84,9 +84,9 @@ That distinction &mdash; find versus rank &mdash; is the single most useful thin
 
 MRR is right when there is in effect one right answer and its position matters &mdash; which describes most question answering. It is harsh on rank 2 versus rank 1, which is arguably correct given how much more attention a model pays to the first chunk.
 
-<strong>nDCG@k</strong> handles <em>graded</em> relevance: a document can be highly relevant, somewhat relevant or irrelevant. And the metric discounts gains logarithmically by position. It is the standard in data retrieval research and requires graded judgements. This are more expensive to collect than binary ones.
+<strong>nDCG@k</strong> handles <em>graded</em> relevance: a document can be highly relevant, somewhat relevant or irrelevant. And the metric discounts gains logarithmically by position. It is the standard in data retrieval research and needs graded judgements. This are more expensive to collect than binary ones.
 
-<strong>Precision@k</strong> matters less for RAG than the others, because passing a few irrelevant chunks alongside the right one is usually tolerable. It matters when context budget is tight or when irrelevant context measurably degrades answers &mdash; which it does.
+<strong>Precision@k</strong> matters less for RAG than the others, because passing a few irrelevant chunks alongside the right one is often tolerable. It matters when context budget is tight or when irrelevant context measurably degrades answers &mdash; which it does.
 
 ## Interactive Exploration Guide
 
@@ -97,7 +97,7 @@ MRR is right when there is in effect one right answer and its position matters &
 
 ## Choosing one for a RAG pipeline
 
-For retrieval feeding a language model, <strong>recall@k</strong> is usually the metric that matters most. The model can ignore an irrelevant chunk among the k it receives. But it cannot use a relevant chunk that was never retrieved. A missed document is unrecoverable, whereas a spurious one is merely noise.
+For retrieval feeding a language model, <strong>recall@k</strong> is often the metric that matters most. The model can ignore an irrelevant chunk among the k it receives. But it cannot use a relevant chunk that was never retrieved. A missed document is unrecoverable, whereas a spurious one is merely noise.
 
 Set k to the number of chunks you really pass to the model and measure recall at that value. Then use precision or NDCG as a secondary check. Since packing the context with irrelevant material does cost tokens and can distract the model.
 
@@ -117,11 +117,11 @@ Retrieval returns a ranking, so metrics are computed at a cutoff k and differ ma
 
 This is the work that makes all of it else doable, and there are three routes.
 
-<strong>Hand-written.</strong> Domain experts write questions and identify the answering chunk. Highest quality, slowest. 50 questions is enough to start and enough to catch large regressions.
+<strong>Hand-written.</strong> Domain experts write questions and find the answering chunk. Highest quality, slowest. 50 questions is enough to start and enough to catch large regressions.
 
 <strong>Made from documents.</strong> For each chunk, ask a model to write a question it answers. Fast, and it gives questions phrased like the document, which flatters retrieval. The vocabulary gap that causes real failures is absent by construction.
 
-<strong>Mined from logs.</strong> Real user queries paired with the documents that were clicked, cited or rated helpful. The most realistic, and it requires a system already in production.
+<strong>Mined from logs.</strong> Real user queries paired with the documents that were clicked, cited or rated helpful. The most realistic, and it needs a system already in production.
 
 The practical compromise: generate a first set to get moving. Then replace it with mined real queries as they become available, and keep a hand-written set of known-hard cases as a regression suite.
 

@@ -9,7 +9,7 @@ Take “The <strong>bank</strong> was steep and muddy.” At the word <em>bank</
 
 The fix is to run two passes &mdash; one forward, one backward &mdash; and concatenate their outputs at every position. The forward pass gives a hidden state that encodes all of it to the left; the backward pass gives a hidden state that encodes all of it to the right. Stacking the two gives each position a representation that sees the entire sequence.
 
-This is the idea behind the bidirectional layer. It doubles the hidden dimension, because it concatenates two free states. And it doubles the parameter count, because the forward and backward cells learn separate weights. The accuracy gain is large for tasks like named-entity recognition, part-of-speech tagging, sentiment classification and question answering. Any task where the label at position t depends on tokens that come after t. The cost is that the full sequence must be available before the layer can run. This rules out autoregressive generation: you cannot predict the next word with a backward pass that requires words you have not made yet. That constraint is why GPT-style models use only a forward pass and BERT-style models use bidirectional layers.
+This is the idea behind the bidirectional layer. It doubles the hidden dimension, because it concatenates two free states. And it doubles the parameter count, because the forward and backward cells learn separate weights. The accuracy gain is large for tasks like named-entity recognition, part-of-speech tagging, sentiment classification and question answering. Any task where the label at position t depends on tokens that come after t. The cost is that the full sequence must be available before the layer can run. This rules out autoregressive generation: you cannot predict the next word with a backward pass that needs words you have not made yet. That constraint is why GPT-style models use only a forward pass and BERT-style models use bidirectional layers.
 
 ## How the two passes combine
 
@@ -27,7 +27,7 @@ A forward LSTM at word 5 knows words 1 to 5. A bidirectional layer runs a second
 
 <p class="mono-font">h&#7511; = [h&#7511;<sup>&rarr;</sup> . H&#7511;<sup>&larr;</sup>]</p>
 
-So the representation at word 5 now contains what came before it <em>and</em> what came after. The output width doubles: 256 hidden units in each direction gives 512-dimensional outputs.
+So the representation at word 5 now holds what came before it <em>and</em> what came after. The output width doubles: 256 hidden units in each direction gives 512-dimensional outputs.
 
 Why it helps is easiest to see with an ambiguous word:
 
@@ -39,7 +39,7 @@ The same argument applies to named entities ("Washington" as a person or a place
 
 ## The hard constraint
 
-Bidirectional layers require the <strong>entire sequence to be available before handling starts</strong>. That rules them out for two important cases:
+Bidirectional layers need the <strong>entire sequence to be available before handling starts</strong>. That rules them out for two important cases:
 
 <strong>Generation.</strong> Predicting the next word cannot use the next word. A bidirectional language model would have access to the answer. This makes training trivial and inference not doable.
 
@@ -196,9 +196,9 @@ print("   for most of a decade before encoders replaced it.")
 
 ## When you cannot use it
 
-A bidirectional layer requires the <em>entire</em> sequence before it can give any output, because the backward pass starts at the end. That rules it out when the future truly is not available:
+A bidirectional layer needs the <em>entire</em> sequence before it can give any output, because the backward pass starts at the end. That rules it out when the future truly is not available:
 
-- <strong>Language modelling and text generation.</strong> Predicting the next token while having already read it is not a prediction. A bidirectional model here achieves perfect accuracy and learns nothing. The answer leaks in through the backward pass.
+- <strong>Language modelling and text generation.</strong> Predicting the next token while having already read it is not a prediction. A bidirectional model here reaches perfect accuracy and learns nothing. The answer leaks in through the backward pass.
 - <strong>Real-time and streaming uses.</strong> Live transcription cannot wait for the end of the utterance.
 - <strong>Autoregressive decoding of any kind</strong>, where output is gave one token at a time.
 
@@ -209,7 +209,7 @@ Where the full sequence <em>is</em> available &mdash; classification, tagging, n
 - <strong>Forgetting the output doubles.</strong> The most common bug. The following layer is sized for h instead of 2h and the shapes do not match.
 - <strong>Using it for generation.</strong> Training looks superb and the model is useless, because it has been shown the answer.
 - <strong>Padding without masking.</strong> Worse here than in a unidirectional model. The backward pass <em>starts</em> in the padding. So an unmasked model begins reading noise.
-- <strong>Assuming it doubles quality.</strong> It doubles cost. The accuracy gain is real but usually a few points. And on some tasks a wider unidirectional layer is the better use of the same parameters.
+- <strong>Assuming it doubles quality.</strong> It doubles cost. The accuracy gain is real but often a few points. And on some tasks a wider unidirectional layer is the better use of the same parameters.
 
 ## The short version
 
@@ -223,9 +223,9 @@ A bidirectional layer runs free forward and backward recurrent passes and concat
 
 <strong>No latency gain from parallelism.</strong> The two directions are free of each other and can run concurrently. But each is still strictly sequential internally.
 
-<strong>Full input required,</strong> which is the real cost rather than the arithmetic.
+<strong>Full input needed,</strong> which is the real cost rather than the arithmetic.
 
-Whether the accuracy gain justifies it depends on the task. For tagging and span extraction, where the right context is truly needed, the gain is usually large. For document-level topic classification, where the signal is distributed and redundant, it is often marginal.
+Whether the accuracy gain justifies it depends on the task. For tagging and span extraction, where the right context is truly needed, the gain is often large. For document-level topic classification, where the signal is distributed and redundant, it is often marginal.
 
 ## The transformer the same
 
@@ -255,12 +255,12 @@ So "bidirectional layer" is largely a recurrent-era concept. The idea survives; 
 
 <strong>Does bidirectionality help every task?</strong> No. It helps most where right context disambiguates. Tagging, entity recognition, span extraction. And least on tasks with redundant global signal.
 
-<strong>Can I stack bidirectional layers?</strong> Yes, and each layer's doubled output feeds the next. Two is usually the practical limit.
+<strong>Can I stack bidirectional layers?</strong> Yes, and each layer's doubled output feeds the next. Two is often the practical limit.
 
 ## Recap in one screen
 
 - A bidirectional layer runs a second recurrent pass backwards and concatenates the states.
 - Each position then has both left and right context, which resolves ambiguity that neither direction can alone.
-- It requires the complete input, so it is unusable for generation and streaming.
+- It needs the complete input, so it is unusable for generation and streaming.
 - Output width doubles, and the two final states correspond to opposite ends of the sequence.
 - In transformers, bidirectionality is the default and a causal mask is what creates the unidirectional case.

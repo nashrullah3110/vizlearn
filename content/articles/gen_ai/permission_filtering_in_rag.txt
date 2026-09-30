@@ -9,11 +9,11 @@ Over-fetching &mdash; retrieve 100, filter, keep 10 &mdash; makes it less likely
 
 The core problem is that vector similarity search and access control operate on different axes. The index ranks by semantic relevance; the access layer filters by who is allowed to see what. Combining them correctly is a systems problem, not a modelling problem, and there are three approaches.
 
-Pre-filtering restricts the search space before retrieval: only documents the user is allowed to see are candidates. This guarantees the result set is clean and the right size. But it requires the vector index to support metadata filtering fast. Not all indexes do — a naive implementation scans the full corpus and checks permissions per document. This is as slow as brute-force search.
+Pre-filtering restricts the search space before retrieval: only documents the user is allowed to see are candidates. This guarantees the result set is clean and the right size. But it needs the vector index to support metadata filtering fast. Not all indexes do — a naive implementation scans the full corpus and checks permissions per document. This is as slow as brute-force search.
 
 Post-filtering retrieves by relevance first and removes forbidden documents afterwards. It is simple to implement but unreliable: the result set shrinks unpredictably. And the generator must work with any remains. Increasing k helps probabilistically but never guarantees enough permitted results.
 
-Hybrid approaches retrieve a large candidate set, filter it. Then backfill from a wider search if too few documents survive. This is more complex but gives a consistent result size. The trade-off is latency: two retrieval rounds instead of one. And the backfill query may not be as well-targeted as the first.
+Hybrid approaches retrieve a large candidate set, filter it. Then backfill from a wider search if too few documents survive. This is more complex but gives a steady result size. The trade-off is latency: two retrieval rounds instead of one. And the backfill query may not be as well-targeted as the first.
 
 Whichever approach you choose, the permission model itself must be correct. A document tagged with the wrong access group will be served to unauthorised users silently and confidently. Permission metadata must be propagated from the source system at indexing time and kept in sync when access rules change.
 
@@ -37,7 +37,7 @@ Pre-filtering is the correct behaviour and it is truly hard to implement,. This 
 
 Walking an HNSW graph while skipping most nodes can <strong>disconnect the traversal</strong>. The search reaches a region where every neighbour is filtered out and stalls. This returns far fewer results than asked for even though plenty of permitted documents exist elsewhere in the graph.
 
-The strategies databases use, all with trade-offs: filtered traversal that keeps searching past excluded nodes; per-tenant sub-indexes. This are clean and expensive once tenants number in the thousands; and falling back to a flat scan when the filter is selective &mdash;. This is often truly fastest. Since a user with access to 0.1% of a million documents is a thousand-vector brute force.
+The plans databases use, all with trade-offs: filtered traversal that keeps searching past excluded nodes; per-tenant sub-indexes. This are clean and expensive once tenants number in the thousands; and falling back to a flat scan when the filter is selective &mdash;. This is often truly fastest. Since a user with access to 0.1% of a million documents is a thousand-vector brute force.
 
 ## Getting the model right, and failing closed
 
@@ -55,7 +55,7 @@ A RAG system retrieves documents and puts them in a prompt. If the retrieval doe
 
 That is a data breach with a helpful tone. And it is the most consequential thing that can go wrong in an enterprise retrieval system. Unlike a hallucination, it is not a quality problem; it is a security one.
 
-The requirement is straightforward to state and easy to implement incorrectly: <strong>the set of documents considered must be exactly the set this user may read</strong>.
+The requirement is straightforward to state and easy to implement incorrectly: <strong>the set of documents thought of must be exactly the set this user may read</strong>.
 
 ## Where the filter has to be applied
 
@@ -63,9 +63,9 @@ There are three places it could go, and only one is correct.
 
 <strong>After generation</strong> &mdash; check the answer for leaked content. Hopeless: the content is already in the output, and paraphrase makes detection unreliable.
 
-<strong>After retrieval, before the prompt</strong> &mdash; retrieve k documents, discard the ones the user cannot see, pass the rest. Better, and still wrong in two ways: the unauthorised documents taken slots. So fewer authorised ones were considered; and their content has already been loaded into the use's memory.
+<strong>After retrieval, before the prompt</strong> &mdash; retrieve k documents, discard the ones the user cannot see, pass the rest. Better, and still wrong in two ways: the unauthorised documents taken slots. So fewer authorised ones were thought of; and their content has already been loaded into the use's memory.
 
-<strong>Inside the search</strong> &mdash; the index only ever considers documents matching the user's permissions. This is the correct answer, and it requires the store to support filtered search.
+<strong>Inside the search</strong> &mdash; the index only ever thinks of documents matching the user's permissions. This is the correct answer, and it needs the store to support filtered search.
 
 ```python
 results = store.search(
@@ -241,7 +241,7 @@ print("   that a user CANNOT retrieve a document, run on every deploy.")
 
 1. Drop <strong>corpus visible</strong> to 5%. Post-filtering returns almost nothing while pre-filtering still returns k. The control fails worst for the most restricted user.
 2. Raise <strong>over-fetch</strong> to 500. The shortfall shrinks and never disappears, which is why over-fetching is a mitigation rather than a fix.
-3. Set visibility to 100%. All three strategies agree, which is exactly why this bug survives testing on an admin account.
+3. Set visibility to 100%. All three plans agree, which is exactly why this bug survives testing on an admin account.
 
 ## What to recall
 
@@ -262,7 +262,7 @@ An other to storing ACLs in the index is to resolve them at query time against t
 
 The trade is sharp: resolving at query time is always correct and forces post-filtering. This brings back the slot-wastage problem.
 
-The pragmatic combination used in practice is <strong>both</strong>: filter inside the search using indexed ACLs to get a correct-enough candidate set fast. Then verify the final selection against the source system before showing anything. The index filter does the heavy lifting; the verification catches the staleness window.
+The pragmatic combination used in practice is <strong>both</strong>: filter inside the search using indexed ACLs to get a correct-enough candidate set fast. Then verify the final choice against the source system before showing anything. The index filter does the heavy lifting; the verification catches the staleness window.
 
 ## Failure modes to test for by name
 
