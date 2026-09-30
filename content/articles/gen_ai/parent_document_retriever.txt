@@ -3,7 +3,7 @@ intro: Index the needle, return the haystack it came from.
 
 ## The problem it solves
 
-<a href="chunking_strategies_for_rag.html" style="color: var(--accent-primary)">Chunking</a> forces a trade-off. A small chunk concentrates the query's terms, so its similarity score is high and the match is precise. But on its own it may be a fragment that answers nothing. A large chunk carries the surrounding context that makes an answer possible, but dilutes the matching terms among hundreds of unrelated words. So it scores worse and may not be retrieved at all. A parent document retriever refuses the trade by indexing small child chunks for precision but returning the larger parent document for context. Each document is split into children (typically 200&ndash;400 tokens), and each child stores a pointer to its parent (typically 1,000&ndash;2,000 tokens). When a child wins the similarity search, the retriever looks up the parent and passes that to the language model instead. Two children from the same parent collapse into one context passage. So the model's context window is not spent sending the same document twice. In LangChain the implementation uses an in-memory or persistent `docstore` that maps child ids to parent documents, alongside a vector store that indexes only the children. This page splits a sample document into parents and children, runs a query, shows which child matched and which parent was returned, and covers the parent-size tradeoff.
+<a href="chunking_strategies_for_rag.html" style="color: var(--accent-primary)">Chunking</a> forces a trade-off. A small chunk concentrates the query's terms, so its similarity score is high and the match is precise. But on its own it may be a fragment that answers nothing. A large chunk carries the surrounding context that makes an answer possible, but dilutes the matching terms among hundreds of unrelated words. So it scores worse and may not be retrieved at all. A parent document retriever refuses the trade by indexing small child chunks for precision but returning the larger parent document for context. Each document is split into children (usually 200&ndash;400 tokens), and each child stores a pointer to its parent (usually 1,000&ndash;2,000 tokens). When a child wins the similarity search, the retriever looks up the parent and passes that to the language model instead. Two children from the same parent collapse into one context passage. So the model's context window is not spent sending the same document twice. In LangChain the implementation uses an in-memory or persistent `docstore` that maps child ids to parent documents, alongside a vector store that indexes only the children. This page splits a sample document into parents and children, runs a query, shows which child matched and which parent was returned, and covers the parent-size tradeoff.
 
 ## Searching one thing, returning another
 
@@ -48,7 +48,7 @@ So the retrieval step must:
 3. <strong>Deduplicate by parent id</strong>, keeping the best child's score.
 4. Return the distinct parents, ordered by that score.
 
-That means retrieving more children than the number of parents you want &mdash; ask for 20 children to end up with 5 distinct parents. A common implementation mistake is retrieving 5 children and returning 2 parents, silently halving the context passed to the model.
+That means retrieving more children than the number of parents you want. Ask for 20 children to end up with 5 distinct parents. A common implementation mistake is retrieving 5 children and returning 2 parents, silently halving the context passed to the model.
 
 ```python
 def retrieve_parents(query, k_children=20, n_parents=5):
@@ -301,7 +301,7 @@ print("   overflow it.")
 
 ## Guided experiments
 
-1. <strong>Read the child list at chunk size 8.</strong> The winning chunk is a short fragment. Read it alone and ask whether it actually answers the question &mdash; it names a duration but not what the duration applies to.
+1. <strong>Read the child list at chunk size 8.</strong> The winning chunk is a short fragment. Read it alone and ask whether it actually answers the question. It names a duration but not what the duration applies to.
 2. <strong>Turn off "Return the parent".</strong> The model now receives only those fragments. The word count drops sharply, and so does the chance of a usable answer.
 3. <strong>Turn it back on and watch the passage count.</strong> Two separate child chunks hit the same document, but only one parent passage is returned. The deduplication is doing real work.
 4. <strong>Drag the chunk size up to 24.</strong> Each child is now most of its parent. The top score actually goes <em>up</em> &mdash; a longer window catches more of the query's words &mdash; but the selection gets worse: the second slot now goes to a different product's document. And the model is sent 53 words instead of 29 for the same question.
@@ -351,7 +351,7 @@ A related variant, <strong>sentence-window retrieval</strong>, indexes single se
 
 <strong>Long structured documents</strong> &mdash; handbooks, manuals, legal texts, standards. The structure gives natural parents and the length makes flat chunking painful.
 
-<strong>Questions whose answers need surrounding context</strong> to be interpreted &mdash; conditions, exceptions, definitions that appear earlier in the section.
+<strong>Questions whose answers need surrounding context</strong> to be interpreted. Conditions, exceptions, definitions that appear earlier in the section.
 
 <strong>Corpora with heavy cross-referencing</strong>, where a passage says "as described above".
 
@@ -361,11 +361,11 @@ Where it helps least: short documents that are already about one thing (FAQ entr
 
 <strong>Is this the same as sentence-window retrieval?</strong> The same pattern at a different granularity. Sentence windows index single sentences and expand by neighbours; parent-child indexes small chunks and returns sections.
 
-<strong>How many children should I retrieve?</strong> Enough that deduplication still leaves the number of parents you want &mdash; typically 3&ndash;5&times; as many.
+<strong>How many children should I retrieve?</strong> Enough that deduplication still leaves the number of parents you want &mdash; usually 3&ndash;5&times; as many.
 
 <strong>Should parents overlap?</strong> Usually not, if they are structural sections. Overlapping fixed windows waste context.
 
-<strong>Can I rerank?</strong> Yes, and rerank the <em>children</em> before mapping to parents &mdash; the child is the unit whose relevance you measured.
+<strong>Can I rerank?</strong> Yes, and rerank the <em>children</em> before mapping to parents. The child is the unit whose relevance you measured.
 
 <strong>Does it work with hybrid search?</strong> Yes. Run both retrievers over the children, fuse the ranks, then map to parents.
 

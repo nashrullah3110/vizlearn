@@ -13,7 +13,7 @@ The decision to shard usually comes from corpus size. A single HNSW index with 1
 
 Sharding introduces two costs that a single-machine index does not have. First, network latency: the slowest shard decides response time, so an unbalanced split or a slow replica creates a tail-latency problem that did not exist before. Second, recall can drop if the sharding strategy separates documents that should have been compared together. For example, placing all science articles on one shard and all history on another means a cross-domain query may miss relevant results from the shard it does not emphasise.
 
-Choosing a sharding strategy means choosing which of these costs you accept. Random sharding distributes load evenly and preserves recall, but every shard must be queried every time. Semantic sharding groups related documents and allows routing queries to a subset of shards, reducing fan-out at the risk of missing cross-cluster matches.
+Choosing a sharding strategy means choosing which of these costs you accept. Random sharding distributes load evenly and preserves recall, but every shard must be queried every time. Semantic sharding groups related documents and allows routing queries to a subset of shards. This reduces fan-out at the risk of missing cross-cluster matches.
 
 ## Shard randomly
 
@@ -25,7 +25,7 @@ The fix if you must shard semantically is to over-fetch from every shard. This c
 
 ## Tail latency, and the merge
 
-Scatter-gather waits for the slowest shard, so p99 response time is roughly the p99 of <em>any</em> shard. Add shards and the chance one is slow rises &mdash; the classic result is that latency gets worse as you scale out, not better.
+Scatter-gather waits for the slowest shard, so p99 response time is roughly the p99 of <em>any</em> shard. Add shards and the chance one is slow rises. The classic result is that latency gets worse as you scale out, not better.
 
 Mitigations: hedged requests (ask two replicas, take the first answer), a deadline after which a late shard is dropped and the degraded result served, and keeping shard counts modest.
 
@@ -45,7 +45,7 @@ Sharding splits data; replication copies it. They solve different problems, and 
 
 Once shards exist, so does partial failure. Scatter-gather waits for everyone, so a single slow or dead shard degrades every query. The practical answers are a <strong>deadline</strong> &mdash; serve what returned in time and mark the result degraded &mdash; and <strong>hedged requests</strong>, asking two replicas and taking whichever answers first. This trades a few percent extra load for a much better tail.
 
-Decide explicitly whether a degraded answer is acceptable. For search it usually is. For a RAG answer that will be presented as authoritative, silently dropping a shard means silently dropping evidence. And the user has no way to know.
+Decide by name whether a degraded answer is acceptable. For search it usually is. For a RAG answer that will be presented as authoritative, silently dropping a shard means silently dropping evidence. And the user has no way to know.
 
 ## When one machine is not enough
 
@@ -312,13 +312,13 @@ That last point is worth trying before distributing at all: <strong>quantisation
 
 <strong>Does sharding hurt recall?</strong> Random sharding with per-shard top-k does not. Semantic sharding can, if the answer is in an unqueried shard.
 
-<strong>How do I handle multi-tenancy?</strong> Shard by tenant where volumes allow &mdash; it gives natural isolation and cheap filtering. Very many small tenants are better served by one index with a tenant field.
+<strong>How do I handle multi-tenancy?</strong> Shard by tenant where volumes allow. It gives natural isolation and cheap filtering. Very many small tenants are better served by one index with a tenant field.
 
 <strong>What about BM25 across shards?</strong> IDF becomes shard-local. Acceptable with random sharding; distribute global term statistics if the skew matters.
 
 ## Recap in one screen
 
-- Shard for capacity, replicate for throughput and availability &mdash; most systems need both.
+- Shard for capacity, replicate for throughput and availability. Most systems need both.
 - Shard by metadata where a natural partition exists, so a query touches one shard instead of all of them.
 - In scatter-gather, each shard must return its own top k, and latency is set by the slowest shard.
 - Enforce permission filters inside each shard's search, never after the merge.

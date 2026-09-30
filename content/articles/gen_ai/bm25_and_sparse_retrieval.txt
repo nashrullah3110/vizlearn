@@ -3,7 +3,7 @@ intro: Keyword search, done properly.
 
 ## What this is
 
-Before <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">dense vector search</a>, and still running alongside it in most real systems, is sparse lexical search: score a document by which query terms it contains, weighted by how informative each term is. BM25 is the version of this idea that actually works well. And it needs no training, no GPU, and no embedding model. BM25 scores a document by summing a term-weight for each query word that appears in it. The term weight combines two ideas: IDF (inverse document frequency) gives rare words more weight than common ones, and TF saturation ensures that a word appearing 10 times scores only slightly higher than one appearing 5 times. Preventing keyword-stuffed documents from dominating. The saturation is controlled by the parameter k1 (typically 1.2-2.0): higher values let term frequency matter more, lower values flatten the curve earlier. The parameter b (typically 0.75) controls length normalisation: b=1 fully penalises long documents, b=0 ignores length. The "sparse" in sparse retrieval refers to the document representation: each document is a vector with one dimension per vocabulary term. And most entries are zero because any given document uses only a tiny fraction of the vocabulary. An inverted index stores only the non-zero entries, making retrieval fast even over millions of documents. [Hybrid search](hybrid_search_reciprocal_rank_fusion.html) combines BM25's lexical precision with [dense vector search](embeddings_and_vector_search.html)'s semantic understanding. This page scores a set of documents against a query, shows the IDF and TF-saturation components, and covers the k1/b parameter tradeoff.
+Before <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">dense vector search</a>, and still running alongside it in most real systems, is sparse lexical search: score a document by which query terms it contains, weighted by how informative each term is. BM25 is the version of this idea that actually works well. And it needs no training, no GPU, and no embedding model. BM25 scores a document by summing a term-weight for each query word that appears in it. The term weight combines two ideas: IDF (inverse document frequency) gives rare words more weight than common ones, and TF saturation ensures that a word appearing 10 times scores only slightly higher than one appearing 5 times. Preventing keyword-stuffed documents from dominating. The saturation is controlled by the parameter k1 (usually 1.2-2.0): higher values let term frequency matter more, lower values flatten the curve earlier. The parameter b (usually 0.75) controls length normalisation: b=1 fully penalises long documents, b=0 ignores length. The "sparse" in sparse retrieval refers to the document representation: each document is a vector with one dimension per vocabulary term. And most entries are zero because any given document uses only a tiny fraction of the vocabulary. An inverted index stores only the non-zero entries, making retrieval fast even over millions of documents. [Hybrid search](hybrid_search_reciprocal_rank_fusion.html) combines BM25's lexical precision with [dense vector search](embeddings_and_vector_search.html)'s semantic understanding. This page scores a set of documents against a query, shows the IDF and TF-saturation components, and covers the k1/b parameter tradeoff.
 
 ## The formula
 
@@ -21,9 +21,9 @@ That looks worse than it is. Three ideas are encoded in it, and each fixes a spe
 
 <strong>Rare terms count more (IDF).</strong> A match on "encephalopathy" is far more informative than a match on "the". The inverse document frequency term weights each match by how rare the term is across the collection.
 
-<strong>Repetition saturates.</strong> A document mentioning a term twenty times is not twenty times more relevant than one mentioning it once. The `k₁` parameter controls how quickly the contribution flattens &mdash; typically around 1.2. This means the third and fourth occurrences add much less than the first.
+<strong>Repetition saturates.</strong> A document mentioning a term twenty times is not twenty times more relevant than one mentioning it once. The `k₁` parameter controls how quickly the contribution flattens &mdash; usually around 1.2. This means the third and fourth occurrences add much less than the first.
 
-<strong>Long documents are penalised.</strong> A 10,000-word document will contain most query terms by chance. Dividing by document length relative to the average corrects for it, with `b` (typically 0.75) controlling how strongly.
+<strong>Long documents are penalised.</strong> A 10,000-word document will contain most query terms by chance. Dividing by document length relative to the average corrects for it, with `b` (usually 0.75) controlling how strongly.
 
 Those three corrections are the entire difference between BM25 and TF-IDF. And they are why BM25 has been the standard for thirty years.
 
@@ -55,7 +55,7 @@ Preprocessing matters more here than for dense retrieval, because matching is li
 - <strong>Stem or lemmatise</strong> so "running" matches "run". Apply the same treatment to the query.
 - <strong>Keep identifiers intact.</strong> A tokeniser that splits "E4471" into "E" and "4471" has destroyed the thing BM25 was best at.
 
-That last point is the one that goes wrong most often in practice. And it is worth testing explicitly with a few known identifiers.
+That last point is the one that goes wrong most often in practice. And it is worth testing by name with a few known identifiers.
 
 ## The two knobs TF-IDF was missing
 
@@ -403,20 +403,20 @@ Whether it beats BM25-plus-dense-hybrid depends on the corpus, and it is worth e
 
 <strong>Is BM25 outdated?</strong> No. It remains a strong baseline that dense retrieval alone often fails to beat, especially on technical corpora.
 
-<strong>Do I need both BM25 and embeddings?</strong> For most real corpora, yes &mdash; hybrid retrieval is the standard recommendation and usually the largest single quality gain.
+<strong>Do I need both BM25 and embeddings?</strong> For most real corpora, yes. Hybrid retrieval is the standard recommendation and usually the largest single quality gain.
 
 <strong>What is the difference from TF-IDF?</strong> Term-frequency saturation and document-length normalisation. Both matter, and both make BM25 better.
 
 <strong>Should I remove stop words?</strong> IDF already suppresses them, so it is optional. Removing them shrinks the index.
 
-<strong>Does it work for other languages?</strong> Yes, with appropriate tokenisation and stemming. Languages without whitespace word boundaries need a proper analyser.
+<strong>Does it work for other languages?</strong> Yes, with right tokenisation and stemming. Languages without whitespace word boundaries need a proper analyser.
 
 <strong>How do I combine it with dense scores?</strong> Reciprocal rank fusion. This uses ranks only and needs no score normalisation.
 
 ## Recap in one screen
 
 - BM25 scores term overlap with three corrections: rare terms count more, repetition saturates, long documents are penalised.
-- It excels at identifiers, codes, names and rare terms &mdash; exactly where embeddings blur.
+- It excels at identifiers, codes, names and rare terms. Exactly where embeddings blur.
 - It needs no model or GPU, indexes instantly, and is fully explainable.
 - Tokenisation must match between index and query, and must not split identifiers.
 - Combine with dense retrieval via reciprocal rank fusion; learned sparse models such as SPLADE blur the boundary.

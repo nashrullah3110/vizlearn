@@ -279,7 +279,7 @@ nobody accidentally opens hundreds of connections.
 
 So for I/O work, set it on purpose. The number you want is roughly the
 concurrency the *other end* is happy with &mdash; a rate limit, a connection
-pool size, a politeness budget for someone else's API &mdash; and it is
+pool size, a politeness budget for someone else's API. And it is
 often higher than 32 and sometimes much lower.
 
 ## Giving each worker its own setup
@@ -372,13 +372,13 @@ higher.
 
 <strong><code>map</code> or <code>as_completed</code>?</strong> <code>map</code> when you want results in argument order and a failure should stop everything. <code>as_completed</code> when you want each result as it lands and want to see every failure &mdash; which is most of the time. And the reason the extra three lines are worth it.
 
-<strong>Does <code>map</code> run lazily?</strong> The submission is eager &mdash; every item is queued at once. So <code>map</code> over a million items queues a million futures &mdash; while the *iteration* is lazy and in order. Use <code>chunksize</code> with a process pool to amortise the boundary cost over several items per trip.
+<strong>Does <code>map</code> run lazily?</strong> The submission is eager &mdash; every item is queued at once. So <code>map</code> over a million items queues a million futures. While the *iteration* is lazy and in order. Use <code>chunksize</code> with a process pool to amortise the boundary cost over several items per trip.
 
-<strong>How do I get a timeout?</strong> <code>result(timeout=...)</code> and <code>as_completed(..., timeout=...)</code> raise <code>TimeoutError</code>. What they do not do is stop the work &mdash; the future is still running and the worker is still occupied. So a timeout here is "I stopped waiting", not "it stopped".
+<strong>How do I get a timeout?</strong> <code>result(timeout=...)</code> and <code>as_completed(..., timeout=...)</code> raise <code>TimeoutError</code>. What they do not do is stop the work. The future is still running and the worker is still occupied. So a timeout here is "I stopped waiting", not "it stopped".
 
 <strong>Can I nest pools?</strong> Nesting process pools deadlocks easily and is best avoided; the usual pattern is one process pool whose workers each use threads. A thread pool inside a process pool worker is fine and common.
 
-<strong>Why did my pool hang at exit?</strong> Because <code>shutdown(wait=True)</code> is the default. So the interpreter waits for every submitted job. If jobs can hang, give them their own timeouts &mdash; the pool will not impose one.
+<strong>Why did my pool hang at exit?</strong> Because <code>shutdown(wait=True)</code> is the default. So the interpreter waits for every submitted job. If jobs can hang, give them their own timeouts. The pool will not impose one.
 
 <strong>Is this the same as asyncio's Future?</strong> No, and they are not interchangeable. <code>asyncio.Future</code> is awaitable and bound to an event loop; <code>concurrent.futures.Future</code> is blocking and thread-based. <code>asyncio.wrap_future</code> converts one into the other, which is how you await a thread-pool job.
 

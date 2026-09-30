@@ -9,7 +9,7 @@ Retrieval-augmented generation is the fix that does not involve training anythin
 
 The pipeline has three stages: indexing, retrieval and generation. At indexing time, documents are split into chunks, each chunk is embedded into a vector. And the vectors are stored in an index. At query time, the question is embedded with the same model, the index returns the closest chunks. And those chunks are injected into the prompt alongside the question. The language model then makes an answer grounded in the retrieved evidence.
 
-Each stage has its own failure modes. Chunking too coarsely means relevant information is buried in noise; chunking too finely means the chunk lacks enough context to be useful on its own. The retrieval step can miss relevant passages if the embedding model does not capture the right notion of similarity, or if the question is phrased differently from the stored text. The generation step can ignore the retrieved evidence entirely, hallucinate beyond it, or contradict it &mdash; a failure called unfaithfulness.
+Each stage has its own failure modes. Chunking too coarsely means relevant information is buried in noise; chunking too finely means the chunk lacks enough context to be useful on its own. The retrieval step can miss relevant passages if the embedding model does not capture the right notion of similarity, or if the question is phrased differently from the stored text. The generation step can ignore the retrieved evidence entirely, hallucinate beyond it, or contradict it. A failure called unfaithfulness.
 
 RAG works because it separates knowledge from reasoning. The language model handles reasoning, and the retrieval system handles knowledge. Updating the knowledge requires re-indexing the documents, not retraining the model. This makes the system far cheaper to maintain than fine-tuning. It also provides attribution: each answer can cite the chunks it was based on, giving the user a way to verify the response.
 
@@ -68,7 +68,7 @@ Almost never in the language model. The failures are in retrieval, and they have
 
 <strong>The model ignored the context</strong> and answered from its parametric knowledge instead.
 
-That distribution is why the practical advice is: <strong>measure retrieval separately from generation</strong>. Recall@k on a set of question-and-known-answer pairs tells you whether the right chunk is even reaching the model. Debugging the prompt when recall is 0.4 is wasted effort.
+That distribution is why the practical advice is: <strong>measure retrieval apart from generation</strong>. Recall@k on a set of question-and-known-answer pairs tells you whether the right chunk is even reaching the model. Debugging the prompt when recall is 0.4 is wasted effort.
 
 ## Where the quality actually comes from
 
@@ -212,16 +212,16 @@ print("   first table rather than as a replacement for any of the others.")
 
 ## Why not just fine-tune?
 
-Fine-tuning changes how a model behaves; retrieval changes what it knows right now. Facts that change weekly, documents with access rules, anything that needs a citation. All of those want retrieval. Tone, format, a domain's vocabulary, a stubborn output schema &mdash; those want fine-tuning. They are not competitors, and production systems often use both.
+Fine-tuning changes how a model behaves; retrieval changes what it knows right now. Facts that change weekly, documents with access rules, anything that needs a citation. All of those want retrieval. Tone, format, a domain's vocabulary, a stubborn output schema. Those want fine-tuning. They are not competitors, and production systems often use both.
 
 Retrieval also has a property fine-tuning cannot offer: you can show the user where the answer came from, and delete a document and have it genuinely gone.
 
 ## Common mistakes
 
 - <strong>Chunking badly.</strong> Too small and a passage loses the context that made it meaningful; too large and the embedding averages several topics into mush. Overlapping windows of a few hundred tokens are the usual compromise.
-- <strong>Assuming retrieval succeeded.</strong> Similarity search always returns its best k, however bad they are. Without a relevance floor, an unanswerable question quietly becomes a confident wrong answer.
+- <strong>Assuming retrieval succeeded.</strong> Similarity search always returns its best k, but bad they are. Without a relevance floor, an unanswerable question quietly becomes a confident wrong answer.
 - <strong>Stuffing the context.</strong> More chunks is not more accuracy. Models attend unevenly across a long context, and a fact buried in the middle of twenty passages can be missed entirely.
-- <strong>Pure vector search.</strong> Embeddings are poor at exact identifiers &mdash; part numbers, error codes, names. Hybrid retrieval, combining keyword search with vectors, is standard for a reason.
+- <strong>Pure vector search.</strong> Embeddings are poor at exact identifiers. Part numbers, error codes, names. Hybrid retrieval, combining keyword search with vectors, is standard for a reason.
 - <strong>A stale index.</strong> The documents changed and nobody re-embedded them. Now the system cites yesterday's policy with complete confidence.
 
 ## What to remember
@@ -238,7 +238,7 @@ RAG answers questions a model was never trained on by finding relevant passages 
 
 <strong>Reranking.</strong> Retrieve 50 candidates cheaply, then score each against the query with a cross-encoder that reads both together. Far more accurate than embedding similarity, affordable because it runs on 50 items rather than a million.
 
-<strong>How many chunks to pass.</strong> 3&ndash;10 typically. More is not better: irrelevant context degrades answers, and the middle of a long context receives less attention.
+<strong>How many chunks to pass.</strong> 3&ndash;10 usually. More is not better: irrelevant context degrades answers, and the middle of a long context receives less attention.
 
 ## Prompting the generation step
 
@@ -264,7 +264,7 @@ Question: {question}
 
 ## Measuring it
 
-Evaluate the two stages separately, then end to end:
+Evaluate the two stages apart, then end to end:
 
 |Stage|Metric|
 |---|---|
@@ -285,14 +285,14 @@ Build a small evaluation set &mdash; 50&ndash;100 real questions with known corr
 
 <strong>Why does it hallucinate even with the right context?</strong> Usually the prompt does not constrain it firmly enough, or the context is contradictory, or the answer genuinely is not there and it has no permission to say so.
 
-<strong>Which embedding model?</strong> Start with a strong general one, then test domain-specific alternatives on your own evaluation set. The benchmark leaderboard is a weaker signal than your own data.
+<strong>Which embedding model?</strong> Start with a strong general one, then test domain-specific options on your own evaluation set. The benchmark leaderboard is a weaker signal than your own data.
 
 <strong>Should I re-embed when I change models?</strong> Yes &mdash; vectors from different models are not comparable. So the whole corpus must be re-indexed.
 
 ## Recap in one screen
 
 - Index documents as embedded chunks; at query time retrieve the nearest and put them in the prompt.
-- It adds facts, supports citations and enforces permissions &mdash; none of which fine-tuning does well.
-- Almost all failures are retrieval failures, so measure recall separately before touching the prompt.
+- It adds facts, supports citations and enforces permissions. None of which fine-tuning does well.
+- Almost all failures are retrieval failures, so measure recall apart before touching the prompt.
 - Hybrid search plus reranking is the highest-value improvement in most systems.
 - Instruct the model to use only the context and to admit when the answer is absent.

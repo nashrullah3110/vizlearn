@@ -3,13 +3,13 @@ intro: Fine-tuning a 7B model the traditional way means updating all 7 billion w
 
 ## The Insight: Updates Are Low-Rank
 
-Fine-tuning changes a weight matrix from <span class="mono-font">W</span> to <span class="mono-font">W + &Delta;W</span>. The observation behind LoRA is that although <span class="mono-font">W</span> is enormously expressive, the <em>change</em> needed to specialise a model for one task has very low intrinsic rank. It does not need the full space.
+Fine-tuning changes a weight matrix from <span class="mono-font">W</span> to <span class="mono-font">W + &Delta;W</span>. The observation behind LoRA is that though <span class="mono-font">W</span> is enormously expressive, the <em>change</em> needed to specialise a model for one task has very low intrinsic rank. It does not need the full space.
 
 So instead of learning a full <span class="mono-font">d &times; k</span> matrix, LoRA factorises the update into two thin matrices:
 
 &Delta;W = B &middot; A &nbsp;&nbsp; where B is d&times;r and A is r&times;k, with r &lll; min(d, k)
 
-The original weights are <strong>frozen</strong>. Only A and B are trained. If the frozen matrix W is d-by-d and the rank r is 16, A is d-by-16 and B is 16-by-d. So the trainable parameter count drops from d-squared to 2dr. A reduction of roughly 10,000x for a 7B model's attention weights. At inference time the product BA is added directly to W, producing a single merged matrix with zero extra latency. Multiple LoRA adapters can coexist: each task gets its own A and B, and switching tasks means swapping two small matrices while the base model stays in memory once. This is how services like Hugging Face PEFT serve hundreds of fine-tuned variants from one base checkpoint. The rank r is the main hyperparameter: too low and the adapter cannot represent the task's deviation from the base model; too high and it overfits or loses the efficiency advantage. In practice, r between 4 and 64 covers most tasks. A is set up with a random Gaussian and B with zeros. So the adapter starts as a no-op and learns the delta. This page freezes a weight matrix, trains a low-rank adapter beside it, and shows how the merged output matches the full fine-tune within a controlled tolerance.
+The original weights are <strong>frozen</strong>. Only A and B are trained. If the frozen matrix W is d-by-d and the rank r is 16, A is d-by-16 and B is 16-by-d. So the trainable parameter count drops from d-squared to 2dr. A reduction of roughly 10,000x for a 7B model's attention weights. At inference time the product BA is added directly to W. This produces a single merged matrix with zero extra latency. Multiple LoRA adapters can coexist: each task gets its own A and B, and switching tasks means swapping two small matrices while the base model stays in memory once. This is how services like Hugging Face PEFT serve hundreds of fine-tuned variants from one base checkpoint. The rank r is the main hyperparameter: too low and the adapter cannot represent the task's deviation from the base model; too high and it overfits or loses the efficiency advantage. In practice, r between 4 and 64 covers most tasks. A is set up with a random Gaussian and B with zeros. So the adapter starts as a no-op and learns the delta. This page freezes a weight matrix, trains a low-rank adapter beside it, and shows how the merged output matches the full fine-tune within a controlled tolerance.
 
 ## Why the Savings Are So Extreme
 
@@ -51,13 +51,13 @@ For a 4096&times;4096 weight matrix with r = 8:
 |A (8&times;4096) + B (4096&times;8)|65,536|
 |Ratio|0.4%|
 
-Across a whole model, LoRA typically trains 0.1&ndash;1% of the parameters &mdash; a few million instead of billions.
+Across a whole model, LoRA usually trains 0.1&ndash;1% of the parameters. A few million instead of billions.
 
 ## Why a low-rank update is enough
 
 The empirical claim behind the method is that <strong>the update needed to adapt a pretrained model to a task has low intrinsic rank</strong>. The base model already knows the language; adaptation is a comparatively small, structured change.
 
-That is an observation rather than a theorem, and it has held up well: LoRA fine-tunes typically match full fine-tuning on task metrics, sometimes within noise, sometimes better because there is less capacity to overfit.
+That is an observation rather than a theorem, and it has held up well: LoRA fine-tunes usually match full fine-tuning on task metrics, sometimes within noise, sometimes better because there is less capacity to overfit.
 
 Two details make it practical:
 
@@ -271,7 +271,7 @@ print("   fine-tunes at once.")
 
 ## Things to try
 
-1. <strong>Start at r = 8</strong> on a 4096&times;4096 layer and read the trainable fraction &mdash; well under 1%.
+1. <strong>Start at r = 8</strong> on a 4096&times;4096 layer and read the trainable fraction. Well under 1%.
 2. <strong>Drag the rank to 128.</strong> Parameters climb steeply but remain a small slice of the full matrix. Even a large rank is cheap.
 3. <strong>Widen d and k while holding rank fixed.</strong> Full fine-tuning grows <em>quadratically</em>; LoRA grows only linearly. The bigger the model, the better LoRA looks.
 4. <strong>Watch the &Delta;W preview at r = 1</strong>, then raise the rank. At rank 1 every row is a scaled copy of a single pattern; higher ranks can express genuinely independent structure.
@@ -332,12 +332,12 @@ The trade: an unmerged adapter adds a small amount of inference latency, since `
 
 <strong>Does merging change quality?</strong> No, if precision matches. Merging into a quantised base can lose a little.
 
-<strong>Is LoRA as good as full fine-tuning?</strong> On most task metrics, effectively yes. Sometimes better, because there is less capacity to overfit.
+<strong>Is LoRA as good as full fine-tuning?</strong> On most task metrics, in effect yes. Sometimes better, because there is less capacity to overfit.
 
 ## Recap in one screen
 
 - Freeze the pretrained weights; train a small low-rank pair `BA` added to selected matrices.
-- Typically 0.1&ndash;1% of parameters are trained, with quality close to full fine-tuning.
+- Usually 0.1&ndash;1% of parameters are trained, with quality close to full fine-tuning.
 - `B` starts at zero so training begins from the pretrained model exactly.
 - QLoRA quantises the frozen base to 4-bit, putting 7B fine-tuning on a single consumer GPU.
 - Adapters are megabytes: one base model can serve many, and merging removes the inference overhead.

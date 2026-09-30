@@ -17,9 +17,9 @@ A bidirectional layer runs two entirely separate recurrent cells with their own 
 
 h<sub>t</sub> = [h&rarr;<sub>t</sub> . H&larr;<sub>t</sub>]
 
-Two consequences follow at once. The output at each position is <strong>twice as wide</strong>, so the next layer’s input size doubles &mdash; a frequent shape-mismatch bug. And there are <strong>twice the parameters</strong>, since nothing is shared between the two directions.
+Two consequences follow at once. The output at each position is <strong>twice as wide</strong>, so the next layer’s input size doubles. A frequent shape-mismatch bug. And there are <strong>twice the parameters</strong>, since nothing is shared between the two directions.
 
-Note the passes are independent: the backward cell does not see the forward cell’s states. They are computed separately and only joined at the end. This also means they can run in parallel.
+Note the passes are independent: the backward cell does not see the forward cell’s states. They are computed apart and only joined at the end. This also means they can run in parallel.
 
 ## Reading the sequence twice
 
@@ -33,7 +33,7 @@ Why it helps is easiest to see with an ambiguous word:
 
 "The <strong>bank</strong> was steep and muddy."
 
-At "bank", a forward-only model has seen "the" and nothing else &mdash; it cannot yet know which sense is meant. The backward pass has seen "steep and muddy" and resolves it at once. Neither direction alone is sufficient; together they are.
+At "bank", a forward-only model has seen "the" and nothing else. It cannot yet know which sense is meant. The backward pass has seen "steep and muddy" and resolves it at once. Neither direction alone is sufficient; together they are.
 
 The same argument applies to named entities ("Washington" as a person or a place depends on what follows), part-of-speech tagging, and coreference.
 
@@ -73,7 +73,7 @@ Two details cause most of the confusion.
 
 <strong>The output is twice as wide.</strong> Any layer after it must expect `2 × hidden_size`. Forgetting this is the most common bidirectional bug, and it produces an immediate shape error.
 
-<strong>The final states are not simply the last row of `out`.</strong> The forward direction's final state corresponds to the <em>last</em> token; the backward direction's corresponds to the <em>first</em>. For classification, concatenate the two final states, or pool over `out` &mdash; do not take `out[:, -1, :]`. This mixes the forward state at the end with the backward state at the end (which has seen only the last token).
+<strong>The final states are not simply the last row of `out`.</strong> The forward direction's final state corresponds to the <em>last</em> token; the backward direction's corresponds to the <em>first</em>. For classification, concatenate the two final states, or pool over `out`. Do not take `out[:, -1, :]`. This mixes the forward state at the end with the backward state at the end (which has seen only the last token).
 
 ```python
 h_fwd, h_bwd = h[0], h[1]
@@ -198,17 +198,17 @@ print("   for most of a decade before encoders replaced it.")
 
 A bidirectional layer requires the <em>entire</em> sequence before it can produce any output, because the backward pass starts at the end. That rules it out whenever the future genuinely is not available:
 
-- <strong>Language modelling and text generation.</strong> Predicting the next token while having already read it is not a prediction. A bidirectional model here achieves perfect accuracy and learns nothing &mdash; the answer leaks in through the backward pass.
+- <strong>Language modelling and text generation.</strong> Predicting the next token while having already read it is not a prediction. A bidirectional model here achieves perfect accuracy and learns nothing. The answer leaks in through the backward pass.
 - <strong>Real-time and streaming applications.</strong> Live transcription cannot wait for the end of the utterance.
 - <strong>Autoregressive decoding of any kind</strong>, where output is produced one token at a time.
 
-Where the full sequence <em>is</em> available &mdash; classification, tagging, named entity recognition. And the encoder half of a translation model &mdash; bidirectionality is close to free accuracy. This is exactly the split between BERT, which is bidirectional and cannot generate, and GPT. This is unidirectional and can.
+Where the full sequence <em>is</em> available &mdash; classification, tagging, named entity recognition. And the encoder half of a translation model. Bidirectionality is close to free accuracy. This is exactly the split between BERT, which is bidirectional and cannot generate, and GPT. This is unidirectional and can.
 
 ## Traps worth knowing
 
 - <strong>Forgetting the output doubles.</strong> The most common bug: the following layer is sized for h instead of 2h and the shapes do not match.
 - <strong>Using it for generation.</strong> Training looks superb and the model is useless, because it has been shown the answer.
-- <strong>Padding without masking.</strong> Worse here than in a unidirectional model &mdash; the backward pass <em>starts</em> in the padding. So an unmasked model begins reading noise.
+- <strong>Padding without masking.</strong> Worse here than in a unidirectional model. The backward pass <em>starts</em> in the padding. So an unmasked model begins reading noise.
 - <strong>Assuming it doubles quality.</strong> It doubles cost. The accuracy gain is real but usually a few points, and on some tasks a wider unidirectional layer is the better use of the same parameters.
 
 ## The short version
@@ -245,7 +245,7 @@ So "bidirectional layer" is largely a recurrent-era concept. The idea survives; 
 
 ## Questions people ask
 
-<strong>Can I use a bidirectional layer for language modelling?</strong> No &mdash; it would see the token it is meant to predict.
+<strong>Can I use a bidirectional layer for language modelling?</strong> No. It would see the token it is meant to predict.
 
 <strong>Does the backward LSTM share weights with the forward one?</strong> No, they are entirely separate parameter sets.
 

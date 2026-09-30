@@ -3,13 +3,13 @@ intro: Why a transformer has to be told what order the words came in, and the od
 
 ## Quick Context
 
-<a href="self_attention.html" style="color: var(--accent-primary)">Self-attention</a> computes every position from every other position by dot products and weighted sums. Nowhere in that computation does an index appear. Permute the input and the outputs permute with it, unchanged &mdash; the mechanism is <em>permutation-equivariant</em>.<p>For a bag of words that would be a feature. For language it is fatal: "dog bites man" and "man bites dog" contain exactly the same words. And a model that cannot tell them apart cannot do anything useful. An <a href="rnn.html" style="color: var(--accent-primary)">RNN</a> got order for free by reading left to right. Throwing out recurrence threw that away too, and it has to be put back by hand.</p>
+<a href="self_attention.html" style="color: var(--accent-primary)">Self-attention</a> computes every position from every other position by dot products and weighted sums. Nowhere in that computation does an index appear. Permute the input and the outputs permute with it, unchanged. The mechanism is <em>permutation-equivariant</em>.<p>For a bag of words that would be a feature. For language it is fatal: "dog bites man" and "man bites dog" contain exactly the same words. And a model that cannot tell them apart cannot do anything useful. An <a href="rnn.html" style="color: var(--accent-primary)">RNN</a> got order for free by reading left to right. Throwing out recurrence threw that away too, and it has to be put back by hand.</p>
 
 The original Transformer paper solved this by adding a fixed vector to each token embedding before attention sees it. The vector is different for each position, so tokens at different positions become distinguishable even though the mechanism itself is position-blind. The encoding uses sine and cosine functions at different frequencies: even dimensions get sin(pos / 10000^(2i/d)) and odd dimensions get the cosine of the same argument, where pos is the position and i is the dimension index.
 
 This scheme has two useful properties. First, the encoding for each position is unique, so no two positions receive the same signal. Second, relative positions can be recovered from the encodings by a linear transformation, because the relationship between sin(a) and sin(a + k) is a fixed rotation that depends only on k, not on a. That means the model can learn to attend to "the token two positions back" regardless of absolute position.
 
-Learned positional embeddings are the main alternative. Instead of computing the encoding from a formula, each position gets a trainable vector that is learned during training, the same way word embeddings are learned. BERT and GPT use learned embeddings, and in practice they perform comparably to sinusoidal encodings for sequences within the training length. The disadvantage is that they do not generalise beyond the longest position seen during training.
+Learned positional embeddings are the main other. Instead of computing the encoding from a formula, each position gets a trainable vector that is learned during training, the same way word embeddings are learned. BERT and GPT use learned embeddings, and in practice they perform comparably to sinusoidal encodings for sequences within the training length. The disadvantage is that they do not generalise beyond the longest position seen during training.
 
 ## The obvious ideas, and why they fail
 
@@ -36,7 +36,7 @@ Self-attention computes a weighted mixture over all positions. Shuffle the input
 
 For language that is fatal. "The dog bit the man" and "The man bit the dog" contain the same tokens. And a model without positional information cannot tell them apart.
 
-So order has to be injected separately. That is the entire job of positional encoding, and there are three families of answer.
+So order has to be injected apart. That is the entire job of positional encoding, and there are three families of answer.
 
 |Approach|How|Used by|
 |---|---|---|
@@ -209,7 +209,7 @@ print("into the values being summed.")
 
 ## Experiments to try
 
-1. <strong>Break word order.</strong> Set the <strong>Scheme</strong> to None and tick <strong>Swap Two Words</strong>. Input Difference reads 0.000 and the two sentences are literally the same to the model. Switch the <strong>Scheme</strong> back to Sinusoidal and the difference becomes non-zero &mdash; the encoding is what makes them different inputs.
+1. <strong>Break word order.</strong> Set the <strong>Scheme</strong> to None and tick <strong>Swap Two Words</strong>. Input Difference reads 0.000 and the two sentences are literally the same to the model. Switch the <strong>Scheme</strong> back to Sinusoidal and the difference becomes non-zero. The encoding is what makes them different inputs.
 2. <strong>See the frequency fan.</strong> Look at the matrix with the <strong>Model Dimension</strong> slider at 64. The leftmost columns stripe rapidly down the page while the rightmost are almost flat. That spread of wavelengths is the whole design.
 3. <strong>Check it encodes distance.</strong> Set the <strong>Inspect Position</strong> slider to 12 and look at the lower panel. Similarity peaks at position 12 and falls away smoothly on both sides. So nearby positions have similar encodings. Move the position and the peak travels with it, keeping its shape. The pattern depends on the gap, not on where you are.
 4. <strong>Try the naive schemes.</strong> Set the <strong>Scheme</strong> to Raw integer position, then drag the <strong>Inspect Position</strong> slider up and watch Largest Value climb with it, without bound. Compare against Sinusoidal, where it never leaves 1. Then try Position / length and lengthen the sequence: every encoding shifts, because the same position now means a different fraction.
@@ -238,15 +238,15 @@ Sinusoidal encoding is no longer the state of the art, but it is the clearest il
 
 ## Where that leaves you
 
-Self-attention has no notion of order, so position has to be supplied explicitly. And the naive options fail: raw indices grow without bound and normalised ones mean different things in different-length sentences. Sinusoidal encoding solves it with a bank of sine and cosine waves at geometrically spaced frequencies, giving every position a bounded, unique fingerprint that is defined for any length and whose similarity to other positions depends on the distance between them. It is added to the embedding rather than concatenated, and modern models mostly use learned or rotary variants. But all of them exist to answer the same question this one does.
+Self-attention has no notion of order, so position has to be supplied by name. And the naive options fail: raw indices grow without bound and normalised ones mean different things in different-length sentences. Sinusoidal encoding solves it with a bank of sine and cosine waves at geometrically spaced frequencies, giving every position a bounded, unique fingerprint that is defined for any length and whose similarity to other positions depends on the distance between them. It is added to the embedding rather than concatenated, and modern models mostly use learned or rotary variants. But all of them exist to answer the same question this one does.
 
 ## Learned absolute encodings, and their limit
 
-The simplest option is a trainable vector per position &mdash; effectively an embedding table indexed by position instead of by token. BERT and GPT-2 both did this.
+The simplest option is a trainable vector per position &mdash; in effect an embedding table indexed by position instead of by token. BERT and GPT-2 both did this.
 
 It works well within the trained range and has one hard limitation: <strong>position 512 has no vector if the model was trained to 512</strong>. There is nothing to look up, so the model cannot process longer input at all without adding and training new rows.
 
-That single constraint is a large part of why the field moved to rotary and ALiBi schemes. Extending a context window from 4,000 to 128,000 tokens is a plausible fine-tuning project with RoPE and effectively impossible with learned absolute positions.
+That single constraint is a large part of why the field moved to rotary and ALiBi schemes. Extending a context window from 4,000 to 128,000 tokens is a plausible fine-tuning project with RoPE and in effect impossible with learned absolute positions.
 
 ## Extending context after training
 
@@ -284,7 +284,7 @@ All three usually involve a short fine-tune on long sequences to let the model a
 
 ## Recap in one screen
 
-- Self-attention is permutation-invariant, so order must be supplied separately.
+- Self-attention is permutation-invariant, so order must be supplied apart.
 - Sinusoidal encodings are fixed patterns at many frequencies, parameter-free and extendable.
 - Learned absolute encodings work well up to the trained length and stop dead beyond it.
 - RoPE rotates queries and keys by position, so attention scores depend on relative distance. And it is what current models use.

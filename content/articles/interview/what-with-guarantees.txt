@@ -3,7 +3,7 @@ intro: What does the with statement actually do, and what happens to an exceptio
 
 ## The question, and what it is testing
 
-<code>with</code> calls <code>__enter__</code>, runs the body, and calls <code>__exit__</code> <strong>however the body ends</strong>. Normally, by <code>return</code>, or by exception. <code>__exit__</code> is told what went wrong, and if it returns something truthy the exception is suppressed.
+<code>with</code> calls <code>__enter__</code>, runs the body, and calls <code>__exit__</code> <strong>but the body ends</strong>. Normally, by <code>return</code>, or by exception. <code>__exit__</code> is told what went wrong, and if it returns something truthy the exception is suppressed.
 
 <p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
 
@@ -125,7 +125,7 @@ def timed(label):
 
 ## The follow-up: why not just use try/finally
 
-<p>You can, and <code>with</code> compiles to roughly that. The difference is that the cleanup lives with the <em>resource</em> rather than with every call site. So it cannot be forgotten at the twelfth place the resource is used. It also composes: <code>with a, b:</code> nests correctly, and both exits run even if the first one raises.</p><p>The async counterpart is <code>async with</code> and <code>__aenter__</code>/<code>__aexit__</code>. This is what an async HTTP client or database session uses &mdash; same protocol, awaitable methods.</p>
+<p>You can, and <code>with</code> compiles to roughly that. The difference is that the cleanup lives with the <em>resource</em> rather than with every call site. So it cannot be forgotten at the twelfth place the resource is used. It also composes: <code>with a, b:</code> nests correctly, and both exits run even if the first one raises.</p><p>The async counterpart is <code>async with</code> and <code>__aenter__</code>/<code>__aexit__</code>. This is what an async HTTP client or database session uses. Same protocol, awaitable methods.</p>
 
 ## What to say out loud
 
@@ -155,7 +155,7 @@ def timed(label):
 
 <p><strong>"What if <code>__enter__</code> itself raises?"</strong> Then <code>__exit__</code> is <strong>not</strong> called, because the block was never entered. This catches people: any resource acquired partway through <code>__enter__</code> has to be cleaned up inside <code>__enter__</code> itself. It is also why <code>ExitStack</code> exists for multi-resource setup.</p>
 
-<p><strong>"How do you manage a variable number of resources?"</strong> <code>contextlib.ExitStack</code>: enter each one into the stack and it unwinds them all in reverse on exit, however many there are. The alternative - a recursive or dynamically nested <code>with</code> - is not writable.</p>
+<p><strong>"How do you manage a variable number of resources?"</strong> <code>contextlib.ExitStack</code>: enter each one into the stack and it unwinds them all in reverse on exit, but many there are. The other - a recursive or dynamically nested <code>with</code> - is not writable.</p>
 
 <p><strong>"What is the async equivalent?"</strong> <code>async with</code>, backed by <code>__aenter__</code> and <code>__aexit__</code>, which are coroutines. Same protocol, awaitable methods, and it is what an async HTTP client or database session gives you.</p>
 
@@ -172,6 +172,6 @@ def timed(label):
 - __exit__ runs in all three cases - that is the guarantee being bought.
 - It is told the exception type, so cleanup can behave differently on failure.
 - Returning True swallows the exception; returning None lets it propagate.
-- The one-line answer: with calls __enter__, runs the body, and calls __exit__ however the body ends - normally, by return, or by exception.
+- The one-line answer: with calls __enter__, runs the body, and calls __exit__ but the body ends - normally, by return, or by exception.
 - Worth trying: Delete the try/finally from guarded and re-run case 5. The exit line disappears - the bug that makes a hand-written context manager worse than none.
 - Worth trying: Replace case 3 with contextlib.suppress(ValueError) and confirm it behaves the same. That is all suppress is.

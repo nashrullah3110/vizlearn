@@ -7,7 +7,7 @@ An <a href="../natural_language_processing/what_are_embeddings.html" style="colo
 
 That is the whole trick behind semantic search, recommendation, deduplication and the retrieval half of <a href="rag.html" style="color: var(--accent-primary)">RAG</a>. Once meaning is a position, similarity is distance, and search becomes a nearest-neighbour problem.
 
-The embedding itself is a fixed-length vector, typically 384 to 1536 dimensions. A model like sentence-transformers or OpenAI's ada-002 reads a passage of text, runs it through a transformer, and outputs one vector per passage. Passages with similar meaning cluster together in this space, regardless of the exact words used, the language, or the phrasing. That is what makes the approach semantic rather than lexical: a keyword search for "dog" misses "puppy" and "canine", while embedding search places all three near the same point.
+The embedding itself is a fixed-length vector, usually 384 to 1536 dimensions. A model like sentence-transformers or OpenAI's ada-002 reads a passage of text, runs it through a transformer, and outputs one vector per passage. Passages with similar meaning cluster together in this space, regardless of the exact words used, the language, or the phrasing. That is what makes the approach semantic rather than lexical: a keyword search for "dog" misses "puppy" and "canine", while embedding search places all three near the same point.
 
 Searching a million vectors by brute force &mdash; computing the distance from the query to every stored vector &mdash; takes milliseconds on a GPU and seconds on a CPU. At ten million vectors it becomes impractical. Approximate nearest-neighbour (ANN) indexes solve this by building a data structure that narrows the search to a small fraction of the corpus. HNSW and IVF are the two most common approaches, and both trade a small amount of recall for orders-of-magnitude speed gains. Choosing the right index, tuning its parameters, and knowing when brute force is still fast enough are the practical skills this page covers.
 
@@ -15,7 +15,7 @@ Searching a million vectors by brute force &mdash; computing the distance from t
 
 Retrieval almost always ranks by <a href="../machine_learning/cosine_similarity.html" style="color: var(--accent-primary)">cosine similarity</a>: the angle between the query vector and the document vector, ignoring how long either one is. Length in an embedding tends to carry things like document length or token count rather than meaning. So ignoring it is the point.
 
-On vectors normalised to unit length, ranking by cosine and ranking by Euclidean distance give the same orders. This is why many systems normalise once at index time and then use whichever their hardware does faster. Switch the metric here and watch how little changes &mdash; and, on the points that are not near the unit circle, exactly where it does.
+On vectors normalised to unit length, ranking by cosine and ranking by Euclidean distance give the same orders. This is why many systems normalise once at index time and then use whichever their hardware does faster. Switch the metric here and watch how little changes. And, on the points that are not near the unit circle, exactly where it does.
 
 ## Exact search does not scale
 
@@ -256,7 +256,7 @@ print("   why the interesting engineering is in the combination.")
 ## Where this goes wrong
 
 - <strong>Mixing embedding models.</strong> Vectors from two different models are not comparable, even at the same dimension. Re-embed everything when you change model, or the index quietly returns nonsense.
-- <strong>Expecting exact matches.</strong> Embeddings are poor at part numbers, error codes and rare proper nouns. This is why serious systems run hybrid retrieval &mdash; keyword search alongside vectors.
+- <strong>Expecting exact matches.</strong> Embeddings are poor at part numbers, error codes and rare proper nouns. This is why serious systems run hybrid retrieval. Keyword search alongside vectors.
 - <strong>Ignoring recall.</strong> An approximate index that has drifted to 70% recall looks perfectly healthy from the outside; every query returns results. Measure against exact search on a sample.
 - <strong>Chunk size chosen by accident.</strong> A vector represents its whole chunk. So a chunk covering three topics has an embedding that means none of them.
 - <strong>No filtering plan.</strong> "Nearest neighbours, but only from this tenant, in the last 30 days" is a much harder query than pure similarity. And the index has to be built for it.
@@ -306,7 +306,7 @@ Four things that matter at scale:
 
 ## Questions people ask
 
-<strong>Which embedding model should I use?</strong> Start with a well-regarded general model, then evaluate alternatives on your own question set. Public benchmarks are a weaker signal than your own data.
+<strong>Which embedding model should I use?</strong> Start with a well-regarded general model, then evaluate options on your own question set. Public benchmarks are a weaker signal than your own data.
 
 <strong>Do I need a vector database?</strong> Below ~100,000 vectors, a NumPy array and a dot product is genuinely fine. Above that, an index earns its place.
 
@@ -314,7 +314,7 @@ Four things that matter at scale:
 
 <strong>Why does search miss obvious matches?</strong> Usually vocabulary the embedding model has not seen, or an exact identifier that embeddings blur. Hybrid search is the fix.
 
-<strong>Can I search across languages?</strong> With a multilingual embedding model, yes &mdash; a query in one language retrieves documents in another.
+<strong>Can I search across languages?</strong> With a multilingual embedding model, yes. A query in one language retrieves documents in another.
 
 <strong>What about updating documents?</strong> Re-embed the changed chunks and upsert them. HNSW handles insertions well and deletions less well; periodic rebuilds are normal.
 

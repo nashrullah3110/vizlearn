@@ -14,7 +14,7 @@ A Python list is a contiguous block of pointers to objects, with spare capacity 
 |`lst.pop(0)`|O(n)|Shifts every element left|
 |`x in lst`|O(n)|Linear scan|
 
-The spare capacity is what makes `append` amortised O(1): CPython over-allocates by roughly 12.5% each time the array fills. So most appends write into existing space without a reallocation. When a reallocation does happen, the entire block is copied to a new, larger block. An O(n) operation that is amortised over the many O(1) appends that preceded it. `insert(0, x)` and `pop(0)` are O(n) because every element must shift; if you need fast operations at both ends, use `collections.deque`. This is a doubly-linked list of fixed-size blocks with O(1) append and popleft. Slicing (`lst[a:b]`) always copies: the result is a new list with new pointers to the same objects. So modifying the slice does not affect the original. List comprehensions are faster than equivalent `for` + `append` loops because the bytecode avoids the method lookup and function-call overhead on each iteration. Sorting is O(n log n) via Timsort, which is adaptive &mdash; nearly-sorted data finishes in O(n). This page times every core operation, prints the internal capacity after each append to show the over-allocation pattern, and compares list against deque for front-insertion workloads.
+The spare capacity is what makes `append` amortised O(1): CPython over-allocates by roughly 12.5% each time the array fills. So most appends write into existing space without a reallocation. When a reallocation does happen, the entire block is copied to a new, larger block. An O(n) operation that is amortised over the many O(1) appends that preceded it. `insert(0, x)` and `pop(0)` are O(n) because every element must shift; if you need fast operations at both ends, use `collections.deque`. This is a doubly-linked list of fixed-size blocks with O(1) append and popleft. Slicing (`lst[a:b]`) always copies: the result is a new list with new pointers to the same objects. So modifying the slice does not affect the original. List comprehensions are faster than equivalent `for` + `append` loops because the bytecode avoids the method lookup and function-call overhead on each iteration. Sorting is O(n log n) via Timsort, which is adaptive. Nearly-sorted data finishes in O(n). This page times every core operation, prints the internal capacity after each append to show the over-allocation pattern, and compares list against deque for front-insertion workloads.
 |`lst.remove(x)`|O(n)|Scan, then shift|
 |`len(lst)`|O(1)|Stored, not counted|
 |Slicing `lst[a:b]`|O(b&minus;a)|Copies|
@@ -41,13 +41,13 @@ The exclusive stop is deliberate: it makes <span class="mono-font">lst[:k] + lst
 
 ## What each operation costs
 
-<p>lst[i]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(1)&nbsp;&nbsp; direct address</p><p>lst.append(x)&nbsp;&nbsp;&nbsp;# O(1) amortised</p><p>lst.pop()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(1)&nbsp;&nbsp; from the end</p><p>lst.insert(0, x)&nbsp;# O(n)&nbsp;&nbsp; shifts everything</p><p>lst.pop(0)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(n)&nbsp;&nbsp; shifts everything</p><p>x in lst&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(n)&nbsp;&nbsp; linear scan</p><p>lst[a:b]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(b&minus;a) copies</p><strong>Amortised</strong> O(1) for append means individual appends are sometimes expensive. When the underlying array fills, Python allocates a larger one and copies everything across &mdash; O(n) for that one call. Because the array grows by a proportion rather than a fixed amount, those resizes become rarer as the list grows. And the average over many appends is constant.
+<p>lst[i]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(1)&nbsp;&nbsp; direct address</p><p>lst.append(x)&nbsp;&nbsp;&nbsp;# O(1) amortised</p><p>lst.pop()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(1)&nbsp;&nbsp; from the end</p><p>lst.insert(0, x)&nbsp;# O(n)&nbsp;&nbsp; shifts everything</p><p>lst.pop(0)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(n)&nbsp;&nbsp; shifts everything</p><p>x in lst&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(n)&nbsp;&nbsp; linear scan</p><p>lst[a:b]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# O(b&minus;a) copies</p><strong>Amortised</strong> O(1) for append means single appends are sometimes expensive. When the underlying array fills, Python allocates a larger one and copies everything across &mdash; O(n) for that one call. Because the array grows by a proportion rather than a fixed amount, those resizes become rarer as the list grows. And the average over many appends is constant.
 
 ## Why append is amortised O(1)
 
 The list holds more capacity than its length. When it fills, Python allocates a larger block &mdash; growing by roughly an eighth of the current size &mdash; and copies everything across.
 
-That resize is O(n). Spread across the many appends that fit in the new capacity, the average cost per append is constant. That is what <strong>amortised</strong> means: individual operations can be expensive, the sequence is cheap.
+That resize is O(n). Spread across the many appends that fit in the new capacity, the average cost per append is constant. That is what <strong>amortised</strong> means: single operations can be expensive, the sequence is cheap.
 
 The practical consequence is that appending in a loop is fine. And it is worth knowing that a list comprehension is faster still because the append happens in C rather than through the interpreter:
 
@@ -103,8 +103,8 @@ board = [[0] * 3 for _ in range(3)]     # three separate rows - correct
 
 1. <strong>Watch the exclusive stop.</strong> Set <strong>Start</strong> to 1 and <strong>Stop</strong> to 4, then press <strong>Run Expression</strong>. Three elements come back, not four &mdash; index 4 is the boundary, not a member.
 2. <strong>Reverse with a negative step.</strong> Set <strong>Step</strong> to &minus;1 and leave start and stop empty. The whole list comes back reversed, and it is a copy: the original is untouched.
-3. <strong>Index from the end.</strong> Set <strong>Index (i)</strong> to &minus;1 and run. You get the last element without needing to know the length &mdash; the idiom that replaces <span class="mono-font">lst[len(lst)&minus;1]</span>.
-4. <strong>Compare a front insert with an append.</strong> Use <strong>Select Method</strong> to insert at index 0, then to append. Both look instant here, but only one avoids shifting every element &mdash; the difference shows up at a hundred thousand elements, not five.
+3. <strong>Index from the end.</strong> Set <strong>Index (i)</strong> to &minus;1 and run. You get the last element without needing to know the length. The idiom that replaces <span class="mono-font">lst[len(lst)&minus;1]</span>.
+4. <strong>Compare a front insert with an append.</strong> Use <strong>Select Method</strong> to insert at index 0, then to append. Both look instant here, but only one avoids shifting every element. The difference shows up at a hundred thousand elements, not five.
 
 ## What trips people up
 
@@ -174,7 +174,7 @@ That transformation is the most common real-world optimisation in Python, and it
 
 A Python list of a million integers uses much more memory than a million integers' worth of data: the list holds a million pointers (8 bytes each). And each small integer is itself an object with a header.
 
-Two alternatives when that matters:
+Two options when that matters:
 
 <strong>`numpy.ndarray`</strong> stores raw values contiguously &mdash; a million 64-bit integers is 8MB, against roughly 40MB for a list. It also enables vectorised operations that run in C.
 
@@ -324,7 +324,7 @@ print("                     deep copy does not:  ", deep[0][0] == 1)
 ## Recap in one screen
 
 - A list is a contiguous array of pointers with spare capacity. This is why indexing and appending are O(1).
-- Operations at the front are O(n) because everything shifts &mdash; use `deque` there.
+- Operations at the front are O(n) because everything shifts. Use `deque` there.
 - Assignment shares the list; `copy()` is shallow; `[x]*n` repeats a reference.
 - `sort()` mutates and returns `None`; `sorted()` returns a new list; both are stable.
 - Replacing `in list` with `in set` is the most common Python speed-up available.

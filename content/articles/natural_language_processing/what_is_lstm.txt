@@ -30,7 +30,7 @@ In a language model the forget gate might drop the previous subject’s gender w
 
 ## Why the gradient survives
 
-The whole design rests on the additive update. Differentiating <span class="mono-font">C<sub>t</sub></span> about <span class="mono-font">C<sub>t&minus;1</sub></span> gives <span class="mono-font">f<sub>t</sub></span> &mdash; the forget gate itself, not a weight matrix.
+The whole design rests on the additive update. Differentiating <span class="mono-font">C<sub>t</sub></span> about <span class="mono-font">C<sub>t&minus;1</sub></span> gives <span class="mono-font">f<sub>t</sub></span>. The forget gate itself, not a weight matrix.
 
 So the gradient flowing back through the cell state is times by the forget gate at each step. When the network learns to keep something, the forget gate sits near 1, and multiplying by roughly 1 many times preserves the gradient. Compare that with a simple RNN, where the same path is times by <span class="mono-font">W<sub>h</sub></span> and a tanh derivative every step and decays geometrically.
 
@@ -40,7 +40,7 @@ This is the same principle as a residual connection: give the gradient an uninte
 
 A plain recurrent network overwrites its hidden state at every step. Whatever it knew about word one is repeatedly transformed, and after fifty steps almost nothing survives. Gradients decay along the same path, so it cannot learn long-range dependencies either.
 
-An LSTM adds a second, separately protected state: the <strong>cell state</strong>. This travels along the sequence with only additive updates and multiplicative gates deciding what enters and leaves.
+An LSTM adds a second, apart protected state: the <strong>cell state</strong>. This travels along the sequence with only additive updates and multiplicative gates deciding what enters and leaves.
 
 Two states, two jobs:
 
@@ -230,7 +230,7 @@ print("   scratch space. nobody assigns those roles; the gradient does.")
 1. <strong>Count the cost of gating.</strong> Press <strong>Parameters</strong> and compare with a plain RNN of the same size. An LSTM has four weight matrices instead of one &mdash; three gates plus the candidate &mdash; so it needs roughly <strong>four times</strong> the parameters.
 2. <strong>Grow the state.</strong> Raise <strong>State Size</strong> and watch the count climb. Each of the four blocks is (d + h) &times; h. So the total is 4[(d + h)h + h].
 3. <strong>Follow one timestep.</strong> Press <strong>Simulate Cell Operation</strong> and trace the cell state along the top. It passes straight through, touched only by a multiply and an add &mdash; that unbroken line is the long-term memory path.
-4. <strong>Watch the gates open and close.</strong> During the simulation note that gate values are between 0 and 1 rather than binary. Gating is continuous, which is what makes it differentiable and therefore learnable.
+4. <strong>Watch the gates open and close.</strong> During the simulation note that gate values are between 0 and 1 rather than binary. Gating is continuous, which is what makes it differentiable and so learnable.
 
 ## Traps worth knowing
 
@@ -264,7 +264,7 @@ Which output you use depends on the task. For classification, take the final hid
 
 Parameter count is worth knowing, because it explains why LSTMs are heavier than they look: four gates each need a weight matrix over the concatenated input and hidden state, giving `4 × ((input + hidden) × hidden + hidden)`. For 300-dimensional input and 256 hidden units that is about 570,000 parameters per layer.
 
-For variable-length batches, use `pack_padded_sequence` so the LSTM does not process padding &mdash; otherwise the final hidden state reflects the padding rather than the last real token.
+For variable-length batches, use `pack_padded_sequence` so the LSTM does not process padding. Otherwise the final hidden state reflects the padding rather than the last real token.
 
 ## LSTM, GRU or transformer?
 
@@ -277,7 +277,7 @@ For variable-length batches, use `pack_padded_sequence` so the LSTM does not pro
 |Streaming / constant memory|Yes|Yes|No &mdash; KV cache grows|
 |Small-data performance|Good|Good|Needs more data|
 
-<strong>GRU</strong> merges the forget and input gates into a single update gate and drops the separate cell state. Fewer parameters, slightly faster, and empirically comparable on most tasks &mdash; the choice between them is usually not worth agonising over.
+<strong>GRU</strong> merges the forget and input gates into a single update gate and drops the separate cell state. Fewer parameters, slightly faster, and empirically comparable on most tasks. The choice between them is usually not worth agonising over.
 
 <strong>Transformers</strong> won for large-scale language work because they parallelise across the sequence and have constant path length between positions. But LSTMs remain a sensible choice for streaming inference with bounded memory, for small datasets, for on-device models, and for classical time-series work.
 
@@ -293,12 +293,12 @@ For variable-length batches, use `pack_padded_sequence` so the LSTM does not pro
 
 <strong>Do I need gradient clipping?</strong> Yes &mdash; recurrent models are the classic case for it.
 
-<strong>Should I use a bidirectional LSTM?</strong> For classification and tagging where the whole input is available, yes &mdash; it usually helps. Never for generation or streaming, where the future is not available.
+<strong>Should I use a bidirectional LSTM?</strong> For classification and tagging where the whole input is available, yes. It usually helps. Never for generation or streaming, where the future is not available.
 
 ## Recap in one screen
 
 - Two states: a protected cell state for long-term memory, a hidden state for the working output.
 - Three sigmoid gates decide what to forget, what to store and what to expose.
-- The cell updates additively, so `∂cₜ/∂cₜ₋₁` is the forget gate &mdash; near 1 means the gradient survives.
+- The cell updates additively, so `∂cₜ/∂cₜ₋₁` is the forget gate. Near 1 means the gradient survives.
 - That additive path is the same idea as a residual connection. And it is what fixed vanishing gradients.
 - Superseded by transformers at scale; still the right tool for streaming, small data and on-device work.

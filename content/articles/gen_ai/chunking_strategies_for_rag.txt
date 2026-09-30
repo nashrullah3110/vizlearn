@@ -5,11 +5,11 @@ intro: The retrieval step can only ever be as good as the pieces it is choosing 
 
 Every piece of <a href="rag.html" style="color: var(--accent-primary)">RAG</a> downstream of chunking — embedding, indexing, retrieval, reranking — operates on whatever the chunk boundaries produced. Cut a sentence in half and both halves lose the context that made the original sentence meaningful; the embedding of a fragment is not a fragment of the embedding.
 
-The strategies form a spectrum. Fixed-size chunking splits by token count, ignoring content entirely — simple and fast. But it regularly cuts mid-sentence. Recursive chunking tries paragraph breaks first, then sentence breaks, then word breaks, keeping units coherent when the document cooperates. Structure-aware chunking reads headings and section markers and splits at the boundaries the author provided. Semantic chunking embeds every sentence and splits where the topic shifts, at the cost of one embedding call per sentence at indexing time.
+The strategies form a spectrum. Fixed-size chunking splits by token count, ignoring content entirely — simple and fast. But it regularly cuts mid-sentence. Recursive chunking tries paragraph breaks first, then sentence breaks, then word breaks. This keeps units coherent when the document cooperates. Structure-aware chunking reads headings and section markers and splits at the boundaries the author provided. Semantic chunking embeds every sentence and splits where the topic shifts, at the cost of one embedding call per sentence at indexing time.
 
 Chunk size controls a direct trade-off. Small chunks (100–200 tokens) are precise — each one is about one idea. So retrieval is accurate — but they lose surrounding context. Large chunks (500–1000 tokens) carry more context but dilute the embedding: a chunk about three topics is weakly relevant to all three and strongly relevant to none. Most production systems settle between 200 and 500 tokens, with 50–100 tokens of overlap to soften boundary effects.
 
-Overlap is a patch, not a fix. It duplicates tokens across chunks so that a sentence split at a boundary still appears whole in at least one chunk. The cost is storage (every overlapped token is embedded and indexed twice) and occasional duplicate retrieval results that need deduplication downstream. The benefit is measurable: removing overlap typically drops recall by 5–15% on boundary-sensitive queries.
+Overlap is a patch, not a fix. It duplicates tokens across chunks so that a sentence split at a boundary still appears whole in at least one chunk. The cost is storage (every overlapped token is embedded and indexed twice) and occasional duplicate retrieval results that need deduplication downstream. The benefit is measurable: removing overlap usually drops recall by 5–15% on boundary-sensitive queries.
 
 ## Fixed-size vs semantic
 
@@ -23,13 +23,13 @@ Even a well-placed boundary loses something: whatever came just before a chunk s
 
 Three reasons, and they compound.
 
-<strong>Embeddings blur when the input is long.</strong> A vector representing a 20-page document is an average of everything in it. So it is close to nothing in particular. Retrieval precision collapses.
+<strong>Embeddings blur when the input is long.</strong> A vector representing a 20-page document is an average of everything in it. So it is close to nothing notably. Retrieval precision collapses.
 
 <strong>The context window is finite,</strong> and shared with the question and the answer. Ten full documents will not fit.
 
 <strong>Precision needs granularity.</strong> The user asked one question; the answer is one paragraph. Retrieving the whole document buries it.
 
-So documents are split into chunks, each embedded separately. The chunk becomes the unit of retrieval, and how you choose its boundaries decides the ceiling on the whole system's quality.
+So documents are split into chunks, each embedded apart. The chunk becomes the unit of retrieval, and how you choose its boundaries decides the ceiling on the whole system's quality.
 
 ## The strategies, from crude to careful
 
@@ -394,7 +394,7 @@ Two patterns resolve the size trade-off rather than compromising on it.
 
 <strong>Parent-child (small-to-big).</strong> Index small chunks for precise matching, but return their larger parent section to the model. Retrieval operates on 100-token units; generation sees the 800-token section they came from. You get the precision of small chunks and the context of large ones.
 
-<strong>Sentence windows.</strong> Index each sentence individually, and at retrieval time expand to include the two or three sentences either side. Same idea, finer granularity.
+<strong>Sentence windows.</strong> Index each sentence one by one, and at retrieval time expand to include the two or three sentences either side. Same idea, finer granularity.
 
 Both require storing the relationship between the indexed unit and its context. This every serious vector store supports through metadata.
 
@@ -413,7 +413,7 @@ Adding metadata after the fact means re-indexing. Deciding it up front costs not
 
 ## Document types that need special handling
 
-<strong>Tables.</strong> Splitting a table mid-row destroys it. Extract tables separately, keep each whole, and store a text summary alongside for embedding.
+<strong>Tables.</strong> Splitting a table mid-row destroys it. Extract tables apart, keep each whole, and store a text summary alongside for embedding.
 
 <strong>Code.</strong> Split on function and class boundaries, not line counts. A half-function is not retrievable knowledge.
 

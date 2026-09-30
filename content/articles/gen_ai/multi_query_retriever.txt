@@ -7,11 +7,11 @@ Embedding-based retrieval finds documents whose vectors are near the query’s v
 
 Ask “how do I speed up my model?” of a corpus that discusses “reducing inference latency”, “quantisation” and “batch throughput” and the embedding may simply not land near any of them. The information is present and the phrasing is wrong, and a single query gets a single shot at matching it.
 
-The failure is silent. The retriever returns its nearest neighbours regardless, so you get plausible-looking, unhelpful chunks with no signal that anything was missed. A multi-query retriever fixes this by making several alternative phrasings of the question &mdash; typically 3 to 5 &mdash; using a language model, then searching with each phrasing independently and merging the results. "How do I speed up my model?" becomes "reduce inference latency," "optimise batch throughput," and "quantise model weights". Three queries that together cover vocabulary the original missed. The merge step deduplicates by document id and can either union the results (maximise recall) or intersect them (maximise precision). The cost is N extra embedding calls and N extra vector searches per user query. This is small compared to the generation step that follows. This page shows the vocabulary mismatch on a real corpus, shows the recall improvement from multiple queries, and covers the tradeoff between union and intersection merging.
+The failure is silent. The retriever returns its nearest neighbours regardless, so you get plausible-looking, unhelpful chunks with no signal that anything was missed. A multi-query retriever fixes this by making several other phrasings of the question &mdash; usually 3 to 5 &mdash; using a language model, then searching with each phrasing independently and merging the results. "How do I speed up my model?" becomes "reduce inference latency," "optimise batch throughput," and "quantise model weights". Three queries that together cover vocabulary the original missed. The merge step deduplicates by document id and can either union the results (maximise recall) or intersect them (maximise precision). The cost is N extra embedding calls and N extra vector searches per user query. This is small compared to the generation step that follows. This page shows the vocabulary mismatch on a real corpus, shows the recall improvement from multiple queries, and covers the tradeoff between union and intersection merging.
 
 ## Making several queries and merging
 
-A multi-query retriever asks a language model to produce N alternative phrasings of the question &mdash; typically 3 to 5 &mdash; each approaching it from a different angle. The original question above might become:
+A multi-query retriever asks a language model to produce N other phrasings of the question &mdash; usually 3 to 5 &mdash; each approaching it from a different angle. The original question above might become:
 
 - “What techniques reduce model inference latency?”
 - “How can I improve throughput at serving time?”
@@ -257,7 +257,7 @@ print("   like a retrieval problem rather than a prompt problem.")
 
 ## What it costs, and what to use instead
 
-Multi-query is not free. Making the variants is an extra LLM call on the critical path, adding latency and cost to every request. And it runs N searches instead of one. For an interactive application that overhead is real.
+Multi-query is not free. Making the variants is an extra LLM call on the critical path. This adds latency and cost to every request. And it runs N searches instead of one. For an interactive application that overhead is real.
 
 Related approaches make different trades. <strong>HyDE</strong> makes a hypothetical <em>answer</em> and embeds that, on the argument that an answer is textually closer to the passage containing it than a question is. <strong>Query decomposition</strong> splits a multi-part question into separate sub-questions, which multi-query does not do. It rephrases rather than divides. And <strong>hybrid search</strong>, combining dense retrieval with BM25 keyword matching, addresses much of the same vocabulary problem for a fraction of the cost, because exact term matching catches precisely the rare words embeddings handle worst.
 
@@ -277,9 +277,9 @@ A multi-query retriever compensates for the fact that a single embedding gets on
 
 <strong>It helps with vague or short queries.</strong> "It's broken" gives an embedding with almost no signal; several specific rewrites give several usable ones.
 
-<strong>It helps when documents use different vocabulary</strong> from users &mdash; jargon, product names, formal register.
+<strong>It helps when documents use different vocabulary</strong> from users. Jargon, product names, formal register.
 
-<strong>It helps with multi-faceted questions,</strong> where different aspects live in different documents. Decomposition is a related and sometimes better approach: split the question into its parts explicitly and retrieve for each.
+<strong>It helps with multi-faceted questions,</strong> where different aspects live in different documents. Decomposition is a related and sometimes better approach: split the question into its parts by name and retrieve for each.
 
 <strong>It does not help much when the query already contains exact identifiers.</strong> Rewriting "error E4471" risks losing the code. This was the most retrievable part. Including the original query protects against this.
 

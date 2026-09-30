@@ -3,11 +3,11 @@ intro: Neither method alone, combined by their agreement.
 
 ## The idea in brief
 
-<a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">Dense retrieval</a> and <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously. Hybrid search runs both and combines the results, so a failure in one is not by itself a failure of the whole system. The combination method matters: averaging raw scores is meaningless because the two scoring functions live on incomparable scales. Reciprocal Rank Fusion (RRF) solves this by discarding the scores entirely and using only each document's position in each ranked list. The formula `RRF(d) = sum(1 / (k + rank(d)))` across all lists gives each document a score that rewards being ranked highly by multiple methods. The constant k (typically 60) dampens the difference between adjacent ranks so that a document at rank 1 does not overwhelm one at rank 3. A document that both methods agree on builds up contributions from both lists and rises to the top; a document that only one method likes gets a single contribution and ranks lower. RRF requires no tuning, no normalisation, and no learned weights. This is why it became the default fusion method in systems like Elasticsearch and Weaviate. This page runs dense and sparse retrieval on the same query, prints both ranked lists side by side, and shows the RRF scores and the fused ranking.
+<a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">Dense retrieval</a> and <a href="bm25_and_sparse_retrieval.html" style="color: var(--accent-primary)">BM25</a> fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously. Hybrid search runs both and combines the results, so a failure in one is not by itself a failure of the whole system. The combination method matters: averaging raw scores is meaningless because the two scoring functions live on incomparable scales. Reciprocal Rank Fusion (RRF) solves this by discarding the scores entirely and using only each document's position in each ranked list. The formula `RRF(d) = sum(1 / (k + rank(d)))` across all lists gives each document a score that rewards being ranked highly by multiple methods. The constant k (usually 60) dampens the difference between adjacent ranks so that a document at rank 1 does not overwhelm one at rank 3. A document that both methods agree on builds up contributions from both lists and rises to the top; a document that only one method likes gets a single contribution and ranks lower. RRF requires no tuning, no normalisation, and no learned weights. This is why it became the default fusion method in systems like Elasticsearch and Weaviate. This page runs dense and sparse retrieval on the same query, prints both ranked lists side by side, and shows the RRF scores and the fused ranking.
 
 ## Why fuse ranks, not raw scores
 
-A cosine similarity lives between -1 and 1. A BM25 score is an unbounded sum that depends on corpus size and term rarity. Averaging the two numbers directly is meaningless — a BM25 score of 8 is not "worth" anything in particular next to a cosine of 0.6. <strong>Reciprocal Rank Fusion</strong> sidesteps this by throwing the scores away and using only each document's <em>position</em> in each list.
+A cosine similarity lives between -1 and 1. A BM25 score is an unbounded sum that depends on corpus size and term rarity. Averaging the two numbers directly is meaningless — a BM25 score of 8 is not "worth" anything notably next to a cosine of 0.6. <strong>Reciprocal Rank Fusion</strong> sidesteps this by throwing the scores away and using only each document's <em>position</em> in each list.
 
 RRF(d) = &Sigma;<sub>list</sub> 1 / (k + rank<sub>list</sub>(d))
 
@@ -15,7 +15,7 @@ A document ranked highly by both methods builds up a large score from both terms
 
 ## Two retrievers with opposite strengths
 
-<strong>Dense retrieval</strong> compares embedding vectors. It finds documents that mean the same thing in different words &mdash; a query for "holiday allowance" retrieves a page about "annual leave entitlement".
+<strong>Dense retrieval</strong> compares embedding vectors. It finds documents that mean the same thing in different words. A query for "holiday allowance" retrieves a page about "annual leave entitlement".
 
 <strong>Sparse retrieval</strong> (BM25) matches terms. It finds exact strings &mdash; product codes, error numbers, surnames, version identifiers &mdash; that embeddings blur into their neighbours.
 
@@ -193,7 +193,7 @@ print("   methods agree on is a better bet than one that either method")
 print("   loves alone.")
 ```
 
-It is worth putting a number on how much that fusion buys over the naive and normalized alternatives above. The next block scores all three approaches at once.
+It is worth putting a number on how much that fusion buys over the naive and normalized options above. The next block scores all three approaches at once.
 
 ```python-run
 import numpy as np
@@ -395,7 +395,7 @@ print("   retrievals and two indexes on every query instead of one.")
 ## Try it yourself
 
 1. <strong>Compare the two lists.</strong> They do not agree on the #1 result — dense and sparse are weighting the same five documents by genuinely different criteria.
-2. <strong>Read the fused ranking.</strong> The winner is not necessarily #1 in either individual list — it is the document both methods placed respectably. This is exactly what "fused by rank" is built to surface.
+2. <strong>Read the fused ranking.</strong> The winner is not necessarily #1 in either single list — it is the document both methods placed respectably. This is exactly what "fused by rank" is built to surface.
 3. <strong>Push k up toward 60.</strong> The gaps between fused scores shrink and consensus dominates even more strongly — this is the standard default, chosen to be forgiving of exactly how far down a list something sits.
 4. <strong>Pull k down to 1.</strong> Rank 1 in either list is now worth sharply more than rank 2 — a document has to actually top one of the lists to compete.
 
@@ -417,7 +417,7 @@ def rrf(rankings, k=60, top_n=10):
 results = rrf([dense_ids, bm25_ids])
 ```
 
-Twelve lines, no tuning, no normalisation. That ease is a large part of why RRF is used so widely in practice despite more sophisticated alternatives existing.
+Twelve lines, no tuning, no normalisation. That ease is a large part of why RRF is used so widely in practice despite more sophisticated options existing.
 
 Two practical details:
 
@@ -425,7 +425,7 @@ Two practical details:
 
 <strong>Weight the branches if you have evidence.</strong> Multiplying one list's contribution by a factor lets you favour the retriever that measures better on your data. Do it from measurements, not intuition.
 
-## The alternatives
+## The options
 
 |Method|How|Needs tuning?|
 |---|---|---|
@@ -436,7 +436,7 @@ Two practical details:
 
 <strong>Weighted score fusion</strong> can beat RRF when carefully tuned on a specific corpus. And it is brittle: the normalisation depends on the result set and the weights need retuning as the corpus changes.
 
-<strong>Cross-encoder reranking</strong> is not an alternative so much as the next stage. The standard production shape is: hybrid retrieval with RRF to get 50 good candidates cheaply, then a cross-encoder to order them accurately, then the top 5 into the prompt.
+<strong>Cross-encoder reranking</strong> is not an other so much as the next stage. The standard production shape is: hybrid retrieval with RRF to get 50 good candidates cheaply, then a cross-encoder to order them accurately, then the top 5 into the prompt.
 
 That three-stage pipeline &mdash; cheap and broad, then expensive and precise &mdash; is the shape almost every serious retrieval system converges on.
 

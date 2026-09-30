@@ -3,7 +3,7 @@ intro: Spend the expensive model only on the candidates that survived the cheap 
 
 ## The idea in brief
 
-A <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">bi-encoder</a> embeds the query and every document <em>separately</em>, ahead of time — that is what makes the embeddings precomputable and search fast. But it also means the model never looks at a query and a document together. A <strong>cross-encoder</strong> takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable. The accuracy gap between these two approaches is real and well-measured: on MS MARCO and similar benchmarks, a cross-encoder consistently and substantially outperforms a bi-encoder by 5-15 points of nDCG, because joint attention can model fine-grained query-document interactions (negation, qualification, partial match) that independent embeddings compress away. The standard pattern is a **two-stage pipeline**: the bi-encoder (or BM25) retrieves a shortlist of 20-100 candidates cheaply. And the cross-encoder rescores only that shortlist to determine the final ranking. This page shows both models scoring the same query-document pairs side by side, shows where the bi-encoder's ranking disagrees with the cross-encoder's, and covers the latency-accuracy tradeoff as the shortlist size changes.
+A <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">bi-encoder</a> embeds the query and every document <em>apart</em>, ahead of time — that is what makes the embeddings precomputable and search fast. But it also means the model never looks at a query and a document together. A <strong>cross-encoder</strong> takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable. The accuracy gap between these two approaches is real and well-measured: on MS MARCO and similar benchmarks, a cross-encoder consistently and substantially outperforms a bi-encoder by 5-15 points of nDCG, because joint attention can model fine-grained query-document interactions (negation, qualification, partial match) that independent embeddings compress away. The standard pattern is a **two-stage pipeline**: the bi-encoder (or BM25) retrieves a shortlist of 20-100 candidates cheaply. And the cross-encoder rescores only that shortlist to determine the final ranking. This page shows both models scoring the same query-document pairs side by side, shows where the bi-encoder's ranking disagrees with the cross-encoder's, and covers the latency-accuracy tradeoff as the shortlist size changes.
 
 ## The two-stage pattern
 
@@ -11,7 +11,7 @@ Cross-encoders are far more accurate but cost too much to run over an entire cor
 
 ## Two ways to score a query against a document
 
-<strong>A bi-encoder</strong> embeds the query and the document <em>separately</em>, then compares the two vectors. Because documents can be embedded ahead of time, search is a fast vector comparison over a precomputed index.
+<strong>A bi-encoder</strong> embeds the query and the document <em>apart</em>, then compares the two vectors. Because documents can be embedded ahead of time, search is a fast vector comparison over a precomputed index.
 
 <strong>A cross-encoder</strong> takes the query and one document <em>together</em> as a single input and outputs a relevance score. The model attends across both, so every query term can interact with every document term. And nothing can be precomputed.
 
@@ -42,7 +42,7 @@ So the standard arrangement uses each for what it is good at:
 
 The insight is that recall and precision can be separated. Stage one needs high recall &mdash; the right document must be <em>somewhere</em> in the 50. Stage two provides precision, ordering them accurately.
 
-Measured on standard benchmarks, adding a cross-encoder reranker typically improves nDCG by 10&ndash;20% over dense retrieval alone. It is one of the highest-value additions to a RAG pipeline. And it is often skipped.
+Measured on standard benchmarks, adding a cross-encoder reranker usually improves nDCG by 10&ndash;20% over dense retrieval alone. It is one of the highest-value additions to a RAG pipeline. And it is often skipped.
 
 ## In code
 
@@ -263,13 +263,13 @@ That diagnostic ordering is worth stating plainly: <strong>reranking cannot reco
 
 <strong>Is an LLM a good reranker?</strong> Effective and expensive. Use a purpose-trained cross-encoder for production paths.
 
-<strong>Does reranking help with the "lost in the middle" problem?</strong> Yes &mdash; it puts the most relevant chunk first, where the model attends to it most.
+<strong>Does reranking help with the "lost in the middle" problem?</strong> Yes. It puts the most relevant chunk first, where the model attends to it most.
 
 <strong>Can I fine-tune a reranker?</strong> Yes, on (query, relevant, irrelevant) triples from your own data. It often beats a general model by a wide margin on a specific domain.
 
 ## Recap in one screen
 
-- A bi-encoder embeds query and document separately, so documents can be indexed and search is fast.
+- A bi-encoder embeds query and document apart, so documents can be indexed and search is fast.
 - A cross-encoder reads both together, which is far more accurate and cannot be precomputed.
 - Use both: broad cheap retrieval for recall, then reranking for precision.
 - Rerank around 50 candidates; measure stage-one recall to know whether that is the bottleneck.

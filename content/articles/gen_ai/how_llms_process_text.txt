@@ -9,7 +9,7 @@ The embedding layer converts each ID into a dense vector of learned real numbers
 
 The transformer layers are the core of the model. Each layer applies self-attention (every token looks at every other token to decide what information to incorporate) followed by a feed-forward network (two linear layers with a nonlinearity). A typical LLM stacks 32 to 96 of these layers. At each layer the representations are refined: early layers learn syntax and local patterns, middle layers learn semantic relationships, and later layers learn task-specific features.
 
-The output layer projects the final hidden state of each position back to the vocabulary size, producing a score (logit) for every token in the vocabulary. Softmax converts those logits into a probability distribution, and the model samples or takes the argmax to produce the next token. This process repeats token by token — each made token is appended to the input and the model runs again — which is why generation is called autoregressive and why it is slower than encoding.
+The output layer projects the final hidden state of each position back to the vocabulary size. This produces a score (logit) for every token in the vocabulary. Softmax converts those logits into a probability distribution, and the model samples or takes the argmax to produce the next token. This process repeats token by token — each made token is appended to the input and the model runs again — which is why generation is called autoregressive and why it is slower than encoding.
 
 The entire pipeline — tokenise, embed, add position, transform through N layers, project, sample — is what happens every time the model makes a single token. Understanding it explains why context length matters (attention is quadratic in sequence length), why the first token is slow (the full input must be encoded) and why subsequent tokens are faster (the KV cache stores the attention keys and values from previous positions).
 
@@ -17,11 +17,11 @@ The entire pipeline — tokenise, embed, add position, transform through N layer
 
 Each ID indexes into a giant lookup table, pulling out a learned vector of <span class="mono-font">d</span> numbers. <em>These vectors are where meaning lives.</em> Words used in similar contexts end up with similar vectors. And this table is trained along with everything else.
 
-Notice the shape change: a list of <span class="mono-font">n</span> integers becomes an <span class="mono-font">n &times; d</span> matrix. Every stage from here on preserves that shape &mdash; the transformer transforms these vectors repeatedly without altering the grid size.
+Notice the shape change: a list of <span class="mono-font">n</span> integers becomes an <span class="mono-font">n &times; d</span> matrix. Every stage from here on preserves that shape. The transformer transforms these vectors repeatedly without altering the grid size.
 
 ## Stage 5: Position Must Be Injected
 
-Self-attention has no inherent sense of order &mdash; it sees a <em>set</em> of vectors. So "dog bites man" and "man bites dog" would be the same. Position is therefore added directly into the vectors, classically with sinusoids of geometrically increasing wavelength:
+Self-attention has no inherent sense of order &mdash; it sees a <em>set</em> of vectors. So "dog bites man" and "man bites dog" would be the same. Position is so added directly into the vectors, classically with sinusoids of geometrically increasing wavelength:
 
 PE(pos, 2i) = sin(pos / 10000<sup>2i/d</sup>) &nbsp;&nbsp; PE(pos, 2i+1) = cos(pos / 10000<sup>2i/d</sup>)
 
@@ -63,7 +63,7 @@ Every block is the same two sublayers, each wrapped in a residual connection and
 
 <strong>Attention</strong> lets each token gather information from others. Each token produces a query, compares it against every token's key, and takes a weighted mixture of their values. In a decoder, future positions are masked out so generation is possible.
 
-<strong>The feed-forward network</strong> processes each position independently, expanding to roughly four times the model dimension and back. This is where <em>most of the parameters live</em> &mdash; typically two thirds of the model &mdash; which is worth knowing because attention gets all the attention.
+<strong>The feed-forward network</strong> processes each position independently, expanding to roughly four times the model dimension and back. This is where <em>most of the parameters live</em> &mdash; usually two thirds of the model &mdash; which is worth knowing because attention gets all the attention.
 
 <strong>Residual connections</strong> give gradients a clean path back through dozens of blocks. Without them, deep stacks do not train.
 
@@ -251,7 +251,7 @@ For a 7B-parameter model with 32 layers and a model dimension of 4096:
 |Embedding and output|~5%|
 |LayerNorm|Negligible|
 
-The embedding and output matrices are often <strong>tied</strong> &mdash; the same weights used in both directions &mdash; which saves a substantial number of parameters (a 128,000-token vocabulary times 4,096 dimensions is 524 million) and typically helps slightly.
+The embedding and output matrices are often <strong>tied</strong> &mdash; the same weights used in both directions &mdash; which saves a substantial number of parameters (a 128,000-token vocabulary times 4,096 dimensions is 524 million) and usually helps slightly.
 
 Memory at inference is roughly the parameter count times the bytes per parameter, plus the KV cache. That is the arithmetic behind every quantisation decision: 7 billion parameters is 14GB at 16-bit and 3.5GB at 4-bit.
 

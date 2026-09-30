@@ -15,7 +15,7 @@ That is one arithmetic operation and one or two memory accesses. This is why loo
 
 The comparison in step 3 is needed because two different keys can hash to the same slot. Hashes are checked first &mdash; comparing integers is cheap &mdash; and only if the hashes match are the keys compared with `==`.
 
-This page builds a miniature hash table so you can watch the slot arithmetic, shows what happens when collisions pile up, and covers the CPython 3.6+ compact layout that made dictionaries both smaller and insertion-ordered. It also explains why keys must be hashable &mdash; and what that requirement actually means in practice.
+This page builds a miniature hash table so you can watch the slot arithmetic, shows what happens when collisions pile up, and covers the CPython 3.6+ compact layout that made dictionaries both smaller and insertion-ordered. It also explains why keys must be hashable. And what that requirement actually means in practice.
 
 
 ## Run it
@@ -125,11 +125,11 @@ CPython's probe sequence is on purpose not a simple linear step; it uses the hig
 
 When the table becomes too full, collisions become frequent and lookups slow down. So the dictionary <strong>resizes</strong>: once it is about two thirds full, a larger table is allocated and every entry is rehashed into it.
 
-That resize is O(n). Averaged over the insertions that fit in the new capacity, insertion is O(1) <strong>amortised</strong>. Individual insertions can be expensive, the sequence is cheap. The same mechanism underlies list `append`.
+That resize is O(n). Averaged over the insertions that fit in the new capacity, insertion is O(1) <strong>amortised</strong>. Single insertions can be expensive, the sequence is cheap. The same mechanism underlies list `append`.
 
 ## Why keys must be immutable
 
-A key's slot is determined by its hash. If the key changed after insertion, its hash would change. And the entry would sit in a slot the new hash does not point to &mdash; unreachable, and effectively lost.
+A key's slot is determined by its hash. If the key changed after insertion, its hash would change. And the entry would sit in a slot the new hash does not point to. Unreachable, and in effect lost.
 
 ```python-run
 d = {}
@@ -161,7 +161,7 @@ The comparison at the end is not optional. Two different keys can share a slot, 
 
 When two keys want the same slot, CPython probes for another one using a sequence derived from the hash. That costs extra comparisons, and the fuller the table the longer the probe sequences get.
 
-So the table grows before that becomes a problem &mdash; past roughly two-thirds occupancy it allocates a bigger one and reinserts everything. A resize is O(n) and every key's slot changes, because the index is <code>hash % size</code> and <code>size</code> just moved. Amortised over the insertions that caused it, insertion is still O(1).
+So the table grows before that becomes a problem. Past roughly two-thirds occupancy it allocates a bigger one and reinserts everything. A resize is O(n) and every key's slot changes, because the index is <code>hash % size</code> and <code>size</code> just moved. Amortised over the insertions that caused it, insertion is still O(1).
 
 ## When O(1) is not true
 
@@ -208,7 +208,7 @@ Practical consequences:
 
 The worst cases require every key to collide, which needs either a bad custom `__hash__` or adversarially chosen keys. And hash randomisation addresses the second.
 
-Two practical notes. Deletion leaves a marker rather than a gap, because removing an entry outright would break probe sequences that passed through it; heavy deletion therefore leaves the table sparse until it is resized. And memory use is higher than a list of the same values. This is the price of the lookup speed.
+Two practical notes. Deletion leaves a marker rather than a gap, because removing an entry outright would break probe sequences that passed through it; heavy deletion so leaves the table sparse until it is resized. And memory use is higher than a list of the same values. This is the price of the lookup speed.
 
 ## Questions people ask
 
@@ -220,13 +220,13 @@ Two practical notes. Deletion leaves a marker rather than a gap, because removin
 
 <strong>Chaining or open addressing?</strong> CPython uses open addressing with a scattering probe sequence; Java uses chaining, upgrading long chains to trees.
 
-<strong>What is the load factor?</strong> The fill ratio that triggers a resize &mdash; about 2/3 in CPython.
+<strong>What is the load factor?</strong> The fill ratio that triggers a resize. About 2/3 in CPython.
 
 <strong>Why do string hashes change between runs?</strong> Deliberate per-process randomisation, to prevent collision-based denial-of-service attacks.
 
 ## Recap in one screen
 
-- Hash the key, index into a slot array, compare &mdash; one calculation and a memory access. So O(1) on average.
+- Hash the key, index into a slot array, compare. One calculation and a memory access. So O(1) on average.
 - Collisions are inevitable and are resolved by probing; the table resizes at about two thirds full.
 - Keys must be immutable, because a changing hash would orphan the entry, and `__eq__` and `__hash__` must agree.
 - The compact layout stores entries contiguously in insertion order, which gives both the ordering guarantee and lower memory use.

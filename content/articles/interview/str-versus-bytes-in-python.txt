@@ -15,7 +15,7 @@ print(len(b))     # 5    bytes -- é needs two in UTF-8
 print(s[0])       # 'c'  a one-character str
 print(b[0])       # 99   an INTEGER, not b'c'
 ```
-Two details catch people out at once. Indexing `bytes` yields an `int`, not a one-byte `bytes` object &mdash; slicing does give `bytes`. So `b[0:1]` is `b'c'` while `b[0]` is `99`. And `len` differs between the two representations of the same text. This is the source of most truncation bugs.
+Two details catch people out at once. Indexing `bytes` yields an `int`, not a one-byte `bytes` object. Slicing does give `bytes`. So `b[0:1]` is `b'c'` while `b[0]` is `99`. And `len` differs between the two representations of the same text. This is the source of most truncation bugs.
 
 This page covers when to use each type, what `encode` and `decode` actually do, why UTF-8 is the right default. And the common errors that appear at system boundaries &mdash; reading a file, calling a subprocess, or sending data over a socket &mdash; where the wrong type produces either a `TypeError` or silent corruption. The code blocks below encode and decode the same text in UTF-8 and Latin-1 so you can see the byte-level differences, then trigger the common errors on purpose &mdash; `TypeError` when you mix types, and `UnicodeDecodeError` when you guess the encoding wrong.
 
@@ -153,7 +153,7 @@ Violating it produces the two classic errors. <code>UnicodeDecodeError</code> me
 
 ## Where it actually shows up
 
-Reading a file with <code>open(path)</code> gives str and applies your platform's default encoding. This differs between machines and is the source of "works on my laptop" bugs. Pass <code>encoding="utf-8"</code> explicitly, always. <code>open(path, "rb")</code> gives bytes and does not guess.
+Reading a file with <code>open(path)</code> gives str and applies your platform's default encoding. This differs between machines and is the source of "works on my laptop" bugs. Pass <code>encoding="utf-8"</code> by name, always. <code>open(path, "rb")</code> gives bytes and does not guess.
 
 Sockets, subprocess output, hashlib and most binary formats are bytes. <code>hashlib.sha256(s)</code> is a <code>TypeError</code> until you encode &mdash; a hash is defined over bytes. So the encoding is part of the answer.
 
@@ -182,7 +182,7 @@ print("binary mode:", data, type(data).__name__)
 # .decode() on the way back.
 print("to send    :", "hello".encode())
 ```
-<strong>Always pass `encoding=` explicitly when opening text files.</strong> Without it, Python uses the platform default. This is UTF-8 on Linux and macOS and historically a legacy code page on Windows. So the same code reads different characters on different machines. Python 3.15 makes UTF-8 the default everywhere, and being explicit remains the habit that survives version differences.
+<strong>Always pass `encoding=` by name when opening text files.</strong> Without it, Python uses the platform default. This is UTF-8 on Linux and macOS and historically a legacy code page on Windows. So the same code reads different characters on different machines. Python 3.15 makes UTF-8 the default everywhere, and being explicit remains the habit that survives version differences.
 
 Three things must stay in `bytes`:
 
@@ -211,7 +211,7 @@ chunk = mv[0:5]               # zero-copy view
 
 <strong>Why is `b"abc" == "abc"` False rather than an error?</strong> Equality across unrelated types returns False by design; only ordering and joining raise. This is why the comparison bug is so easy to miss.
 
-<strong>What is the default encoding?</strong> UTF-8 for `encode`/`decode`. File `open` used the locale default before Python 3.15, so pass it explicitly.
+<strong>What is the default encoding?</strong> UTF-8 for `encode`/`decode`. File `open` used the locale default before Python 3.15, so pass it by name.
 
 <strong>How do I get the byte length of text?</strong> `len(s.encode("utf-8"))`. `len(s)` counts characters.
 
@@ -225,4 +225,4 @@ chunk = mv[0:5]               # zero-copy view
 - `encode` goes `str` &rarr; `bytes`; `decode` goes back. UTF-8 unless told otherwise.
 - `b[0]` is an `int`; `b[0:1]` is `bytes`. And `len` differs between the two forms of the same text.
 - `b"abc" == "abc"` is silently False, which is the bug that hides in dictionary lookups.
-- Decode at the input edge, work in `str`, encode on output &mdash; and always pass `encoding=` to `open`.
+- Decode at the input edge, work in `str`, encode on output. And always pass `encoding=` to `open`.
