@@ -11,7 +11,7 @@ But notice what it is multiplied against. It never touches the old memory. It sc
 
 $$C_t = \underbrace{f_t \odot C_{t-1}}_{\text{what survives}} + \underbrace{i_t \odot \tilde{C}_t}_{\text{what gets written}}$$
 
-The input gate and the [candidate layer](candidate_memory_in_lstm.html) form a division of labour: the candidate proposes what to write, and the input gate decides how much of it to accept. A gate value near 0 blocks a memory slot entirely; near 1, it writes the candidate's full proposal. This element-wise scaling means different slots can be updated by different amounts on the same timestep. The LSTM can at once write strongly to one slot and barely touch another. During backpropagation, the gradient to the candidate flows through the input gate, and the gradient to the input gate flows through the candidate. So training adjusts both what content is proposed and how aggressively it is written. The [forget gate](forget_gate_in_lstm.html) and input gate together control the memory's evolution: the forget gate erases selectively, and the input gate writes selectively. When the forget gate is near 1 and the input gate is near 0, the memory is copied forward unchanged &mdash; the LSTM is coasting. When both are active, the memory is being rewritten. This page animates the input gate and candidate at each timestep, shows which memory slots receive new content, and covers the forget-input interplay.
+The input gate and the [candidate layer](candidate_memory_in_lstm.html) form a division of labour: the candidate proposes what to write. And the input gate decides how much of it to accept. A gate value near 0 blocks a memory slot entirely; near 1, it writes the candidate's full proposal. This element-wise scaling means different slots can be updated by different amounts on the same timestep. The LSTM can at once write strongly to one slot and barely touch another. During backpropagation, the gradient to the candidate flows through the input gate, and the gradient to the input gate flows through the candidate. So training adjusts both what content is proposed and how aggressively it is written. The [forget gate](forget_gate_in_lstm.html) and input gate together control the memory's evolution: the forget gate erases selectively. And the input gate writes selectively. When the forget gate is near 1 and the input gate is near 0, the memory is copied forward unchanged &mdash; the LSTM is coasting. When both are active, the memory is being rewritten. This page animates the input gate and candidate at each timestep, shows which memory slots receive new content, and covers the forget-input interplay.
 
 ## Two Layers, Two Different Jobs
 
@@ -30,7 +30,7 @@ It also protects the gradient. Addition passes gradients backwards unchanged, wh
 
 ## Forget and Input Are Not Opposites
 
-A natural assumption is that $i_t = 1 - f_t$ &mdash; that whatever you forget, you replace. In a standard LSTM this is <strong>false</strong>: the two gates are independent layers with their own weights, and all four combinations are meaningful.
+A natural assumption is that $i_t = 1 - f_t$ &mdash; that whatever you forget, you replace. In a standard LSTM this is <strong>false</strong>: the two gates are independent layers with their own weights. And all four combinations are meaningful.
 
 The cell can keep old memory <em>and</em> write new content ($f\!\approx\!1, i\!\approx\!1$), keep memory and write nothing ($f\!\approx\!1, i\!\approx\!0$), wipe and overwrite ($f\!\approx\!0, i\!\approx\!1$), or wipe and store nothing at all ($f\!\approx\!0, i\!\approx\!0$). The GRU is the variant that <em>does</em> tie them together with a single update gate &mdash; which is exactly how it saves a set of weights.
 
@@ -55,7 +55,7 @@ The obvious question: why not have one computation produce both the content and 
 
 Because they are different decisions and depend on different things. Whether a piece of information is <em>relevant now</em> is a question about context; what that information <em>is</em> is a question about the current input. Separating them lets the cell learn "this input carries a strong signal, but it is not relevant at this point in the sequence" &mdash; which a single computation cannot express.
 
-The practical demonstration is selectivity. Reading "The cat, which was orange, sat", the cell wants to store the subject (cat) and update its state as the clause proceeds without letting "orange" overwrite the subject. Separate gate and candidate make that possible: the candidate can carry "orange" while the gate keeps it out of the dimensions holding the subject.
+The practical example is selectivity. Reading "The cat, which was orange, sat", the cell wants to store the subject (cat) and update its state as the clause proceeds without letting "orange" overwrite the subject. Separate gate and candidate make that possible: the candidate can carry "orange" while the gate keeps it out of the dimensions holding the subject.
 
 |&nbsp;|Gate `i`|Candidate `g`|
 |---|---|---|
@@ -242,7 +242,7 @@ That is why LSTMs are heavier than they appear, and why a GRU with three matrice
 
 <strong>What if the input gate is always 0?</strong> The cell never stores anything new, and memory is useless. Check initialisation and learning rate.
 
-<strong>Should its bias be initialised specially?</strong> Zero is standard. It is the <em>forget</em> gate that benefits from a bias of 1.
+<strong>Should its bias be set up specially?</strong> Zero is standard. It is the <em>forget</em> gate that benefits from a bias of 1.
 
 <strong>Are the four matrices computed separately?</strong> No &mdash; implementations concatenate them into one multiplication and split the result, which is considerably faster.
 

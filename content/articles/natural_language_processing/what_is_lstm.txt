@@ -26,11 +26,11 @@ C<sub>t</sub> = f<sub>t</sub> &odot; C<sub>t&minus;1</sub> + i<sub>t</sub> &odot
 
 h<sub>t</sub> = o<sub>t</sub> &odot; tanh(C<sub>t</sub>)
 
-In a language model the forget gate might drop the previous subject’s gender when a new subject appears, the input gate writes the new one, and the output gate exposes it only when a pronoun actually needs to agree.
+In a language model the forget gate might drop the previous subject’s gender when a new subject appears, the input gate writes the new one. And the output gate exposes it only when a pronoun actually needs to agree.
 
 ## Why the gradient survives
 
-The whole design rests on the additive update. Differentiating <span class="mono-font">C<sub>t</sub></span> with respect to <span class="mono-font">C<sub>t&minus;1</sub></span> gives <span class="mono-font">f<sub>t</sub></span> &mdash; the forget gate itself, not a weight matrix.
+The whole design rests on the additive update. Differentiating <span class="mono-font">C<sub>t</sub></span> about <span class="mono-font">C<sub>t&minus;1</sub></span> gives <span class="mono-font">f<sub>t</sub></span> &mdash; the forget gate itself, not a weight matrix.
 
 So the gradient flowing back through the cell state is multiplied by the forget gate at each step. When the network learns to keep something, the forget gate sits near 1, and multiplying by roughly 1 many times preserves the gradient. Compare that with a simple RNN, where the same path is multiplied by <span class="mono-font">W<sub>h</sub></span> and a tanh derivative every step and decays geometrically.
 
@@ -72,11 +72,11 @@ Note the two activations doing different jobs. Sigmoid produces gates, because a
 
 In a plain RNN, the gradient flowing back through k steps is a product of k Jacobian factors. If those average below 1, the product decays exponentially.
 
-The LSTM's cell state has a path where the derivative of `cₜ` with respect to `cₜ₋₁` is simply the forget gate `fₜ`. If the forget gate is near 1 &mdash; the network has learned to keep this information &mdash; the gradient passes back in effect unchanged.
+The LSTM's cell state has a path where the derivative of `cₜ` about `cₜ₋₁` is simply the forget gate `fₜ`. If the forget gate is near 1 &mdash; the network has learned to keep this information &mdash; the gradient passes back in effect unchanged.
 
 That is the same structural idea as a residual connection: an additive path with a derivative near 1, protecting the gradient from the multiplicative decay. It is why LSTMs handled sequences of hundreds of steps where plain RNNs managed ten.
 
-It reduces the problem rather than eliminating it. Very long dependencies remain hard, and exploding gradients still occur, which is why gradient clipping is standard when training recurrent models.
+It reduces the problem rather than removing it. Very long dependencies remain hard, and exploding gradients still occur, which is why gradient clipping is standard when training recurrent models.
 
 ## The whole cell, one timestep at a time
 
@@ -234,7 +234,7 @@ print("   scratch space. nobody assigns those roles; the gradient does.")
 
 ## Traps worth knowing
 
-- <strong>Initialising the forget-gate bias at zero.</strong> That puts the gate at 0.5, halving the cell state every step and destroying memory before training can fix it. Initialise it to 1 or 2 so the cell starts out remembering.
+- <strong>Setting up the forget-gate bias at zero.</strong> That puts the gate at 0.5, halving the cell state every step and destroying memory before training can fix it. Initialise it to 1 or 2 so the cell starts out remembering.
 - <strong>Reaching for an LSTM by default.</strong> A GRU merges the forget and input gates into one, uses about 25% fewer parameters, trains faster, and performs comparably on most tasks. Try it first.
 - <strong>Confusing cell state with hidden state.</strong> PyTorch returns both as a tuple; passing the wrong one to the next layer is a common and quiet bug.
 - <strong>Using an LSTM where attention belongs.</strong> For long documents a transformer both remembers further and parallelises, which an LSTM cannot.

@@ -75,7 +75,7 @@ Following a sentence through a decoder-only model:
 6. <strong>Output projection</strong> to vocabulary size, giving one logit per possible next token.
 7. <strong>Softmax</strong> (inside the loss during training; explicitly at generation time).
 
-Step 6 is often <em>tied</em> to the embedding table &mdash; the same matrix used in reverse. That saves a large number of parameters and usually improves quality slightly.
+Step 6 is often <em>tied</em> to the embedding table &mdash; the same matrix used in reverse. That saves many parameters and usually improves quality slightly.
 
 The shape of the tensors flowing through: (batch, sequence, model_dim) from step 2 onwards, unchanged by every block. That constancy is what makes the stack composable.
 
@@ -243,7 +243,7 @@ print("   arrangement that makes 100-layer models trainable.")
 
 1. <strong>Take the residuals away.</strong> Untick <strong>Residual Connections</strong> and set the <strong>Number of Layers</strong> slider to 24. Watch the gradient curve decay toward zero and Trainable flip to no. Each sublayer shrinks what passes through it, and twenty-four of those in a row leave nothing to learn from.
 2. <strong>Put them back.</strong> Tick <strong>Residual Connections</strong> with the depth still at 24. The gradient holds at 1 all the way back to layer 1. This is the single change that makes deep stacks trainable at all.
-3. <strong>Take normalisation away instead.</strong> Untick <strong>Layer Normalisation</strong> with residuals on and depth at 24. Now the opposite failure: with nothing rescaling between layers the gradient compounds instead of decaying, and a deep stack becomes unstable rather than dead.
+3. <strong>Take normalisation away instead.</strong> Untick <strong>Layer Normalisation</strong> with residuals on and depth at 24. Now the opposite failure: with nothing rescaling between layers the gradient compounds instead of decaying. And a deep stack becomes unstable rather than dead.
 4. <strong>Find where the parameters are.</strong> With <strong>Feed-Forward Width</strong> at 4, read FFN Share. Roughly two thirds of every block sits in the feed-forward network, not in attention &mdash; which surprises most people, since attention is the part that gets all the attention.
 5. <strong>Change the width.</strong> Set the <strong>Feed-Forward Width</strong> slider to 1 and watch FFN Share collapse, then to 8 and watch it dominate. The 4× default is a convention, not a law.
 6. <strong>Scale it up.</strong> Set the <strong>Model Dimension</strong> slider to its maximum and watch the total. Parameters grow with the <em>square</em> of the dimension but only linearly with depth, which is why widening is so much more expensive than deepening.
@@ -269,7 +269,7 @@ The reason is practical: with post-norm the residual path itself gets normalised
 
 ## In one line
 
-A transformer block is two sublayers, each wrapped in the same add-and-normalise pattern: attention moves information between positions, and a position-wise feed-forward network processes each token on its own. The residual connection is what makes depth possible, giving the gradient a path that skips each sublayer &mdash; remove it and a deep stack stops training entirely &mdash; while layer normalisation holds the activation scale steady as layers build up. About two thirds of the parameters live in the feed-forward network rather than in attention, and parameters grow with the square of the model dimension but only linearly with depth.
+A transformer block is two sublayers, each wrapped in the same add-and-normalise pattern: attention moves information between positions. And a position-wise feed-forward network processes each token on its own. The residual connection is what makes depth possible, giving the gradient a path that skips each sublayer &mdash; remove it and a deep stack stops training entirely &mdash; while layer normalisation holds the activation scale steady as layers build up. About two thirds of the parameters live in the feed-forward network rather than in attention, and parameters grow with the square of the model dimension but only linearly with depth.
 
 ## Why it replaced recurrent networks
 

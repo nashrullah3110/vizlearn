@@ -3,7 +3,7 @@ intro: Half the sentence is a subject. Half of it is a WHERE clause.
 
 ## The idea in brief
 
-Similarity search compares meaning, and that is all it does. Ask it for "papers about attention published after 2020" and the words <em>published after 2020</em> are treated as more subject matter to match, not as a rule to enforce. A 2017 paper that is squarely about attention will score well and be returned, because nothing in a cosine score knows what a year is. A self-query retriever fixes this by using a language model to split the user's question into two parts before any search runs: a semantic query (the subject to embed and compare) and a structured filter (the metadata constraint to enforce exactly). The LLM receives a schema describing the metadata fields each document carries &mdash; year, author, document type, department &mdash; and returns a JSON object with the semantic query string and a set of comparison operators over those fields. The vector store applies the filter first as a hard WHERE clause, then ranks only the surviving documents by cosine similarity to the semantic query. The constraint becomes a guarantee rather than a signal that the embedding may or may not capture. LangChain's `SelfQueryRetriever` wraps this pattern: you define an `AttributeInfo` list describing each metadata field, pass it alongside a natural-language description of the document collection, and the retriever handles the LLM call, filter construction, and filtered search in one step. This page walks through the split on several example queries, shows the generated filter, and covers the metadata schema definition.
+Similarity search compares meaning, and that is all it does. Ask it for "papers about attention published after 2020" and the words <em>published after 2020</em> are treated as more subject matter to match, not as a rule to enforce. A 2017 paper that is squarely about attention will score well and be returned, because nothing in a cosine score knows what a year is. A self-query retriever fixes this by using a language model to split the user's question into two parts before any search runs: a semantic query (the subject to embed and compare) and a structured filter (the metadata constraint to enforce exactly). The LLM receives a schema describing the metadata fields each document carries &mdash; year, author, document type, department &mdash; and returns a JSON object with the semantic query string and a set of comparison operators over those fields. The vector store applies the filter first as a hard WHERE clause, then ranks only the surviving documents by cosine similarity to the semantic query. The constraint becomes a guarantee rather than a signal that the embedding may or may not capture. LangChain's `SelfQueryRetriever` wraps this pattern: you define an `AttributeInfo` list describing each metadata field, pass it alongside a natural-language description of the document collection. And the retriever handles the LLM call, filter construction, and filtered search in one step. This page walks through the split on several example queries, shows the generated filter, and covers the metadata schema definition.
 
 ## Two questions in one sentence
 
@@ -74,8 +74,8 @@ if not results:
 ## Exploration guide
 
 1. <strong>Read the parse for the first query.</strong> Note what was removed from the semantic half: only <em>attention</em> is left to match on, because the date has become a filter instead.
-2. <strong>Turn the filter off.</strong> This is plain similarity search over everything. A 2017 paper takes the top spot &mdash; it is genuinely the best match for "attention", and it breaks the constraint the reader stated.
-3. <strong>Turn it back on.</strong> The 2017 paper is struck out with the reason it failed, and the top result is now both about attention and inside the requested date range.
+2. <strong>Turn the filter off.</strong> This is plain similarity search over everything. A 2017 paper takes the top spot &mdash; it is genuinely the best match for "attention". And it breaks the constraint the reader stated.
+3. <strong>Turn it back on.</strong> The 2017 paper is struck out with the reason it failed. And the top result is now both about attention and inside the requested date range.
 4. <strong>Try "short surveys on retrieval".</strong> Two constraints this time, on different fields and different types &mdash; a number and a category &mdash; combined with AND.
 5. <strong>Try "anything about attention".</strong> No constraint in the sentence, so the filter is empty and the retriever degrades gracefully into ordinary similarity search.
 
@@ -380,13 +380,13 @@ print("Same data, same filter, different answers.")
 
 ## Questions people ask
 
-<strong>Does it need a large model?</strong> No &mdash; extracting a filter from a question is a small structured task, and a fast, cheap model handles it well. Use structured output constraints.
+<strong>Does it need a large model?</strong> No &mdash; extracting a filter from a question is a small structured task. And a fast, cheap model handles it well. Use structured output constraints.
 
 <strong>What if the model produces an invalid filter?</strong> Validate against the schema and fall back to an unfiltered search. Never pass an unvalidated filter to the store.
 
 <strong>How much latency does it add?</strong> One model call, typically 200&ndash;600ms. Cache by query text.
 
-<strong>Can I use it without a vector database?</strong> The filtering needs a store that supports metadata predicates. Most do; plain in-memory vector arrays generally do not.
+<strong>Can I use it without a vector database?</strong> The filtering needs a store that supports metadata predicates. Most do; plain in-memory vector arrays usually do not.
 
 <strong>Should filters be hard or soft?</strong> Hard for correctness constraints such as permissions and dates. Consider soft (a score boost) for preferences, where over-filtering to zero results is worse than imperfect ordering.
 

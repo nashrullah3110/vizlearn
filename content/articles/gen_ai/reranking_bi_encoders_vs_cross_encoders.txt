@@ -3,7 +3,7 @@ intro: Spend the expensive model only on the candidates that survived the cheap 
 
 ## The idea in brief
 
-A <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">bi-encoder</a> embeds the query and every document <em>separately</em>, ahead of time — that is what makes the embeddings precomputable and search fast, but it also means the model never looks at a query and a document together. A <strong>cross-encoder</strong> takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable. The accuracy gap between these two approaches is real and well-measured: on MS MARCO and similar benchmarks, a cross-encoder consistently and substantially outperforms a bi-encoder by 5-15 points of nDCG, because joint attention can model fine-grained query-document interactions (negation, qualification, partial match) that independent embeddings compress away. The standard pattern is a **two-stage pipeline**: the bi-encoder (or BM25) retrieves a shortlist of 20-100 candidates cheaply, and the cross-encoder rescores only that shortlist to determine the final ranking. This page shows both models scoring the same query-document pairs side by side, shows where the bi-encoder's ranking disagrees with the cross-encoder's, and covers the latency-accuracy tradeoff as the shortlist size changes.
+A <a href="embeddings_and_vector_search.html" style="color: var(--accent-primary)">bi-encoder</a> embeds the query and every document <em>separately</em>, ahead of time — that is what makes the embeddings precomputable and search fast. But it also means the model never looks at a query and a document together. A <strong>cross-encoder</strong> takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable. The accuracy gap between these two approaches is real and well-measured: on MS MARCO and similar benchmarks, a cross-encoder consistently and substantially outperforms a bi-encoder by 5-15 points of nDCG, because joint attention can model fine-grained query-document interactions (negation, qualification, partial match) that independent embeddings compress away. The standard pattern is a **two-stage pipeline**: the bi-encoder (or BM25) retrieves a shortlist of 20-100 candidates cheaply. And the cross-encoder rescores only that shortlist to determine the final ranking. This page shows both models scoring the same query-document pairs side by side, shows where the bi-encoder's ranking disagrees with the cross-encoder's, and covers the latency-accuracy tradeoff as the shortlist size changes.
 
 ## The two-stage pattern
 
@@ -216,7 +216,7 @@ print("reranker is. Tune k by watching recall@k of stage one.")
 
 ## Try it yourself
 
-1. <strong>Read Stage 1.</strong> Pure cosine similarity over word overlap. One candidate about python <em>the snake</em> ranks deceptively high — it shares the words "python" and "memory" with the query, and a bi-encoder scoring query and document independently has no way to notice they mean something different in context.
+1. <strong>Read Stage 1.</strong> Pure cosine similarity over word overlap. One candidate about python <em>the snake</em> ranks deceptively high — it shares the words "python" and "memory" with the query. And a bi-encoder scoring query and document independently has no way to notice they mean something different in context.
 2. <strong>Turn on the reranker.</strong> The final order changes: the snake document drops sharply, and a genuinely on-topic document that Stage 1 under-ranked moves up. This is what "reading query and document together" catches that comparing two independent vectors cannot.
 3. <strong>Turn it back off.</strong> The order reverts to pure Stage 1 — the reranker did not change what was retrieved, only the order the survivors are returned in.
 4. <strong>Read the cost panel.</strong> The bi-encoder cost is already paid, before the query ever arrived. The cross-encoder cost is exactly the number of candidates it re-scores — six forward passes, not a million.
@@ -237,7 +237,7 @@ A bi-encoder scores query and document independently, which is what makes it fas
 
 <strong>ColBERT</strong> deserves a mention as the genuine middle ground. It stores a vector per <em>token</em> rather than per document, and scores by matching query tokens against document tokens at query time. That gives much of a cross-encoder's fine-grained interaction while keeping the document side precomputable. At the cost of a far larger index.
 
-<strong>LLM reranking</strong> &mdash; asking a language model to rate each candidate's relevance, or to order a list &mdash; is flexible and adapts to instructions, and it is slow and expensive enough that it is usually reserved for small candidate sets or offline evaluation.
+<strong>LLM reranking</strong> &mdash; asking a language model to rate each candidate's relevance, or to order a list &mdash; is flexible and adapts to instructions. And it is slow and expensive enough that it is usually reserved for small candidate sets or offline evaluation.
 
 ## How many candidates to rerank
 

@@ -94,7 +94,7 @@ It is chosen more often than the literature suggests, for four good reasons.
 
 **Under a few hundred thousand vectors.** A flat scan of 100k × 768 is
 milliseconds. An HNSW graph over the same data adds memory, build time, a
-tuning surface and a recall cliff in order to save time you were not
+tuning surface and a recall cliff to save time you were not
 spending. Most internal search tools, most document collections, and most
 RAG systems over a company wiki are comfortably in this range.
 
@@ -171,7 +171,7 @@ thousand vectors it is usually also the right thing to ship.
 
 <strong>Why does `argpartition` matter so much?</strong> Because at a million vectors the top-k selection, not the dot products, can dominate the query. `argpartition` is O(n) where a full `argsort` is O(n log n), and you then sort only the k you kept.
 
-<strong>Is float16 worth it?</strong> Usually. It halves the memory, most CPUs convert on the fly, and for cosine over normalised embeddings the ranking difference is generally below measurement noise. It is the cheapest 2&times; available before you reach for a scheme that needs training.
+<strong>Is float16 worth it?</strong> Usually. It halves the memory, most CPUs convert on the fly, and for cosine over normalised embeddings the ranking difference is usually below measurement noise. It is the cheapest 2&times; available before you reach for a scheme that needs training.
 
 <strong>Does adding vectors mean reindexing?</strong> No &mdash; it is an array append, and deleting is a tombstone or a swap-and-pop. This is the property you give up first when you move to a graph, and the reason flat indexes survive in write-heavy systems.
 
@@ -181,7 +181,7 @@ thousand vectors it is usually also the right thing to ship.
 
 - The whole algorithm: distance to every stored vector, keep the k smallest. No build step, no parameters, nothing that can go stale.
 - `O(n · d)` and linear in both &mdash; but the batched form is a matrix multiply. This is the one operation all modern hardware is built for.
-- It is the measuring instrument: every recall figure on every other index is defined against an exhaustive search, and it has to be run on your own corpus and queries.
+- It is the measuring instrument: every recall figure on every other index is defined against an exhaustive search. And it has to be run on your own corpus and queries.
 - Its single dial, fraction scanned, is *non-selective* &mdash; stopping early loses arbitrary neighbours. Every other index here exists to make that dial selective.
 - Genuinely the right choice under a few hundred thousand vectors, under constant churn, when recall must be exactly 1, or inside a tight metadata filter.
 - Memory and latency are separate problems with separate fixes: compression shrinks vectors and still scans them all, pruning skips vectors and keeps them whole.

@@ -9,7 +9,7 @@ Separating value from key matters just as much. What makes a token worth attendi
 
 Concretely, the input embedding of each token is multiplied by three learned weight matrices &mdash; W_Q, W_K and W_V &mdash; to produce its query, key and value vectors. The query of the current token is dotted with the key of every other token to produce a score. The scores are scaled by 1/&radic;d (where d is the key dimension) and passed through softmax to become attention weights that sum to one. Those weights are then applied to the value vectors, and the weighted sum becomes the output for the current position.
 
-The three projections give the model three independent degrees of freedom per token. A word like "bank" can have a key that advertises its grammatical role (noun, subject), a query that looks for a modifier or a prepositional phrase, and a value that carries its semantic content for the next layer. None of these needs to be the same vector, and learning them separately is what gives attention its representational power.
+The three projections give the model three independent degrees of freedom per token. A word like "bank" can have a key that advertises its grammatical role (noun, subject), a query that looks for a modifier or a prepositional phrase. And a value that carries its semantic content for the next layer. None of these needs to be the same vector, and learning them separately is what gives attention its representational power.
 
 Multi-head attention repeats this mechanism several times in parallel, each head with its own W_Q, W_K and W_V. Different heads learn to attend to different kinds of relationships &mdash; one head might focus on syntactic dependency, another on coreference, a third on positional proximity. The outputs of all heads are concatenated and projected to produce the final representation.
 
@@ -17,7 +17,7 @@ Multi-head attention repeats this mechanism several times in parallel, each head
 
 <p><code>softmax(QK<sup>T</sup> / &radic;d) V</code>. The dot products score every query against every key; the division keeps the softmax out of its saturated region, where gradients vanish; softmax turns scores into weights summing to one; and those weights are applied to the values.</p>
 
-In self-attention all three come from the same sequence. In cross-attention the queries come from one sequence and the keys and values from another &mdash; which is how a decoder reads an encoder, and the same shape as retrieval: a query against a set of keys.
+In self-attention all three come from the same sequence. In cross-attention the queries come from one sequence and the keys and values from another &mdash; which is how a decoder reads an encoder. And the same shape as retrieval: a query against a set of keys.
 
 ## Why this is a serving question too
 
@@ -63,7 +63,7 @@ Because the three roles want different information. What a token is <em>looking 
 
 Take "it" in "The cat sat on the mat because it was warm". As a query, "it" needs to search for a nearby noun that could plausibly be warm. As a key, "mat" needs to advertise itself as a warmable surface. As a value, "mat" contributes its full semantic content.
 
-The clean demonstration is that Q and K are used <em>only</em> to compute compatibility, and V <em>only</em> to produce output. A token can therefore be attended to for one reason and contribute something quite different &mdash; which a single shared projection could not express.
+The clean example is that Q and K are used <em>only</em> to compute compatibility, and V <em>only</em> to produce output. A token can therefore be attended to for one reason and contribute something quite different &mdash; which a single shared projection could not express.
 
 ## The computation, with shapes
 
@@ -80,7 +80,7 @@ For 4 tokens with head dimension 64:
 
 Row i of the 4&times;4 matrix is token i's attention weights over all tokens. Multiplying by V replaces token i's representation with the weighted mixture.
 
-The `√dₖ` division is not cosmetic. Dot products of d-dimensional vectors grow with d, so without scaling the scores reach the tens or hundreds, the softmax saturates into something nearly one-hot, and the gradient through it approaches zero. Dividing by `√dₖ` keeps the score variance near 1 regardless of dimension.
+The `√dₖ` division is not cosmetic. Dot products of d-dimensional vectors grow with d, so without scaling the scores reach the tens or hundreds, the softmax saturates into something nearly one-hot. And the gradient through it approaches zero. Dividing by `√dₖ` keeps the score variance near 1 regardless of dimension.
 
 ```python
 import torch, torch.nn.functional as F
@@ -341,7 +341,7 @@ Multi-head attention runs several of these computations in parallel with differe
 
 With a model dimension of 512 and 8 heads, each head works in 64 dimensions, so the total cost is roughly that of one 512-dimensional head. And the model gets 8 independent views of the sequence rather than 1.
 
-Inspected in trained models, heads specialise: some track the previous token, some link verbs to subjects, some match brackets, some connect pronouns to referents, and some do very little. Pruning studies find many can be removed with minimal loss, which suggests the redundancy helps training rather than inference.
+Inspected in trained models, heads specialise: some track the previous token, some link verbs to subjects, some match brackets, some connect pronouns to referents. And some do very little. Pruning studies find many can be removed with minimal loss, which suggests the redundancy helps training rather than inference.
 
 ## Questions people ask
 

@@ -45,7 +45,7 @@ Sharding splits data; replication copies it. They solve different problems, and 
 
 Once shards exist, so does partial failure. Scatter-gather waits for everyone, so a single slow or dead shard degrades every query. The practical answers are a <strong>deadline</strong> &mdash; serve what returned in time and mark the result degraded &mdash; and <strong>hedged requests</strong>, asking two replicas and taking whichever answers first. This trades a few percent extra load for a much better tail.
 
-Decide explicitly whether a degraded answer is acceptable. For search it usually is. For a RAG answer that will be presented as authoritative, silently dropping a shard means silently dropping evidence, and the user has no way to know.
+Decide explicitly whether a degraded answer is acceptable. For search it usually is. For a RAG answer that will be presented as authoritative, silently dropping a shard means silently dropping evidence. And the user has no way to know.
 
 ## When one machine is not enough
 
@@ -78,7 +78,7 @@ Most production systems need both: shards for capacity, replicas of each shard f
 
 <strong>Metadata sharding</strong> is usually the best choice when the data has a natural partition. Shard by tenant, and each query touches one shard. Shard by language, and a query in French touches the French shard. The saving is proportional to the selectivity.
 
-<strong>Semantic sharding</strong> clusters similar vectors together so a query only needs the nearest clusters. Attractive in principle, and it risks recall loss when the answer sits in an unqueried shard, and it needs rebalancing as the distribution shifts.
+<strong>Semantic sharding</strong> clusters similar vectors together so a query only needs the nearest clusters. Attractive in principle, and it risks recall loss when the answer sits in an unqueried shard. And it needs rebalancing as the distribution shifts.
 
 <strong>Time-based sharding</strong> suits corpora where recency matters: query the recent shards first, and older ones only if needed. It also makes retention easy &mdash; drop an old shard.
 
@@ -96,7 +96,7 @@ The latency condition is different and equally important: the query takes as lon
 
 ## Tail latency, and the scores that do not survive the merge
 
-Scatter-gather looks simple until you measure it. Two things bite: a query is only as fast as the slowest shard it waited for, and the per-shard scores you merge are often not comparable. Both are arithmetic, and both are here.
+Scatter-gather looks simple until you measure it. Two things bite: a query is only as fast as the slowest shard it waited for. And the per-shard scores you merge are often not comparable. Both are arithmetic, and both are here.
 
 ```python-run
 import numpy as np
@@ -284,7 +284,7 @@ Distribution interacts badly with filtering unless it is planned for.
 
 <strong>Permissions</strong> must be enforced per shard, inside each shard's search, not merged afterwards. Filtering after the gather step means unauthorised content has already crossed the boundary and has already occupied result slots.
 
-<strong>Global statistics break.</strong> BM25's IDF term depends on how many documents in the <em>corpus</em> contain a term, and each shard only knows its own counts. With random sharding the local approximation is usually close enough; with metadata sharding it can be badly skewed, and correcting it requires distributing global term statistics.
+<strong>Global statistics break.</strong> BM25's IDF term depends on how many documents in the <em>corpus</em> contain a term. And each shard only knows its own counts. With random sharding the local approximation is usually close enough; with metadata sharding it can be badly skewed, and correcting it requires distributing global term statistics.
 
 That last point is a real and under-discussed source of ranking inconsistency in sharded hybrid search.
 
@@ -298,7 +298,7 @@ That last point is a real and under-discussed source of ranking inconsistency in
 
 <strong>Deletions.</strong> Tombstones build up per shard, so schedule compactions.
 
-<strong>Cost.</strong> Memory-resident indexes are the expensive part. Reducing dimensions &mdash; 1,536 to 384 &mdash; is a fourfold saving and often a small accuracy cost, and it is usually a better first move than adding machines.
+<strong>Cost.</strong> Memory-resident indexes are the expensive part. Reducing dimensions &mdash; 1,536 to 384 &mdash; is a fourfold saving and often a small accuracy cost. And it is usually a better first move than adding machines.
 
 That last point is worth trying before distributing at all: <strong>quantisation and dimension reduction frequently keep a corpus on one machine</strong>, which removes every problem above.
 

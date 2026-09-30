@@ -9,7 +9,7 @@ So instead of learning a full <span class="mono-font">d &times; k</span> matrix,
 
 &Delta;W = B &middot; A &nbsp;&nbsp; where B is d&times;r and A is r&times;k, with r &lll; min(d, k)
 
-The original weights are <strong>frozen</strong>. Only A and B are trained. If the frozen matrix W is d-by-d and the rank r is 16, A is d-by-16 and B is 16-by-d. So the trainable parameter count drops from d-squared to 2dr. A reduction of roughly 10,000x for a 7B model's attention weights. At inference time the product BA is added directly to W, producing a single merged matrix with zero extra latency. Multiple LoRA adapters can coexist: each task gets its own A and B, and switching tasks means swapping two small matrices while the base model stays in memory once. This is how services like Hugging Face PEFT serve hundreds of fine-tuned variants from one base checkpoint. The rank r is the main hyperparameter: too low and the adapter cannot represent the task's deviation from the base model; too high and it overfits or loses the efficiency advantage. In practice, r between 4 and 64 covers most tasks. A is initialised with a random Gaussian and B with zeros, so the adapter starts as a no-op and learns the delta. This page freezes a weight matrix, trains a low-rank adapter beside it, and shows how the merged output matches the full fine-tune within a controlled tolerance.
+The original weights are <strong>frozen</strong>. Only A and B are trained. If the frozen matrix W is d-by-d and the rank r is 16, A is d-by-16 and B is 16-by-d. So the trainable parameter count drops from d-squared to 2dr. A reduction of roughly 10,000x for a 7B model's attention weights. At inference time the product BA is added directly to W, producing a single merged matrix with zero extra latency. Multiple LoRA adapters can coexist: each task gets its own A and B, and switching tasks means swapping two small matrices while the base model stays in memory once. This is how services like Hugging Face PEFT serve hundreds of fine-tuned variants from one base checkpoint. The rank r is the main hyperparameter: too low and the adapter cannot represent the task's deviation from the base model; too high and it overfits or loses the efficiency advantage. In practice, r between 4 and 64 covers most tasks. A is set up with a random Gaussian and B with zeros, so the adapter starts as a no-op and learns the delta. This page freezes a weight matrix, trains a low-rank adapter beside it, and shows how the merged output matches the full fine-tune within a controlled tolerance.
 
 ## Why the Savings Are So Extreme
 
@@ -25,11 +25,11 @@ Rank is the one hyperparameter that matters, and it is a capacity dial:
 - <strong>r = 8&ndash;16</strong> &mdash; the common default. Handles most instruction-tuning and domain adaptation.
 - <strong>r = 64&ndash;128</strong> &mdash; for teaching genuinely new capabilities, approaching full fine-tuning behaviour at a fraction of the cost.
 
-Higher is not automatically better: past the task's intrinsic rank you are adding parameters that mostly learn noise. Note also that A is initialised randomly while B is initialised to <strong>zero</strong>, so <span class="mono-font">BA = 0</span> at the start and training begins from exactly the pretrained model.
+Higher is not automatically better: past the task's intrinsic rank you are adding parameters that mostly learn noise. Note also that A is set up randomly while B is set up to <strong>zero</strong>, so <span class="mono-font">BA = 0</span> at the start and training begins from exactly the pretrained model.
 
 ## The Practical Superpower: Swappable Adapters
 
-Because the base model is untouched, a LoRA adapter is a small standalone file &mdash; often just a few megabytes. One copy of a 70B model in memory can serve many specialisations by swapping adapters, and they can be merged into the weights before deployment (<span class="mono-font">W' = W + BA</span>) so inference costs nothing extra.
+Because the base model is untouched, a LoRA adapter is a small standalone file &mdash; often just a few megabytes. One copy of a 70B model in memory can serve many specialisations by swapping adapters. And they can be merged into the weights before deployment (<span class="mono-font">W' = W + BA</span>) so inference costs nothing extra.
 
 Combine LoRA with a 4-bit quantized base and you get <strong>QLoRA</strong>, the recipe that made fine-tuning very large models possible on a single GPU.
 
@@ -57,11 +57,11 @@ Across a whole model, LoRA typically trains 0.1&ndash;1% of the parameters &mdas
 
 The empirical claim behind the method is that <strong>the update needed to adapt a pretrained model to a task has low intrinsic rank</strong>. The base model already knows the language; adaptation is a comparatively small, structured change.
 
-That is an observation rather than a theorem, and it has held up well: LoRA fine-tunes typically match full fine-tuning on task metrics, sometimes within noise, occasionally better because there is less capacity to overfit.
+That is an observation rather than a theorem, and it has held up well: LoRA fine-tunes typically match full fine-tuning on task metrics, sometimes within noise, sometimes better because there is less capacity to overfit.
 
 Two details make it practical:
 
-<strong>A is initialised randomly and B to zero</strong>, so `BA = 0` at the start and the model begins exactly as the pretrained one. Training then moves it gradually rather than disrupting it on the first step.
+<strong>A is set up randomly and B to zero</strong>, so `BA = 0` at the start and the model begins exactly as the pretrained one. Training then moves it gradually rather than disrupting it on the first step.
 
 <strong>The adapter can be merged.</strong> After training, `W₀ + BA` can be computed once and stored as a single matrix. So inference has <em>no</em> extra cost. Or the adapter can be kept separate and swapped &mdash; which is what allows one base model to serve many tasks.
 
@@ -76,7 +76,7 @@ Two details make it practical:
 
 <strong>Rank</strong> is the capacity dial. 8 is enough for style and format adaptation; 32&ndash;64 for teaching genuinely new behaviour or a specialised domain. Larger is not automatically better &mdash; it adds capacity to overfit a small dataset.
 
-<strong>Which modules</strong> matters more than people expect. Adapting only the query and value projections was the original recipe; adapting all attention projections plus the feed-forward layers generally works better, at more parameters.
+<strong>Which modules</strong> matters more than people expect. Adapting only the query and value projections was the original recipe; adapting all attention projections plus the feed-forward layers usually works better, at more parameters.
 
 ```python
 from peft import LoraConfig, get_peft_model
@@ -287,7 +287,7 @@ LoRA reduces the <em>trainable</em> parameters. The frozen base model still has 
 
 <strong>QLoRA</strong> quantises the frozen base to 4-bit &mdash; about 3.5GB &mdash; while training the LoRA adapters in higher precision. Gradients flow through the quantised weights without updating them.
 
-That combination is what put fine-tuning a 7B model within reach of a single 24GB card, and a 70B model within reach of two.
+That combination is what put fine-tuning a 7B model within reach of a single 24GB card. And a 70B model within reach of two.
 
 |Approach|Memory for a 7B model|
 |---|---|
@@ -296,7 +296,7 @@ That combination is what put fine-tuning a 7B model within reach of a single 24G
 |LoRA (fp16 base)|~16GB|
 |QLoRA (4-bit base)|~6GB|
 
-The quality cost of the quantisation is small &mdash; measurably present, and generally acceptable given what it enables.
+The quality cost of the quantisation is small &mdash; measurably present, and usually acceptable given what it enables.
 
 ## Adapters as deployable artefacts
 
@@ -306,7 +306,7 @@ Because a LoRA adapter is a few megabytes rather than gigabytes, it changes how 
 
 <strong>Cheap distribution.</strong> A 20MB adapter can be versioned in git and downloaded in seconds. A 14GB full fine-tune cannot.
 
-<strong>Cheap experimentation.</strong> Training several adapters and comparing them is affordable, where several full fine-tunes are not.
+<strong>Cheap testing.</strong> Training several adapters and comparing them is affordable, where several full fine-tunes are not.
 
 The trade: an unmerged adapter adds a small amount of inference latency, since `BAx` is computed alongside `W₀x`. Merging removes it and gives up the ability to swap.
 
@@ -332,7 +332,7 @@ The trade: an unmerged adapter adds a small amount of inference latency, since `
 
 <strong>Does merging change quality?</strong> No, if precision matches. Merging into a quantised base can lose a little.
 
-<strong>Is LoRA as good as full fine-tuning?</strong> On most task metrics, effectively yes. Occasionally better, because there is less capacity to overfit.
+<strong>Is LoRA as good as full fine-tuning?</strong> On most task metrics, effectively yes. Sometimes better, because there is less capacity to overfit.
 
 ## Recap in one screen
 
